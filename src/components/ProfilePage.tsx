@@ -1,16 +1,20 @@
+
 import React, { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { Textarea } from '@/components/ui/textarea';
-import { Label } from '@/components/ui/label';
-import { Slider } from '@/components/ui/slider';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog';
-import { User, Edit, Save, X, Upload, Trash2, AlertTriangle, LogOut } from 'lucide-react';
+import { User, Edit, Save, X } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
-import InterestsEditor from './InterestsEditor';
+import BasicInfoSection from './profile/BasicInfoSection';
+import LocationSection from './profile/LocationSection';
+import PreferencesSection from './profile/PreferencesSection';
+import LifestyleSection from './profile/LifestyleSection';
+import WorkEducationSection from './profile/WorkEducationSection';
+import PersonalitySection from './profile/PersonalitySection';
+import FunQuestionsSection from './profile/FunQuestionsSection';
+import InterestsSection from './profile/InterestsSection';
+import ImageManagement from './profile/ImageManagement';
+import AccountActions from './profile/AccountActions';
 
 interface ProfilePageProps {
   currentUser: any;
@@ -21,10 +25,6 @@ interface ProfilePageProps {
 
 const ProfilePage = ({ currentUser, profile, onProfileUpdate, onLogout }: ProfilePageProps) => {
   const [isEditing, setIsEditing] = useState(false);
-  const [userImages, setUserImages] = useState<string[]>([]);
-  const [uploading, setUploading] = useState(false);
-  const [deleting, setDeleting] = useState(false);
-  const [deletingAccount, setDeletingAccount] = useState(false);
   const { toast } = useToast();
 
   const [editedProfile, setEditedProfile] = useState({
@@ -83,25 +83,7 @@ const ProfilePage = ({ currentUser, profile, onProfileUpdate, onLogout }: Profil
         interests: profile.interests || [],
       });
     }
-    fetchUserImages();
-  }, [profile, currentUser]);
-
-  const fetchUserImages = async () => {
-    if (!currentUser?.id) return;
-
-    try {
-      const { data: images, error } = await supabase
-        .from('user_images')
-        .select('image_url')
-        .eq('user_id', currentUser.id)
-        .order('image_order', { ascending: true });
-
-      if (error) throw error;
-      setUserImages(images?.map(img => img.image_url) || []);
-    } catch (error) {
-      console.error('Error fetching user images:', error);
-    }
-  };
+  }, [profile]);
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
     const { name, value } = e.target;
@@ -116,121 +98,9 @@ const ProfilePage = ({ currentUser, profile, onProfileUpdate, onLogout }: Profil
     setEditedProfile(prev => ({ ...prev, [name]: value }));
   };
 
-  const handleImageUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
-    const file = event.target.files?.[0];
-    if (!file) return;
-
-    // Check if user already has 7 images
-    if (userImages.length >= 7) {
-      toast({
-        title: "Maximum images reached",
-        description: "You can upload a maximum of 7 images.",
-        variant: "destructive",
-      });
-      return;
-    }
-
-    setUploading(true);
-
-    try {
-      // Generate a unique file name
-      const fileExt = file.name.split('.').pop();
-      const fileName = `${currentUser.id}-${Date.now()}.${fileExt}`;
-      const filePath = `user-images/${fileName}`;
-
-      // Upload the image to Supabase storage
-      const { error: uploadError } = await supabase.storage
-        .from('loveconnect')
-        .upload(filePath, file, {
-          cacheControl: '3600',
-          upsert: false
-        });
-
-      if (uploadError) {
-        throw uploadError;
-      }
-
-      // Get the public URL of the uploaded image
-      const { data: { publicUrl } } = supabase.storage
-        .from('loveconnect')
-        .getPublicUrl(filePath);
-
-      // Determine the order for the new image
-      const nextImageOrder = userImages.length + 1;
-
-      // Save the image URL and order in the database
-      const { error: dbError } = await supabase
-        .from('user_images')
-        .insert({
-          user_id: currentUser.id,
-          image_url: publicUrl,
-          image_order: nextImageOrder
-        });
-
-      if (dbError) {
-        throw dbError;
-      }
-
-      await fetchUserImages();
-      toast({
-        title: "Image uploaded",
-        description: "Your image has been uploaded successfully.",
-      });
-    } catch (error: any) {
-      console.error('Image upload error:', error);
-      toast({
-        title: "Error",
-        description: "Failed to upload image. Please try again.",
-        variant: "destructive",
-      });
-    } finally {
-      setUploading(false);
-      event.target.value = '';
-    }
-  };
-
-  const handleDeleteImage = async (imageUrl: string) => {
-    setDeleting(true);
-
-    try {
-      // Extract the path from the URL
-      const urlParts = imageUrl.split('/');
-      const filePath = `user-images/${urlParts[urlParts.length - 1]}`;
-
-      // Delete the image from Supabase storage
-      const { error: storageError } = await supabase.storage
-        .from('loveconnect')
-        .remove([filePath]);
-
-      if (storageError) {
-        console.error('Storage deletion error:', storageError);
-      }
-
-      // Delete the image record from the database
-      const { error: dbError } = await supabase
-        .from('user_images')
-        .delete()
-        .eq('user_id', currentUser.id)
-        .eq('image_url', imageUrl);
-
-      if (dbError) {
-        throw dbError;
-      }
-
-      await fetchUserImages();
-      toast({
-        title: "Image deleted",
-        description: "Your image has been deleted successfully.",
-      });
-    } catch (error: any) {
-      console.error('Image deletion error:', error);
-      toast({
-        title: "Error",
-        description: "Failed to delete image. Please try again.",
-        variant: "destructive",
-      });
-    } finally {
-      setDeleting(false);
+  const handleInterestsChange = (interests: string[]) => {
+    if (isEditing) {
+      setEditedProfile(prev => ({ ...prev, interests }));
     }
   };
 
@@ -284,381 +154,12 @@ const ProfilePage = ({ currentUser, profile, onProfileUpdate, onLogout }: Profil
     }
   };
 
-  const handleLogout = async () => {
-    try {
-      await supabase.auth.signOut();
-      onLogout();
-      toast({
-        title: "Logged out",
-        description: "See you again soon!",
-      });
-    } catch (error) {
-      console.error('Error logging out:', error);
-    }
-  };
-
-  const handleDeleteAccount = async () => {
-    setDeletingAccount(true);
-    
-    try {
-      // Call the delete function we created
-      const { error } = await supabase.rpc('delete_user_and_data', {
-        user_id_to_delete: currentUser.id
-      });
-
-      if (error) throw error;
-
-      toast({
-        title: "Account deleted",
-        description: "Your account and all associated data have been permanently deleted.",
-      });
-
-      // Sign out after successful deletion
-      await supabase.auth.signOut();
-      onLogout();
-    } catch (error: any) {
-      console.error('Error deleting account:', error);
-      toast({
-        title: "Error",
-        description: "Failed to delete account. Please try again.",
-        variant: "destructive",
-      });
-    } finally {
-      setDeletingAccount(false);
-    }
-  };
-
-  const renderBasicInfo = () => (
-    <div className="space-y-2">
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-        <div>
-          <Label htmlFor="first_name">First Name</Label>
-          <Input
-            type="text"
-            id="first_name"
-            name="first_name"
-            value={editedProfile.first_name}
-            onChange={handleInputChange}
-            disabled={!isEditing}
-          />
-        </div>
-        <div>
-          <Label htmlFor="last_name">Last Name</Label>
-          <Input
-            type="text"
-            id="last_name"
-            name="last_name"
-            value={editedProfile.last_name}
-            onChange={handleInputChange}
-            disabled={!isEditing}
-          />
-        </div>
-      </div>
-      <div>
-        <Label htmlFor="bio">Bio</Label>
-        <Textarea
-          id="bio"
-          name="bio"
-          value={editedProfile.bio}
-          onChange={handleInputChange}
-          disabled={!isEditing}
-        />
-      </div>
-    </div>
-  );
-
-  const renderLocationInfo = () => (
-    <div className="space-y-2">
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-        <div>
-          <Label htmlFor="city">City</Label>
-          <Input
-            type="text"
-            id="city"
-            name="city"
-            value={editedProfile.city}
-            onChange={handleInputChange}
-            disabled={!isEditing}
-          />
-        </div>
-        <div>
-          <Label htmlFor="country">Country</Label>
-          <Input
-            type="text"
-            id="country"
-            name="country"
-            value={editedProfile.country}
-            onChange={handleInputChange}
-            disabled={!isEditing}
-          />
-        </div>
-      </div>
-    </div>
-  );
-
-  const renderPreferences = () => (
-    <div className="space-y-2">
-      <div>
-        <Label htmlFor="distance_preference">Distance Preference (km)</Label>
-        <Slider
-          id="distance_preference"
-          name="distance_preference"
-          defaultValue={[editedProfile.distance_preference]}
-          onValueChange={(value) => handleSliderChange('distance_preference', value)}
-          max={200}
-          step={1}
-          disabled={!isEditing}
-        />
-      </div>
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-        <div>
-          <Label htmlFor="gender">Gender</Label>
-          <Select disabled={!isEditing} onValueChange={(value) => handleSelectChange('gender', value)}>
-            <SelectTrigger id="gender">
-              <SelectValue placeholder="Select" defaultValue={editedProfile.gender} />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="male">Male</SelectItem>
-              <SelectItem value="female">Female</SelectItem>
-              <SelectItem value="other">Other</SelectItem>
-            </SelectContent>
-          </Select>
-        </div>
-        <div>
-          <Label htmlFor="preference">Preference</Label>
-          <Select disabled={!isEditing} onValueChange={(value) => handleSelectChange('preference', value)}>
-            <SelectTrigger id="preference">
-              <SelectValue placeholder="Select" defaultValue={editedProfile.preference} />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="male">Male</SelectItem>
-              <SelectItem value="female">Female</SelectItem>
-              <SelectItem value="both">Both</SelectItem>
-            </SelectContent>
-          </Select>
-        </div>
-      </div>
-    </div>
-  );
-
-  const renderLifestyleInfo = () => (
-    <div className="space-y-2">
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-        <div>
-          <Label htmlFor="relationship_intent">Relationship Intent</Label>
-          <Select disabled={!isEditing} onValueChange={(value) => handleSelectChange('relationship_intent', value)}>
-            <SelectTrigger id="relationship_intent">
-              <SelectValue placeholder="Select" defaultValue={editedProfile.relationship_intent} />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="casual">Casual</SelectItem>
-              <SelectItem value="serious">Serious</SelectItem>
-              <SelectItem value="open_to_anything">Open to Anything</SelectItem>
-            </SelectContent>
-          </Select>
-        </div>
-        <div>
-          <Label htmlFor="smoking">Smoking</Label>
-          <Select disabled={!isEditing} onValueChange={(value) => handleSelectChange('smoking', value)}>
-            <SelectTrigger id="smoking">
-              <SelectValue placeholder="Select" defaultValue={editedProfile.smoking} />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="yes">Yes</SelectItem>
-              <SelectItem value="no">No</SelectItem>
-              <SelectItem value="socially">Socially</SelectItem>
-            </SelectContent>
-          </Select>
-        </div>
-      </div>
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-        <div>
-          <Label htmlFor="drinking">Drinking</Label>
-          <Select disabled={!isEditing} onValueChange={(value) => handleSelectChange('drinking', value)}>
-            <SelectTrigger id="drinking">
-              <SelectValue placeholder="Select" defaultValue={editedProfile.drinking} />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="yes">Yes</SelectItem>
-              <SelectItem value="no">No</SelectItem>
-              <SelectItem value="socially">Socially</SelectItem>
-            </SelectContent>
-          </Select>
-        </div>
-        <div>
-          <Label htmlFor="exercise_level">Exercise Level</Label>
-          <Select disabled={!isEditing} onValueChange={(value) => handleSelectChange('exercise_level', value)}>
-            <SelectTrigger id="exercise_level">
-              <SelectValue placeholder="Select" defaultValue={editedProfile.exercise_level} />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="active">Active</SelectItem>
-              <SelectItem value="moderate">Moderate</SelectItem>
-              <SelectItem value="inactive">Inactive</SelectItem>
-            </SelectContent>
-          </Select>
-        </div>
-      </div>
-      <div>
-        <Label htmlFor="sleeping_schedule">Sleeping Schedule</Label>
-        <Select disabled={!isEditing} onValueChange={(value) => handleSelectChange('sleeping_schedule', value)}>
-          <SelectTrigger id="sleeping_schedule">
-            <SelectValue placeholder="Select" defaultValue={editedProfile.sleeping_schedule} />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="early_bird">Early Bird</SelectItem>
-            <SelectItem value="night_owl">Night Owl</SelectItem>
-            <SelectItem value="flexible">Flexible</SelectItem>
-          </SelectContent>
-        </Select>
-      </div>
-    </div>
-  );
-
-  const renderWorkEducationInfo = () => (
-    <div className="space-y-2">
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-        <div>
-          <Label htmlFor="occupation">Occupation</Label>
-          <Input
-            type="text"
-            id="occupation"
-            name="occupation"
-            value={editedProfile.occupation}
-            onChange={handleInputChange}
-            disabled={!isEditing}
-          />
-        </div>
-        <div>
-          <Label htmlFor="industry">Industry</Label>
-          <Input
-            type="text"
-            id="industry"
-            name="industry"
-            value={editedProfile.industry}
-            onChange={handleInputChange}
-            disabled={!isEditing}
-          />
-        </div>
-      </div>
-      <div>
-        <Label htmlFor="education_level">Education Level</Label>
-        <Input
-          type="text"
-          id="education_level"
-          name="education_level"
-          value={editedProfile.education_level}
-          onChange={handleInputChange}
-          disabled={!isEditing}
-        />
-      </div>
-      <div>
-        <Label htmlFor="zip_code">Zip Code</Label>
-        <Input
-          type="text"
-          id="zip_code"
-          name="zip_code"
-          value={editedProfile.zip_code}
-          onChange={handleInputChange}
-          disabled={!isEditing}
-        />
-      </div>
-    </div>
-  );
-
-  const renderPersonalityInfo = () => (
-    <div className="space-y-2">
-      <div>
-        <Label htmlFor="introvert_extrovert">Introvert vs Extrovert</Label>
-        <Slider
-          id="introvert_extrovert"
-          name="introvert_extrovert"
-          defaultValue={[editedProfile.introvert_extrovert]}
-          onValueChange={(value) => handleSliderChange('introvert_extrovert', value)}
-          disabled={!isEditing}
-        />
-      </div>
-      <div>
-        <Label htmlFor="spontaneous_planner">Spontaneous vs Planner</Label>
-        <Slider
-          id="spontaneous_planner"
-          name="spontaneous_planner"
-          defaultValue={[editedProfile.spontaneous_planner]}
-          onValueChange={(value) => handleSliderChange('spontaneous_planner', value)}
-          disabled={!isEditing}
-        />
-      </div>
-      <div>
-        <Label htmlFor="messy_organized">Messy vs Organized</Label>
-        <Slider
-          id="messy_organized"
-          name="messy_organized"
-          defaultValue={[editedProfile.messy_organized]}
-          onValueChange={(value) => handleSliderChange('messy_organized', value)}
-          disabled={!isEditing}
-        />
-      </div>
-    </div>
-  );
-
-  const renderFunQuestions = () => (
-    <div className="space-y-2">
-      <div>
-        <Label htmlFor="fun_fact">Fun Fact</Label>
-        <Input
-          type="text"
-          id="fun_fact"
-          name="fun_fact"
-          value={editedProfile.fun_fact}
-          onChange={handleInputChange}
-          disabled={!isEditing}
-        />
-      </div>
-      <div>
-        <Label htmlFor="perfect_first_date">Perfect First Date</Label>
-        <Input
-          type="text"
-          id="perfect_first_date"
-          name="perfect_first_date"
-          value={editedProfile.perfect_first_date}
-          onChange={handleInputChange}
-          disabled={!isEditing}
-        />
-      </div>
-      <div>
-        <Label htmlFor="last_googled">Last Googled</Label>
-        <Input
-          type="text"
-          id="last_googled"
-          name="last_googled"
-          value={editedProfile.last_googled}
-          onChange={handleInputChange}
-          disabled={!isEditing}
-        />
-      </div>
-    </div>
-  );
-
-  const renderInterests = () => (
-    <div className="space-y-2">
-      <Label htmlFor="interests">Interests</Label>
-      <InterestsEditor
-        interests={isEditing ? editedProfile.interests || [] : profile?.interests || []}
-        onInterestsChange={(interests) => {
-          if (isEditing) {
-            setEditedProfile(prev => ({ ...prev, interests }));
-          }
-        }}
-        disabled={!isEditing}
-      />
-    </div>
-  );
-
   return (
-    <div className="max-w-4xl mx-auto space-y-6">
-      <div className="flex justify-between items-center">
-        <Card>
-          <CardHeader>
+    <div className="max-w-4xl mx-auto space-y-6 px-4 sm:px-6 lg:px-8">
+      {/* Header */}
+      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+        <Card className="w-full sm:w-auto">
+          <CardHeader className="pb-3">
             <CardTitle className="flex items-center space-x-2">
               <User className="w-6 h-6 text-pink-600" />
               <span>Your Profile</span>
@@ -666,206 +167,93 @@ const ProfilePage = ({ currentUser, profile, onProfileUpdate, onLogout }: Profil
           </CardHeader>
         </Card>
         {!isEditing ? (
-          <Button onClick={() => setIsEditing(true)}><Edit className="w-4 h-4 mr-2" /> Edit Profile</Button>
+          <Button 
+            onClick={() => setIsEditing(true)}
+            className="w-full sm:w-auto"
+          >
+            <Edit className="w-4 h-4 mr-2" /> 
+            Edit Profile
+          </Button>
         ) : (
-          <div className="flex space-x-2">
-            <Button onClick={handleSave}><Save className="w-4 h-4 mr-2" /> Save</Button>
-            <Button variant="outline" onClick={() => setIsEditing(false)}><X className="w-4 h-4 mr-2" /> Cancel</Button>
+          <div className="flex flex-col sm:flex-row space-y-2 sm:space-y-0 sm:space-x-2 w-full sm:w-auto">
+            <Button 
+              onClick={handleSave}
+              className="w-full sm:w-auto"
+            >
+              <Save className="w-4 h-4 mr-2" /> 
+              Save
+            </Button>
+            <Button 
+              variant="outline" 
+              onClick={() => setIsEditing(false)}
+              className="w-full sm:w-auto"
+            >
+              <X className="w-4 h-4 mr-2" /> 
+              Cancel
+            </Button>
           </div>
         )}
       </div>
 
-      {/* Images Section */}
-      <Card>
-        <CardHeader>
-          <CardTitle>Your Photos ({userImages.length}/7)</CardTitle>
-        </CardHeader>
-        <CardContent>
-          {userImages.length < 7 && (
-            <div className="mb-4">
-              <Label htmlFor="image_upload">Upload Image</Label>
-              <Input
-                type="file"
-                id="image_upload"
-                accept="image/*"
-                onChange={handleImageUpload}
-                disabled={uploading}
-              />
-              {uploading && <p className="text-sm text-gray-500 mt-1">Uploading...</p>}
-            </div>
-          )}
+      {/* Image Management */}
+      <ImageManagement currentUser={currentUser} />
 
-          <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
-            {userImages.map((imageUrl, index) => (
-              <div key={imageUrl} className="relative group">
-                <img 
-                  src={imageUrl} 
-                  alt={`User Image ${index + 1}`} 
-                  className="w-full h-32 object-cover rounded-md" 
-                />
-                <AlertDialog>
-                  <AlertDialogTrigger asChild>
-                    <Button 
-                      variant="destructive" 
-                      size="sm" 
-                      className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity"
-                    >
-                      <Trash2 className="w-4 h-4" />
-                    </Button>
-                  </AlertDialogTrigger>
-                  <AlertDialogContent>
-                    <AlertDialogHeader>
-                      <AlertDialogTitle>Delete Image</AlertDialogTitle>
-                      <AlertDialogDescription>
-                        Are you sure you want to delete this image? This action cannot be undone.
-                      </AlertDialogDescription>
-                    </AlertDialogHeader>
-                    <AlertDialogFooter>
-                      <AlertDialogCancel>Cancel</AlertDialogCancel>
-                      <AlertDialogAction 
-                        disabled={deleting} 
-                        onClick={() => handleDeleteImage(imageUrl)}
-                      >
-                        {deleting ? 'Deleting...' : 'Delete'}
-                      </AlertDialogAction>
-                    </AlertDialogFooter>
-                  </AlertDialogContent>
-                </AlertDialog>
-              </div>
-            ))}
-          </div>
-        </CardContent>
-      </Card>
+      {/* Profile Sections */}
+      <BasicInfoSection 
+        editedProfile={editedProfile}
+        isEditing={isEditing}
+        onInputChange={handleInputChange}
+      />
 
-      {/* Keep existing profile sections */}
-      <Card>
-        <CardHeader>
-          <CardTitle>Basic Information</CardTitle>
-        </CardHeader>
-        <CardContent>
-          {renderBasicInfo()}
-        </CardContent>
-      </Card>
+      <LocationSection 
+        editedProfile={editedProfile}
+        isEditing={isEditing}
+        onInputChange={handleInputChange}
+      />
 
-      <Card>
-        <CardHeader>
-          <CardTitle>Location Information</CardTitle>
-        </CardHeader>
-        <CardContent>
-          {renderLocationInfo()}
-        </CardContent>
-      </Card>
+      <PreferencesSection 
+        editedProfile={editedProfile}
+        isEditing={isEditing}
+        onSliderChange={handleSliderChange}
+        onSelectChange={handleSelectChange}
+      />
 
-      <Card>
-        <CardHeader>
-          <CardTitle>Preferences</CardTitle>
-        </CardHeader>
-        <CardContent>
-          {renderPreferences()}
-        </CardContent>
-      </Card>
+      <LifestyleSection 
+        editedProfile={editedProfile}
+        isEditing={isEditing}
+        onSelectChange={handleSelectChange}
+      />
 
-      <Card>
-        <CardHeader>
-          <CardTitle>Lifestyle</CardTitle>
-        </CardHeader>
-        <CardContent>
-          {renderLifestyleInfo()}
-        </CardContent>
-      </Card>
+      <WorkEducationSection 
+        editedProfile={editedProfile}
+        isEditing={isEditing}
+        onInputChange={handleInputChange}
+      />
 
-      <Card>
-        <CardHeader>
-          <CardTitle>Work & Education</CardTitle>
-        </CardHeader>
-        <CardContent>
-          {renderWorkEducationInfo()}
-        </CardContent>
-      </Card>
+      <PersonalitySection 
+        editedProfile={editedProfile}
+        isEditing={isEditing}
+        onSliderChange={handleSliderChange}
+      />
 
-      <Card>
-        <CardHeader>
-          <CardTitle>Personality</CardTitle>
-        </CardHeader>
-        <CardContent>
-          {renderPersonalityInfo()}
-        </CardContent>
-      </Card>
+      <FunQuestionsSection 
+        editedProfile={editedProfile}
+        isEditing={isEditing}
+        onInputChange={handleInputChange}
+      />
 
-      <Card>
-        <CardHeader>
-          <CardTitle>Fun Questions</CardTitle>
-        </CardHeader>
-        <CardContent>
-          {renderFunQuestions()}
-        </CardContent>
-      </Card>
+      <InterestsSection 
+        editedProfile={editedProfile}
+        profile={profile}
+        isEditing={isEditing}
+        onInterestsChange={handleInterestsChange}
+      />
 
-      <Card>
-        <CardHeader>
-          <CardTitle>Interests</CardTitle>
-        </CardHeader>
-        <CardContent>
-          {renderInterests()}
-        </CardContent>
-      </Card>
-
-      {/* Account Actions Section */}
-      <Card>
-        <CardHeader>
-          <CardTitle>Account Actions</CardTitle>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          <div className="flex flex-col sm:flex-row gap-4">
-            <Button 
-              onClick={handleLogout}
-              variant="outline"
-              className="flex items-center space-x-2 border-gray-300 text-gray-700 hover:bg-gray-50"
-            >
-              <LogOut className="w-4 h-4" />
-              <span>Logout</span>
-            </Button>
-
-            <AlertDialog>
-              <AlertDialogTrigger asChild>
-                <Button 
-                  variant="destructive"
-                  className="flex items-center space-x-2"
-                >
-                  <AlertTriangle className="w-4 h-4" />
-                  <span>Delete Account</span>
-                </Button>
-              </AlertDialogTrigger>
-              <AlertDialogContent>
-                <AlertDialogHeader>
-                  <AlertDialogTitle>Delete Account</AlertDialogTitle>
-                  <AlertDialogDescription>
-                    Are you sure you want to permanently delete your account? This action will:
-                    <ul className="list-disc ml-6 mt-2">
-                      <li>Delete your profile and all personal information</li>
-                      <li>Remove all your photos</li>
-                      <li>Delete all your matches and conversations</li>
-                      <li>Remove all likes given and received</li>
-                    </ul>
-                    <br />
-                    <strong>This action cannot be undone.</strong>
-                  </AlertDialogDescription>
-                </AlertDialogHeader>
-                <AlertDialogFooter>
-                  <AlertDialogCancel>Cancel</AlertDialogCancel>
-                  <AlertDialogAction 
-                    disabled={deletingAccount}
-                    onClick={handleDeleteAccount}
-                    className="bg-red-600 hover:bg-red-700"
-                  >
-                    {deletingAccount ? 'Deleting...' : 'Delete Account Permanently'}
-                  </AlertDialogAction>
-                </AlertDialogFooter>
-              </AlertDialogContent>
-            </AlertDialog>
-          </div>
-        </CardContent>
-      </Card>
+      {/* Account Actions */}
+      <AccountActions 
+        currentUser={currentUser}
+        onLogout={onLogout}
+      />
     </div>
   );
 };

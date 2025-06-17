@@ -144,59 +144,59 @@ const MainApp = ({ user, onLogout }: MainAppProps) => {
         </div>
 
         {/* Content Area */}
-        <div className="flex-1 overflow-auto pb-20 md:pb-6 p-4 md:p-6">
+        <div className="flex-1 overflow-auto pb-20 md:pb-6 p-2 sm:p-4 md:p-6">
           {renderContent()}
         </div>
       </div>
 
       {/* Mobile Bottom Navigation */}
-      <div className="md:hidden fixed bottom-0 left-0 right-0 bg-white border-t border-gray-200 px-4 py-2 safe-area-pb">
+      <div className="md:hidden fixed bottom-0 left-0 right-0 bg-white border-t border-gray-200 px-2 py-2 safe-area-pb">
         <div className="flex justify-around items-center">
           <button
             onClick={() => setActiveTab('discover')}
-            className={`flex flex-col items-center space-y-1 py-2 px-3 rounded-lg transition-colors ${
+            className={`flex flex-col items-center space-y-1 py-2 px-2 rounded-lg transition-colors ${
               activeTab === 'discover'
                 ? 'text-pink-600'
                 : 'text-gray-500'
             }`}
           >
-            <Heart className={`w-6 h-6 ${activeTab === 'discover' ? 'fill-current' : ''}`} />
+            <Heart className={`w-5 h-5 ${activeTab === 'discover' ? 'fill-current' : ''}`} />
             <span className="text-xs font-medium">Discover</span>
           </button>
           
           <button
             onClick={() => setActiveTab('chat')}
-            className={`flex flex-col items-center space-y-1 py-2 px-3 rounded-lg transition-colors ${
+            className={`flex flex-col items-center space-y-1 py-2 px-2 rounded-lg transition-colors ${
               activeTab === 'chat'
                 ? 'text-pink-600'
                 : 'text-gray-500'
             }`}
           >
-            <MessageCircle className={`w-6 h-6 ${activeTab === 'chat' ? 'fill-current' : ''}`} />
+            <MessageCircle className={`w-5 h-5 ${activeTab === 'chat' ? 'fill-current' : ''}`} />
             <span className="text-xs font-medium">Chat</span>
           </button>
           
           <button
             onClick={() => setActiveTab('liked')}
-            className={`flex flex-col items-center space-y-1 py-2 px-3 rounded-lg transition-colors ${
+            className={`flex flex-col items-center space-y-1 py-2 px-2 rounded-lg transition-colors ${
               activeTab === 'liked'
                 ? 'text-pink-600'
                 : 'text-gray-500'
             }`}
           >
-            <Users className={`w-6 h-6 ${activeTab === 'liked' ? 'fill-current' : ''}`} />
+            <Users className={`w-5 h-5 ${activeTab === 'liked' ? 'fill-current' : ''}`} />
             <span className="text-xs font-medium">Liked Me</span>
           </button>
           
           <button
             onClick={() => setActiveTab('profile')}
-            className={`flex flex-col items-center space-y-1 py-2 px-3 rounded-lg transition-colors ${
+            className={`flex flex-col items-center space-y-1 py-2 px-2 rounded-lg transition-colors ${
               activeTab === 'profile'
                 ? 'text-pink-600'
                 : 'text-gray-500'
             }`}
           >
-            <User className={`w-6 h-6 ${activeTab === 'profile' ? 'fill-current' : ''}`} />
+            <User className={`w-5 h-5 ${activeTab === 'profile' ? 'fill-current' : ''}`} />
             <span className="text-xs font-medium">Profile</span>
           </button>
         </div>
