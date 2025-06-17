@@ -1,14 +1,11 @@
+
 import React, { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
-import { Heart, MessageCircle, Users, User, Settings } from 'lucide-react';
-import { Badge } from '@/components/ui/badge';
+import { Heart, MessageCircle, Users, User } from 'lucide-react';
 import DiscoverPage from '@/components/DiscoverPage';
 import ChatPage from '@/components/ChatPage';
 import LikedMePage from '@/components/LikedMePage';
 import ProfilePage from '@/components/ProfilePage';
-import AdminDashboard from '@/components/AdminDashboard';
-import NotificationsDropdown from '@/components/NotificationsDropdown';
-import { useChatNotifications } from '@/hooks/useChatNotifications';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 
@@ -21,28 +18,10 @@ const MainApp = ({ user, onLogout }: MainAppProps) => {
   const [activeTab, setActiveTab] = useState('discover');
   const [profile, setProfile] = useState<any>(null);
   const { toast } = useToast();
-  const { unreadChatCount } = useChatNotifications(user?.id);
 
   useEffect(() => {
     fetchUserProfile();
   }, [user]);
-
-  // Auto-delete old messages every hour
-  useEffect(() => {
-    const deleteOldMessages = async () => {
-      try {
-        await supabase.rpc('delete_old_messages');
-      } catch (error) {
-        console.error('Error deleting old messages:', error);
-      }
-    };
-
-    // Run immediately and then every hour
-    deleteOldMessages();
-    const interval = setInterval(deleteOldMessages, 60 * 60 * 1000);
-
-    return () => clearInterval(interval);
-  }, []);
 
   const fetchUserProfile = async () => {
     if (!user?.id) return;
@@ -71,8 +50,6 @@ const MainApp = ({ user, onLogout }: MainAppProps) => {
         return <LikedMePage currentUser={user} />;
       case 'profile':
         return <ProfilePage currentUser={user} profile={profile} onProfileUpdate={fetchUserProfile} onLogout={onLogout} />;
-      case 'admin':
-        return <AdminDashboard currentUser={user} />;
       default:
         return <DiscoverPage currentUser={user} />;
     }
@@ -90,7 +67,6 @@ const MainApp = ({ user, onLogout }: MainAppProps) => {
             </h1>
           </div>
           <div className="flex items-center space-x-4">
-            <NotificationsDropdown userId={user?.id} />
             <span className="text-gray-600">
               Welcome, {profile?.first_name || 'User'}!
             </span>
@@ -100,14 +76,13 @@ const MainApp = ({ user, onLogout }: MainAppProps) => {
 
       {/* Mobile Header */}
       <div className="md:hidden bg-white shadow-sm border-b">
-        <div className="px-4 py-3 flex justify-between items-center">
+        <div className="px-4 py-3 flex justify-center items-center">
           <div className="flex items-center space-x-2">
             <Heart className="w-6 h-6 text-pink-600" />
             <h1 className="text-xl font-bold bg-gradient-to-r from-pink-600 to-purple-600 bg-clip-text text-transparent">
               LoveConnect
             </h1>
           </div>
-          <NotificationsDropdown userId={user?.id} />
         </div>
       </div>
 
@@ -131,21 +106,14 @@ const MainApp = ({ user, onLogout }: MainAppProps) => {
               
               <button
                 onClick={() => setActiveTab('chat')}
-                className={`w-full flex items-center justify-between px-4 py-3 rounded-lg transition-colors ${
+                className={`w-full flex items-center space-x-3 px-4 py-3 rounded-lg transition-colors ${
                   activeTab === 'chat'
                     ? 'bg-gradient-to-r from-pink-500 to-purple-600 text-white'
                     : 'text-gray-600 hover:bg-gray-100'
                 }`}
               >
-                <div className="flex items-center space-x-3">
-                  <MessageCircle className="w-5 h-5" />
-                  <span>Chat</span>
-                </div>
-                {unreadChatCount > 0 && (
-                  <Badge variant="destructive" className="text-xs">
-                    {unreadChatCount}
-                  </Badge>
-                )}
+                <MessageCircle className="w-5 h-5" />
+                <span>Chat</span>
               </button>
               
               <button
@@ -171,20 +139,6 @@ const MainApp = ({ user, onLogout }: MainAppProps) => {
                 <User className="w-5 h-5" />
                 <span>Profile</span>
               </button>
-
-              {profile?.is_admin && (
-                <button
-                  onClick={() => setActiveTab('admin')}
-                  className={`w-full flex items-center space-x-3 px-4 py-3 rounded-lg transition-colors ${
-                    activeTab === 'admin'
-                      ? 'bg-gradient-to-r from-pink-500 to-purple-600 text-white'
-                      : 'text-gray-600 hover:bg-gray-100'
-                  }`}
-                >
-                  <Settings className="w-5 h-5" />
-                  <span>Admin</span>
-                </button>
-              )}
             </div>
           </nav>
         </div>
@@ -212,7 +166,7 @@ const MainApp = ({ user, onLogout }: MainAppProps) => {
           
           <button
             onClick={() => setActiveTab('chat')}
-            className={`flex flex-col items-center space-y-1 py-2 px-2 rounded-lg transition-colors relative ${
+            className={`flex flex-col items-center space-y-1 py-2 px-2 rounded-lg transition-colors ${
               activeTab === 'chat'
                 ? 'text-pink-600'
                 : 'text-gray-500'
@@ -220,14 +174,6 @@ const MainApp = ({ user, onLogout }: MainAppProps) => {
           >
             <MessageCircle className={`w-5 h-5 ${activeTab === 'chat' ? 'fill-current' : ''}`} />
             <span className="text-xs font-medium">Chat</span>
-            {unreadChatCount > 0 && (
-              <Badge 
-                variant="destructive" 
-                className="absolute -top-1 -right-1 min-w-[18px] h-4 text-xs px-1"
-              >
-                {unreadChatCount}
-              </Badge>
-            )}
           </button>
           
           <button
@@ -253,20 +199,6 @@ const MainApp = ({ user, onLogout }: MainAppProps) => {
             <User className={`w-5 h-5 ${activeTab === 'profile' ? 'fill-current' : ''}`} />
             <span className="text-xs font-medium">Profile</span>
           </button>
-
-          {profile?.is_admin && (
-            <button
-              onClick={() => setActiveTab('admin')}
-              className={`flex flex-col items-center space-y-1 py-2 px-2 rounded-lg transition-colors ${
-                activeTab === 'admin'
-                  ? 'text-pink-600'
-                  : 'text-gray-500'
-              }`}
-            >
-              <Settings className={`w-5 h-5 ${activeTab === 'admin' ? 'fill-current' : ''}`} />
-              <span className="text-xs font-medium">Admin</span>
-            </button>
-          )}
         </div>
       </div>
     </div>
