@@ -37,7 +37,7 @@ const MainApp = ({ user, onLogout }: MainAppProps) => {
         .from('profiles')
         .select('*')
         .eq('id', user.id)
-        .single();
+        .maybeSingle();
       
       if (error) {
         console.error('Profile fetch error:', error);
@@ -46,9 +46,16 @@ const MainApp = ({ user, onLogout }: MainAppProps) => {
           description: "Could not load your profile data.",
           variant: "destructive",
         });
-      } else {
+      } else if (data) {
         console.log('Profile loaded successfully:', data);
         setProfile(data);
+      } else {
+        console.log('No profile found for user');
+        toast({
+          title: "Profile not found",
+          description: "Your profile could not be found. Please contact support.",
+          variant: "destructive",
+        });
       }
     } catch (error) {
       console.error('Error in fetchUserProfile:', error);

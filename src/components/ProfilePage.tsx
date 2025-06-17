@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -153,6 +152,24 @@ const ProfilePage = ({ currentUser, profile, onProfileUpdate, onLogout }: Profil
       });
     }
   };
+
+  if (!profile) {
+    return (
+      <div className="max-w-4xl mx-auto space-y-6 px-4 sm:px-6 lg:px-8">
+        <Card>
+          <CardContent className="p-6">
+            <div className="text-center">
+              <User className="w-12 h-12 text-gray-400 mx-auto mb-4" />
+              <h2 className="text-xl font-semibold text-gray-900 mb-2">Profile Not Found</h2>
+              <p className="text-gray-600">
+                Your profile could not be loaded. Please try refreshing the page or contact support.
+              </p>
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
 
   return (
     <div className="max-w-4xl mx-auto space-y-6 px-4 sm:px-6 lg:px-8">
