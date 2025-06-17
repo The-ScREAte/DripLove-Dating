@@ -9,7 +9,83 @@ export type Json =
 export type Database = {
   public: {
     Tables: {
-      [_ in never]: never
+      profiles: {
+        Row: {
+          bio: string | null
+          city: string
+          country: string
+          created_at: string | null
+          date_of_birth: string
+          email: string
+          first_name: string
+          id: string
+          interests: string[] | null
+          last_name: string
+          preference: string
+          updated_at: string | null
+        }
+        Insert: {
+          bio?: string | null
+          city: string
+          country: string
+          created_at?: string | null
+          date_of_birth: string
+          email: string
+          first_name: string
+          id: string
+          interests?: string[] | null
+          last_name: string
+          preference: string
+          updated_at?: string | null
+        }
+        Update: {
+          bio?: string | null
+          city?: string
+          country?: string
+          created_at?: string | null
+          date_of_birth?: string
+          email?: string
+          first_name?: string
+          id?: string
+          interests?: string[] | null
+          last_name?: string
+          preference?: string
+          updated_at?: string | null
+        }
+        Relationships: []
+      }
+      user_images: {
+        Row: {
+          created_at: string | null
+          id: string
+          image_order: number
+          image_url: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string | null
+          id?: string
+          image_order: number
+          image_url: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string | null
+          id?: string
+          image_order?: number
+          image_url?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "user_images_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
     }
     Views: {
       [_ in never]: never
