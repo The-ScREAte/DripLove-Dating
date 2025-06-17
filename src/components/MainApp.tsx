@@ -69,9 +69,9 @@ const MainApp = ({ user, onLogout }: MainAppProps) => {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-pink-50 to-purple-50">
-      {/* Header */}
-      <div className="bg-white shadow-sm border-b">
+    <div className="min-h-screen bg-gradient-to-br from-pink-50 to-purple-50 flex flex-col">
+      {/* Header - Hidden on mobile, visible on desktop */}
+      <div className="hidden md:block bg-white shadow-sm border-b">
         <div className="container mx-auto px-4 py-4 flex justify-between items-center">
           <div className="flex items-center space-x-2">
             <Heart className="w-8 h-8 text-pink-600" />
@@ -80,7 +80,7 @@ const MainApp = ({ user, onLogout }: MainAppProps) => {
             </h1>
           </div>
           <div className="flex items-center space-x-4">
-            <span className="text-gray-600 hidden md:block">
+            <span className="text-gray-600">
               Welcome, {profile?.first_name || 'User'}!
             </span>
             <Button 
@@ -89,16 +89,28 @@ const MainApp = ({ user, onLogout }: MainAppProps) => {
               className="flex items-center space-x-2 border-pink-200 text-pink-600 hover:bg-pink-50"
             >
               <LogOut className="w-4 h-4" />
-              <span className="hidden md:block">Logout</span>
+              <span>Logout</span>
             </Button>
           </div>
         </div>
       </div>
 
+      {/* Mobile Header */}
+      <div className="md:hidden bg-white shadow-sm border-b">
+        <div className="px-4 py-3 flex justify-center items-center">
+          <div className="flex items-center space-x-2">
+            <Heart className="w-6 h-6 text-pink-600" />
+            <h1 className="text-xl font-bold bg-gradient-to-r from-pink-600 to-purple-600 bg-clip-text text-transparent">
+              LoveConnect
+            </h1>
+          </div>
+        </div>
+      </div>
+
       {/* Main Content */}
-      <div className="flex min-h-[calc(100vh-80px)]">
-        {/* Sidebar Navigation */}
-        <div className="w-20 md:w-64 bg-white shadow-sm border-r">
+      <div className="flex flex-1 overflow-hidden">
+        {/* Desktop Sidebar Navigation */}
+        <div className="hidden md:block w-64 bg-white shadow-sm border-r">
           <nav className="p-4">
             <div className="space-y-2">
               <button
@@ -110,7 +122,7 @@ const MainApp = ({ user, onLogout }: MainAppProps) => {
                 }`}
               >
                 <Heart className="w-5 h-5" />
-                <span className="hidden md:block">Discover</span>
+                <span>Discover</span>
               </button>
               
               <button
@@ -122,7 +134,7 @@ const MainApp = ({ user, onLogout }: MainAppProps) => {
                 }`}
               >
                 <MessageCircle className="w-5 h-5" />
-                <span className="hidden md:block">Chat</span>
+                <span>Chat</span>
               </button>
               
               <button
@@ -134,7 +146,7 @@ const MainApp = ({ user, onLogout }: MainAppProps) => {
                 }`}
               >
                 <Users className="w-5 h-5" />
-                <span className="hidden md:block">Liked Me</span>
+                <span>Liked Me</span>
               </button>
               
               <button
@@ -146,15 +158,68 @@ const MainApp = ({ user, onLogout }: MainAppProps) => {
                 }`}
               >
                 <User className="w-5 h-5" />
-                <span className="hidden md:block">Profile</span>
+                <span>Profile</span>
               </button>
             </div>
           </nav>
         </div>
 
         {/* Content Area */}
-        <div className="flex-1 p-6">
+        <div className="flex-1 overflow-auto pb-20 md:pb-6 p-4 md:p-6">
           {renderContent()}
+        </div>
+      </div>
+
+      {/* Mobile Bottom Navigation */}
+      <div className="md:hidden fixed bottom-0 left-0 right-0 bg-white border-t border-gray-200 px-4 py-2 safe-area-pb">
+        <div className="flex justify-around items-center">
+          <button
+            onClick={() => setActiveTab('discover')}
+            className={`flex flex-col items-center space-y-1 py-2 px-3 rounded-lg transition-colors ${
+              activeTab === 'discover'
+                ? 'text-pink-600'
+                : 'text-gray-500'
+            }`}
+          >
+            <Heart className={`w-6 h-6 ${activeTab === 'discover' ? 'fill-current' : ''}`} />
+            <span className="text-xs font-medium">Discover</span>
+          </button>
+          
+          <button
+            onClick={() => setActiveTab('chat')}
+            className={`flex flex-col items-center space-y-1 py-2 px-3 rounded-lg transition-colors ${
+              activeTab === 'chat'
+                ? 'text-pink-600'
+                : 'text-gray-500'
+            }`}
+          >
+            <MessageCircle className={`w-6 h-6 ${activeTab === 'chat' ? 'fill-current' : ''}`} />
+            <span className="text-xs font-medium">Chat</span>
+          </button>
+          
+          <button
+            onClick={() => setActiveTab('liked')}
+            className={`flex flex-col items-center space-y-1 py-2 px-3 rounded-lg transition-colors ${
+              activeTab === 'liked'
+                ? 'text-pink-600'
+                : 'text-gray-500'
+            }`}
+          >
+            <Users className={`w-6 h-6 ${activeTab === 'liked' ? 'fill-current' : ''}`} />
+            <span className="text-xs font-medium">Liked Me</span>
+          </button>
+          
+          <button
+            onClick={() => setActiveTab('profile')}
+            className={`flex flex-col items-center space-y-1 py-2 px-3 rounded-lg transition-colors ${
+              activeTab === 'profile'
+                ? 'text-pink-600'
+                : 'text-gray-500'
+            }`}
+          >
+            <User className={`w-6 h-6 ${activeTab === 'profile' ? 'fill-current' : ''}`} />
+            <span className="text-xs font-medium">Profile</span>
+          </button>
         </div>
       </div>
     </div>
