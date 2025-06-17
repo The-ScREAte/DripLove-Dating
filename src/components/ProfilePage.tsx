@@ -26,6 +26,7 @@ interface ProfilePageProps {
 
 const ProfilePage = ({ currentUser, profile, onProfileUpdate, onLogout }: ProfilePageProps) => {
   const [isEditing, setIsEditing] = useState(false);
+  const [isSaving, setIsSaving] = useState(false);
   const { toast } = useToast();
 
   const [editedProfile, setEditedProfile] = useState({
@@ -106,38 +107,48 @@ const ProfilePage = ({ currentUser, profile, onProfileUpdate, onLogout }: Profil
   };
 
   const handleSave = async () => {
+    if (isSaving) return;
+    
+    setIsSaving(true);
+    
     try {
+      console.log('Saving profile:', editedProfile);
+      
       const { error } = await supabase
         .from('profiles')
         .update({
-          first_name: editedProfile.first_name,
-          last_name: editedProfile.last_name,
-          bio: editedProfile.bio,
-          city: editedProfile.city,
-          country: editedProfile.country,
+          first_name: editedProfile.first_name.trim(),
+          last_name: editedProfile.last_name.trim(),
+          bio: editedProfile.bio?.trim() || null,
+          city: editedProfile.city.trim(),
+          country: editedProfile.country.trim(),
           distance_preference: editedProfile.distance_preference,
-          gender: editedProfile.gender,
+          gender: editedProfile.gender || null,
           preference: editedProfile.preference,
-          relationship_intent: editedProfile.relationship_intent,
-          smoking: editedProfile.smoking,
-          drinking: editedProfile.drinking,
-          exercise_level: editedProfile.exercise_level,
-          sleeping_schedule: editedProfile.sleeping_schedule,
-          occupation: editedProfile.occupation,
-          industry: editedProfile.industry,
-          education_level: editedProfile.education_level,
-          zip_code: editedProfile.zip_code,
+          relationship_intent: editedProfile.relationship_intent || null,
+          smoking: editedProfile.smoking || null,
+          drinking: editedProfile.drinking || null,
+          exercise_level: editedProfile.exercise_level || null,
+          sleeping_schedule: editedProfile.sleeping_schedule || null,
+          occupation: editedProfile.occupation?.trim() || null,
+          industry: editedProfile.industry?.trim() || null,
+          education_level: editedProfile.education_level || null,
+          zip_code: editedProfile.zip_code?.trim() || null,
           introvert_extrovert: editedProfile.introvert_extrovert,
           spontaneous_planner: editedProfile.spontaneous_planner,
           messy_organized: editedProfile.messy_organized,
-          fun_fact: editedProfile.fun_fact,
-          perfect_first_date: editedProfile.perfect_first_date,
-          last_googled: editedProfile.last_googled,
+          fun_fact: editedProfile.fun_fact?.trim() || null,
+          perfect_first_date: editedProfile.perfect_first_date?.trim() || null,
+          last_googled: editedProfile.last_googled?.trim() || null,
           interests: editedProfile.interests,
+          updated_at: new Date().toISOString(),
         })
         .eq('id', currentUser.id);
 
-      if (error) throw error;
+      if (error) {
+        console.error('Save error:', error);
+        throw error;
+      }
 
       setIsEditing(false);
       onProfileUpdate();
@@ -145,14 +156,49 @@ const ProfilePage = ({ currentUser, profile, onProfileUpdate, onLogout }: Profil
         title: "Profile updated",
         description: "Your AfroVibe profile has been saved successfully.",
       });
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error updating profile:', error);
       toast({
         title: "Error",
-        description: "Failed to update profile. Please try again.",
+        description: error.message || "Failed to update profile. Please try again.",
         variant: "destructive",
       });
+    } finally {
+      setIsSaving(false);
     }
+  };
+
+  const handleCancel = () => {
+    // Reset to original profile data
+    if (profile) {
+      setEditedProfile({
+        first_name: profile.first_name || '',
+        last_name: profile.last_name || '',
+        bio: profile.bio || '',
+        city: profile.city || '',
+        country: profile.country || '',
+        distance_preference: profile.distance_preference || 50,
+        gender: profile.gender || '',
+        preference: profile.preference || '',
+        relationship_intent: profile.relationship_intent || '',
+        smoking: profile.smoking || '',
+        drinking: profile.drinking || '',
+        exercise_level: profile.exercise_level || '',
+        sleeping_schedule: profile.sleeping_schedule || '',
+        occupation: profile.occupation || '',
+        industry: profile.industry || '',
+        education_level: profile.education_level || '',
+        zip_code: profile.zip_code || '',
+        introvert_extrovert: profile.introvert_extrovert || 50,
+        spontaneous_planner: profile.spontaneous_planner || 50,
+        messy_organized: profile.messy_organized || 50,
+        fun_fact: profile.fun_fact || '',
+        perfect_first_date: profile.perfect_first_date || '',
+        last_googled: profile.last_googled || '',
+        interests: profile.interests || [],
+      });
+    }
+    setIsEditing(false);
   };
 
   return (
@@ -179,14 +225,16 @@ const ProfilePage = ({ currentUser, profile, onProfileUpdate, onLogout }: Profil
           <div className="flex flex-col sm:flex-row space-y-2 sm:space-y-0 sm:space-x-2 w-full sm:w-auto">
             <Button 
               onClick={handleSave}
+              disabled={isSaving}
               className="w-full sm:w-auto"
             >
               <Save className="w-4 h-4 mr-2" /> 
-              Save
+              {isSaving ? 'Saving...' : 'Save'}
             </Button>
             <Button 
               variant="outline" 
-              onClick={() => setIsEditing(false)}
+              onClick={handleCancel}
+              disabled={isSaving}
               className="w-full sm:w-auto"
             >
               <X className="w-4 h-4 mr-2" /> 

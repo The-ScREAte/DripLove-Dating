@@ -53,12 +53,34 @@ const ImageManagement = ({ currentUser }: ImageManagementProps) => {
       return;
     }
 
+    // Validate file type
+    if (!file.type.startsWith('image/')) {
+      toast({
+        title: "Invalid file type",
+        description: "Please upload an image file.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    // Validate file size (10MB)
+    if (file.size > 10 * 1024 * 1024) {
+      toast({
+        title: "File too large",
+        description: "Please upload an image smaller than 10MB.",
+        variant: "destructive",
+      });
+      return;
+    }
+
     setUploading(true);
 
     try {
       const fileExt = file.name.split('.').pop();
-      const fileName = `${currentUser.id}-${Date.now()}.${fileExt}`;
-      const filePath = `user-images/${fileName}`;
+      const fileName = `${currentUser.id}/${Date.now()}.${fileExt}`;
+      const filePath = fileName;
+
+      console.log('Uploading file to path:', filePath);
 
       const { error: uploadError } = await supabase.storage
         .from('loveconnect')
@@ -68,12 +90,15 @@ const ImageManagement = ({ currentUser }: ImageManagementProps) => {
         });
 
       if (uploadError) {
+        console.error('Upload error:', uploadError);
         throw uploadError;
       }
 
       const { data: { publicUrl } } = supabase.storage
         .from('loveconnect')
         .getPublicUrl(filePath);
+
+      console.log('Public URL:', publicUrl);
 
       const nextImageOrder = userImages.length + 1;
 
@@ -86,6 +111,7 @@ const ImageManagement = ({ currentUser }: ImageManagementProps) => {
         });
 
       if (dbError) {
+        console.error('Database error:', dbError);
         throw dbError;
       }
 
@@ -98,7 +124,7 @@ const ImageManagement = ({ currentUser }: ImageManagementProps) => {
       console.error('Image upload error:', error);
       toast({
         title: "Error",
-        description: "Failed to upload image. Please try again.",
+        description: error.message || "Failed to upload image. Please try again.",
         variant: "destructive",
       });
     } finally {
@@ -111,15 +137,21 @@ const ImageManagement = ({ currentUser }: ImageManagementProps) => {
     setDeleting(true);
 
     try {
+      // Extract file path from URL
       const urlParts = imageUrl.split('/');
-      const filePath = `user-images/${urlParts[urlParts.length - 1]}`;
+      const bucketIndex = urlParts.findIndex(part => part === 'loveconnect');
+      if (bucketIndex !== -1 && bucketIndex < urlParts.length - 1) {
+        const filePath = urlParts.slice(bucketIndex + 1).join('/');
+        
+        console.log('Deleting file from path:', filePath);
 
-      const { error: storageError } = await supabase.storage
-        .from('loveconnect')
-        .remove([filePath]);
+        const { error: storageError } = await supabase.storage
+          .from('loveconnect')
+          .remove([filePath]);
 
-      if (storageError) {
-        console.error('Storage deletion error:', storageError);
+        if (storageError) {
+          console.error('Storage deletion error:', storageError);
+        }
       }
 
       const { error: dbError } = await supabase
