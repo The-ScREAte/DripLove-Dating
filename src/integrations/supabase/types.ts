@@ -16,6 +16,7 @@ export type Database = {
           country: string
           created_at: string | null
           date_of_birth: string
+          distance_preference: number | null
           drinking: string | null
           education_level: string | null
           email: string
@@ -46,6 +47,7 @@ export type Database = {
           country: string
           created_at?: string | null
           date_of_birth: string
+          distance_preference?: number | null
           drinking?: string | null
           education_level?: string | null
           email: string
@@ -76,6 +78,7 @@ export type Database = {
           country?: string
           created_at?: string | null
           date_of_birth?: string
+          distance_preference?: number | null
           drinking?: string | null
           education_level?: string | null
           email?: string
