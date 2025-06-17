@@ -16,13 +16,29 @@ export type Database = {
           country: string
           created_at: string | null
           date_of_birth: string
+          drinking: string | null
+          education_level: string | null
           email: string
+          exercise_level: string | null
           first_name: string
+          fun_fact: string | null
+          gender: string | null
           id: string
+          industry: string | null
           interests: string[] | null
+          introvert_extrovert: number | null
+          last_googled: string | null
           last_name: string
+          messy_organized: number | null
+          occupation: string | null
+          perfect_first_date: string | null
           preference: string
+          relationship_intent: string | null
+          sleeping_schedule: string | null
+          smoking: string | null
+          spontaneous_planner: number | null
           updated_at: string | null
+          zip_code: string | null
         }
         Insert: {
           bio?: string | null
@@ -30,13 +46,29 @@ export type Database = {
           country: string
           created_at?: string | null
           date_of_birth: string
+          drinking?: string | null
+          education_level?: string | null
           email: string
+          exercise_level?: string | null
           first_name: string
+          fun_fact?: string | null
+          gender?: string | null
           id: string
+          industry?: string | null
           interests?: string[] | null
+          introvert_extrovert?: number | null
+          last_googled?: string | null
           last_name: string
+          messy_organized?: number | null
+          occupation?: string | null
+          perfect_first_date?: string | null
           preference: string
+          relationship_intent?: string | null
+          sleeping_schedule?: string | null
+          smoking?: string | null
+          spontaneous_planner?: number | null
           updated_at?: string | null
+          zip_code?: string | null
         }
         Update: {
           bio?: string | null
@@ -44,13 +76,29 @@ export type Database = {
           country?: string
           created_at?: string | null
           date_of_birth?: string
+          drinking?: string | null
+          education_level?: string | null
           email?: string
+          exercise_level?: string | null
           first_name?: string
+          fun_fact?: string | null
+          gender?: string | null
           id?: string
+          industry?: string | null
           interests?: string[] | null
+          introvert_extrovert?: number | null
+          last_googled?: string | null
           last_name?: string
+          messy_organized?: number | null
+          occupation?: string | null
+          perfect_first_date?: string | null
           preference?: string
+          relationship_intent?: string | null
+          sleeping_schedule?: string | null
+          smoking?: string | null
+          spontaneous_planner?: number | null
           updated_at?: string | null
+          zip_code?: string | null
         }
         Relationships: []
       }
