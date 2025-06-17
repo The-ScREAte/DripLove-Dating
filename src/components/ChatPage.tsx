@@ -10,9 +10,10 @@ import EmojiPicker from './EmojiPicker';
 
 interface ChatPageProps {
   currentUser: any;
+  onUnreadChange?: () => void;
 }
 
-const ChatPage = ({ currentUser }: ChatPageProps) => {
+const ChatPage = ({ currentUser, onUnreadChange }: ChatPageProps) => {
   const [matches, setMatches] = useState<any[]>([]);
   const [selectedMatch, setSelectedMatch] = useState<any>(null);
   const [messages, setMessages] = useState<any[]>([]);
@@ -104,6 +105,7 @@ const ChatPage = ({ currentUser }: ChatPageProps) => {
         .eq('id', selectedMatch.id);
 
       fetchMatches();
+      onUnreadChange?.();
     } catch (error) {
       console.error('Error marking messages as read:', error);
     }
@@ -126,6 +128,7 @@ const ChatPage = ({ currentUser }: ChatPageProps) => {
       setNewMessage('');
       fetchMessages();
       fetchMatches();
+      onUnreadChange?.();
     } catch (error) {
       console.error('Error sending message:', error);
       toast({

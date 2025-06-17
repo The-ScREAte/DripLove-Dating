@@ -150,6 +150,54 @@ export type Database = {
           },
         ]
       }
+      notifications: {
+        Row: {
+          created_at: string
+          id: string
+          is_read: boolean
+          message: string
+          related_user_id: string | null
+          title: string
+          type: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          is_read?: boolean
+          message: string
+          related_user_id?: string | null
+          title: string
+          type: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          is_read?: boolean
+          message?: string
+          related_user_id?: string | null
+          title?: string
+          type?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "notifications_related_user_id_fkey"
+            columns: ["related_user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "notifications_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       profiles: {
         Row: {
           bio: string | null
@@ -169,6 +217,7 @@ export type Database = {
           industry: string | null
           interests: string[] | null
           introvert_extrovert: number | null
+          is_admin: boolean | null
           last_googled: string | null
           last_name: string
           messy_organized: number | null
@@ -200,6 +249,7 @@ export type Database = {
           industry?: string | null
           interests?: string[] | null
           introvert_extrovert?: number | null
+          is_admin?: boolean | null
           last_googled?: string | null
           last_name: string
           messy_organized?: number | null
@@ -231,6 +281,7 @@ export type Database = {
           industry?: string | null
           interests?: string[] | null
           introvert_extrovert?: number | null
+          is_admin?: boolean | null
           last_googled?: string | null
           last_name?: string
           messy_organized?: number | null
@@ -283,9 +334,17 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      delete_old_messages: {
+        Args: Record<PropertyKey, never>
+        Returns: undefined
+      }
       delete_user_and_data: {
         Args: { user_id_to_delete: string }
         Returns: undefined
+      }
+      get_app_stats: {
+        Args: Record<PropertyKey, never>
+        Returns: Json
       }
     }
     Enums: {

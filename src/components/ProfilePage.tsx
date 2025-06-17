@@ -15,6 +15,7 @@ import FunQuestionsSection from './profile/FunQuestionsSection';
 import InterestsSection from './profile/InterestsSection';
 import ImageManagement from './profile/ImageManagement';
 import AccountActions from './profile/AccountActions';
+import ProfileSummaryCard from './ProfileSummaryCard';
 
 interface ProfilePageProps {
   currentUser: any;
@@ -142,7 +143,7 @@ const ProfilePage = ({ currentUser, profile, onProfileUpdate, onLogout }: Profil
       onProfileUpdate();
       toast({
         title: "Profile updated",
-        description: "Your profile has been saved successfully.",
+        description: "Your AfroVibe profile has been saved successfully.",
       });
     } catch (error) {
       console.error('Error updating profile:', error);
@@ -162,7 +163,7 @@ const ProfilePage = ({ currentUser, profile, onProfileUpdate, onLogout }: Profil
           <CardHeader className="pb-3">
             <CardTitle className="flex items-center space-x-2">
               <User className="w-6 h-6 text-pink-600" />
-              <span>Your Profile</span>
+              <span>Your AfroVibe Profile</span>
             </CardTitle>
           </CardHeader>
         </Card>
@@ -194,6 +195,9 @@ const ProfilePage = ({ currentUser, profile, onProfileUpdate, onLogout }: Profil
           </div>
         )}
       </div>
+
+      {/* Profile Summary */}
+      <ProfileSummaryCard currentUser={currentUser} />
 
       {/* Image Management */}
       <ImageManagement currentUser={currentUser} />

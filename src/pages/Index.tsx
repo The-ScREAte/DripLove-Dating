@@ -1,13 +1,15 @@
+
 import React, { useState, useEffect } from 'react';
 import WelcomeScreen from '@/components/WelcomeScreen';
 import AuthForm from '@/components/AuthForm';
 import RegistrationForm from '@/components/RegistrationForm';
 import MainApp from '@/components/MainApp';
+import AdminPage from '@/components/AdminPage';
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
 
 const Index = () => {
-  const [currentView, setCurrentView] = useState<'welcome' | 'login' | 'register' | 'app'>('welcome');
+  const [currentView, setCurrentView] = useState<'welcome' | 'login' | 'register' | 'app' | 'admin'>('welcome');
   const [user, setUser] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const { toast } = useToast();
@@ -28,7 +30,7 @@ const Index = () => {
     } = supabase.auth.onAuthStateChange((_event, session) => {
       setUser(session?.user || null);
       if (session?.user) {
-        console.log("Auth state changed user ID:", session.user.id); // ✅ Add this
+        console.log("Auth state changed user ID:", session.user.id);
         setCurrentView('app');
       } else {
         setCurrentView('welcome');
@@ -51,6 +53,14 @@ const Index = () => {
     setCurrentView('login');
   };
 
+  const handleAdminAccess = () => {
+    setCurrentView('admin');
+  };
+
+  const handleBackToWelcome = () => {
+    setCurrentView('welcome');
+  };
+
   const handleLogin = async (formData: any) => {
     try {
       const { data, error } = await supabase.auth.signInWithPassword({
@@ -60,10 +70,10 @@ const Index = () => {
 
       if (error) throw error;
 
-      console.log("Logged in user ID:", data.user?.id); // ✅ Add this
+      console.log("Logged in user ID:", data.user?.id);
       
       toast({
-        title: "Welcome back!",
+        title: "Welcome back to AfroVibe!",
         description: "You've been successfully logged in.",
       });
       
@@ -112,9 +122,9 @@ const Index = () => {
         industry: formData.industry,
         education_level: formData.educationLevel,
         zip_code: formData.zipCode,
-        introvert_extrovert: formData.introvertExtrovert[0], // Extract single value from array
-        spontaneous_planner: formData.spontaneousPlanner[0], // Extract single value from array
-        messy_organized: formData.messyOrganized[0], // Extract single value from array
+        introvert_extrovert: formData.introvertExtrovert[0],
+        spontaneous_planner: formData.spontaneousPlanner[0],
+        messy_organized: formData.messyOrganized[0],
         fun_fact: formData.funFact,
         perfect_first_date: formData.perfectFirstDate,
         last_googled: formData.lastGoogled,
@@ -135,7 +145,7 @@ const Index = () => {
         await supabase.from("profiles").insert({
           id: data.user.id,
           email: data.user.email,
-          ...transformedData, // optional: preload profile with sign-up form info
+          ...transformedData,
         });
       }
       
@@ -148,8 +158,8 @@ const Index = () => {
       }
 
       toast({
-        title: "Account created!",
-        description: "Welcome to LoveConnect! You can now start using the app.",
+        title: "Welcome to AfroVibe!",
+        description: "Your account has been created successfully!",
       });
     } catch (error: any) {
       console.error('Registration error:', error);
@@ -174,8 +184,12 @@ const Index = () => {
     );
   }
 
+  if (currentView === 'admin') {
+    return <AdminPage />;
+  }
+
   if (currentView === 'welcome') {
-    return <WelcomeScreen onGetStarted={handleGetStarted} />;
+    return <WelcomeScreen onGetStarted={handleGetStarted} onAdminAccess={handleAdminAccess} />;
   }
 
   if (currentView === 'login') {

@@ -1,7 +1,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
-import { Heart, MessageCircle, Users, User } from 'lucide-react';
+import { Heart, MessageCircle, Users, User, Bell } from 'lucide-react';
 import DiscoverPage from '@/components/DiscoverPage';
 import ChatPage from '@/components/ChatPage';
 import LikedMePage from '@/components/LikedMePage';
@@ -17,10 +17,34 @@ interface MainAppProps {
 const MainApp = ({ user, onLogout }: MainAppProps) => {
   const [activeTab, setActiveTab] = useState('discover');
   const [profile, setProfile] = useState<any>(null);
+  const [unreadCount, setUnreadCount] = useState(0);
   const { toast } = useToast();
 
   useEffect(() => {
     fetchUserProfile();
+    fetchUnreadCount();
+  }, [user]);
+
+  useEffect(() => {
+    // Set up real-time subscription for unread messages
+    const channel = supabase
+      .channel('unread-messages')
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'matches'
+        },
+        () => {
+          fetchUnreadCount();
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
   }, [user]);
 
   const fetchUserProfile = async () => {
@@ -40,12 +64,35 @@ const MainApp = ({ user, onLogout }: MainAppProps) => {
     }
   };
 
+  const fetchUnreadCount = async () => {
+    if (!user?.id) return;
+    
+    try {
+      const { data, error } = await supabase
+        .from('matches')
+        .select('user1_unread_count, user2_unread_count, user1_id, user2_id')
+        .or(`user1_id.eq.${user.id},user2_id.eq.${user.id}`);
+      
+      if (error) throw error;
+      
+      const total = data?.reduce((sum, match) => {
+        const isUser1 = match.user1_id === user.id;
+        const unread = isUser1 ? match.user1_unread_count : match.user2_unread_count;
+        return sum + (unread || 0);
+      }, 0) || 0;
+      
+      setUnreadCount(total);
+    } catch (error) {
+      console.error('Error fetching unread count:', error);
+    }
+  };
+
   const renderContent = () => {
     switch (activeTab) {
       case 'discover':
         return <DiscoverPage currentUser={user} />;
       case 'chat':
-        return <ChatPage currentUser={user} />;
+        return <ChatPage currentUser={user} onUnreadChange={fetchUnreadCount} />;
       case 'liked':
         return <LikedMePage currentUser={user} />;
       case 'profile':
@@ -61,9 +108,13 @@ const MainApp = ({ user, onLogout }: MainAppProps) => {
       <div className="hidden md:block bg-white shadow-sm border-b">
         <div className="container mx-auto px-4 py-4 flex justify-between items-center">
           <div className="flex items-center space-x-2">
-            <Heart className="w-8 h-8 text-pink-600" />
+            <img 
+              src="/lovable-uploads/ef9367e7-bcc2-40e6-8a31-b92465c0e20b.png" 
+              alt="AfroVibe Logo" 
+              className="w-8 h-8"
+            />
             <h1 className="text-2xl font-bold bg-gradient-to-r from-pink-600 to-purple-600 bg-clip-text text-transparent">
-              LoveConnect
+              AfroVibe
             </h1>
           </div>
           <div className="flex items-center space-x-4">
@@ -78,9 +129,13 @@ const MainApp = ({ user, onLogout }: MainAppProps) => {
       <div className="md:hidden bg-white shadow-sm border-b">
         <div className="px-4 py-3 flex justify-center items-center">
           <div className="flex items-center space-x-2">
-            <Heart className="w-6 h-6 text-pink-600" />
+            <img 
+              src="/lovable-uploads/ef9367e7-bcc2-40e6-8a31-b92465c0e20b.png" 
+              alt="AfroVibe Logo" 
+              className="w-6 h-6"
+            />
             <h1 className="text-xl font-bold bg-gradient-to-r from-pink-600 to-purple-600 bg-clip-text text-transparent">
-              LoveConnect
+              AfroVibe
             </h1>
           </div>
         </div>
@@ -106,7 +161,7 @@ const MainApp = ({ user, onLogout }: MainAppProps) => {
               
               <button
                 onClick={() => setActiveTab('chat')}
-                className={`w-full flex items-center space-x-3 px-4 py-3 rounded-lg transition-colors ${
+                className={`w-full flex items-center space-x-3 px-4 py-3 rounded-lg transition-colors relative ${
                   activeTab === 'chat'
                     ? 'bg-gradient-to-r from-pink-500 to-purple-600 text-white'
                     : 'text-gray-600 hover:bg-gray-100'
@@ -114,6 +169,11 @@ const MainApp = ({ user, onLogout }: MainAppProps) => {
               >
                 <MessageCircle className="w-5 h-5" />
                 <span>Chat</span>
+                {unreadCount > 0 && (
+                  <span className="absolute -top-1 -right-1 bg-red-500 text-white text-xs rounded-full px-2 py-1 min-w-[20px] text-center">
+                    {unreadCount}
+                  </span>
+                )}
               </button>
               
               <button
@@ -166,7 +226,7 @@ const MainApp = ({ user, onLogout }: MainAppProps) => {
           
           <button
             onClick={() => setActiveTab('chat')}
-            className={`flex flex-col items-center space-y-1 py-2 px-2 rounded-lg transition-colors ${
+            className={`flex flex-col items-center space-y-1 py-2 px-2 rounded-lg transition-colors relative ${
               activeTab === 'chat'
                 ? 'text-pink-600'
                 : 'text-gray-500'
@@ -174,6 +234,11 @@ const MainApp = ({ user, onLogout }: MainAppProps) => {
           >
             <MessageCircle className={`w-5 h-5 ${activeTab === 'chat' ? 'fill-current' : ''}`} />
             <span className="text-xs font-medium">Chat</span>
+            {unreadCount > 0 && (
+              <span className="absolute -top-1 -right-1 bg-red-500 text-white text-xs rounded-full px-1.5 py-0.5 min-w-[16px] text-center">
+                {unreadCount}
+              </span>
+            )}
           </button>
           
           <button
