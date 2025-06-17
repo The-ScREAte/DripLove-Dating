@@ -17,7 +17,6 @@ interface MainAppProps {
 const MainApp = ({ user, onLogout }: MainAppProps) => {
   const [activeTab, setActiveTab] = useState('discover');
   const [profile, setProfile] = useState<any>(null);
-  const [loading, setLoading] = useState(true);
   const { toast } = useToast();
 
   useEffect(() => {
@@ -25,52 +24,23 @@ const MainApp = ({ user, onLogout }: MainAppProps) => {
   }, [user]);
 
   const fetchUserProfile = async () => {
-    if (!user?.id) {
-      setLoading(false);
-      return;
-    }
+    if (!user?.id) return;
     
     try {
-      console.log('Fetching profile for user:', user.id);
-      
       const { data, error } = await supabase
         .from('profiles')
         .select('*')
         .eq('id', user.id)
         .single();
       
-      if (error) {
-        console.error('Profile fetch error:', error);
-        toast({
-          title: "Error loading profile",
-          description: "Could not load your profile data.",
-          variant: "destructive",
-        });
-      } else {
-        console.log('Profile loaded successfully:', data);
-        setProfile(data);
-      }
+      if (error) throw error;
+      setProfile(data);
     } catch (error) {
-      console.error('Error in fetchUserProfile:', error);
-      toast({
-        title: "Error",
-        description: "Failed to load profile. Please try again.",
-        variant: "destructive",
-      });
-    } finally {
-      setLoading(false);
+      console.error('Error fetching profile:', error);
     }
   };
 
   const renderContent = () => {
-    if (loading) {
-      return (
-        <div className="flex items-center justify-center h-64">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-pink-600"></div>
-        </div>
-      );
-    }
-
     switch (activeTab) {
       case 'discover':
         return <DiscoverPage currentUser={user} />;

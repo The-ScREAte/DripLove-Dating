@@ -154,15 +154,6 @@ const ProfilePage = ({ currentUser, profile, onProfileUpdate, onLogout }: Profil
     }
   };
 
-  // Show loading state while profile is being fetched
-  if (!profile) {
-    return (
-      <div className="flex items-center justify-center h-64">
-        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-pink-600"></div>
-      </div>
-    );
-  }
-
   return (
     <div className="max-w-4xl mx-auto space-y-6 px-4 sm:px-6 lg:px-8">
       {/* Header */}
