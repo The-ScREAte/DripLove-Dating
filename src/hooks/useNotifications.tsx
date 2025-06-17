@@ -23,9 +23,12 @@ export const useNotifications = (userId: string | null) => {
 
     fetchNotifications();
     
+    // Create unique channel name with userId to avoid conflicts
+    const channelName = `notifications-${userId}-${Date.now()}`;
+    
     // Subscribe to new notifications
     const channel = supabase
-      .channel('notifications')
+      .channel(channelName)
       .on('postgres_changes', {
         event: 'INSERT',
         schema: 'public',

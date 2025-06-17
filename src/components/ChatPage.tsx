@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect, useRef } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -38,9 +37,14 @@ const ChatPage = ({ currentUser }: ChatPageProps) => {
   }, [messages]);
 
   useEffect(() => {
+    if (!currentUser?.id) return;
+
+    // Create unique channel name to avoid conflicts
+    const channelName = `chat-updates-${currentUser.id}-${Date.now()}`;
+    
     // Subscribe to new messages for real-time updates
     const channel = supabase
-      .channel('chat-updates')
+      .channel(channelName)
       .on('postgres_changes', {
         event: 'INSERT',
         schema: 'public',
@@ -56,7 +60,7 @@ const ChatPage = ({ currentUser }: ChatPageProps) => {
     return () => {
       supabase.removeChannel(channel);
     };
-  }, [selectedMatch]);
+  }, [selectedMatch, currentUser?.id]);
 
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
