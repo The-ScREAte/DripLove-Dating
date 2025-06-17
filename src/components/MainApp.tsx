@@ -17,6 +17,7 @@ interface MainAppProps {
 const MainApp = ({ user, onLogout }: MainAppProps) => {
   const [activeTab, setActiveTab] = useState('discover');
   const [profile, setProfile] = useState<any>(null);
+  const [loading, setLoading] = useState(true);
   const { toast } = useToast();
 
   useEffect(() => {
@@ -24,23 +25,125 @@ const MainApp = ({ user, onLogout }: MainAppProps) => {
   }, [user]);
 
   const fetchUserProfile = async () => {
-    if (!user?.id) return;
+    if (!user?.id) {
+      setLoading(false);
+      return;
+    }
     
     try {
+      console.log('Fetching profile for user:', user.id);
+      
+      // Try to fetch the profile with a more specific query
       const { data, error } = await supabase
         .from('profiles')
         .select('*')
         .eq('id', user.id)
-        .single();
+        .maybeSingle();
       
-      if (error) throw error;
-      setProfile(data);
+      if (error) {
+        console.error('Profile fetch error:', error);
+        // If no profile exists or there's an error, create a basic one
+        if (error.code === '42P17' || !data) {
+          console.log('Creating basic profile for user');
+          await createBasicProfile();
+        } else {
+          throw error;
+        }
+      } else if (data) {
+        console.log('Profile loaded successfully:', data);
+        setProfile(data);
+      } else {
+        console.log('No profile found, creating basic profile');
+        await createBasicProfile();
+      }
     } catch (error) {
-      console.error('Error fetching profile:', error);
+      console.error('Error in fetchUserProfile:', error);
+      // Fallback: create a basic profile structure from user data
+      const basicProfile = {
+        id: user.id,
+        first_name: user.user_metadata?.first_name || 'User',
+        last_name: user.user_metadata?.last_name || '',
+        email: user.email || '',
+        bio: '',
+        city: '',
+        country: '',
+        distance_preference: 50,
+        gender: '',
+        preference: '',
+        relationship_intent: '',
+        smoking: '',
+        drinking: '',
+        exercise_level: '',
+        sleeping_schedule: '',
+        occupation: '',
+        industry: '',
+        education_level: '',
+        zip_code: '',
+        introvert_extrovert: 50,
+        spontaneous_planner: 50,
+        messy_organized: 50,
+        fun_fact: '',
+        perfect_first_date: '',
+        last_googled: '',
+        interests: [],
+      };
+      setProfile(basicProfile);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const createBasicProfile = async () => {
+    try {
+      const profileData = {
+        id: user.id,
+        first_name: user.user_metadata?.first_name || 'User',
+        last_name: user.user_metadata?.last_name || '',
+        email: user.email || '',
+        date_of_birth: user.user_metadata?.date_of_birth || '1990-01-01',
+        bio: user.user_metadata?.bio || '',
+        city: user.user_metadata?.city || '',
+        country: user.user_metadata?.country || '',
+        preference: user.user_metadata?.preference || 'both',
+        gender: user.user_metadata?.gender || '',
+        interests: user.user_metadata?.interests || [],
+      };
+
+      const { data, error } = await supabase
+        .from('profiles')
+        .upsert(profileData, { onConflict: 'id' })
+        .select()
+        .single();
+
+      if (error) {
+        console.error('Error creating basic profile:', error);
+        // Even if upsert fails, set a basic profile structure
+        setProfile(profileData);
+      } else {
+        console.log('Basic profile created/updated:', data);
+        setProfile(data);
+      }
+    } catch (error) {
+      console.error('Error in createBasicProfile:', error);
+      // Set a minimal profile structure as fallback
+      setProfile({
+        id: user.id,
+        first_name: user.user_metadata?.first_name || 'User',
+        last_name: user.user_metadata?.last_name || '',
+        email: user.email || '',
+      });
     }
   };
 
   const renderContent = () => {
+    if (loading) {
+      return (
+        <div className="flex items-center justify-center h-64">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-pink-600"></div>
+        </div>
+      );
+    }
+
     switch (activeTab) {
       case 'discover':
         return <DiscoverPage currentUser={user} />;
