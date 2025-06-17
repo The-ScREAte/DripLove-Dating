@@ -18,6 +18,7 @@ import {
   AlertDialogTrigger,
 } from '@/components/ui/alert-dialog';
 import { Label } from '@/components/ui/label';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 
 interface ProfilePageProps {
   currentUser: any;
@@ -33,7 +34,23 @@ const ProfilePage = ({ currentUser, profile, onProfileUpdate }: ProfilePageProps
     bio: '',
     city: '',
     country: '',
-    distance_preference: 25
+    distance_preference: 25,
+    gender: '',
+    relationship_intent: '',
+    smoking: '',
+    drinking: '',
+    exercise_level: '',
+    sleeping_schedule: '',
+    occupation: '',
+    industry: '',
+    education_level: '',
+    zip_code: '',
+    introvert_extrovert: 3,
+    spontaneous_planner: 3,
+    messy_organized: 3,
+    fun_fact: '',
+    perfect_first_date: '',
+    last_googled: ''
   });
   const { toast } = useToast();
 
@@ -46,7 +63,23 @@ const ProfilePage = ({ currentUser, profile, onProfileUpdate }: ProfilePageProps
         bio: profile.bio || '',
         city: profile.city || '',
         country: profile.country || '',
-        distance_preference: profile.distance_preference || 25
+        distance_preference: profile.distance_preference || 25,
+        gender: profile.gender || '',
+        relationship_intent: profile.relationship_intent || '',
+        smoking: profile.smoking || '',
+        drinking: profile.drinking || '',
+        exercise_level: profile.exercise_level || '',
+        sleeping_schedule: profile.sleeping_schedule || '',
+        occupation: profile.occupation || '',
+        industry: profile.industry || '',
+        education_level: profile.education_level || '',
+        zip_code: profile.zip_code || '',
+        introvert_extrovert: profile.introvert_extrovert || 3,
+        spontaneous_planner: profile.spontaneous_planner || 3,
+        messy_organized: profile.messy_organized || 3,
+        fun_fact: profile.fun_fact || '',
+        perfect_first_date: profile.perfect_first_date || '',
+        last_googled: profile.last_googled || ''
       });
     }
   }, [currentUser, profile]);
@@ -103,14 +136,28 @@ const ProfilePage = ({ currentUser, profile, onProfileUpdate }: ProfilePageProps
     }
   };
 
-  const deleteImage = async (imageId: string) => {
+  const deleteImage = async (imageId: string, imageUrl: string) => {
     try {
-      const { error } = await supabase
+      // Extract the file path from the URL
+      const urlParts = imageUrl.split('/');
+      const fileName = urlParts.slice(-2).join('/'); // Get "userId/filename.ext"
+
+      // Delete from storage
+      const { error: storageError } = await supabase.storage
+        .from('user-images')
+        .remove([fileName]);
+
+      if (storageError) {
+        console.error('Storage deletion error:', storageError);
+      }
+
+      // Delete from database
+      const { error: dbError } = await supabase
         .from('user_images')
         .delete()
         .eq('id', imageId);
 
-      if (error) throw error;
+      if (dbError) throw dbError;
 
       toast({
         title: "Success!",
@@ -147,12 +194,7 @@ const ProfilePage = ({ currentUser, profile, onProfileUpdate }: ProfilePageProps
     try {
       const { error } = await supabase
         .from('profiles')
-        .update({
-          bio: editData.bio,
-          city: editData.city,
-          country: editData.country,
-          distance_preference: editData.distance_preference
-        })
+        .update(editData)
         .eq('id', currentUser.id);
 
       if (error) throw error;
@@ -184,8 +226,6 @@ const ProfilePage = ({ currentUser, profile, onProfileUpdate }: ProfilePageProps
         title: "Account deleted",
         description: "Your account has been permanently deleted",
       });
-      
-      // The user will be automatically logged out
     } catch (error) {
       console.error('Error deleting account:', error);
       toast({
@@ -252,8 +292,9 @@ const ProfilePage = ({ currentUser, profile, onProfileUpdate }: ProfilePageProps
         </CardHeader>
         <CardContent>
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+            {/* Basic Information */}
             <div>
-              <h3 className="text-lg font-semibold mb-4">Personal Information</h3>
+              <h3 className="text-lg font-semibold mb-4">Basic Information</h3>
               <div className="space-y-3">
                 <div>
                   <span className="font-medium">Name:</span> {profile.first_name} {profile.last_name}
@@ -268,7 +309,21 @@ const ProfilePage = ({ currentUser, profile, onProfileUpdate }: ProfilePageProps
                 {isEditing ? (
                   <div className="space-y-3">
                     <div>
-                      <Label htmlFor="edit-city" className="font-medium">City:</Label>
+                      <Label htmlFor="edit-gender">Gender:</Label>
+                      <Select value={editData.gender} onValueChange={(value) => setEditData({...editData, gender: value})}>
+                        <SelectTrigger>
+                          <SelectValue placeholder="Select gender" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="man">Man</SelectItem>
+                          <SelectItem value="woman">Woman</SelectItem>
+                          <SelectItem value="non-binary">Non-binary</SelectItem>
+                          <SelectItem value="other">Other</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <div>
+                      <Label htmlFor="edit-city">City:</Label>
                       <Input
                         id="edit-city"
                         value={editData.city}
@@ -277,7 +332,7 @@ const ProfilePage = ({ currentUser, profile, onProfileUpdate }: ProfilePageProps
                       />
                     </div>
                     <div>
-                      <Label htmlFor="edit-country" className="font-medium">Country:</Label>
+                      <Label htmlFor="edit-country">Country:</Label>
                       <Input
                         id="edit-country"
                         value={editData.country}
@@ -285,10 +340,31 @@ const ProfilePage = ({ currentUser, profile, onProfileUpdate }: ProfilePageProps
                         className="mt-1"
                       />
                     </div>
+                    <div>
+                      <Label htmlFor="edit-zip">Zip Code:</Label>
+                      <Input
+                        id="edit-zip"
+                        value={editData.zip_code}
+                        onChange={(e) => setEditData({...editData, zip_code: e.target.value})}
+                        className="mt-1"
+                      />
+                    </div>
                   </div>
                 ) : (
-                  <div>
-                    <span className="font-medium">Location:</span> {profile.city}, {profile.country}
+                  <div className="space-y-2">
+                    {profile.gender && (
+                      <div>
+                        <span className="font-medium">Gender:</span> {profile.gender}
+                      </div>
+                    )}
+                    <div>
+                      <span className="font-medium">Location:</span> {profile.city}, {profile.country}
+                    </div>
+                    {profile.zip_code && (
+                      <div>
+                        <span className="font-medium">Zip Code:</span> {profile.zip_code}
+                      </div>
+                    )}
                   </div>
                 )}
                 
@@ -298,7 +374,7 @@ const ProfilePage = ({ currentUser, profile, onProfileUpdate }: ProfilePageProps
                 
                 {isEditing ? (
                   <div>
-                    <Label htmlFor="edit-bio" className="font-medium">Bio:</Label>
+                    <Label htmlFor="edit-bio">Bio:</Label>
                     <textarea
                       id="edit-bio"
                       value={editData.bio}
@@ -317,8 +393,9 @@ const ProfilePage = ({ currentUser, profile, onProfileUpdate }: ProfilePageProps
               </div>
             </div>
             
+            {/* Lifestyle & Preferences */}
             <div>
-              <h3 className="text-lg font-semibold mb-4">Preferences & Interests</h3>
+              <h3 className="text-lg font-semibold mb-4">Lifestyle & Preferences</h3>
               
               {isEditing && (
                 <div className="mb-4 p-4 bg-gray-50 rounded-lg">
@@ -348,8 +425,111 @@ const ProfilePage = ({ currentUser, profile, onProfileUpdate }: ProfilePageProps
                   <span className="font-medium">Discovery Distance:</span> {profile.distance_preference || 25} km
                 </div>
               )}
+
+              {isEditing ? (
+                <div className="space-y-4">
+                  <div>
+                    <Label>Relationship Intent:</Label>
+                    <Select value={editData.relationship_intent} onValueChange={(value) => setEditData({...editData, relationship_intent: value})}>
+                      <SelectTrigger>
+                        <SelectValue placeholder="What are you looking for?" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="long-term">Long-term relationship</SelectItem>
+                        <SelectItem value="friendship">Friendship</SelectItem>
+                        <SelectItem value="casual">Casual dating</SelectItem>
+                        <SelectItem value="marriage">Marriage</SelectItem>
+                        <SelectItem value="exploring">Still exploring</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+
+                  <div>
+                    <Label>Smoking:</Label>
+                    <Select value={editData.smoking} onValueChange={(value) => setEditData({...editData, smoking: value})}>
+                      <SelectTrigger>
+                        <SelectValue placeholder="Do you smoke?" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="yes">Yes</SelectItem>
+                        <SelectItem value="no">No</SelectItem>
+                        <SelectItem value="occasionally">Occasionally</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+
+                  <div>
+                    <Label>Drinking:</Label>
+                    <Select value={editData.drinking} onValueChange={(value) => setEditData({...editData, drinking: value})}>
+                      <SelectTrigger>
+                        <SelectValue placeholder="Do you drink?" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="yes">Yes</SelectItem>
+                        <SelectItem value="no">No</SelectItem>
+                        <SelectItem value="socially">Socially</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+
+                  <div>
+                    <Label>Exercise Level:</Label>
+                    <Select value={editData.exercise_level} onValueChange={(value) => setEditData({...editData, exercise_level: value})}>
+                      <SelectTrigger>
+                        <SelectValue placeholder="How often do you exercise?" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="active">Very active</SelectItem>
+                        <SelectItem value="sometimes">Sometimes</SelectItem>
+                        <SelectItem value="rarely">Rarely</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+
+                  <div>
+                    <Label>Sleep Schedule:</Label>
+                    <Select value={editData.sleeping_schedule} onValueChange={(value) => setEditData({...editData, sleeping_schedule: value})}>
+                      <SelectTrigger>
+                        <SelectValue placeholder="Are you a morning or night person?" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="early-riser">Early riser</SelectItem>
+                        <SelectItem value="night-owl">Night owl</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                </div>
+              ) : (
+                <div className="space-y-2">
+                  {profile.relationship_intent && (
+                    <div>
+                      <span className="font-medium">Looking for:</span> {profile.relationship_intent.replace('-', ' ')}
+                    </div>
+                  )}
+                  {profile.smoking && (
+                    <div>
+                      <span className="font-medium">Smoking:</span> {profile.smoking}
+                    </div>
+                  )}
+                  {profile.drinking && (
+                    <div>
+                      <span className="font-medium">Drinking:</span> {profile.drinking}
+                    </div>
+                  )}
+                  {profile.exercise_level && (
+                    <div>
+                      <span className="font-medium">Exercise:</span> {profile.exercise_level}
+                    </div>
+                  )}
+                  {profile.sleeping_schedule && (
+                    <div>
+                      <span className="font-medium">Sleep schedule:</span> {profile.sleeping_schedule.replace('-', ' ')}
+                    </div>
+                  )}
+                </div>
+              )}
               
-              <div className="flex flex-wrap gap-2">
+              <div className="flex flex-wrap gap-2 mt-4">
                 {profile.interests?.map((interest: string, index: number) => (
                   <span
                     key={index}
@@ -361,6 +541,140 @@ const ProfilePage = ({ currentUser, profile, onProfileUpdate }: ProfilePageProps
               </div>
             </div>
           </div>
+
+          {/* Professional Information */}
+          {isEditing && (
+            <div className="mt-6 grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div>
+                <h3 className="text-lg font-semibold mb-4">Professional</h3>
+                <div className="space-y-3">
+                  <div>
+                    <Label htmlFor="edit-occupation">Occupation:</Label>
+                    <Input
+                      id="edit-occupation"
+                      value={editData.occupation}
+                      onChange={(e) => setEditData({...editData, occupation: e.target.value})}
+                      placeholder="Your job title"
+                    />
+                  </div>
+                  <div>
+                    <Label htmlFor="edit-industry">Industry:</Label>
+                    <Input
+                      id="edit-industry"
+                      value={editData.industry}
+                      onChange={(e) => setEditData({...editData, industry: e.target.value})}
+                      placeholder="What industry do you work in?"
+                    />
+                  </div>
+                  <div>
+                    <Label>Education Level:</Label>
+                    <Select value={editData.education_level} onValueChange={(value) => setEditData({...editData, education_level: value})}>
+                      <SelectTrigger>
+                        <SelectValue placeholder="Your education level" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="high-school">High School</SelectItem>
+                        <SelectItem value="some-college">Some College</SelectItem>
+                        <SelectItem value="bachelors">Bachelor's Degree</SelectItem>
+                        <SelectItem value="masters">Master's Degree</SelectItem>
+                        <SelectItem value="phd">PhD</SelectItem>
+                        <SelectItem value="trade-school">Trade School</SelectItem>
+                        <SelectItem value="other">Other</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                </div>
+              </div>
+
+              <div>
+                <h3 className="text-lg font-semibold mb-4">Conversation Starters</h3>
+                <div className="space-y-3">
+                  <div>
+                    <Label htmlFor="edit-fun-fact">Fun Fact:</Label>
+                    <textarea
+                      id="edit-fun-fact"
+                      value={editData.fun_fact}
+                      onChange={(e) => setEditData({...editData, fun_fact: e.target.value})}
+                      className="w-full p-2 border border-gray-300 rounded-md resize-none"
+                      rows={2}
+                      placeholder="Share something interesting about yourself"
+                    />
+                  </div>
+                  <div>
+                    <Label htmlFor="edit-first-date">Perfect First Date:</Label>
+                    <textarea
+                      id="edit-first-date"
+                      value={editData.perfect_first_date}
+                      onChange={(e) => setEditData({...editData, perfect_first_date: e.target.value})}
+                      className="w-full p-2 border border-gray-300 rounded-md resize-none"
+                      rows={2}
+                      placeholder="Describe your ideal first date"
+                    />
+                  </div>
+                  <div>
+                    <Label htmlFor="edit-last-googled">Last Thing Googled:</Label>
+                    <Input
+                      id="edit-last-googled"
+                      value={editData.last_googled}
+                      onChange={(e) => setEditData({...editData, last_googled: e.target.value})}
+                      placeholder="What did you search for recently?"
+                    />
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* Display professional and conversation info when not editing */}
+          {!isEditing && (profile.occupation || profile.industry || profile.education_level || profile.fun_fact || profile.perfect_first_date || profile.last_googled) && (
+            <div className="mt-6 grid grid-cols-1 md:grid-cols-2 gap-4">
+              {(profile.occupation || profile.industry || profile.education_level) && (
+                <div>
+                  <h3 className="text-lg font-semibold mb-3">Professional</h3>
+                  <div className="space-y-2">
+                    {profile.occupation && (
+                      <div>
+                        <span className="font-medium">Occupation:</span> {profile.occupation}
+                      </div>
+                    )}
+                    {profile.industry && (
+                      <div>
+                        <span className="font-medium">Industry:</span> {profile.industry}
+                      </div>
+                    )}
+                    {profile.education_level && (
+                      <div>
+                        <span className="font-medium">Education:</span> {profile.education_level.replace('-', ' ')}
+                      </div>
+                    )}
+                  </div>
+                </div>
+              )}
+
+              {(profile.fun_fact || profile.perfect_first_date || profile.last_googled) && (
+                <div>
+                  <h3 className="text-lg font-semibold mb-3">About Me</h3>
+                  <div className="space-y-2">
+                    {profile.fun_fact && (
+                      <div>
+                        <span className="font-medium">Fun Fact:</span> {profile.fun_fact}
+                      </div>
+                    )}
+                    {profile.perfect_first_date && (
+                      <div>
+                        <span className="font-medium">Perfect First Date:</span> {profile.perfect_first_date}
+                      </div>
+                    )}
+                    {profile.last_googled && (
+                      <div>
+                        <span className="font-medium">Last Googled:</span> {profile.last_googled}
+                      </div>
+                    )}
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
           
           {isEditing && (
             <div className="mt-6 flex justify-end space-x-3">
@@ -392,7 +706,7 @@ const ProfilePage = ({ currentUser, profile, onProfileUpdate }: ProfilePageProps
                   className="w-full h-32 object-cover rounded-lg"
                 />
                 <button
-                  onClick={() => deleteImage(image.id)}
+                  onClick={() => deleteImage(image.id, image.image_url)}
                   className="absolute top-2 right-2 bg-red-500 text-white rounded-full p-1 opacity-0 group-hover:opacity-100 transition-opacity"
                 >
                   <X className="w-4 h-4" />
