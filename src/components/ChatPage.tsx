@@ -1,11 +1,11 @@
-
 import React, { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { MessageCircle, Send, ArrowLeft } from 'lucide-react';
+import { MessageCircle, Send, ArrowLeft, Shield } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
+import BlockDialog from './BlockDialog';
 
 interface ChatPageProps {
   currentUser: any;
@@ -17,6 +17,7 @@ const ChatPage = ({ currentUser }: ChatPageProps) => {
   const [messages, setMessages] = useState<any[]>([]);
   const [newMessage, setNewMessage] = useState('');
   const [loading, setLoading] = useState(true);
+  const [blockDialogOpen, setBlockDialogOpen] = useState(false);
   const { toast } = useToast();
 
   useEffect(() => {
@@ -26,10 +27,11 @@ const ChatPage = ({ currentUser }: ChatPageProps) => {
   useEffect(() => {
     if (selectedMatch) {
       fetchMessages();
+      markMessagesAsRead();
       
-      // Subscribe to new messages
+      // Subscribe to new messages with improved real-time performance
       const channel = supabase
-        .channel('chat-messages')
+        .channel(`chat-messages-${selectedMatch.id}`)
         .on(
           'postgres_changes',
           {
@@ -39,7 +41,13 @@ const ChatPage = ({ currentUser }: ChatPageProps) => {
             filter: `match_id=eq.${selectedMatch.id}`
           },
           (payload) => {
+            console.log('New message received:', payload.new);
             setMessages(prev => [...prev, payload.new]);
+            
+            // Mark as read if it's not from current user
+            if (payload.new.sender_id !== currentUser.id) {
+              markMessagesAsRead();
+            }
           }
         )
         .subscribe();
@@ -54,6 +62,16 @@ const ChatPage = ({ currentUser }: ChatPageProps) => {
     if (!currentUser?.id) return;
 
     try {
+      // Get blocked users to filter them out
+      const { data: blockedUsers } = await supabase
+        .from('blocks')
+        .select('blocked_id, blocker_id')
+        .or(`blocker_id.eq.${currentUser.id},blocked_id.eq.${currentUser.id}`);
+      
+      const blockedIds = blockedUsers?.map(block => 
+        block.blocker_id === currentUser.id ? block.blocked_id : block.blocker_id
+      ) || [];
+
       const { data: matchesData, error } = await supabase
         .from('matches')
         .select(`
@@ -66,11 +84,18 @@ const ChatPage = ({ currentUser }: ChatPageProps) => {
 
       if (error) throw error;
 
-      // Get the other user for each match
-      const matchesWithOtherUser = matchesData?.map(match => ({
-        ...match,
-        otherUser: match.user1_id === currentUser.id ? match.user2 : match.user1
-      })) || [];
+      // Filter out blocked users and get the other user for each match
+      const matchesWithOtherUser = matchesData?.filter(match => {
+        const otherUserId = match.user1_id === currentUser.id ? match.user2_id : match.user1_id;
+        return !blockedIds.includes(otherUserId);
+      }).map(match => {
+        const isUser1 = match.user1_id === currentUser.id;
+        return {
+          ...match,
+          otherUser: isUser1 ? match.user2 : match.user1,
+          unreadCount: isUser1 ? match.user1_unread_count : match.user2_unread_count
+        };
+      }) || [];
 
       setMatches(matchesWithOtherUser);
     } catch (error) {
@@ -105,8 +130,36 @@ const ChatPage = ({ currentUser }: ChatPageProps) => {
     }
   };
 
+  const markMessagesAsRead = async () => {
+    if (!selectedMatch) return;
+
+    try {
+      const isUser1 = selectedMatch.user1_id === currentUser.id;
+      const updateField = isUser1 ? 'user1_unread_count' : 'user2_unread_count';
+      
+      const { error } = await supabase
+        .from('matches')
+        .update({ [updateField]: 0 })
+        .eq('id', selectedMatch.id);
+
+      if (error) throw error;
+
+      // Update local state
+      setMatches(prev => prev.map(match => 
+        match.id === selectedMatch.id 
+          ? { ...match, unreadCount: 0 }
+          : match
+      ));
+    } catch (error) {
+      console.error('Error marking messages as read:', error);
+    }
+  };
+
   const sendMessage = async () => {
     if (!newMessage.trim() || !selectedMatch) return;
+
+    const messageText = newMessage.trim();
+    setNewMessage(''); // Clear immediately for better UX
 
     try {
       const { error } = await supabase
@@ -114,19 +167,29 @@ const ChatPage = ({ currentUser }: ChatPageProps) => {
         .insert({
           match_id: selectedMatch.id,
           sender_id: currentUser.id,
-          message: newMessage.trim()
+          message: messageText
         });
 
       if (error) throw error;
-      setNewMessage('');
     } catch (error) {
       console.error('Error sending message:', error);
+      setNewMessage(messageText); // Restore message on error
       toast({
         title: "Error",
         description: "Failed to send message",
         variant: "destructive",
       });
     }
+  };
+
+  const handleBlock = () => {
+    setBlockDialogOpen(true);
+  };
+
+  const handleBlockSuccess = () => {
+    // Remove from matches list and go back to matches view
+    setMatches(prev => prev.filter(match => match.id !== selectedMatch.id));
+    setSelectedMatch(null);
   };
 
   const calculateAge = (dateOfBirth: string) => {
@@ -155,27 +218,37 @@ const ChatPage = ({ currentUser }: ChatPageProps) => {
       <div className="max-w-4xl mx-auto h-full flex flex-col">
         <Card className="flex-1 flex flex-col">
           <CardHeader className="pb-4">
-            <div className="flex items-center space-x-3">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center space-x-3">
+                <Button
+                  onClick={() => setSelectedMatch(null)}
+                  variant="ghost"
+                  size="sm"
+                >
+                  <ArrowLeft className="w-4 h-4" />
+                </Button>
+                <div className="w-10 h-10 bg-gradient-to-br from-pink-200 to-purple-200 rounded-full flex items-center justify-center">
+                  <span className="text-sm font-semibold">
+                    {selectedMatch.otherUser.first_name?.[0]}{selectedMatch.otherUser.last_name?.[0]}
+                  </span>
+                </div>
+                <div>
+                  <h3 className="font-semibold text-gray-800">
+                    {selectedMatch.otherUser.first_name} {selectedMatch.otherUser.last_name}
+                  </h3>
+                  <p className="text-sm text-gray-600">
+                    {calculateAge(selectedMatch.otherUser.date_of_birth)} years old
+                  </p>
+                </div>
+              </div>
+              
               <Button
-                onClick={() => setSelectedMatch(null)}
-                variant="ghost"
+                onClick={handleBlock}
+                variant="outline"
                 size="sm"
               >
-                <ArrowLeft className="w-4 h-4" />
+                <Shield className="w-4 h-4" />
               </Button>
-              <div className="w-10 h-10 bg-gradient-to-br from-pink-200 to-purple-200 rounded-full flex items-center justify-center">
-                <span className="text-sm font-semibold">
-                  {selectedMatch.otherUser.first_name?.[0]}{selectedMatch.otherUser.last_name?.[0]}
-                </span>
-              </div>
-              <div>
-                <h3 className="font-semibold text-gray-800">
-                  {selectedMatch.otherUser.first_name} {selectedMatch.otherUser.last_name}
-                </h3>
-                <p className="text-sm text-gray-600">
-                  {calculateAge(selectedMatch.otherUser.date_of_birth)} years old
-                </p>
-              </div>
             </div>
           </CardHeader>
           
@@ -225,6 +298,14 @@ const ChatPage = ({ currentUser }: ChatPageProps) => {
             </div>
           </CardContent>
         </Card>
+
+        <BlockDialog
+          isOpen={blockDialogOpen}
+          onClose={() => setBlockDialogOpen(false)}
+          userToBlock={selectedMatch.otherUser}
+          currentUserId={currentUser.id}
+          onBlockSuccess={handleBlockSuccess}
+        />
       </div>
     );
   }
@@ -271,7 +352,14 @@ const ChatPage = ({ currentUser }: ChatPageProps) => {
                           Matched {new Date(match.created_at).toLocaleDateString()}
                         </p>
                       </div>
-                      <MessageCircle className="w-5 h-5 text-pink-500" />
+                      <div className="flex items-center space-x-2">
+                        {match.unreadCount > 0 && (
+                          <div className="bg-pink-500 text-white rounded-full min-w-[20px] h-5 flex items-center justify-center px-1 text-xs font-semibold">
+                            {match.unreadCount}
+                          </div>
+                        )}
+                        <MessageCircle className="w-5 h-5 text-pink-500" />
+                      </div>
                     </div>
                   </CardContent>
                 </Card>

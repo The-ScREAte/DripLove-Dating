@@ -9,6 +9,30 @@ export type Json =
 export type Database = {
   public: {
     Tables: {
+      blocks: {
+        Row: {
+          blocked_id: string
+          blocker_id: string
+          created_at: string
+          id: string
+          reason: string | null
+        }
+        Insert: {
+          blocked_id: string
+          blocker_id: string
+          created_at?: string
+          id?: string
+          reason?: string | null
+        }
+        Update: {
+          blocked_id?: string
+          blocker_id?: string
+          created_at?: string
+          id?: string
+          reason?: string | null
+        }
+        Relationships: []
+      }
       chats: {
         Row: {
           created_at: string
@@ -89,19 +113,25 @@ export type Database = {
           created_at: string
           id: string
           user1_id: string
+          user1_unread_count: number | null
           user2_id: string
+          user2_unread_count: number | null
         }
         Insert: {
           created_at?: string
           id?: string
           user1_id: string
+          user1_unread_count?: number | null
           user2_id: string
+          user2_unread_count?: number | null
         }
         Update: {
           created_at?: string
           id?: string
           user1_id?: string
+          user1_unread_count?: number | null
           user2_id?: string
+          user2_unread_count?: number | null
         }
         Relationships: [
           {

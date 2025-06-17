@@ -1,9 +1,10 @@
 import React, { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Users, Heart, X, Calendar, MapPin } from 'lucide-react';
+import { Users, Heart, X, Calendar, MapPin, Shield } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
+import BlockDialog from './BlockDialog';
 
 interface LikedMePageProps {
   currentUser: any;
@@ -14,6 +15,7 @@ const LikedMePage = ({ currentUser }: LikedMePageProps) => {
   const [loading, setLoading] = useState(true);
   const [selectedProfile, setSelectedProfile] = useState<any>(null);
   const [userImages, setUserImages] = useState<{ [key: string]: string[] }>({});
+  const [blockDialogOpen, setBlockDialogOpen] = useState(false);
   const { toast } = useToast();
 
   useEffect(() => {
@@ -35,7 +37,32 @@ const LikedMePage = ({ currentUser }: LikedMePageProps) => {
 
       if (error) throw error;
 
-      const likersData = likes?.map(like => like.liker) || [];
+      // Get matched users to filter them out
+      const { data: matches } = await supabase
+        .from('matches')
+        .select('user1_id, user2_id')
+        .or(`user1_id.eq.${currentUser.id},user2_id.eq.${currentUser.id}`);
+      
+      const matchedIds = matches?.map(match => 
+        match.user1_id === currentUser.id ? match.user2_id : match.user1_id
+      ) || [];
+
+      // Get blocked users to filter them out
+      const { data: blockedUsers } = await supabase
+        .from('blocks')
+        .select('blocked_id, blocker_id')
+        .or(`blocker_id.eq.${currentUser.id},blocked_id.eq.${currentUser.id}`);
+      
+      const blockedIds = blockedUsers?.map(block => 
+        block.blocker_id === currentUser.id ? block.blocked_id : block.blocker_id
+      ) || [];
+
+      // Filter out matched and blocked users
+      const filteredLikes = likes?.filter(like => 
+        !matchedIds.includes(like.liker.id) && !blockedIds.includes(like.liker.id)
+      ) || [];
+
+      const likersData = filteredLikes.map(like => like.liker);
       
       // Fetch images for each liker
       if (likersData.length > 0) {
@@ -162,6 +189,18 @@ const LikedMePage = ({ currentUser }: LikedMePageProps) => {
     }
   };
 
+  const handleBlock = () => {
+    setBlockDialogOpen(true);
+  };
+
+  const handleBlockSuccess = () => {
+    // Remove from likers list
+    if (selectedProfile) {
+      setLikers(prev => prev.filter(liker => liker.id !== selectedProfile.id));
+      setSelectedProfile(null);
+    }
+  };
+
   if (loading) {
     return (
       <div className="flex items-center justify-center h-full">
@@ -206,6 +245,16 @@ const LikedMePage = ({ currentUser }: LikedMePageProps) => {
                 +{profileImages.length - 1} photos
               </div>
             )}
+
+            {/* Block button */}
+            <Button
+              onClick={handleBlock}
+              variant="outline"
+              size="sm"
+              className="absolute top-4 left-4 bg-white/80 hover:bg-white"
+            >
+              <Shield className="w-4 h-4" />
+            </Button>
           </div>
           
           <CardContent className="p-6">
@@ -264,6 +313,14 @@ const LikedMePage = ({ currentUser }: LikedMePageProps) => {
             </div>
           </CardContent>
         </Card>
+
+        <BlockDialog
+          isOpen={blockDialogOpen}
+          onClose={() => setBlockDialogOpen(false)}
+          userToBlock={selectedProfile}
+          currentUserId={currentUser.id}
+          onBlockSuccess={handleBlockSuccess}
+        />
       </div>
     );
   }

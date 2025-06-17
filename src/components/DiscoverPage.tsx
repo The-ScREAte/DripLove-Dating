@@ -2,9 +2,10 @@ import React, { useState, useEffect } from 'react';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Carousel, CarouselContent, CarouselItem, CarouselNext, CarouselPrevious } from '@/components/ui/carousel';
-import { Heart, X, MapPin, Calendar, Briefcase, GraduationCap, Dumbbell, Wine, Cigarette } from 'lucide-react';
+import { Heart, X, MapPin, Calendar, Briefcase, GraduationCap, Dumbbell, Wine, Cigarette, Shield } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
+import BlockDialog from './BlockDialog';
 
 interface DiscoverPageProps {
   currentUser: any;
@@ -15,6 +16,7 @@ const DiscoverPage = ({ currentUser }: DiscoverPageProps) => {
   const [currentIndex, setCurrentIndex] = useState(0);
   const [loading, setLoading] = useState(true);
   const [userImages, setUserImages] = useState<{ [key: string]: string[] }>({});
+  const [blockDialogOpen, setBlockDialogOpen] = useState(false);
   const { toast } = useToast();
 
   useEffect(() => {
@@ -33,14 +35,37 @@ const DiscoverPage = ({ currentUser }: DiscoverPageProps) => {
       
       const likedIds = likedProfiles?.map(like => like.liked_id) || [];
       
+      // Get blocked users (both directions)
+      const { data: blockedUsers } = await supabase
+        .from('blocks')
+        .select('blocked_id, blocker_id')
+        .or(`blocker_id.eq.${currentUser.id},blocked_id.eq.${currentUser.id}`);
+      
+      const blockedIds = blockedUsers?.map(block => 
+        block.blocker_id === currentUser.id ? block.blocked_id : block.blocker_id
+      ) || [];
+      
+      // Get matched users
+      const { data: matches } = await supabase
+        .from('matches')
+        .select('user1_id, user2_id')
+        .or(`user1_id.eq.${currentUser.id},user2_id.eq.${currentUser.id}`);
+      
+      const matchedIds = matches?.map(match => 
+        match.user1_id === currentUser.id ? match.user2_id : match.user1_id
+      ) || [];
+      
+      // Combine all excluded IDs
+      const excludedIds = [...likedIds, ...blockedIds, ...matchedIds];
+      
       let query = supabase
         .from('profiles')
         .select('*')
         .neq('id', currentUser.id)
         .limit(10);
       
-      if (likedIds.length > 0) {
-        query = query.not('id', 'in', `(${likedIds.join(',')})`);
+      if (excludedIds.length > 0) {
+        query = query.not('id', 'in', `(${excludedIds.join(',')})`);
       }
       
       const { data, error } = await query;
@@ -144,6 +169,19 @@ const DiscoverPage = ({ currentUser }: DiscoverPageProps) => {
     setCurrentIndex(prev => prev + 1);
   };
 
+  const handleBlock = () => {
+    setBlockDialogOpen(true);
+  };
+
+  const handleBlockSuccess = () => {
+    // Remove the current profile from the list
+    setProfiles(prev => prev.filter((_, index) => index !== currentIndex));
+    // Reset current index if needed
+    if (currentIndex >= profiles.length - 1) {
+      setCurrentIndex(0);
+    }
+  };
+
   if (loading) {
     return (
       <div className="flex items-center justify-center h-full">
@@ -222,6 +260,16 @@ const DiscoverPage = ({ currentUser }: DiscoverPageProps) => {
               {profileImages.length} photos
             </div>
           )}
+
+          {/* Block button */}
+          <Button
+            onClick={handleBlock}
+            variant="outline"
+            size="sm"
+            className="absolute top-4 left-4 bg-white/80 hover:bg-white"
+          >
+            <Shield className="w-4 h-4" />
+          </Button>
         </div>
         
         <CardContent className="p-6">
@@ -329,6 +377,14 @@ const DiscoverPage = ({ currentUser }: DiscoverPageProps) => {
           </div>
         </CardContent>
       </Card>
+
+      <BlockDialog
+        isOpen={blockDialogOpen}
+        onClose={() => setBlockDialogOpen(false)}
+        userToBlock={currentProfile}
+        currentUserId={currentUser.id}
+        onBlockSuccess={handleBlockSuccess}
+      />
     </div>
   );
 };
