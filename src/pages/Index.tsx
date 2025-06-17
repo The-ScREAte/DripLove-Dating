@@ -27,27 +27,7 @@ const Index = () => {
         }
 
         if (session?.user) {
-          // Validate user by checking if profile exists
-          const { data: profileData, error: profileError } = await supabase
-            .from('profiles')
-            .select('*')
-            .eq('id', session.user.id)
-            .single();
-
-          if (profileError || !profileData) {
-            console.error('Invalid user - no profile found:', profileError);
-            toast({
-              title: "Access Denied",
-              description: "Your account is not properly configured. Please contact support.",
-              variant: "destructive",
-            });
-            await supabase.auth.signOut();
-            setCurrentView('welcome');
-          } else {
-            setUser(session.user);
-            setProfile(profileData);
-            setCurrentView('app');
-          }
+          await handleUserSession(session.user);
         } else {
           setCurrentView('welcome');
         }
@@ -73,38 +53,83 @@ const Index = () => {
       }
 
       if (event === 'SIGNED_IN' && session?.user) {
-        // Validate user by checking if profile exists
-        try {
-          const { data: profileData, error: profileError } = await supabase
-            .from('profiles')
-            .select('*')
-            .eq('id', session.user.id)
-            .single();
-
-          if (profileError || !profileData) {
-            console.error('Invalid user - no profile found:', profileError);
-            toast({
-              title: "Access Denied",
-              description: "Your account is not properly configured. Please contact support.",
-              variant: "destructive",
-            });
-            await supabase.auth.signOut();
-            setCurrentView('welcome');
-          } else {
-            setUser(session.user);
-            setProfile(profileData);
-            setCurrentView('app');
-          }
-        } catch (error) {
-          console.error('Profile validation error:', error);
-          await supabase.auth.signOut();
-          setCurrentView('welcome');
-        }
+        await handleUserSession(session.user);
       }
     });
 
     return () => subscription.unsubscribe();
   }, [toast]);
+
+  const handleUserSession = async (user: any) => {
+    try {
+      // Try to get the profile
+      const { data: profileData, error: profileError } = await supabase
+        .from('profiles')
+        .select('*')
+        .eq('id', user.id)
+        .single();
+
+      if (profileError && profileError.code !== 'PGRST116') {
+        // PGRST116 is "not found", other errors are real problems
+        console.error('Profile fetch error:', profileError);
+        toast({
+          title: "Database Error",
+          description: "There was a problem accessing your profile. Please try again.",
+          variant: "destructive",
+        });
+        await supabase.auth.signOut();
+        return;
+      }
+
+      if (!profileData) {
+        // Profile doesn't exist, create a basic one
+        console.log('No profile found, creating basic profile for user:', user.id);
+        
+        const { data: newProfile, error: createError } = await supabase
+          .from('profiles')
+          .insert({
+            id: user.id,
+            first_name: user.user_metadata?.first_name || 'User',
+            last_name: user.user_metadata?.last_name || '',
+            email: user.email || '',
+            date_of_birth: user.user_metadata?.date_of_birth || '1990-01-01',
+            country: user.user_metadata?.country || 'Unknown',
+            city: user.user_metadata?.city || 'Unknown',
+            bio: user.user_metadata?.bio || '',
+            preference: user.user_metadata?.preference || 'both',
+            interests: user.user_metadata?.interests || [],
+          })
+          .select()
+          .single();
+
+        if (createError) {
+          console.error('Error creating profile:', createError);
+          toast({
+            title: "Setup Error",
+            description: "We couldn't set up your profile. Please try logging in again.",
+            variant: "destructive",
+          });
+          await supabase.auth.signOut();
+          return;
+        }
+
+        setProfile(newProfile);
+      } else {
+        setProfile(profileData);
+      }
+
+      setUser(user);
+      setCurrentView('app');
+    } catch (error) {
+      console.error('User session handling error:', error);
+      toast({
+        title: "Authentication Error",
+        description: "There was a problem with your session. Please try logging in again.",
+        variant: "destructive",
+      });
+      await supabase.auth.signOut();
+    }
+  };
 
   const handleGetStarted = () => {
     setCurrentView('login');
