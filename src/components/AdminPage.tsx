@@ -1,8 +1,35 @@
+
 import React, { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Users, Heart, MessageCircle, UserX, TrendingUp, Activity } from 'lucide-react';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { Users, Heart, MessageCircle, UserX, TrendingUp, Activity, Plus, Search, Shield, Ban, Pause, Trash2, RotateCcw } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from '@/components/ui/table';
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from '@/components/ui/dialog';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
 
 interface AdminStats {
   total_users: number;
@@ -15,19 +42,46 @@ interface AdminStats {
   matches_this_week: number;
 }
 
+interface UserProfile {
+  id: string;
+  first_name: string;
+  last_name: string;
+  email: string;
+  account_status: string;
+  created_at: string;
+  is_admin: boolean;
+}
+
 const AdminPage = () => {
   const [stats, setStats] = useState<AdminStats | null>(null);
+  const [users, setUsers] = useState<UserProfile[]>([]);
+  const [filteredUsers, setFilteredUsers] = useState<UserProfile[]>([]);
+  const [searchTerm, setSearchTerm] = useState('');
   const [loading, setLoading] = useState(true);
+  const [showCreateAdmin, setShowCreateAdmin] = useState(false);
+  const [showManualMatch, setShowManualMatch] = useState(false);
+  const [newAdmin, setNewAdmin] = useState({
+    firstName: '',
+    lastName: '',
+    email: '',
+    password: ''
+  });
+  const [matchUsers, setMatchUsers] = useState({
+    user1: '',
+    user2: ''
+  });
   const { toast } = useToast();
 
   useEffect(() => {
     fetchStats();
+    fetchUsers();
     
     // Set up real-time subscriptions
     const profilesChannel = supabase
       .channel('admin-profiles')
       .on('postgres_changes', { event: '*', schema: 'public', table: 'profiles' }, () => {
         fetchStats();
+        fetchUsers();
       })
       .subscribe();
 
@@ -60,14 +114,32 @@ const AdminPage = () => {
     };
   }, []);
 
+  useEffect(() => {
+    if (searchTerm) {
+      const filtered = users.filter(user => 
+        user.first_name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        user.last_name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        user.email.toLowerCase().includes(searchTerm.toLowerCase())
+      );
+      setFilteredUsers(filtered);
+    } else {
+      setFilteredUsers(users);
+    }
+  }, [searchTerm, users]);
+
   const fetchStats = async () => {
     try {
       const { data, error } = await supabase.rpc('get_app_stats');
       
       if (error) throw error;
       
-      // Type cast the Json response to our AdminStats interface
-      setStats(data as AdminStats);
+      // Type assertion with validation
+      if (data && typeof data === 'object' && !Array.isArray(data)) {
+        setStats(data as AdminStats);
+      } else {
+        console.error('Invalid stats data format:', data);
+        setStats(null);
+      }
     } catch (error) {
       console.error('Error fetching admin stats:', error);
       toast({
@@ -80,6 +152,215 @@ const AdminPage = () => {
     }
   };
 
+  const fetchUsers = async () => {
+    try {
+      const { data, error } = await supabase
+        .from('profiles')
+        .select('id, first_name, last_name, email, account_status, created_at, is_admin')
+        .order('created_at', { ascending: false });
+      
+      if (error) throw error;
+      setUsers(data || []);
+    } catch (error) {
+      console.error('Error fetching users:', error);
+      toast({
+        title: "Error",
+        description: "Failed to fetch users",
+        variant: "destructive",
+      });
+    }
+  };
+
+  const createAdmin = async (e: React.FormEvent) => {
+    e.preventDefault();
+    try {
+      // Check if email already exists
+      const { data: existingUser } = await supabase
+        .from('profiles')
+        .select('email')
+        .eq('email', newAdmin.email)
+        .single();
+
+      if (existingUser) {
+        toast({
+          title: "Error",
+          description: "An account with this email already exists",
+          variant: "destructive",
+        });
+        return;
+      }
+
+      const { data, error } = await supabase.auth.signUp({
+        email: newAdmin.email,
+        password: newAdmin.password,
+        options: {
+          emailRedirectTo: `${window.location.origin}/`,
+          data: {
+            first_name: newAdmin.firstName,
+            last_name: newAdmin.lastName,
+            is_admin: true,
+            // Required fields for the handle_new_user trigger
+            date_of_birth: '1990-01-01',
+            country: 'Admin',
+            city: 'Admin',
+            preference: 'admin'
+          },
+        },
+      });
+      
+      if (error) throw error;
+      
+      if (data.user) {
+        // Also insert directly into profiles with admin flag
+        await supabase.from("profiles").insert({
+          id: data.user.id,
+          email: data.user.email,
+          first_name: newAdmin.firstName,
+          last_name: newAdmin.lastName,
+          is_admin: true,
+          date_of_birth: '1990-01-01',
+          country: 'Admin',
+          city: 'Admin',
+          bio: 'Admin User',
+          preference: 'admin',
+          interests: [],
+          account_status: 'active'
+        });
+      }
+
+      toast({
+        title: "Success",
+        description: "Admin user created successfully",
+      });
+
+      setNewAdmin({
+        firstName: '',
+        lastName: '',
+        email: '',
+        password: ''
+      });
+      setShowCreateAdmin(false);
+      fetchUsers();
+    } catch (error: any) {
+      console.error('Error creating admin:', error);
+      toast({
+        title: "Error",
+        description: error.message || "Failed to create admin user",
+        variant: "destructive",
+      });
+    }
+  };
+
+  const createManualMatch = async (e: React.FormEvent) => {
+    e.preventDefault();
+    try {
+      if (matchUsers.user1 === matchUsers.user2) {
+        toast({
+          title: "Error",
+          description: "Cannot match a user with themselves",
+          variant: "destructive",
+        });
+        return;
+      }
+
+      // Create match directly
+      const { error } = await supabase
+        .from('matches')
+        .insert({
+          user1_id: matchUsers.user1 < matchUsers.user2 ? matchUsers.user1 : matchUsers.user2,
+          user2_id: matchUsers.user1 < matchUsers.user2 ? matchUsers.user2 : matchUsers.user1
+        });
+
+      if (error) throw error;
+
+      toast({
+        title: "Success",
+        description: "Manual match created successfully",
+      });
+
+      setMatchUsers({ user1: '', user2: '' });
+      setShowManualMatch(false);
+      fetchStats();
+    } catch (error: any) {
+      console.error('Error creating manual match:', error);
+      toast({
+        title: "Error",
+        description: error.message || "Failed to create manual match",
+        variant: "destructive",
+      });
+    }
+  };
+
+  const updateUserStatus = async (userId: string, newStatus: string) => {
+    try {
+      const { error } = await supabase
+        .from('profiles')
+        .update({ account_status: newStatus })
+        .eq('id', userId);
+
+      if (error) throw error;
+
+      toast({
+        title: "Success",
+        description: `User status updated to ${newStatus}`,
+      });
+
+      fetchUsers();
+    } catch (error: any) {
+      console.error('Error updating user status:', error);
+      toast({
+        title: "Error",
+        description: error.message || "Failed to update user status",
+        variant: "destructive",
+      });
+    }
+  };
+
+  const deleteUser = async (userId: string) => {
+    try {
+      const { error } = await supabase.rpc('delete_user_and_data', {
+        user_id_to_delete: userId
+      });
+
+      if (error) throw error;
+
+      toast({
+        title: "Success",
+        description: "User deleted successfully",
+      });
+
+      fetchUsers();
+      fetchStats();
+    } catch (error: any) {
+      console.error('Error deleting user:', error);
+      toast({
+        title: "Error",
+        description: error.message || "Failed to delete user",
+        variant: "destructive",
+      });
+    }
+  };
+
+  const getStatusColor = (status: string) => {
+    switch (status) {
+      case 'active': return 'text-green-600';
+      case 'blocked': return 'text-red-600';
+      case 'on_hold': return 'text-yellow-600';
+      default: return 'text-gray-600';
+    }
+  };
+
+  const getStatusBadge = (status: string) => {
+    switch (status) {
+      case 'active': return 'bg-green-100 text-green-800';
+      case 'blocked': return 'bg-red-100 text-red-800';
+      case 'on_hold': return 'bg-yellow-100 text-yellow-800';
+      default: return 'bg-gray-100 text-gray-800';
+    }
+  };
+
+  const nonAdminUsers = users.filter(user => !user.is_admin);
+
   if (loading) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-pink-50 to-purple-50 flex items-center justify-center">
@@ -91,20 +372,135 @@ const AdminPage = () => {
   return (
     <div className="min-h-screen bg-gradient-to-br from-pink-50 to-purple-50 p-6">
       <div className="max-w-7xl mx-auto">
-        <div className="flex items-center space-x-4 mb-8">
-          <img 
-            src="/lovable-uploads/ef9367e7-bcc2-40e6-8a31-b92465c0e20b.png" 
-            alt="AfroVibe Logo" 
-            className="w-12 h-12"
-          />
-          <div>
-            <h1 className="text-3xl font-bold bg-gradient-to-r from-pink-600 to-purple-600 bg-clip-text text-transparent">
-              AfroVibe Admin Dashboard
-            </h1>
-            <p className="text-gray-600">Real-time application statistics and insights</p>
+        <div className="flex items-center justify-between mb-8">
+          <div className="flex items-center space-x-4">
+            <img 
+              src="/lovable-uploads/ef9367e7-bcc2-40e6-8a31-b92465c0e20b.png" 
+              alt="AfroVibe Logo" 
+              className="w-12 h-12"
+            />
+            <div>
+              <h1 className="text-3xl font-bold bg-gradient-to-r from-pink-600 to-purple-600 bg-clip-text text-transparent">
+                AfroVibe Admin Dashboard
+              </h1>
+              <p className="text-gray-600">Real-time application statistics and insights</p>
+            </div>
+          </div>
+          
+          <div className="flex space-x-4">
+            <Dialog open={showCreateAdmin} onOpenChange={setShowCreateAdmin}>
+              <DialogTrigger asChild>
+                <Button className="bg-gradient-to-r from-purple-500 to-pink-600 hover:from-purple-600 hover:to-pink-700">
+                  <Plus className="w-4 h-4 mr-2" />
+                  Create Admin
+                </Button>
+              </DialogTrigger>
+              <DialogContent>
+                <DialogHeader>
+                  <DialogTitle>Create Admin User</DialogTitle>
+                  <DialogDescription>
+                    Create a new admin user with full dashboard access
+                  </DialogDescription>
+                </DialogHeader>
+                <form onSubmit={createAdmin} className="space-y-4">
+                  <div>
+                    <Label htmlFor="firstName">First Name</Label>
+                    <Input
+                      id="firstName"
+                      value={newAdmin.firstName}
+                      onChange={(e) => setNewAdmin({...newAdmin, firstName: e.target.value})}
+                      required
+                    />
+                  </div>
+                  <div>
+                    <Label htmlFor="lastName">Last Name</Label>
+                    <Input
+                      id="lastName"
+                      value={newAdmin.lastName}
+                      onChange={(e) => setNewAdmin({...newAdmin, lastName: e.target.value})}
+                      required
+                    />
+                  </div>
+                  <div>
+                    <Label htmlFor="email">Email</Label>
+                    <Input
+                      id="email"
+                      type="email"
+                      value={newAdmin.email}
+                      onChange={(e) => setNewAdmin({...newAdmin, email: e.target.value})}
+                      required
+                    />
+                  </div>
+                  <div>
+                    <Label htmlFor="password">Password</Label>
+                    <Input
+                      id="password"
+                      type="password"
+                      value={newAdmin.password}
+                      onChange={(e) => setNewAdmin({...newAdmin, password: e.target.value})}
+                      required
+                    />
+                  </div>
+                  <Button type="submit" className="w-full">Create Admin</Button>
+                </form>
+              </DialogContent>
+            </Dialog>
+
+            <Dialog open={showManualMatch} onOpenChange={setShowManualMatch}>
+              <DialogTrigger asChild>
+                <Button variant="outline">
+                  <Heart className="w-4 h-4 mr-2" />
+                  Manual Match
+                </Button>
+              </DialogTrigger>
+              <DialogContent>
+                <DialogHeader>
+                  <DialogTitle>Create Manual Match</DialogTitle>
+                  <DialogDescription>
+                    Select two users to create a manual match between them
+                  </DialogDescription>
+                </DialogHeader>
+                <form onSubmit={createManualMatch} className="space-y-4">
+                  <div>
+                    <Label htmlFor="user1">First User</Label>
+                    <Select value={matchUsers.user1} onValueChange={(value) => setMatchUsers({...matchUsers, user1: value})}>
+                      <SelectTrigger>
+                        <SelectValue placeholder="Select first user" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {nonAdminUsers.map((user) => (
+                          <SelectItem key={user.id} value={user.id}>
+                            {user.first_name} {user.last_name} ({user.email})
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div>
+                    <Label htmlFor="user2">Second User</Label>
+                    <Select value={matchUsers.user2} onValueChange={(value) => setMatchUsers({...matchUsers, user2: value})}>
+                      <SelectTrigger>
+                        <SelectValue placeholder="Select second user" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {nonAdminUsers.filter(user => user.id !== matchUsers.user1).map((user) => (
+                          <SelectItem key={user.id} value={user.id}>
+                            {user.first_name} {user.last_name} ({user.email})
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <Button type="submit" className="w-full" disabled={!matchUsers.user1 || !matchUsers.user2}>
+                    Create Match
+                  </Button>
+                </form>
+              </DialogContent>
+            </Dialog>
           </div>
         </div>
 
+        {/* Stats Grid */}
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
           <Card className="border-pink-200 shadow-lg">
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
@@ -151,74 +547,108 @@ const AdminPage = () => {
           </Card>
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-          <Card className="shadow-lg">
-            <CardHeader>
+        {/* User Management */}
+        <Card className="shadow-lg">
+          <CardHeader>
+            <div className="flex justify-between items-center">
               <CardTitle className="flex items-center space-x-2">
-                <TrendingUp className="h-5 w-5 text-pink-600" />
-                <span>Weekly Growth</span>
+                <Users className="h-5 w-5 text-pink-600" />
+                <span>User Management</span>
               </CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="space-y-4">
-                <div className="flex justify-between items-center">
-                  <span className="text-sm text-gray-600">New Users</span>
-                  <span className="font-semibold text-pink-600">{stats?.new_users_this_week || 0}</span>
-                </div>
-                <div className="flex justify-between items-center">
-                  <span className="text-sm text-gray-600">New Matches</span>
-                  <span className="font-semibold text-purple-600">{stats?.matches_this_week || 0}</span>
-                </div>
+              <div className="flex items-center space-x-2">
+                <Search className="h-4 w-4 text-gray-400" />
+                <Input
+                  placeholder="Search users..."
+                  value={searchTerm}
+                  onChange={(e) => setSearchTerm(e.target.value)}
+                  className="w-64"
+                />
               </div>
-            </CardContent>
-          </Card>
-
-          <Card className="shadow-lg">
-            <CardHeader>
-              <CardTitle className="flex items-center space-x-2">
-                <Heart className="h-5 w-5 text-red-600" />
-                <span>Engagement</span>
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="space-y-4">
-                <div className="flex justify-between items-center">
-                  <span className="text-sm text-gray-600">Total Likes</span>
-                  <span className="font-semibold text-red-600">{stats?.total_likes || 0}</span>
-                </div>
-                <div className="flex justify-between items-center">
-                  <span className="text-sm text-gray-600">Match Rate</span>
-                  <span className="font-semibold text-green-600">
-                    {stats?.total_likes ? Math.round((stats.total_matches / stats.total_likes) * 100) : 0}%
-                  </span>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-
-          <Card className="shadow-lg">
-            <CardHeader>
-              <CardTitle className="flex items-center space-x-2">
-                <UserX className="h-5 w-5 text-gray-600" />
-                <span>Moderation</span>
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="space-y-4">
-                <div className="flex justify-between items-center">
-                  <span className="text-sm text-gray-600">Total Blocks</span>
-                  <span className="font-semibold text-gray-600">{stats?.total_blocks || 0}</span>
-                </div>
-                <div className="flex justify-between items-center">
-                  <span className="text-sm text-gray-600">Block Rate</span>
-                  <span className="font-semibold text-orange-600">
-                    {stats?.total_users ? Math.round((stats.total_blocks / stats.total_users) * 100) : 0}%
-                  </span>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-        </div>
+            </div>
+          </CardHeader>
+          <CardContent>
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Name</TableHead>
+                  <TableHead>Email</TableHead>
+                  <TableHead>Status</TableHead>
+                  <TableHead>Type</TableHead>
+                  <TableHead>Created</TableHead>
+                  <TableHead>Actions</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {filteredUsers.map((user) => (
+                  <TableRow key={user.id}>
+                    <TableCell className="font-medium">
+                      {user.first_name} {user.last_name}
+                    </TableCell>
+                    <TableCell>{user.email}</TableCell>
+                    <TableCell>
+                      <span className={`px-2 py-1 rounded-full text-xs font-medium ${getStatusBadge(user.account_status)}`}>
+                        {user.account_status}
+                      </span>
+                    </TableCell>
+                    <TableCell>
+                      {user.is_admin ? (
+                        <span className="flex items-center text-purple-600">
+                          <Shield className="w-4 h-4 mr-1" />
+                          Admin
+                        </span>
+                      ) : (
+                        'User'
+                      )}
+                    </TableCell>
+                    <TableCell>
+                      {new Date(user.created_at).toLocaleDateString()}
+                    </TableCell>
+                    <TableCell>
+                      {!user.is_admin && (
+                        <div className="flex space-x-2">
+                          {user.account_status === 'active' && (
+                            <>
+                              <Button
+                                size="sm"
+                                variant="outline"
+                                onClick={() => updateUserStatus(user.id, 'blocked')}
+                              >
+                                <Ban className="w-4 h-4" />
+                              </Button>
+                              <Button
+                                size="sm"
+                                variant="outline"
+                                onClick={() => updateUserStatus(user.id, 'on_hold')}
+                              >
+                                <Pause className="w-4 h-4" />
+                              </Button>
+                            </>
+                          )}
+                          {user.account_status !== 'active' && (
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              onClick={() => updateUserStatus(user.id, 'active')}
+                            >
+                              <RotateCcw className="w-4 h-4" />
+                            </Button>
+                          )}
+                          <Button
+                            size="sm"
+                            variant="destructive"
+                            onClick={() => deleteUser(user.id)}
+                          >
+                            <Trash2 className="w-4 h-4" />
+                          </Button>
+                        </div>
+                      )}
+                    </TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          </CardContent>
+        </Card>
       </div>
     </div>
   );

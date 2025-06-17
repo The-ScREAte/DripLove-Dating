@@ -9,6 +9,36 @@ export type Json =
 export type Database = {
   public: {
     Tables: {
+      admin_actions: {
+        Row: {
+          action_type: string
+          admin_id: string | null
+          created_at: string | null
+          details: Json | null
+          id: string
+          target_user_id: string | null
+          target_user_id_2: string | null
+        }
+        Insert: {
+          action_type: string
+          admin_id?: string | null
+          created_at?: string | null
+          details?: Json | null
+          id?: string
+          target_user_id?: string | null
+          target_user_id_2?: string | null
+        }
+        Update: {
+          action_type?: string
+          admin_id?: string | null
+          created_at?: string | null
+          details?: Json | null
+          id?: string
+          target_user_id?: string | null
+          target_user_id_2?: string | null
+        }
+        Relationships: []
+      }
       blocks: {
         Row: {
           blocked_id: string
@@ -200,6 +230,7 @@ export type Database = {
       }
       profiles: {
         Row: {
+          account_status: string | null
           bio: string | null
           city: string
           country: string
@@ -232,6 +263,7 @@ export type Database = {
           zip_code: string | null
         }
         Insert: {
+          account_status?: string | null
           bio?: string | null
           city: string
           country: string
@@ -264,6 +296,7 @@ export type Database = {
           zip_code?: string | null
         }
         Update: {
+          account_status?: string | null
           bio?: string | null
           city?: string
           country?: string
@@ -334,6 +367,22 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      admin_create_match: {
+        Args: { user1_id: string; user2_id: string }
+        Returns: undefined
+      }
+      admin_update_account_status: {
+        Args: { target_user_id: string; new_status: string }
+        Returns: undefined
+      }
+      create_admin_user: {
+        Args: {
+          admin_email: string
+          admin_password: string
+          admin_name: string
+        }
+        Returns: Json
+      }
       delete_old_messages: {
         Args: Record<PropertyKey, never>
         Returns: undefined

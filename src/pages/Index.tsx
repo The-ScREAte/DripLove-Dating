@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import WelcomeScreen from '@/components/WelcomeScreen';
 import AuthForm from '@/components/AuthForm';
@@ -17,29 +16,55 @@ const Index = () => {
   useEffect(() => {
     // Check for existing session
     supabase.auth.getSession().then(({ data: { session } }) => {
-      setUser(session?.user || null);
       if (session?.user) {
-        setCurrentView('app');
+        setUser(session.user);
+        checkUserTypeAndRedirect(session.user.id);
+      } else {
+        setLoading(false);
       }
-      setLoading(false);
     });
 
     // Listen for auth changes
     const {
       data: { subscription },
     } = supabase.auth.onAuthStateChange((_event, session) => {
-      setUser(session?.user || null);
       if (session?.user) {
         console.log("Auth state changed user ID:", session.user.id);
-        setCurrentView('app');
+        setUser(session.user);
+        checkUserTypeAndRedirect(session.user.id);
       } else {
+        setUser(null);
         setCurrentView('welcome');
+        setLoading(false);
       }
     });
     
-
     return () => subscription.unsubscribe();
   }, []);
+
+  const checkUserTypeAndRedirect = async (userId: string) => {
+    try {
+      const { data: profile, error } = await supabase
+        .from('profiles')
+        .select('is_admin')
+        .eq('id', userId)
+        .single();
+      
+      if (error) {
+        console.error('Error fetching user profile:', error);
+        setCurrentView('app'); // Default to regular app if profile not found
+      } else if (profile?.is_admin) {
+        setCurrentView('admin');
+      } else {
+        setCurrentView('app');
+      }
+    } catch (error) {
+      console.error('Error checking user type:', error);
+      setCurrentView('app');
+    } finally {
+      setLoading(false);
+    }
+  };
 
   const handleGetStarted = () => {
     setCurrentView('login');
@@ -76,6 +101,8 @@ const Index = () => {
         title: "Welcome back to AfroVibe!",
         description: "You've been successfully logged in.",
       });
+      
+      // The auth state change listener will handle the redirect
       
     } catch (error: any) {
       toast({
@@ -171,7 +198,8 @@ const Index = () => {
     }
   };
 
-  const handleLogout = () => {
+  const handleLogout = async () => {
+    await supabase.auth.signOut();
     setUser(null);
     setCurrentView('welcome');
   };
