@@ -18,10 +18,16 @@ export const useNotifications = (userId: string | null) => {
   const [unreadCount, setUnreadCount] = useState(0);
   const { toast } = useToast();
   const channelRef = useRef<any>(null);
-  const isSubscribedRef = useRef(false);
+  const mountedRef = useRef(true);
 
   useEffect(() => {
-    if (!userId) return;
+    mountedRef.current = true;
+    
+    if (!userId) {
+      setNotifications([]);
+      setUnreadCount(0);
+      return;
+    }
 
     fetchNotifications();
     
@@ -29,24 +35,19 @@ export const useNotifications = (userId: string | null) => {
     if (channelRef.current) {
       supabase.removeChannel(channelRef.current);
       channelRef.current = null;
-      isSubscribedRef.current = false;
     }
     
-    // Prevent multiple subscriptions
-    if (isSubscribedRef.current) return;
-    
-    // Create unique channel name with userId to avoid conflicts
-    const channelName = `notifications-${userId}-${Date.now()}`;
-    
-    // Subscribe to new notifications
+    // Subscribe to new notifications with a unique channel name
     const channel = supabase
-      .channel(channelName)
+      .channel(`user-notifications-${userId}`)
       .on('postgres_changes', {
         event: 'INSERT',
         schema: 'public',
         table: 'notifications',
         filter: `user_id=eq.${userId}`
       }, (payload) => {
+        if (!mountedRef.current) return;
+        
         const newNotification = payload.new as Notification;
         setNotifications(prev => [newNotification, ...prev]);
         setUnreadCount(prev => prev + 1);
@@ -60,19 +61,18 @@ export const useNotifications = (userId: string | null) => {
       .subscribe();
 
     channelRef.current = channel;
-    isSubscribedRef.current = true;
 
     return () => {
+      mountedRef.current = false;
       if (channelRef.current) {
         supabase.removeChannel(channelRef.current);
         channelRef.current = null;
-        isSubscribedRef.current = false;
       }
     };
-  }, [userId]); // Removed toast from dependencies to prevent unnecessary re-runs
+  }, [userId, toast]);
 
   const fetchNotifications = async () => {
-    if (!userId) return;
+    if (!userId || !mountedRef.current) return;
 
     try {
       const { data, error } = await supabase
@@ -84,14 +84,18 @@ export const useNotifications = (userId: string | null) => {
 
       if (error) throw error;
       
-      setNotifications(data || []);
-      setUnreadCount(data?.filter(n => !n.is_read).length || 0);
+      if (mountedRef.current) {
+        setNotifications(data || []);
+        setUnreadCount(data?.filter(n => !n.is_read).length || 0);
+      }
     } catch (error) {
       console.error('Error fetching notifications:', error);
     }
   };
 
   const markAsRead = async (notificationId: string) => {
+    if (!mountedRef.current) return;
+
     try {
       const { error } = await supabase
         .from('notifications')
@@ -100,17 +104,19 @@ export const useNotifications = (userId: string | null) => {
 
       if (error) throw error;
 
-      setNotifications(prev => 
-        prev.map(n => n.id === notificationId ? { ...n, is_read: true } : n)
-      );
-      setUnreadCount(prev => Math.max(0, prev - 1));
+      if (mountedRef.current) {
+        setNotifications(prev => 
+          prev.map(n => n.id === notificationId ? { ...n, is_read: true } : n)
+        );
+        setUnreadCount(prev => Math.max(0, prev - 1));
+      }
     } catch (error) {
       console.error('Error marking notification as read:', error);
     }
   };
 
   const markAllAsRead = async () => {
-    if (!userId) return;
+    if (!userId || !mountedRef.current) return;
 
     try {
       const { error } = await supabase
@@ -121,8 +127,10 @@ export const useNotifications = (userId: string | null) => {
 
       if (error) throw error;
 
-      setNotifications(prev => prev.map(n => ({ ...n, is_read: true })));
-      setUnreadCount(0);
+      if (mountedRef.current) {
+        setNotifications(prev => prev.map(n => ({ ...n, is_read: true })));
+        setUnreadCount(0);
+      }
     } catch (error) {
       console.error('Error marking all notifications as read:', error);
     }

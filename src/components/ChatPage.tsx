@@ -22,14 +22,19 @@ const ChatPage = ({ currentUser }: ChatPageProps) => {
   const { toast } = useToast();
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const channelRef = useRef<any>(null);
-  const isSubscribedRef = useRef(false);
+  const mountedRef = useRef(true);
 
   useEffect(() => {
+    mountedRef.current = true;
     fetchMatches();
+    
+    return () => {
+      mountedRef.current = false;
+    };
   }, [currentUser]);
 
   useEffect(() => {
-    if (selectedMatch) {
+    if (selectedMatch && mountedRef.current) {
       fetchMessages();
       markMessagesAsRead();
     }
@@ -40,54 +45,47 @@ const ChatPage = ({ currentUser }: ChatPageProps) => {
   }, [messages]);
 
   useEffect(() => {
-    if (!currentUser?.id) return;
+    if (!currentUser?.id || !mountedRef.current) return;
 
     // Clean up existing channel if it exists
     if (channelRef.current) {
       supabase.removeChannel(channelRef.current);
       channelRef.current = null;
-      isSubscribedRef.current = false;
     }
 
-    // Prevent multiple subscriptions
-    if (isSubscribedRef.current) return;
-
-    // Create unique channel name to avoid conflicts
-    const channelName = `chat-updates-${currentUser.id}-${Date.now()}`;
-    
     // Subscribe to new messages for real-time updates
     const channel = supabase
-      .channel(channelName)
+      .channel(`chat-realtime-${currentUser.id}`)
       .on('postgres_changes', {
         event: 'INSERT',
         schema: 'public',
         table: 'chats'
       }, () => {
-        fetchMatches();
-        if (selectedMatch) {
-          fetchMessages();
+        if (mountedRef.current) {
+          fetchMatches();
+          if (selectedMatch) {
+            fetchMessages();
+          }
         }
       })
       .subscribe();
 
     channelRef.current = channel;
-    isSubscribedRef.current = true;
 
     return () => {
       if (channelRef.current) {
         supabase.removeChannel(channelRef.current);
         channelRef.current = null;
-        isSubscribedRef.current = false;
       }
     };
-  }, [currentUser?.id]); // Removed selectedMatch from dependencies to prevent unnecessary re-subscriptions
+  }, [currentUser?.id, selectedMatch]);
 
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   };
 
   const fetchMatches = async () => {
-    if (!currentUser?.id) return;
+    if (!currentUser?.id || !mountedRef.current) return;
 
     try {
       const { data, error } = await supabase
@@ -111,28 +109,30 @@ const ChatPage = ({ currentUser }: ChatPageProps) => {
         };
       }) || [];
 
-      setMatches(matchesWithPartner);
-      
-      // Fetch message counts for each match
-      const counts: Record<string, number> = {};
-      for (const match of matchesWithPartner) {
-        const { count, error } = await supabase
-          .from('chats')
-          .select('*', { count: 'exact', head: true })
-          .eq('match_id', match.id);
+      if (mountedRef.current) {
+        setMatches(matchesWithPartner);
         
-        if (!error) {
-          counts[match.id] = count || 0;
+        // Fetch message counts for each match
+        const counts: Record<string, number> = {};
+        for (const match of matchesWithPartner) {
+          const { count, error } = await supabase
+            .from('chats')
+            .select('*', { count: 'exact', head: true })
+            .eq('match_id', match.id);
+          
+          if (!error) {
+            counts[match.id] = count || 0;
+          }
         }
+        setMessageCounts(counts);
       }
-      setMessageCounts(counts);
     } catch (error) {
       console.error('Error fetching matches:', error);
     }
   };
 
   const fetchMessages = async () => {
-    if (!selectedMatch?.id) return;
+    if (!selectedMatch?.id || !mountedRef.current) return;
 
     try {
       const { data, error } = await supabase
@@ -145,14 +145,17 @@ const ChatPage = ({ currentUser }: ChatPageProps) => {
         .order('created_at', { ascending: true });
 
       if (error) throw error;
-      setMessages(data || []);
+      
+      if (mountedRef.current) {
+        setMessages(data || []);
+      }
     } catch (error) {
       console.error('Error fetching messages:', error);
     }
   };
 
   const markMessagesAsRead = async () => {
-    if (!selectedMatch?.id || !currentUser?.id) return;
+    if (!selectedMatch?.id || !currentUser?.id || !mountedRef.current) return;
 
     try {
       const isUser1 = selectedMatch.user1_id === currentUser.id;
@@ -163,14 +166,16 @@ const ChatPage = ({ currentUser }: ChatPageProps) => {
         .update({ [updateField]: 0 })
         .eq('id', selectedMatch.id);
 
-      fetchMatches();
+      if (mountedRef.current) {
+        fetchMatches();
+      }
     } catch (error) {
       console.error('Error marking messages as read:', error);
     }
   };
 
   const sendMessage = async () => {
-    if (!newMessage.trim() || !selectedMatch?.id) return;
+    if (!newMessage.trim() || !selectedMatch?.id || !mountedRef.current) return;
 
     try {
       const { error } = await supabase
@@ -184,8 +189,10 @@ const ChatPage = ({ currentUser }: ChatPageProps) => {
       if (error) throw error;
 
       setNewMessage('');
-      fetchMessages();
-      fetchMatches();
+      if (mountedRef.current) {
+        fetchMessages();
+        fetchMatches();
+      }
     } catch (error) {
       console.error('Error sending message:', error);
       toast({

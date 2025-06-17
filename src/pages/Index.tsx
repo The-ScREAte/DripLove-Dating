@@ -9,33 +9,102 @@ import { supabase } from '@/integrations/supabase/client';
 const Index = () => {
   const [currentView, setCurrentView] = useState<'welcome' | 'login' | 'register' | 'app'>('welcome');
   const [user, setUser] = useState<any>(null);
+  const [profile, setProfile] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const { toast } = useToast();
 
   useEffect(() => {
     // Check for existing session
-    supabase.auth.getSession().then(({ data: { session } }) => {
-      setUser(session?.user || null);
-      if (session?.user) {
-        setCurrentView('app');
+    const initializeAuth = async () => {
+      try {
+        const { data: { session }, error } = await supabase.auth.getSession();
+        
+        if (error) {
+          console.error('Auth error:', error);
+          setCurrentView('welcome');
+          setLoading(false);
+          return;
+        }
+
+        if (session?.user) {
+          // Validate user by checking if profile exists
+          const { data: profileData, error: profileError } = await supabase
+            .from('profiles')
+            .select('*')
+            .eq('id', session.user.id)
+            .single();
+
+          if (profileError || !profileData) {
+            console.error('Invalid user - no profile found:', profileError);
+            toast({
+              title: "Access Denied",
+              description: "Your account is not properly configured. Please contact support.",
+              variant: "destructive",
+            });
+            await supabase.auth.signOut();
+            setCurrentView('welcome');
+          } else {
+            setUser(session.user);
+            setProfile(profileData);
+            setCurrentView('app');
+          }
+        } else {
+          setCurrentView('welcome');
+        }
+      } catch (error) {
+        console.error('Initialization error:', error);
+        setCurrentView('welcome');
+      } finally {
+        setLoading(false);
       }
-      setLoading(false);
-    });
+    };
+
+    initializeAuth();
 
     // Listen for auth changes
-    const {
-      data: { subscription },
-    } = supabase.auth.onAuthStateChange((_event, session) => {
-      setUser(session?.user || null);
-      if (session?.user) {
-        setCurrentView('app');
-      } else {
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
+      console.log('Auth state changed:', event, session?.user?.id);
+      
+      if (event === 'SIGNED_OUT' || !session?.user) {
+        setUser(null);
+        setProfile(null);
         setCurrentView('welcome');
+        return;
+      }
+
+      if (event === 'SIGNED_IN' && session?.user) {
+        // Validate user by checking if profile exists
+        try {
+          const { data: profileData, error: profileError } = await supabase
+            .from('profiles')
+            .select('*')
+            .eq('id', session.user.id)
+            .single();
+
+          if (profileError || !profileData) {
+            console.error('Invalid user - no profile found:', profileError);
+            toast({
+              title: "Access Denied",
+              description: "Your account is not properly configured. Please contact support.",
+              variant: "destructive",
+            });
+            await supabase.auth.signOut();
+            setCurrentView('welcome');
+          } else {
+            setUser(session.user);
+            setProfile(profileData);
+            setCurrentView('app');
+          }
+        } catch (error) {
+          console.error('Profile validation error:', error);
+          await supabase.auth.signOut();
+          setCurrentView('welcome');
+        }
       }
     });
 
     return () => subscription.unsubscribe();
-  }, []);
+  }, [toast]);
 
   const handleGetStarted = () => {
     setCurrentView('login');
@@ -58,14 +127,12 @@ const Index = () => {
 
       if (error) throw error;
 
-      toast({
-        title: "Welcome back!",
-        description: "You've been successfully logged in.",
-      });
+      // User validation will happen in the auth state change listener
     } catch (error: any) {
+      console.error('Login error:', error);
       toast({
-        title: "Error",
-        description: error.message,
+        title: "Login Error",
+        description: error.message || "Failed to login. Please check your credentials.",
         variant: "destructive",
       });
     }
@@ -145,9 +212,12 @@ const Index = () => {
     }
   };
 
-  const handleLogout = () => {
-    setUser(null);
-    setCurrentView('welcome');
+  const handleLogout = async () => {
+    try {
+      await supabase.auth.signOut();
+    } catch (error) {
+      console.error('Logout error:', error);
+    }
   };
 
   if (loading) {
@@ -159,7 +229,7 @@ const Index = () => {
   }
 
   if (currentView === 'welcome') {
-    return <WelcomeScreen onGetStarted={handleGetStarted} />;
+    return <WelcomeScreen onGetStarted={() => setCurrentView('login')} />;
   }
 
   if (currentView === 'login') {
@@ -167,7 +237,7 @@ const Index = () => {
       <div className="min-h-screen bg-gradient-to-br from-pink-400 via-purple-500 to-indigo-600 flex items-center justify-center p-4">
         <AuthForm 
           isLogin={true}
-          onToggle={handleShowRegister}
+          onToggle={() => setCurrentView('register')}
           onSubmit={handleLogin}
         />
       </div>
@@ -178,14 +248,84 @@ const Index = () => {
     return (
       <div className="min-h-screen bg-gradient-to-br from-pink-400 via-purple-500 to-indigo-600 flex items-center justify-center p-4">
         <RegistrationForm 
-          onSubmit={handleRegister}
-          onBackToLogin={handleBackToLogin}
+          onSubmit={async (formData: any) => {
+            try {
+              if (formData.password !== formData.confirmPassword) {
+                throw new Error("Passwords don't match");
+              }
+
+              const transformedData = {
+                first_name: formData.firstName,
+                last_name: formData.lastName,
+                date_of_birth: formData.dateOfBirth,
+                country: formData.country,
+                city: formData.city,
+                bio: formData.bio,
+                preference: formData.preference,
+                interests: formData.interests,
+                gender: formData.gender,
+                relationship_intent: formData.relationshipIntent,
+                smoking: formData.smoking,
+                drinking: formData.drinking,
+                exercise_level: formData.exerciseLevel,
+                sleeping_schedule: formData.sleepingSchedule,
+                occupation: formData.occupation,
+                industry: formData.industry,
+                education_level: formData.educationLevel,
+                zip_code: formData.zipCode,
+                introvert_extrovert: formData.introvertExtrovert[0],
+                spontaneous_planner: formData.spontaneousPlanner[0],
+                messy_organized: formData.messyOrganized[0],
+                fun_fact: formData.funFact,
+                perfect_first_date: formData.perfectFirstDate,
+                last_googled: formData.lastGoogled,
+              };
+
+              const { data, error } = await supabase.auth.signUp({
+                email: formData.email,
+                password: formData.password,
+                options: {
+                  emailRedirectTo: `${window.location.origin}/`,
+                  data: transformedData,
+                },
+              });
+
+              if (error) {
+                if (error.message.includes('User already registered')) {
+                  throw new Error("An account with this email already exists. Please try logging in instead.");
+                }
+                throw error;
+              }
+
+              toast({
+                title: "Account created!",
+                description: "Welcome to LoveConnect! You can now start using the app.",
+              });
+            } catch (error: any) {
+              console.error('Registration error:', error);
+              toast({
+                title: "Registration Error",
+                description: error.message || "Failed to create account. Please try again.",
+                variant: "destructive",
+              });
+            }
+          }}
+          onBackToLogin={() => setCurrentView('login')}
         />
       </div>
     );
   }
 
-  return <MainApp user={user} onLogout={handleLogout} />;
+  return user && profile ? (
+    <MainApp user={user} onLogout={handleLogout} />
+  ) : (
+    <div className="min-h-screen bg-gradient-to-br from-pink-400 via-purple-500 to-indigo-600 flex items-center justify-center">
+      <div className="text-white text-center">
+        <h2 className="text-2xl font-bold mb-4">Loading...</h2>
+        <p>Please wait while we set up your account.</p>
+      </div>
+    </div>
+  );
 };
 
 export default Index;

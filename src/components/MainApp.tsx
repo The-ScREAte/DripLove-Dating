@@ -1,13 +1,14 @@
-
 import React, { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Heart, MessageCircle, Users, User, Settings } from 'lucide-react';
+import { Badge } from '@/components/ui/badge';
 import DiscoverPage from '@/components/DiscoverPage';
 import ChatPage from '@/components/ChatPage';
 import LikedMePage from '@/components/LikedMePage';
 import ProfilePage from '@/components/ProfilePage';
 import AdminDashboard from '@/components/AdminDashboard';
 import NotificationsDropdown from '@/components/NotificationsDropdown';
+import { useChatNotifications } from '@/hooks/useChatNotifications';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 
@@ -20,6 +21,7 @@ const MainApp = ({ user, onLogout }: MainAppProps) => {
   const [activeTab, setActiveTab] = useState('discover');
   const [profile, setProfile] = useState<any>(null);
   const { toast } = useToast();
+  const { unreadChatCount } = useChatNotifications(user?.id);
 
   useEffect(() => {
     fetchUserProfile();
@@ -129,14 +131,21 @@ const MainApp = ({ user, onLogout }: MainAppProps) => {
               
               <button
                 onClick={() => setActiveTab('chat')}
-                className={`w-full flex items-center space-x-3 px-4 py-3 rounded-lg transition-colors ${
+                className={`w-full flex items-center justify-between px-4 py-3 rounded-lg transition-colors ${
                   activeTab === 'chat'
                     ? 'bg-gradient-to-r from-pink-500 to-purple-600 text-white'
                     : 'text-gray-600 hover:bg-gray-100'
                 }`}
               >
-                <MessageCircle className="w-5 h-5" />
-                <span>Chat</span>
+                <div className="flex items-center space-x-3">
+                  <MessageCircle className="w-5 h-5" />
+                  <span>Chat</span>
+                </div>
+                {unreadChatCount > 0 && (
+                  <Badge variant="destructive" className="text-xs">
+                    {unreadChatCount}
+                  </Badge>
+                )}
               </button>
               
               <button
@@ -203,7 +212,7 @@ const MainApp = ({ user, onLogout }: MainAppProps) => {
           
           <button
             onClick={() => setActiveTab('chat')}
-            className={`flex flex-col items-center space-y-1 py-2 px-2 rounded-lg transition-colors ${
+            className={`flex flex-col items-center space-y-1 py-2 px-2 rounded-lg transition-colors relative ${
               activeTab === 'chat'
                 ? 'text-pink-600'
                 : 'text-gray-500'
@@ -211,6 +220,14 @@ const MainApp = ({ user, onLogout }: MainAppProps) => {
           >
             <MessageCircle className={`w-5 h-5 ${activeTab === 'chat' ? 'fill-current' : ''}`} />
             <span className="text-xs font-medium">Chat</span>
+            {unreadChatCount > 0 && (
+              <Badge 
+                variant="destructive" 
+                className="absolute -top-1 -right-1 min-w-[18px] h-4 text-xs px-1"
+              >
+                {unreadChatCount}
+              </Badge>
+            )}
           </button>
           
           <button
