@@ -168,6 +168,10 @@ const ChatPage = ({ currentUser, onUnreadChange }: ChatPageProps) => {
     setIsUserProfileOpen(true);
   };
 
+  const handleUserAvatarClick = (userId: string) => {
+    handleUserProfileClick(userId);
+  };
+
   return (
     <div className="flex flex-col h-[calc(100vh-200px)] max-w-6xl mx-auto">
       {/* Matches Sidebar */}
@@ -206,10 +210,7 @@ const ChatPage = ({ currentUser, onUnreadChange }: ChatPageProps) => {
                         userId={match.partner?.id}
                         firstName={match.partner?.first_name}
                         lastName={match.partner?.last_name}
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          handleUserProfileClick(match.partner?.id);
-                        }}
+                        onClick={() => handleUserAvatarClick(match.partner?.id)}
                       />
                       <div className="flex-1">
                         <div className="flex justify-between items-center">
@@ -241,7 +242,7 @@ const ChatPage = ({ currentUser, onUnreadChange }: ChatPageProps) => {
                     userId={selectedMatch.partner?.id}
                     firstName={selectedMatch.partner?.first_name}
                     lastName={selectedMatch.partner?.last_name}
-                    onClick={() => handleUserProfileClick(selectedMatch.partner?.id)}
+                    onClick={() => handleUserAvatarClick(selectedMatch.partner?.id)}
                     size="lg"
                   />
                   <CardTitle>
@@ -273,7 +274,7 @@ const ChatPage = ({ currentUser, onUnreadChange }: ChatPageProps) => {
                               firstName={message.sender.first_name}
                               lastName={message.sender.last_name}
                               size="sm"
-                              onClick={() => handleUserProfileClick(message.sender_id)}
+                              onClick={() => handleUserAvatarClick(message.sender_id)}
                             />
                           </div>
                         )}
