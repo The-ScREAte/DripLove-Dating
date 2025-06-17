@@ -7,6 +7,7 @@ import MainApp from '@/components/MainApp';
 import AdminPage from '@/components/AdminPage';
 import { supabase } from '@/integrations/supabase/client';
 import { User, Session } from '@supabase/supabase-js';
+import { useToast } from '@/hooks/use-toast';
 
 const Index = () => {
   const [user, setUser] = useState<User | null>(null);
@@ -15,6 +16,8 @@ const Index = () => {
   const [showAdmin, setShowAdmin] = useState(false);
   const [isAdmin, setIsAdmin] = useState(false);
   const [loading, setLoading] = useState(true);
+  const [isLogin, setIsLogin] = useState(true);
+  const { toast } = useToast();
 
   useEffect(() => {
     // Set up auth state listener
@@ -66,11 +69,65 @@ const Index = () => {
   }, []);
 
   const handleGetStarted = () => {
+    setIsLogin(false);
     setShowAuth(true);
   };
 
   const handleAdminAccess = () => {
+    setIsLogin(true);
     setShowAuth(true);
+  };
+
+  const handleToggleAuthMode = () => {
+    setIsLogin(!isLogin);
+  };
+
+  const handleAuthSubmit = async (formData: { email: string; password: string }) => {
+    try {
+      if (isLogin) {
+        const { error } = await supabase.auth.signInWithPassword({
+          email: formData.email,
+          password: formData.password,
+        });
+        
+        if (error) {
+          toast({
+            title: "Sign In Failed",
+            description: error.message,
+            variant: "destructive",
+          });
+        }
+      } else {
+        const redirectUrl = `${window.location.origin}/`;
+        const { error } = await supabase.auth.signUp({
+          email: formData.email,
+          password: formData.password,
+          options: {
+            emailRedirectTo: redirectUrl
+          }
+        });
+        
+        if (error) {
+          toast({
+            title: "Sign Up Failed",
+            description: error.message,
+            variant: "destructive",
+          });
+        } else {
+          toast({
+            title: "Check your email",
+            description: "We've sent you a confirmation link to complete your registration.",
+          });
+        }
+      }
+    } catch (error) {
+      console.error('Auth error:', error);
+      toast({
+        title: "Authentication Error",
+        description: "An unexpected error occurred. Please try again.",
+        variant: "destructive",
+      });
+    }
   };
 
   const handleLogout = async () => {
@@ -119,10 +176,24 @@ const Index = () => {
   // Show auth form
   if (showAuth) {
     return (
-      <>
-        <AuthForm onBack={() => setShowAuth(false)} />
+      <div className="min-h-screen bg-gradient-to-br from-pink-50 to-purple-50 flex items-center justify-center p-4">
+        <div className="w-full max-w-md">
+          <AuthForm 
+            isLogin={isLogin}
+            onToggle={handleToggleAuthMode}
+            onSubmit={handleAuthSubmit}
+          />
+          <div className="mt-4 text-center">
+            <button
+              onClick={() => setShowAuth(false)}
+              className="text-pink-600 hover:text-pink-700 font-medium"
+            >
+              ← Back to Home
+            </button>
+          </div>
+        </div>
         <Toaster />
-      </>
+      </div>
     );
   }
 
