@@ -14,6 +14,7 @@ const DiscoverPage = ({ currentUser }: DiscoverPageProps) => {
   const [profiles, setProfiles] = useState<any[]>([]);
   const [currentIndex, setCurrentIndex] = useState(0);
   const [loading, setLoading] = useState(true);
+  const [userImages, setUserImages] = useState<{ [key: string]: string[] }>({});
   const { toast } = useToast();
 
   useEffect(() => {
@@ -24,13 +25,52 @@ const DiscoverPage = ({ currentUser }: DiscoverPageProps) => {
     if (!currentUser?.id) return;
     
     try {
-      const { data, error } = await supabase
+      // Get profiles that current user hasn't liked yet
+      const { data: likedProfiles } = await supabase
+        .from('likes')
+        .select('liked_id')
+        .eq('liker_id', currentUser.id);
+      
+      const likedIds = likedProfiles?.map(like => like.liked_id) || [];
+      
+      let query = supabase
         .from('profiles')
         .select('*')
         .neq('id', currentUser.id)
         .limit(10);
       
+      if (likedIds.length > 0) {
+        query = query.not('id', 'in', `(${likedIds.join(',')})`);
+      }
+      
+      const { data, error } = await query;
+      
       if (error) throw error;
+      
+      // Fetch images for each profile
+      if (data && data.length > 0) {
+        const imagePromises = data.map(async (profile) => {
+          const { data: images } = await supabase
+            .from('user_images')
+            .select('image_url')
+            .eq('user_id', profile.id)
+            .order('image_order');
+          
+          return {
+            profileId: profile.id,
+            images: images?.map(img => img.image_url) || []
+          };
+        });
+        
+        const imageResults = await Promise.all(imagePromises);
+        const imageMap: { [key: string]: string[] } = {};
+        imageResults.forEach(result => {
+          imageMap[result.profileId] = result.images;
+        });
+        
+        setUserImages(imageMap);
+      }
+      
       setProfiles(data || []);
     } catch (error) {
       console.error('Error fetching profiles:', error);
@@ -57,12 +97,47 @@ const DiscoverPage = ({ currentUser }: DiscoverPageProps) => {
     return age;
   };
 
-  const handleSwipe = (direction: 'like' | 'pass') => {
+  const handleSwipe = async (direction: 'like' | 'pass') => {
+    const currentProfile = profiles[currentIndex];
+    
     if (direction === 'like') {
-      toast({
-        title: "Liked!",
-        description: `You liked ${profiles[currentIndex]?.first_name}`,
-      });
+      try {
+        const { error } = await supabase
+          .from('likes')
+          .insert({
+            liker_id: currentUser.id,
+            liked_id: currentProfile.id
+          });
+        
+        if (error) throw error;
+        
+        // Check if it's a match
+        const { data: existingLike } = await supabase
+          .from('likes')
+          .select('*')
+          .eq('liker_id', currentProfile.id)
+          .eq('liked_id', currentUser.id)
+          .single();
+        
+        if (existingLike) {
+          toast({
+            title: "It's a Match! 🎉",
+            description: `You and ${currentProfile.first_name} liked each other!`,
+          });
+        } else {
+          toast({
+            title: "Liked!",
+            description: `You liked ${currentProfile.first_name}`,
+          });
+        }
+      } catch (error) {
+        console.error('Error liking profile:', error);
+        toast({
+          title: "Error",
+          description: "Failed to like profile",
+          variant: "destructive",
+        });
+      }
     }
     
     setCurrentIndex(prev => prev + 1);
@@ -97,20 +172,33 @@ const DiscoverPage = ({ currentUser }: DiscoverPageProps) => {
   }
 
   const currentProfile = profiles[currentIndex];
+  const profileImages = userImages[currentProfile.id] || [];
 
   return (
     <div className="max-w-md mx-auto">
       <Card className="overflow-hidden shadow-2xl">
-        <div className="relative h-96 bg-gradient-to-br from-pink-200 to-purple-200">
-          <div className="absolute inset-0 flex items-center justify-center">
-            <div className="text-center">
-              <div className="w-32 h-32 bg-white rounded-full flex items-center justify-center mb-4 mx-auto">
-                <span className="text-4xl">
+        <div className="relative h-96">
+          {profileImages.length > 0 ? (
+            <img
+              src={profileImages[0]}
+              alt={`${currentProfile.first_name}'s photo`}
+              className="w-full h-full object-cover"
+            />
+          ) : (
+            <div className="w-full h-full bg-gradient-to-br from-pink-200 to-purple-200 flex items-center justify-center">
+              <div className="w-32 h-32 bg-white rounded-full flex items-center justify-center">
+                <span className="text-4xl font-bold text-gray-700">
                   {currentProfile.first_name?.[0]}{currentProfile.last_name?.[0]}
                 </span>
               </div>
             </div>
-          </div>
+          )}
+          
+          {profileImages.length > 1 && (
+            <div className="absolute top-4 right-4 bg-black bg-opacity-50 text-white px-2 py-1 rounded-full text-sm">
+              +{profileImages.length - 1} photos
+            </div>
+          )}
         </div>
         
         <CardContent className="p-6">
