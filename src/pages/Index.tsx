@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import WelcomeScreen from '@/components/WelcomeScreen';
 import AuthForm from '@/components/AuthForm';
@@ -52,7 +53,14 @@ const Index = () => {
       
       if (error) {
         console.error('Error fetching user profile:', error);
-        setCurrentView('app'); // Default to regular app if profile not found
+        // If profile doesn't exist, user might be an admin without a full profile
+        // Check auth metadata for admin flag
+        const { data: { user } } = await supabase.auth.getUser();
+        if (user?.user_metadata?.is_admin) {
+          setCurrentView('admin');
+        } else {
+          setCurrentView('app');
+        }
       } else if (profile?.is_admin) {
         setCurrentView('admin');
       } else {
@@ -79,7 +87,7 @@ const Index = () => {
   };
 
   const handleAdminAccess = () => {
-    setCurrentView('admin');
+    setCurrentView('login'); // Redirect to login instead of direct admin access
   };
 
   const handleBackToWelcome = () => {

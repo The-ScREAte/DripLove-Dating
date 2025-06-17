@@ -58,6 +58,8 @@ const AdminPage = () => {
   const [filteredUsers, setFilteredUsers] = useState<UserProfile[]>([]);
   const [searchTerm, setSearchTerm] = useState('');
   const [loading, setLoading] = useState(true);
+  const [isAuthorized, setIsAuthorized] = useState(false);
+  const [currentUser, setCurrentUser] = useState<any>(null);
   const [showCreateAdmin, setShowCreateAdmin] = useState(false);
   const [showManualMatch, setShowManualMatch] = useState(false);
   const [newAdmin, setNewAdmin] = useState({
@@ -73,46 +75,52 @@ const AdminPage = () => {
   const { toast } = useToast();
 
   useEffect(() => {
-    fetchStats();
-    fetchUsers();
-    
-    // Set up real-time subscriptions
-    const profilesChannel = supabase
-      .channel('admin-profiles')
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'profiles' }, () => {
-        fetchStats();
-        fetchUsers();
-      })
-      .subscribe();
-
-    const matchesChannel = supabase
-      .channel('admin-matches')
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'matches' }, () => {
-        fetchStats();
-      })
-      .subscribe();
-
-    const likesChannel = supabase
-      .channel('admin-likes')
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'likes' }, () => {
-        fetchStats();
-      })
-      .subscribe();
-
-    const chatsChannel = supabase
-      .channel('admin-chats')
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'chats' }, () => {
-        fetchStats();
-      })
-      .subscribe();
-
-    return () => {
-      supabase.removeChannel(profilesChannel);
-      supabase.removeChannel(matchesChannel);
-      supabase.removeChannel(likesChannel);
-      supabase.removeChannel(chatsChannel);
-    };
+    checkAdminAccess();
   }, []);
+
+  useEffect(() => {
+    if (isAuthorized) {
+      fetchStats();
+      fetchUsers();
+      
+      // Set up real-time subscriptions
+      const profilesChannel = supabase
+        .channel('admin-profiles')
+        .on('postgres_changes', { event: '*', schema: 'public', table: 'profiles' }, () => {
+          fetchStats();
+          fetchUsers();
+        })
+        .subscribe();
+
+      const matchesChannel = supabase
+        .channel('admin-matches')
+        .on('postgres_changes', { event: '*', schema: 'public', table: 'matches' }, () => {
+          fetchStats();
+        })
+        .subscribe();
+
+      const likesChannel = supabase
+        .channel('admin-likes')
+        .on('postgres_changes', { event: '*', schema: 'public', table: 'likes' }, () => {
+          fetchStats();
+        })
+        .subscribe();
+
+      const chatsChannel = supabase
+        .channel('admin-chats')
+        .on('postgres_changes', { event: '*', schema: 'public', table: 'chats' }, () => {
+          fetchStats();
+        })
+        .subscribe();
+
+      return () => {
+        supabase.removeChannel(profilesChannel);
+        supabase.removeChannel(matchesChannel);
+        supabase.removeChannel(likesChannel);
+        supabase.removeChannel(chatsChannel);
+      };
+    }
+  }, [isAuthorized]);
 
   useEffect(() => {
     if (searchTerm) {
@@ -127,15 +135,53 @@ const AdminPage = () => {
     }
   }, [searchTerm, users]);
 
+  const checkAdminAccess = async () => {
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      
+      if (!session?.user) {
+        setLoading(false);
+        return;
+      }
+
+      setCurrentUser(session.user);
+
+      const { data: profile, error } = await supabase
+        .from('profiles')
+        .select('is_admin')
+        .eq('id', session.user.id)
+        .single();
+
+      if (error || !profile?.is_admin) {
+        toast({
+          title: "Access Denied",
+          description: "You don't have admin privileges",
+          variant: "destructive",
+        });
+        setLoading(false);
+        return;
+      }
+
+      setIsAuthorized(true);
+    } catch (error) {
+      console.error('Error checking admin access:', error);
+      toast({
+        title: "Error",
+        description: "Failed to verify admin access",
+        variant: "destructive",
+      });
+    } finally {
+      setLoading(false);
+    }
+  };
+
   const fetchStats = async () => {
     try {
       const { data, error } = await supabase.rpc('get_app_stats');
       
       if (error) throw error;
       
-      // Properly handle the data type from the RPC call
       if (data && typeof data === 'object' && !Array.isArray(data)) {
-        // Transform the data to match our AdminStats interface
         const statsData: AdminStats = {
           total_users: Number(data.total_users) || 0,
           total_matches: Number(data.total_matches) || 0,
@@ -158,8 +204,6 @@ const AdminPage = () => {
         description: "Failed to fetch admin statistics",
         variant: "destructive",
       });
-    } finally {
-      setLoading(false);
     }
   };
 
@@ -210,19 +254,14 @@ const AdminPage = () => {
             first_name: newAdmin.firstName,
             last_name: newAdmin.lastName,
             is_admin: true,
-            // Required fields for the handle_new_user trigger
-            date_of_birth: '1990-01-01',
-            country: 'Admin',
-            city: 'Admin',
-            preference: 'both' // Use a valid preference value
           },
         },
       });
       
       if (error) throw error;
       
+      // Manually create profile for admin (since we don't want the trigger to create a full profile)
       if (data.user) {
-        // Also insert directly into profiles with admin flag
         await supabase.from("profiles").insert({
           id: data.user.id,
           email: data.user.email,
@@ -233,7 +272,7 @@ const AdminPage = () => {
           country: 'Admin',
           city: 'Admin',
           bio: 'Admin User',
-          preference: 'both', // Use a valid preference value
+          preference: 'both',
           interests: [],
           account_status: 'active'
         });
@@ -361,12 +400,30 @@ const AdminPage = () => {
     }
   };
 
+  // Filter out admin users for manual matching
   const nonAdminUsers = users.filter(user => !user.is_admin);
 
   if (loading) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-pink-50 to-purple-50 flex items-center justify-center">
         <div className="animate-spin rounded-full h-32 w-32 border-b-2 border-pink-600"></div>
+      </div>
+    );
+  }
+
+  if (!isAuthorized) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-pink-50 to-purple-50 flex items-center justify-center">
+        <Card className="w-96">
+          <CardContent className="p-8 text-center">
+            <Shield className="w-16 h-16 mx-auto mb-4 text-red-500" />
+            <h2 className="text-2xl font-bold mb-2">Access Denied</h2>
+            <p className="text-gray-600 mb-4">You don't have admin privileges to access this page.</p>
+            <Button onClick={() => window.location.href = '/'}>
+              Go Back
+            </Button>
+          </CardContent>
+        </Card>
       </div>
     );
   }
