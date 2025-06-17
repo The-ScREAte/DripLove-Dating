@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Users, Heart, MessageCircle, UserX, TrendingUp, Activity } from 'lucide-react';
@@ -67,7 +66,8 @@ const AdminPage = () => {
       
       if (error) throw error;
       
-      setStats(data);
+      // Type cast the Json response to our AdminStats interface
+      setStats(data as AdminStats);
     } catch (error) {
       console.error('Error fetching admin stats:', error);
       toast({
