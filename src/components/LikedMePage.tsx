@@ -1,8 +1,7 @@
-
 import React, { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Users, Heart, X, MessageCircle, Calendar, MapPin } from 'lucide-react';
+import { Users, Heart, X, Calendar, MapPin } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 
@@ -25,27 +24,14 @@ const LikedMePage = ({ currentUser }: LikedMePageProps) => {
     if (!currentUser?.id) return;
 
     try {
-      // Get people who liked the current user, excluding those already liked back
-      const { data: myLikes } = await supabase
-        .from('likes')
-        .select('liked_id')
-        .eq('liker_id', currentUser.id);
-
-      const myLikedIds = myLikes?.map(like => like.liked_id) || [];
-
-      let query = supabase
+      // Get people who liked the current user
+      const { data: likes, error } = await supabase
         .from('likes')
         .select(`
           *,
           liker:profiles!likes_liker_id_fkey(*)
         `)
         .eq('liked_id', currentUser.id);
-
-      if (myLikedIds.length > 0) {
-        query = query.not('liker_id', 'in', `(${myLikedIds.join(',')})`);
-      }
-
-      const { data: likes, error } = await query;
 
       if (error) throw error;
 
@@ -120,22 +106,23 @@ const LikedMePage = ({ currentUser }: LikedMePageProps) => {
       }
 
       // Create the like back
-      const { error } = await supabase
+      const { error: likeError } = await supabase
         .from('likes')
         .insert({
           liker_id: currentUser.id,
           liked_id: profileId
         });
 
-      if (error) throw error;
+      if (likeError) throw likeError;
 
       toast({
         title: "It's a Match! 🎉",
         description: "You can now start chatting!",
       });
 
-      // Refresh the likers list
-      fetchLikers();
+      // Remove from likers list since they're now matched
+      setLikers(prev => prev.filter(liker => liker.id !== profileId));
+      setSelectedProfile(null);
     } catch (error) {
       console.error('Error liking back:', error);
       toast({
@@ -148,6 +135,7 @@ const LikedMePage = ({ currentUser }: LikedMePageProps) => {
 
   const handlePass = async (profileId: string) => {
     try {
+      // Remove the like from the likes table
       const { error } = await supabase
         .from('likes')
         .delete()
@@ -161,8 +149,9 @@ const LikedMePage = ({ currentUser }: LikedMePageProps) => {
         description: "Profile removed from your likes",
       });
 
-      // Refresh the likers list
-      fetchLikers();
+      // Remove from likers list
+      setLikers(prev => prev.filter(liker => liker.id !== profileId));
+      setSelectedProfile(null);
     } catch (error) {
       console.error('Error passing:', error);
       toast({

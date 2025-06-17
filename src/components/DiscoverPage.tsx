@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -138,6 +137,7 @@ const DiscoverPage = ({ currentUser }: DiscoverPageProps) => {
           description: "Failed to like profile",
           variant: "destructive",
         });
+        return; // Don't proceed to next profile if there was an error
       }
     }
     
