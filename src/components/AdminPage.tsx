@@ -133,9 +133,20 @@ const AdminPage = () => {
       
       if (error) throw error;
       
-      // Type assertion with validation
+      // Properly handle the data type from the RPC call
       if (data && typeof data === 'object' && !Array.isArray(data)) {
-        setStats(data as AdminStats);
+        // Transform the data to match our AdminStats interface
+        const statsData: AdminStats = {
+          total_users: Number(data.total_users) || 0,
+          total_matches: Number(data.total_matches) || 0,
+          total_likes: Number(data.total_likes) || 0,
+          total_blocks: Number(data.total_blocks) || 0,
+          total_messages: Number(data.total_messages) || 0,
+          active_users_today: Number(data.active_users_today) || 0,
+          new_users_this_week: Number(data.new_users_this_week) || 0,
+          matches_this_week: Number(data.matches_this_week) || 0,
+        };
+        setStats(statsData);
       } else {
         console.error('Invalid stats data format:', data);
         setStats(null);
@@ -203,7 +214,7 @@ const AdminPage = () => {
             date_of_birth: '1990-01-01',
             country: 'Admin',
             city: 'Admin',
-            preference: 'admin'
+            preference: 'both' // Use a valid preference value
           },
         },
       });
@@ -222,7 +233,7 @@ const AdminPage = () => {
           country: 'Admin',
           city: 'Admin',
           bio: 'Admin User',
-          preference: 'admin',
+          preference: 'both', // Use a valid preference value
           interests: [],
           account_status: 'active'
         });
@@ -338,15 +349,6 @@ const AdminPage = () => {
         description: error.message || "Failed to delete user",
         variant: "destructive",
       });
-    }
-  };
-
-  const getStatusColor = (status: string) => {
-    switch (status) {
-      case 'active': return 'text-green-600';
-      case 'blocked': return 'text-red-600';
-      case 'on_hold': return 'text-yellow-600';
-      default: return 'text-gray-600';
     }
   };
 
