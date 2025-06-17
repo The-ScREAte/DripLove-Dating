@@ -2,10 +2,11 @@ import React, { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { MessageCircle, Send, ArrowLeft, Shield } from 'lucide-react';
+import { MessageCircle, Send, ArrowLeft, Shield, Smile, Image } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import BlockDialog from './BlockDialog';
+import EmojiPicker from './EmojiPicker';
 
 interface ChatPageProps {
   currentUser: any;
@@ -18,6 +19,7 @@ const ChatPage = ({ currentUser }: ChatPageProps) => {
   const [newMessage, setNewMessage] = useState('');
   const [loading, setLoading] = useState(true);
   const [blockDialogOpen, setBlockDialogOpen] = useState(false);
+  const [showEmojiPicker, setShowEmojiPicker] = useState(false);
   const { toast } = useToast();
 
   useEffect(() => {
@@ -185,6 +187,102 @@ const ChatPage = ({ currentUser }: ChatPageProps) => {
     }
   };
 
+  const handleEmojiSelect = (emoji: string) => {
+    setNewMessage(prev => prev + emoji);
+    setShowEmojiPicker(false);
+  };
+
+  const handleImageUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (!file || !selectedMatch) return;
+
+    try {
+      // Upload image to storage
+      const fileExt = file.name.split('.').pop();
+      const fileName = `${currentUser.id}/${Date.now()}.${fileExt}`;
+      
+      const { data, error } = await supabase.storage
+        .from('loveconnect')
+        .upload(fileName, file);
+
+      if (error) {
+        console.error('Image upload error:', error);
+        toast({
+          title: "Upload Failed",
+          description: "Could not upload image. Please try again.",
+          variant: "destructive",
+        });
+        return;
+      }
+
+      // Get public URL
+      const { data: { publicUrl } } = supabase.storage
+        .from('loveconnect')
+        .getPublicUrl(fileName);
+
+      // Send image message
+      const { error: chatError } = await supabase
+        .from('chats')
+        .insert({
+          match_id: selectedMatch.id,
+          sender_id: currentUser.id,
+          message: `[IMAGE]${publicUrl}`
+        });
+
+      if (chatError) throw chatError;
+
+    } catch (error) {
+      console.error('Error uploading image:', error);
+      toast({
+        title: "Error",
+        description: "Failed to send image",
+        variant: "destructive",
+      });
+    }
+  };
+
+  const renderMessage = (message: any) => {
+    const isImage = message.message.startsWith('[IMAGE]');
+    const content = isImage ? message.message.replace('[IMAGE]', '') : message.message;
+
+    return (
+      <div
+        key={message.id}
+        className={`flex ${message.sender_id === currentUser.id ? 'justify-end' : 'justify-start'}`}
+      >
+        <div
+          className={`max-w-xs lg:max-w-md px-4 py-2 rounded-lg ${
+            message.sender_id === currentUser.id
+              ? 'bg-pink-500 text-white'
+              : 'bg-gray-100 text-gray-800'
+          }`}
+        >
+          {isImage ? (
+            <img 
+              src={content} 
+              alt="Shared image" 
+              className="max-w-full h-auto rounded"
+              onError={(e) => {
+                e.currentTarget.style.display = 'none';
+                e.currentTarget.parentElement!.innerHTML = '<p class="text-sm">Image failed to load</p>';
+              }}
+            />
+          ) : (
+            <p className="text-sm">{content}</p>
+          )}
+          <p className={`text-xs mt-1 ${
+            message.sender_id === currentUser.id ? 'text-pink-100' : 'text-gray-500'
+          }`}>
+            {new Date(message.created_at).toLocaleTimeString([], { 
+              hour: '2-digit', 
+              minute: '2-digit' 
+            })}
+          </p>
+        </div>
+      </div>
+    );
+  };
+
   const handleBlock = () => {
     setBlockDialogOpen(true);
   };
@@ -257,33 +355,10 @@ const ChatPage = ({ currentUser }: ChatPageProps) => {
           
           <CardContent className="flex-1 flex flex-col">
             <div className="flex-1 overflow-y-auto space-y-3 mb-4 max-h-96">
-              {messages.map((message) => (
-                <div
-                  key={message.id}
-                  className={`flex ${message.sender_id === currentUser.id ? 'justify-end' : 'justify-start'}`}
-                >
-                  <div
-                    className={`max-w-xs lg:max-w-md px-4 py-2 rounded-lg ${
-                      message.sender_id === currentUser.id
-                        ? 'bg-pink-500 text-white'
-                        : 'bg-gray-100 text-gray-800'
-                    }`}
-                  >
-                    <p className="text-sm">{message.message}</p>
-                    <p className={`text-xs mt-1 ${
-                      message.sender_id === currentUser.id ? 'text-pink-100' : 'text-gray-500'
-                    }`}>
-                      {new Date(message.created_at).toLocaleTimeString([], { 
-                        hour: '2-digit', 
-                        minute: '2-digit' 
-                      })}
-                    </p>
-                  </div>
-                </div>
-              ))}
+              {messages.map(renderMessage)}
             </div>
             
-            <div className="flex space-x-2">
+            <div className="flex space-x-2 relative">
               <Input
                 placeholder="Type a message..."
                 value={newMessage}
@@ -292,12 +367,40 @@ const ChatPage = ({ currentUser }: ChatPageProps) => {
                 className="flex-1"
               />
               <Button
+                onClick={() => setShowEmojiPicker(!showEmojiPicker)}
+                variant="outline"
+                size="icon"
+              >
+                <Smile className="w-4 h-4" />
+              </Button>
+              <Button
+                onClick={() => document.getElementById('image-upload')?.click()}
+                variant="outline"
+                size="icon"
+              >
+                <Image className="w-4 h-4" />
+              </Button>
+              <Button
                 onClick={sendMessage}
                 disabled={!newMessage.trim()}
                 className="bg-pink-500 hover:bg-pink-600"
               >
                 <Send className="w-4 h-4" />
               </Button>
+              
+              <input
+                id="image-upload"
+                type="file"
+                accept="image/*"
+                onChange={handleImageUpload}
+                className="hidden"
+              />
+              
+              {showEmojiPicker && (
+                <div className="absolute bottom-full right-0 mb-2">
+                  <EmojiPicker onEmojiSelect={handleEmojiSelect} />
+                </div>
+              )}
             </div>
           </CardContent>
         </Card>
