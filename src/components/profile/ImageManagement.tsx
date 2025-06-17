@@ -76,15 +76,33 @@ const ImageManagement = ({ currentUser }: ImageManagementProps) => {
     setUploading(true);
 
     try {
+      // Create a unique filename
       const fileExt = file.name.split('.').pop();
-      const fileName = `${currentUser.id}/${Date.now()}.${fileExt}`;
-      const filePath = fileName;
+      const fileName = `${currentUser.id}/${Date.now()}-${Math.random().toString(36).substring(2)}.${fileExt}`;
+      
+      console.log('Uploading file:', fileName);
 
-      console.log('Uploading file to path:', filePath);
+      // Check if bucket exists, if not create it
+      const { data: buckets } = await supabase.storage.listBuckets();
+      const bucketExists = buckets?.some(bucket => bucket.id === 'loveconnect');
+      
+      if (!bucketExists) {
+        console.log('Creating bucket...');
+        const { error: bucketError } = await supabase.storage.createBucket('loveconnect', {
+          public: true,
+          allowedMimeTypes: ['image/jpeg', 'image/png', 'image/gif', 'image/webp'],
+          fileSizeLimit: 10485760 // 10MB
+        });
+        
+        if (bucketError) {
+          console.error('Bucket creation error:', bucketError);
+          // Continue anyway, bucket might exist
+        }
+      }
 
-      const { error: uploadError } = await supabase.storage
+      const { data: uploadData, error: uploadError } = await supabase.storage
         .from('loveconnect')
-        .upload(filePath, file, {
+        .upload(fileName, file, {
           cacheControl: '3600',
           upsert: false
         });
@@ -94,12 +112,16 @@ const ImageManagement = ({ currentUser }: ImageManagementProps) => {
         throw uploadError;
       }
 
+      console.log('Upload successful:', uploadData);
+
+      // Get the public URL
       const { data: { publicUrl } } = supabase.storage
         .from('loveconnect')
-        .getPublicUrl(filePath);
+        .getPublicUrl(fileName);
 
       console.log('Public URL:', publicUrl);
 
+      // Save to database
       const nextImageOrder = userImages.length + 1;
 
       const { error: dbError } = await supabase
@@ -123,7 +145,7 @@ const ImageManagement = ({ currentUser }: ImageManagementProps) => {
     } catch (error: any) {
       console.error('Image upload error:', error);
       toast({
-        title: "Error",
+        title: "Upload failed",
         description: error.message || "Failed to upload image. Please try again.",
         variant: "destructive",
       });
