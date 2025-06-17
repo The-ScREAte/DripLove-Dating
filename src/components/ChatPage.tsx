@@ -20,6 +20,7 @@ const ChatPage = ({ currentUser }: ChatPageProps) => {
   const [messageCounts, setMessageCounts] = useState<Record<string, number>>({});
   const { toast } = useToast();
   const messagesEndRef = useRef<HTMLDivElement>(null);
+  const channelRef = useRef<any>(null);
 
   useEffect(() => {
     fetchMatches();
@@ -39,6 +40,12 @@ const ChatPage = ({ currentUser }: ChatPageProps) => {
   useEffect(() => {
     if (!currentUser?.id) return;
 
+    // Clean up existing channel if it exists
+    if (channelRef.current) {
+      supabase.removeChannel(channelRef.current);
+      channelRef.current = null;
+    }
+
     // Create unique channel name to avoid conflicts
     const channelName = `chat-updates-${currentUser.id}-${Date.now()}`;
     
@@ -57,8 +64,13 @@ const ChatPage = ({ currentUser }: ChatPageProps) => {
       })
       .subscribe();
 
+    channelRef.current = channel;
+
     return () => {
-      supabase.removeChannel(channel);
+      if (channelRef.current) {
+        supabase.removeChannel(channelRef.current);
+        channelRef.current = null;
+      }
     };
   }, [selectedMatch, currentUser?.id]);
 
