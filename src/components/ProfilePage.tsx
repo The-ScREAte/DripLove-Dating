@@ -7,7 +7,7 @@ import { Label } from '@/components/ui/label';
 import { Slider } from '@/components/ui/slider';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog';
-import { User, Edit, Save, X, Upload, Trash2, AlertTriangle } from 'lucide-react';
+import { User, Edit, Save, X, Upload, Trash2, AlertTriangle, LogOut } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import InterestsEditor from './InterestsEditor';
@@ -16,13 +16,15 @@ interface ProfilePageProps {
   currentUser: any;
   profile: any;
   onProfileUpdate: () => void;
+  onLogout: () => void;
 }
 
-const ProfilePage = ({ currentUser, profile, onProfileUpdate }: ProfilePageProps) => {
+const ProfilePage = ({ currentUser, profile, onProfileUpdate, onLogout }: ProfilePageProps) => {
   const [isEditing, setIsEditing] = useState(false);
   const [userImages, setUserImages] = useState<string[]>([]);
   const [uploading, setUploading] = useState(false);
   const [deleting, setDeleting] = useState(false);
+  const [deletingAccount, setDeletingAccount] = useState(false);
   const { toast } = useToast();
 
   const [editedProfile, setEditedProfile] = useState({
@@ -279,6 +281,50 @@ const ProfilePage = ({ currentUser, profile, onProfileUpdate }: ProfilePageProps
         description: "Failed to update profile. Please try again.",
         variant: "destructive",
       });
+    }
+  };
+
+  const handleLogout = async () => {
+    try {
+      await supabase.auth.signOut();
+      onLogout();
+      toast({
+        title: "Logged out",
+        description: "See you again soon!",
+      });
+    } catch (error) {
+      console.error('Error logging out:', error);
+    }
+  };
+
+  const handleDeleteAccount = async () => {
+    setDeletingAccount(true);
+    
+    try {
+      // Call the delete function we created
+      const { error } = await supabase.rpc('delete_user_and_data', {
+        user_id_to_delete: currentUser.id
+      });
+
+      if (error) throw error;
+
+      toast({
+        title: "Account deleted",
+        description: "Your account and all associated data have been permanently deleted.",
+      });
+
+      // Sign out after successful deletion
+      await supabase.auth.signOut();
+      onLogout();
+    } catch (error: any) {
+      console.error('Error deleting account:', error);
+      toast({
+        title: "Error",
+        description: "Failed to delete account. Please try again.",
+        variant: "destructive",
+      });
+    } finally {
+      setDeletingAccount(false);
     }
   };
 
@@ -761,6 +807,63 @@ const ProfilePage = ({ currentUser, profile, onProfileUpdate }: ProfilePageProps
         </CardHeader>
         <CardContent>
           {renderInterests()}
+        </CardContent>
+      </Card>
+
+      {/* Account Actions Section */}
+      <Card>
+        <CardHeader>
+          <CardTitle>Account Actions</CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <div className="flex flex-col sm:flex-row gap-4">
+            <Button 
+              onClick={handleLogout}
+              variant="outline"
+              className="flex items-center space-x-2 border-gray-300 text-gray-700 hover:bg-gray-50"
+            >
+              <LogOut className="w-4 h-4" />
+              <span>Logout</span>
+            </Button>
+
+            <AlertDialog>
+              <AlertDialogTrigger asChild>
+                <Button 
+                  variant="destructive"
+                  className="flex items-center space-x-2"
+                >
+                  <AlertTriangle className="w-4 h-4" />
+                  <span>Delete Account</span>
+                </Button>
+              </AlertDialogTrigger>
+              <AlertDialogContent>
+                <AlertDialogHeader>
+                  <AlertDialogTitle>Delete Account</AlertDialogTitle>
+                  <AlertDialogDescription>
+                    Are you sure you want to permanently delete your account? This action will:
+                    <ul className="list-disc ml-6 mt-2">
+                      <li>Delete your profile and all personal information</li>
+                      <li>Remove all your photos</li>
+                      <li>Delete all your matches and conversations</li>
+                      <li>Remove all likes given and received</li>
+                    </ul>
+                    <br />
+                    <strong>This action cannot be undone.</strong>
+                  </AlertDialogDescription>
+                </AlertDialogHeader>
+                <AlertDialogFooter>
+                  <AlertDialogCancel>Cancel</AlertDialogCancel>
+                  <AlertDialogAction 
+                    disabled={deletingAccount}
+                    onClick={handleDeleteAccount}
+                    className="bg-red-600 hover:bg-red-700"
+                  >
+                    {deletingAccount ? 'Deleting...' : 'Delete Account Permanently'}
+                  </AlertDialogAction>
+                </AlertDialogFooter>
+              </AlertDialogContent>
+            </AlertDialog>
+          </div>
         </CardContent>
       </Card>
     </div>

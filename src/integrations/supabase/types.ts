@@ -283,7 +283,10 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
-      [_ in never]: never
+      delete_user_and_data: {
+        Args: { user_id_to_delete: string }
+        Returns: undefined
+      }
     }
     Enums: {
       [_ in never]: never

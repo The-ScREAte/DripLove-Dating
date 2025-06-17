@@ -1,7 +1,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
-import { Heart, MessageCircle, Users, User, LogOut, Upload } from 'lucide-react';
+import { Heart, MessageCircle, Users, User } from 'lucide-react';
 import DiscoverPage from '@/components/DiscoverPage';
 import ChatPage from '@/components/ChatPage';
 import LikedMePage from '@/components/LikedMePage';
@@ -40,19 +40,6 @@ const MainApp = ({ user, onLogout }: MainAppProps) => {
     }
   };
 
-  const handleLogout = async () => {
-    try {
-      await supabase.auth.signOut();
-      onLogout();
-      toast({
-        title: "Logged out",
-        description: "See you again soon!",
-      });
-    } catch (error) {
-      console.error('Error logging out:', error);
-    }
-  };
-
   const renderContent = () => {
     switch (activeTab) {
       case 'discover':
@@ -62,7 +49,7 @@ const MainApp = ({ user, onLogout }: MainAppProps) => {
       case 'liked':
         return <LikedMePage currentUser={user} />;
       case 'profile':
-        return <ProfilePage currentUser={user} profile={profile} onProfileUpdate={fetchUserProfile} />;
+        return <ProfilePage currentUser={user} profile={profile} onProfileUpdate={fetchUserProfile} onLogout={onLogout} />;
       default:
         return <DiscoverPage currentUser={user} />;
     }
@@ -83,14 +70,6 @@ const MainApp = ({ user, onLogout }: MainAppProps) => {
             <span className="text-gray-600">
               Welcome, {profile?.first_name || 'User'}!
             </span>
-            <Button 
-              onClick={handleLogout}
-              variant="outline"
-              className="flex items-center space-x-2 border-pink-200 text-pink-600 hover:bg-pink-50"
-            >
-              <LogOut className="w-4 h-4" />
-              <span>Logout</span>
-            </Button>
           </div>
         </div>
       </div>
