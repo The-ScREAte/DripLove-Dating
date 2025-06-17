@@ -18,6 +18,7 @@ const ChatPage = ({ currentUser }: ChatPageProps) => {
   const [messages, setMessages] = useState<any[]>([]);
   const [newMessage, setNewMessage] = useState('');
   const [showEmojiPicker, setShowEmojiPicker] = useState(false);
+  const [messageCounts, setMessageCounts] = useState<Record<string, number>>({});
   const { toast } = useToast();
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
@@ -35,6 +36,27 @@ const ChatPage = ({ currentUser }: ChatPageProps) => {
   useEffect(() => {
     scrollToBottom();
   }, [messages]);
+
+  useEffect(() => {
+    // Subscribe to new messages for real-time updates
+    const channel = supabase
+      .channel('chat-updates')
+      .on('postgres_changes', {
+        event: 'INSERT',
+        schema: 'public',
+        table: 'chats'
+      }, () => {
+        fetchMatches();
+        if (selectedMatch) {
+          fetchMessages();
+        }
+      })
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [selectedMatch]);
 
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -66,6 +88,20 @@ const ChatPage = ({ currentUser }: ChatPageProps) => {
       }) || [];
 
       setMatches(matchesWithPartner);
+      
+      // Fetch message counts for each match
+      const counts: Record<string, number> = {};
+      for (const match of matchesWithPartner) {
+        const { count, error } = await supabase
+          .from('chats')
+          .select('*', { count: 'exact', head: true })
+          .eq('match_id', match.id);
+        
+        if (!error) {
+          counts[match.id] = count || 0;
+        }
+      }
+      setMessageCounts(counts);
     } catch (error) {
       console.error('Error fetching matches:', error);
     }
@@ -149,14 +185,14 @@ const ChatPage = ({ currentUser }: ChatPageProps) => {
   };
 
   return (
-    <div className="flex h-[calc(100vh-200px)] max-w-6xl mx-auto">
+    <div className="flex flex-col md:flex-row h-[calc(100vh-200px)] max-w-6xl mx-auto gap-4">
       {/* Matches Sidebar */}
-      <Card className="w-1/3 mr-4">
+      <Card className="w-full md:w-1/3">
         <CardHeader>
           <CardTitle>Your Matches</CardTitle>
         </CardHeader>
         <CardContent className="p-0">
-          <div className="max-h-[500px] overflow-y-auto">
+          <div className="max-h-[400px] md:max-h-[500px] overflow-y-auto">
             {matches.length === 0 ? (
               <p className="text-center text-gray-500 p-4">No matches yet</p>
             ) : (
@@ -169,9 +205,14 @@ const ChatPage = ({ currentUser }: ChatPageProps) => {
                   }`}
                 >
                   <div className="flex justify-between items-center">
-                    <span className="font-medium">
-                      {match.partner?.first_name} {match.partner?.last_name}
-                    </span>
+                    <div>
+                      <span className="font-medium">
+                        {match.partner?.first_name} {match.partner?.last_name}
+                      </span>
+                      <p className="text-sm text-gray-500">
+                        {messageCounts[match.id] || 0} messages
+                      </p>
+                    </div>
                     {match.unreadCount > 0 && (
                       <span className="bg-pink-600 text-white text-xs rounded-full px-2 py-1 min-w-[20px] text-center">
                         {match.unreadCount}
@@ -196,7 +237,7 @@ const ChatPage = ({ currentUser }: ChatPageProps) => {
             </CardHeader>
             <CardContent className="flex flex-col h-full p-0">
               {/* Messages */}
-              <div className="flex-1 p-4 overflow-y-auto max-h-[400px]">
+              <div className="flex-1 p-4 overflow-y-auto max-h-[300px] md:max-h-[400px]">
                 {messages.length === 0 ? (
                   <p className="text-center text-gray-500">No messages yet. Start the conversation!</p>
                 ) : (
