@@ -3,7 +3,7 @@ import React, { useState, useEffect } from 'react';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Carousel, CarouselContent, CarouselItem, CarouselNext, CarouselPrevious } from '@/components/ui/carousel';
-import { Heart, X, MapPin, Calendar } from 'lucide-react';
+import { Heart, X, MapPin, Calendar, Briefcase, GraduationCap, Dumbbell, Wine, Cigarette } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 
@@ -238,6 +238,55 @@ const DiscoverPage = ({ currentUser }: DiscoverPageProps) => {
               <span>{currentProfile.city}, {currentProfile.country}</span>
             </div>
           </div>
+
+          {/* Work & Experience */}
+          {(currentProfile.occupation || currentProfile.industry || currentProfile.education_level) && (
+            <div className="mb-4">
+              <h3 className="font-semibold text-gray-800 mb-2">Work & Experience</h3>
+              <div className="space-y-1">
+                {currentProfile.occupation && (
+                  <div className="flex items-center text-gray-600 text-sm">
+                    <Briefcase className="w-4 h-4 mr-2" />
+                    <span>{currentProfile.occupation}</span>
+                    {currentProfile.industry && <span className="text-gray-500 ml-1">at {currentProfile.industry}</span>}
+                  </div>
+                )}
+                {currentProfile.education_level && (
+                  <div className="flex items-center text-gray-600 text-sm">
+                    <GraduationCap className="w-4 h-4 mr-2" />
+                    <span>{currentProfile.education_level}</span>
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
+
+          {/* Lifestyle */}
+          {(currentProfile.exercise_level || currentProfile.drinking || currentProfile.smoking) && (
+            <div className="mb-4">
+              <h3 className="font-semibold text-gray-800 mb-2">Lifestyle</h3>
+              <div className="flex flex-wrap gap-2">
+                {currentProfile.exercise_level && (
+                  <span className="flex items-center px-2 py-1 bg-blue-100 text-blue-700 rounded-full text-xs">
+                    <Dumbbell className="w-3 h-3 mr-1" />
+                    {currentProfile.exercise_level}
+                  </span>
+                )}
+                {currentProfile.drinking && (
+                  <span className="flex items-center px-2 py-1 bg-purple-100 text-purple-700 rounded-full text-xs">
+                    <Wine className="w-3 h-3 mr-1" />
+                    {currentProfile.drinking}
+                  </span>
+                )}
+                {currentProfile.smoking && (
+                  <span className="flex items-center px-2 py-1 bg-gray-100 text-gray-700 rounded-full text-xs">
+                    <Cigarette className="w-3 h-3 mr-1" />
+                    {currentProfile.smoking}
+                  </span>
+                )}
+              </div>
+            </div>
+          )}
           
           {currentProfile.bio && (
             <div className="mb-4">

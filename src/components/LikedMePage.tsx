@@ -25,13 +25,27 @@ const LikedMePage = ({ currentUser }: LikedMePageProps) => {
     if (!currentUser?.id) return;
 
     try {
-      const { data: likes, error } = await supabase
+      // Get people who liked the current user, excluding those already liked back
+      const { data: myLikes } = await supabase
+        .from('likes')
+        .select('liked_id')
+        .eq('liker_id', currentUser.id);
+
+      const myLikedIds = myLikes?.map(like => like.liked_id) || [];
+
+      let query = supabase
         .from('likes')
         .select(`
           *,
           liker:profiles!likes_liker_id_fkey(*)
         `)
         .eq('liked_id', currentUser.id);
+
+      if (myLikedIds.length > 0) {
+        query = query.not('liker_id', 'in', `(${myLikedIds.join(',')})`);
+      }
+
+      const { data: likes, error } = await query;
 
       if (error) throw error;
 
@@ -89,6 +103,23 @@ const LikedMePage = ({ currentUser }: LikedMePageProps) => {
 
   const handleLikeBack = async (profileId: string) => {
     try {
+      // Check if already liked back
+      const { data: existingLike } = await supabase
+        .from('likes')
+        .select('*')
+        .eq('liker_id', currentUser.id)
+        .eq('liked_id', profileId)
+        .single();
+
+      if (existingLike) {
+        toast({
+          title: "Already liked",
+          description: "You've already liked this person back",
+        });
+        return;
+      }
+
+      // Create the like back
       const { error } = await supabase
         .from('likes')
         .insert({
@@ -261,7 +292,7 @@ const LikedMePage = ({ currentUser }: LikedMePageProps) => {
           {likers.length === 0 ? (
             <div className="text-center py-12">
               <Users className="w-16 h-16 text-gray-400 mx-auto mb-4" />
-              <h3 className="text-xl font-semibold text-gray-800 mb-2">No likes yet</h3>
+              <h3 className="text-xl font-semibold text-gray-800 mb-2">No new likes</h3>
               <p className="text-gray-600">Keep swiping! Someone special is waiting to find you.</p>
             </div>
           ) : (
