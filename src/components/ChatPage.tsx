@@ -93,7 +93,7 @@ const ChatPage = ({ currentUser }: ChatPageProps) => {
         return {
           ...match,
           otherUser: isUser1 ? match.user2 : match.user1,
-          unreadCount: isUser1 ? match.user1_unread_count : match.user2_unread_count
+          unreadCount: isUser1 ? match.user1_unread_count || 0 : match.user2_unread_count || 0
         };
       }) || [];
 
@@ -150,6 +150,9 @@ const ChatPage = ({ currentUser }: ChatPageProps) => {
           ? { ...match, unreadCount: 0 }
           : match
       ));
+      
+      // Update selected match
+      setSelectedMatch(prev => ({ ...prev, unreadCount: 0 }));
     } catch (error) {
       console.error('Error marking messages as read:', error);
     }
