@@ -18,6 +18,7 @@ export const useNotifications = (userId: string | null) => {
   const [unreadCount, setUnreadCount] = useState(0);
   const { toast } = useToast();
   const channelRef = useRef<any>(null);
+  const isSubscribedRef = useRef(false);
 
   useEffect(() => {
     if (!userId) return;
@@ -28,7 +29,11 @@ export const useNotifications = (userId: string | null) => {
     if (channelRef.current) {
       supabase.removeChannel(channelRef.current);
       channelRef.current = null;
+      isSubscribedRef.current = false;
     }
+    
+    // Prevent multiple subscriptions
+    if (isSubscribedRef.current) return;
     
     // Create unique channel name with userId to avoid conflicts
     const channelName = `notifications-${userId}-${Date.now()}`;
@@ -55,14 +60,16 @@ export const useNotifications = (userId: string | null) => {
       .subscribe();
 
     channelRef.current = channel;
+    isSubscribedRef.current = true;
 
     return () => {
       if (channelRef.current) {
         supabase.removeChannel(channelRef.current);
         channelRef.current = null;
+        isSubscribedRef.current = false;
       }
     };
-  }, [userId, toast]);
+  }, [userId]); // Removed toast from dependencies to prevent unnecessary re-runs
 
   const fetchNotifications = async () => {
     if (!userId) return;

@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect, useRef } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -21,6 +22,7 @@ const ChatPage = ({ currentUser }: ChatPageProps) => {
   const { toast } = useToast();
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const channelRef = useRef<any>(null);
+  const isSubscribedRef = useRef(false);
 
   useEffect(() => {
     fetchMatches();
@@ -44,7 +46,11 @@ const ChatPage = ({ currentUser }: ChatPageProps) => {
     if (channelRef.current) {
       supabase.removeChannel(channelRef.current);
       channelRef.current = null;
+      isSubscribedRef.current = false;
     }
+
+    // Prevent multiple subscriptions
+    if (isSubscribedRef.current) return;
 
     // Create unique channel name to avoid conflicts
     const channelName = `chat-updates-${currentUser.id}-${Date.now()}`;
@@ -65,14 +71,16 @@ const ChatPage = ({ currentUser }: ChatPageProps) => {
       .subscribe();
 
     channelRef.current = channel;
+    isSubscribedRef.current = true;
 
     return () => {
       if (channelRef.current) {
         supabase.removeChannel(channelRef.current);
         channelRef.current = null;
+        isSubscribedRef.current = false;
       }
     };
-  }, [selectedMatch, currentUser?.id]);
+  }, [currentUser?.id]); // Removed selectedMatch from dependencies to prevent unnecessary re-subscriptions
 
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
