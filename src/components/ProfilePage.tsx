@@ -20,6 +20,11 @@ interface ProfilePageProps {
 
 const ProfilePage = ({ currentUser, profile, onProfileUpdate }: ProfilePageProps) => {
   const [isEditing, setIsEditing] = useState(false);
+  const [userImages, setUserImages] = useState<string[]>([]);
+  const [uploading, setUploading] = useState(false);
+  const [deleting, setDeleting] = useState(false);
+  const { toast } = useToast();
+
   const [editedProfile, setEditedProfile] = useState({
     first_name: '',
     last_name: '',
@@ -46,9 +51,6 @@ const ProfilePage = ({ currentUser, profile, onProfileUpdate }: ProfilePageProps
     last_googled: '',
     interests: [] as string[],
   });
-  const [uploading, setUploading] = useState(false);
-  const [deleting, setDeleting] = useState(false);
-  const { toast } = useToast();
 
   useEffect(() => {
     if (profile) {
@@ -79,7 +81,25 @@ const ProfilePage = ({ currentUser, profile, onProfileUpdate }: ProfilePageProps
         interests: profile.interests || [],
       });
     }
-  }, [profile]);
+    fetchUserImages();
+  }, [profile, currentUser]);
+
+  const fetchUserImages = async () => {
+    if (!currentUser?.id) return;
+
+    try {
+      const { data: images, error } = await supabase
+        .from('user_images')
+        .select('image_url')
+        .eq('user_id', currentUser.id)
+        .order('image_order', { ascending: true });
+
+      if (error) throw error;
+      setUserImages(images?.map(img => img.image_url) || []);
+    } catch (error) {
+      console.error('Error fetching user images:', error);
+    }
+  };
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
     const { name, value } = e.target;
@@ -97,6 +117,16 @@ const ProfilePage = ({ currentUser, profile, onProfileUpdate }: ProfilePageProps
   const handleImageUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
     if (!file) return;
+
+    // Check if user already has 7 images
+    if (userImages.length >= 7) {
+      toast({
+        title: "Maximum images reached",
+        description: "You can upload a maximum of 7 images.",
+        variant: "destructive",
+      });
+      return;
+    }
 
     setUploading(true);
 
@@ -124,18 +154,7 @@ const ProfilePage = ({ currentUser, profile, onProfileUpdate }: ProfilePageProps
         .getPublicUrl(filePath);
 
       // Determine the order for the new image
-      const { data: existingImages, error: imageFetchError } = await supabase
-        .from('user_images')
-        .select('image_order')
-        .eq('user_id', currentUser.id)
-        .order('image_order', { ascending: false })
-        .limit(1);
-
-      if (imageFetchError) {
-        throw imageFetchError;
-      }
-
-      const nextImageOrder = (existingImages?.[0]?.image_order || 0) + 1;
+      const nextImageOrder = userImages.length + 1;
 
       // Save the image URL and order in the database
       const { error: dbError } = await supabase
@@ -150,6 +169,7 @@ const ProfilePage = ({ currentUser, profile, onProfileUpdate }: ProfilePageProps
         throw dbError;
       }
 
+      await fetchUserImages();
       toast({
         title: "Image uploaded",
         description: "Your image has been uploaded successfully.",
@@ -163,7 +183,7 @@ const ProfilePage = ({ currentUser, profile, onProfileUpdate }: ProfilePageProps
       });
     } finally {
       setUploading(false);
-      event.target.value = ''; // Reset the input
+      event.target.value = '';
     }
   };
 
@@ -172,7 +192,8 @@ const ProfilePage = ({ currentUser, profile, onProfileUpdate }: ProfilePageProps
 
     try {
       // Extract the path from the URL
-      const filePath = imageUrl.replace(`${process.env.NEXT_PUBLIC_SUPABASE_URL}/storage/v1/object/public/loveconnect/`, '');
+      const urlParts = imageUrl.split('/');
+      const filePath = `user-images/${urlParts[urlParts.length - 1]}`;
 
       // Delete the image from Supabase storage
       const { error: storageError } = await supabase.storage
@@ -180,7 +201,7 @@ const ProfilePage = ({ currentUser, profile, onProfileUpdate }: ProfilePageProps
         .remove([filePath]);
 
       if (storageError) {
-        throw storageError;
+        console.error('Storage deletion error:', storageError);
       }
 
       // Delete the image record from the database
@@ -194,6 +215,7 @@ const ProfilePage = ({ currentUser, profile, onProfileUpdate }: ProfilePageProps
         throw dbError;
       }
 
+      await fetchUserImages();
       toast({
         title: "Image deleted",
         description: "Your image has been deleted successfully.",
@@ -607,7 +629,69 @@ const ProfilePage = ({ currentUser, profile, onProfileUpdate }: ProfilePageProps
         )}
       </div>
 
-      {/* Basic Information Section */}
+      {/* Images Section */}
+      <Card>
+        <CardHeader>
+          <CardTitle>Your Photos ({userImages.length}/7)</CardTitle>
+        </CardHeader>
+        <CardContent>
+          {userImages.length < 7 && (
+            <div className="mb-4">
+              <Label htmlFor="image_upload">Upload Image</Label>
+              <Input
+                type="file"
+                id="image_upload"
+                accept="image/*"
+                onChange={handleImageUpload}
+                disabled={uploading}
+              />
+              {uploading && <p className="text-sm text-gray-500 mt-1">Uploading...</p>}
+            </div>
+          )}
+
+          <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
+            {userImages.map((imageUrl, index) => (
+              <div key={imageUrl} className="relative group">
+                <img 
+                  src={imageUrl} 
+                  alt={`User Image ${index + 1}`} 
+                  className="w-full h-32 object-cover rounded-md" 
+                />
+                <AlertDialog>
+                  <AlertDialogTrigger asChild>
+                    <Button 
+                      variant="destructive" 
+                      size="sm" 
+                      className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity"
+                    >
+                      <Trash2 className="w-4 h-4" />
+                    </Button>
+                  </AlertDialogTrigger>
+                  <AlertDialogContent>
+                    <AlertDialogHeader>
+                      <AlertDialogTitle>Delete Image</AlertDialogTitle>
+                      <AlertDialogDescription>
+                        Are you sure you want to delete this image? This action cannot be undone.
+                      </AlertDialogDescription>
+                    </AlertDialogHeader>
+                    <AlertDialogFooter>
+                      <AlertDialogCancel>Cancel</AlertDialogCancel>
+                      <AlertDialogAction 
+                        disabled={deleting} 
+                        onClick={() => handleDeleteImage(imageUrl)}
+                      >
+                        {deleting ? 'Deleting...' : 'Delete'}
+                      </AlertDialogAction>
+                    </AlertDialogFooter>
+                  </AlertDialogContent>
+                </AlertDialog>
+              </div>
+            ))}
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* Keep existing profile sections */}
       <Card>
         <CardHeader>
           <CardTitle>Basic Information</CardTitle>
@@ -617,7 +701,6 @@ const ProfilePage = ({ currentUser, profile, onProfileUpdate }: ProfilePageProps
         </CardContent>
       </Card>
 
-      {/* Location Information Section */}
       <Card>
         <CardHeader>
           <CardTitle>Location Information</CardTitle>
@@ -627,7 +710,6 @@ const ProfilePage = ({ currentUser, profile, onProfileUpdate }: ProfilePageProps
         </CardContent>
       </Card>
 
-      {/* Preferences Section */}
       <Card>
         <CardHeader>
           <CardTitle>Preferences</CardTitle>
@@ -637,7 +719,6 @@ const ProfilePage = ({ currentUser, profile, onProfileUpdate }: ProfilePageProps
         </CardContent>
       </Card>
 
-      {/* Lifestyle Information Section */}
       <Card>
         <CardHeader>
           <CardTitle>Lifestyle</CardTitle>
@@ -647,7 +728,6 @@ const ProfilePage = ({ currentUser, profile, onProfileUpdate }: ProfilePageProps
         </CardContent>
       </Card>
 
-      {/* Work & Education Information Section */}
       <Card>
         <CardHeader>
           <CardTitle>Work & Education</CardTitle>
@@ -657,7 +737,6 @@ const ProfilePage = ({ currentUser, profile, onProfileUpdate }: ProfilePageProps
         </CardContent>
       </Card>
 
-      {/* Personality Section */}
       <Card>
         <CardHeader>
           <CardTitle>Personality</CardTitle>
@@ -667,7 +746,6 @@ const ProfilePage = ({ currentUser, profile, onProfileUpdate }: ProfilePageProps
         </CardContent>
       </Card>
 
-      {/* Fun Questions Section */}
       <Card>
         <CardHeader>
           <CardTitle>Fun Questions</CardTitle>
@@ -677,71 +755,12 @@ const ProfilePage = ({ currentUser, profile, onProfileUpdate }: ProfilePageProps
         </CardContent>
       </Card>
 
-      {/* Interests Section */}
       <Card>
         <CardHeader>
           <CardTitle>Interests</CardTitle>
         </CardHeader>
         <CardContent>
           {renderInterests()}
-        </CardContent>
-      </Card>
-
-      {/* Images Section */}
-      <Card>
-        <CardHeader>
-          <CardTitle>Images</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <div className="mb-4">
-            <Label htmlFor="image_upload">Upload Image</Label>
-            <Input
-              type="file"
-              id="image_upload"
-              accept="image/*"
-              onChange={handleImageUpload}
-              disabled={uploading}
-            />
-            {uploading && <p className="text-sm text-gray-500">Uploading...</p>}
-          </div>
-
-          {/* Display User Images */}
-          <div className="grid grid-cols-3 gap-4">
-            {profile?.images?.map((imageUrl: string) => (
-              <div key={imageUrl} className="relative">
-                <img src={imageUrl} alt="User Image" className="w-full h-32 object-cover rounded-md" />
-                <AlertDialog>
-                  <AlertDialogTrigger asChild>
-                    <Button variant="ghost" size="icon" className="absolute top-2 right-2 hover:bg-gray-200">
-                      <Trash2 className="w-4 h-4" />
-                    </Button>
-                  </AlertDialogTrigger>
-                  <AlertDialogContent>
-                    <AlertDialogHeader>
-                      <AlertDialogTitle>Are you absolutely sure?</AlertDialogTitle>
-                      <AlertDialogDescription>
-                        This action cannot be undone. This will permanently delete the image from our servers.
-                      </AlertDialogDescription>
-                    </AlertDialogHeader>
-                    <AlertDialogFooter>
-                      <AlertDialogCancel>Cancel</AlertDialogCancel>
-                      <AlertDialogAction disabled={deleting} onClick={() => handleDeleteImage(imageUrl)}>
-                        {deleting ? (
-                          <>
-                            Deleting...
-                          </>
-                        ) : (
-                          <>
-                            Delete
-                          </>
-                        )}
-                      </AlertDialogAction>
-                    </AlertDialogFooter>
-                  </AlertDialogContent>
-                </AlertDialog>
-              </div>
-            ))}
-          </div>
         </CardContent>
       </Card>
     </div>

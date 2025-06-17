@@ -2,6 +2,7 @@
 import React, { useState, useEffect } from 'react';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
+import { Carousel, CarouselContent, CarouselItem, CarouselNext, CarouselPrevious } from '@/components/ui/carousel';
 import { Heart, X, MapPin, Calendar } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
@@ -179,11 +180,33 @@ const DiscoverPage = ({ currentUser }: DiscoverPageProps) => {
       <Card className="overflow-hidden shadow-2xl">
         <div className="relative h-96">
           {profileImages.length > 0 ? (
-            <img
-              src={profileImages[0]}
-              alt={`${currentProfile.first_name}'s photo`}
-              className="w-full h-full object-cover"
-            />
+            profileImages.length === 1 ? (
+              <img
+                src={profileImages[0]}
+                alt={`${currentProfile.first_name}'s photo`}
+                className="w-full h-full object-cover"
+              />
+            ) : (
+              <Carousel className="w-full h-full">
+                <CarouselContent>
+                  {profileImages.map((imageUrl, index) => (
+                    <CarouselItem key={index}>
+                      <img
+                        src={imageUrl}
+                        alt={`${currentProfile.first_name}'s photo ${index + 1}`}
+                        className="w-full h-96 object-cover"
+                      />
+                    </CarouselItem>
+                  ))}
+                </CarouselContent>
+                {profileImages.length > 1 && (
+                  <>
+                    <CarouselPrevious className="absolute left-2 top-1/2 -translate-y-1/2" />
+                    <CarouselNext className="absolute right-2 top-1/2 -translate-y-1/2" />
+                  </>
+                )}
+              </Carousel>
+            )
           ) : (
             <div className="w-full h-full bg-gradient-to-br from-pink-200 to-purple-200 flex items-center justify-center">
               <div className="w-32 h-32 bg-white rounded-full flex items-center justify-center">
@@ -196,7 +219,7 @@ const DiscoverPage = ({ currentUser }: DiscoverPageProps) => {
           
           {profileImages.length > 1 && (
             <div className="absolute top-4 right-4 bg-black bg-opacity-50 text-white px-2 py-1 rounded-full text-sm">
-              +{profileImages.length - 1} photos
+              {profileImages.length} photos
             </div>
           )}
         </div>

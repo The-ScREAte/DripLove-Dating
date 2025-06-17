@@ -2,6 +2,7 @@
 import React, { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { Badge } from '@/components/ui/badge';
 import { X, Plus } from 'lucide-react';
 
 interface InterestsEditorProps {
@@ -10,13 +11,21 @@ interface InterestsEditorProps {
   disabled?: boolean;
 }
 
-const InterestsEditor = ({ interests, onInterestsChange, disabled }: InterestsEditorProps) => {
-  const [newInterest, setNewInterest] = useState('');
+const PREDEFINED_INTERESTS = [
+  'Travel', 'Photography', 'Cooking', 'Reading', 'Music', 'Movies', 'Sports',
+  'Fitness', 'Yoga', 'Dancing', 'Art', 'Gaming', 'Technology', 'Nature',
+  'Hiking', 'Swimming', 'Running', 'Cycling', 'Meditation', 'Writing',
+  'Fashion', 'Wine', 'Coffee', 'Animals', 'Volunteering', 'Learning',
+  'Adventure', 'Comedy', 'Theatre', 'Concerts'
+];
 
-  const addInterest = () => {
-    if (newInterest.trim() && !interests.includes(newInterest.trim())) {
-      onInterestsChange([...interests, newInterest.trim()]);
-      setNewInterest('');
+const InterestsEditor = ({ interests, onInterestsChange, disabled = false }: InterestsEditorProps) => {
+  const [newInterest, setNewInterest] = useState('');
+  const [showAddCustom, setShowAddCustom] = useState(false);
+
+  const addInterest = (interest: string) => {
+    if (!interests.includes(interest) && interests.length < 10) {
+      onInterestsChange([...interests, interest]);
     }
   };
 
@@ -24,44 +33,105 @@ const InterestsEditor = ({ interests, onInterestsChange, disabled }: InterestsEd
     onInterestsChange(interests.filter(i => i !== interest));
   };
 
-  return (
-    <div>
-      <div className="flex flex-wrap gap-2 mb-3">
-        {interests.map((interest, index) => (
-          <span
-            key={index}
-            className="inline-flex items-center gap-1 px-3 py-1 bg-pink-100 text-pink-700 rounded-full text-sm"
-          >
+  const addCustomInterest = () => {
+    if (newInterest.trim() && !interests.includes(newInterest.trim())) {
+      addInterest(newInterest.trim());
+      setNewInterest('');
+      setShowAddCustom(false);
+    }
+  };
+
+  const availableInterests = PREDEFINED_INTERESTS.filter(interest => !interests.includes(interest));
+
+  if (disabled) {
+    return (
+      <div className="flex flex-wrap gap-2">
+        {interests.map((interest) => (
+          <Badge key={interest} variant="secondary">
             {interest}
-            {!disabled && (
-              <button
-                onClick={() => removeInterest(interest)}
-                className="ml-1 hover:text-pink-900"
-              >
-                <X className="w-3 h-3" />
-              </button>
-            )}
-          </span>
+          </Badge>
         ))}
       </div>
-      
-      {!disabled && (
-        <div className="flex gap-2">
-          <Input
-            placeholder="Add new interest"
-            value={newInterest}
-            onChange={(e) => setNewInterest(e.target.value)}
-            onKeyPress={(e) => e.key === 'Enter' && addInterest()}
-            className="flex-1"
-          />
-          <Button
-            onClick={addInterest}
-            variant="outline"
-            size="sm"
-            disabled={!newInterest.trim()}
-          >
-            <Plus className="w-4 h-4" />
-          </Button>
+    );
+  }
+
+  return (
+    <div className="space-y-4">
+      {/* Selected Interests */}
+      <div>
+        <h4 className="text-sm font-medium mb-2">Selected Interests ({interests.length}/10):</h4>
+        <div className="flex flex-wrap gap-2">
+          {interests.map((interest) => (
+            <Badge key={interest} variant="default" className="flex items-center gap-1">
+              {interest}
+              <Button
+                variant="ghost"
+                size="sm"
+                className="h-4 w-4 p-0 hover:bg-transparent"
+                onClick={() => removeInterest(interest)}
+              >
+                <X className="h-3 w-3" />
+              </Button>
+            </Badge>
+          ))}
+        </div>
+      </div>
+
+      {/* Available Interests */}
+      {interests.length < 10 && (
+        <div>
+          <h4 className="text-sm font-medium mb-2">Choose from popular interests:</h4>
+          <div className="flex flex-wrap gap-2 mb-4">
+            {availableInterests.slice(0, 15).map((interest) => (
+              <Button
+                key={interest}
+                variant="outline"
+                size="sm"
+                onClick={() => addInterest(interest)}
+                className="text-xs"
+              >
+                {interest}
+              </Button>
+            ))}
+          </div>
+
+          {/* Add Custom Interest */}
+          <div className="space-y-2">
+            {!showAddCustom ? (
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setShowAddCustom(true)}
+                className="flex items-center gap-1"
+              >
+                <Plus className="h-4 w-4" />
+                Add Custom Interest
+              </Button>
+            ) : (
+              <div className="flex gap-2">
+                <Input
+                  placeholder="Enter custom interest..."
+                  value={newInterest}
+                  onChange={(e) => setNewInterest(e.target.value)}
+                  onKeyPress={(e) => e.key === 'Enter' && addCustomInterest()}
+                  className="flex-1"
+                />
+                <Button onClick={addCustomInterest} size="sm">
+                  Add
+                </Button>
+                <Button 
+                  variant="outline" 
+                  size="sm" 
+                  onClick={() => {
+                    setShowAddCustom(false);
+                    setNewInterest('');
+                  }}
+                >
+                  Cancel
+                </Button>
+              </div>
+            )}
+          </div>
         </div>
       )}
     </div>
