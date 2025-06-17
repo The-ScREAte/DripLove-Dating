@@ -28,11 +28,13 @@ const Index = () => {
     } = supabase.auth.onAuthStateChange((_event, session) => {
       setUser(session?.user || null);
       if (session?.user) {
+        console.log("Auth state changed user ID:", session.user.id); // ✅ Add this
         setCurrentView('app');
       } else {
         setCurrentView('welcome');
       }
     });
+    
 
     return () => subscription.unsubscribe();
   }, []);
@@ -58,10 +60,13 @@ const Index = () => {
 
       if (error) throw error;
 
+      console.log("Logged in user ID:", data.user?.id); // ✅ Add this
+      
       toast({
         title: "Welcome back!",
         description: "You've been successfully logged in.",
       });
+      
     } catch (error: any) {
       toast({
         title: "Error",
@@ -123,6 +128,17 @@ const Index = () => {
           data: transformedData,
         },
       });
+      
+      if (error) throw error;
+      
+      if (data.user) {
+        await supabase.from("profiles").insert({
+          id: data.user.id,
+          email: data.user.email,
+          ...transformedData, // optional: preload profile with sign-up form info
+        });
+      }
+      
 
       if (error) {
         if (error.message.includes('User already registered')) {
