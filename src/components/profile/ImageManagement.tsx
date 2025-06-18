@@ -1,10 +1,12 @@
-
 import React, { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog';
+import {
+  AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription,
+  AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger
+} from '@/components/ui/alert-dialog';
 import { Upload, Trash2 } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
@@ -45,92 +47,52 @@ const ImageManagement = ({ currentUser }: ImageManagementProps) => {
     if (!file) return;
 
     if (userImages.length >= 7) {
-      toast({
-        title: "Maximum images reached",
-        description: "You can upload a maximum of 7 images.",
-        variant: "destructive",
-      });
+      toast({ title: "Maximum images reached", description: "You can upload a maximum of 7 images.", variant: "destructive" });
       return;
     }
 
-    // Validate file type
     if (!file.type.startsWith('image/')) {
-      toast({
-        title: "Invalid file type",
-        description: "Please upload an image file.",
-        variant: "destructive",
-      });
+      toast({ title: "Invalid file type", description: "Please upload an image file.", variant: "destructive" });
       return;
     }
 
-    // Validate file size (10MB)
     if (file.size > 10 * 1024 * 1024) {
-      toast({
-        title: "File too large",
-        description: "Please upload an image smaller than 10MB.",
-        variant: "destructive",
-      });
+      toast({ title: "File too large", description: "Please upload an image smaller than 10MB.", variant: "destructive" });
       return;
     }
 
     setUploading(true);
 
     try {
-      // Create a unique filename
       const fileExt = file.name.split('.').pop();
       const fileName = `${currentUser.id}/${Date.now()}-${Math.random().toString(36).substring(2)}.${fileExt}`;
-      
-      console.log('Uploading file:', fileName);
 
       const { data: uploadData, error: uploadError } = await supabase.storage
         .from('user-photos')
-        .upload(fileName, file, {
-          cacheControl: '3600',
-          upsert: false
-        });
+        .upload(fileName, file, { cacheControl: '3600', upsert: false });
 
-      if (uploadError) {
-        console.error('Upload error:', uploadError);
-        throw uploadError;
-      }
+      if (uploadError) throw uploadError;
 
-      console.log('Upload successful:', uploadData);
-
-      // Get the public URL
-      const { data: { publicUrl } } = supabase.storage
+      const { data: urlData, error: urlError } = await supabase.storage
         .from('user-photos')
         .getPublicUrl(fileName);
 
-      console.log('Public URL:', publicUrl);
+      if (urlError || !urlData?.publicUrl) throw new Error("Failed to generate public image URL");
 
-      // Save to database
+      const publicUrl = urlData.publicUrl;
       const nextImageOrder = userImages.length + 1;
 
       const { error: dbError } = await supabase
         .from('user_images')
-        .insert({
-          user_id: currentUser.id,
-          image_url: publicUrl,
-          image_order: nextImageOrder
-        });
+        .insert({ user_id: currentUser.id, image_url: publicUrl, image_order: nextImageOrder });
 
-      if (dbError) {
-        console.error('Database error:', dbError);
-        throw dbError;
-      }
+      if (dbError) throw dbError;
 
       await fetchUserImages();
-      toast({
-        title: "Image uploaded",
-        description: "Your image has been uploaded successfully.",
-      });
+      toast({ title: "Image uploaded", description: "Your image has been uploaded successfully." });
     } catch (error: any) {
       console.error('Image upload error:', error);
-      toast({
-        title: "Upload failed",
-        description: error.message || "Failed to upload image. Please try again.",
-        variant: "destructive",
-      });
+      toast({ title: "Upload failed", description: error.message || "Failed to upload image.", variant: "destructive" });
     } finally {
       setUploading(false);
       event.target.value = '';
@@ -141,45 +103,24 @@ const ImageManagement = ({ currentUser }: ImageManagementProps) => {
     setDeleting(true);
 
     try {
-      // Extract file path from URL
       const urlParts = imageUrl.split('/');
       const bucketIndex = urlParts.findIndex(part => part === 'user-photos');
       if (bucketIndex !== -1 && bucketIndex < urlParts.length - 1) {
         const filePath = urlParts.slice(bucketIndex + 1).join('/');
-        
-        console.log('Deleting file from path:', filePath);
-
-        const { error: storageError } = await supabase.storage
-          .from('user-photos')
-          .remove([filePath]);
-
-        if (storageError) {
-          console.error('Storage deletion error:', storageError);
-        }
+        await supabase.storage.from('user-photos').remove([filePath]);
       }
 
-      const { error: dbError } = await supabase
+      await supabase
         .from('user_images')
         .delete()
         .eq('user_id', currentUser.id)
         .eq('image_url', imageUrl);
 
-      if (dbError) {
-        throw dbError;
-      }
-
       await fetchUserImages();
-      toast({
-        title: "Image deleted",
-        description: "Your image has been deleted successfully.",
-      });
+      toast({ title: "Image deleted", description: "Your image has been deleted successfully." });
     } catch (error: any) {
       console.error('Image deletion error:', error);
-      toast({
-        title: "Error",
-        description: "Failed to delete image. Please try again.",
-        variant: "destructive",
-      });
+      toast({ title: "Error", description: "Failed to delete image. Please try again.", variant: "destructive" });
     } finally {
       setDeleting(false);
     }
@@ -197,55 +138,29 @@ const ImageManagement = ({ currentUser }: ImageManagementProps) => {
         {userImages.length < 7 && (
           <div className="mb-6">
             <Label htmlFor="image_upload" className="block mb-2">Upload Image</Label>
-            <Input
-              type="file"
-              id="image_upload"
-              accept="image/*"
-              onChange={handleImageUpload}
-              disabled={uploading}
-              className="w-full"
-            />
-            {uploading && (
-              <p className="text-sm text-gray-500 mt-2 flex items-center">
-                <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-pink-600 mr-2"></div>
-                Uploading...
-              </p>
-            )}
+            <Input type="file" id="image_upload" accept="image/*" onChange={handleImageUpload} disabled={uploading} className="w-full" />
+            {uploading && <p className="text-sm text-gray-500 mt-2 flex items-center"><div className="animate-spin rounded-full h-4 w-4 border-b-2 border-pink-600 mr-2"></div>Uploading...</p>}
           </div>
         )}
 
         <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-4">
           {userImages.map((imageUrl, index) => (
             <div key={imageUrl} className="relative group">
-              <img 
-                src={imageUrl} 
-                alt={`User Image ${index + 1}`} 
-                className="w-full h-32 sm:h-40 object-cover rounded-lg shadow-sm" 
-              />
+              <img src={imageUrl} alt={`User Image ${index + 1}`} className="w-full h-32 sm:h-40 object-cover rounded-lg shadow-sm" />
               <AlertDialog>
                 <AlertDialogTrigger asChild>
-                  <Button 
-                    variant="destructive" 
-                    size="sm" 
-                    className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity p-1 h-8 w-8"
-                  >
+                  <Button variant="destructive" size="sm" className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity p-1 h-8 w-8">
                     <Trash2 className="w-4 h-4" />
                   </Button>
                 </AlertDialogTrigger>
                 <AlertDialogContent className="sm:max-w-md">
                   <AlertDialogHeader>
                     <AlertDialogTitle>Delete Image</AlertDialogTitle>
-                    <AlertDialogDescription>
-                      Are you sure you want to delete this image? This action cannot be undone.
-                    </AlertDialogDescription>
+                    <AlertDialogDescription>Are you sure you want to delete this image? This action cannot be undone.</AlertDialogDescription>
                   </AlertDialogHeader>
                   <AlertDialogFooter>
                     <AlertDialogCancel>Cancel</AlertDialogCancel>
-                    <AlertDialogAction 
-                      disabled={deleting} 
-                      onClick={() => handleDeleteImage(imageUrl)}
-                      className="bg-red-600 hover:bg-red-700"
-                    >
+                    <AlertDialogAction disabled={deleting} onClick={() => handleDeleteImage(imageUrl)} className="bg-red-600 hover:bg-red-700">
                       {deleting ? 'Deleting...' : 'Delete'}
                     </AlertDialogAction>
                   </AlertDialogFooter>

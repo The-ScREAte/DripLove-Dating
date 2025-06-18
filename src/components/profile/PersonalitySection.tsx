@@ -1,4 +1,3 @@
-
 import React from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Label } from '@/components/ui/label';
@@ -26,7 +25,7 @@ const PersonalitySection = ({ editedProfile, isEditing, onSliderChange }: Person
               <Slider
                 id="introvert_extrovert"
                 name="introvert_extrovert"
-                defaultValue={[editedProfile.introvert_extrovert]}
+                value={[editedProfile.introvert_extrovert]}
                 onValueChange={(value) => onSliderChange('introvert_extrovert', value)}
                 disabled={!isEditing}
                 className="w-full"
@@ -45,7 +44,7 @@ const PersonalitySection = ({ editedProfile, isEditing, onSliderChange }: Person
               <Slider
                 id="spontaneous_planner"
                 name="spontaneous_planner"
-                defaultValue={[editedProfile.spontaneous_planner]}
+                value={[editedProfile.spontaneous_planner]}
                 onValueChange={(value) => onSliderChange('spontaneous_planner', value)}
                 disabled={!isEditing}
                 className="w-full"
@@ -64,7 +63,7 @@ const PersonalitySection = ({ editedProfile, isEditing, onSliderChange }: Person
               <Slider
                 id="messy_organized"
                 name="messy_organized"
-                defaultValue={[editedProfile.messy_organized]}
+                value={[editedProfile.messy_organized]}
                 onValueChange={(value) => onSliderChange('messy_organized', value)}
                 disabled={!isEditing}
                 className="w-full"

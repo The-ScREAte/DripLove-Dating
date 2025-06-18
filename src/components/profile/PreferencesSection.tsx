@@ -1,4 +1,3 @@
-
 import React from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Label } from '@/components/ui/label';
@@ -26,7 +25,7 @@ const PreferencesSection = ({ editedProfile, isEditing, onSliderChange, onSelect
               <Slider
                 id="distance_preference"
                 name="distance_preference"
-                defaultValue={[editedProfile.distance_preference]}
+                value={[editedProfile.distance_preference]}
                 onValueChange={(value) => onSliderChange('distance_preference', value)}
                 max={200}
                 step={1}
@@ -58,8 +57,8 @@ const PreferencesSection = ({ editedProfile, isEditing, onSliderChange, onSelect
                 <SelectContent>
                   <SelectItem value="male">Male</SelectItem>
                   <SelectItem value="female">Female</SelectItem>
-                  <SelectItem value="both">Both</SelectItem>
-                </SelectContent>
+                  <SelectItem value="everyone">Both</SelectItem>
+                  </SelectContent>
               </Select>
             </div>
           </div>

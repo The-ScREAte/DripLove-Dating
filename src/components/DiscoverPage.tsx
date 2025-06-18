@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -31,6 +30,7 @@ interface PassedUser {
 const DiscoverPage = ({ currentUser }: DiscoverPageProps) => {
   const [potentialMatches, setPotentialMatches] = useState<PotentialMatch[]>([]);
   const [currentIndex, setCurrentIndex] = useState(0);
+  const [imageIndex, setImageIndex] = useState(0);
   const [isLoading, setIsLoading] = useState(true);
   const [passedUsers, setPassedUsers] = useState<PassedUser[]>([]);
   const { toast } = useToast();
@@ -39,19 +39,21 @@ const DiscoverPage = ({ currentUser }: DiscoverPageProps) => {
     fetchPotentialMatches();
   }, [currentUser]);
 
+  useEffect(() => {
+    setImageIndex(0);
+  }, [currentIndex]);
+
   const fetchPotentialMatches = async () => {
     if (!currentUser?.id) return;
 
     try {
       setIsLoading(true);
 
-      // Get users that the current user has already liked
       const { data: likedUsers } = await supabase
         .from('likes')
         .select('liked_id')
         .eq('liker_id', currentUser.id);
 
-      // Get users that the current user has blocked or been blocked by
       const { data: blockedUsers } = await supabase
         .from('blocks')
         .select('blocked_id, blocker_id')
@@ -61,9 +63,6 @@ const DiscoverPage = ({ currentUser }: DiscoverPageProps) => {
       const blockedUserIds = blockedUsers?.flatMap(block => [block.blocked_id, block.blocker_id]) || [];
       const excludedIds = [...likedUserIds, ...blockedUserIds, currentUser.id];
 
-      console.log('Excluded IDs:', excludedIds);
-
-      // Fetch potential matches
       const { data: profiles, error } = await supabase
         .from('profiles')
         .select('*')
@@ -73,9 +72,6 @@ const DiscoverPage = ({ currentUser }: DiscoverPageProps) => {
 
       if (error) throw error;
 
-      console.log('Fetched profiles:', profiles);
-
-      // Fetch images for each profile
       const matchesWithImages = await Promise.all(
         (profiles || []).map(async (profile) => {
           const { data: images } = await supabase
@@ -95,9 +91,9 @@ const DiscoverPage = ({ currentUser }: DiscoverPageProps) => {
     } catch (error) {
       console.error('Error fetching potential matches:', error);
       toast({
-        title: "Error",
-        description: "Failed to load potential matches. Please try again.",
-        variant: "destructive",
+        title: 'Error',
+        description: 'Failed to load potential matches. Please try again.',
+        variant: 'destructive'
       });
     } finally {
       setIsLoading(false);
@@ -109,18 +105,12 @@ const DiscoverPage = ({ currentUser }: DiscoverPageProps) => {
     if (!currentMatch) return;
 
     try {
-      console.log('Liking user:', currentMatch.id);
-
       const { error } = await supabase
         .from('likes')
-        .insert({
-          liker_id: currentUser.id,
-          liked_id: currentMatch.id
-        });
+        .insert({ liker_id: currentUser.id, liked_id: currentMatch.id });
 
       if (error) throw error;
 
-      // Check if it's a mutual like
       const { data: mutualLike } = await supabase
         .from('likes')
         .select('*')
@@ -131,7 +121,7 @@ const DiscoverPage = ({ currentUser }: DiscoverPageProps) => {
       if (mutualLike) {
         toast({
           title: "It's a Match! 🎉",
-          description: `You and ${currentMatch.first_name} liked each other!`,
+          description: `You and ${currentMatch.first_name} liked each other!`
         });
       }
 
@@ -139,9 +129,9 @@ const DiscoverPage = ({ currentUser }: DiscoverPageProps) => {
     } catch (error) {
       console.error('Error liking user:', error);
       toast({
-        title: "Error",
-        description: "Failed to like user. Please try again.",
-        variant: "destructive",
+        title: 'Error',
+        description: 'Failed to like user. Please try again.',
+        variant: 'destructive'
       });
     }
   };
@@ -150,12 +140,7 @@ const DiscoverPage = ({ currentUser }: DiscoverPageProps) => {
     const currentMatch = potentialMatches[currentIndex];
     if (!currentMatch) return;
 
-    // Add to passed users for potential reversal
-    setPassedUsers(prev => [{
-      user_id: currentMatch.id,
-      passed_at: new Date()
-    }, ...prev]);
-
+    setPassedUsers(prev => [{ user_id: currentMatch.id, passed_at: new Date() }, ...prev]);
     moveToNext();
   };
 
@@ -163,31 +148,39 @@ const DiscoverPage = ({ currentUser }: DiscoverPageProps) => {
     if (passedUsers.length === 0) return;
 
     const lastPassedUser = passedUsers[0];
-    
-    // Find the passed user in potential matches or create a new entry
     const passedUserData = potentialMatches.find(match => match.id === lastPassedUser.user_id);
-    
+
     if (passedUserData) {
-      // Insert the passed user back at the current position
       const newMatches = [...potentialMatches];
       newMatches.splice(currentIndex, 0, passedUserData);
       setPotentialMatches(newMatches);
     }
 
-    // Remove from passed users
     setPassedUsers(prev => prev.slice(1));
 
     toast({
-      title: "Reversed",
-      description: "Brought back the last passed user.",
+      title: 'Reversed',
+      description: 'Brought back the last passed user.'
     });
+  };
+
+  const handleTouch = (e: React.TouchEvent<HTMLDivElement>) => {
+    const { clientX } = e.changedTouches[0];
+    const screenWidth = window.innerWidth;
+
+    if (clientX < screenWidth / 2) {
+      setImageIndex(prev => (prev > 0 ? prev - 1 : prev));
+    } else {
+      setImageIndex(prev =>
+        currentMatch?.images && prev < currentMatch.images.length - 1 ? prev + 1 : prev
+      );
+    }
   };
 
   const moveToNext = () => {
     if (currentIndex < potentialMatches.length - 1) {
       setCurrentIndex(currentIndex + 1);
     } else {
-      // No more matches, try to fetch more
       fetchPotentialMatches();
       setCurrentIndex(0);
     }
@@ -225,24 +218,31 @@ const DiscoverPage = ({ currentUser }: DiscoverPageProps) => {
   return (
     <div className="max-w-md mx-auto p-4">
       <Card className="relative overflow-hidden">
-        {/* Main Image */}
-        <div className="relative h-96">
-          {currentMatch.images && currentMatch.images.length > 0 ? (
-            <img 
-              src={currentMatch.images[0]} 
-              alt={`${currentMatch.first_name}'s photo`}
-              className="w-full h-full object-cover"
-            />
+        <div className="relative h-96" onTouchEnd={handleTouch}>
+          {currentMatch.images?.length > 0 ? (
+            <>
+              <img
+                src={currentMatch.images[imageIndex]}
+                alt={`${currentMatch.first_name}'s photo`}
+                className="w-full h-full object-cover"
+              />
+              <div className="absolute top-2 left-1/2 transform -translate-x-1/2 flex gap-1">
+                {currentMatch.images.map((_, idx) => (
+                  <div
+                    key={idx}
+                    className={`w-2 h-2 rounded-full ${idx === imageIndex ? 'bg-white' : 'bg-white/40'}`}
+                  />
+                ))}
+              </div>
+            </>
           ) : (
             <div className="w-full h-full bg-gray-200 flex items-center justify-center">
               <span className="text-gray-500">No photo available</span>
             </div>
           )}
-          
-          {/* Gradient overlay */}
+
           <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-transparent" />
-          
-          {/* Basic info overlay */}
+
           <div className="absolute bottom-0 left-0 right-0 p-4 text-white">
             <h2 className="text-2xl font-bold">
               {currentMatch.first_name} {currentMatch.last_name}
@@ -250,13 +250,14 @@ const DiscoverPage = ({ currentUser }: DiscoverPageProps) => {
             <div className="flex items-center mt-2 space-x-4 text-sm">
               <div className="flex items-center">
                 <MapPin className="w-4 h-4 mr-1" />
-                <span>{currentMatch.city}, {currentMatch.country}</span>
+                <span>
+                  {currentMatch.city}, {currentMatch.country}
+                </span>
               </div>
             </div>
           </div>
         </div>
 
-        {/* Profile Details */}
         <CardContent className="p-4">
           {currentMatch.bio && (
             <div className="mb-4">
@@ -282,12 +283,12 @@ const DiscoverPage = ({ currentUser }: DiscoverPageProps) => {
             </div>
           )}
 
-          {currentMatch.interests && currentMatch.interests.length > 0 && (
+          {currentMatch.interests?.length > 0 && (
             <div className="mb-4">
               <h3 className="font-semibold text-gray-800 mb-2">Interests</h3>
               <div className="flex flex-wrap gap-2">
-                {currentMatch.interests.slice(0, 6).map((interest, index) => (
-                  <span 
+                {currentMatch.interests.map((interest, index) => (
+                  <span
                     key={index}
                     className="px-3 py-1 bg-pink-100 text-pink-800 rounded-full text-sm"
                   >
@@ -299,13 +300,11 @@ const DiscoverPage = ({ currentUser }: DiscoverPageProps) => {
           )}
         </CardContent>
 
-        {/* Action Buttons */}
         <div className="p-4 bg-gray-50">
           <div className="flex justify-center space-x-4">
             <Button
               onClick={handlePass}
               variant="outline"
-              size="lg"
               className="w-14 h-14 rounded-full border-2 border-gray-300 hover:border-red-500 hover:bg-red-50"
             >
               <X className="w-6 h-6 text-gray-600 hover:text-red-500" />
@@ -314,9 +313,8 @@ const DiscoverPage = ({ currentUser }: DiscoverPageProps) => {
             <Button
               onClick={handleReverse}
               variant="outline"
-              size="lg"
-              disabled={passedUsers.length === 0}
-              className="w-14 h-14 rounded-full border-2 border-gray-300 hover:border-blue-500 hover:bg-blue-50 disabled:opacity-50"
+              disabled={!passedUsers.length}
+              className="w-14 h-14 rounded-full border-2 border-gray-300 hover:border-blue-500 disabled:opacity-50"
             >
               <Undo2 className="w-6 h-6 text-gray-600 hover:text-blue-500" />
             </Button>
@@ -324,7 +322,6 @@ const DiscoverPage = ({ currentUser }: DiscoverPageProps) => {
             <Button
               onClick={handleLike}
               variant="outline"
-              size="lg"
               className="w-14 h-14 rounded-full border-2 border-pink-300 hover:border-pink-500 hover:bg-pink-50"
             >
               <Heart className="w-6 h-6 text-pink-500" />
@@ -333,7 +330,6 @@ const DiscoverPage = ({ currentUser }: DiscoverPageProps) => {
         </div>
       </Card>
 
-      {/* Progress indicator */}
       <div className="mt-4 text-center text-sm text-gray-500">
         {currentIndex + 1} of {potentialMatches.length} profiles
         {passedUsers.length > 0 && (

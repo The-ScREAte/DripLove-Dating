@@ -16,55 +16,52 @@ const LikedMePage = ({ currentUser }: LikedMePageProps) => {
   const [selectedProfile, setSelectedProfile] = useState<any>(null);
   const [userImages, setUserImages] = useState<{ [key: string]: string[] }>({});
   const [blockDialogOpen, setBlockDialogOpen] = useState(false);
+  const [imageIndex, setImageIndex] = useState(0);
   const { toast } = useToast();
 
   useEffect(() => {
     fetchLikers();
   }, [currentUser]);
 
+  useEffect(() => {
+    setImageIndex(0);
+  }, [selectedProfile]);
+
   const fetchLikers = async () => {
     if (!currentUser?.id) return;
 
     try {
-      // Get people who liked the current user
       const { data: likes, error } = await supabase
         .from('likes')
-        .select(`
-          *,
-          liker:profiles!likes_liker_id_fkey(*)
-        `)
+        .select(`*, liker:profiles!likes_liker_id_fkey(*)`)
         .eq('liked_id', currentUser.id);
 
       if (error) throw error;
 
-      // Get matched users to filter them out
       const { data: matches } = await supabase
         .from('matches')
         .select('user1_id, user2_id')
         .or(`user1_id.eq.${currentUser.id},user2_id.eq.${currentUser.id}`);
-      
-      const matchedIds = matches?.map(match => 
+
+      const matchedIds = matches?.map(match =>
         match.user1_id === currentUser.id ? match.user2_id : match.user1_id
       ) || [];
 
-      // Get blocked users to filter them out
       const { data: blockedUsers } = await supabase
         .from('blocks')
         .select('blocked_id, blocker_id')
         .or(`blocker_id.eq.${currentUser.id},blocked_id.eq.${currentUser.id}`);
-      
-      const blockedIds = blockedUsers?.map(block => 
+
+      const blockedIds = blockedUsers?.map(block =>
         block.blocker_id === currentUser.id ? block.blocked_id : block.blocker_id
       ) || [];
 
-      // Filter out matched and blocked users
-      const filteredLikes = likes?.filter(like => 
+      const filteredLikes = likes?.filter(like =>
         !matchedIds.includes(like.liker.id) && !blockedIds.includes(like.liker.id)
       ) || [];
 
       const likersData = filteredLikes.map(like => like.liker);
-      
-      // Fetch images for each liker
+
       if (likersData.length > 0) {
         const imagePromises = likersData.map(async (profile) => {
           const { data: images } = await supabase
@@ -72,19 +69,19 @@ const LikedMePage = ({ currentUser }: LikedMePageProps) => {
             .select('image_url')
             .eq('user_id', profile.id)
             .order('image_order');
-          
+
           return {
             profileId: profile.id,
             images: images?.map(img => img.image_url) || []
           };
         });
-        
+
         const imageResults = await Promise.all(imagePromises);
         const imageMap: { [key: string]: string[] } = {};
         imageResults.forEach(result => {
           imageMap[result.profileId] = result.images;
         });
-        
+
         setUserImages(imageMap);
       }
 
@@ -106,17 +103,28 @@ const LikedMePage = ({ currentUser }: LikedMePageProps) => {
     const birthDate = new Date(dateOfBirth);
     let age = today.getFullYear() - birthDate.getFullYear();
     const monthDiff = today.getMonth() - birthDate.getMonth();
-    
+
     if (monthDiff < 0 || (monthDiff === 0 && today.getDate() < birthDate.getDate())) {
       age--;
     }
-    
+
     return age;
+  };
+
+  const handleTouch = (e: React.TouchEvent<HTMLDivElement>) => {
+    const { clientX } = e.changedTouches[0];
+    const screenWidth = window.innerWidth;
+    const profileImages = userImages[selectedProfile.id] || [];
+
+    if (clientX < screenWidth / 2) {
+      setImageIndex(prev => (prev > 0 ? prev - 1 : prev));
+    } else {
+      setImageIndex(prev => (prev < profileImages.length - 1 ? prev + 1 : prev));
+    }
   };
 
   const handleLikeBack = async (profileId: string) => {
     try {
-      // Check if already liked back
       const { data: existingLike } = await supabase
         .from('likes')
         .select('*')
@@ -132,7 +140,6 @@ const LikedMePage = ({ currentUser }: LikedMePageProps) => {
         return;
       }
 
-      // Create the like back
       const { error: likeError } = await supabase
         .from('likes')
         .insert({
@@ -147,7 +154,6 @@ const LikedMePage = ({ currentUser }: LikedMePageProps) => {
         description: "You can now start chatting!",
       });
 
-      // Remove from likers list since they're now matched
       setLikers(prev => prev.filter(liker => liker.id !== profileId));
       setSelectedProfile(null);
     } catch (error) {
@@ -162,7 +168,6 @@ const LikedMePage = ({ currentUser }: LikedMePageProps) => {
 
   const handlePass = async (profileId: string) => {
     try {
-      // Remove the like from the likes table
       const { error } = await supabase
         .from('likes')
         .delete()
@@ -176,7 +181,6 @@ const LikedMePage = ({ currentUser }: LikedMePageProps) => {
         description: "Profile removed from your likes",
       });
 
-      // Remove from likers list
       setLikers(prev => prev.filter(liker => liker.id !== profileId));
       setSelectedProfile(null);
     } catch (error) {
@@ -194,7 +198,6 @@ const LikedMePage = ({ currentUser }: LikedMePageProps) => {
   };
 
   const handleBlockSuccess = () => {
-    // Remove from likers list
     if (selectedProfile) {
       setLikers(prev => prev.filter(liker => liker.id !== selectedProfile.id));
       setSelectedProfile(null);
@@ -211,25 +214,31 @@ const LikedMePage = ({ currentUser }: LikedMePageProps) => {
 
   if (selectedProfile) {
     const profileImages = userImages[selectedProfile.id] || [];
-    
+
     return (
       <div className="max-w-md mx-auto">
-        <Button 
-          onClick={() => setSelectedProfile(null)}
-          variant="outline"
-          className="mb-4"
-        >
+        <Button onClick={() => setSelectedProfile(null)} variant="outline" className="mb-4">
           ← Back to likes
         </Button>
-        
+
         <Card className="overflow-hidden shadow-2xl">
-          <div className="relative h-96">
+          <div className="relative h-96" onTouchEnd={handleTouch}>
             {profileImages.length > 0 ? (
-              <img
-                src={profileImages[0]}
-                alt={`${selectedProfile.first_name}'s photo`}
-                className="w-full h-full object-cover"
-              />
+              <>
+                <img
+                  src={profileImages[imageIndex]}
+                  alt={`${selectedProfile.first_name}'s photo`}
+                  className="w-full h-full object-cover"
+                />
+                <div className="absolute top-2 left-1/2 transform -translate-x-1/2 flex gap-1">
+                  {profileImages.map((_, idx) => (
+                    <div
+                      key={idx}
+                      className={`w-2 h-2 rounded-full ${idx === imageIndex ? 'bg-white' : 'bg-white/40'}`}
+                    />
+                  ))}
+                </div>
+              </>
             ) : (
               <div className="w-full h-full bg-gradient-to-br from-pink-200 to-purple-200 flex items-center justify-center">
                 <div className="w-32 h-32 bg-white rounded-full flex items-center justify-center">
@@ -239,14 +248,7 @@ const LikedMePage = ({ currentUser }: LikedMePageProps) => {
                 </div>
               </div>
             )}
-            
-            {profileImages.length > 1 && (
-              <div className="absolute top-4 right-4 bg-black bg-opacity-50 text-white px-2 py-1 rounded-full text-sm">
-                +{profileImages.length - 1} photos
-              </div>
-            )}
 
-            {/* Block button */}
             <Button
               onClick={handleBlock}
               variant="outline"
@@ -256,7 +258,7 @@ const LikedMePage = ({ currentUser }: LikedMePageProps) => {
               <Shield className="w-4 h-4" />
             </Button>
           </div>
-          
+
           <CardContent className="p-6">
             <div className="mb-4">
               <h2 className="text-2xl font-bold text-gray-800">
@@ -271,13 +273,13 @@ const LikedMePage = ({ currentUser }: LikedMePageProps) => {
                 <span>{selectedProfile.city}, {selectedProfile.country}</span>
               </div>
             </div>
-            
+
             {selectedProfile.bio && (
               <div className="mb-4">
                 <p className="text-gray-700">{selectedProfile.bio}</p>
               </div>
             )}
-            
+
             {selectedProfile.interests && selectedProfile.interests.length > 0 && (
               <div className="mb-6">
                 <h3 className="font-semibold text-gray-800 mb-2">Interests</h3>
@@ -293,7 +295,7 @@ const LikedMePage = ({ currentUser }: LikedMePageProps) => {
                 </div>
               </div>
             )}
-            
+
             <div className="flex space-x-4">
               <Button
                 onClick={() => handlePass(selectedProfile.id)}
@@ -346,8 +348,8 @@ const LikedMePage = ({ currentUser }: LikedMePageProps) => {
               {likers.map((liker) => {
                 const profileImages = userImages[liker.id] || [];
                 return (
-                  <Card 
-                    key={liker.id} 
+                  <Card
+                    key={liker.id}
                     className="cursor-pointer hover:shadow-lg transition-shadow"
                     onClick={() => setSelectedProfile(liker)}
                   >

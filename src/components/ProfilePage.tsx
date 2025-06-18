@@ -1,6 +1,5 @@
-
 import React, { useState, useEffect } from 'react';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { User, Edit, Save, X } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
@@ -58,7 +57,6 @@ const ProfilePage = ({ currentUser, profile, onProfileUpdate, onLogout }: Profil
 
   useEffect(() => {
     if (profile) {
-      console.log('Setting edited profile from:', profile);
       setEditedProfile({
         first_name: profile.first_name || '',
         last_name: profile.last_name || '',
@@ -90,37 +88,28 @@ const ProfilePage = ({ currentUser, profile, onProfileUpdate, onLogout }: Profil
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
     const { name, value } = e.target;
-    console.log('Input change:', name, value);
     setEditedProfile(prev => ({ ...prev, [name]: value }));
   };
 
   const handleSliderChange = (name: string, value: number[]) => {
-    console.log('Slider change:', name, value[0]);
     setEditedProfile(prev => ({ ...prev, [name]: value[0] }));
   };
 
   const handleSelectChange = (name: string, value: string) => {
-    console.log('Select change:', name, value);
     setEditedProfile(prev => ({ ...prev, [name]: value }));
   };
 
   const handleInterestsChange = (interests: string[]) => {
     if (isEditing) {
-      console.log('Interests change:', interests);
       setEditedProfile(prev => ({ ...prev, interests }));
     }
   };
 
   const handleSave = async () => {
     if (isSaving) return;
-    
     setIsSaving(true);
-    
+
     try {
-      console.log('Saving profile with data:', editedProfile);
-      console.log('Current user ID:', currentUser.id);
-      
-      // Prepare the update data with proper validation - including date_of_birth
       const updateData = {
         first_name: editedProfile.first_name?.trim() || null,
         last_name: editedProfile.last_name?.trim() || null,
@@ -130,20 +119,35 @@ const ProfilePage = ({ currentUser, profile, onProfileUpdate, onLogout }: Profil
         date_of_birth: profile?.date_of_birth || currentUser?.user_metadata?.date_of_birth || '1990-01-01',
         email: currentUser.email,
         distance_preference: editedProfile.distance_preference || 25,
-        gender: editedProfile.gender || null,
-        preference: editedProfile.preference || null,
-        relationship_intent: editedProfile.relationship_intent || null,
-        smoking: editedProfile.smoking || null,
-        drinking: editedProfile.drinking || null,
-        exercise_level: editedProfile.exercise_level || null,
-        sleeping_schedule: editedProfile.sleeping_schedule || null,
+        gender: editedProfile.gender || 'not_specified',
+        preference: editedProfile.preference || 'not_specified',
+        relationship_intent: editedProfile.relationship_intent || 'open_to_anything',
+        smoking: editedProfile.smoking || 'not_specified',
+        drinking: editedProfile.drinking || 'not_specified',
+        exercise_level: editedProfile.exercise_level || 'not_specified',
+        sleeping_schedule: editedProfile.sleeping_schedule || 'not_specified',
         occupation: editedProfile.occupation?.trim() || null,
         industry: editedProfile.industry?.trim() || null,
         education_level: editedProfile.education_level || null,
         zip_code: editedProfile.zip_code?.trim() || null,
-        introvert_extrovert: editedProfile.introvert_extrovert || 50,
-        spontaneous_planner: editedProfile.spontaneous_planner || 50,
-        messy_organized: editedProfile.messy_organized || 50,
+        introvert_extrovert:
+          typeof editedProfile.introvert_extrovert === 'number' &&
+          editedProfile.introvert_extrovert >= 0 &&
+          editedProfile.introvert_extrovert <= 100
+            ? editedProfile.introvert_extrovert
+            : 50,
+        spontaneous_planner:
+          typeof editedProfile.spontaneous_planner === 'number' &&
+          editedProfile.spontaneous_planner >= 0 &&
+          editedProfile.spontaneous_planner <= 100
+            ? editedProfile.spontaneous_planner
+            : 50,
+        messy_organized:
+          typeof editedProfile.messy_organized === 'number' &&
+          editedProfile.messy_organized >= 0 &&
+          editedProfile.messy_organized <= 100
+            ? editedProfile.messy_organized
+            : 50,
         fun_fact: editedProfile.fun_fact?.trim() || null,
         perfect_first_date: editedProfile.perfect_first_date?.trim() || null,
         last_googled: editedProfile.last_googled?.trim() || null,
@@ -151,67 +155,43 @@ const ProfilePage = ({ currentUser, profile, onProfileUpdate, onLogout }: Profil
         updated_at: new Date().toISOString(),
       };
 
-      console.log('Update data being sent:', updateData);
-
-      // Check if profile exists first
-      const { data: existingProfile, error: checkError } = await supabase
+      const { data: existingProfile } = await supabase
         .from('profiles')
         .select('id')
         .eq('id', currentUser.id)
-        .maybeSingle();
+        .single();
 
-      if (checkError) {
-        throw checkError;
-      }
-
+      const profileExists = !!existingProfile;
       let result;
-      if (existingProfile) {
-        // Update existing profile
-        result = await supabase
+
+      if (profileExists) {
+        const { data, error } = await supabase
           .from('profiles')
-          .update(updateData)
-          .eq('id', currentUser.id)
-          .select()
-          .single();
+          .upsert({ id: currentUser.id, ...updateData })
+          .select();
+        if (error) throw new Error('Update failed: ' + error.message);
+        result = data;
       } else {
-        // Insert new profile
-        result = await supabase
+        const { data, error } = await supabase
           .from('profiles')
-          .insert({
-            id: currentUser.id,
-            ...updateData
-          })
-          .select()
-          .single();
+          .insert({ id: currentUser.id, ...updateData })
+          .select();
+        if (error) throw new Error('Insert failed: ' + error.message);
+        result = data;
       }
-
-      if (result.error) {
-        console.error('Save error details:', result.error);
-        throw result.error;
-      }
-
-      console.log('Profile saved successfully:', result.data);
 
       setIsEditing(false);
       onProfileUpdate();
-      toast({
-        title: "Profile updated",
-        description: "Your AfroVibe profile has been saved successfully.",
-      });
+      toast({ title: 'Profile updated', description: 'Your AfroVibe profile has been saved successfully.' });
     } catch (error: any) {
-      console.error('Error updating profile:', error);
-      toast({
-        title: "Error",
-        description: error.message || "Failed to update profile. Please try again.",
-        variant: "destructive",
-      });
+      console.error('🚨 Save failed:', error);
+      toast({ title: 'Error', description: error.message || 'Failed to update profile.', variant: 'destructive' });
     } finally {
       setIsSaving(false);
     }
   };
 
   const handleCancel = () => {
-    // Reset to original profile data
     if (profile) {
       setEditedProfile({
         first_name: profile.first_name || '',
@@ -245,7 +225,6 @@ const ProfilePage = ({ currentUser, profile, onProfileUpdate, onLogout }: Profil
 
   return (
     <div className="max-w-4xl mx-auto space-y-6 p-4">
-      {/* Header */}
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
         <Card className="w-full sm:w-auto">
           <CardHeader className="pb-3">
@@ -256,98 +235,32 @@ const ProfilePage = ({ currentUser, profile, onProfileUpdate, onLogout }: Profil
           </CardHeader>
         </Card>
         {!isEditing ? (
-          <Button 
-            onClick={() => setIsEditing(true)}
-            className="w-full sm:w-auto"
-          >
-            <Edit className="w-4 h-4 mr-2" /> 
-            Edit Profile
+          <Button onClick={() => setIsEditing(true)} className="w-full sm:w-auto">
+            <Edit className="w-4 h-4 mr-2" /> Edit Profile
           </Button>
         ) : (
           <div className="flex flex-col sm:flex-row space-y-2 sm:space-y-0 sm:space-x-2 w-full sm:w-auto">
-            <Button 
-              onClick={handleSave}
-              disabled={isSaving}
-              className="w-full sm:w-auto"
-            >
-              <Save className="w-4 h-4 mr-2" /> 
-              {isSaving ? 'Saving...' : 'Save'}
+            <Button onClick={handleSave} disabled={isSaving} className="w-full sm:w-auto">
+              <Save className="w-4 h-4 mr-2" /> {isSaving ? 'Saving...' : 'Save'}
             </Button>
-            <Button 
-              variant="outline" 
-              onClick={handleCancel}
-              disabled={isSaving}
-              className="w-full sm:w-auto"
-            >
-              <X className="w-4 h-4 mr-2" /> 
-              Cancel
+            <Button variant="outline" onClick={handleCancel} disabled={isSaving} className="w-full sm:w-auto">
+              <X className="w-4 h-4 mr-2" /> Cancel
             </Button>
           </div>
         )}
       </div>
 
-      {/* Profile Summary */}
       <ProfileSummaryCard currentUser={currentUser} />
-
-      {/* Image Management */}
       <ImageManagement currentUser={currentUser} />
-
-      {/* Profile Sections */}
-      <BasicInfoSection 
-        editedProfile={editedProfile}
-        isEditing={isEditing}
-        onInputChange={handleInputChange}
-      />
-
-      <LocationSection 
-        editedProfile={editedProfile}
-        isEditing={isEditing}
-        onInputChange={handleInputChange}
-      />
-
-      <PreferencesSection 
-        editedProfile={editedProfile}
-        isEditing={isEditing}
-        onSliderChange={handleSliderChange}
-        onSelectChange={handleSelectChange}
-      />
-
-      <LifestyleSection 
-        editedProfile={editedProfile}
-        isEditing={isEditing}
-        onSelectChange={handleSelectChange}
-      />
-
-      <WorkEducationSection 
-        editedProfile={editedProfile}
-        isEditing={isEditing}
-        onInputChange={handleInputChange}
-      />
-
-      <PersonalitySection 
-        editedProfile={editedProfile}
-        isEditing={isEditing}
-        onSliderChange={handleSliderChange}
-      />
-
-      <FunQuestionsSection 
-        editedProfile={editedProfile}
-        isEditing={isEditing}
-        onInputChange={handleInputChange}
-      />
-
-      <InterestsSection 
-        editedProfile={editedProfile}
-        profile={profile}
-        isEditing={isEditing}
-        onInterestsChange={handleInterestsChange}
-      />
-
-      {/* Account Actions */}
-      <AccountActions 
-        currentUser={currentUser}
-        onLogout={onLogout}
-      />
+      <BasicInfoSection editedProfile={editedProfile} isEditing={isEditing} onInputChange={handleInputChange} />
+      <LocationSection editedProfile={editedProfile} isEditing={isEditing} onInputChange={handleInputChange} />
+      <PreferencesSection editedProfile={editedProfile} isEditing={isEditing} onSliderChange={handleSliderChange} onSelectChange={handleSelectChange} />
+      <LifestyleSection editedProfile={editedProfile} isEditing={isEditing} onSelectChange={handleSelectChange} />
+      <WorkEducationSection editedProfile={editedProfile} isEditing={isEditing} onInputChange={handleInputChange} />
+      <PersonalitySection editedProfile={editedProfile} isEditing={isEditing} onSliderChange={handleSliderChange} />
+      <FunQuestionsSection editedProfile={editedProfile} isEditing={isEditing} onInputChange={handleInputChange} />
+      <InterestsSection editedProfile={editedProfile} profile={profile} isEditing={isEditing} onInterestsChange={handleInterestsChange} />
+      <AccountActions currentUser={currentUser} onLogout={onLogout} />
     </div>
   );
 };
