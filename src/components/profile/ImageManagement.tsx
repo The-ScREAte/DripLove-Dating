@@ -40,6 +40,41 @@ const ImageManagement = ({ currentUser }: ImageManagementProps) => {
     }
   };
 
+  const ensureBucketExists = async () => {
+    try {
+      // First, try to get the bucket
+      const { data: bucket, error: bucketError } = await supabase.storage.getBucket('loveconnect');
+      
+      if (bucketError && bucketError.message.includes('not found')) {
+        console.log('Bucket not found, attempting to create...');
+        
+        // Create the bucket if it doesn't exist
+        const { error: createError } = await supabase.storage.createBucket('loveconnect', {
+          public: true,
+          allowedMimeTypes: ['image/jpeg', 'image/png', 'image/gif', 'image/webp'],
+          fileSizeLimit: 10485760 // 10MB
+        });
+        
+        if (createError) {
+          console.error('Error creating bucket:', createError);
+          // If creation fails, the bucket might already exist - continue
+          return true;
+        }
+        
+        console.log('Bucket created successfully');
+        return true;
+      } else if (bucketError) {
+        console.error('Error checking bucket:', bucketError);
+        return false;
+      }
+      
+      return true;
+    } catch (error) {
+      console.error('Error ensuring bucket exists:', error);
+      return false;
+    }
+  };
+
   const handleImageUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
     if (!file) return;
@@ -76,29 +111,17 @@ const ImageManagement = ({ currentUser }: ImageManagementProps) => {
     setUploading(true);
 
     try {
+      // Ensure bucket exists
+      const bucketReady = await ensureBucketExists();
+      if (!bucketReady) {
+        throw new Error('Storage bucket is not available');
+      }
+
       // Create a unique filename
       const fileExt = file.name.split('.').pop();
       const fileName = `${currentUser.id}/${Date.now()}-${Math.random().toString(36).substring(2)}.${fileExt}`;
       
       console.log('Uploading file:', fileName);
-
-      // Check if bucket exists, if not create it
-      const { data: buckets } = await supabase.storage.listBuckets();
-      const bucketExists = buckets?.some(bucket => bucket.id === 'loveconnect');
-      
-      if (!bucketExists) {
-        console.log('Creating bucket...');
-        const { error: bucketError } = await supabase.storage.createBucket('loveconnect', {
-          public: true,
-          allowedMimeTypes: ['image/jpeg', 'image/png', 'image/gif', 'image/webp'],
-          fileSizeLimit: 10485760 // 10MB
-        });
-        
-        if (bucketError) {
-          console.error('Bucket creation error:', bucketError);
-          // Continue anyway, bucket might exist
-        }
-      }
 
       const { data: uploadData, error: uploadError } = await supabase.storage
         .from('loveconnect')

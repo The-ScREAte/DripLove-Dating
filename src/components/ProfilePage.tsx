@@ -120,13 +120,15 @@ const ProfilePage = ({ currentUser, profile, onProfileUpdate, onLogout }: Profil
       console.log('Saving profile with data:', editedProfile);
       console.log('Current user ID:', currentUser.id);
       
-      // Prepare the update data with proper validation
+      // Prepare the update data with proper validation - including date_of_birth
       const updateData = {
         first_name: editedProfile.first_name?.trim() || null,
         last_name: editedProfile.last_name?.trim() || null,
         bio: editedProfile.bio?.trim() || null,
         city: editedProfile.city?.trim() || null,
         country: editedProfile.country?.trim() || null,
+        date_of_birth: profile?.date_of_birth || currentUser?.user_metadata?.date_of_birth || '1990-01-01',
+        email: currentUser.email,
         distance_preference: editedProfile.distance_preference || 25,
         gender: editedProfile.gender || null,
         preference: editedProfile.preference || null,
@@ -164,7 +166,7 @@ const ProfilePage = ({ currentUser, profile, onProfileUpdate, onLogout }: Profil
 
       let result;
       if (existingProfile) {
-        // Update existing profile
+        // Update existing profile - don't include id in the update data
         result = await supabase
           .from('profiles')
           .update(updateData)
@@ -172,12 +174,11 @@ const ProfilePage = ({ currentUser, profile, onProfileUpdate, onLogout }: Profil
           .select()
           .single();
       } else {
-        // Insert new profile
+        // Insert new profile - include id in the insert data
         result = await supabase
           .from('profiles')
           .insert({
             id: currentUser.id,
-            email: currentUser.email,
             ...updateData
           })
           .select()

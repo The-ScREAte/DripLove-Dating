@@ -1,7 +1,7 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Heart, X, MapPin, Calendar, Briefcase, GraduationCap, Dumbbell, Wine, Cigarette, Shield, ChevronLeft, ChevronRight } from 'lucide-react';
+import { Heart, X, MapPin, Calendar, Briefcase, GraduationCap, Dumbbell, Wine, Cigarette, Shield, ChevronLeft, ChevronRight, RotateCcw } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import BlockDialog from './BlockDialog';
@@ -18,7 +18,16 @@ const DiscoverPage = ({ currentUser }: DiscoverPageProps) => {
   const [userImages, setUserImages] = useState<{ [key: string]: string[] }>({});
   const [blockDialogOpen, setBlockDialogOpen] = useState(false);
   const [showDetails, setShowDetails] = useState(false);
+  const [passedProfiles, setPassedProfiles] = useState<any[]>([]);
   const { toast } = useToast();
+  
+  // Touch/swipe handling
+  const [touchStart, setTouchStart] = useState<{ x: number; y: number } | null>(null);
+  const [touchEnd, setTouchEnd] = useState<{ x: number; y: number } | null>(null);
+  const cardRef = useRef<HTMLDivElement>(null);
+
+  // Minimum swipe distance to trigger action
+  const minSwipeDistance = 50;
 
   useEffect(() => {
     fetchProfiles();
@@ -171,9 +180,68 @@ const DiscoverPage = ({ currentUser }: DiscoverPageProps) => {
         });
         return;
       }
+    } else if (direction === 'pass') {
+      // Store passed profile for potential reversal
+      setPassedProfiles(prev => [...prev, currentProfile]);
     }
     
     setCurrentIndex(prev => prev + 1);
+  };
+
+  const handleReverse = () => {
+    if (passedProfiles.length > 0 && currentIndex > 0) {
+      const lastPassedProfile = passedProfiles[passedProfiles.length - 1];
+      
+      // Insert the passed profile back to the current position
+      setProfiles(prev => {
+        const newProfiles = [...prev];
+        newProfiles.splice(currentIndex, 0, lastPassedProfile);
+        return newProfiles;
+      });
+      
+      // Remove from passed profiles
+      setPassedProfiles(prev => prev.slice(0, -1));
+      
+      toast({
+        title: "Profile restored",
+        description: `${lastPassedProfile.first_name} is back in your queue`,
+      });
+    }
+  };
+
+  // Touch handlers for swipe functionality
+  const onTouchStart = (e: React.TouchEvent) => {
+    setTouchEnd(null);
+    setTouchStart({
+      x: e.targetTouches[0].clientX,
+      y: e.targetTouches[0].clientY
+    });
+  };
+
+  const onTouchMove = (e: React.TouchEvent) => {
+    setTouchEnd({
+      x: e.targetTouches[0].clientX,
+      y: e.targetTouches[0].clientY
+    });
+  };
+
+  const onTouchEnd = () => {
+    if (!touchStart || !touchEnd) return;
+    
+    const distanceX = touchStart.x - touchEnd.x;
+    const distanceY = touchStart.y - touchEnd.y;
+    const isLeftSwipe = distanceX > minSwipeDistance;
+    const isRightSwipe = distanceX < -minSwipeDistance;
+    const isVerticalSwipe = Math.abs(distanceY) > Math.abs(distanceX);
+    
+    // Only process horizontal swipes
+    if (!isVerticalSwipe) {
+      if (isLeftSwipe) {
+        handleSwipe('pass');
+      } else if (isRightSwipe) {
+        handleSwipe('like');
+      }
+    }
   };
 
   const handleBlock = () => {
@@ -235,7 +303,13 @@ const DiscoverPage = ({ currentUser }: DiscoverPageProps) => {
   return (
     <div className="h-full relative overflow-hidden">
       {/* Full-screen background image */}
-      <div className="absolute inset-0">
+      <div 
+        className="absolute inset-0"
+        ref={cardRef}
+        onTouchStart={onTouchStart}
+        onTouchMove={onTouchMove}
+        onTouchEnd={onTouchEnd}
+      >
         {currentImage ? (
           <img
             src={currentImage}
@@ -258,14 +332,27 @@ const DiscoverPage = ({ currentUser }: DiscoverPageProps) => {
 
       {/* Top controls */}
       <div className="absolute top-4 left-4 right-4 flex justify-between items-center z-10">
-        <Button
-          onClick={handleBlock}
-          variant="outline"
-          size="sm"
-          className="bg-white/80 hover:bg-white border-white"
-        >
-          <Shield className="w-4 h-4" />
-        </Button>
+        <div className="flex space-x-2">
+          <Button
+            onClick={handleBlock}
+            variant="outline"
+            size="sm"
+            className="bg-white/80 hover:bg-white border-white"
+          >
+            <Shield className="w-4 h-4" />
+          </Button>
+          
+          {passedProfiles.length > 0 && (
+            <Button
+              onClick={handleReverse}
+              variant="outline"
+              size="sm"
+              className="bg-white/80 hover:bg-white border-white"
+            >
+              <RotateCcw className="w-4 h-4" />
+            </Button>
+          )}
+        </div>
         
         {profileImages.length > 1 && (
           <div className="bg-black bg-opacity-50 text-white px-3 py-1 rounded-full text-sm">
@@ -293,6 +380,18 @@ const DiscoverPage = ({ currentUser }: DiscoverPageProps) => {
           </button>
         </>
       )}
+
+      {/* Swipe indicators */}
+      <div className="absolute top-1/2 left-8 transform -translate-y-1/2 z-10 opacity-50">
+        <div className="text-white text-sm bg-black bg-opacity-50 px-2 py-1 rounded">
+          ← Pass
+        </div>
+      </div>
+      <div className="absolute top-1/2 right-8 transform -translate-y-1/2 z-10 opacity-50">
+        <div className="text-white text-sm bg-black bg-opacity-50 px-2 py-1 rounded">
+          Like →
+        </div>
+      </div>
 
       {/* Bottom content overlay */}
       <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black to-transparent text-white p-6 z-10">
