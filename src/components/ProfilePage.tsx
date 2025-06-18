@@ -120,14 +120,14 @@ const ProfilePage = ({ currentUser, profile, onProfileUpdate, onLogout }: Profil
       console.log('Saving profile with data:', editedProfile);
       console.log('Current user ID:', currentUser.id);
       
-      // Prepare the update data with proper type handling
+      // Prepare the update data with proper validation
       const updateData = {
         first_name: editedProfile.first_name?.trim() || null,
         last_name: editedProfile.last_name?.trim() || null,
         bio: editedProfile.bio?.trim() || null,
         city: editedProfile.city?.trim() || null,
         country: editedProfile.country?.trim() || null,
-        distance_preference: Number(editedProfile.distance_preference) || 25,
+        distance_preference: editedProfile.distance_preference || 25,
         gender: editedProfile.gender || null,
         preference: editedProfile.preference || null,
         relationship_intent: editedProfile.relationship_intent || null,
@@ -139,31 +139,57 @@ const ProfilePage = ({ currentUser, profile, onProfileUpdate, onLogout }: Profil
         industry: editedProfile.industry?.trim() || null,
         education_level: editedProfile.education_level || null,
         zip_code: editedProfile.zip_code?.trim() || null,
-        introvert_extrovert: Number(editedProfile.introvert_extrovert) || 50,
-        spontaneous_planner: Number(editedProfile.spontaneous_planner) || 50,
-        messy_organized: Number(editedProfile.messy_organized) || 50,
+        introvert_extrovert: editedProfile.introvert_extrovert || 50,
+        spontaneous_planner: editedProfile.spontaneous_planner || 50,
+        messy_organized: editedProfile.messy_organized || 50,
         fun_fact: editedProfile.fun_fact?.trim() || null,
         perfect_first_date: editedProfile.perfect_first_date?.trim() || null,
         last_googled: editedProfile.last_googled?.trim() || null,
-        interests: editedProfile.interests || [],
+        interests: Array.isArray(editedProfile.interests) ? editedProfile.interests : [],
         updated_at: new Date().toISOString(),
       };
 
       console.log('Update data being sent:', updateData);
 
-      const { data, error } = await supabase
+      // Check if profile exists first
+      const { data: existingProfile, error: checkError } = await supabase
         .from('profiles')
-        .update(updateData)
+        .select('id')
         .eq('id', currentUser.id)
-        .select()
         .single();
 
-      if (error) {
-        console.error('Save error details:', error);
-        throw error;
+      if (checkError && checkError.code !== 'PGRST116') {
+        throw checkError;
       }
 
-      console.log('Profile updated successfully:', data);
+      let result;
+      if (existingProfile) {
+        // Update existing profile
+        result = await supabase
+          .from('profiles')
+          .update(updateData)
+          .eq('id', currentUser.id)
+          .select()
+          .single();
+      } else {
+        // Insert new profile
+        result = await supabase
+          .from('profiles')
+          .insert({
+            id: currentUser.id,
+            email: currentUser.email,
+            ...updateData
+          })
+          .select()
+          .single();
+      }
+
+      if (result.error) {
+        console.error('Save error details:', result.error);
+        throw result.error;
+      }
+
+      console.log('Profile saved successfully:', result.data);
 
       setIsEditing(false);
       onProfileUpdate();

@@ -1,68 +1,66 @@
 
 import React from 'react';
 import { Button } from '@/components/ui/button';
-import { Heart, Sparkles, Users, MessageCircle, Shield } from 'lucide-react';
 
 interface WelcomeScreenProps {
   onGetStarted: () => void;
-  onAdminAccess?: () => void;
+  onAdminAccess: () => void;
 }
 
 const WelcomeScreen = ({ onGetStarted, onAdminAccess }: WelcomeScreenProps) => {
   return (
-    <div className="min-h-screen bg-gradient-to-br from-pink-400 via-purple-500 to-indigo-600 flex items-center justify-center p-4">
-      <div className="text-center max-w-md mx-auto">
-        {/* Admin Access Button */}
-        {onAdminAccess && (
-          <div className="absolute top-4 right-4">
-            <Button
-              onClick={onAdminAccess}
-              variant="ghost"
-              className="text-white hover:bg-white/20"
-            >
-              <Shield className="w-4 h-4 mr-2" />
-              Admin
-            </Button>
-          </div>
-        )}
-
-        <div className="mb-8">
-          <div className="inline-flex items-center justify-center p-4 bg-white/20 rounded-full mb-6">
-            <img 
-              src="/lovable-uploads/ef9367e7-bcc2-40e6-8a31-b92465c0e20b.png" 
-              alt="AfroVibe Logo" 
-              className="w-16 h-16"
-            />
-          </div>
-          <h1 className="text-5xl font-bold text-white mb-4">
-            AfroVibe
-          </h1>
-          <p className="text-xl text-white/90 mb-8">
-            Connect with your vibe and find your perfect match
-          </p>
+    <div className="min-h-screen bg-gradient-to-br from-pink-400 via-purple-500 to-indigo-600 flex flex-col items-center justify-center text-white relative overflow-hidden">
+      {/* Background Pattern */}
+      <div className="absolute inset-0 opacity-10">
+        <div className="absolute top-10 left-10 w-20 h-20 bg-white rounded-full"></div>
+        <div className="absolute top-32 right-20 w-16 h-16 bg-white rounded-full"></div>
+        <div className="absolute bottom-20 left-20 w-12 h-12 bg-white rounded-full"></div>
+        <div className="absolute bottom-32 right-32 w-24 h-24 bg-white rounded-full"></div>
+      </div>
+      
+      {/* Main Content */}
+      <div className="text-center z-10 px-4 max-w-md mx-auto">
+        {/* Logo */}
+        <div className="mb-8 flex justify-center">
+          <img 
+            src="/lovable-uploads/0e9bd84b-0f71-493b-8c1f-1a2883e5109d.png" 
+            alt="AfroVibe Logo" 
+            className="h-32 w-auto"
+          />
         </div>
         
-        <div className="grid grid-cols-1 gap-4 mb-8">
-          <div className="flex items-center justify-center space-x-3 text-white/90">
-            <Users className="w-6 h-6" />
-            <span>Connect with like-minded people</span>
-          </div>
-          <div className="flex items-center justify-center space-x-3 text-white/90">
-            <MessageCircle className="w-6 h-6" />
-            <span>Start meaningful conversations</span>
-          </div>
-          <div className="flex items-center justify-center space-x-3 text-white/90">
-            <Sparkles className="w-6 h-6" />
-            <span>Discover your perfect vibe</span>
-          </div>
-        </div>
+        {/* Tagline */}
+        <h2 className="text-2xl md:text-3xl font-bold mb-4 leading-tight">
+          Where African Hearts Connect
+        </h2>
         
+        <p className="text-lg md:text-xl mb-8 opacity-90 leading-relaxed">
+          Discover meaningful connections within the vibrant African diaspora community
+        </p>
+        
+        {/* CTA Button */}
         <Button 
           onClick={onGetStarted}
-          className="w-full bg-white text-purple-600 hover:bg-gray-100 font-semibold py-4 rounded-lg text-lg transition-all duration-200 transform hover:scale-[1.02] shadow-lg"
+          size="lg"
+          className="bg-white text-purple-600 hover:bg-gray-100 font-semibold px-8 py-3 rounded-full text-lg shadow-lg transform hover:scale-105 transition-all duration-200"
         >
           Get Started
         </Button>
+        
+        {/* Admin Access */}
+        <div className="mt-8">
+          <button 
+            onClick={onAdminAccess}
+            className="text-sm text-white/70 hover:text-white underline transition-colors"
+          >
+            Admin Access
+          </button>
+        </div>
+      </div>
+      
+      {/* Footer */}
+      <div className="absolute bottom-8 text-center text-white/60 text-sm">
+        <p>Join thousands finding love across continents</p>
       </div>
     </div>
   );
