@@ -1,8 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Carousel, CarouselContent, CarouselItem, CarouselNext, CarouselPrevious } from '@/components/ui/carousel';
-import { Heart, X, MapPin, Calendar, Briefcase, GraduationCap, Dumbbell, Wine, Cigarette, Shield } from 'lucide-react';
+import { Heart, X, MapPin, Calendar, Briefcase, GraduationCap, Dumbbell, Wine, Cigarette, Shield, ChevronLeft, ChevronRight } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import BlockDialog from './BlockDialog';
@@ -14,14 +13,22 @@ interface DiscoverPageProps {
 const DiscoverPage = ({ currentUser }: DiscoverPageProps) => {
   const [profiles, setProfiles] = useState<any[]>([]);
   const [currentIndex, setCurrentIndex] = useState(0);
+  const [currentImageIndex, setCurrentImageIndex] = useState(0);
   const [loading, setLoading] = useState(true);
   const [userImages, setUserImages] = useState<{ [key: string]: string[] }>({});
   const [blockDialogOpen, setBlockDialogOpen] = useState(false);
+  const [showDetails, setShowDetails] = useState(false);
   const { toast } = useToast();
 
   useEffect(() => {
     fetchProfiles();
   }, [currentUser]);
+
+  // Reset image index when profile changes
+  useEffect(() => {
+    setCurrentImageIndex(0);
+    setShowDetails(false);
+  }, [currentIndex]);
 
   const fetchProfiles = async () => {
     if (!currentUser?.id) return;
@@ -162,7 +169,7 @@ const DiscoverPage = ({ currentUser }: DiscoverPageProps) => {
           description: "Failed to like profile",
           variant: "destructive",
         });
-        return; // Don't proceed to next profile if there was an error
+        return;
       }
     }
     
@@ -174,11 +181,22 @@ const DiscoverPage = ({ currentUser }: DiscoverPageProps) => {
   };
 
   const handleBlockSuccess = () => {
-    // Remove the current profile from the list
     setProfiles(prev => prev.filter((_, index) => index !== currentIndex));
-    // Reset current index if needed
     if (currentIndex >= profiles.length - 1) {
       setCurrentIndex(0);
+    }
+  };
+
+  const nextImage = () => {
+    const profileImages = userImages[profiles[currentIndex]?.id] || [];
+    if (currentImageIndex < profileImages.length - 1) {
+      setCurrentImageIndex(prev => prev + 1);
+    }
+  };
+
+  const prevImage = () => {
+    if (currentImageIndex > 0) {
+      setCurrentImageIndex(prev => prev - 1);
     }
   };
 
@@ -193,7 +211,7 @@ const DiscoverPage = ({ currentUser }: DiscoverPageProps) => {
   if (profiles.length === 0 || currentIndex >= profiles.length) {
     return (
       <div className="flex items-center justify-center h-full">
-        <Card className="w-full max-w-md">
+        <Card className="w-full max-w-md mx-4">
           <CardContent className="p-8 text-center">
             <Heart className="w-16 h-16 text-gray-400 mx-auto mb-4" />
             <h2 className="text-2xl font-bold text-gray-800 mb-2">No more profiles</h2>
@@ -212,171 +230,190 @@ const DiscoverPage = ({ currentUser }: DiscoverPageProps) => {
 
   const currentProfile = profiles[currentIndex];
   const profileImages = userImages[currentProfile.id] || [];
+  const currentImage = profileImages[currentImageIndex];
 
   return (
-    <div className="max-w-md mx-auto">
-      <Card className="overflow-hidden shadow-2xl">
-        <div className="relative h-96">
-          {profileImages.length > 0 ? (
-            profileImages.length === 1 ? (
-              <img
-                src={profileImages[0]}
-                alt={`${currentProfile.first_name}'s photo`}
-                className="w-full h-full object-cover"
-              />
-            ) : (
-              <Carousel className="w-full h-full">
-                <CarouselContent>
-                  {profileImages.map((imageUrl, index) => (
-                    <CarouselItem key={index}>
-                      <img
-                        src={imageUrl}
-                        alt={`${currentProfile.first_name}'s photo ${index + 1}`}
-                        className="w-full h-96 object-cover"
-                      />
-                    </CarouselItem>
-                  ))}
-                </CarouselContent>
-                {profileImages.length > 1 && (
-                  <>
-                    <CarouselPrevious className="absolute left-2 top-1/2 -translate-y-1/2" />
-                    <CarouselNext className="absolute right-2 top-1/2 -translate-y-1/2" />
-                  </>
-                )}
-              </Carousel>
-            )
-          ) : (
-            <div className="w-full h-full bg-gradient-to-br from-pink-200 to-purple-200 flex items-center justify-center">
-              <div className="w-32 h-32 bg-white rounded-full flex items-center justify-center">
-                <span className="text-4xl font-bold text-gray-700">
-                  {currentProfile.first_name?.[0]}{currentProfile.last_name?.[0]}
-                </span>
-              </div>
+    <div className="h-full relative overflow-hidden">
+      {/* Full-screen background image */}
+      <div className="absolute inset-0">
+        {currentImage ? (
+          <img
+            src={currentImage}
+            alt={`${currentProfile.first_name}'s photo`}
+            className="w-full h-full object-cover"
+          />
+        ) : (
+          <div className="w-full h-full bg-gradient-to-br from-pink-200 to-purple-200 flex items-center justify-center">
+            <div className="w-32 h-32 bg-white rounded-full flex items-center justify-center">
+              <span className="text-4xl font-bold text-gray-700">
+                {currentProfile.first_name?.[0]}{currentProfile.last_name?.[0]}
+              </span>
             </div>
-          )}
-          
-          {profileImages.length > 1 && (
-            <div className="absolute top-4 right-4 bg-black bg-opacity-50 text-white px-2 py-1 rounded-full text-sm">
-              {profileImages.length} photos
-            </div>
-          )}
+          </div>
+        )}
+        
+        {/* Dark overlay for better text readability */}
+        <div className="absolute inset-0 bg-black bg-opacity-30"></div>
+      </div>
 
-          {/* Block button */}
-          <Button
-            onClick={handleBlock}
-            variant="outline"
-            size="sm"
-            className="absolute top-4 left-4 bg-white/80 hover:bg-white"
+      {/* Top controls */}
+      <div className="absolute top-4 left-4 right-4 flex justify-between items-center z-10">
+        <Button
+          onClick={handleBlock}
+          variant="outline"
+          size="sm"
+          className="bg-white/80 hover:bg-white border-white"
+        >
+          <Shield className="w-4 h-4" />
+        </Button>
+        
+        {profileImages.length > 1 && (
+          <div className="bg-black bg-opacity-50 text-white px-3 py-1 rounded-full text-sm">
+            {currentImageIndex + 1} / {profileImages.length}
+          </div>
+        )}
+      </div>
+
+      {/* Image navigation */}
+      {profileImages.length > 1 && (
+        <>
+          <button
+            onClick={prevImage}
+            className="absolute left-4 top-1/2 -translate-y-1/2 z-10 bg-black bg-opacity-50 text-white p-2 rounded-full hover:bg-opacity-70 transition-all"
+            disabled={currentImageIndex === 0}
           >
-            <Shield className="w-4 h-4" />
+            <ChevronLeft className="w-6 h-6" />
+          </button>
+          <button
+            onClick={nextImage}
+            className="absolute right-4 top-1/2 -translate-y-1/2 z-10 bg-black bg-opacity-50 text-white p-2 rounded-full hover:bg-opacity-70 transition-all"
+            disabled={currentImageIndex === profileImages.length - 1}
+          >
+            <ChevronRight className="w-6 h-6" />
+          </button>
+        </>
+      )}
+
+      {/* Bottom content overlay */}
+      <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black to-transparent text-white p-6 z-10">
+        {/* Basic info always visible */}
+        <div className="mb-4">
+          <h2 className="text-3xl font-bold">
+            {currentProfile.first_name} {currentProfile.last_name}
+          </h2>
+          <div className="flex items-center text-white/90 mt-2">
+            <Calendar className="w-4 h-4 mr-1" />
+            <span>{calculateAge(currentProfile.date_of_birth)} years old</span>
+          </div>
+          <div className="flex items-center text-white/90 mt-1">
+            <MapPin className="w-4 h-4 mr-1" />
+            <span>{currentProfile.city}, {currentProfile.country}</span>
+          </div>
+        </div>
+
+        {/* Toggle button for more details */}
+        <Button
+          onClick={() => setShowDetails(!showDetails)}
+          variant="outline"
+          size="sm"
+          className="mb-4 bg-white/20 border-white/30 text-white hover:bg-white/30"
+        >
+          {showDetails ? 'Show Less' : 'Show More'}
+        </Button>
+
+        {/* Expandable details */}
+        {showDetails && (
+          <div className="space-y-4 mb-4 max-h-48 overflow-y-auto">
+            {(currentProfile.occupation || currentProfile.industry || currentProfile.education_level) && (
+              <div>
+                <h3 className="font-semibold text-white mb-2">Work & Experience</h3>
+                <div className="space-y-1">
+                  {currentProfile.occupation && (
+                    <div className="flex items-center text-white/90 text-sm">
+                      <Briefcase className="w-4 h-4 mr-2" />
+                      <span>{currentProfile.occupation}</span>
+                      {currentProfile.industry && <span className="text-white/70 ml-1">at {currentProfile.industry}</span>}
+                    </div>
+                  )}
+                  {currentProfile.education_level && (
+                    <div className="flex items-center text-white/90 text-sm">
+                      <GraduationCap className="w-4 h-4 mr-2" />
+                      <span>{currentProfile.education_level}</span>
+                    </div>
+                  )}
+                </div>
+              </div>
+            )}
+
+            {(currentProfile.exercise_level || currentProfile.drinking || currentProfile.smoking) && (
+              <div>
+                <h3 className="font-semibold text-white mb-2">Lifestyle</h3>
+                <div className="flex flex-wrap gap-2">
+                  {currentProfile.exercise_level && (
+                    <span className="flex items-center px-2 py-1 bg-white/20 text-white rounded-full text-xs">
+                      <Dumbbell className="w-3 h-3 mr-1" />
+                      {currentProfile.exercise_level}
+                    </span>
+                  )}
+                  {currentProfile.drinking && (
+                    <span className="flex items-center px-2 py-1 bg-white/20 text-white rounded-full text-xs">
+                      <Wine className="w-3 h-3 mr-1" />
+                      {currentProfile.drinking}
+                    </span>
+                  )}
+                  {currentProfile.smoking && (
+                    <span className="flex items-center px-2 py-1 bg-white/20 text-white rounded-full text-xs">
+                      <Cigarette className="w-3 h-3 mr-1" />
+                      {currentProfile.smoking}
+                    </span>
+                  )}
+                </div>
+              </div>
+            )}
+            
+            {currentProfile.bio && (
+              <div>
+                <p className="text-white/90">{currentProfile.bio}</p>
+              </div>
+            )}
+            
+            {currentProfile.interests && currentProfile.interests.length > 0 && (
+              <div>
+                <h3 className="font-semibold text-white mb-2">Interests</h3>
+                <div className="flex flex-wrap gap-2">
+                  {currentProfile.interests.map((interest: string, index: number) => (
+                    <span
+                      key={index}
+                      className="px-3 py-1 bg-white/20 text-white rounded-full text-sm"
+                    >
+                      {interest}
+                    </span>
+                  ))}
+                </div>
+              </div>
+            )}
+          </div>
+        )}
+        
+        {/* Action buttons */}
+        <div className="flex space-x-4">
+          <Button
+            onClick={() => handleSwipe('pass')}
+            variant="outline"
+            size="lg"
+            className="flex-1 border-2 border-white/50 bg-white/20 text-white hover:bg-white/30"
+          >
+            <X className="w-6 h-6" />
+          </Button>
+          <Button
+            onClick={() => handleSwipe('like')}
+            size="lg"
+            className="flex-1 bg-gradient-to-r from-pink-500 to-purple-600 hover:from-pink-600 hover:to-purple-700 border-0"
+          >
+            <Heart className="w-6 h-6" />
           </Button>
         </div>
-        
-        <CardContent className="p-6">
-          <div className="mb-4">
-            <h2 className="text-2xl font-bold text-gray-800">
-              {currentProfile.first_name} {currentProfile.last_name}
-            </h2>
-            <div className="flex items-center text-gray-600 mt-2">
-              <Calendar className="w-4 h-4 mr-1" />
-              <span>{calculateAge(currentProfile.date_of_birth)} years old</span>
-            </div>
-            <div className="flex items-center text-gray-600 mt-1">
-              <MapPin className="w-4 h-4 mr-1" />
-              <span>{currentProfile.city}, {currentProfile.country}</span>
-            </div>
-          </div>
-
-          {/* Work & Experience */}
-          {(currentProfile.occupation || currentProfile.industry || currentProfile.education_level) && (
-            <div className="mb-4">
-              <h3 className="font-semibold text-gray-800 mb-2">Work & Experience</h3>
-              <div className="space-y-1">
-                {currentProfile.occupation && (
-                  <div className="flex items-center text-gray-600 text-sm">
-                    <Briefcase className="w-4 h-4 mr-2" />
-                    <span>{currentProfile.occupation}</span>
-                    {currentProfile.industry && <span className="text-gray-500 ml-1">at {currentProfile.industry}</span>}
-                  </div>
-                )}
-                {currentProfile.education_level && (
-                  <div className="flex items-center text-gray-600 text-sm">
-                    <GraduationCap className="w-4 h-4 mr-2" />
-                    <span>{currentProfile.education_level}</span>
-                  </div>
-                )}
-              </div>
-            </div>
-          )}
-
-          {/* Lifestyle */}
-          {(currentProfile.exercise_level || currentProfile.drinking || currentProfile.smoking) && (
-            <div className="mb-4">
-              <h3 className="font-semibold text-gray-800 mb-2">Lifestyle</h3>
-              <div className="flex flex-wrap gap-2">
-                {currentProfile.exercise_level && (
-                  <span className="flex items-center px-2 py-1 bg-blue-100 text-blue-700 rounded-full text-xs">
-                    <Dumbbell className="w-3 h-3 mr-1" />
-                    {currentProfile.exercise_level}
-                  </span>
-                )}
-                {currentProfile.drinking && (
-                  <span className="flex items-center px-2 py-1 bg-purple-100 text-purple-700 rounded-full text-xs">
-                    <Wine className="w-3 h-3 mr-1" />
-                    {currentProfile.drinking}
-                  </span>
-                )}
-                {currentProfile.smoking && (
-                  <span className="flex items-center px-2 py-1 bg-gray-100 text-gray-700 rounded-full text-xs">
-                    <Cigarette className="w-3 h-3 mr-1" />
-                    {currentProfile.smoking}
-                  </span>
-                )}
-              </div>
-            </div>
-          )}
-          
-          {currentProfile.bio && (
-            <div className="mb-4">
-              <p className="text-gray-700">{currentProfile.bio}</p>
-            </div>
-          )}
-          
-          {currentProfile.interests && currentProfile.interests.length > 0 && (
-            <div className="mb-6">
-              <h3 className="font-semibold text-gray-800 mb-2">Interests</h3>
-              <div className="flex flex-wrap gap-2">
-                {currentProfile.interests.map((interest: string, index: number) => (
-                  <span
-                    key={index}
-                    className="px-3 py-1 bg-pink-100 text-pink-700 rounded-full text-sm"
-                  >
-                    {interest}
-                  </span>
-                ))}
-              </div>
-            </div>
-          )}
-          
-          <div className="flex space-x-4">
-            <Button
-              onClick={() => handleSwipe('pass')}
-              variant="outline"
-              size="lg"
-              className="flex-1 border-2 border-gray-300 hover:border-gray-400"
-            >
-              <X className="w-6 h-6 text-gray-600" />
-            </Button>
-            <Button
-              onClick={() => handleSwipe('like')}
-              size="lg"
-              className="flex-1 bg-gradient-to-r from-pink-500 to-purple-600 hover:from-pink-600 hover:to-purple-700"
-            >
-              <Heart className="w-6 h-6" />
-            </Button>
-          </div>
-        </CardContent>
-      </Card>
+      </div>
 
       <BlockDialog
         isOpen={blockDialogOpen}

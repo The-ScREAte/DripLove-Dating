@@ -27,7 +27,6 @@ const ChatPage = ({ currentUser, onUnreadChange }: ChatPageProps) => {
   const { toast } = useToast();
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const messagesContainerRef = useRef<HTMLDivElement>(null);
-  const lastMessageHeight = useRef<number>(0);
 
   useEffect(() => {
     fetchMatches();
@@ -173,10 +172,10 @@ const ChatPage = ({ currentUser, onUnreadChange }: ChatPageProps) => {
   };
 
   return (
-    <div className="flex flex-col h-[calc(100vh-200px)] max-w-6xl mx-auto">
-      {/* Matches Sidebar */}
-      <Card className="flex flex-col md:flex-row h-full">
-        <div className="w-full md:w-1/3 md:border-r">
+    <div className="h-full p-4">
+      <div className="flex flex-col md:flex-row h-full max-w-6xl mx-auto">
+        {/* Matches Sidebar */}
+        <Card className="w-full md:w-1/3 md:mr-4 mb-4 md:mb-0 flex flex-col">
           <CardHeader className="pb-2">
             <CardTitle>Your Matches</CardTitle>
             <div className="relative mt-2">
@@ -190,8 +189,8 @@ const ChatPage = ({ currentUser, onUnreadChange }: ChatPageProps) => {
               <Search className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4" />
             </div>
           </CardHeader>
-          <CardContent className="p-0 overflow-y-auto h-[calc(100%-80px)]">
-            <div className="max-h-full">
+          <CardContent className="p-0 flex-1 overflow-y-auto">
+            <div className="max-h-96 md:max-h-full">
               {filteredMatches.length === 0 ? (
                 <p className="text-center text-gray-500 p-4">
                   {searchTerm ? 'No matches found' : 'No matches yet'}
@@ -230,10 +229,10 @@ const ChatPage = ({ currentUser, onUnreadChange }: ChatPageProps) => {
               )}
             </div>
           </CardContent>
-        </div>
+        </Card>
 
         {/* Chat Area */}
-        <div className="flex-1 flex flex-col">
+        <Card className="flex-1 flex flex-col min-h-0">
           {selectedMatch ? (
             <>
               <CardHeader className="border-b flex-shrink-0">
@@ -250,12 +249,13 @@ const ChatPage = ({ currentUser, onUnreadChange }: ChatPageProps) => {
                   </CardTitle>
                 </div>
               </CardHeader>
-              <CardContent className="flex flex-col h-full p-0">
-                {/* Messages */}
+              
+              <CardContent className="flex flex-col flex-1 p-0 min-h-0">
+                {/* Messages Container */}
                 <div 
                   ref={messagesContainerRef} 
                   className="flex-1 p-4 overflow-y-auto"
-                  style={{ maxHeight: 'calc(100vh - 350px)' }}
+                  style={{ minHeight: '300px', maxHeight: 'calc(100vh - 300px)' }}
                 >
                   {messages.length === 0 ? (
                     <p className="text-center text-gray-500">No messages yet. Start the conversation!</p>
@@ -306,8 +306,8 @@ const ChatPage = ({ currentUser, onUnreadChange }: ChatPageProps) => {
                   <div ref={messagesEndRef} />
                 </div>
 
-                {/* Message Input */}
-                <div className="border-t p-4 mt-auto">
+                {/* Message Input - Fixed at bottom with proper spacing */}
+                <div className="border-t p-4 bg-white flex-shrink-0">
                   <div className="flex space-x-2 relative">
                     <div className="flex-1 relative">
                       <Input
@@ -345,8 +345,8 @@ const ChatPage = ({ currentUser, onUnreadChange }: ChatPageProps) => {
               <p className="text-gray-500">Select a match to start chatting</p>
             </CardContent>
           )}
-        </div>
-      </Card>
+        </Card>
+      </div>
 
       {/* User Profile Modal */}
       <UserProfileModal

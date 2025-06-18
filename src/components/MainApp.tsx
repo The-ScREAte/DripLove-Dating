@@ -104,44 +104,18 @@ const MainApp = ({ user, onLogout }: MainAppProps) => {
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-pink-50 to-purple-50 flex flex-col">
-      {/* Header - Hidden on mobile, visible on desktop */}
-      <div className="hidden md:block bg-white shadow-sm border-b">
-        <div className="container mx-auto px-4 py-4 flex justify-between items-center">
-          <div className="flex items-center space-x-2">
-            <img 
-              src="/lovable-uploads/ef9367e7-bcc2-40e6-8a31-b92465c0e20b.png" 
-              alt="AfroVibe Logo" 
-              className="w-8 h-8"
-            />
-            <h1 className="text-2xl font-bold bg-gradient-to-r from-pink-600 to-purple-600 bg-clip-text text-transparent">
-              AfroVibe
-            </h1>
-          </div>
-          <div className="flex items-center space-x-4">
-            <span className="text-gray-600">
-              Welcome, {profile?.first_name || 'User'}!
-            </span>
-          </div>
+      {/* Header - Only logo on top left */}
+      <div className="bg-white shadow-sm border-b">
+        <div className="container mx-auto px-4 py-2 flex justify-start items-center">
+          <img 
+            src="/lovable-uploads/0e9bd84b-0f71-493b-8c1f-1a2883e5109d.png" 
+            alt="AfroVibe Logo" 
+            className="h-10"
+          />
         </div>
       </div>
 
-      {/* Mobile Header */}
-      <div className="md:hidden bg-white shadow-sm border-b">
-        <div className="px-4 py-3 flex justify-center items-center">
-          <div className="flex items-center space-x-2">
-            <img 
-              src="/lovable-uploads/ef9367e7-bcc2-40e6-8a31-b92465c0e20b.png" 
-              alt="AfroVibe Logo" 
-              className="w-6 h-6"
-            />
-            <h1 className="text-xl font-bold bg-gradient-to-r from-pink-600 to-purple-600 bg-clip-text text-transparent">
-              AfroVibe
-            </h1>
-          </div>
-        </div>
-      </div>
-
-      {/* Main Content */}
+      {/* Main Content - Full height */}
       <div className="flex flex-1 overflow-hidden">
         {/* Desktop Sidebar Navigation */}
         <div className="hidden md:block w-64 bg-white shadow-sm border-r">
@@ -203,14 +177,16 @@ const MainApp = ({ user, onLogout }: MainAppProps) => {
           </nav>
         </div>
 
-        {/* Content Area */}
-        <div className="flex-1 overflow-auto pb-20 md:pb-6 p-2 sm:p-4 md:p-6">
-          {renderContent()}
+        {/* Content Area - Full height minus bottom nav */}
+        <div className="flex-1 overflow-hidden">
+          <div className="h-full pb-16 md:pb-0 overflow-auto">
+            {renderContent()}
+          </div>
         </div>
       </div>
 
-      {/* Mobile Bottom Navigation */}
-      <div className="md:hidden fixed bottom-0 left-0 right-0 bg-white border-t border-gray-200 px-2 py-2 safe-area-pb">
+      {/* Mobile Bottom Navigation - Fixed position */}
+      <div className="md:hidden fixed bottom-0 left-0 right-0 bg-white border-t border-gray-200 px-2 py-2 z-50">
         <div className="flex justify-around items-center">
           <button
             onClick={() => setActiveTab('discover')}

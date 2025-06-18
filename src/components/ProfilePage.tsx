@@ -58,6 +58,7 @@ const ProfilePage = ({ currentUser, profile, onProfileUpdate, onLogout }: Profil
 
   useEffect(() => {
     if (profile) {
+      console.log('Setting edited profile from:', profile);
       setEditedProfile({
         first_name: profile.first_name || '',
         last_name: profile.last_name || '',
@@ -89,19 +90,23 @@ const ProfilePage = ({ currentUser, profile, onProfileUpdate, onLogout }: Profil
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
     const { name, value } = e.target;
+    console.log('Input change:', name, value);
     setEditedProfile(prev => ({ ...prev, [name]: value }));
   };
 
   const handleSliderChange = (name: string, value: number[]) => {
+    console.log('Slider change:', name, value[0]);
     setEditedProfile(prev => ({ ...prev, [name]: value[0] }));
   };
 
   const handleSelectChange = (name: string, value: string) => {
+    console.log('Select change:', name, value);
     setEditedProfile(prev => ({ ...prev, [name]: value }));
   };
 
   const handleInterestsChange = (interests: string[]) => {
     if (isEditing) {
+      console.log('Interests change:', interests);
       setEditedProfile(prev => ({ ...prev, interests }));
     }
   };
@@ -112,43 +117,53 @@ const ProfilePage = ({ currentUser, profile, onProfileUpdate, onLogout }: Profil
     setIsSaving(true);
     
     try {
-      console.log('Saving profile:', editedProfile);
+      console.log('Saving profile with data:', editedProfile);
+      console.log('Current user ID:', currentUser.id);
       
-      const { error } = await supabase
+      // Prepare the update data with proper type handling
+      const updateData = {
+        first_name: editedProfile.first_name?.trim() || null,
+        last_name: editedProfile.last_name?.trim() || null,
+        bio: editedProfile.bio?.trim() || null,
+        city: editedProfile.city?.trim() || null,
+        country: editedProfile.country?.trim() || null,
+        distance_preference: Number(editedProfile.distance_preference) || 25,
+        gender: editedProfile.gender || null,
+        preference: editedProfile.preference || null,
+        relationship_intent: editedProfile.relationship_intent || null,
+        smoking: editedProfile.smoking || null,
+        drinking: editedProfile.drinking || null,
+        exercise_level: editedProfile.exercise_level || null,
+        sleeping_schedule: editedProfile.sleeping_schedule || null,
+        occupation: editedProfile.occupation?.trim() || null,
+        industry: editedProfile.industry?.trim() || null,
+        education_level: editedProfile.education_level || null,
+        zip_code: editedProfile.zip_code?.trim() || null,
+        introvert_extrovert: Number(editedProfile.introvert_extrovert) || 50,
+        spontaneous_planner: Number(editedProfile.spontaneous_planner) || 50,
+        messy_organized: Number(editedProfile.messy_organized) || 50,
+        fun_fact: editedProfile.fun_fact?.trim() || null,
+        perfect_first_date: editedProfile.perfect_first_date?.trim() || null,
+        last_googled: editedProfile.last_googled?.trim() || null,
+        interests: editedProfile.interests || [],
+        updated_at: new Date().toISOString(),
+      };
+
+      console.log('Update data being sent:', updateData);
+
+      const { data, error } = await supabase
         .from('profiles')
-        .update({
-          first_name: editedProfile.first_name.trim(),
-          last_name: editedProfile.last_name.trim(),
-          bio: editedProfile.bio?.trim() || null,
-          city: editedProfile.city.trim(),
-          country: editedProfile.country.trim(),
-          distance_preference: editedProfile.distance_preference,
-          gender: editedProfile.gender || null,
-          preference: editedProfile.preference,
-          relationship_intent: editedProfile.relationship_intent || null,
-          smoking: editedProfile.smoking || null,
-          drinking: editedProfile.drinking || null,
-          exercise_level: editedProfile.exercise_level || null,
-          sleeping_schedule: editedProfile.sleeping_schedule || null,
-          occupation: editedProfile.occupation?.trim() || null,
-          industry: editedProfile.industry?.trim() || null,
-          education_level: editedProfile.education_level || null,
-          zip_code: editedProfile.zip_code?.trim() || null,
-          introvert_extrovert: editedProfile.introvert_extrovert,
-          spontaneous_planner: editedProfile.spontaneous_planner,
-          messy_organized: editedProfile.messy_organized,
-          fun_fact: editedProfile.fun_fact?.trim() || null,
-          perfect_first_date: editedProfile.perfect_first_date?.trim() || null,
-          last_googled: editedProfile.last_googled?.trim() || null,
-          interests: editedProfile.interests,
-          updated_at: new Date().toISOString(),
-        })
-        .eq('id', currentUser.id);
+        .update(updateData)
+        .eq('id', currentUser.id)
+        .select()
+        .single();
 
       if (error) {
-        console.error('Save error:', error);
+        console.error('Save error details:', error);
         throw error;
       }
+
+      console.log('Profile updated successfully:', data);
 
       setIsEditing(false);
       onProfileUpdate();
@@ -202,7 +217,7 @@ const ProfilePage = ({ currentUser, profile, onProfileUpdate, onLogout }: Profil
   };
 
   return (
-    <div className="max-w-4xl mx-auto space-y-6 px-4 sm:px-6 lg:px-8">
+    <div className="max-w-4xl mx-auto space-y-6 p-4">
       {/* Header */}
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
         <Card className="w-full sm:w-auto">
