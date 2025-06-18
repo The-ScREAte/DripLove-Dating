@@ -158,15 +158,15 @@ const ProfilePage = ({ currentUser, profile, onProfileUpdate, onLogout }: Profil
         .from('profiles')
         .select('id')
         .eq('id', currentUser.id)
-        .single();
+        .maybeSingle();
 
-      if (checkError && checkError.code !== 'PGRST116') {
+      if (checkError) {
         throw checkError;
       }
 
       let result;
       if (existingProfile) {
-        // Update existing profile - don't include id in the update data
+        // Update existing profile
         result = await supabase
           .from('profiles')
           .update(updateData)
@@ -174,7 +174,7 @@ const ProfilePage = ({ currentUser, profile, onProfileUpdate, onLogout }: Profil
           .select()
           .single();
       } else {
-        // Insert new profile - include id in the insert data
+        // Insert new profile
         result = await supabase
           .from('profiles')
           .insert({
