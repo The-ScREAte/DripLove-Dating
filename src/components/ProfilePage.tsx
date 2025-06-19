@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { Card, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -224,43 +225,47 @@ const ProfilePage = ({ currentUser, profile, onProfileUpdate, onLogout }: Profil
   };
 
   return (
-    <div className="max-w-4xl mx-auto space-y-6 p-4">
-      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
-        <Card className="w-full sm:w-auto">
-          <CardHeader className="pb-3">
-            <CardTitle className="flex items-center space-x-2">
-              <User className="w-6 h-6 text-pink-600" />
-              <span>Your AfroVibe Profile</span>
-            </CardTitle>
-          </CardHeader>
-        </Card>
-        {!isEditing ? (
-          <Button onClick={() => setIsEditing(true)} className="w-full sm:w-auto">
-            <Edit className="w-4 h-4 mr-2" /> Edit Profile
-          </Button>
-        ) : (
-          <div className="flex flex-col sm:flex-row space-y-2 sm:space-y-0 sm:space-x-2 w-full sm:w-auto">
-            <Button onClick={handleSave} disabled={isSaving} className="w-full sm:w-auto">
-              <Save className="w-4 h-4 mr-2" /> {isSaving ? 'Saving...' : 'Save'}
-            </Button>
-            <Button variant="outline" onClick={handleCancel} disabled={isSaving} className="w-full sm:w-auto">
-              <X className="w-4 h-4 mr-2" /> Cancel
-            </Button>
+    <div className="h-full flex flex-col">
+      {/* Fixed Header */}
+      <div className="flex-shrink-0 bg-white border-b p-4">
+        <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+          <div className="flex items-center space-x-2">
+            <User className="w-6 h-6 text-pink-600" />
+            <h1 className="text-2xl font-bold text-gray-800">Your AfroVibe Profile</h1>
           </div>
-        )}
+          {!isEditing ? (
+            <Button onClick={() => setIsEditing(true)} className="w-full sm:w-auto">
+              <Edit className="w-4 h-4 mr-2" /> Edit Profile
+            </Button>
+          ) : (
+            <div className="flex flex-col sm:flex-row space-y-2 sm:space-y-0 sm:space-x-2 w-full sm:w-auto">
+              <Button onClick={handleSave} disabled={isSaving} className="w-full sm:w-auto">
+                <Save className="w-4 h-4 mr-2" /> {isSaving ? 'Saving...' : 'Save'}
+              </Button>
+              <Button variant="outline" onClick={handleCancel} disabled={isSaving} className="w-full sm:w-auto">
+                <X className="w-4 h-4 mr-2" /> Cancel
+              </Button>
+            </div>
+          )}
+        </div>
       </div>
 
-      <ProfileSummaryCard currentUser={currentUser} />
-      <ImageManagement currentUser={currentUser} />
-      <BasicInfoSection editedProfile={editedProfile} isEditing={isEditing} onInputChange={handleInputChange} />
-      <LocationSection editedProfile={editedProfile} isEditing={isEditing} onInputChange={handleInputChange} />
-      <PreferencesSection editedProfile={editedProfile} isEditing={isEditing} onSliderChange={handleSliderChange} onSelectChange={handleSelectChange} />
-      <LifestyleSection editedProfile={editedProfile} isEditing={isEditing} onSelectChange={handleSelectChange} />
-      <WorkEducationSection editedProfile={editedProfile} isEditing={isEditing} onInputChange={handleInputChange} />
-      <PersonalitySection editedProfile={editedProfile} isEditing={isEditing} onSliderChange={handleSliderChange} />
-      <FunQuestionsSection editedProfile={editedProfile} isEditing={isEditing} onInputChange={handleInputChange} />
-      <InterestsSection editedProfile={editedProfile} profile={profile} isEditing={isEditing} onInterestsChange={handleInterestsChange} />
-      <AccountActions currentUser={currentUser} onLogout={onLogout} />
+      {/* Scrollable Content */}
+      <div className="flex-1 overflow-y-auto p-4 pb-24">
+        <div className="max-w-4xl mx-auto space-y-6">
+          <ProfileSummaryCard currentUser={currentUser} />
+          <ImageManagement currentUser={currentUser} />
+          <BasicInfoSection editedProfile={editedProfile} isEditing={isEditing} onInputChange={handleInputChange} />
+          <LocationSection editedProfile={editedProfile} isEditing={isEditing} onInputChange={handleInputChange} />
+          <PreferencesSection editedProfile={editedProfile} isEditing={isEditing} onSliderChange={handleSliderChange} onSelectChange={handleSelectChange} />
+          <LifestyleSection editedProfile={editedProfile} isEditing={isEditing} onSelectChange={handleSelectChange} />
+          <WorkEducationSection editedProfile={editedProfile} isEditing={isEditing} onInputChange={handleInputChange} />
+          <PersonalitySection editedProfile={editedProfile} isEditing={isEditing} onSliderChange={handleSliderChange} />
+          <FunQuestionsSection editedProfile={editedProfile} isEditing={isEditing} onInputChange={handleInputChange} />
+          <InterestsSection editedProfile={editedProfile} profile={profile} isEditing={isEditing} onInterestsChange={handleInterestsChange} />
+          <AccountActions currentUser={currentUser} onLogout={onLogout} />
+        </div>
+      </div>
     </div>
   );
 };

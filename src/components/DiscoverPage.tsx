@@ -322,7 +322,7 @@ const DiscoverPage = ({ currentUser }: DiscoverPageProps) => {
         <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-transparent to-transparent pointer-events-none" />
 
         {/* Profile Info Overlay - Fixed at bottom with proper spacing for mobile nav */}
-        <div className="absolute bottom-0 left-0 right-0 text-white pb-20">
+        <div className="absolute bottom-0 left-0 right-0 text-white pb-24">
           {/* Main info section */}
           <div className="px-6 pb-4">
             <div className="mb-3">
@@ -400,31 +400,31 @@ const DiscoverPage = ({ currentUser }: DiscoverPageProps) => {
             </div>
           </div>
 
-          {/* Action Buttons - positioned above mobile nav */}
+          {/* Action Buttons - positioned above mobile nav and visible on all screen sizes */}
           <div className="flex justify-center space-x-6 px-6">
             <Button
               onClick={handlePass}
               variant="outline"
-              className="w-14 h-14 rounded-full border-2 border-white/50 bg-white/10 hover:bg-white/20 backdrop-blur-sm"
+              className="w-14 h-14 rounded-full border-2 border-red-400/80 bg-red-500/20 hover:bg-red-500/30 backdrop-blur-sm shadow-lg"
             >
-              <X className="w-6 h-6 text-white" />
+              <X className="w-6 h-6 text-red-400" />
             </Button>
 
             <Button
               onClick={handleReverse}
               variant="outline"
               disabled={!passedUsers.length}
-              className="w-14 h-14 rounded-full border-2 border-white/50 bg-white/10 hover:bg-white/20 disabled:opacity-30 backdrop-blur-sm"
+              className="w-14 h-14 rounded-full border-2 border-yellow-400/80 bg-yellow-500/20 hover:bg-yellow-500/30 disabled:opacity-30 backdrop-blur-sm shadow-lg"
             >
-              <Undo2 className="w-6 h-6 text-white" />
+              <Undo2 className="w-6 h-6 text-yellow-400" />
             </Button>
 
             <Button
               onClick={handleLike}
               variant="outline"
-              className="w-14 h-14 rounded-full border-2 border-white/50 bg-white/10 hover:bg-white/20 backdrop-blur-sm"
+              className="w-14 h-14 rounded-full border-2 border-green-400/80 bg-green-500/20 hover:bg-green-500/30 backdrop-blur-sm shadow-lg"
             >
-              <Heart className="w-6 h-6 text-white" />
+              <Heart className="w-6 h-6 text-green-400" />
             </Button>
           </div>
         </div>

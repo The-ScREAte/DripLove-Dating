@@ -271,7 +271,7 @@ const LikedMePage = ({ currentUser }: LikedMePageProps) => {
           <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-transparent to-transparent pointer-events-none" />
 
           {/* Profile Info Overlay - Fixed at bottom with proper spacing for mobile nav */}
-          <div className="absolute bottom-0 left-0 right-0 text-white pb-20">
+          <div className="absolute bottom-0 left-0 right-0 text-white pb-24">
             {/* Main info section */}
             <div className="px-6 pb-4">
               <div className="mb-3">
@@ -354,17 +354,17 @@ const LikedMePage = ({ currentUser }: LikedMePageProps) => {
               <Button
                 onClick={() => handlePass(selectedProfile.id)}
                 variant="outline"
-                className="w-14 h-14 rounded-full border-2 border-white/50 bg-white/10 hover:bg-white/20 backdrop-blur-sm"
+                className="w-14 h-14 rounded-full border-2 border-red-400/80 bg-red-500/20 hover:bg-red-500/30 backdrop-blur-sm"
               >
-                <X className="w-6 h-6 text-white" />
+                <X className="w-6 h-6 text-red-400" />
               </Button>
 
               <Button
                 onClick={() => handleLikeBack(selectedProfile.id)}
                 variant="outline"
-                className="w-14 h-14 rounded-full border-2 border-white/50 bg-white/10 hover:bg-white/20 backdrop-blur-sm"
+                className="w-14 h-14 rounded-full border-2 border-green-400/80 bg-green-500/20 hover:bg-green-500/30 backdrop-blur-sm"
               >
-                <Heart className="w-6 h-6 text-white" />
+                <Heart className="w-6 h-6 text-green-400" />
               </Button>
             </div>
           </div>
@@ -383,62 +383,62 @@ const LikedMePage = ({ currentUser }: LikedMePageProps) => {
 
   return (
     <div className="h-full flex flex-col">
-      <Card className="flex-1 m-4 flex flex-col">
-        <CardHeader className="flex-shrink-0">
-          <CardTitle className="flex items-center space-x-2">
-            <Users className="w-6 h-6 text-pink-600" />
-            <span>People who liked you ({likers.length})</span>
-          </CardTitle>
-        </CardHeader>
-        <CardContent className="flex-1 overflow-hidden pb-20">
-          {likers.length === 0 ? (
-            <div className="flex items-center justify-center h-full">
-              <div className="text-center">
-                <Users className="w-16 h-16 text-gray-400 mx-auto mb-4" />
-                <h3 className="text-xl font-semibold text-gray-800 mb-2">No new likes</h3>
-                <p className="text-gray-600">Keep swiping! Someone special is waiting to find you.</p>
-              </div>
+      <div className="flex-shrink-0 bg-white border-b p-4">
+        <div className="flex items-center space-x-2 mb-2">
+          <Users className="w-6 h-6 text-pink-600" />
+          <h1 className="text-2xl font-bold text-gray-800">People who liked you</h1>
+        </div>
+        <p className="text-gray-600">({likers.length} people)</p>
+      </div>
+      
+      <div className="flex-1 overflow-y-auto p-4 pb-24">
+        {likers.length === 0 ? (
+          <div className="flex items-center justify-center h-full">
+            <div className="text-center">
+              <Users className="w-16 h-16 text-gray-400 mx-auto mb-4" />
+              <h3 className="text-xl font-semibold text-gray-800 mb-2">No new likes</h3>
+              <p className="text-gray-600">Keep swiping! Someone special is waiting to find you.</p>
             </div>
-          ) : (
-            <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4 overflow-y-auto h-full">
-              {likers.map((liker) => {
-                const profileImages = userImages[liker.id] || [];
-                return (
-                  <Card
-                    key={liker.id}
-                    className="cursor-pointer hover:shadow-lg transition-shadow flex flex-col"
-                    onClick={() => setSelectedProfile(liker)}
-                  >
-                    <div className="relative h-48 flex-shrink-0">
-                      {profileImages.length > 0 ? (
-                        <img
-                          src={profileImages[0]}
-                          alt={`${liker.first_name}'s photo`}
-                          className="w-full h-full object-cover rounded-t-lg"
-                        />
-                      ) : (
-                        <div className="w-full h-full bg-gradient-to-br from-pink-200 to-purple-200 flex items-center justify-center rounded-t-lg">
-                          <span className="text-2xl font-bold text-gray-700">
-                            {liker.first_name?.[0]}{liker.last_name?.[0]}
-                          </span>
-                        </div>
-                      )}
-                    </div>
-                    <CardContent className="p-3 flex-1">
-                      <h3 className="font-semibold text-gray-800 truncate">
-                        {liker.first_name}, {calculateAge(liker.date_of_birth)}
-                      </h3>
-                      <p className="text-sm text-gray-600 truncate">
-                        {liker.city}
-                      </p>
-                    </CardContent>
-                  </Card>
-                );
-              })}
-            </div>
-          )}
-        </CardContent>
-      </Card>
+          </div>
+        ) : (
+          <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
+            {likers.map((liker) => {
+              const profileImages = userImages[liker.id] || [];
+              return (
+                <Card
+                  key={liker.id}
+                  className="cursor-pointer hover:shadow-lg transition-shadow flex flex-col"
+                  onClick={() => setSelectedProfile(liker)}
+                >
+                  <div className="relative h-48 flex-shrink-0">
+                    {profileImages.length > 0 ? (
+                      <img
+                        src={profileImages[0]}
+                        alt={`${liker.first_name}'s photo`}
+                        className="w-full h-full object-cover rounded-t-lg"
+                      />
+                    ) : (
+                      <div className="w-full h-full bg-gradient-to-br from-pink-200 to-purple-200 flex items-center justify-center rounded-t-lg">
+                        <span className="text-2xl font-bold text-gray-700">
+                          {liker.first_name?.[0]}{liker.last_name?.[0]}
+                        </span>
+                      </div>
+                    )}
+                  </div>
+                  <CardContent className="p-3 flex-1">
+                    <h3 className="font-semibold text-gray-800 truncate">
+                      {liker.first_name}, {calculateAge(liker.date_of_birth)}
+                    </h3>
+                    <p className="text-sm text-gray-600 truncate">
+                      {liker.city}
+                    </p>
+                  </CardContent>
+                </Card>
+              );
+            })}
+          </div>
+        )}
+      </div>
     </div>
   );
 };
