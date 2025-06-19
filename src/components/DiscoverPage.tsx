@@ -36,7 +36,6 @@ const DiscoverPage = ({ currentUser }: DiscoverPageProps) => {
   const [isLoading, setIsLoading] = useState(true);
   const [passedUsers, setPassedUsers] = useState<PassedUser[]>([]);
   const [showMoreInfo, setShowMoreInfo] = useState(false);
-  const [hiddenProfiles, setHiddenProfiles] = useState<Set<string>>(new Set());
   const { toast } = useToast();
 
   useEffect(() => {
@@ -106,15 +105,6 @@ const DiscoverPage = ({ currentUser }: DiscoverPageProps) => {
       );
 
       setPotentialMatches(matchesWithImages);
-      
-      // Hide 1 out of 4 profiles randomly
-      const hiddenSet = new Set<string>();
-      matchesWithImages.forEach((match, index) => {
-        if (index % 4 === 0 && Math.random() > 0.5) {
-          hiddenSet.add(match.id);
-        }
-      });
-      setHiddenProfiles(hiddenSet);
     } catch (error) {
       console.error('Error fetching potential matches:', error);
       toast({
@@ -191,40 +181,40 @@ const DiscoverPage = ({ currentUser }: DiscoverPageProps) => {
     });
   };
 
-  const handleUnlike = async () => {
-    const currentMatch = potentialMatches[currentIndex];
-    if (!currentMatch) return;
+  const handleImageAreaClick = (e: React.MouseEvent<HTMLDivElement>) => {
+    // Only change image if clicking on empty space (not on text/buttons)
+    const target = e.target as HTMLElement;
+    if (target.closest('.profile-info') || target.closest('button')) {
+      return;
+    }
 
-    try {
-      const { error } = await supabase
-        .from('likes')
-        .delete()
-        .eq('liker_id', currentUser.id)
-        .eq('liked_id', currentMatch.id);
+    const { clientX } = e;
+    const rect = e.currentTarget.getBoundingClientRect();
+    const clickX = clientX - rect.left;
+    const width = rect.width;
 
-      if (error) throw error;
-
-      toast({
-        title: 'Unliked',
-        description: 'Profile removed from your likes.'
-      });
-
-      moveToNext();
-    } catch (error) {
-      console.error('Error unliking user:', error);
-      toast({
-        title: 'Error',
-        description: 'Failed to unlike user. Please try again.',
-        variant: 'destructive'
-      });
+    if (clickX < width / 2) {
+      setImageIndex(prev => (prev > 0 ? prev - 1 : prev));
+    } else {
+      setImageIndex(prev =>
+        currentMatch?.images && prev < currentMatch.images.length - 1 ? prev + 1 : prev
+      );
     }
   };
 
   const handleTouch = (e: React.TouchEvent<HTMLDivElement>) => {
-    const { clientX } = e.changedTouches[0];
-    const screenWidth = window.innerWidth;
+    // Only change image if touching empty space (not on text/buttons)
+    const target = e.target as HTMLElement;
+    if (target.closest('.profile-info') || target.closest('button')) {
+      return;
+    }
 
-    if (clientX < screenWidth / 2) {
+    const { clientX } = e.changedTouches[0];
+    const rect = e.currentTarget.getBoundingClientRect();
+    const touchX = clientX - rect.left;
+    const width = rect.width;
+
+    if (touchX < width / 2) {
       setImageIndex(prev => (prev > 0 ? prev - 1 : prev));
     } else {
       setImageIndex(prev =>
@@ -271,28 +261,14 @@ const DiscoverPage = ({ currentUser }: DiscoverPageProps) => {
     );
   }
 
-  if (hiddenProfiles.has(currentMatch.id)) {
-    return (
-      <div className="h-full w-full flex items-center justify-center bg-gradient-to-br from-pink-500 to-purple-600">
-        <div className="text-center text-white p-8">
-          <Heart className="w-24 h-24 mx-auto mb-6 opacity-50" />
-          <h2 className="text-2xl font-bold mb-4">Upgrade to Premium</h2>
-          <p className="text-lg mb-6">See who likes you and get unlimited swipes!</p>
-          <Button 
-            onClick={moveToNext}
-            className="bg-white text-pink-600 hover:bg-gray-100"
-          >
-            Continue Swiping
-          </Button>
-        </div>
-      </div>
-    );
-  }
-
   return (
     <div className="h-full w-full relative flex flex-col">
       {/* Main Image Area - takes full available height */}
-      <div className="flex-1 relative" onTouchEnd={handleTouch}>
+      <div 
+        className="flex-1 relative cursor-pointer" 
+        onTouchEnd={handleTouch}
+        onClick={handleImageAreaClick}
+      >
         {currentMatch.images?.length > 0 ? (
           <>
             <img
@@ -321,8 +297,8 @@ const DiscoverPage = ({ currentUser }: DiscoverPageProps) => {
         {/* Gradient overlay for text readability */}
         <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-transparent to-transparent pointer-events-none" />
 
-        {/* Profile Info Overlay - Fixed at bottom with proper spacing for mobile nav */}
-        <div className="absolute bottom-0 left-0 right-0 text-white pb-24">
+        {/* Profile Info Overlay - Fixed at bottom with proper spacing */}
+        <div className="absolute bottom-0 left-0 right-0 text-white pb-24 md:pb-32 profile-info">
           {/* Main info section */}
           <div className="px-6 pb-4">
             <div className="mb-3">
@@ -400,31 +376,31 @@ const DiscoverPage = ({ currentUser }: DiscoverPageProps) => {
             </div>
           </div>
 
-          {/* Action Buttons - positioned above mobile nav and visible on all screen sizes */}
+          {/* Action Buttons - positioned to be visible on all screen sizes */}
           <div className="flex justify-center space-x-6 px-6">
             <Button
               onClick={handlePass}
               variant="outline"
-              className="w-14 h-14 rounded-full border-2 border-red-400/80 bg-red-500/20 hover:bg-red-500/30 backdrop-blur-sm shadow-lg"
+              className="w-14 h-14 rounded-full border-2 border-red-500 bg-red-500/20 hover:bg-red-500/30 backdrop-blur-sm shadow-lg hover:border-red-400 transition-all duration-200"
             >
-              <X className="w-6 h-6 text-red-400" />
+              <X className="w-6 h-6 text-red-500" />
             </Button>
 
             <Button
               onClick={handleReverse}
               variant="outline"
               disabled={!passedUsers.length}
-              className="w-14 h-14 rounded-full border-2 border-yellow-400/80 bg-yellow-500/20 hover:bg-yellow-500/30 disabled:opacity-30 backdrop-blur-sm shadow-lg"
+              className="w-14 h-14 rounded-full border-2 border-yellow-500 bg-yellow-500/20 hover:bg-yellow-500/30 disabled:opacity-30 backdrop-blur-sm shadow-lg hover:border-yellow-400 transition-all duration-200"
             >
-              <Undo2 className="w-6 h-6 text-yellow-400" />
+              <Undo2 className="w-6 h-6 text-yellow-500" />
             </Button>
 
             <Button
               onClick={handleLike}
               variant="outline"
-              className="w-14 h-14 rounded-full border-2 border-green-400/80 bg-green-500/20 hover:bg-green-500/30 backdrop-blur-sm shadow-lg"
+              className="w-14 h-14 rounded-full border-2 border-green-500 bg-green-500/20 hover:bg-green-500/30 backdrop-blur-sm shadow-lg hover:border-green-400 transition-all duration-200"
             >
-              <Heart className="w-6 h-6 text-green-400" />
+              <Heart className="w-6 h-6 text-green-500" />
             </Button>
           </div>
         </div>
