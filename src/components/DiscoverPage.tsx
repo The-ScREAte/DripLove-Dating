@@ -1,7 +1,8 @@
+
 import React, { useState, useEffect } from 'react';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Heart, X, Undo2, MapPin, Briefcase, GraduationCap } from 'lucide-react';
+import { Heart, X, Undo2, MapPin, Briefcase, GraduationCap, ChevronDown, ChevronUp } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 
@@ -33,6 +34,8 @@ const DiscoverPage = ({ currentUser }: DiscoverPageProps) => {
   const [imageIndex, setImageIndex] = useState(0);
   const [isLoading, setIsLoading] = useState(true);
   const [passedUsers, setPassedUsers] = useState<PassedUser[]>([]);
+  const [showMoreInfo, setShowMoreInfo] = useState(false);
+  const [hiddenProfiles, setHiddenProfiles] = useState<Set<string>>(new Set());
   const { toast } = useToast();
 
   useEffect(() => {
@@ -41,6 +44,7 @@ const DiscoverPage = ({ currentUser }: DiscoverPageProps) => {
 
   useEffect(() => {
     setImageIndex(0);
+    setShowMoreInfo(false);
   }, [currentIndex]);
 
   const fetchPotentialMatches = async () => {
@@ -88,6 +92,15 @@ const DiscoverPage = ({ currentUser }: DiscoverPageProps) => {
       );
 
       setPotentialMatches(matchesWithImages);
+      
+      // Hide 1 out of 4 profiles randomly
+      const hiddenSet = new Set<string>();
+      matchesWithImages.forEach((match, index) => {
+        if (index % 4 === 0 && Math.random() > 0.5) {
+          hiddenSet.add(match.id);
+        }
+      });
+      setHiddenProfiles(hiddenSet);
     } catch (error) {
       console.error('Error fetching potential matches:', error);
       toast({
@@ -164,6 +177,35 @@ const DiscoverPage = ({ currentUser }: DiscoverPageProps) => {
     });
   };
 
+  const handleUnlike = async () => {
+    const currentMatch = potentialMatches[currentIndex];
+    if (!currentMatch) return;
+
+    try {
+      const { error } = await supabase
+        .from('likes')
+        .delete()
+        .eq('liker_id', currentUser.id)
+        .eq('liked_id', currentMatch.id);
+
+      if (error) throw error;
+
+      toast({
+        title: 'Unliked',
+        description: 'Profile removed from your likes.'
+      });
+
+      moveToNext();
+    } catch (error) {
+      console.error('Error unliking user:', error);
+      toast({
+        title: 'Error',
+        description: 'Failed to unlike user. Please try again.',
+        variant: 'destructive'
+      });
+    }
+  };
+
   const handleTouch = (e: React.TouchEvent<HTMLDivElement>) => {
     const { clientX } = e.changedTouches[0];
     const screenWidth = window.innerWidth;
@@ -188,7 +230,7 @@ const DiscoverPage = ({ currentUser }: DiscoverPageProps) => {
 
   if (isLoading) {
     return (
-      <div className="flex items-center justify-center min-h-screen">
+      <div className="flex items-center justify-center h-screen">
         <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-pink-600"></div>
       </div>
     );
@@ -198,7 +240,7 @@ const DiscoverPage = ({ currentUser }: DiscoverPageProps) => {
 
   if (!currentMatch) {
     return (
-      <div className="flex items-center justify-center min-h-screen">
+      <div className="flex items-center justify-center h-screen">
         <Card className="max-w-md w-full mx-4">
           <CardContent className="p-8 text-center">
             <Heart className="w-16 h-16 mx-auto mb-4 text-gray-300" />
@@ -215,126 +257,153 @@ const DiscoverPage = ({ currentUser }: DiscoverPageProps) => {
     );
   }
 
+  if (hiddenProfiles.has(currentMatch.id)) {
+    return (
+      <div className="flex items-center justify-center h-screen bg-gradient-to-br from-pink-500 to-purple-600">
+        <div className="text-center text-white p-8">
+          <Heart className="w-24 h-24 mx-auto mb-6 opacity-50" />
+          <h2 className="text-2xl font-bold mb-4">Upgrade to Premium</h2>
+          <p className="text-lg mb-6">See who likes you and get unlimited swipes!</p>
+          <Button 
+            onClick={moveToNext}
+            className="bg-white text-pink-600 hover:bg-gray-100"
+          >
+            Continue Swiping
+          </Button>
+        </div>
+      </div>
+    );
+  }
+
   return (
-    <div className="max-w-md mx-auto p-4">
-      <Card className="relative overflow-hidden">
-        <div className="relative h-96" onTouchEnd={handleTouch}>
-          {currentMatch.images?.length > 0 ? (
-            <>
-              <img
-                src={currentMatch.images[imageIndex]}
-                alt={`${currentMatch.first_name}'s photo`}
-                className="w-full h-full object-cover"
-              />
-              <div className="absolute top-2 left-1/2 transform -translate-x-1/2 flex gap-1">
-                {currentMatch.images.map((_, idx) => (
-                  <div
-                    key={idx}
-                    className={`w-2 h-2 rounded-full ${idx === imageIndex ? 'bg-white' : 'bg-white/40'}`}
-                  />
-                ))}
-              </div>
-            </>
-          ) : (
-            <div className="w-full h-full bg-gray-200 flex items-center justify-center">
-              <span className="text-gray-500">No photo available</span>
+    <div className="h-screen relative overflow-hidden">
+      <div className="relative h-full" onTouchEnd={handleTouch}>
+        {currentMatch.images?.length > 0 ? (
+          <>
+            <img
+              src={currentMatch.images[imageIndex]}
+              alt={`${currentMatch.first_name}'s photo`}
+              className="w-full h-full object-cover"
+            />
+            <div className="absolute top-4 left-1/2 transform -translate-x-1/2 flex gap-1 z-10">
+              {currentMatch.images.map((_, idx) => (
+                <div
+                  key={idx}
+                  className={`w-2 h-2 rounded-full ${idx === imageIndex ? 'bg-white' : 'bg-white/40'}`}
+                />
+              ))}
             </div>
-          )}
+          </>
+        ) : (
+          <div className="w-full h-full bg-gradient-to-br from-pink-200 to-purple-200 flex items-center justify-center">
+            <span className="text-6xl font-bold text-gray-700">
+              {currentMatch.first_name?.[0]}{currentMatch.last_name?.[0]}
+            </span>
+          </div>
+        )}
 
-          <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-transparent" />
+        <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-transparent to-transparent" />
 
-          <div className="absolute bottom-0 left-0 right-0 p-4 text-white">
-            <h2 className="text-2xl font-bold">
+        {/* Profile Info Overlay */}
+        <div className="absolute bottom-0 left-0 right-0 text-white p-6">
+          <div className="mb-4">
+            <h2 className="text-3xl font-bold mb-2">
               {currentMatch.first_name} {currentMatch.last_name}
             </h2>
-            <div className="flex items-center mt-2 space-x-4 text-sm">
+            <div className="flex items-center space-x-4 text-lg">
               <div className="flex items-center">
-                <MapPin className="w-4 h-4 mr-1" />
-                <span>
-                  {currentMatch.city}, {currentMatch.country}
-                </span>
+                <MapPin className="w-5 h-5 mr-2" />
+                <span>{currentMatch.city}, {currentMatch.country}</span>
               </div>
             </div>
           </div>
-        </div>
 
-        <CardContent className="p-4">
-          {currentMatch.bio && (
-            <div className="mb-4">
-              <h3 className="font-semibold text-gray-800 mb-2">About</h3>
-              <p className="text-gray-600">{currentMatch.bio}</p>
-            </div>
-          )}
+          {/* Expandable Info Section */}
+          <div className="mb-6">
+            <Button
+              onClick={() => setShowMoreInfo(!showMoreInfo)}
+              variant="ghost"
+              className="text-white p-0 h-auto font-normal text-left mb-2"
+            >
+              <span className="flex items-center">
+                {showMoreInfo ? 'Show Less' : 'Show More'}
+                {showMoreInfo ? <ChevronUp className="w-4 h-4 ml-1" /> : <ChevronDown className="w-4 h-4 ml-1" />}
+              </span>
+            </Button>
 
-          {(currentMatch.occupation || currentMatch.education_level) && (
-            <div className="mb-4 space-y-2">
-              {currentMatch.occupation && (
-                <div className="flex items-center text-sm text-gray-600">
-                  <Briefcase className="w-4 h-4 mr-2" />
-                  <span>{currentMatch.occupation}</span>
-                </div>
-              )}
-              {currentMatch.education_level && (
-                <div className="flex items-center text-sm text-gray-600">
-                  <GraduationCap className="w-4 h-4 mr-2" />
-                  <span>{currentMatch.education_level}</span>
-                </div>
-              )}
-            </div>
-          )}
+            {showMoreInfo && (
+              <div className="space-y-3 bg-black/50 p-4 rounded-lg">
+                {currentMatch.bio && (
+                  <div>
+                    <h3 className="font-semibold mb-1">About</h3>
+                    <p className="text-sm">{currentMatch.bio}</p>
+                  </div>
+                )}
 
-          {currentMatch.interests?.length > 0 && (
-            <div className="mb-4">
-              <h3 className="font-semibold text-gray-800 mb-2">Interests</h3>
-              <div className="flex flex-wrap gap-2">
-                {currentMatch.interests.map((interest, index) => (
-                  <span
-                    key={index}
-                    className="px-3 py-1 bg-pink-100 text-pink-800 rounded-full text-sm"
-                  >
-                    {interest}
-                  </span>
-                ))}
+                {(currentMatch.occupation || currentMatch.education_level) && (
+                  <div className="space-y-2">
+                    {currentMatch.occupation && (
+                      <div className="flex items-center text-sm">
+                        <Briefcase className="w-4 h-4 mr-2" />
+                        <span>{currentMatch.occupation}</span>
+                      </div>
+                    )}
+                    {currentMatch.education_level && (
+                      <div className="flex items-center text-sm">
+                        <GraduationCap className="w-4 h-4 mr-2" />
+                        <span>{currentMatch.education_level}</span>
+                      </div>
+                    )}
+                  </div>
+                )}
+
+                {currentMatch.interests?.length > 0 && (
+                  <div>
+                    <h3 className="font-semibold mb-2">Interests</h3>
+                    <div className="flex flex-wrap gap-2">
+                      {currentMatch.interests.map((interest, index) => (
+                        <span
+                          key={index}
+                          className="px-2 py-1 bg-white/20 rounded-full text-xs"
+                        >
+                          {interest}
+                        </span>
+                      ))}
+                    </div>
+                  </div>
+                )}
               </div>
-            </div>
-          )}
-        </CardContent>
+            )}
+          </div>
 
-        <div className="p-4 bg-gray-50">
-          <div className="flex justify-center space-x-4">
+          {/* Action Buttons */}
+          <div className="flex justify-center space-x-6">
             <Button
               onClick={handlePass}
               variant="outline"
-              className="w-14 h-14 rounded-full border-2 border-gray-300 hover:border-red-500 hover:bg-red-50"
+              className="w-16 h-16 rounded-full border-2 border-white/50 bg-white/10 hover:bg-white/20"
             >
-              <X className="w-6 h-6 text-gray-600 hover:text-red-500" />
+              <X className="w-8 h-8 text-white" />
             </Button>
 
             <Button
               onClick={handleReverse}
               variant="outline"
               disabled={!passedUsers.length}
-              className="w-14 h-14 rounded-full border-2 border-gray-300 hover:border-blue-500 disabled:opacity-50"
+              className="w-16 h-16 rounded-full border-2 border-white/50 bg-white/10 hover:bg-white/20 disabled:opacity-30"
             >
-              <Undo2 className="w-6 h-6 text-gray-600 hover:text-blue-500" />
+              <Undo2 className="w-8 h-8 text-white" />
             </Button>
 
             <Button
               onClick={handleLike}
               variant="outline"
-              className="w-14 h-14 rounded-full border-2 border-pink-300 hover:border-pink-500 hover:bg-pink-50"
+              className="w-16 h-16 rounded-full border-2 border-white/50 bg-white/10 hover:bg-white/20"
             >
-              <Heart className="w-6 h-6 text-pink-500" />
+              <Heart className="w-8 h-8 text-white" />
             </Button>
           </div>
         </div>
-      </Card>
-
-      <div className="mt-4 text-center text-sm text-gray-500">
-        {currentIndex + 1} of {potentialMatches.length} profiles
-        {passedUsers.length > 0 && (
-          <span className="ml-2">• {passedUsers.length} passed</span>
-        )}
       </div>
     </div>
   );

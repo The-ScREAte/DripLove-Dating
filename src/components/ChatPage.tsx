@@ -1,9 +1,8 @@
-
 import React, { useState, useEffect, useRef } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Smile, Send, Search } from 'lucide-react';
+import { Smile, Send, Search, ArrowLeft } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import EmojiPicker from './EmojiPicker';
@@ -171,181 +170,164 @@ const ChatPage = ({ currentUser, onUnreadChange }: ChatPageProps) => {
     handleUserProfileClick(userId);
   };
 
-  return (
-    <div className="h-full p-4">
-      <div className="flex flex-col md:flex-row h-full max-w-6xl mx-auto">
-        {/* Matches Sidebar */}
-        <Card className="w-full md:w-1/3 md:mr-4 mb-4 md:mb-0 flex flex-col">
-          <CardHeader className="pb-2">
-            <CardTitle>Your Matches</CardTitle>
-            <div className="relative mt-2">
-              <Input
-                type="text"
-                placeholder="Search matches..."
-                value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
-                className="pr-10"
-              />
-              <Search className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4" />
-            </div>
-          </CardHeader>
-          <CardContent className="p-0 flex-1 overflow-y-auto">
-            <div className="max-h-96 md:max-h-full">
-              {filteredMatches.length === 0 ? (
-                <p className="text-center text-gray-500 p-4">
-                  {searchTerm ? 'No matches found' : 'No matches yet'}
-                </p>
-              ) : (
-                filteredMatches.map((match) => (
-                  <div
-                    key={match.id}
-                    onClick={() => setSelectedMatch(match)}
-                    className={`p-4 border-b cursor-pointer hover:bg-gray-50 transition-colors ${
-                      selectedMatch?.id === match.id ? 'bg-pink-50 border-pink-200' : ''
-                    }`}
-                  >
-                    <div className="flex items-center space-x-3">
-                      <ChatUserAvatar 
-                        userId={match.partner?.id}
-                        firstName={match.partner?.first_name}
-                        lastName={match.partner?.last_name}
-                        onClick={() => handleUserAvatarClick(match.partner?.id)}
-                      />
-                      <div className="flex-1">
-                        <div className="flex justify-between items-center">
-                          <span className="font-medium">
-                            {match.partner?.first_name} {match.partner?.last_name}
-                          </span>
-                          {match.unreadCount > 0 && (
-                            <span className="bg-pink-600 text-white text-xs rounded-full px-2 py-1 min-w-[20px] text-center">
-                              {match.unreadCount}
-                            </span>
-                          )}
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-                ))
-              )}
-            </div>
-          </CardContent>
-        </Card>
+  // Show chat list view
+  if (!selectedMatch) {
+    return (
+      <div className="h-screen flex flex-col">
+        <div className="bg-white border-b p-4">
+          <h1 className="text-2xl font-bold text-gray-800 mb-4">Messages</h1>
+          <div className="relative">
+            <Input
+              type="text"
+              placeholder="Search conversations..."
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+              className="pr-10"
+            />
+            <Search className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4" />
+          </div>
+        </div>
 
-        {/* Chat Area */}
-        <Card className="flex-1 flex flex-col min-h-0">
-          {selectedMatch ? (
-            <>
-              <CardHeader className="border-b flex-shrink-0">
-                <div className="flex items-center space-x-3">
-                  <ChatUserAvatar
-                    userId={selectedMatch.partner?.id}
-                    firstName={selectedMatch.partner?.first_name}
-                    lastName={selectedMatch.partner?.last_name}
-                    onClick={() => handleUserAvatarClick(selectedMatch.partner?.id)}
-                    size="lg"
-                  />
-                  <CardTitle>
-                    {selectedMatch.partner?.first_name} {selectedMatch.partner?.last_name}
-                  </CardTitle>
-                </div>
-              </CardHeader>
-              
-              <CardContent className="flex flex-col flex-1 p-0 min-h-0">
-                {/* Messages Container */}
-                <div 
-                  ref={messagesContainerRef} 
-                  className="flex-1 p-4 overflow-y-auto"
-                  style={{ minHeight: '300px', maxHeight: 'calc(100vh - 300px)' }}
-                >
-                  {messages.length === 0 ? (
-                    <p className="text-center text-gray-500">No messages yet. Start the conversation!</p>
-                  ) : (
-                    messages.map((message) => (
-                      <div
-                        key={message.id}
-                        className={`mb-4 flex ${
-                          message.sender_id === currentUser.id ? 'justify-end' : 'justify-start'
-                        }`}
-                      >
-                        {message.sender_id !== currentUser.id && (
-                          <div className="mr-2 flex-shrink-0">
-                            <ChatUserAvatar 
-                              userId={message.sender_id}
-                              firstName={message.sender.first_name}
-                              lastName={message.sender.last_name}
-                              size="sm"
-                              onClick={() => handleUserAvatarClick(message.sender_id)}
-                            />
-                          </div>
-                        )}
-                        <div
-                          className={`max-w-xs lg:max-w-md px-4 py-2 rounded-lg ${
-                            message.sender_id === currentUser.id
-                              ? 'bg-pink-600 text-white'
-                              : 'bg-gray-100 text-gray-800'
-                          }`}
-                        >
-                          <p className="text-sm whitespace-pre-wrap">{message.message}</p>
-                          <p className="text-xs opacity-70 mt-1">
-                            {new Date(message.created_at).toLocaleTimeString()}
-                          </p>
-                        </div>
-                        {message.sender_id === currentUser.id && (
-                          <div className="ml-2 flex-shrink-0">
-                            <ChatUserAvatar 
-                              userId={message.sender_id}
-                              firstName={message.sender.first_name}
-                              lastName={message.sender.last_name}
-                              size="sm"
-                            />
-                          </div>
-                        )}
-                      </div>
-                    ))
-                  )}
-                  <div ref={messagesEndRef} />
-                </div>
-
-                {/* Message Input - Fixed at bottom with proper spacing */}
-                <div className="border-t p-4 bg-white flex-shrink-0">
-                  <div className="flex space-x-2 relative">
-                    <div className="flex-1 relative">
-                      <Input
-                        value={newMessage}
-                        onChange={(e) => setNewMessage(e.target.value)}
-                        onKeyPress={handleKeyPress}
-                        placeholder="Type a message..."
-                        className="pr-12"
-                      />
-                      <Button
-                        type="button"
-                        variant="ghost"
-                        size="sm"
-                        onClick={() => setShowEmojiPicker(!showEmojiPicker)}
-                        className="absolute right-2 top-1/2 transform -translate-y-1/2 p-1"
-                      >
-                        <Smile className="w-4 h-4" />
-                      </Button>
-                    </div>
-                    <Button onClick={sendMessage} disabled={!newMessage.trim()}>
-                      <Send className="w-4 h-4" />
-                    </Button>
-                  </div>
-                  
-                  {showEmojiPicker && (
-                    <div className="absolute bottom-20 right-4 z-10">
-                      <EmojiPicker onEmojiSelect={handleEmojiSelect} />
-                    </div>
-                  )}
-                </div>
-              </CardContent>
-            </>
+        <div className="flex-1 overflow-y-auto">
+          {filteredMatches.length === 0 ? (
+            <div className="flex items-center justify-center h-full">
+              <p className="text-center text-gray-500 p-4">
+                {searchTerm ? 'No matches found' : 'No matches yet'}
+              </p>
+            </div>
           ) : (
-            <CardContent className="flex items-center justify-center h-full">
-              <p className="text-gray-500">Select a match to start chatting</p>
-            </CardContent>
+            <div className="divide-y">
+              {filteredMatches.map((match) => (
+                <div
+                  key={match.id}
+                  onClick={() => setSelectedMatch(match)}
+                  className="p-4 hover:bg-gray-50 transition-colors cursor-pointer"
+                >
+                  <div className="flex items-center space-x-3">
+                    <ChatUserAvatar 
+                      userId={match.partner?.id}
+                      firstName={match.partner?.first_name}
+                      lastName={match.partner?.last_name}
+                      onClick={() => handleUserProfileClick(match.partner?.id)}
+                      size="lg"
+                    />
+                    <div className="flex-1 min-w-0">
+                      <div className="flex justify-between items-center">
+                        <span className="font-semibold text-gray-900 truncate">
+                          {match.partner?.first_name} {match.partner?.last_name}
+                        </span>
+                        {match.unreadCount > 0 && (
+                          <span className="bg-pink-600 text-white text-xs rounded-full px-2 py-1 min-w-[20px] text-center">
+                            {match.unreadCount}
+                          </span>
+                        )}
+                      </div>
+                      <p className="text-sm text-gray-500 truncate">
+                        Tap to start chatting
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
           )}
-        </Card>
+        </div>
+      </div>
+    );
+  }
+
+  // Show individual chat view
+  return (
+    <div className="h-screen flex flex-col">
+      {/* Chat Header */}
+      <div className="bg-white border-b p-4 flex items-center space-x-3">
+        <Button
+          onClick={() => setSelectedMatch(null)}
+          variant="ghost"
+          size="sm"
+          className="p-1"
+        >
+          <ArrowLeft className="w-5 h-5" />
+        </Button>
+        <ChatUserAvatar
+          userId={selectedMatch.partner?.id}
+          firstName={selectedMatch.partner?.first_name}
+          lastName={selectedMatch.partner?.last_name}
+          onClick={() => handleUserProfileClick(selectedMatch.partner?.id)}
+          size="md"
+        />
+        <div className="flex-1">
+          <h2 className="font-semibold text-gray-900">
+            {selectedMatch.partner?.first_name} {selectedMatch.partner?.last_name}
+          </h2>
+        </div>
+      </div>
+
+      {/* Messages */}
+      <div className="flex-1 overflow-y-auto p-4 space-y-4">
+        {messages.length === 0 ? (
+          <div className="flex items-center justify-center h-full">
+            <p className="text-center text-gray-500">No messages yet. Start the conversation!</p>
+          </div>
+        ) : (
+          messages.map((message) => (
+            <div
+              key={message.id}
+              className={`flex ${message.sender_id === currentUser.id ? 'justify-end' : 'justify-start'}`}
+            >
+              <div
+                className={`max-w-xs lg:max-w-md px-4 py-2 rounded-2xl ${
+                  message.sender_id === currentUser.id
+                    ? 'bg-pink-600 text-white'
+                    : 'bg-gray-200 text-gray-800'
+                }`}
+              >
+                <p className="text-sm whitespace-pre-wrap">{message.message}</p>
+                <p className="text-xs opacity-70 mt-1">
+                  {new Date(message.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                </p>
+              </div>
+            </div>
+          ))
+        )}
+        <div ref={messagesEndRef} />
+      </div>
+
+      {/* Message Input */}
+      <div className="border-t p-4 bg-white">
+        <div className="flex space-x-2 relative">
+          <div className="flex-1 relative">
+            <Input
+              value={newMessage}
+              onChange={(e) => setNewMessage(e.target.value)}
+              onKeyPress={handleKeyPress}
+              placeholder="Type a message..."
+              className="pr-12 rounded-full"
+            />
+            <Button
+              type="button"
+              variant="ghost"
+              size="sm"
+              onClick={() => setShowEmojiPicker(!showEmojiPicker)}
+              className="absolute right-2 top-1/2 transform -translate-y-1/2 p-1"
+            >
+              <Smile className="w-4 h-4" />
+            </Button>
+          </div>
+          <Button 
+            onClick={sendMessage} 
+            disabled={!newMessage.trim()}
+            className="rounded-full w-12 h-12 p-0"
+          >
+            <Send className="w-4 h-4" />
+          </Button>
+        </div>
+        
+        {showEmojiPicker && (
+          <div className="absolute bottom-20 right-4 z-10">
+            <EmojiPicker onEmojiSelect={handleEmojiSelect} />
+          </div>
+        )}
       </div>
 
       {/* User Profile Modal */}

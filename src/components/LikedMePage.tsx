@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Users, Heart, X, Calendar, MapPin, Shield } from 'lucide-react';
+import { Users, Heart, X, Calendar, MapPin, Shield, ChevronDown, ChevronUp } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import BlockDialog from './BlockDialog';
@@ -17,6 +17,7 @@ const LikedMePage = ({ currentUser }: LikedMePageProps) => {
   const [userImages, setUserImages] = useState<{ [key: string]: string[] }>({});
   const [blockDialogOpen, setBlockDialogOpen] = useState(false);
   const [imageIndex, setImageIndex] = useState(0);
+  const [showMoreInfo, setShowMoreInfo] = useState(false);
   const { toast } = useToast();
 
   useEffect(() => {
@@ -25,6 +26,7 @@ const LikedMePage = ({ currentUser }: LikedMePageProps) => {
 
   useEffect(() => {
     setImageIndex(0);
+    setShowMoreInfo(false);
   }, [selectedProfile]);
 
   const fetchLikers = async () => {
@@ -206,7 +208,7 @@ const LikedMePage = ({ currentUser }: LikedMePageProps) => {
 
   if (loading) {
     return (
-      <div className="flex items-center justify-center h-full">
+      <div className="flex items-center justify-center h-screen">
         <div className="animate-spin rounded-full h-32 w-32 border-b-2 border-pink-600"></div>
       </div>
     );
@@ -216,105 +218,132 @@ const LikedMePage = ({ currentUser }: LikedMePageProps) => {
     const profileImages = userImages[selectedProfile.id] || [];
 
     return (
-      <div className="max-w-md mx-auto">
-        <Button onClick={() => setSelectedProfile(null)} variant="outline" className="mb-4">
-          ← Back to likes
-        </Button>
-
-        <Card className="overflow-hidden shadow-2xl">
-          <div className="relative h-96" onTouchEnd={handleTouch}>
-            {profileImages.length > 0 ? (
-              <>
-                <img
-                  src={profileImages[imageIndex]}
-                  alt={`${selectedProfile.first_name}'s photo`}
-                  className="w-full h-full object-cover"
-                />
-                <div className="absolute top-2 left-1/2 transform -translate-x-1/2 flex gap-1">
-                  {profileImages.map((_, idx) => (
-                    <div
-                      key={idx}
-                      className={`w-2 h-2 rounded-full ${idx === imageIndex ? 'bg-white' : 'bg-white/40'}`}
-                    />
-                  ))}
-                </div>
-              </>
-            ) : (
-              <div className="w-full h-full bg-gradient-to-br from-pink-200 to-purple-200 flex items-center justify-center">
-                <div className="w-32 h-32 bg-white rounded-full flex items-center justify-center">
-                  <span className="text-4xl font-bold text-gray-700">
-                    {selectedProfile.first_name?.[0]}{selectedProfile.last_name?.[0]}
-                  </span>
-                </div>
+      <div className="h-screen relative overflow-hidden">
+        <div className="relative h-full" onTouchEnd={handleTouch}>
+          {profileImages.length > 0 ? (
+            <>
+              <img
+                src={profileImages[imageIndex]}
+                alt={`${selectedProfile.first_name}'s photo`}
+                className="w-full h-full object-cover"
+              />
+              <div className="absolute top-4 left-1/2 transform -translate-x-1/2 flex gap-1 z-10">
+                {profileImages.map((_, idx) => (
+                  <div
+                    key={idx}
+                    className={`w-2 h-2 rounded-full ${idx === imageIndex ? 'bg-white' : 'bg-white/40'}`}
+                  />
+                ))}
               </div>
-            )}
+            </>
+          ) : (
+            <div className="w-full h-full bg-gradient-to-br from-pink-200 to-purple-200 flex items-center justify-center">
+              <div className="w-32 h-32 bg-white rounded-full flex items-center justify-center">
+                <span className="text-4xl font-bold text-gray-700">
+                  {selectedProfile.first_name?.[0]}{selectedProfile.last_name?.[0]}
+                </span>
+              </div>
+            </div>
+          )}
 
-            <Button
-              onClick={handleBlock}
-              variant="outline"
-              size="sm"
-              className="absolute top-4 left-4 bg-white/80 hover:bg-white"
-            >
-              <Shield className="w-4 h-4" />
-            </Button>
-          </div>
+          <Button
+            onClick={() => setSelectedProfile(null)}
+            variant="outline"
+            className="absolute top-4 left-4 bg-white/80 hover:bg-white z-10"
+          >
+            ← Back
+          </Button>
 
-          <CardContent className="p-6">
+          <Button
+            onClick={handleBlock}
+            variant="outline"
+            size="sm"
+            className="absolute top-4 right-4 bg-white/80 hover:bg-white z-10"
+          >
+            <Shield className="w-4 h-4" />
+          </Button>
+
+          <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-transparent to-transparent" />
+
+          {/* Profile Info Overlay */}
+          <div className="absolute bottom-0 left-0 right-0 text-white p-6">
             <div className="mb-4">
-              <h2 className="text-2xl font-bold text-gray-800">
+              <h2 className="text-3xl font-bold mb-2">
                 {selectedProfile.first_name} {selectedProfile.last_name}
               </h2>
-              <div className="flex items-center text-gray-600 mt-2">
-                <Calendar className="w-4 h-4 mr-1" />
-                <span>{calculateAge(selectedProfile.date_of_birth)} years old</span>
-              </div>
-              <div className="flex items-center text-gray-600 mt-1">
-                <MapPin className="w-4 h-4 mr-1" />
-                <span>{selectedProfile.city}, {selectedProfile.country}</span>
+              <div className="flex items-center space-x-4 text-lg">
+                <div className="flex items-center">
+                  <Calendar className="w-5 h-5 mr-2" />
+                  <span>{calculateAge(selectedProfile.date_of_birth)} years old</span>
+                </div>
+                <div className="flex items-center">
+                  <MapPin className="w-5 h-5 mr-2" />
+                  <span>{selectedProfile.city}, {selectedProfile.country}</span>
+                </div>
               </div>
             </div>
 
-            {selectedProfile.bio && (
-              <div className="mb-4">
-                <p className="text-gray-700">{selectedProfile.bio}</p>
-              </div>
-            )}
+            {/* Expandable Info Section */}
+            <div className="mb-6">
+              <Button
+                onClick={() => setShowMoreInfo(!showMoreInfo)}
+                variant="ghost"
+                className="text-white p-0 h-auto font-normal text-left mb-2"
+              >
+                <span className="flex items-center">
+                  {showMoreInfo ? 'Show Less' : 'Show More'}
+                  {showMoreInfo ? <ChevronUp className="w-4 h-4 ml-1" /> : <ChevronDown className="w-4 h-4 ml-1" />}
+                </span>
+              </Button>
 
-            {selectedProfile.interests && selectedProfile.interests.length > 0 && (
-              <div className="mb-6">
-                <h3 className="font-semibold text-gray-800 mb-2">Interests</h3>
-                <div className="flex flex-wrap gap-2">
-                  {selectedProfile.interests.map((interest: string, index: number) => (
-                    <span
-                      key={index}
-                      className="px-3 py-1 bg-pink-100 text-pink-700 rounded-full text-sm"
-                    >
-                      {interest}
-                    </span>
-                  ))}
+              {showMoreInfo && (
+                <div className="space-y-3 bg-black/50 p-4 rounded-lg">
+                  {selectedProfile.bio && (
+                    <div>
+                      <h3 className="font-semibold mb-1">About</h3>
+                      <p className="text-sm">{selectedProfile.bio}</p>
+                    </div>
+                  )}
+
+                  {selectedProfile.interests && selectedProfile.interests.length > 0 && (
+                    <div>
+                      <h3 className="font-semibold mb-2">Interests</h3>
+                      <div className="flex flex-wrap gap-2">
+                        {selectedProfile.interests.map((interest: string, index: number) => (
+                          <span
+                            key={index}
+                            className="px-2 py-1 bg-white/20 rounded-full text-xs"
+                          >
+                            {interest}
+                          </span>
+                        ))}
+                      </div>
+                    </div>
+                  )}
                 </div>
-              </div>
-            )}
+              )}
+            </div>
 
-            <div className="flex space-x-4">
+            {/* Action Buttons */}
+            <div className="flex justify-center space-x-6">
               <Button
                 onClick={() => handlePass(selectedProfile.id)}
                 variant="outline"
-                size="lg"
-                className="flex-1 border-2 border-gray-300 hover:border-gray-400"
+                className="w-16 h-16 rounded-full border-2 border-white/50 bg-white/10 hover:bg-white/20"
               >
-                <X className="w-6 h-6 text-gray-600" />
+                <X className="w-8 h-8 text-white" />
               </Button>
+
               <Button
                 onClick={() => handleLikeBack(selectedProfile.id)}
-                size="lg"
-                className="flex-1 bg-gradient-to-r from-pink-500 to-purple-600 hover:from-pink-600 hover:to-purple-700"
+                variant="outline"
+                className="w-16 h-16 rounded-full border-2 border-white/50 bg-white/10 hover:bg-white/20"
               >
-                <Heart className="w-6 h-6" />
+                <Heart className="w-8 h-8 text-white" />
               </Button>
             </div>
-          </CardContent>
-        </Card>
+          </div>
+        </div>
 
         <BlockDialog
           isOpen={blockDialogOpen}
@@ -328,8 +357,8 @@ const LikedMePage = ({ currentUser }: LikedMePageProps) => {
   }
 
   return (
-    <div className="max-w-4xl mx-auto">
-      <Card>
+    <div className="h-screen p-4 overflow-y-auto">
+      <Card className="h-full">
         <CardHeader>
           <CardTitle className="flex items-center space-x-2">
             <Users className="w-6 h-6 text-pink-600" />
