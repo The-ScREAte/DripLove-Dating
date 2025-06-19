@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -73,11 +74,11 @@ const ImageManagement = ({ currentUser }: ImageManagementProps) => {
 
       if (uploadError) throw uploadError;
 
-      const { data: urlData, error: urlError } = await supabase.storage
+      const { data: urlData } = await supabase.storage
         .from('user-photos')
         .getPublicUrl(fileName);
 
-      if (urlError || !urlData?.publicUrl) throw new Error("Failed to generate public image URL");
+      if (!urlData?.publicUrl) throw new Error("Failed to generate public image URL");
 
       const publicUrl = urlData.publicUrl;
       const nextImageOrder = userImages.length + 1;
