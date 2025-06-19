@@ -1,8 +1,7 @@
-
 import React, { useState, useEffect } from 'react';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Heart, X, Undo2, MapPin, Briefcase, GraduationCap, ChevronDown, ChevronUp } from 'lucide-react';
+import { Heart, X, Undo2, MapPin, Briefcase, GraduationCap, ChevronDown, ChevronUp, Calendar } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 
@@ -19,6 +18,7 @@ interface PotentialMatch {
   country: string;
   occupation: string;
   education_level: string;
+  date_of_birth: string;
   interests: string[];
   images: string[];
 }
@@ -46,6 +46,19 @@ const DiscoverPage = ({ currentUser }: DiscoverPageProps) => {
     setImageIndex(0);
     setShowMoreInfo(false);
   }, [currentIndex]);
+
+  const calculateAge = (dateOfBirth: string) => {
+    const today = new Date();
+    const birthDate = new Date(dateOfBirth);
+    let age = today.getFullYear() - birthDate.getFullYear();
+    const monthDiff = today.getMonth() - birthDate.getMonth();
+
+    if (monthDiff < 0 || (monthDiff === 0 && today.getDate() < birthDate.getDate())) {
+      age--;
+    }
+
+    return age;
+  };
 
   const fetchPotentialMatches = async () => {
     if (!currentUser?.id) return;
@@ -230,7 +243,7 @@ const DiscoverPage = ({ currentUser }: DiscoverPageProps) => {
 
   if (isLoading) {
     return (
-      <div className="flex items-center justify-center h-screen">
+      <div className="h-screen flex items-center justify-center bg-gradient-to-br from-pink-50 to-purple-50">
         <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-pink-600"></div>
       </div>
     );
@@ -240,7 +253,7 @@ const DiscoverPage = ({ currentUser }: DiscoverPageProps) => {
 
   if (!currentMatch) {
     return (
-      <div className="flex items-center justify-center h-screen">
+      <div className="h-screen flex items-center justify-center bg-gradient-to-br from-pink-50 to-purple-50">
         <Card className="max-w-md w-full mx-4">
           <CardContent className="p-8 text-center">
             <Heart className="w-16 h-16 mx-auto mb-4 text-gray-300" />
@@ -259,7 +272,7 @@ const DiscoverPage = ({ currentUser }: DiscoverPageProps) => {
 
   if (hiddenProfiles.has(currentMatch.id)) {
     return (
-      <div className="flex items-center justify-center h-screen bg-gradient-to-br from-pink-500 to-purple-600">
+      <div className="h-screen flex items-center justify-center bg-gradient-to-br from-pink-500 to-purple-600">
         <div className="text-center text-white p-8">
           <Heart className="w-24 h-24 mx-auto mb-6 opacity-50" />
           <h2 className="text-2xl font-bold mb-4">Upgrade to Premium</h2>
@@ -276,8 +289,9 @@ const DiscoverPage = ({ currentUser }: DiscoverPageProps) => {
   }
 
   return (
-    <div className="h-screen relative overflow-hidden">
-      <div className="relative h-full" onTouchEnd={handleTouch}>
+    <div className="h-screen w-full relative overflow-hidden flex flex-col">
+      {/* Main Image Area */}
+      <div className="flex-1 relative" onTouchEnd={handleTouch}>
         {currentMatch.images?.length > 0 ? (
           <>
             <img
@@ -285,6 +299,7 @@ const DiscoverPage = ({ currentUser }: DiscoverPageProps) => {
               alt={`${currentMatch.first_name}'s photo`}
               className="w-full h-full object-cover"
             />
+            {/* Image indicators */}
             <div className="absolute top-4 left-1/2 transform -translate-x-1/2 flex gap-1 z-10">
               {currentMatch.images.map((_, idx) => (
                 <div
@@ -302,105 +317,113 @@ const DiscoverPage = ({ currentUser }: DiscoverPageProps) => {
           </div>
         )}
 
-        <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-transparent to-transparent" />
+        {/* Gradient overlay for text readability */}
+        <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-transparent to-transparent pointer-events-none" />
 
-        {/* Profile Info Overlay */}
-        <div className="absolute bottom-0 left-0 right-0 text-white p-6">
-          <div className="mb-4">
-            <h2 className="text-3xl font-bold mb-2">
-              {currentMatch.first_name} {currentMatch.last_name}
-            </h2>
-            <div className="flex items-center space-x-4 text-lg">
-              <div className="flex items-center">
-                <MapPin className="w-5 h-5 mr-2" />
-                <span>{currentMatch.city}, {currentMatch.country}</span>
+        {/* Profile Info Overlay - Fixed at bottom */}
+        <div className="absolute bottom-0 left-0 right-0 text-white">
+          {/* Main info section */}
+          <div className="px-6 pb-4">
+            <div className="mb-3">
+              <h2 className="text-2xl font-bold mb-1">
+                {currentMatch.first_name} {currentMatch.last_name}
+              </h2>
+              <div className="flex items-center space-x-4 text-sm">
+                <div className="flex items-center">
+                  <Calendar className="w-4 h-4 mr-1" />
+                  <span>{calculateAge(currentMatch.date_of_birth)} years old</span>
+                </div>
+                <div className="flex items-center">
+                  <MapPin className="w-4 h-4 mr-1" />
+                  <span>{currentMatch.city}, {currentMatch.country}</span>
+                </div>
               </div>
+            </div>
+
+            {/* Expandable Info Section */}
+            <div className="mb-4">
+              <Button
+                onClick={() => setShowMoreInfo(!showMoreInfo)}
+                variant="ghost"
+                className="text-white p-0 h-auto font-normal text-left mb-2 hover:bg-transparent"
+              >
+                <span className="flex items-center text-sm">
+                  {showMoreInfo ? 'Show Less' : 'Show More'}
+                  {showMoreInfo ? <ChevronUp className="w-4 h-4 ml-1" /> : <ChevronDown className="w-4 h-4 ml-1" />}
+                </span>
+              </Button>
+
+              {showMoreInfo && (
+                <div className="space-y-3 bg-black/50 p-3 rounded-lg max-h-32 overflow-y-auto">
+                  {currentMatch.bio && (
+                    <div>
+                      <h3 className="font-semibold mb-1 text-sm">About</h3>
+                      <p className="text-xs leading-relaxed">{currentMatch.bio}</p>
+                    </div>
+                  )}
+
+                  {(currentMatch.occupation || currentMatch.education_level) && (
+                    <div className="space-y-2">
+                      {currentMatch.occupation && (
+                        <div className="flex items-center text-xs">
+                          <Briefcase className="w-3 h-3 mr-2 flex-shrink-0" />
+                          <span>{currentMatch.occupation}</span>
+                        </div>
+                      )}
+                      {currentMatch.education_level && (
+                        <div className="flex items-center text-xs">
+                          <GraduationCap className="w-3 h-3 mr-2 flex-shrink-0" />
+                          <span>{currentMatch.education_level}</span>
+                        </div>
+                      )}
+                    </div>
+                  )}
+
+                  {currentMatch.interests?.length > 0 && (
+                    <div>
+                      <h3 className="font-semibold mb-2 text-sm">Interests</h3>
+                      <div className="flex flex-wrap gap-1">
+                        {currentMatch.interests.map((interest, index) => (
+                          <span
+                            key={index}
+                            className="px-2 py-1 bg-white/20 rounded-full text-xs"
+                          >
+                            {interest}
+                          </span>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                </div>
+              )}
             </div>
           </div>
 
-          {/* Expandable Info Section */}
-          <div className="mb-6">
-            <Button
-              onClick={() => setShowMoreInfo(!showMoreInfo)}
-              variant="ghost"
-              className="text-white p-0 h-auto font-normal text-left mb-2"
-            >
-              <span className="flex items-center">
-                {showMoreInfo ? 'Show Less' : 'Show More'}
-                {showMoreInfo ? <ChevronUp className="w-4 h-4 ml-1" /> : <ChevronDown className="w-4 h-4 ml-1" />}
-              </span>
-            </Button>
-
-            {showMoreInfo && (
-              <div className="space-y-3 bg-black/50 p-4 rounded-lg">
-                {currentMatch.bio && (
-                  <div>
-                    <h3 className="font-semibold mb-1">About</h3>
-                    <p className="text-sm">{currentMatch.bio}</p>
-                  </div>
-                )}
-
-                {(currentMatch.occupation || currentMatch.education_level) && (
-                  <div className="space-y-2">
-                    {currentMatch.occupation && (
-                      <div className="flex items-center text-sm">
-                        <Briefcase className="w-4 h-4 mr-2" />
-                        <span>{currentMatch.occupation}</span>
-                      </div>
-                    )}
-                    {currentMatch.education_level && (
-                      <div className="flex items-center text-sm">
-                        <GraduationCap className="w-4 h-4 mr-2" />
-                        <span>{currentMatch.education_level}</span>
-                      </div>
-                    )}
-                  </div>
-                )}
-
-                {currentMatch.interests?.length > 0 && (
-                  <div>
-                    <h3 className="font-semibold mb-2">Interests</h3>
-                    <div className="flex flex-wrap gap-2">
-                      {currentMatch.interests.map((interest, index) => (
-                        <span
-                          key={index}
-                          className="px-2 py-1 bg-white/20 rounded-full text-xs"
-                        >
-                          {interest}
-                        </span>
-                      ))}
-                    </div>
-                  </div>
-                )}
-              </div>
-            )}
-          </div>
-
-          {/* Action Buttons */}
-          <div className="flex justify-center space-x-6">
+          {/* Action Buttons - Fixed at very bottom */}
+          <div className="flex justify-center space-x-6 pb-6 px-6">
             <Button
               onClick={handlePass}
               variant="outline"
-              className="w-16 h-16 rounded-full border-2 border-white/50 bg-white/10 hover:bg-white/20"
+              className="w-14 h-14 rounded-full border-2 border-white/50 bg-white/10 hover:bg-white/20 backdrop-blur-sm"
             >
-              <X className="w-8 h-8 text-white" />
+              <X className="w-6 h-6 text-white" />
             </Button>
 
             <Button
               onClick={handleReverse}
               variant="outline"
               disabled={!passedUsers.length}
-              className="w-16 h-16 rounded-full border-2 border-white/50 bg-white/10 hover:bg-white/20 disabled:opacity-30"
+              className="w-14 h-14 rounded-full border-2 border-white/50 bg-white/10 hover:bg-white/20 disabled:opacity-30 backdrop-blur-sm"
             >
-              <Undo2 className="w-8 h-8 text-white" />
+              <Undo2 className="w-6 h-6 text-white" />
             </Button>
 
             <Button
               onClick={handleLike}
               variant="outline"
-              className="w-16 h-16 rounded-full border-2 border-white/50 bg-white/10 hover:bg-white/20"
+              className="w-14 h-14 rounded-full border-2 border-white/50 bg-white/10 hover:bg-white/20 backdrop-blur-sm"
             >
-              <Heart className="w-8 h-8 text-white" />
+              <Heart className="w-6 h-6 text-white" />
             </Button>
           </div>
         </div>
