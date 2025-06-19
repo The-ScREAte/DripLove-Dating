@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Heart, MessageCircle, Users, User } from 'lucide-react';
@@ -112,8 +113,9 @@ const MainApp = ({ user, onLogout }: MainAppProps) => {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-pink-50 to-purple-50 flex flex-col">
-      <div className="bg-white shadow-sm border-b">
+    <div className="h-screen flex flex-col bg-gradient-to-br from-pink-50 to-purple-50">
+      {/* Header */}
+      <div className="bg-white shadow-sm border-b flex-shrink-0">
         <div className="container mx-auto px-4 py-2 flex justify-start items-center">
           <img 
             src="/lovable-uploads/0e9bd84b-0f71-493b-8c1f-1a2883e5109d.png" 
@@ -123,71 +125,40 @@ const MainApp = ({ user, onLogout }: MainAppProps) => {
         </div>
       </div>
 
-      <div className="flex flex-1 overflow-hidden">
-        <div className="hidden md:block w-64 bg-white shadow-sm border-r">
-          <nav className="p-4">
-            <div className="space-y-2">
-              <TabButton label="Discover" icon={Heart} activeTab={activeTab} setActiveTab={setActiveTab} />
-              <TabButton label="Chat" icon={MessageCircle} activeTab={activeTab} setActiveTab={setActiveTab} badge={unreadCount} />
-              <TabButton label="Liked Me" icon={Users} activeTab={activeTab} setActiveTab={setActiveTab} />
-              <TabButton label="Profile" icon={User} activeTab={activeTab} setActiveTab={setActiveTab} />
-            </div>
-          </nav>
-        </div>
-
-        <div className="flex-1 overflow-hidden">
-          <div className="h-full pb-16 md:pb-0 overflow-auto">
-            {renderContent()}
-          </div>
-        </div>
+      {/* Main Content - fills remaining space between header and mobile nav */}
+      <div className="flex-1 overflow-hidden">
+        {renderContent()}
       </div>
 
-      <MobileTabBar activeTab={activeTab} setActiveTab={setActiveTab} unreadCount={unreadCount} />
+      {/* Mobile Navigation - fixed at bottom */}
+      <div className="fixed bottom-0 left-0 right-0 bg-white border-t border-gray-200 px-2 py-2 z-50 flex-shrink-0">
+        <div className="flex justify-around items-center">
+          {[
+            { label: 'Discover', icon: Heart }, 
+            { label: 'Chat', icon: MessageCircle }, 
+            { label: 'Liked', icon: Users }, 
+            { label: 'Profile', icon: User }
+          ].map(({ label, icon: Icon }) => (
+            <button
+              key={label}
+              onClick={() => setActiveTab(label.toLowerCase())}
+              className={`flex flex-col items-center space-y-1 py-2 px-2 rounded-lg transition-colors relative ${
+                activeTab === label.toLowerCase() ? 'text-pink-600' : 'text-gray-500'
+              }`}
+            >
+              <Icon className={`w-5 h-5 ${activeTab === label.toLowerCase() ? 'fill-current' : ''}`} />
+              <span className="text-xs font-medium">{label}</span>
+              {label === 'Chat' && unreadCount > 0 && (
+                <span className="absolute -top-1 -right-1 bg-red-500 text-white text-xs rounded-full px-1.5 py-0.5 min-w-[16px] text-center">
+                  {unreadCount}
+                </span>
+              )}
+            </button>
+          ))}
+        </div>
+      </div>
     </div>
   );
 };
-
-const TabButton = ({ label, icon: Icon, activeTab, setActiveTab, badge }: any) => (
-  <button
-    onClick={() => setActiveTab(label.toLowerCase())}
-    className={`w-full flex items-center space-x-3 px-4 py-3 rounded-lg transition-colors relative ${
-      activeTab === label.toLowerCase()
-        ? 'bg-gradient-to-r from-pink-500 to-purple-600 text-white'
-        : 'text-gray-600 hover:bg-gray-100'
-    }`}
-  >
-    <Icon className="w-5 h-5" />
-    <span>{label}</span>
-    {badge > 0 && (
-      <span className="absolute -top-1 -right-1 bg-red-500 text-white text-xs rounded-full px-2 py-1 min-w-[20px] text-center">
-        {badge}
-      </span>
-    )}
-  </button>
-);
-
-const MobileTabBar = ({ activeTab, setActiveTab, unreadCount }: any) => (
-  <div className="md:hidden fixed bottom-0 left-0 right-0 bg-white border-t border-gray-200 px-2 py-2 z-50">
-    <div className="flex justify-around items-center">
-      {[{ label: 'Discover', icon: Heart }, { label: 'Chat', icon: MessageCircle }, { label: 'Liked', icon: Users }, { label: 'Profile', icon: User }].map(({ label, icon: Icon }) => (
-        <button
-          key={label}
-          onClick={() => setActiveTab(label.toLowerCase())}
-          className={`flex flex-col items-center space-y-1 py-2 px-2 rounded-lg transition-colors relative ${
-            activeTab === label.toLowerCase() ? 'text-pink-600' : 'text-gray-500'
-          }`}
-        >
-          <Icon className={`w-5 h-5 ${activeTab === label.toLowerCase() ? 'fill-current' : ''}`} />
-          <span className="text-xs font-medium">{label}</span>
-          {label === 'Chat' && unreadCount > 0 && (
-            <span className="absolute -top-1 -right-1 bg-red-500 text-white text-xs rounded-full px-1.5 py-0.5 min-w-[16px] text-center">
-              {unreadCount}
-            </span>
-          )}
-        </button>
-      ))}
-    </div>
-  </div>
-);
 
 export default MainApp;

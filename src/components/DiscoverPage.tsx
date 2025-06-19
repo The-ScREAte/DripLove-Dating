@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -243,7 +244,7 @@ const DiscoverPage = ({ currentUser }: DiscoverPageProps) => {
 
   if (isLoading) {
     return (
-      <div className="h-screen flex items-center justify-center bg-gradient-to-br from-pink-50 to-purple-50">
+      <div className="h-full w-full flex items-center justify-center">
         <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-pink-600"></div>
       </div>
     );
@@ -253,7 +254,7 @@ const DiscoverPage = ({ currentUser }: DiscoverPageProps) => {
 
   if (!currentMatch) {
     return (
-      <div className="h-screen flex items-center justify-center bg-gradient-to-br from-pink-50 to-purple-50">
+      <div className="h-full w-full flex items-center justify-center">
         <Card className="max-w-md w-full mx-4">
           <CardContent className="p-8 text-center">
             <Heart className="w-16 h-16 mx-auto mb-4 text-gray-300" />
@@ -272,7 +273,7 @@ const DiscoverPage = ({ currentUser }: DiscoverPageProps) => {
 
   if (hiddenProfiles.has(currentMatch.id)) {
     return (
-      <div className="h-screen flex items-center justify-center bg-gradient-to-br from-pink-500 to-purple-600">
+      <div className="h-full w-full flex items-center justify-center bg-gradient-to-br from-pink-500 to-purple-600">
         <div className="text-center text-white p-8">
           <Heart className="w-24 h-24 mx-auto mb-6 opacity-50" />
           <h2 className="text-2xl font-bold mb-4">Upgrade to Premium</h2>
@@ -289,8 +290,8 @@ const DiscoverPage = ({ currentUser }: DiscoverPageProps) => {
   }
 
   return (
-    <div className="h-screen w-full relative overflow-hidden flex flex-col">
-      {/* Main Image Area */}
+    <div className="h-full w-full relative flex flex-col">
+      {/* Main Image Area - takes full available height */}
       <div className="flex-1 relative" onTouchEnd={handleTouch}>
         {currentMatch.images?.length > 0 ? (
           <>
@@ -320,8 +321,8 @@ const DiscoverPage = ({ currentUser }: DiscoverPageProps) => {
         {/* Gradient overlay for text readability */}
         <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-transparent to-transparent pointer-events-none" />
 
-        {/* Profile Info Overlay - Fixed at bottom */}
-        <div className="absolute bottom-0 left-0 right-0 text-white">
+        {/* Profile Info Overlay - Fixed at bottom with proper spacing for mobile nav */}
+        <div className="absolute bottom-0 left-0 right-0 text-white pb-20">
           {/* Main info section */}
           <div className="px-6 pb-4">
             <div className="mb-3">
@@ -399,8 +400,8 @@ const DiscoverPage = ({ currentUser }: DiscoverPageProps) => {
             </div>
           </div>
 
-          {/* Action Buttons - Fixed at very bottom */}
-          <div className="flex justify-center space-x-6 pb-6 px-6">
+          {/* Action Buttons - positioned above mobile nav */}
+          <div className="flex justify-center space-x-6 px-6">
             <Button
               onClick={handlePass}
               variant="outline"

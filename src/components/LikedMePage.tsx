@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -208,7 +209,7 @@ const LikedMePage = ({ currentUser }: LikedMePageProps) => {
 
   if (loading) {
     return (
-      <div className="h-screen flex items-center justify-center bg-gradient-to-br from-pink-50 to-purple-50">
+      <div className="h-full w-full flex items-center justify-center">
         <div className="animate-spin rounded-full h-32 w-32 border-b-2 border-pink-600"></div>
       </div>
     );
@@ -218,8 +219,8 @@ const LikedMePage = ({ currentUser }: LikedMePageProps) => {
     const profileImages = userImages[selectedProfile.id] || [];
 
     return (
-      <div className="h-screen w-full relative overflow-hidden flex flex-col">
-        {/* Main Image Area */}
+      <div className="h-full w-full relative flex flex-col">
+        {/* Main Image Area - takes full available height */}
         <div className="flex-1 relative" onTouchEnd={handleTouch}>
           {profileImages.length > 0 ? (
             <>
@@ -269,8 +270,8 @@ const LikedMePage = ({ currentUser }: LikedMePageProps) => {
           {/* Gradient overlay for text readability */}
           <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-transparent to-transparent pointer-events-none" />
 
-          {/* Profile Info Overlay - Fixed at bottom */}
-          <div className="absolute bottom-0 left-0 right-0 text-white">
+          {/* Profile Info Overlay - Fixed at bottom with proper spacing for mobile nav */}
+          <div className="absolute bottom-0 left-0 right-0 text-white pb-20">
             {/* Main info section */}
             <div className="px-6 pb-4">
               <div className="mb-3">
@@ -348,8 +349,8 @@ const LikedMePage = ({ currentUser }: LikedMePageProps) => {
               </div>
             </div>
 
-            {/* Action Buttons - Fixed at very bottom */}
-            <div className="flex justify-center space-x-6 pb-6 px-6">
+            {/* Action Buttons - positioned above mobile nav */}
+            <div className="flex justify-center space-x-6 px-6">
               <Button
                 onClick={() => handlePass(selectedProfile.id)}
                 variant="outline"
@@ -381,7 +382,7 @@ const LikedMePage = ({ currentUser }: LikedMePageProps) => {
   }
 
   return (
-    <div className="h-screen flex flex-col bg-gradient-to-br from-pink-50 to-purple-50">
+    <div className="h-full flex flex-col">
       <Card className="flex-1 m-4 flex flex-col">
         <CardHeader className="flex-shrink-0">
           <CardTitle className="flex items-center space-x-2">
@@ -389,7 +390,7 @@ const LikedMePage = ({ currentUser }: LikedMePageProps) => {
             <span>People who liked you ({likers.length})</span>
           </CardTitle>
         </CardHeader>
-        <CardContent className="flex-1 overflow-hidden">
+        <CardContent className="flex-1 overflow-hidden pb-20">
           {likers.length === 0 ? (
             <div className="flex items-center justify-center h-full">
               <div className="text-center">
