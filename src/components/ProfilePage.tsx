@@ -1,10 +1,10 @@
+
 import React, { useState, useEffect } from 'react';
 import { Card, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { User, Edit, Save, X, Crown } from 'lucide-react';
+import { User, Edit, Save, X } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
-import { useSubscription } from '@/hooks/useSubscription';
 import BasicInfoSection from './profile/BasicInfoSection';
 import LocationSection from './profile/LocationSection';
 import PreferencesSection from './profile/PreferencesSection';
@@ -16,7 +16,6 @@ import InterestsSection from './profile/InterestsSection';
 import ImageManagement from './profile/ImageManagement';
 import AccountActions from './profile/AccountActions';
 import ProfileSummaryCard from './ProfileSummaryCard';
-import PremiumUpgrade from './PremiumUpgrade';
 
 interface ProfilePageProps {
   currentUser: any;
@@ -28,9 +27,7 @@ interface ProfilePageProps {
 const ProfilePage = ({ currentUser, profile, onProfileUpdate, onLogout }: ProfilePageProps) => {
   const [isEditing, setIsEditing] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
-  const [showUpgrade, setShowUpgrade] = useState(false);
   const { toast } = useToast();
-  const { subscription, isPremium } = useSubscription(currentUser?.id);
 
   const [editedProfile, setEditedProfile] = useState({
     first_name: '',
@@ -227,10 +224,6 @@ const ProfilePage = ({ currentUser, profile, onProfileUpdate, onLogout }: Profil
     setIsEditing(false);
   };
 
-  if (showUpgrade) {
-    return <PremiumUpgrade currentUser={currentUser} onClose={() => setShowUpgrade(false)} />;
-  }
-
   return (
     <div className="h-full flex flex-col">
       {/* Fixed Header */}
@@ -240,31 +233,20 @@ const ProfilePage = ({ currentUser, profile, onProfileUpdate, onLogout }: Profil
             <User className="w-6 h-6 text-pink-600" />
             <h1 className="text-2xl font-bold text-gray-800">Your AfroVibe Profile</h1>
           </div>
-          <div className="flex flex-col sm:flex-row space-y-2 sm:space-y-0 sm:space-x-2 w-full sm:w-auto">
-            {!isPremium() && (
-              <Button 
-                onClick={() => setShowUpgrade(true)}
-                className="bg-gradient-to-r from-yellow-400 to-yellow-600 hover:from-yellow-500 hover:to-yellow-700 text-black font-bold w-full sm:w-auto"
-              >
-                <Crown className="w-4 h-4 mr-2" />
-                Upgrade to Premium
+          {!isEditing ? (
+            <Button onClick={() => setIsEditing(true)} className="w-full sm:w-auto">
+              <Edit className="w-4 h-4 mr-2" /> Edit Profile
+            </Button>
+          ) : (
+            <div className="flex flex-col sm:flex-row space-y-2 sm:space-y-0 sm:space-x-2 w-full sm:w-auto">
+              <Button onClick={handleSave} disabled={isSaving} className="w-full sm:w-auto">
+                <Save className="w-4 h-4 mr-2" /> {isSaving ? 'Saving...' : 'Save'}
               </Button>
-            )}
-            {!isEditing ? (
-              <Button onClick={() => setIsEditing(true)} className="w-full sm:w-auto">
-                <Edit className="w-4 h-4 mr-2" /> Edit Profile
+              <Button variant="outline" onClick={handleCancel} disabled={isSaving} className="w-full sm:w-auto">
+                <X className="w-4 h-4 mr-2" /> Cancel
               </Button>
-            ) : (
-              <>
-                <Button onClick={handleSave} disabled={isSaving} className="w-full sm:w-auto">
-                  <Save className="w-4 h-4 mr-2" /> {isSaving ? 'Saving...' : 'Save'}
-                </Button>
-                <Button variant="outline" onClick={handleCancel} disabled={isSaving} className="w-full sm:w-auto">
-                  <X className="w-4 h-4 mr-2" /> Cancel
-                </Button>
-              </>
-            )}
-          </div>
+            </div>
+          )}
         </div>
       </div>
 
