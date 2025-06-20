@@ -38,15 +38,14 @@ const DiscoverPage = ({ currentUser }: DiscoverPageProps) => {
   const { toast } = useToast();
   const { subscription, checkUsageLimit, isPremium } = useSubscription(currentUser?.id);
 
-  // Preload next profiles for faster experience
-  const preloadProfiles = useCallback(async (offset = 0, limit = 10) => {
+  const fetchProfiles = useCallback(async () => {
     try {
       const { data, error } = await supabase
         .from('profiles')
         .select(`
           id, first_name, last_name, bio, city, country, gender, date_of_birth,
           interests, occupation, education_level, relationship_intent,
-          user_images!inner(image_url, image_order)
+          user_images(image_url, image_order)
         `)
         .neq('id', currentUser.id)
         .eq('account_status', 'active')
@@ -60,7 +59,7 @@ const DiscoverPage = ({ currentUser }: DiscoverPageProps) => {
           SELECT blocker_id FROM blocks WHERE blocked_id = '${currentUser.id}'
         )`)
         .order('created_at', { ascending: false })
-        .range(offset, offset + limit - 1);
+        .limit(20);
 
       if (error) throw error;
 
@@ -72,28 +71,13 @@ const DiscoverPage = ({ currentUser }: DiscoverPageProps) => {
         images: profile.user_images?.sort((a, b) => a.image_order - b.image_order) || []
       })) || [];
 
-      return processedProfiles;
+      setProfiles(processedProfiles);
     } catch (error) {
       console.error('Error fetching profiles:', error);
-      return [];
+    } finally {
+      setLoading(false);
     }
   }, [currentUser.id]);
-
-  const fetchProfiles = useCallback(async () => {
-    setLoading(true);
-    const fetchedProfiles = await preloadProfiles(0, 20);
-    setProfiles(fetchedProfiles);
-    setLoading(false);
-  }, [preloadProfiles]);
-
-  // Preload more profiles when getting close to the end
-  useEffect(() => {
-    if (currentIndex >= profiles.length - 3 && profiles.length > 0) {
-      preloadProfiles(profiles.length, 10).then(newProfiles => {
-        setProfiles(prev => [...prev, ...newProfiles]);
-      });
-    }
-  }, [currentIndex, profiles.length, preloadProfiles]);
 
   useEffect(() => {
     fetchProfiles();

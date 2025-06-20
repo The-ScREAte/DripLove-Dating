@@ -52,8 +52,8 @@ const PremiumUpgrade = ({ currentUser, onClose, preselectedPlan }: PremiumUpgrad
   ];
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-pink-400 via-purple-500 to-indigo-600 flex items-center justify-center p-4">
-      <div className="max-w-4xl w-full">
+    <div className="min-h-screen bg-gradient-to-br from-pink-400 via-purple-500 to-indigo-600 flex items-start justify-center p-4 overflow-y-auto">
+      <div className="max-w-4xl w-full py-8">
         {onClose && (
           <Button
             onClick={onClose}
@@ -123,7 +123,7 @@ const PremiumUpgrade = ({ currentUser, onClose, preselectedPlan }: PremiumUpgrad
           </Card>
         </div>
 
-        <div className="text-center">
+        <div className="text-center pb-8">
           <Button
             onClick={handleUpgrade}
             disabled={loading}
