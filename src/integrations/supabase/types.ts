@@ -330,6 +330,33 @@ export type Database = {
         }
         Relationships: []
       }
+      subscription_plans: {
+        Row: {
+          created_at: string
+          currency: string
+          features: Json | null
+          id: string
+          name: string
+          price: number
+        }
+        Insert: {
+          created_at?: string
+          currency?: string
+          features?: Json | null
+          id?: string
+          name: string
+          price: number
+        }
+        Update: {
+          created_at?: string
+          currency?: string
+          features?: Json | null
+          id?: string
+          name?: string
+          price?: number
+        }
+        Relationships: []
+      }
       user_images: {
         Row: {
           created_at: string | null
@@ -355,6 +382,95 @@ export type Database = {
         Relationships: [
           {
             foreignKeyName: "user_images_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      user_subscriptions: {
+        Row: {
+          created_at: string
+          expires_at: string | null
+          flutterwave_transaction_id: string | null
+          id: string
+          plan_name: string
+          starts_at: string
+          status: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          expires_at?: string | null
+          flutterwave_transaction_id?: string | null
+          id?: string
+          plan_name: string
+          starts_at?: string
+          status?: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          expires_at?: string | null
+          flutterwave_transaction_id?: string | null
+          id?: string
+          plan_name?: string
+          starts_at?: string
+          status?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "user_subscriptions_plan_name_fkey"
+            columns: ["plan_name"]
+            isOneToOne: false
+            referencedRelation: "subscription_plans"
+            referencedColumns: ["name"]
+          },
+          {
+            foreignKeyName: "user_subscriptions_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      user_usage: {
+        Row: {
+          created_at: string
+          date: string
+          id: string
+          reverse_dislikes_used: number
+          swipes_used: number
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          date?: string
+          id?: string
+          reverse_dislikes_used?: number
+          swipes_used?: number
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          date?: string
+          id?: string
+          reverse_dislikes_used?: number
+          swipes_used?: number
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "user_usage_user_id_fkey"
             columns: ["user_id"]
             isOneToOne: false
             referencedRelation: "profiles"
@@ -393,6 +509,18 @@ export type Database = {
       }
       get_app_stats: {
         Args: Record<PropertyKey, never>
+        Returns: Json
+      }
+      get_user_subscription: {
+        Args: { user_id_param: string }
+        Returns: Json
+      }
+      update_user_usage: {
+        Args: {
+          user_id_param: string
+          usage_type: string
+          increment_by?: number
+        }
         Returns: Json
       }
     }

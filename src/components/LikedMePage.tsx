@@ -2,10 +2,12 @@
 import React, { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Users, Heart, X, Calendar, MapPin, Shield, ChevronDown, ChevronUp, Briefcase, GraduationCap } from 'lucide-react';
+import { Users, Heart, X, Calendar, MapPin, Shield, ChevronDown, ChevronUp, Briefcase, GraduationCap, Crown, Lock } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
+import { useSubscription } from '@/hooks/useSubscription';
 import BlockDialog from './BlockDialog';
+import PremiumUpgrade from './PremiumUpgrade';
 
 interface LikedMePageProps {
   currentUser: any;
@@ -19,7 +21,10 @@ const LikedMePage = ({ currentUser }: LikedMePageProps) => {
   const [blockDialogOpen, setBlockDialogOpen] = useState(false);
   const [imageIndex, setImageIndex] = useState(0);
   const [showMoreInfo, setShowMoreInfo] = useState(false);
+  const [showPremiumUpgrade, setShowPremiumUpgrade] = useState(false);
   const { toast } = useToast();
+
+  const { subscription, isPremium, getLikedMeVisibleCount } = useSubscription(currentUser?.id);
 
   useEffect(() => {
     fetchLikers();
@@ -207,6 +212,22 @@ const LikedMePage = ({ currentUser }: LikedMePageProps) => {
     }
   };
 
+  const handleProfileClick = (liker: any, index: number) => {
+    const visibleCount = getLikedMeVisibleCount();
+    
+    // If premium or within visible limit, allow click
+    if (isPremium() || visibleCount === -1 || index < visibleCount) {
+      setSelectedProfile(liker);
+    } else {
+      // Show premium upgrade for blurred profiles
+      setShowPremiumUpgrade(true);
+    }
+  };
+
+  if (showPremiumUpgrade) {
+    return <PremiumUpgrade currentUser={currentUser} onClose={() => setShowPremiumUpgrade(false)} preselectedPlan="premium" />;
+  }
+
   if (loading) {
     return (
       <div className="h-full w-full flex items-center justify-center">
@@ -381,14 +402,33 @@ const LikedMePage = ({ currentUser }: LikedMePageProps) => {
     );
   }
 
+  const visibleCount = getLikedMeVisibleCount();
+  const hasBlurredProfiles = !isPremium() && visibleCount !== -1 && likers.length > visibleCount;
+
   return (
     <div className="h-full flex flex-col">
       <div className="flex-shrink-0 bg-white border-b p-4">
-        <div className="flex items-center space-x-2 mb-2">
-          <Users className="w-6 h-6 text-pink-600" />
-          <h1 className="text-2xl font-bold text-gray-800">People who liked you</h1>
+        <div className="flex items-center justify-between mb-2">
+          <div className="flex items-center space-x-2">
+            <Users className="w-6 h-6 text-pink-600" />
+            <h1 className="text-2xl font-bold text-gray-800">People who liked you</h1>
+          </div>
+          {hasBlurredProfiles && (
+            <Button
+              onClick={() => setShowPremiumUpgrade(true)}
+              className="bg-gradient-to-r from-yellow-400 to-yellow-600 hover:from-yellow-500 hover:to-yellow-700 text-black font-bold text-sm px-3 py-1"
+            >
+              <Crown className="w-4 h-4 mr-1" />
+              Upgrade to see all
+            </Button>
+          )}
         </div>
         <p className="text-gray-600">({likers.length} people)</p>
+        {hasBlurredProfiles && (
+          <p className="text-sm text-yellow-600 mt-2">
+            Free users can see {visibleCount} profile{visibleCount !== 1 ? 's' : ''}. Upgrade to Premium to see all likes!
+          </p>
+        )}
       </div>
       
       <div className="flex-1 overflow-y-auto p-4 pb-24">
@@ -402,34 +442,43 @@ const LikedMePage = ({ currentUser }: LikedMePageProps) => {
           </div>
         ) : (
           <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
-            {likers.map((liker) => {
+            {likers.map((liker, index) => {
               const profileImages = userImages[liker.id] || [];
+              const isBlurred = !isPremium() && visibleCount !== -1 && index >= visibleCount;
+              
               return (
                 <Card
                   key={liker.id}
-                  className="cursor-pointer hover:shadow-lg transition-shadow flex flex-col"
-                  onClick={() => setSelectedProfile(liker)}
+                  className={`cursor-pointer hover:shadow-lg transition-shadow flex flex-col relative ${isBlurred ? 'opacity-75' : ''}`}
+                  onClick={() => handleProfileClick(liker, index)}
                 >
                   <div className="relative h-48 flex-shrink-0">
                     {profileImages.length > 0 ? (
                       <img
                         src={profileImages[0]}
                         alt={`${liker.first_name}'s photo`}
-                        className="w-full h-full object-cover rounded-t-lg"
+                        className={`w-full h-full object-cover rounded-t-lg ${isBlurred ? 'blur-md' : ''}`}
                       />
                     ) : (
-                      <div className="w-full h-full bg-gradient-to-br from-pink-200 to-purple-200 flex items-center justify-center rounded-t-lg">
+                      <div className={`w-full h-full bg-gradient-to-br from-pink-200 to-purple-200 flex items-center justify-center rounded-t-lg ${isBlurred ? 'blur-md' : ''}`}>
                         <span className="text-2xl font-bold text-gray-700">
                           {liker.first_name?.[0]}{liker.last_name?.[0]}
                         </span>
                       </div>
                     )}
+                    {isBlurred && (
+                      <div className="absolute inset-0 flex items-center justify-center bg-black/20 rounded-t-lg">
+                        <div className="bg-white/90 backdrop-blur-sm rounded-full p-3">
+                          <Lock className="w-6 h-6 text-gray-700" />
+                        </div>
+                      </div>
+                    )}
                   </div>
                   <CardContent className="p-3 flex-1">
-                    <h3 className="font-semibold text-gray-800 truncate">
+                    <h3 className={`font-semibold text-gray-800 truncate ${isBlurred ? 'blur-sm' : ''}`}>
                       {liker.first_name}, {calculateAge(liker.date_of_birth)}
                     </h3>
-                    <p className="text-sm text-gray-600 truncate">
+                    <p className={`text-sm text-gray-600 truncate ${isBlurred ? 'blur-sm' : ''}`}>
                       {liker.city}
                     </p>
                   </CardContent>

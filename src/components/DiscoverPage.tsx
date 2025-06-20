@@ -1,10 +1,11 @@
-
 import React, { useState, useEffect } from 'react';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Heart, X, Undo2, MapPin, Briefcase, GraduationCap, ChevronDown, ChevronUp, Calendar } from 'lucide-react';
+import { Heart, X, Undo2, MapPin, Briefcase, GraduationCap, ChevronDown, ChevronUp, Calendar, Crown } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
+import { useSubscription } from '@/hooks/useSubscription';
+import PremiumUpgrade from './PremiumUpgrade';
 
 interface DiscoverPageProps {
   currentUser: any;
@@ -36,7 +37,11 @@ const DiscoverPage = ({ currentUser }: DiscoverPageProps) => {
   const [isLoading, setIsLoading] = useState(true);
   const [passedUsers, setPassedUsers] = useState<PassedUser[]>([]);
   const [showMoreInfo, setShowMoreInfo] = useState(false);
+  const [showPremiumUpgrade, setShowPremiumUpgrade] = useState(false);
+  const [isOutOfSwipes, setIsOutOfSwipes] = useState(false);
   const { toast } = useToast();
+  
+  const { subscription, checkUsageLimit, isPremium } = useSubscription(currentUser?.id);
 
   useEffect(() => {
     fetchPotentialMatches();
@@ -121,6 +126,18 @@ const DiscoverPage = ({ currentUser }: DiscoverPageProps) => {
     const currentMatch = potentialMatches[currentIndex];
     if (!currentMatch) return;
 
+    // Check swipe limit before proceeding
+    const usageResult = await checkUsageLimit('swipe');
+    if (!usageResult.success) {
+      setIsOutOfSwipes(true);
+      toast({
+        title: 'Daily Limit Reached',
+        description: usageResult.message,
+        variant: 'destructive'
+      });
+      return;
+    }
+
     try {
       const { error } = await supabase
         .from('likes')
@@ -157,12 +174,37 @@ const DiscoverPage = ({ currentUser }: DiscoverPageProps) => {
     const currentMatch = potentialMatches[currentIndex];
     if (!currentMatch) return;
 
+    // Check swipe limit before proceeding
+    const usageResult = await checkUsageLimit('swipe');
+    if (!usageResult.success) {
+      setIsOutOfSwipes(true);
+      toast({
+        title: 'Daily Limit Reached',
+        description: usageResult.message,
+        variant: 'destructive'
+      });
+      return;
+    }
+
     setPassedUsers(prev => [{ user_id: currentMatch.id, passed_at: new Date() }, ...prev]);
     moveToNext();
   };
 
-  const handleReverse = () => {
+  const handleReverse = async () => {
     if (passedUsers.length === 0) return;
+
+    // Check reverse dislike limit for free users
+    if (!isPremium()) {
+      const usageResult = await checkUsageLimit('reverse_dislike');
+      if (!usageResult.success) {
+        toast({
+          title: 'Daily Limit Reached',
+          description: usageResult.message + ' Upgrade to Premium for unlimited reverse dislikes.',
+          variant: 'destructive'
+        });
+        return;
+      }
+    }
 
     const lastPassedUser = passedUsers[0];
     const passedUserData = potentialMatches.find(match => match.id === lastPassedUser.user_id);
@@ -232,10 +274,49 @@ const DiscoverPage = ({ currentUser }: DiscoverPageProps) => {
     }
   };
 
+  if (showPremiumUpgrade) {
+    return <PremiumUpgrade currentUser={currentUser} onClose={() => setShowPremiumUpgrade(false)} />;
+  }
+
   if (isLoading) {
     return (
       <div className="h-full w-full flex items-center justify-center">
         <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-pink-600"></div>
+      </div>
+    );
+  }
+
+  if (isOutOfSwipes) {
+    return (
+      <div className="h-full w-full flex items-center justify-center">
+        <Card className="max-w-md w-full mx-4">
+          <CardContent className="p-8 text-center">
+            <Heart className="w-16 h-16 mx-auto mb-4 text-gray-300" />
+            <h2 className="text-xl font-semibold mb-2">You're out of swipes for today!</h2>
+            <p className="text-gray-600 mb-4">
+              Free users get 12 swipes per day. Come back tomorrow or upgrade to Premium for unlimited swipes!
+            </p>
+            <div className="space-y-3">
+              <Button 
+                onClick={() => setShowPremiumUpgrade(true)} 
+                className="w-full bg-gradient-to-r from-yellow-400 to-yellow-600 hover:from-yellow-500 hover:to-yellow-700 text-black font-bold"
+              >
+                <Crown className="w-4 h-4 mr-2" />
+                Upgrade to Premium
+              </Button>
+              <Button 
+                onClick={() => {
+                  setIsOutOfSwipes(false);
+                  fetchPotentialMatches();
+                }} 
+                variant="outline" 
+                className="w-full"
+              >
+                Check Again Tomorrow
+              </Button>
+            </div>
+          </CardContent>
+        </Card>
       </div>
     );
   }
