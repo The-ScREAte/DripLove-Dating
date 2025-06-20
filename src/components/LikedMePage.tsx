@@ -27,7 +27,7 @@ const LikedMePage = ({ currentUser }: LikedMePageProps) => {
   const [profiles, setProfiles] = useState<Profile[]>([]);
   const [loading, setLoading] = useState(true);
   const [showUpgrade, setShowUpgrade] = useState(false);
-  const [selectedProfileId, setSelectedProfileId] = useState<string | null>(null);
+  const [selectedProfile, setSelectedProfile] = useState<Profile | null>(null);
   const { subscription, isPremium, getLikedMeVisibleCount } = useSubscription(currentUser?.id);
 
   const fetchLikedMeProfiles = useCallback(async () => {
@@ -125,7 +125,7 @@ const LikedMePage = ({ currentUser }: LikedMePageProps) => {
                 className={`relative bg-white rounded-lg shadow-md overflow-hidden cursor-pointer transform transition-all duration-200 hover:scale-105 ${
                   shouldBlur ? 'pointer-events-none' : ''
                 }`}
-                onClick={() => !shouldBlur && setSelectedProfileId(profile.id)}
+                onClick={() => !shouldBlur && setSelectedProfile(profile)}
               >
                 <div className="relative aspect-[3/4]">
                   {profile.images && profile.images.length > 0 ? (
@@ -185,11 +185,11 @@ const LikedMePage = ({ currentUser }: LikedMePageProps) => {
         </div>
       </div>
 
-      {selectedProfileId && (
+      {selectedProfile && (
         <UserProfileModal
-          isOpen={true}
-          onClose={() => setSelectedProfileId(null)}
-          userId={selectedProfileId}
+          profile={selectedProfile}
+          currentUser={currentUser}
+          onClose={() => setSelectedProfile(null)}
         />
       )}
     </div>

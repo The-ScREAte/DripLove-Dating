@@ -36,8 +36,8 @@ export const useSubscription = (userId: string | undefined) => {
 
       if (error) throw error;
       
-      // Safely parse the JSON response
-      const subscriptionData = data as unknown as SubscriptionInfo;
+      // Parse the JSON response properly
+      const subscriptionData = data as SubscriptionInfo;
       setSubscription(subscriptionData);
     } catch (error) {
       console.error('Error fetching subscription:', error);
@@ -60,8 +60,8 @@ export const useSubscription = (userId: string | undefined) => {
 
       if (error) throw error;
       
-      // Safely parse the JSON response
-      return data as unknown as UsageInfo;
+      // Parse the JSON response properly
+      return data as UsageInfo;
     } catch (error) {
       console.error('Error checking usage limit:', error);
       return { success: false, message: 'Error checking limits', current_usage: 0, limit: 0 };
