@@ -229,60 +229,37 @@ const AdminPage = () => {
   const createAdmin = async (e: React.FormEvent) => {
     e.preventDefault();
     try {
-      // Check if email already exists
-      const { data: existingUser } = await supabase
-        .from('profiles')
-        .select('email')
-        .eq('email', newAdmin.email)
-        .single();
-
-      if (existingUser) {
-        toast({
-          title: "Error",
-          description: "An account with this email already exists",
-          variant: "destructive",
-        });
-        return;
-      }
-
       const { data, error } = await supabase.auth.signUp({
         email: newAdmin.email,
         password: newAdmin.password,
         options: {
           emailRedirectTo: `${window.location.origin}/`,
-          data: {
-            first_name: newAdmin.firstName,
-            last_name: newAdmin.lastName,
-            is_admin: true,
-          },
         },
       });
-      
+  
       if (error) throw error;
-      
-      // Manually create profile for admin (since we don't want the trigger to create a full profile)
-      if (data.user) {
-        await supabase.from("profiles").insert({
-          id: data.user.id,
-          email: data.user.email,
+  
+      // Let them confirm via email first (optional)
+      if (!data.user) throw new Error('No user returned from signup.');
+  
+      // Elevate to admin after successful sign up
+      const { error: updateError } = await supabase
+        .from('profiles')
+        .update({
           first_name: newAdmin.firstName,
           last_name: newAdmin.lastName,
           is_admin: true,
-          date_of_birth: '1990-01-01',
-          country: 'Admin',
-          city: 'Admin',
-          bio: 'Admin User',
-          preference: 'both',
-          interests: [],
-          account_status: 'active'
-        });
-      }
-
+          account_status: 'active',
+        })
+        .eq('id', data.user.id);
+  
+      if (updateError) throw updateError;
+  
       toast({
         title: "Success",
-        description: "Admin user created successfully",
+        description: "Admin user created. They will need to confirm their email.",
       });
-
+  
       setNewAdmin({
         firstName: '',
         lastName: '',
@@ -300,6 +277,7 @@ const AdminPage = () => {
       });
     }
   };
+  
 
   const createManualMatch = async (e: React.FormEvent) => {
     e.preventDefault();

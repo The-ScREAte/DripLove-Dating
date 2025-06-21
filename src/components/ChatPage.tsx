@@ -49,34 +49,37 @@ const ChatPage = ({ currentUser, onUnreadChange }: ChatPageProps) => {
 
   const fetchMatches = async () => {
     if (!currentUser?.id) return;
-
+  
     try {
       const { data, error } = await supabase
         .from('matches')
         .select(`
           *,
-          user1:profiles!matches_user1_id_fkey(id, first_name, last_name),
-          user2:profiles!matches_user2_id_fkey(id, first_name, last_name)
+          user1:profiles!matches_user1_id_fkey(id, first_name, last_name, is_admin),
+          user2:profiles!matches_user2_id_fkey(id, first_name, last_name, is_admin)
         `)
         .or(`user1_id.eq.${currentUser.id},user2_id.eq.${currentUser.id}`)
         .order('created_at', { ascending: false });
-
+  
       if (error) throw error;
-
+  
       const matchesWithPartner = data?.map(match => {
         const isUser1 = match.user1_id === currentUser.id;
+        const partner = isUser1 ? match.user2 : match.user1;
+  
         return {
           ...match,
-          partner: isUser1 ? match.user2 : match.user1,
+          partner,
           unreadCount: isUser1 ? match.user1_unread_count : match.user2_unread_count
         };
-      }) || [];
-
+      }).filter(match => !match.partner?.is_admin) || [];
+  
       setMatches(matchesWithPartner);
     } catch (error) {
       console.error('Error fetching matches:', error);
     }
   };
+  
 
   const fetchMessages = async () => {
     if (!selectedMatch?.id) return;
@@ -119,7 +122,16 @@ const ChatPage = ({ currentUser, onUnreadChange }: ChatPageProps) => {
 
   const sendMessage = async () => {
     if (!newMessage.trim() || !selectedMatch?.id) return;
-
+  
+    if (selectedMatch.partner?.is_admin) {
+      toast({
+        title: "Action not allowed",
+        description: "You cannot send messages to admin users.",
+        variant: "destructive",
+      });
+      return;
+    }
+  
     try {
       const { error } = await supabase
         .from('chats')
@@ -128,9 +140,9 @@ const ChatPage = ({ currentUser, onUnreadChange }: ChatPageProps) => {
           sender_id: currentUser.id,
           message: newMessage.trim()
         });
-
+  
       if (error) throw error;
-
+  
       setNewMessage('');
       fetchMessages();
       fetchMatches();
@@ -144,6 +156,7 @@ const ChatPage = ({ currentUser, onUnreadChange }: ChatPageProps) => {
       });
     }
   };
+  
 
   const handleEmojiSelect = (emoji: string) => {
     setNewMessage(prev => prev + emoji);

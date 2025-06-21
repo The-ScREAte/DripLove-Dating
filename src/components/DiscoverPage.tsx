@@ -90,6 +90,7 @@ const DiscoverPage = ({ currentUser }: DiscoverPageProps) => {
         .select('*')
         .not('id', 'in', `(${excludedIds.join(',')})`)
         .eq('account_status', 'active')
+        .eq('is_admin', false)
         .limit(10);
 
       if (error) throw error;
@@ -101,13 +102,18 @@ const DiscoverPage = ({ currentUser }: DiscoverPageProps) => {
             .select('image_url')
             .eq('user_id', profile.id)
             .order('image_order', { ascending: true });
-
+      
           return {
             ...profile,
             images: images?.map(img => img.image_url) || []
           };
         })
       );
+      
+      // Shuffle client-side
+      const shuffled = matchesWithImages.sort(() => 0.5 - Math.random());
+      setPotentialMatches(shuffled);
+      
 
       setPotentialMatches(matchesWithImages);
     } catch (error) {

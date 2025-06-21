@@ -1,23 +1,26 @@
-
 import React, { useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Heart, Mail, Lock, Eye, EyeOff } from 'lucide-react';
+import { supabase } from '@/integrations/supabase/client';
 
 interface AuthFormProps {
   isLogin: boolean;
   onToggle: () => void;
-  onSubmit: (data: any) => void;
 }
 
-const AuthForm = ({ isLogin, onToggle, onSubmit }: AuthFormProps) => {
+const AuthForm = ({ isLogin, onToggle }: AuthFormProps) => {
+  const navigate = useNavigate();
+
   const [formData, setFormData] = useState({
     email: '',
     password: ''
   });
   const [showPassword, setShowPassword] = useState(false);
+  const [loading, setLoading] = useState(false);
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     setFormData({
@@ -26,9 +29,42 @@ const AuthForm = ({ isLogin, onToggle, onSubmit }: AuthFormProps) => {
     });
   };
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    onSubmit(formData);
+    setLoading(true);
+
+    const { email, password } = formData;
+
+    const { data: authData, error: authError } = await supabase.auth.signInWithPassword({
+      email,
+      password
+    });
+
+    if (authError || !authData.user) {
+      alert(authError?.message || 'Login failed');
+      setLoading(false);
+      return;
+    }
+
+    // Fetch user profile
+    const { data: profile, error: profileError } = await supabase
+      .from('profiles')
+      .select('id, is_admin')
+      .eq('id', authData.user.id)
+      .single();
+
+    if (profileError || !profile) {
+      await supabase.auth.signOut();
+      alert('No profile found. Login denied.');
+      setLoading(false);
+      return;
+    }
+
+    // Save profile ID to session
+    sessionStorage.setItem('profile_id', profile.id);
+
+
+    setLoading(false);
   };
 
   return (
@@ -46,7 +82,7 @@ const AuthForm = ({ isLogin, onToggle, onSubmit }: AuthFormProps) => {
           {isLogin ? 'Sign in to your account' : 'Join LoveConnect today'}
         </CardDescription>
       </CardHeader>
-      
+
       <CardContent>
         <form onSubmit={handleSubmit} className="space-y-4">
           <div className="space-y-2">
@@ -65,7 +101,7 @@ const AuthForm = ({ isLogin, onToggle, onSubmit }: AuthFormProps) => {
               />
             </div>
           </div>
-          
+
           <div className="space-y-2">
             <Label htmlFor="password" className="text-sm font-medium">Password</Label>
             <div className="relative">
@@ -89,15 +125,16 @@ const AuthForm = ({ isLogin, onToggle, onSubmit }: AuthFormProps) => {
               </button>
             </div>
           </div>
-          
-          <Button 
-            type="submit" 
+
+          <Button
+            type="submit"
+            disabled={loading}
             className="w-full bg-gradient-to-r from-pink-500 to-purple-600 hover:from-pink-600 hover:to-purple-700 text-white font-semibold py-3 rounded-lg transition-all duration-200 transform hover:scale-[1.02]"
           >
-            {isLogin ? 'Sign In' : 'Create Account'}
+            {loading ? 'Processing...' : isLogin ? 'Sign In' : 'Create Account'}
           </Button>
         </form>
-        
+
         <div className="mt-6 text-center">
           <p className="text-sm text-gray-600">
             {isLogin ? "Don't have an account?" : "Already have an account?"}

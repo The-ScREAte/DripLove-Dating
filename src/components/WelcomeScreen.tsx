@@ -53,7 +53,6 @@ const WelcomeScreen = ({ onGetStarted, onAdminAccess }: WelcomeScreenProps) => {
             onClick={onAdminAccess}
             className="text-sm text-white/70 hover:text-white underline transition-colors"
           >
-            Admin Access
           </button>
         </div>
       </div>

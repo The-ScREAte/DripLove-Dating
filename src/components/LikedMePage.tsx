@@ -78,7 +78,7 @@ const LikedMePage = ({ currentUser }: LikedMePageProps) => {
       ) || [];
 
       const filteredLikes = likes?.filter(like =>
-        !matchedIds.includes(like.liker.id) && !blockedIds.includes(like.liker.id)
+        !matchedIds.includes(like.liker.id) && !blockedIds.includes(like.liker.id) && like.liker.is_admin !== true
       ) || [];
 
       const likersData = filteredLikes.map(like => like.liker);
