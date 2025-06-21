@@ -221,8 +221,8 @@ const AdminPage = () => {
         return;
       }
 
-      // Type cast the response properly
-      const typedAppStats = appStats as AppStatsResponse;
+      // Type cast the response properly - cast to unknown first, then to our interface
+      const typedAppStats = appStats as unknown as AppStatsResponse;
 
       // Get additional stats for new requirements
       const thirtyDaysAgo = new Date();
