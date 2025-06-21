@@ -65,7 +65,7 @@ const AdminPage = () => {
   const [currentUser, setCurrentUser] = useState<any>(null);
   const [showCreateAdmin, setShowCreateAdmin] = useState(false);
   const [showManualMatch, setShowManualMatch] = useState(false);
-  const [selectedProfile, setSelectedProfile] = useState<UserProfile | null>(null);
+  const [selectedUserId, setSelectedUserId] = useState<string | null>(null);
   const [showProfileModal, setShowProfileModal] = useState(false);
   const [userPage, setUserPage] = useState(1);
   const [adminPage, setAdminPage] = useState(1);
@@ -199,48 +199,55 @@ const AdminPage = () => {
 
   const fetchStats = async () => {
     try {
-      // Get updated stats with new requirements
-      const { data, error } = await supabase.rpc('get_updated_admin_stats');
+      // Use the existing get_app_stats function and calculate additional stats
+      const { data: appStats, error: appStatsError } = await supabase.rpc('get_app_stats');
       
-      if (error) {
-        // Fallback to custom queries if RPC doesn't exist
-        const [usersData, matchesData, likesData, blocksData, activeConversationsData, activeUsersData, newUsersData, monthMatchesData] = await Promise.all([
-          supabase.from('profiles').select('*', { count: 'exact' }).eq('account_status', 'active'),
-          supabase.from('matches').select('*', { count: 'exact' }),
-          supabase.from('likes').select('*', { count: 'exact' }),
-          supabase.from('blocks').select('*', { count: 'exact' }),
-          supabase.from('matches').select('*', { count: 'exact' }).gt('user1_unread_count', 0).or('user2_unread_count.gt.0'),
-          supabase.rpc('get_active_users_today'),
-          supabase.from('profiles').select('*', { count: 'exact' }).gte('created_at', new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString()),
-          supabase.from('matches').select('*', { count: 'exact' }).gte('created_at', new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString())
-        ]);
-
-        const statsData: AdminStats = {
-          total_users: usersData.count || 0,
-          total_matches: matchesData.count || 0,
-          total_likes: likesData.count || 0,
-          total_blocks: blocksData.count || 0,
-          active_conversations: activeConversationsData.count || 0,
-          active_users_today: typeof activeUsersData.data === 'number' ? activeUsersData.data : 0,
-          new_users_this_month: newUsersData.count || 0,
-          matches_this_month: monthMatchesData.count || 0,
-        };
-        setStats(statsData);
-      } else {
-        if (data && typeof data === 'object' && !Array.isArray(data)) {
-          const statsData: AdminStats = {
-            total_users: Number(data.total_users) || 0,
-            total_matches: Number(data.total_matches) || 0,
-            total_likes: Number(data.total_likes) || 0,
-            total_blocks: Number(data.total_blocks) || 0,
-            active_conversations: Number(data.active_conversations) || 0,
-            active_users_today: Number(data.active_users_today) || 0,
-            new_users_this_month: Number(data.new_users_this_month) || 0,
-            matches_this_month: Number(data.matches_this_month) || 0,
-          };
-          setStats(statsData);
-        }
+      if (appStatsError) {
+        console.error('Error fetching app stats:', appStatsError);
+        return;
       }
+
+      // Get additional stats for new requirements
+      const thirtyDaysAgo = new Date();
+      thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+      
+      const [newUsersData, monthMatchesData, activeConversationsData, activeTodayData] = await Promise.all([
+        supabase
+          .from('profiles')
+          .select('*', { count: 'exact' })
+          .gte('created_at', thirtyDaysAgo.toISOString())
+          .eq('account_status', 'active'),
+        supabase
+          .from('matches')
+          .select('*', { count: 'exact' })
+          .gte('created_at', thirtyDaysAgo.toISOString()),
+        supabase
+          .from('matches')
+          .select('*', { count: 'exact' })
+          .or('user1_unread_count.gt.0,user2_unread_count.gt.0'),
+        supabase
+          .from('chats')
+          .select('sender_id', { count: 'exact' })
+          .gte('created_at', new Date().toISOString().split('T')[0])
+      ]);
+
+      // Count unique active users today
+      const uniqueActiveTodayCount = activeTodayData.data 
+        ? new Set(activeTodayData.data.map(chat => chat.sender_id)).size 
+        : 0;
+
+      const statsData: AdminStats = {
+        total_users: appStats?.total_users || 0,
+        total_matches: appStats?.total_matches || 0,
+        total_likes: appStats?.total_likes || 0,
+        total_blocks: appStats?.total_blocks || 0,
+        active_conversations: activeConversationsData.count || 0,
+        active_users_today: uniqueActiveTodayCount,
+        new_users_this_month: newUsersData.count || 0,
+        matches_this_month: monthMatchesData.count || 0,
+      };
+      
+      setStats(statsData);
     } catch (error) {
       console.error('Error fetching admin stats:', error);
       toast({
@@ -288,26 +295,9 @@ const AdminPage = () => {
     }
   };
 
-  const handleViewProfile = async (userId: string) => {
-    try {
-      const { data: profile, error } = await supabase
-        .from('profiles')
-        .select('*')
-        .eq('id', userId)
-        .single();
-
-      if (error) throw error;
-      
-      setSelectedProfile(profile);
-      setShowProfileModal(true);
-    } catch (error) {
-      console.error('Error fetching profile:', error);
-      toast({
-        title: "Error",
-        description: "Failed to fetch user profile",
-        variant: "destructive",
-      });
-    }
+  const handleViewProfile = (userId: string) => {
+    setSelectedUserId(userId);
+    setShowProfileModal(true);
   };
 
   const createAdmin = async (e: React.FormEvent) => {
@@ -858,14 +848,14 @@ const AdminPage = () => {
         </div>
 
         {/* Profile Modal */}
-        {selectedProfile && (
+        {selectedUserId && (
           <UserProfileModal
-            user={selectedProfile}
-            currentUser={currentUser}
+            isOpen={showProfileModal}
             onClose={() => {
               setShowProfileModal(false);
-              setSelectedProfile(null);
+              setSelectedUserId(null);
             }}
+            userId={selectedUserId}
           />
         )}
       </div>
