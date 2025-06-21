@@ -1,3 +1,4 @@
+
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
@@ -6,6 +7,7 @@ import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Heart, Mail, Lock, Eye, EyeOff } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
+import { useToast } from '@/hooks/use-toast';
 
 interface AuthFormProps {
   isLogin: boolean;
@@ -14,6 +16,7 @@ interface AuthFormProps {
 
 const AuthForm = ({ isLogin, onToggle }: AuthFormProps) => {
   const navigate = useNavigate();
+  const { toast } = useToast();
 
   const [formData, setFormData] = useState({
     email: '',
@@ -35,36 +38,59 @@ const AuthForm = ({ isLogin, onToggle }: AuthFormProps) => {
 
     const { email, password } = formData;
 
-    const { data: authData, error: authError } = await supabase.auth.signInWithPassword({
-      email,
-      password
-    });
+    try {
+      const { data: authData, error: authError } = await supabase.auth.signInWithPassword({
+        email,
+        password
+      });
 
-    if (authError || !authData.user) {
-      alert(authError?.message || 'Login failed');
+      if (authError || !authData.user) {
+        toast({
+          title: "Login Failed",
+          description: authError?.message || 'Invalid credentials',
+          variant: "destructive",
+        });
+        setLoading(false);
+        return;
+      }
+
+      // Check if user profile exists
+      const { data: profile, error: profileError } = await supabase
+        .from('profiles')
+        .select('id, is_admin')
+        .eq('id', authData.user.id)
+        .single();
+
+      if (profileError || !profile) {
+        // Sign out the user since they don't have a profile
+        await supabase.auth.signOut();
+        toast({
+          title: "Account Not Found",
+          description: "This account doesn't exist in our system. Please register first.",
+          variant: "destructive",
+        });
+        setLoading(false);
+        return;
+      }
+
+      // Save profile ID to session
+      sessionStorage.setItem('profile_id', profile.id);
+
+      toast({
+        title: "Welcome back!",
+        description: "You've been successfully logged in.",
+      });
+
       setLoading(false);
-      return;
-    }
-
-    // Fetch user profile
-    const { data: profile, error: profileError } = await supabase
-      .from('profiles')
-      .select('id, is_admin')
-      .eq('id', authData.user.id)
-      .single();
-
-    if (profileError || !profile) {
-      await supabase.auth.signOut();
-      alert('No profile found. Login denied.');
+    } catch (error: any) {
+      console.error('Login error:', error);
+      toast({
+        title: "Login Error",
+        description: "An unexpected error occurred. Please try again.",
+        variant: "destructive",
+      });
       setLoading(false);
-      return;
     }
-
-    // Save profile ID to session
-    sessionStorage.setItem('profile_id', profile.id);
-
-
-    setLoading(false);
   };
 
   return (

@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import WelcomeScreen from '@/components/WelcomeScreen';
 import AuthForm from '@/components/AuthForm';
@@ -46,28 +47,60 @@ const Index = () => {
     try {
       const { data: profile, error } = await supabase
         .from('profiles')
-        .select('is_admin')
+        .select('is_admin, account_status')
         .eq('id', userId)
         .single();
       
-      if (error) {
-        console.error('Error fetching user profile:', error);
-        // If profile doesn't exist, user might be an admin without a full profile
-        // Check auth metadata for admin flag
-        const { data: { user } } = await supabase.auth.getUser();
-        if (user?.user_metadata?.is_admin) {
-          setCurrentView('admin');
-        } else {
-          setCurrentView('app');
-        }
-      } else if (profile?.is_admin) {
+      if (error || !profile) {
+        console.error('Profile not found for user:', userId);
+        // Sign out user if no profile exists
+        await supabase.auth.signOut();
+        toast({
+          title: "Profile Required",
+          description: "No profile found. Please register to create your account.",
+          variant: "destructive",
+        });
+        setCurrentView('welcome');
+        setLoading(false);
+        return;
+      }
+
+      // Check account status
+      if (profile.account_status === 'blocked') {
+        await supabase.auth.signOut();
+        toast({
+          title: "Account Blocked",
+          description: "Your account has been blocked. Please contact support.",
+          variant: "destructive",
+        });
+        setCurrentView('welcome');
+        setLoading(false);
+        return;
+      }
+
+      if (profile.account_status === 'on_hold') {
+        await supabase.auth.signOut();
+        toast({
+          title: "Account On Hold",
+          description: "Your account is currently on hold. Please contact support.",
+          variant: "destructive",
+        });
+        setCurrentView('welcome');
+        setLoading(false);
+        return;
+      }
+
+      // Redirect based on user type
+      if (profile?.is_admin) {
         setCurrentView('admin');
       } else {
         setCurrentView('app');
       }
     } catch (error) {
       console.error('Error checking user type:', error);
-      setCurrentView('app');
+      // On error, sign out and redirect to welcome
+      await supabase.auth.signOut();
+      setCurrentView('welcome');
     } finally {
       setLoading(false);
     }
@@ -91,33 +124,6 @@ const Index = () => {
 
   const handleBackToWelcome = () => {
     setCurrentView('welcome');
-  };
-
-  const handleLogin = async (formData: any) => {
-    try {
-      const { data, error } = await supabase.auth.signInWithPassword({
-        email: formData.email,
-        password: formData.password,
-      });
-
-      if (error) throw error;
-
-      console.log("Logged in user ID:", data.user?.id);
-      
-      toast({
-        title: "Welcome back to AfroVibe!",
-        description: "You've been successfully logged in.",
-      });
-      
-      // The auth state change listener will handle the redirect
-      
-    } catch (error: any) {
-      toast({
-        title: "Error",
-        description: error.message,
-        variant: "destructive",
-      });
-    }
   };
 
   const handleRegister = async (formData: any) => {
