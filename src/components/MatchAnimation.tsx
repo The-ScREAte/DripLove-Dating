@@ -8,14 +8,16 @@ interface MatchAnimationProps {
   currentUserName: string;
   matchedUserName: string;
   matchedUserImage?: string;
+  matchedUserId?: string;
   onClose: () => void;
-  onStartChat: () => void;
+  onStartChat: (userId: string) => void;
 }
 
 const MatchAnimation = ({ 
   currentUserName, 
   matchedUserName, 
   matchedUserImage,
+  matchedUserId,
   onClose, 
   onStartChat 
 }: MatchAnimationProps) => {
@@ -26,6 +28,12 @@ const MatchAnimation = ({
     const timer = setTimeout(() => setShowAnimation(true), 100);
     return () => clearTimeout(timer);
   }, []);
+
+  const handleStartChat = () => {
+    if (matchedUserId) {
+      onStartChat(matchedUserId);
+    }
+  };
 
   return (
     <div className="fixed inset-0 bg-black/80 flex items-center justify-center z-50 p-4">
@@ -86,7 +94,7 @@ const MatchAnimation = ({
           {/* Action Buttons */}
           <div className={`space-y-3 transform transition-all duration-700 delay-1100 ${showAnimation ? 'translate-y-0 opacity-100' : 'translate-y-4 opacity-0'}`}>
             <Button 
-              onClick={onStartChat}
+              onClick={handleStartChat}
               className="w-full bg-gradient-to-r from-pink-500 to-purple-600 hover:from-pink-600 hover:to-purple-700 text-white font-semibold py-3"
             >
               <MessageCircle className="w-5 h-5 mr-2" />

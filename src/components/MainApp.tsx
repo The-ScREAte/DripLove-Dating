@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Heart, MessageCircle, Users, User } from 'lucide-react';
@@ -97,10 +96,14 @@ const MainApp = ({ user, onLogout }: MainAppProps) => {
     }
   };
 
+  const handleNavigateToChat = (userId: string) => {
+    setActiveTab('chat');
+  };
+
   const renderContent = () => {
     switch (activeTab) {
       case 'discover':
-        return <DiscoverPage currentUser={user} />;
+        return <DiscoverPage currentUser={user} onNavigateToChat={handleNavigateToChat} />;
       case 'chat':
         return <ChatPage currentUser={user} onUnreadChange={fetchUnreadCount} />;
       case 'liked':
@@ -108,7 +111,7 @@ const MainApp = ({ user, onLogout }: MainAppProps) => {
       case 'profile':
         return <ProfilePage currentUser={user} profile={profile} onProfileUpdate={fetchUserProfile} onLogout={onLogout} />;
       default:
-        return <DiscoverPage currentUser={user} />;
+        return <DiscoverPage currentUser={user} onNavigateToChat={handleNavigateToChat} />;
     }
   };
 

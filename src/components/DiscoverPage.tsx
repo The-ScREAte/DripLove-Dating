@@ -10,6 +10,7 @@ import MatchAnimation from './MatchAnimation';
 
 interface DiscoverPageProps {
   currentUser: any;
+  onNavigateToChat?: (userId: string) => void;
 }
 
 interface PotentialMatch {
@@ -31,7 +32,7 @@ interface PassedUser {
   passed_at: Date;
 }
 
-const DiscoverPage = ({ currentUser }: DiscoverPageProps) => {
+const DiscoverPage = ({ currentUser, onNavigateToChat }: DiscoverPageProps) => {
   const [potentialMatches, setPotentialMatches] = useState<PotentialMatch[]>([]);
   const [currentIndex, setCurrentIndex] = useState(0);
   const [imageIndex, setImageIndex] = useState(0);
@@ -281,13 +282,11 @@ const DiscoverPage = ({ currentUser }: DiscoverPageProps) => {
     }
   };
 
-  const handleStartChat = () => {
+  const handleStartChat = (userId: string) => {
     setShowMatchAnimation(false);
-    // TODO: Navigate to chat with matched user
-    toast({
-      title: 'Chat Feature',
-      description: 'Chat functionality will be implemented soon!',
-    });
+    if (onNavigateToChat) {
+      onNavigateToChat(userId);
+    }
   };
 
   const handleCloseMatch = () => {
@@ -301,6 +300,7 @@ const DiscoverPage = ({ currentUser }: DiscoverPageProps) => {
         currentUserName={currentUser?.first_name || 'You'}
         matchedUserName={`${matchedUser.first_name} ${matchedUser.last_name}`}
         matchedUserImage={matchedUser.images?.[0]}
+        matchedUserId={matchedUser.id}
         onClose={handleCloseMatch}
         onStartChat={handleStartChat}
       />
@@ -378,7 +378,7 @@ const DiscoverPage = ({ currentUser }: DiscoverPageProps) => {
   return (
     <div className="h-full w-full relative flex flex-col">
       {/* Main Image Area - Fixed height container with reserved space for buttons */}
-      <div className="flex-1 relative overflow-hidden pb-24">
+      <div className="flex-1 relative overflow-hidden pb-32">
         <div 
           className="h-full w-full cursor-pointer" 
           onTouchEnd={handleTouch}
@@ -413,7 +413,7 @@ const DiscoverPage = ({ currentUser }: DiscoverPageProps) => {
           <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-transparent to-transparent pointer-events-none" />
 
           {/* Profile Info Overlay - Positioned to not interfere with buttons */}
-          <div className="absolute bottom-24 left-0 right-0 text-white px-6 profile-info">
+          <div className="absolute bottom-32 left-0 right-0 text-white px-6 profile-info">
             {/* Main info section */}
             <div className="mb-3">
               <h2 className="text-2xl font-bold mb-1">
@@ -492,8 +492,8 @@ const DiscoverPage = ({ currentUser }: DiscoverPageProps) => {
         </div>
       </div>
 
-      {/* Action Buttons - Fixed position at bottom with higher z-index */}
-      <div className="absolute bottom-6 left-0 right-0 flex justify-center space-x-6 px-6 z-30">
+      {/* Action Buttons - Fixed position at bottom with higher z-index and moved up more */}
+      <div className="absolute bottom-24 left-0 right-0 flex justify-center space-x-6 px-6 z-30">
         <Button
           onClick={handlePass}
           variant="outline"
