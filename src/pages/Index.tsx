@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import WelcomeScreen from '@/components/WelcomeScreen';
 import AuthForm from '@/components/AuthForm';
@@ -234,7 +233,6 @@ const Index = () => {
         <AuthForm 
           isLogin={true}
           onToggle={handleShowRegister}
-          onSubmit={handleLogin}
         />
       </div>
     );

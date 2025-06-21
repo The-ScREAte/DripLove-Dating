@@ -42,6 +42,20 @@ interface AdminStats {
   matches_this_month: number;
 }
 
+interface AppStatsResponse {
+  total_users: number;
+  total_matches: number;
+  total_likes: number;
+  total_blocks: number;
+  total_messages: number;
+  active_users_today: number;
+  new_users_this_week: number;
+  matches_this_week: number;
+  blocked_users: number;
+  users_on_hold: number;
+  total_admins: number;
+}
+
 interface UserProfile {
   id: string;
   first_name: string;
@@ -207,6 +221,9 @@ const AdminPage = () => {
         return;
       }
 
+      // Type cast the response properly
+      const typedAppStats = appStats as AppStatsResponse;
+
       // Get additional stats for new requirements
       const thirtyDaysAgo = new Date();
       thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
@@ -237,10 +254,10 @@ const AdminPage = () => {
         : 0;
 
       const statsData: AdminStats = {
-        total_users: appStats?.total_users || 0,
-        total_matches: appStats?.total_matches || 0,
-        total_likes: appStats?.total_likes || 0,
-        total_blocks: appStats?.total_blocks || 0,
+        total_users: typedAppStats?.total_users || 0,
+        total_matches: typedAppStats?.total_matches || 0,
+        total_likes: typedAppStats?.total_likes || 0,
+        total_blocks: typedAppStats?.total_blocks || 0,
         active_conversations: activeConversationsData.count || 0,
         active_users_today: uniqueActiveTodayCount,
         new_users_this_month: newUsersData.count || 0,
