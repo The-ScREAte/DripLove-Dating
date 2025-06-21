@@ -52,8 +52,8 @@ const PremiumUpgrade = ({ currentUser, onClose, preselectedPlan }: PremiumUpgrad
   ];
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-pink-400 via-purple-500 to-indigo-600 flex items-center justify-center p-4">
-      <div className="max-w-4xl w-full">
+<div className="h-screen overflow-y-auto bg-gradient-to-br from-pink-400 via-purple-500 to-indigo-600 p-4">
+<div className="max-w-4xl w-full mx-auto py-8">
         {onClose && (
           <Button
             onClick={onClose}
@@ -95,56 +95,64 @@ const PremiumUpgrade = ({ currentUser, onClose, preselectedPlan }: PremiumUpgrad
 
           {/* Premium Plan */}
           <Card className="border-2 border-yellow-400 relative overflow-hidden">
-            <div className="absolute top-0 right-0 bg-yellow-400 text-black px-3 py-1 text-sm font-bold">
-              POPULAR
-            </div>
-            <CardHeader className="text-center">
-              <CardTitle className="text-2xl flex items-center justify-center">
-                <Crown className="w-6 h-6 text-yellow-500 mr-2" />
-                Premium Plan
-              </CardTitle>
-              <div className="text-3xl font-bold">$9.99<span className="text-sm font-normal">/month</span></div>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              {features.map((feature, index) => (
-                <div key={index} className="flex items-center space-x-3">
-                  <feature.icon className="w-5 h-5 text-yellow-500" />
-                  <div>
-                    <div className="font-medium">{feature.name}</div>
-                    <div className="text-sm text-green-600 font-medium">{feature.premium}</div>
-                  </div>
-                </div>
-              ))}
-              <div className="flex items-center space-x-3 pt-2 border-t">
-                <Check className="w-5 h-5 text-green-500" />
-                <div className="font-medium text-green-600">All future premium features included!</div>
-              </div>
-            </CardContent>
-          </Card>
+  <div className="absolute top-0 right-0 bg-yellow-400 text-black px-3 py-1 text-sm font-bold">
+    POPULAR
+  </div>
+  <CardHeader className="text-center">
+    <CardTitle className="text-2xl flex items-center justify-center">
+      <Crown className="w-6 h-6 text-yellow-500 mr-2" />
+      Premium Plan
+    </CardTitle>
+    <div className="text-3xl font-bold">
+      $9.99<span className="text-sm font-normal">/month</span>
+    </div>
+  </CardHeader>
+  <CardContent className="space-y-4">
+    {features.map((feature, index) => (
+      <div key={index} className="flex items-center space-x-3">
+        <feature.icon className="w-5 h-5 text-yellow-500" />
+        <div>
+          <div className="font-medium">{feature.name}</div>
+          <div className="text-sm text-green-600 font-medium">{feature.premium}</div>
         </div>
+      </div>
+    ))}
+    <div className="flex items-center space-x-3 pt-2 border-t">
+      <Check className="w-5 h-5 text-green-500" />
+      <div className="font-medium text-green-600">
+        All future premium features included!
+      </div>
+    </div>
 
-        <div className="text-center">
-          <Button
-            onClick={handleUpgrade}
-            disabled={loading}
-            className="bg-gradient-to-r from-yellow-400 to-yellow-600 hover:from-yellow-500 hover:to-yellow-700 text-black font-bold py-3 px-8 rounded-full text-lg shadow-lg transform hover:scale-105 transition-all duration-200"
-          >
-            {loading ? (
-              <div className="flex items-center">
-                <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-black mr-2"></div>
-                Processing...
-              </div>
-            ) : (
-              <>
-                <Crown className="w-5 h-5 mr-2" />
-                Upgrade to Premium Now
-              </>
-            )}
-          </Button>
-          <p className="text-white/70 text-sm mt-4">
-            Secure payment powered by Flutterwave • Cancel anytime
-          </p>
-        </div>
+    {/* 👇 Move the button and info here */}
+    <div className="pt-6 text-center">
+      <Button
+        onClick={handleUpgrade}
+        disabled={loading}
+        className="bg-gradient-to-r from-yellow-400 to-yellow-600 hover:from-yellow-500 hover:to-yellow-700 text-black font-bold py-3 px-8 rounded-full text-lg shadow-lg transform hover:scale-105 transition-all duration-200"
+      >
+        {loading ? (
+          <div className="flex items-center">
+            <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-black mr-2"></div>
+            Processing...
+          </div>
+        ) : (
+          <>
+            <Crown className="w-5 h-5 mr-2" />
+            Upgrade to Premium Now
+          </>
+        )}
+      </Button>
+      <p className="text-gray-600 text-sm mt-2">
+        Secure payment powered by Flutterwave • Cancel anytime
+      </p>
+    </div>
+  </CardContent>
+</Card>
+</div>
+<br />
+<br />
+<br />
       </div>
     </div>
   );

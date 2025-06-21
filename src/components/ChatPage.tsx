@@ -218,23 +218,25 @@ const ChatPage = ({ currentUser, onUnreadChange }: ChatPageProps) => {
                   className="p-4 hover:bg-gray-50 transition-colors cursor-pointer"
                 >
                   <div className="flex items-center space-x-3">
-                    <ChatUserAvatar 
-                      userId={match.partner?.id}
-                      firstName={match.partner?.first_name}
-                      lastName={match.partner?.last_name}
-                      onClick={() => handleUserProfileClick(match.partner?.id)}
-                      size="lg"
-                    />
+                  <div className="relative">
+  <ChatUserAvatar 
+    userId={match.partner?.id}
+    firstName={match.partner?.first_name}
+    lastName={match.partner?.last_name}
+    onClick={() => handleUserProfileClick(match.partner?.id)}
+    size="lg"
+  />
+  {match.unreadCount > 0 && (
+    <span className="absolute top-0 right-0 -mt-1 -mr-1 bg-red-500 text-white text-xs font-bold rounded-full h-5 w-5 flex items-center justify-center z-10">
+      {match.unreadCount}
+    </span>
+  )}
+</div>
                     <div className="flex-1 min-w-0">
                       <div className="flex justify-between items-center">
                         <span className="font-semibold text-gray-900 truncate">
                           {match.partner?.first_name} {match.partner?.last_name}
                         </span>
-                        {match.unreadCount > 0 && (
-                          <span className="bg-pink-600 text-white text-xs rounded-full px-2 py-1 min-w-[20px] text-center">
-                            {match.unreadCount}
-                          </span>
-                        )}
                       </div>
                       <p className="text-sm text-gray-500 truncate">
                         Tap to start chatting

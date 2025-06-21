@@ -128,12 +128,12 @@ const MainApp = ({ user, onLogout }: MainAppProps) => {
         </div>
       </div>
 
-      {/* Main Content - fills remaining space between header and mobile nav */}
+      {/* Main Content */}
       <div className="flex-1 overflow-hidden">
         {renderContent()}
       </div>
 
-      {/* Mobile Navigation - fixed at bottom */}
+      {/* Bottom Nav */}
       <div className="fixed bottom-0 left-0 right-0 bg-white border-t border-gray-200 px-2 py-2 z-50 flex-shrink-0">
         <div className="flex justify-around items-center">
           {[
