@@ -6,6 +6,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import { useSubscription } from '@/hooks/useSubscription';
 import PremiumUpgrade from './PremiumUpgrade';
+import MatchAnimation from './MatchAnimation';
 
 interface DiscoverPageProps {
   currentUser: any;
@@ -39,6 +40,8 @@ const DiscoverPage = ({ currentUser }: DiscoverPageProps) => {
   const [showMoreInfo, setShowMoreInfo] = useState(false);
   const [showPremiumUpgrade, setShowPremiumUpgrade] = useState(false);
   const [isOutOfSwipes, setIsOutOfSwipes] = useState(false);
+  const [showMatchAnimation, setShowMatchAnimation] = useState(false);
+  const [matchedUser, setMatchedUser] = useState<PotentialMatch | null>(null);
   const { toast } = useToast();
   
   const { subscription, checkUsageLimit, isPremium } = useSubscription(currentUser?.id);
@@ -159,10 +162,8 @@ const DiscoverPage = ({ currentUser }: DiscoverPageProps) => {
         .single();
 
       if (mutualLike) {
-        toast({
-          title: "It's a Match! 🎉",
-          description: `You and ${currentMatch.first_name} liked each other!`
-        });
+        setMatchedUser(currentMatch);
+        setShowMatchAnimation(true);
       }
 
       moveToNext();
@@ -280,6 +281,32 @@ const DiscoverPage = ({ currentUser }: DiscoverPageProps) => {
     }
   };
 
+  const handleStartChat = () => {
+    setShowMatchAnimation(false);
+    // TODO: Navigate to chat with matched user
+    toast({
+      title: 'Chat Feature',
+      description: 'Chat functionality will be implemented soon!',
+    });
+  };
+
+  const handleCloseMatch = () => {
+    setShowMatchAnimation(false);
+    setMatchedUser(null);
+  };
+
+  if (showMatchAnimation && matchedUser) {
+    return (
+      <MatchAnimation
+        currentUserName={currentUser?.first_name || 'You'}
+        matchedUserName={`${matchedUser.first_name} ${matchedUser.last_name}`}
+        matchedUserImage={matchedUser.images?.[0]}
+        onClose={handleCloseMatch}
+        onStartChat={handleStartChat}
+      />
+    );
+  }
+
   if (showPremiumUpgrade) {
     return <PremiumUpgrade currentUser={currentUser} onClose={() => setShowPremiumUpgrade(false)} />;
   }
@@ -350,147 +377,149 @@ const DiscoverPage = ({ currentUser }: DiscoverPageProps) => {
 
   return (
     <div className="h-full w-full relative flex flex-col">
-      {/* Main Image Area - takes full available height */}
-      <div 
-        className="flex-1 relative cursor-pointer" 
-        onTouchEnd={handleTouch}
-        onClick={handleImageAreaClick}
-      >
-        {currentMatch.images?.length > 0 ? (
-          <>
-            <img
-              src={currentMatch.images[imageIndex]}
-              alt={`${currentMatch.first_name}'s photo`}
-              className="w-full h-full object-cover"
-            />
-            {/* Image indicators */}
-            <div className="absolute top-4 left-1/2 transform -translate-x-1/2 flex gap-1 z-10">
-              {currentMatch.images.map((_, idx) => (
-                <div
-                  key={idx}
-                  className={`w-2 h-2 rounded-full ${idx === imageIndex ? 'bg-white' : 'bg-white/40'}`}
-                />
-              ))}
+      {/* Main Image Area - Fixed height container to prevent layout shifts */}
+      <div className="flex-1 relative overflow-hidden">
+        <div 
+          className="h-full w-full cursor-pointer" 
+          onTouchEnd={handleTouch}
+          onClick={handleImageAreaClick}
+        >
+          {currentMatch.images?.length > 0 ? (
+            <>
+              <img
+                src={currentMatch.images[imageIndex]}
+                alt={`${currentMatch.first_name}'s photo`}
+                className="w-full h-full object-cover object-center"
+              />
+              {/* Image indicators */}
+              <div className="absolute top-4 left-1/2 transform -translate-x-1/2 flex gap-1 z-10">
+                {currentMatch.images.map((_, idx) => (
+                  <div
+                    key={idx}
+                    className={`w-2 h-2 rounded-full ${idx === imageIndex ? 'bg-white' : 'bg-white/40'}`}
+                  />
+                ))}
+              </div>
+            </>
+          ) : (
+            <div className="w-full h-full bg-gradient-to-br from-pink-200 to-purple-200 flex items-center justify-center">
+              <span className="text-6xl font-bold text-gray-700">
+                {currentMatch.first_name?.[0]}{currentMatch.last_name?.[0]}
+              </span>
             </div>
-          </>
-        ) : (
-          <div className="w-full h-full bg-gradient-to-br from-pink-200 to-purple-200 flex items-center justify-center">
-            <span className="text-6xl font-bold text-gray-700">
-              {currentMatch.first_name?.[0]}{currentMatch.last_name?.[0]}
-            </span>
-          </div>
-        )}
+          )}
 
-        {/* Gradient overlay for text readability */}
-        <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-transparent to-transparent pointer-events-none" />
+          {/* Gradient overlay for text readability */}
+          <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-transparent to-transparent pointer-events-none" />
 
-        {/* Profile Info Overlay - Fixed at bottom with proper spacing */}
-        <div className="absolute bottom-0 left-0 right-0 text-white pb-24 md:pb-32 profile-info">
-          {/* Main info section */}
-          <div className="px-6 pb-4">
-            <div className="mb-3">
-              <h2 className="text-2xl font-bold mb-1">
-                {currentMatch.first_name} {currentMatch.last_name}
-              </h2>
-              <div className="flex items-center space-x-4 text-sm">
-                <div className="flex items-center">
-                  <Calendar className="w-4 h-4 mr-1" />
-                  <span>{calculateAge(currentMatch.date_of_birth)} years old</span>
-                </div>
-                <div className="flex items-center">
-                  <MapPin className="w-4 h-4 mr-1" />
-                  <span>{currentMatch.city}, {currentMatch.country}</span>
+          {/* Profile Info Overlay - Positioned absolutely to never push buttons down */}
+          <div className="absolute bottom-0 left-0 right-0 text-white pb-20 profile-info">
+            {/* Main info section */}
+            <div className="px-6 pb-4">
+              <div className="mb-3">
+                <h2 className="text-2xl font-bold mb-1">
+                  {currentMatch.first_name} {currentMatch.last_name}
+                </h2>
+                <div className="flex items-center space-x-4 text-sm">
+                  <div className="flex items-center">
+                    <Calendar className="w-4 h-4 mr-1" />
+                    <span>{calculateAge(currentMatch.date_of_birth)} years old</span>
+                  </div>
+                  <div className="flex items-center">
+                    <MapPin className="w-4 h-4 mr-1" />
+                    <span>{currentMatch.city}, {currentMatch.country}</span>
+                  </div>
                 </div>
               </div>
-            </div>
 
-            {/* Expandable Info Section */}
-            <div className="mb-4">
-              <Button
-                onClick={() => setShowMoreInfo(!showMoreInfo)}
-                variant="ghost"
-                className="text-white p-0 h-auto font-normal text-left mb-2 hover:bg-transparent"
-              >
-                <span className="flex items-center text-sm">
-                  {showMoreInfo ? 'Show Less' : 'Show More'}
-                  {showMoreInfo ? <ChevronUp className="w-4 h-4 ml-1" /> : <ChevronDown className="w-4 h-4 ml-1" />}
-                </span>
-              </Button>
+              {/* Expandable Info Section */}
+              <div className="mb-4">
+                <Button
+                  onClick={() => setShowMoreInfo(!showMoreInfo)}
+                  variant="ghost"
+                  className="text-white p-0 h-auto font-normal text-left mb-2 hover:bg-transparent"
+                >
+                  <span className="flex items-center text-sm">
+                    {showMoreInfo ? 'Show Less' : 'Show More'}
+                    {showMoreInfo ? <ChevronUp className="w-4 h-4 ml-1" /> : <ChevronDown className="w-4 h-4 ml-1" />}
+                  </span>
+                </Button>
 
-              {showMoreInfo && (
-                <div className="space-y-3 bg-black/50 p-3 rounded-lg max-h-32 overflow-y-auto">
-                  {currentMatch.bio && (
-                    <div>
-                      <h3 className="font-semibold mb-1 text-sm">About</h3>
-                      <p className="text-xs leading-relaxed">{currentMatch.bio}</p>
-                    </div>
-                  )}
-
-                  {(currentMatch.occupation || currentMatch.education_level) && (
-                    <div className="space-y-2">
-                      {currentMatch.occupation && (
-                        <div className="flex items-center text-xs">
-                          <Briefcase className="w-3 h-3 mr-2 flex-shrink-0" />
-                          <span>{currentMatch.occupation}</span>
-                        </div>
-                      )}
-                      {currentMatch.education_level && (
-                        <div className="flex items-center text-xs">
-                          <GraduationCap className="w-3 h-3 mr-2 flex-shrink-0" />
-                          <span>{currentMatch.education_level}</span>
-                        </div>
-                      )}
-                    </div>
-                  )}
-
-                  {currentMatch.interests?.length > 0 && (
-                    <div>
-                      <h3 className="font-semibold mb-2 text-sm">Interests</h3>
-                      <div className="flex flex-wrap gap-1">
-                        {currentMatch.interests.map((interest, index) => (
-                          <span
-                            key={index}
-                            className="px-2 py-1 bg-white/20 rounded-full text-xs"
-                          >
-                            {interest}
-                          </span>
-                        ))}
+                {showMoreInfo && (
+                  <div className="space-y-3 bg-black/50 p-3 rounded-lg max-h-32 overflow-y-auto">
+                    {currentMatch.bio && (
+                      <div>
+                        <h3 className="font-semibold mb-1 text-sm">About</h3>
+                        <p className="text-xs leading-relaxed">{currentMatch.bio}</p>
                       </div>
-                    </div>
-                  )}
-                </div>
-              )}
+                    )}
+
+                    {(currentMatch.occupation || currentMatch.education_level) && (
+                      <div className="space-y-2">
+                        {currentMatch.occupation && (
+                          <div className="flex items-center text-xs">
+                            <Briefcase className="w-3 h-3 mr-2 flex-shrink-0" />
+                            <span>{currentMatch.occupation}</span>
+                          </div>
+                        )}
+                        {currentMatch.education_level && (
+                          <div className="flex items-center text-xs">
+                            <GraduationCap className="w-3 h-3 mr-2 flex-shrink-0" />
+                            <span>{currentMatch.education_level}</span>
+                          </div>
+                        )}
+                      </div>
+                    )}
+
+                    {currentMatch.interests?.length > 0 && (
+                      <div>
+                        <h3 className="font-semibold mb-2 text-sm">Interests</h3>
+                        <div className="flex flex-wrap gap-1">
+                          {currentMatch.interests.map((interest, index) => (
+                            <span
+                              key={index}
+                              className="px-2 py-1 bg-white/20 rounded-full text-xs"
+                            >
+                              {interest}
+                            </span>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                )}
+              </div>
             </div>
-          </div>
-
-          {/* Action Buttons - positioned to be visible on all screen sizes */}
-          <div className="flex justify-center space-x-6 px-6">
-            <Button
-              onClick={handlePass}
-              variant="outline"
-              className="w-14 h-14 rounded-full border-2 border-red-500 bg-red-500/20 hover:bg-red-500/30 backdrop-blur-sm shadow-lg hover:border-red-400 transition-all duration-200"
-            >
-              <X className="w-6 h-6 text-red-500" />
-            </Button>
-
-            <Button
-              onClick={handleReverse}
-              variant="outline"
-              disabled={!passedUsers.length}
-              className="w-14 h-14 rounded-full border-2 border-yellow-500 bg-yellow-500/20 hover:bg-yellow-500/30 disabled:opacity-30 backdrop-blur-sm shadow-lg hover:border-yellow-400 transition-all duration-200"
-            >
-              <Undo2 className="w-6 h-6 text-yellow-500" />
-            </Button>
-
-            <Button
-              onClick={handleLike}
-              variant="outline"
-              className="w-14 h-14 rounded-full border-2 border-green-500 bg-green-500/20 hover:bg-green-500/30 backdrop-blur-sm shadow-lg hover:border-green-400 transition-all duration-200"
-            >
-              <Heart className="w-6 h-6 text-green-500" />
-            </Button>
           </div>
         </div>
+      </div>
+
+      {/* Action Buttons - Fixed position at bottom */}
+      <div className="absolute bottom-4 left-0 right-0 flex justify-center space-x-6 px-6 z-20">
+        <Button
+          onClick={handlePass}
+          variant="outline"
+          className="w-14 h-14 rounded-full border-2 border-red-500 bg-red-500/20 hover:bg-red-500/30 backdrop-blur-sm shadow-lg hover:border-red-400 transition-all duration-200"
+        >
+          <X className="w-6 h-6 text-red-500" />
+        </Button>
+
+        <Button
+          onClick={handleReverse}
+          variant="outline"
+          disabled={!passedUsers.length}
+          className="w-14 h-14 rounded-full border-2 border-yellow-500 bg-yellow-500/20 hover:bg-yellow-500/30 disabled:opacity-30 backdrop-blur-sm shadow-lg hover:border-yellow-400 transition-all duration-200"
+        >
+          <Undo2 className="w-6 h-6 text-yellow-500" />
+        </Button>
+
+        <Button
+          onClick={handleLike}
+          variant="outline"
+          className="w-14 h-14 rounded-full border-2 border-green-500 bg-green-500/20 hover:bg-green-500/30 backdrop-blur-sm shadow-lg hover:border-green-400 transition-all duration-200"
+        >
+          <Heart className="w-6 h-6 text-green-500" />
+        </Button>
       </div>
     </div>
   );
