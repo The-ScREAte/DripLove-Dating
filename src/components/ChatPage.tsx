@@ -13,10 +13,10 @@ import { useRealtimeMessages } from '@/hooks/useRealtimeMessages';
 
 interface ChatPageProps {
   currentUser: any;
-  onUnreadChange?: () => void;
+  onUnreadCountChange?: () => void;
 }
 
-const ChatPage = ({ currentUser, onUnreadChange }: ChatPageProps) => {
+const ChatPage = ({ currentUser, onUnreadCountChange }: ChatPageProps) => {
   const [matches, setMatches] = useState<any[]>([]);
   const [selectedMatch, setSelectedMatch] = useState<any>(null);
   const [messages, setMessages] = useState<any[]>([]);
@@ -36,7 +36,7 @@ const ChatPage = ({ currentUser, onUnreadChange }: ChatPageProps) => {
     },
     onUnreadCountChange: () => {
       fetchMatches();
-      onUnreadChange?.();
+      onUnreadCountChange?.();
     }
   });
 
@@ -154,7 +154,7 @@ const ChatPage = ({ currentUser, onUnreadChange }: ChatPageProps) => {
         .eq('id', selectedMatch.id);
 
       fetchMatches();
-      onUnreadChange?.();
+      onUnreadCountChange?.();
     } catch (error) {
       console.error('Error marking messages as read:', error);
     }
@@ -187,7 +187,7 @@ const ChatPage = ({ currentUser, onUnreadChange }: ChatPageProps) => {
       setNewMessage('');
       fetchMessages();
       fetchMatches();
-      onUnreadChange?.();
+      onUnreadCountChange?.();
     } catch (error) {
       console.error('Error sending message:', error);
       toast({
