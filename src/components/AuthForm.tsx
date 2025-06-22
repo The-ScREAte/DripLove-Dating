@@ -1,179 +1,315 @@
 
-import React, { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import React, { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Heart, Mail, Lock, Eye, EyeOff } from 'lucide-react';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
+import { Loader2, AlertCircle } from 'lucide-react';
 
 interface AuthFormProps {
-  isLogin: boolean;
-  onToggle: () => void;
+  onAuthSuccess: () => void;
 }
 
-const AuthForm = ({ isLogin, onToggle }: AuthFormProps) => {
-  const navigate = useNavigate();
+const AuthForm = ({ onAuthSuccess }: AuthFormProps) => {
+  const [isLoading, setIsLoading] = useState(false);
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
+  const [confirmPassword, setConfirmPassword] = useState('');
+  const [firstName, setFirstName] = useState('');
+  const [lastName, setLastName] = useState('');
+  const [activeTab, setActiveTab] = useState('login');
   const { toast } = useToast();
 
-  const [formData, setFormData] = useState({
-    email: '',
-    password: ''
-  });
-  const [showPassword, setShowPassword] = useState(false);
-  const [loading, setLoading] = useState(false);
+  // Check if user is already authenticated on component mount
+  useEffect(() => {
+    const checkUser = async () => {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (session?.user) {
+        // Check if user account is on hold or blocked
+        const { data: profile } = await supabase
+          .from('profiles')
+          .select('account_status')
+          .eq('id', session.user.id)
+          .single();
 
-  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    setFormData({
-      ...formData,
-      [e.target.name]: e.target.value
-    });
-  };
+        if (profile?.account_status === 'on_hold') {
+          toast({
+            title: "Account On Hold",
+            description: "Your account is on hold. Please contact support for assistance.",
+            variant: "destructive",
+          });
+          await supabase.auth.signOut();
+          return;
+        }
 
-  const handleSubmit = async (e: React.FormEvent) => {
+        if (profile?.account_status === 'blocked') {
+          toast({
+            title: "Account Blocked",
+            description: "Your account has been blocked. Please contact support for assistance.",
+            variant: "destructive",
+          });
+          await supabase.auth.signOut();
+          return;
+        }
+
+        onAuthSuccess();
+      }
+    };
+    
+    checkUser();
+  }, [onAuthSuccess, toast]);
+
+  const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
-    setLoading(true);
-
-    const { email, password } = formData;
+    setIsLoading(true);
 
     try {
-      const { data: authData, error: authError } = await supabase.auth.signInWithPassword({
+      const { data, error } = await supabase.auth.signInWithPassword({
         email,
-        password
+        password,
       });
 
-      if (authError || !authData.user) {
+      if (error) throw error;
+
+      if (data.user) {
+        // Check account status after successful login
+        const { data: profile } = await supabase
+          .from('profiles')
+          .select('account_status')
+          .eq('id', data.user.id)
+          .single();
+
+        if (profile?.account_status === 'on_hold') {
+          toast({
+            title: "Account On Hold",
+            description: "Your account is on hold. Please contact support for assistance.",
+            variant: "destructive",
+          });
+          await supabase.auth.signOut();
+          return;
+        }
+
+        if (profile?.account_status === 'blocked') {
+          toast({
+            title: "Account Blocked",
+            description: "Your account has been blocked. Please contact support for assistance.",
+            variant: "destructive",
+          });
+          await supabase.auth.signOut();
+          return;
+        }
+
         toast({
-          title: "Login Failed",
-          description: authError?.message || 'Invalid credentials',
-          variant: "destructive",
+          title: "Welcome back!",
+          description: "Successfully signed in.",
         });
-        setLoading(false);
-        return;
+        onAuthSuccess();
       }
-
-      // Check if user profile exists
-      const { data: profile, error: profileError } = await supabase
-        .from('profiles')
-        .select('id, is_admin')
-        .eq('id', authData.user.id)
-        .single();
-
-      if (profileError || !profile) {
-        // Sign out the user since they don't have a profile
-        await supabase.auth.signOut();
-        toast({
-          title: "Account Not Found",
-          description: "This account doesn't exist in our system. Please register first.",
-          variant: "destructive",
-        });
-        setLoading(false);
-        return;
-      }
-
-      // Save profile ID to session
-      sessionStorage.setItem('profile_id', profile.id);
-
-      toast({
-        title: "Welcome back!",
-        description: "You've been successfully logged in.",
-      });
-
-      setLoading(false);
     } catch (error: any) {
       console.error('Login error:', error);
       toast({
-        title: "Login Error",
-        description: "An unexpected error occurred. Please try again.",
+        title: "Login Failed",
+        description: error.message || "Invalid email or password.",
         variant: "destructive",
       });
-      setLoading(false);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const handleSignUp = async (e: React.FormEvent) => {
+    e.preventDefault();
+    
+    if (password !== confirmPassword) {
+      toast({
+        title: "Password Mismatch",
+        description: "Passwords do not match.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    setIsLoading(true);
+
+    try {
+      const redirectUrl = `${window.location.origin}/`;
+      
+      const { error } = await supabase.auth.signUp({
+        email,
+        password,
+        options: {
+          emailRedirectTo: redirectUrl,
+          data: {
+            first_name: firstName,
+            last_name: lastName,
+          }
+        }
+      });
+
+      if (error) throw error;
+
+      toast({
+        title: "Account Created!",
+        description: "Please check your email to verify your account.",
+      });
+      
+      // Switch to login tab
+      setActiveTab('login');
+    } catch (error: any) {
+      console.error('Sign up error:', error);
+      toast({
+        title: "Sign Up Failed",
+        description: error.message || "Failed to create account.",
+        variant: "destructive",
+      });
+    } finally {
+      setIsLoading(false);
     }
   };
 
   return (
-    <Card className="w-full max-w-md mx-auto backdrop-blur-sm bg-white/90 shadow-2xl border-0">
-      <CardHeader className="text-center pb-6">
-        <div className="flex justify-center mb-4">
-          <div className="p-3 bg-gradient-to-r from-pink-500 to-purple-600 rounded-full">
-            <Heart className="w-8 h-8 text-white" />
-          </div>
-        </div>
-        <CardTitle className="text-2xl font-bold bg-gradient-to-r from-pink-600 to-purple-600 bg-clip-text text-transparent">
-          {isLogin ? 'Welcome Back' : 'Create Account'}
-        </CardTitle>
-        <CardDescription className="text-gray-600">
-          {isLogin ? 'Sign in to your account' : 'Join LoveConnect today'}
-        </CardDescription>
-      </CardHeader>
-
-      <CardContent>
-        <form onSubmit={handleSubmit} className="space-y-4">
-          <div className="space-y-2">
-            <Label htmlFor="email" className="text-sm font-medium">Email</Label>
-            <div className="relative">
-              <Mail className="absolute left-3 top-3 h-4 w-4 text-gray-400" />
-              <Input
-                id="email"
-                name="email"
-                type="email"
-                value={formData.email}
-                onChange={handleInputChange}
-                className="pl-10 border-gray-200 focus:border-pink-400 focus:ring-pink-400"
-                placeholder="Enter your email"
-                required
-              />
+    <div className="min-h-screen bg-gradient-to-br from-pink-50 to-purple-50 flex items-center justify-center p-4">
+      <Card className="w-full max-w-md shadow-lg">
+        <CardHeader className="text-center pb-4">
+          <img 
+            src="/lovable-uploads/0e9bd84b-0f71-493b-8c1f-1a2883e5109d.png" 
+            alt="AfroVibe Logo" 
+            className="h-12 mx-auto mb-4"
+          />
+          <CardTitle className="text-2xl font-bold bg-gradient-to-r from-pink-600 to-purple-600 bg-clip-text text-transparent">
+            Welcome to AfroVibe
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          <Tabs value={activeTab} onValueChange={setActiveTab}>
+            <TabsList className="grid w-full grid-cols-2 mb-6">
+              <TabsTrigger value="login">Login</TabsTrigger>
+              <TabsTrigger value="signup">Sign Up</TabsTrigger>
+            </TabsList>
+            
+            <TabsContent value="login">
+              <form onSubmit={handleLogin} className="space-y-4">
+                <div>
+                  <Input
+                    type="email"
+                    placeholder="Email"
+                    value={email}
+                    onChange={(e) => setEmail(e.target.value)}
+                    required
+                    disabled={isLoading}
+                  />
+                </div>
+                <div>
+                  <Input
+                    type="password"
+                    placeholder="Password"
+                    value={password}
+                    onChange={(e) => setPassword(e.target.value)}
+                    required
+                    disabled={isLoading}
+                  />
+                </div>
+                <Button 
+                  type="submit" 
+                  className="w-full bg-gradient-to-r from-pink-600 to-purple-600 hover:from-pink-700 hover:to-purple-700"
+                  disabled={isLoading}
+                >
+                  {isLoading ? (
+                    <>
+                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                      Signing In...
+                    </>
+                  ) : (
+                    'Sign In'
+                  )}
+                </Button>
+              </form>
+            </TabsContent>
+            
+            <TabsContent value="signup">
+              <form onSubmit={handleSignUp} className="space-y-4">
+                <div className="grid grid-cols-2 gap-2">
+                  <Input
+                    type="text"
+                    placeholder="First Name"
+                    value={firstName}
+                    onChange={(e) => setFirstName(e.target.value)}
+                    required
+                    disabled={isLoading}
+                  />
+                  <Input
+                    type="text"
+                    placeholder="Last Name"
+                    value={lastName}
+                    onChange={(e) => setLastName(e.target.value)}
+                    required
+                    disabled={isLoading}
+                  />
+                </div>
+                <div>
+                  <Input
+                    type="email"
+                    placeholder="Email"
+                    value={email}
+                    onChange={(e) => setEmail(e.target.value)}
+                    required
+                    disabled={isLoading}
+                  />
+                </div>
+                <div>
+                  <Input
+                    type="password"
+                    placeholder="Password"
+                    value={password}
+                    onChange={(e) => setPassword(e.target.value)}
+                    required
+                    disabled={isLoading}
+                    minLength={6}
+                  />
+                </div>
+                <div>
+                  <Input
+                    type="password"
+                    placeholder="Confirm Password"
+                    value={confirmPassword}
+                    onChange={(e) => setConfirmPassword(e.target.value)}
+                    required
+                    disabled={isLoading}
+                    minLength={6}
+                  />
+                </div>
+                <Button 
+                  type="submit" 
+                  className="w-full bg-gradient-to-r from-pink-600 to-purple-600 hover:from-pink-700 hover:to-purple-700"
+                  disabled={isLoading}
+                >
+                  {isLoading ? (
+                    <>
+                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                      Creating Account...
+                    </>
+                  ) : (
+                    'Create Account'
+                  )}
+                </Button>
+              </form>
+            </TabsContent>
+          </Tabs>
+          
+          <div className="mt-6 p-4 bg-blue-50 rounded-lg border border-blue-200">
+            <div className="flex items-start space-x-2">
+              <AlertCircle className="w-5 h-5 text-blue-600 mt-0.5 flex-shrink-0" />
+              <div className="text-sm text-blue-800">
+                <p className="font-medium mb-1">Account Status Notice:</p>
+                <p>If your account is on hold or blocked, you'll see a message and won't be able to access the app. Contact support for assistance.</p>
+              </div>
             </div>
           </div>
-
-          <div className="space-y-2">
-            <Label htmlFor="password" className="text-sm font-medium">Password</Label>
-            <div className="relative">
-              <Lock className="absolute left-3 top-3 h-4 w-4 text-gray-400" />
-              <Input
-                id="password"
-                name="password"
-                type={showPassword ? "text" : "password"}
-                value={formData.password}
-                onChange={handleInputChange}
-                className="pl-10 pr-10 border-gray-200 focus:border-pink-400 focus:ring-pink-400"
-                placeholder="Enter your password"
-                required
-              />
-              <button
-                type="button"
-                onClick={() => setShowPassword(!showPassword)}
-                className="absolute right-3 top-3 text-gray-400 hover:text-gray-600"
-              >
-                {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
-              </button>
-            </div>
-          </div>
-
-          <Button
-            type="submit"
-            disabled={loading}
-            className="w-full bg-gradient-to-r from-pink-500 to-purple-600 hover:from-pink-600 hover:to-purple-700 text-white font-semibold py-3 rounded-lg transition-all duration-200 transform hover:scale-[1.02]"
-          >
-            {loading ? 'Processing...' : isLogin ? 'Sign In' : 'Create Account'}
-          </Button>
-        </form>
-
-        <div className="mt-6 text-center">
-          <p className="text-sm text-gray-600">
-            {isLogin ? "Don't have an account?" : "Already have an account?"}
-            <button
-              onClick={onToggle}
-              className="ml-2 text-pink-600 hover:text-pink-700 font-semibold transition-colors"
-            >
-              {isLogin ? 'Sign Up' : 'Sign In'}
-            </button>
-          </p>
-        </div>
-      </CardContent>
-    </Card>
+        </CardContent>
+      </Card>
+    </div>
   );
 };
 
