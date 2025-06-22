@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect, useRef } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -9,14 +8,14 @@ import { useToast } from '@/hooks/use-toast';
 import EmojiPicker from './EmojiPicker';
 import ChatUserAvatar from './ChatUserAvatar';
 import UserProfileModal from './UserProfileModal';
+import { useRealtimeMessages } from '@/hooks/useRealtimeMessages';
 
 interface ChatPageProps {
   currentUser: any;
   onUnreadCountChange?: () => void;
-  onUnreadChange?: () => Promise<void>;
 }
 
-const ChatPage = ({ currentUser, onUnreadCountChange, onUnreadChange }: ChatPageProps) => {
+const ChatPage = ({ currentUser, onUnreadCountChange }: ChatPageProps) => {
   const [matches, setMatches] = useState<any[]>([]);
   const [selectedMatch, setSelectedMatch] = useState<any>(null);
   const [messages, setMessages] = useState<any[]>([]);
@@ -28,10 +27,20 @@ const ChatPage = ({ currentUser, onUnreadCountChange, onUnreadChange }: ChatPage
   const { toast } = useToast();
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
-  useEffect(() => {
-    if (currentUser?.id) {
+  useRealtimeMessages({
+    onNewMessage: () => {
+      if (selectedMatch) {
+        fetchMessages();
+      }
+    },
+    onUnreadCountChange: () => {
       fetchMatches();
+      onUnreadCountChange?.();
     }
+  });
+
+  useEffect(() => {
+    fetchMatches();
   }, [currentUser]);
 
   useEffect(() => {
@@ -44,31 +53,6 @@ const ChatPage = ({ currentUser, onUnreadCountChange, onUnreadChange }: ChatPage
   useEffect(() => {
     scrollToBottom();
   }, [messages]);
-
-  // Simplified realtime subscription
-  useEffect(() => {
-    if (!currentUser?.id) return;
-
-    const channel = supabase
-      .channel('chat-updates')
-      .on('postgres_changes', {
-        event: 'INSERT',
-        schema: 'public',
-        table: 'chats',
-      }, () => {
-        if (selectedMatch) {
-          fetchMessages();
-        }
-        fetchMatches();
-        onUnreadCountChange?.();
-        onUnreadChange?.();
-      })
-      .subscribe();
-
-    return () => {
-      supabase.removeChannel(channel);
-    };
-  }, [selectedMatch, currentUser?.id, onUnreadCountChange, onUnreadChange]);
 
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -170,7 +154,6 @@ const ChatPage = ({ currentUser, onUnreadCountChange, onUnreadChange }: ChatPage
 
       fetchMatches();
       onUnreadCountChange?.();
-      onUnreadChange?.();
     } catch (error) {
       console.error('Error marking messages as read:', error);
     }
@@ -204,7 +187,6 @@ const ChatPage = ({ currentUser, onUnreadCountChange, onUnreadChange }: ChatPage
       fetchMessages();
       fetchMatches();
       onUnreadCountChange?.();
-      onUnreadChange?.();
     } catch (error) {
       console.error('Error sending message:', error);
       toast({

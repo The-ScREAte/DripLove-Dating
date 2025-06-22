@@ -8,6 +8,7 @@ import LikedMePage from '@/components/LikedMePage';
 import ProfilePage from '@/components/ProfilePage';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
+import { useRealtimeMessages } from '@/hooks/useRealtimeMessages';
 
 interface MainAppProps {
   user: any;
@@ -20,6 +21,13 @@ const MainApp = ({ user, onLogout }: MainAppProps) => {
   const [unreadCount, setUnreadCount] = useState(0);
   const [chatUsersWithUnread, setChatUsersWithUnread] = useState<Set<string>>(new Set());
   const { toast } = useToast();
+
+  useRealtimeMessages({
+    onUnreadCountChange: () => {
+      fetchUnreadCount();
+      fetchChatUsersWithUnread();
+    }
+  });
 
   useEffect(() => {
     fetchUserProfile();
@@ -120,7 +128,7 @@ const MainApp = ({ user, onLogout }: MainAppProps) => {
       case 'discover':
         return <DiscoverPage currentUser={user} onNavigateToChat={handleNavigateToChat} />;
       case 'chat':
-        return <ChatPage currentUser={user} onUnreadChange={fetchUnreadCount} onUnreadCountChange={fetchUnreadCount} />;
+        return <ChatPage currentUser={user} onUnreadChange={fetchUnreadCount} />;
       case 'liked':
         return <LikedMePage currentUser={user} />;
       case 'profile':

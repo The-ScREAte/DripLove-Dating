@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -44,10 +43,6 @@ const DiscoverPage = ({ currentUser, onNavigateToChat }: DiscoverPageProps) => {
   const [isOutOfSwipes, setIsOutOfSwipes] = useState(false);
   const [showMatchAnimation, setShowMatchAnimation] = useState(false);
   const [matchedUser, setMatchedUser] = useState<PotentialMatch | null>(null);
-  const [swipeStartX, setSwipeStartX] = useState(0);
-  const [swipeStartY, setSwipeStartY] = useState(0);
-  const [isDragging, setIsDragging] = useState(false);
-  const [dragOffset, setDragOffset] = useState({ x: 0, y: 0 });
   const { toast } = useToast();
   
   const { subscription, checkUsageLimit, isPremium } = useSubscription(currentUser?.id);
@@ -122,6 +117,9 @@ const DiscoverPage = ({ currentUser, onNavigateToChat }: DiscoverPageProps) => {
       // Shuffle client-side
       const shuffled = matchesWithImages.sort(() => 0.5 - Math.random());
       setPotentialMatches(shuffled);
+      
+
+      setPotentialMatches(matchesWithImages);
     } catch (error) {
       console.error('Error fetching potential matches:', error);
       toast({
@@ -254,87 +252,25 @@ const DiscoverPage = ({ currentUser, onNavigateToChat }: DiscoverPageProps) => {
     }
   };
 
-  const handleSwipeStart = (clientX: number, clientY: number) => {
-    setSwipeStartX(clientX);
-    setSwipeStartY(clientY);
-    setIsDragging(true);
-  };
-
-  const handleSwipeMove = (clientX: number, clientY: number) => {
-    if (!isDragging) return;
-    
-    const deltaX = clientX - swipeStartX;
-    const deltaY = clientY - swipeStartY;
-    
-    setDragOffset({ x: deltaX, y: deltaY });
-  };
-
-  const handleSwipeEnd = (clientX: number, clientY: number) => {
-    if (!isDragging) return;
-    
-    const deltaX = clientX - swipeStartX;
-    const deltaY = clientY - swipeStartY;
-    const threshold = 100;
-    
-    setIsDragging(false);
-    setDragOffset({ x: 0, y: 0 });
-    
-    // Only trigger swipe if horizontal movement is dominant
-    if (Math.abs(deltaX) > Math.abs(deltaY) && Math.abs(deltaX) > threshold) {
-      if (deltaX > 0) {
-        handleLike(); // Swipe right = like
-      } else {
-        handlePass(); // Swipe left = pass
-      }
-    }
-  };
-
-  // Touch event handlers
-  const handleTouchStart = (e: React.TouchEvent<HTMLDivElement>) => {
+  const handleTouch = (e: React.TouchEvent<HTMLDivElement>) => {
+    // Only change image if touching empty space (not on text/buttons)
     const target = e.target as HTMLElement;
     if (target.closest('.profile-info') || target.closest('button')) {
       return;
     }
-    
-    const touch = e.touches[0];
-    handleSwipeStart(touch.clientX, touch.clientY);
-  };
 
-  const handleTouchMove = (e: React.TouchEvent<HTMLDivElement>) => {
-    if (!isDragging) return;
-    
-    const touch = e.touches[0];
-    handleSwipeMove(touch.clientX, touch.clientY);
-    e.preventDefault();
-  };
+    const { clientX } = e.changedTouches[0];
+    const rect = e.currentTarget.getBoundingClientRect();
+    const touchX = clientX - rect.left;
+    const width = rect.width;
 
-  const handleTouchEnd = (e: React.TouchEvent<HTMLDivElement>) => {
-    if (!isDragging) return;
-    
-    const touch = e.changedTouches[0];
-    handleSwipeEnd(touch.clientX, touch.clientY);
-  };
-
-  // Mouse event handlers
-  const handleMouseDown = (e: React.MouseEvent<HTMLDivElement>) => {
-    const target = e.target as HTMLElement;
-    if (target.closest('.profile-info') || target.closest('button')) {
-      return;
+    if (touchX < width / 2) {
+      setImageIndex(prev => (prev > 0 ? prev - 1 : prev));
+    } else {
+      setImageIndex(prev =>
+        currentMatch?.images && prev < currentMatch.images.length - 1 ? prev + 1 : prev
+      );
     }
-    
-    handleSwipeStart(e.clientX, e.clientY);
-  };
-
-  const handleMouseMove = (e: React.MouseEvent<HTMLDivElement>) => {
-    if (!isDragging) return;
-    
-    handleSwipeMove(e.clientX, e.clientY);
-  };
-
-  const handleMouseUp = (e: React.MouseEvent<HTMLDivElement>) => {
-    if (!isDragging) return;
-    
-    handleSwipeEnd(e.clientX, e.clientY);
   };
 
   const moveToNext = () => {
@@ -444,23 +380,9 @@ const DiscoverPage = ({ currentUser, onNavigateToChat }: DiscoverPageProps) => {
       {/* Main Image Area - Fixed height container with reserved space for buttons */}
       <div className="flex-1 relative overflow-hidden pb-32">
         <div 
-          className="h-full w-full cursor-pointer select-none" 
-          onTouchStart={handleTouchStart}
-          onTouchMove={handleTouchMove}
-          onTouchEnd={handleTouchEnd}
-          onMouseDown={handleMouseDown}
-          onMouseMove={handleMouseMove}
-          onMouseUp={handleMouseUp}
-          onMouseLeave={() => {
-            if (isDragging) {
-              setIsDragging(false);
-              setDragOffset({ x: 0, y: 0 });
-            }
-          }}
-          style={{
-            transform: `translate(${dragOffset.x}px, ${dragOffset.y}px) rotate(${dragOffset.x * 0.1}deg)`,
-            transition: isDragging ? 'none' : 'transform 0.3s ease-out',
-          }}
+          className="h-full w-full cursor-pointer" 
+          onTouchEnd={handleTouch}
+          onClick={handleImageAreaClick}
         >
           {currentMatch.images?.length > 0 ? (
             <>
@@ -468,7 +390,6 @@ const DiscoverPage = ({ currentUser, onNavigateToChat }: DiscoverPageProps) => {
                 src={currentMatch.images[imageIndex]}
                 alt={`${currentMatch.first_name}'s photo`}
                 className="w-full h-full object-cover object-center"
-                draggable={false}
               />
               {/* Image indicators */}
               <div className="absolute top-4 left-1/2 transform -translate-x-1/2 flex gap-1 z-10">
@@ -486,26 +407,6 @@ const DiscoverPage = ({ currentUser, onNavigateToChat }: DiscoverPageProps) => {
                 {currentMatch.first_name?.[0]}{currentMatch.last_name?.[0]}
               </span>
             </div>
-          )}
-
-          {/* Swipe indicators */}
-          {isDragging && (
-            <>
-              {dragOffset.x > 50 && (
-                <div className="absolute inset-0 bg-green-500/20 flex items-center justify-center">
-                  <div className="bg-green-500 text-white px-4 py-2 rounded-full font-bold text-xl transform rotate-12">
-                    LIKE!
-                  </div>
-                </div>
-              )}
-              {dragOffset.x < -50 && (
-                <div className="absolute inset-0 bg-red-500/20 flex items-center justify-center">
-                  <div className="bg-red-500 text-white px-4 py-2 rounded-full font-bold text-xl transform -rotate-12">
-                    NOPE!
-                  </div>
-                </div>
-              )}
-            </>
           )}
 
           {/* Gradient overlay for text readability */}

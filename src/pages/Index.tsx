@@ -126,11 +126,6 @@ const Index = () => {
     setCurrentView('welcome');
   };
 
-  const handleAuthSuccess = () => {
-    // This will be handled by the auth state change listener
-    // which will automatically redirect based on user type
-  };
-
   const handleRegister = async (formData: any) => {
     try {
       if (formData.password !== formData.confirmPassword) {
@@ -239,7 +234,14 @@ const Index = () => {
   }
 
   if (currentView === 'login') {
-    return <AuthForm onAuthSuccess={handleAuthSuccess} />;
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-pink-400 via-purple-500 to-indigo-600 flex items-center justify-center p-4">
+        <AuthForm 
+          isLogin={true}
+          onToggle={handleShowRegister}
+        />
+      </div>
+    );
   }
 
   if (currentView === 'register') {

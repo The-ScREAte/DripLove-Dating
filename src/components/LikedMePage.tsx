@@ -319,10 +319,7 @@ const LikedMePage = ({ currentUser }: LikedMePageProps) => {
                       
                       <div className="flex space-x-2">
                         <Button
-                          onClick={() => {
-                            setSelectedUserId(profile.id);
-                            setIsUserProfileOpen(true);
-                          }}
+                          onClick={() => setSelectedUserId(profile.id)}
                           variant="outline"
                           className="flex-1"
                           size="sm"
