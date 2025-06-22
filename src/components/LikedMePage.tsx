@@ -2,152 +2,154 @@
 import React, { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Users, Heart, X, Calendar, MapPin, Shield, ChevronDown, ChevronUp, Briefcase, GraduationCap, Crown, Lock } from 'lucide-react';
+import { Badge } from '@/components/ui/badge';
+import { Heart, Crown, Timer, Lock } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
-import { useSubscription } from '@/hooks/useSubscription';
-import BlockDialog from './BlockDialog';
+import UserProfileModal from './UserProfileModal';
 import PremiumUpgrade from './PremiumUpgrade';
+import { useSubscription } from '@/hooks/useSubscription';
 
 interface LikedMePageProps {
   currentUser: any;
 }
 
 const LikedMePage = ({ currentUser }: LikedMePageProps) => {
-  const [likers, setLikers] = useState<any[]>([]);
+  const [likedProfiles, setLikedProfiles] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
-  const [selectedProfile, setSelectedProfile] = useState<any>(null);
-  const [userImages, setUserImages] = useState<{ [key: string]: string[] }>({});
-  const [blockDialogOpen, setBlockDialogOpen] = useState(false);
-  const [imageIndex, setImageIndex] = useState(0);
-  const [showMoreInfo, setShowMoreInfo] = useState(false);
+  const [isUserProfileOpen, setIsUserProfileOpen] = useState(false);
+  const [selectedUserId, setSelectedUserId] = useState<string>('');
   const [showPremiumUpgrade, setShowPremiumUpgrade] = useState(false);
+  const [canUseLikeMe, setCanUseLikeMe] = useState(true);
+  const [cooldownUntil, setCooldownUntil] = useState<string | null>(null);
   const { toast } = useToast();
-
-  const { subscription, isPremium, getLikedMeVisibleCount } = useSubscription(currentUser?.id);
+  const { subscription, isPremium } = useSubscription(currentUser?.id);
 
   useEffect(() => {
-    fetchLikers();
+    if (currentUser?.id) {
+      fetchLikedProfiles();
+      checkLikeMeCooldown();
+    }
   }, [currentUser]);
 
-  useEffect(() => {
-    setImageIndex(0);
-    setShowMoreInfo(false);
-  }, [selectedProfile]);
-
-  const calculateAge = (dateOfBirth: string) => {
-    const today = new Date();
-    const birthDate = new Date(dateOfBirth);
-    let age = today.getFullYear() - birthDate.getFullYear();
-    const monthDiff = today.getMonth() - birthDate.getMonth();
-
-    if (monthDiff < 0 || (monthDiff === 0 && today.getDate() < birthDate.getDate())) {
-      age--;
-    }
-
-    return age;
-  };
-
-  const fetchLikers = async () => {
+  const checkLikeMeCooldown = async () => {
     if (!currentUser?.id) return;
 
     try {
-      const { data: likes, error } = await supabase
+      const { data: canUse, error: cooldownError } = await supabase.rpc('can_use_like_me', {
+        user_id_param: currentUser.id
+      });
+
+      if (cooldownError) throw cooldownError;
+
+      setCanUseLikeMe(canUse);
+
+      if (!canUse) {
+        const { data: profile, error: profileError } = await supabase
+          .from('profiles')
+          .select('like_me_cooldown_until')
+          .eq('id', currentUser.id)
+          .single();
+
+        if (profileError) throw profileError;
+        setCooldownUntil(profile.like_me_cooldown_until);
+      }
+    } catch (error) {
+      console.error('Error checking Like Me cooldown:', error);
+    }
+  };
+
+  const fetchLikedProfiles = async () => {
+    if (!currentUser?.id) return;
+
+    try {
+      setLoading(true);
+
+      // Get users who liked me but I haven't liked back (no mutual match yet)
+      const { data: likes, error: likesError } = await supabase
         .from('likes')
-        .select(`*, liker:profiles!likes_liker_id_fkey(*)`)
-        .eq('liked_id', currentUser.id);
+        .select(`
+          *,
+          liker:profiles!likes_liker_id_fkey(
+            id,
+            first_name,
+            last_name,
+            age:date_of_birth,
+            bio,
+            city,
+            country,
+            interests,
+            account_status
+          )
+        `)
+        .eq('liked_id', currentUser.id)
+        .neq('liker.account_status', 'blocked');
 
-      if (error) throw error;
+      if (likesError) throw likesError;
 
-      const { data: matches } = await supabase
-        .from('matches')
-        .select('user1_id, user2_id')
-        .or(`user1_id.eq.${currentUser.id},user2_id.eq.${currentUser.id}`);
+      // Filter out users I've already liked back (mutual matches)
+      const { data: myLikes, error: myLikesError } = await supabase
+        .from('likes')
+        .select('liked_id')
+        .eq('liker_id', currentUser.id);
 
-      const matchedIds = matches?.map(match =>
-        match.user1_id === currentUser.id ? match.user2_id : match.user1_id
-      ) || [];
+      if (myLikesError) throw myLikesError;
 
-      const { data: blockedUsers } = await supabase
+      const myLikedIds = new Set(myLikes?.map(like => like.liked_id) || []);
+      
+      // Filter out users I've blocked or who have blocked me
+      const { data: blocks, error: blocksError } = await supabase
         .from('blocks')
-        .select('blocked_id, blocker_id')
+        .select('*')
         .or(`blocker_id.eq.${currentUser.id},blocked_id.eq.${currentUser.id}`);
 
-      const blockedIds = blockedUsers?.map(block =>
-        block.blocker_id === currentUser.id ? block.blocked_id : block.blocker_id
+      if (blocksError) throw blocksError;
+
+      const blockedUserIds = new Set();
+      blocks?.forEach(block => {
+        if (block.blocker_id === currentUser.id) {
+          blockedUserIds.add(block.blocked_id);
+        } else {
+          blockedUserIds.add(block.blocker_id);
+        }
+      });
+
+      const filteredLikes = likes?.filter(like => 
+        !myLikedIds.has(like.liker_id) && 
+        !blockedUserIds.has(like.liker_id) &&
+        like.liker.account_status === 'active'
       ) || [];
 
-      const filteredLikes = likes?.filter(like =>
-        !matchedIds.includes(like.liker.id) && !blockedIds.includes(like.liker.id) && like.liker.is_admin !== true
-      ) || [];
+      // For free users, show only limited profiles based on subscription
+      const visibleCount = subscription?.features?.liked_me_visible || 1;
+      const visibleProfiles = isPremium() ? filteredLikes : filteredLikes.slice(0, visibleCount);
 
-      const likersData = filteredLikes.map(like => like.liker);
-
-      if (likersData.length > 0) {
-        const imagePromises = likersData.map(async (profile) => {
-          const { data: images } = await supabase
-            .from('user_images')
-            .select('image_url')
-            .eq('user_id', profile.id)
-            .order('image_order');
-
-          return {
-            profileId: profile.id,
-            images: images?.map(img => img.image_url) || []
-          };
-        });
-
-        const imageResults = await Promise.all(imagePromises);
-        const imageMap: { [key: string]: string[] } = {};
-        imageResults.forEach(result => {
-          imageMap[result.profileId] = result.images;
-        });
-
-        setUserImages(imageMap);
-      }
-
-      setLikers(likersData);
+      setLikedProfiles(visibleProfiles);
     } catch (error) {
-      console.error('Error fetching likers:', error);
+      console.error('Error fetching liked profiles:', error);
       toast({
-        title: "Error",
-        description: "Failed to load people who liked you",
-        variant: "destructive",
+        title: 'Error',
+        description: 'Failed to load profiles who liked you.',
+        variant: 'destructive'
       });
     } finally {
       setLoading(false);
     }
   };
 
-  const handleTouch = (e: React.TouchEvent<HTMLDivElement>) => {
-    const { clientX } = e.changedTouches[0];
-    const screenWidth = window.innerWidth;
-    const profileImages = userImages[selectedProfile.id] || [];
-
-    if (clientX < screenWidth / 2) {
-      setImageIndex(prev => (prev > 0 ? prev - 1 : prev));
-    } else {
-      setImageIndex(prev => (prev < profileImages.length - 1 ? prev + 1 : prev));
-    }
-  };
-
   const handleLikeBack = async (profileId: string) => {
+    if (!canUseLikeMe && !isPremium()) {
+      toast({
+        title: 'Like Me Cooldown',
+        description: 'Free users can only match from Like Me once every 90 days. Upgrade to Premium for unlimited access!',
+        variant: 'destructive'
+      });
+      setShowPremiumUpgrade(true);
+      return;
+    }
+
     try {
-      const { data: existingLike } = await supabase
-        .from('likes')
-        .select('*')
-        .eq('liker_id', currentUser.id)
-        .eq('liked_id', profileId)
-        .single();
-
-      if (existingLike) {
-        toast({
-          title: "Already liked",
-          description: "You've already liked this person back",
-        });
-        return;
-      }
-
+      // Like back
       const { error: likeError } = await supabase
         .from('likes')
         .insert({
@@ -157,337 +159,216 @@ const LikedMePage = ({ currentUser }: LikedMePageProps) => {
 
       if (likeError) throw likeError;
 
+      // Set cooldown for free users
+      if (!isPremium()) {
+        await supabase.rpc('set_like_me_cooldown', {
+          user_id_param: currentUser.id
+        });
+        setCanUseLikeMe(false);
+        checkLikeMeCooldown();
+      }
+
       toast({
-        title: "It's a Match! 🎉",
-        description: "You can now start chatting!",
+        title: 'It\'s a Match! 🎉',
+        description: 'You can now start chatting with each other.',
       });
 
-      setLikers(prev => prev.filter(liker => liker.id !== profileId));
-      setSelectedProfile(null);
+      // Refresh the list
+      fetchLikedProfiles();
+
     } catch (error) {
       console.error('Error liking back:', error);
       toast({
-        title: "Error",
-        description: "Failed to like back",
-        variant: "destructive",
+        title: 'Error',
+        description: 'Failed to like back. Please try again.',
+        variant: 'destructive'
       });
     }
   };
 
-  const handlePass = async (profileId: string) => {
-    try {
-      const { error } = await supabase
-        .from('likes')
-        .delete()
-        .eq('liker_id', profileId)
-        .eq('liked_id', currentUser.id);
-
-      if (error) throw error;
-
-      toast({
-        title: "Passed",
-        description: "Profile removed from your likes",
-      });
-
-      setLikers(prev => prev.filter(liker => liker.id !== profileId));
-      setSelectedProfile(null);
-    } catch (error) {
-      console.error('Error passing:', error);
-      toast({
-        title: "Error",
-        description: "Failed to pass",
-        variant: "destructive",
-      });
-    }
-  };
-
-  const handleBlock = () => {
-    setBlockDialogOpen(true);
-  };
-
-  const handleBlockSuccess = () => {
-    if (selectedProfile) {
-      setLikers(prev => prev.filter(liker => liker.id !== selectedProfile.id));
-      setSelectedProfile(null);
-    }
-  };
-
-  const handleProfileClick = (liker: any, index: number) => {
-    const visibleCount = getLikedMeVisibleCount();
+  const formatCooldownTime = (cooldownUntil: string) => {
+    const now = new Date();
+    const cooldown = new Date(cooldownUntil);
+    const diffTime = cooldown.getTime() - now.getTime();
+    const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
     
-    // If premium or within visible limit, allow click
-    if (isPremium() || visibleCount === -1 || index < visibleCount) {
-      setSelectedProfile(liker);
-    } else {
-      // Show premium upgrade for blurred profiles
-      setShowPremiumUpgrade(true);
+    if (diffDays > 0) {
+      return `${diffDays} days`;
     }
+    return 'Soon';
   };
 
   if (showPremiumUpgrade) {
-    return <PremiumUpgrade currentUser={currentUser} onClose={() => setShowPremiumUpgrade(false)} preselectedPlan="premium" />;
+    return <PremiumUpgrade currentUser={currentUser} onClose={() => setShowPremiumUpgrade(false)} />;
   }
 
   if (loading) {
     return (
-      <div className="h-full w-full flex items-center justify-center">
-        <div className="animate-spin rounded-full h-32 w-32 border-b-2 border-pink-600"></div>
+      <div className="h-full flex items-center justify-center">
+        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-pink-600"></div>
       </div>
     );
   }
-
-  if (selectedProfile) {
-    const profileImages = userImages[selectedProfile.id] || [];
-
-    return (
-      <div className="h-full w-full relative flex flex-col">
-        {/* Main Image Area - takes full available height */}
-        <div className="flex-1 relative" onTouchEnd={handleTouch}>
-          {profileImages.length > 0 ? (
-            <>
-              <img
-                src={profileImages[imageIndex]}
-                alt={`${selectedProfile.first_name}'s photo`}
-                className="w-full h-full object-cover"
-              />
-              {/* Image indicators */}
-              <div className="absolute top-4 left-1/2 transform -translate-x-1/2 flex gap-1 z-10">
-                {profileImages.map((_, idx) => (
-                  <div
-                    key={idx}
-                    className={`w-2 h-2 rounded-full ${idx === imageIndex ? 'bg-white' : 'bg-white/40'}`}
-                  />
-                ))}
-              </div>
-            </>
-          ) : (
-            <div className="w-full h-full bg-gradient-to-br from-pink-200 to-purple-200 flex items-center justify-center">
-              <div className="w-32 h-32 bg-white rounded-full flex items-center justify-center">
-                <span className="text-4xl font-bold text-gray-700">
-                  {selectedProfile.first_name?.[0]}{selectedProfile.last_name?.[0]}
-                </span>
-              </div>
-            </div>
-          )}
-
-          {/* Header buttons */}
-          <Button
-            onClick={() => setSelectedProfile(null)}
-            variant="outline"
-            className="absolute top-4 left-4 bg-white/80 hover:bg-white z-10 h-10 px-3"
-          >
-            ← Back
-          </Button>
-
-          <Button
-            onClick={handleBlock}
-            variant="outline"
-            size="sm"
-            className="absolute top-4 right-4 bg-white/80 hover:bg-white z-10 h-10 w-10 p-0"
-          >
-            <Shield className="w-4 h-4" />
-          </Button>
-
-          {/* Gradient overlay for text readability */}
-          <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-transparent to-transparent pointer-events-none" />
-
-          {/* Profile Info Overlay - Fixed at bottom with proper spacing for mobile nav */}
-          <div className="absolute bottom-0 left-0 right-0 text-white pb-24">
-            {/* Main info section */}
-            <div className="px-6 pb-4">
-              <div className="mb-3">
-                <h2 className="text-2xl font-bold mb-1">
-                  {selectedProfile.first_name} {selectedProfile.last_name}
-                </h2>
-                <div className="flex items-center space-x-4 text-sm">
-                  <div className="flex items-center">
-                    <Calendar className="w-4 h-4 mr-1" />
-                    <span>{calculateAge(selectedProfile.date_of_birth)} years old</span>
-                  </div>
-                  <div className="flex items-center">
-                    <MapPin className="w-4 h-4 mr-1" />
-                    <span>{selectedProfile.city}, {selectedProfile.country}</span>
-                  </div>
-                </div>
-              </div>
-
-              {/* Expandable Info Section */}
-              <div className="mb-4">
-                <Button
-                  onClick={() => setShowMoreInfo(!showMoreInfo)}
-                  variant="ghost"
-                  className="text-white p-0 h-auto font-normal text-left mb-2 hover:bg-transparent"
-                >
-                  <span className="flex items-center text-sm">
-                    {showMoreInfo ? 'Show Less' : 'Show More'}
-                    {showMoreInfo ? <ChevronUp className="w-4 h-4 ml-1" /> : <ChevronDown className="w-4 h-4 ml-1" />}
-                  </span>
-                </Button>
-
-                {showMoreInfo && (
-                  <div className="space-y-3 bg-black/50 p-3 rounded-lg max-h-32 overflow-y-auto">
-                    {selectedProfile.bio && (
-                      <div>
-                        <h3 className="font-semibold mb-1 text-sm">About</h3>
-                        <p className="text-xs leading-relaxed">{selectedProfile.bio}</p>
-                      </div>
-                    )}
-
-                    {(selectedProfile.occupation || selectedProfile.education_level) && (
-                      <div className="space-y-2">
-                        {selectedProfile.occupation && (
-                          <div className="flex items-center text-xs">
-                            <Briefcase className="w-3 h-3 mr-2 flex-shrink-0" />
-                            <span>{selectedProfile.occupation}</span>
-                          </div>
-                        )}
-                        {selectedProfile.education_level && (
-                          <div className="flex items-center text-xs">
-                            <GraduationCap className="w-3 h-3 mr-2 flex-shrink-0" />
-                            <span>{selectedProfile.education_level}</span>
-                          </div>
-                        )}
-                      </div>
-                    )}
-
-                    {selectedProfile.interests && selectedProfile.interests.length > 0 && (
-                      <div>
-                        <h3 className="font-semibold mb-2 text-sm">Interests</h3>
-                        <div className="flex flex-wrap gap-1">
-                          {selectedProfile.interests.map((interest: string, index: number) => (
-                            <span
-                              key={index}
-                              className="px-2 py-1 bg-white/20 rounded-full text-xs"
-                            >
-                              {interest}
-                            </span>
-                          ))}
-                        </div>
-                      </div>
-                    )}
-                  </div>
-                )}
-              </div>
-            </div>
-
-            {/* Action Buttons - positioned above mobile nav */}
-            <div className="flex justify-center space-x-6 px-6">
-              <Button
-                onClick={() => handlePass(selectedProfile.id)}
-                variant="outline"
-                className="w-14 h-14 rounded-full border-2 border-red-400/80 bg-red-500/20 hover:bg-red-500/30 backdrop-blur-sm"
-              >
-                <X className="w-6 h-6 text-red-400" />
-              </Button>
-
-              <Button
-                onClick={() => handleLikeBack(selectedProfile.id)}
-                variant="outline"
-                className="w-14 h-14 rounded-full border-2 border-green-400/80 bg-green-500/20 hover:bg-green-500/30 backdrop-blur-sm"
-              >
-                <Heart className="w-6 h-6 text-green-400" />
-              </Button>
-            </div>
-          </div>
-        </div>
-
-        <BlockDialog
-          isOpen={blockDialogOpen}
-          onClose={() => setBlockDialogOpen(false)}
-          userToBlock={selectedProfile}
-          currentUserId={currentUser.id}
-          onBlockSuccess={handleBlockSuccess}
-        />
-      </div>
-    );
-  }
-
-  const visibleCount = getLikedMeVisibleCount();
-  const hasBlurredProfiles = !isPremium() && visibleCount !== -1 && likers.length > visibleCount;
 
   return (
-    <div className="h-full flex flex-col">
-      <div className="flex-shrink-0 bg-white border-b p-4">
-        <div className="flex items-center justify-between mb-2">
-          <div className="flex items-center space-x-2">
-            <Users className="w-6 h-6 text-pink-600" />
-            <h1 className="text-2xl font-bold text-gray-800">People who liked you</h1>
+    <div className="h-full overflow-y-auto bg-gradient-to-br from-pink-50 to-purple-50 pb-20">
+      <div className="p-6">
+        <div className="flex items-center justify-between mb-6">
+          <div>
+            <h1 className="text-2xl font-bold text-gray-800 flex items-center">
+              <Heart className="w-6 h-6 text-pink-600 mr-2" />
+              People Who Liked You
+            </h1>
+            <p className="text-gray-600 mt-1">
+              {likedProfiles.length} {likedProfiles.length === 1 ? 'person has' : 'people have'} liked you
+            </p>
           </div>
-          {hasBlurredProfiles && (
-            <Button
-              onClick={() => setShowPremiumUpgrade(true)}
-              className="bg-gradient-to-r from-yellow-400 to-yellow-600 hover:from-yellow-500 hover:to-yellow-700 text-black font-bold text-sm px-3 py-1"
-            >
-              <Crown className="w-4 h-4 mr-1" />
-              Upgrade to see all
-            </Button>
-          )}
         </div>
-        <p className="text-gray-600">({likers.length} people)</p>
-        {hasBlurredProfiles && (
-          <p className="text-sm text-yellow-600 mt-2">
-            Free users can see {visibleCount} profile{visibleCount !== 1 ? 's' : ''}. Upgrade to Premium to see all likes!
-          </p>
+
+        {/* Cooldown Warning for Free Users */}
+        {!isPremium() && !canUseLikeMe && cooldownUntil && (
+          <Card className="mb-6 border-orange-200 bg-orange-50">
+            <CardContent className="p-4">
+              <div className="flex items-center space-x-3">
+                <Timer className="w-5 h-5 text-orange-600" />
+                <div>
+                  <p className="font-medium text-orange-800">Like Me Cooldown Active</p>
+                  <p className="text-sm text-orange-600">
+                    You can match again in {formatCooldownTime(cooldownUntil)}. 
+                    <Button 
+                      variant="link" 
+                      className="p-0 ml-1 text-orange-600 underline"
+                      onClick={() => setShowPremiumUpgrade(true)}
+                    >
+                      Upgrade to Premium for unlimited access!
+                    </Button>
+                  </p>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
         )}
-      </div>
-      
-      <div className="flex-1 overflow-y-auto p-4 pb-24">
-        {likers.length === 0 ? (
-          <div className="flex items-center justify-center h-full">
-            <div className="text-center">
-              <Users className="w-16 h-16 text-gray-400 mx-auto mb-4" />
-              <h3 className="text-xl font-semibold text-gray-800 mb-2">No new likes</h3>
-              <p className="text-gray-600">Keep swiping! Someone special is waiting to find you.</p>
-            </div>
-          </div>
+
+        {likedProfiles.length === 0 ? (
+          <Card className="text-center py-12">
+            <CardContent>
+              <Heart className="w-16 h-16 text-gray-300 mx-auto mb-4" />
+              <h2 className="text-xl font-semibold text-gray-600 mb-2">No Likes Yet</h2>
+              <p className="text-gray-500">
+                Keep swiping! People who like you will appear here.
+              </p>
+            </CardContent>
+          </Card>
         ) : (
-          <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
-            {likers.map((liker, index) => {
-              const profileImages = userImages[liker.id] || [];
-              const isBlurred = !isPremium() && visibleCount !== -1 && index >= visibleCount;
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+            {likedProfiles.map((like) => {
+              const profile = like.liker;
+              const age = profile.age ? new Date().getFullYear() - new Date(profile.age).getFullYear() : null;
               
               return (
-                <Card
-                  key={liker.id}
-                  className={`cursor-pointer hover:shadow-lg transition-shadow flex flex-col relative ${isBlurred ? 'opacity-75' : ''}`}
-                  onClick={() => handleProfileClick(liker, index)}
-                >
-                  <div className="relative h-48 flex-shrink-0">
-                    {profileImages.length > 0 ? (
-                      <img
-                        src={profileImages[0]}
-                        alt={`${liker.first_name}'s photo`}
-                        className={`w-full h-full object-cover rounded-t-lg ${isBlurred ? 'blur-md' : ''}`}
-                      />
-                    ) : (
-                      <div className={`w-full h-full bg-gradient-to-br from-pink-200 to-purple-200 flex items-center justify-center rounded-t-lg ${isBlurred ? 'blur-md' : ''}`}>
-                        <span className="text-2xl font-bold text-gray-700">
-                          {liker.first_name?.[0]}{liker.last_name?.[0]}
-                        </span>
-                      </div>
-                    )}
-                    {isBlurred && (
-                      <div className="absolute inset-0 flex items-center justify-center bg-black/20 rounded-t-lg">
-                        <div className="bg-white/90 backdrop-blur-sm rounded-full p-3">
-                          <Lock className="w-6 h-6 text-gray-700" />
+                <Card key={like.id} className="overflow-hidden hover:shadow-lg transition-shadow">
+                  <CardContent className="p-0">
+                    <div className="aspect-square bg-gradient-to-br from-pink-100 to-purple-100 flex items-center justify-center">
+                      <div className="text-center">
+                        <div className="w-20 h-20 bg-pink-200 rounded-full flex items-center justify-center mx-auto mb-2">
+                          <span className="text-2xl font-bold text-pink-700">
+                            {profile.first_name?.charAt(0)}{profile.last_name?.charAt(0)}
+                          </span>
                         </div>
+                        <h3 className="font-semibold text-lg">
+                          {profile.first_name} {profile.last_name}
+                        </h3>
+                        {age && <p className="text-gray-600">{age} years old</p>}
+                        <p className="text-sm text-gray-500">
+                          {profile.city}, {profile.country}
+                        </p>
                       </div>
-                    )}
-                  </div>
-                  <CardContent className="p-3 flex-1">
-                    <h3 className={`font-semibold text-gray-800 truncate ${isBlurred ? 'blur-sm' : ''}`}>
-                      {liker.first_name}, {calculateAge(liker.date_of_birth)}
-                    </h3>
-                    <p className={`text-sm text-gray-600 truncate ${isBlurred ? 'blur-sm' : ''}`}>
-                      {liker.city}
-                    </p>
+                    </div>
+                    
+                    <div className="p-4">
+                      {profile.bio && (
+                        <p className="text-sm text-gray-600 mb-3 line-clamp-3">
+                          {profile.bio}
+                        </p>
+                      )}
+                      
+                      {profile.interests && profile.interests.length > 0 && (
+                        <div className="flex flex-wrap gap-1 mb-4">
+                          {profile.interests.slice(0, 3).map((interest: string, index: number) => (
+                            <Badge key={index} variant="secondary" className="text-xs">
+                              {interest}
+                            </Badge>
+                          ))}
+                          {profile.interests.length > 3 && (
+                            <Badge variant="outline" className="text-xs">
+                              +{profile.interests.length - 3} more
+                            </Badge>
+                          )}
+                        </div>
+                      )}
+                      
+                      <div className="flex space-x-2">
+                        <Button
+                          onClick={() => setSelectedUserId(profile.id)}
+                          variant="outline"
+                          className="flex-1"
+                          size="sm"
+                        >
+                          View Profile
+                        </Button>
+                        <Button
+                          onClick={() => handleLikeBack(profile.id)}
+                          className="flex-1"
+                          size="sm"
+                          disabled={!canUseLikeMe && !isPremium()}
+                        >
+                          <Heart className="w-4 h-4 mr-1" />
+                          {!canUseLikeMe && !isPremium() ? (
+                            <Lock className="w-4 h-4" />
+                          ) : (
+                            'Like Back'
+                          )}
+                        </Button>
+                      </div>
+                    </div>
                   </CardContent>
                 </Card>
               );
             })}
           </div>
         )}
+
+        {!isPremium() && likedProfiles.length > 0 && (
+          <Card className="mt-6 bg-gradient-to-r from-yellow-50 to-orange-50 border-yellow-200">
+            <CardContent className="p-4">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center space-x-3">
+                  <Crown className="w-6 h-6 text-yellow-600" />
+                  <div>
+                    <p className="font-medium text-yellow-800">Upgrade to Premium</p>
+                    <p className="text-sm text-yellow-600">
+                      See all your likes and match unlimited times from Like Me!
+                    </p>
+                  </div>
+                </div>
+                <Button
+                  onClick={() => setShowPremiumUpgrade(true)}
+                  className="bg-gradient-to-r from-yellow-500 to-orange-500 hover:from-yellow-600 hover:to-orange-600"
+                >
+                  <Crown className="w-4 h-4 mr-2" />
+                  Upgrade
+                </Button>
+              </div>
+            </CardContent>
+          </Card>
+        )}
       </div>
+
+      <UserProfileModal
+        isOpen={isUserProfileOpen}
+        onClose={() => setIsUserProfileOpen(false)}
+        userId={selectedUserId}
+      />
     </div>
   );
 };

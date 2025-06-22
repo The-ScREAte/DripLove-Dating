@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Heart, MessageCircle, Users, User } from 'lucide-react';
@@ -7,6 +8,7 @@ import LikedMePage from '@/components/LikedMePage';
 import ProfilePage from '@/components/ProfilePage';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
+import { useRealtimeMessages } from '@/hooks/useRealtimeMessages';
 
 interface MainAppProps {
   user: any;
@@ -17,28 +19,20 @@ const MainApp = ({ user, onLogout }: MainAppProps) => {
   const [activeTab, setActiveTab] = useState('discover');
   const [profile, setProfile] = useState<any>(null);
   const [unreadCount, setUnreadCount] = useState(0);
+  const [chatUsersWithUnread, setChatUsersWithUnread] = useState<Set<string>>(new Set());
   const { toast } = useToast();
+
+  useRealtimeMessages({
+    onUnreadChange: () => {
+      fetchUnreadCount();
+      fetchChatUsersWithUnread();
+    }
+  });
 
   useEffect(() => {
     fetchUserProfile();
     fetchUnreadCount();
-  }, [user]);
-
-  useEffect(() => {
-    const channel = supabase
-      .channel('unread-messages')
-      .on('postgres_changes', {
-        event: '*',
-        schema: 'public',
-        table: 'matches',
-      }, () => {
-        fetchUnreadCount();
-      })
-      .subscribe();
-
-    return () => {
-      supabase.removeChannel(channel);
-    };
+    fetchChatUsersWithUnread();
   }, [user]);
 
   const fetchUserProfile = async () => {
@@ -96,6 +90,35 @@ const MainApp = ({ user, onLogout }: MainAppProps) => {
     }
   };
 
+  const fetchChatUsersWithUnread = async () => {
+    if (!user?.id) return;
+
+    try {
+      const { data, error } = await supabase
+        .from('matches')
+        .select('user1_unread_count, user2_unread_count, user1_id, user2_id')
+        .or(`user1_id.eq.${user.id},user2_id.eq.${user.id}`)
+        .or(`user1_unread_count.gt.0,user2_unread_count.gt.0`);
+
+      if (error) throw error;
+
+      const usersWithUnread = new Set<string>();
+      data?.forEach(match => {
+        const isUser1 = match.user1_id === user.id;
+        const hasUnread = isUser1 ? match.user1_unread_count > 0 : match.user2_unread_count > 0;
+        
+        if (hasUnread) {
+          const partnerId = isUser1 ? match.user2_id : match.user1_id;
+          usersWithUnread.add(partnerId);
+        }
+      });
+
+      setChatUsersWithUnread(usersWithUnread);
+    } catch (error) {
+      console.error('Error fetching chat users with unread:', error);
+    }
+  };
+
   const handleNavigateToChat = (userId: string) => {
     setActiveTab('chat');
   };
@@ -149,13 +172,18 @@ const MainApp = ({ user, onLogout }: MainAppProps) => {
                 activeTab === label.toLowerCase() ? 'text-pink-600' : 'text-gray-500'
               }`}
             >
-              <Icon className={`w-5 h-5 ${activeTab === label.toLowerCase() ? 'fill-current' : ''}`} />
+              <div className="relative">
+                <Icon className={`w-5 h-5 ${activeTab === label.toLowerCase() ? 'fill-current' : ''}`} />
+                {label === 'Chat' && unreadCount > 0 && (
+                  <>
+                    <span className="absolute -top-2 -right-2 bg-red-500 text-white text-xs rounded-full px-1.5 py-0.5 min-w-[16px] text-center">
+                      {unreadCount}
+                    </span>
+                    <div className="absolute -top-1 -right-1 w-2 h-2 bg-red-500 rounded-full border border-white"></div>
+                  </>
+                )}
+              </div>
               <span className="text-xs font-medium">{label}</span>
-              {label === 'Chat' && unreadCount > 0 && (
-                <span className="absolute -top-1 -right-1 bg-red-500 text-white text-xs rounded-full px-1.5 py-0.5 min-w-[16px] text-center">
-                  {unreadCount}
-                </span>
-              )}
             </button>
           ))}
         </div>

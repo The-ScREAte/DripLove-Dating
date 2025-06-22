@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect, useRef } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -9,6 +8,7 @@ import { useToast } from '@/hooks/use-toast';
 import EmojiPicker from './EmojiPicker';
 import ChatUserAvatar from './ChatUserAvatar';
 import UserProfileModal from './UserProfileModal';
+import { useRealtimeMessages } from '@/hooks/useRealtimeMessages';
 
 interface ChatPageProps {
   currentUser: any;
@@ -26,7 +26,18 @@ const ChatPage = ({ currentUser, onUnreadChange }: ChatPageProps) => {
   const [selectedUserId, setSelectedUserId] = useState<string>('');
   const { toast } = useToast();
   const messagesEndRef = useRef<HTMLDivElement>(null);
-  const messagesContainerRef = useRef<HTMLDivElement>(null);
+
+  useRealtimeMessages({
+    onNewMessage: () => {
+      if (selectedMatch) {
+        fetchMessages();
+      }
+    },
+    onUnreadCountChange: () => {
+      fetchMatches();
+      onUnreadChange?.();
+    }
+  });
 
   useEffect(() => {
     fetchMatches();
@@ -51,35 +62,33 @@ const ChatPage = ({ currentUser, onUnreadChange }: ChatPageProps) => {
     if (!currentUser?.id) return;
   
     try {
-      const { data, error } = await supabase
-        .from('matches')
-        .select(`
-          *,
-          user1:profiles!matches_user1_id_fkey(id, first_name, last_name, is_admin),
-          user2:profiles!matches_user2_id_fkey(id, first_name, last_name, is_admin)
-        `)
-        .or(`user1_id.eq.${currentUser.id},user2_id.eq.${currentUser.id}`)
-        .order('created_at', { ascending: false });
-  
+      const { data, error } = await supabase.rpc('get_active_matches', {
+        user_id_param: currentUser.id
+      });
+
       if (error) throw error;
-  
-      const matchesWithPartner = data?.map(match => {
-        const isUser1 = match.user1_id === currentUser.id;
-        const partner = isUser1 ? match.user2 : match.user1;
-  
-        return {
-          ...match,
-          partner,
-          unreadCount: isUser1 ? match.user1_unread_count : match.user2_unread_count
-        };
-      }).filter(match => !match.partner?.is_admin) || [];
-  
-      setMatches(matchesWithPartner);
+
+      const matchesWithUnread = data?.map(match => ({
+        id: match.id,
+        user1_id: match.user1_id,
+        user2_id: match.user2_id,
+        user1_unread_count: match.user1_unread_count,
+        user2_unread_count: match.user2_unread_count,
+        last_msg_at: match.last_msg_at,
+        created_at: match.created_at,
+        partner: {
+          id: match.partner_id,
+          first_name: match.partner_first_name,
+          last_name: match.partner_last_name
+        },
+        unreadCount: match.user1_id === currentUser.id ? match.user1_unread_count : match.user2_unread_count
+      })) || [];
+
+      setMatches(matchesWithUnread);
     } catch (error) {
       console.error('Error fetching matches:', error);
     }
   };
-  
 
   const fetchMessages = async () => {
     if (!selectedMatch?.id) return;
@@ -105,13 +114,10 @@ const ChatPage = ({ currentUser, onUnreadChange }: ChatPageProps) => {
     if (!selectedMatch?.id || !currentUser?.id) return;
 
     try {
-      const isUser1 = selectedMatch.user1_id === currentUser.id;
-      const updateField = isUser1 ? 'user1_unread_count' : 'user2_unread_count';
-
-      await supabase
-        .from('matches')
-        .update({ [updateField]: 0 })
-        .eq('id', selectedMatch.id);
+      await supabase.rpc('mark_messages_read', {
+        match_id_param: selectedMatch.id,
+        user_id_param: currentUser.id
+      });
 
       fetchMatches();
       onUnreadChange?.();
@@ -138,7 +144,8 @@ const ChatPage = ({ currentUser, onUnreadChange }: ChatPageProps) => {
         .insert({
           match_id: selectedMatch.id,
           sender_id: currentUser.id,
-          message: newMessage.trim()
+          message: newMessage.trim(),
+          is_read: false
         });
   
       if (error) throw error;
@@ -156,7 +163,6 @@ const ChatPage = ({ currentUser, onUnreadChange }: ChatPageProps) => {
       });
     }
   };
-  
 
   const handleEmojiSelect = (emoji: string) => {
     setNewMessage(prev => prev + emoji);
@@ -206,7 +212,7 @@ const ChatPage = ({ currentUser, onUnreadChange }: ChatPageProps) => {
           {filteredMatches.length === 0 ? (
             <div className="flex items-center justify-center h-full">
               <p className="text-center text-gray-500 p-4">
-                {searchTerm ? 'No matches found' : 'No matches yet'}
+                {searchTerm ? 'No matches found' : 'No active chats'}
               </p>
             </div>
           ) : (
@@ -218,28 +224,36 @@ const ChatPage = ({ currentUser, onUnreadChange }: ChatPageProps) => {
                   className="p-4 hover:bg-gray-50 transition-colors cursor-pointer"
                 >
                   <div className="flex items-center space-x-3">
-                  <div className="relative">
-  <ChatUserAvatar 
-    userId={match.partner?.id}
-    firstName={match.partner?.first_name}
-    lastName={match.partner?.last_name}
-    onClick={() => handleUserProfileClick(match.partner?.id)}
-    size="lg"
-  />
-  {match.unreadCount > 0 && (
-    <span className="absolute top-0 right-0 -mt-1 -mr-1 bg-red-500 text-white text-xs font-bold rounded-full h-5 w-5 flex items-center justify-center z-10">
-      {match.unreadCount}
-    </span>
-  )}
-</div>
+                    <div className="relative">
+                      <ChatUserAvatar 
+                        userId={match.partner?.id}
+                        firstName={match.partner?.first_name}
+                        lastName={match.partner?.last_name}
+                        onClick={() => handleUserProfileClick(match.partner?.id)}
+                        size="lg"
+                      />
+                      {match.unreadCount > 0 && (
+                        <>
+                          <span className="absolute top-0 right-0 -mt-1 -mr-1 bg-red-500 text-white text-xs font-bold rounded-full h-5 w-5 flex items-center justify-center z-10">
+                            {match.unreadCount}
+                          </span>
+                          <div className="absolute top-1 right-1 w-2 h-2 bg-red-500 rounded-full border border-white"></div>
+                        </>
+                      )}
+                    </div>
                     <div className="flex-1 min-w-0">
                       <div className="flex justify-between items-center">
                         <span className="font-semibold text-gray-900 truncate">
                           {match.partner?.first_name} {match.partner?.last_name}
                         </span>
+                        {match.last_msg_at && (
+                          <span className="text-xs text-gray-500">
+                            {new Date(match.last_msg_at).toLocaleDateString()}
+                          </span>
+                        )}
                       </div>
                       <p className="text-sm text-gray-500 truncate">
-                        Tap to start chatting
+                        {match.unreadCount > 0 ? `${match.unreadCount} unread messages` : 'Tap to start chatting'}
                       </p>
                     </div>
                   </div>
@@ -265,13 +279,18 @@ const ChatPage = ({ currentUser, onUnreadChange }: ChatPageProps) => {
         >
           <ArrowLeft className="w-5 h-5" />
         </Button>
-        <ChatUserAvatar
-          userId={selectedMatch.partner?.id}
-          firstName={selectedMatch.partner?.first_name}
-          lastName={selectedMatch.partner?.last_name}
-          onClick={() => handleUserProfileClick(selectedMatch.partner?.id)}
-          size="md"
-        />
+        <div className="relative">
+          <ChatUserAvatar
+            userId={selectedMatch.partner?.id}
+            firstName={selectedMatch.partner?.first_name}
+            lastName={selectedMatch.partner?.last_name}
+            onClick={() => handleUserProfileClick(selectedMatch.partner?.id)}
+            size="md"
+          />
+          {selectedMatch.unreadCount > 0 && (
+            <div className="absolute top-0 right-0 w-3 h-3 bg-red-500 rounded-full border border-white"></div>
+          )}
+        </div>
         <div className="flex-1">
           <h2 className="font-semibold text-gray-900">
             {selectedMatch.partner?.first_name} {selectedMatch.partner?.last_name}
@@ -299,9 +318,16 @@ const ChatPage = ({ currentUser, onUnreadChange }: ChatPageProps) => {
                 }`}
               >
                 <p className="text-sm whitespace-pre-wrap">{message.message}</p>
-                <p className="text-xs opacity-70 mt-1">
-                  {new Date(message.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-                </p>
+                <div className="flex items-center justify-between mt-1">
+                  <p className="text-xs opacity-70">
+                    {new Date(message.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                  </p>
+                  {message.sender_id === currentUser.id && (
+                    <span className={`text-xs ${message.is_read ? 'opacity-70' : 'opacity-50'}`}>
+                      {message.is_read ? '✓✓' : '✓'}
+                    </span>
+                  )}
+                </div>
               </div>
             </div>
           ))
