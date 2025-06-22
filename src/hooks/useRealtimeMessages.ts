@@ -1,5 +1,5 @@
 
-import { useEffect } from 'react';
+import { useEffect, useRef } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 
 interface UseRealtimeMessagesProps {
@@ -8,9 +8,17 @@ interface UseRealtimeMessagesProps {
 }
 
 export const useRealtimeMessages = ({ onNewMessage, onUnreadCountChange }: UseRealtimeMessagesProps) => {
+  const channelRef = useRef<any>(null);
+
   useEffect(() => {
-    const messageChannel = supabase
-      .channel('messages-updates')
+    // Clean up existing channel if it exists
+    if (channelRef.current) {
+      supabase.removeChannel(channelRef.current);
+    }
+
+    // Create new channel
+    channelRef.current = supabase
+      .channel('global-messages-updates')
       .on('postgres_changes', {
         event: 'INSERT',
         schema: 'public',
@@ -26,10 +34,6 @@ export const useRealtimeMessages = ({ onNewMessage, onUnreadCountChange }: UseRe
       }, () => {
         onUnreadCountChange?.();
       })
-      .subscribe();
-
-    const matchChannel = supabase
-      .channel('matches-updates')
       .on('postgres_changes', {
         event: 'UPDATE',
         schema: 'public',
@@ -40,8 +44,10 @@ export const useRealtimeMessages = ({ onNewMessage, onUnreadCountChange }: UseRe
       .subscribe();
 
     return () => {
-      supabase.removeChannel(messageChannel);
-      supabase.removeChannel(matchChannel);
+      if (channelRef.current) {
+        supabase.removeChannel(channelRef.current);
+        channelRef.current = null;
+      }
     };
   }, [onNewMessage, onUnreadCountChange]);
 };
