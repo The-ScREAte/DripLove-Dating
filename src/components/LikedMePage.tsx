@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -142,7 +141,7 @@ const LikedMePage = ({ currentUser }: LikedMePageProps) => {
     }
   };
 
-  const handleLi keBack = async (profileId: string) => {
+  const handleLikeBack = async (profileId: string) => {
     if (!canUseLikeMe && !isPremium()) {
       toast({
         title: 'Like Me Cooldown',
@@ -209,7 +208,7 @@ const LikedMePage = ({ currentUser }: LikedMePageProps) => {
   };
 
   if (showPremiumUpgrade) {
-    return <PremiumUpgrade currentUser={currentUser} onClose={() => setShowPremiumUprade(false)} />;
+    return <PremiumUpgrade currentUser={currentUser} onClose={() => setShowPremiumUpgrade(false)} />;
   }
 
   if (loading) {
