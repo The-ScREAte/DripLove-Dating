@@ -36,28 +36,23 @@ const LikedMePage = ({ currentUser }: LikedMePageProps) => {
     if (!currentUser?.id) return;
 
     try {
-      // Check if user is premium first
-      if (isPremium()) {
-        setCanUseLikeMe(true);
-        return;
-      }
+      const { data: canUse, error: cooldownError } = await supabase.rpc('can_use_like_me', {
+        user_id_param: currentUser.id
+      });
 
-      // For free users, check cooldown
-      const { data: profile, error } = await supabase
-        .from('profiles')
-        .select('like_me_cooldown_until')
-        .eq('id', currentUser.id)
-        .single();
-
-      if (error) throw error;
-
-      const cooldownTime = profile?.like_me_cooldown_until;
-      const now = new Date();
-      const canUse = !cooldownTime || new Date(cooldownTime) <= now;
+      if (cooldownError) throw cooldownError;
 
       setCanUseLikeMe(canUse);
+
       if (!canUse) {
-        setCooldownUntil(cooldownTime);
+        const { data: profile, error: profileError } = await supabase
+          .from('profiles')
+          .select('like_me_cooldown_until')
+          .eq('id', currentUser.id)
+          .single();
+
+        if (profileError) throw profileError;
+        setCooldownUntil(profile.like_me_cooldown_until);
       }
     } catch (error) {
       console.error('Error checking Like Me cooldown:', error);
@@ -166,14 +161,9 @@ const LikedMePage = ({ currentUser }: LikedMePageProps) => {
 
       // Set cooldown for free users
       if (!isPremium()) {
-        const cooldownDate = new Date();
-        cooldownDate.setDate(cooldownDate.getDate() + 90);
-        
-        await supabase
-          .from('profiles')
-          .update({ like_me_cooldown_until: cooldownDate.toISOString() })
-          .eq('id', currentUser.id);
-          
+        await supabase.rpc('set_like_me_cooldown', {
+          user_id_param: currentUser.id
+        });
         setCanUseLikeMe(false);
         checkLikeMeCooldown();
       }

@@ -12,10 +12,10 @@ import { useRealtimeMessages } from '@/hooks/useRealtimeMessages';
 
 interface ChatPageProps {
   currentUser: any;
-  onUnreadCountChange?: () => void;
+  onUnreadChange?: () => void;
 }
 
-const ChatPage = ({ currentUser, onUnreadCountChange }: ChatPageProps) => {
+const ChatPage = ({ currentUser, onUnreadChange }: ChatPageProps) => {
   const [matches, setMatches] = useState<any[]>([]);
   const [selectedMatch, setSelectedMatch] = useState<any>(null);
   const [messages, setMessages] = useState<any[]>([]);
@@ -35,7 +35,7 @@ const ChatPage = ({ currentUser, onUnreadCountChange }: ChatPageProps) => {
     },
     onUnreadCountChange: () => {
       fetchMatches();
-      onUnreadCountChange?.();
+      onUnreadChange?.();
     }
   });
 
@@ -62,49 +62,29 @@ const ChatPage = ({ currentUser, onUnreadCountChange }: ChatPageProps) => {
     if (!currentUser?.id) return;
   
     try {
-      // Get matches excluding those older than 3 weeks and blocked users
-      const { data: matchesData, error: matchesError } = await supabase
-        .from('matches')
-        .select(`
-          id,
-          user1_id,
-          user2_id,
-          user1_unread_count,
-          user2_unread_count,
-          last_msg_at,
-          created_at
-        `)
-        .or(`user1_id.eq.${currentUser.id},user2_id.eq.${currentUser.id}`)
-        .or(`last_msg_at.is.null,last_msg_at.gt.${new Date(Date.now() - 21 * 24 * 60 * 60 * 1000).toISOString()}`);
+      const { data, error } = await supabase.rpc('get_active_matches', {
+        user_id_param: currentUser.id
+      });
 
-      if (matchesError) throw matchesError;
+      if (error) throw error;
 
-      // Get profile data for partners
-      const matchesWithPartners = await Promise.all(
-        (matchesData || []).map(async (match) => {
-          const partnerId = match.user1_id === currentUser.id ? match.user2_id : match.user1_id;
-          
-          const { data: partnerProfile, error: profileError } = await supabase
-            .from('profiles')
-            .select('id, first_name, last_name')
-            .eq('id', partnerId)
-            .single();
+      const matchesWithUnread = data?.map(match => ({
+        id: match.id,
+        user1_id: match.user1_id,
+        user2_id: match.user2_id,
+        user1_unread_count: match.user1_unread_count,
+        user2_unread_count: match.user2_unread_count,
+        last_msg_at: match.last_msg_at,
+        created_at: match.created_at,
+        partner: {
+          id: match.partner_id,
+          first_name: match.partner_first_name,
+          last_name: match.partner_last_name
+        },
+        unreadCount: match.user1_id === currentUser.id ? match.user1_unread_count : match.user2_unread_count
+      })) || [];
 
-          if (profileError) {
-            console.error('Error fetching partner profile:', profileError);
-            return null;
-          }
-
-          return {
-            ...match,
-            partner: partnerProfile,
-            unreadCount: match.user1_id === currentUser.id ? match.user1_unread_count : match.user2_unread_count
-          };
-        })
-      );
-
-      const validMatches = matchesWithPartners.filter(match => match !== null);
-      setMatches(validMatches);
+      setMatches(matchesWithUnread);
     } catch (error) {
       console.error('Error fetching matches:', error);
     }
@@ -134,26 +114,13 @@ const ChatPage = ({ currentUser, onUnreadCountChange }: ChatPageProps) => {
     if (!selectedMatch?.id || !currentUser?.id) return;
 
     try {
-      // Mark messages as read
-      await supabase
-        .from('chats')
-        .update({ is_read: true })
-        .eq('match_id', selectedMatch.id)
-        .neq('sender_id', currentUser.id)
-        .eq('is_read', false);
-
-      // Reset unread count in matches
-      const updateData = selectedMatch.user1_id === currentUser.id 
-        ? { user1_unread_count: 0 }
-        : { user2_unread_count: 0 };
-
-      await supabase
-        .from('matches')
-        .update(updateData)
-        .eq('id', selectedMatch.id);
+      await supabase.rpc('mark_messages_read', {
+        match_id_param: selectedMatch.id,
+        user_id_param: currentUser.id
+      });
 
       fetchMatches();
-      onUnreadCountChange?.();
+      onUnreadChange?.();
     } catch (error) {
       console.error('Error marking messages as read:', error);
     }
@@ -186,7 +153,7 @@ const ChatPage = ({ currentUser, onUnreadCountChange }: ChatPageProps) => {
       setNewMessage('');
       fetchMessages();
       fetchMatches();
-      onUnreadCountChange?.();
+      onUnreadChange?.();
     } catch (error) {
       console.error('Error sending message:', error);
       toast({
