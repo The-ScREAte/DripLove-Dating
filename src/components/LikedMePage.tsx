@@ -36,23 +36,28 @@ const LikedMePage = ({ currentUser }: LikedMePageProps) => {
     if (!currentUser?.id) return;
 
     try {
-      const { data: canUse, error: cooldownError } = await supabase.rpc('can_use_like_me', {
-        user_id_param: currentUser.id
-      });
+      // Check if user is premium first
+      if (isPremium()) {
+        setCanUseLikeMe(true);
+        return;
+      }
 
-      if (cooldownError) throw cooldownError;
+      // For free users, check cooldown
+      const { data: profile, error } = await supabase
+        .from('profiles')
+        .select('like_me_cooldown_until')
+        .eq('id', currentUser.id)
+        .single();
+
+      if (error) throw error;
+
+      const cooldownTime = profile?.like_me_cooldown_until;
+      const now = new Date();
+      const canUse = !cooldownTime || new Date(cooldownTime) <= now;
 
       setCanUseLikeMe(canUse);
-
       if (!canUse) {
-        const { data: profile, error: profileError } = await supabase
-          .from('profiles')
-          .select('like_me_cooldown_until')
-          .eq('id', currentUser.id)
-          .single();
-
-        if (profileError) throw profileError;
-        setCooldownUntil(profile.like_me_cooldown_until);
+        setCooldownUntil(cooldownTime);
       }
     } catch (error) {
       console.error('Error checking Like Me cooldown:', error);
@@ -137,7 +142,7 @@ const LikedMePage = ({ currentUser }: LikedMePageProps) => {
     }
   };
 
-  const handleLikeBack = async (profileId: string) => {
+  const handleLi keBack = async (profileId: string) => {
     if (!canUseLikeMe && !isPremium()) {
       toast({
         title: 'Like Me Cooldown',
@@ -161,9 +166,14 @@ const LikedMePage = ({ currentUser }: LikedMePageProps) => {
 
       // Set cooldown for free users
       if (!isPremium()) {
-        await supabase.rpc('set_like_me_cooldown', {
-          user_id_param: currentUser.id
-        });
+        const cooldownDate = new Date();
+        cooldownDate.setDate(cooldownDate.getDate() + 90);
+        
+        await supabase
+          .from('profiles')
+          .update({ like_me_cooldown_until: cooldownDate.toISOString() })
+          .eq('id', currentUser.id);
+          
         setCanUseLikeMe(false);
         checkLikeMeCooldown();
       }
@@ -199,7 +209,7 @@ const LikedMePage = ({ currentUser }: LikedMePageProps) => {
   };
 
   if (showPremiumUpgrade) {
-    return <PremiumUpgrade currentUser={currentUser} onClose={() => setShowPremiumUpgrade(false)} />;
+    return <PremiumUpgrade currentUser={currentUser} onClose={() => setShowPremiumUprade(false)} />;
   }
 
   if (loading) {
