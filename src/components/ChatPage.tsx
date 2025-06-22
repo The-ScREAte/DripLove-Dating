@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect, useRef } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -62,29 +63,49 @@ const ChatPage = ({ currentUser, onUnreadChange }: ChatPageProps) => {
     if (!currentUser?.id) return;
   
     try {
-      const { data, error } = await supabase.rpc('get_active_matches', {
-        user_id_param: currentUser.id
-      });
+      // Get matches excluding those older than 3 weeks and blocked users
+      const { data: matchesData, error: matchesError } = await supabase
+        .from('matches')
+        .select(`
+          id,
+          user1_id,
+          user2_id,
+          user1_unread_count,
+          user2_unread_count,
+          last_msg_at,
+          created_at
+        `)
+        .or(`user1_id.eq.${currentUser.id},user2_id.eq.${currentUser.id}`)
+        .or(`last_msg_at.is.null,last_msg_at.gt.${new Date(Date.now() - 21 * 24 * 60 * 60 * 1000).toISOString()}`);
 
-      if (error) throw error;
+      if (matchesError) throw matchesError;
 
-      const matchesWithUnread = data?.map(match => ({
-        id: match.id,
-        user1_id: match.user1_id,
-        user2_id: match.user2_id,
-        user1_unread_count: match.user1_unread_count,
-        user2_unread_count: match.user2_unread_count,
-        last_msg_at: match.last_msg_at,
-        created_at: match.created_at,
-        partner: {
-          id: match.partner_id,
-          first_name: match.partner_first_name,
-          last_name: match.partner_last_name
-        },
-        unreadCount: match.user1_id === currentUser.id ? match.user1_unread_count : match.user2_unread_count
-      })) || [];
+      // Get profile data for partners
+      const matchesWithPartners = await Promise.all(
+        (matchesData || []).map(async (match) => {
+          const partnerId = match.user1_id === currentUser.id ? match.user2_id : match.user1_id;
+          
+          const { data: partnerProfile, error: profileError } = await supabase
+            .from('profiles')
+            .select('id, first_name, last_name')
+            .eq('id', partnerId)
+            .single();
 
-      setMatches(matchesWithUnread);
+          if (profileError) {
+            console.error('Error fetching partner profile:', profileError);
+            return null;
+          }
+
+          return {
+            ...match,
+            partner: partnerProfile,
+            unreadCount: match.user1_id === currentUser.id ? match.user1_unread_count : match.user2_unread_count
+          };
+        })
+      );
+
+      const validMatches = matchesWithPartners.filter(match => match !== null);
+      setMatches(validMatches);
     } catch (error) {
       console.error('Error fetching matches:', error);
     }
@@ -114,10 +135,23 @@ const ChatPage = ({ currentUser, onUnreadChange }: ChatPageProps) => {
     if (!selectedMatch?.id || !currentUser?.id) return;
 
     try {
-      await supabase.rpc('mark_messages_read', {
-        match_id_param: selectedMatch.id,
-        user_id_param: currentUser.id
-      });
+      // Mark messages as read
+      await supabase
+        .from('chats')
+        .update({ is_read: true })
+        .eq('match_id', selectedMatch.id)
+        .neq('sender_id', currentUser.id)
+        .eq('is_read', false);
+
+      // Reset unread count in matches
+      const updateData = selectedMatch.user1_id === currentUser.id 
+        ? { user1_unread_count: 0 }
+        : { user2_unread_count: 0 };
+
+      await supabase
+        .from('matches')
+        .update(updateData)
+        .eq('id', selectedMatch.id);
 
       fetchMatches();
       onUnreadChange?.();

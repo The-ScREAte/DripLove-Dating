@@ -23,7 +23,7 @@ const MainApp = ({ user, onLogout }: MainAppProps) => {
   const { toast } = useToast();
 
   useRealtimeMessages({
-    onUnreadChange: () => {
+    onUnreadCountChange: () => {
       fetchUnreadCount();
       fetchChatUsersWithUnread();
     }
