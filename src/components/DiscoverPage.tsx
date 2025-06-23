@@ -52,6 +52,8 @@ const DiscoverPage = ({ currentUser, onNavigateToChat }: DiscoverPageProps) => {
   const [currentX, setCurrentX] = useState(0);
   const [currentY, setCurrentY] = useState(0);
   const [isDragging, setIsDragging] = useState(false);
+  const [swipeDirection, setSwipeDirection] = useState<'left' | 'right' | null>(null);
+  const [swipeDistance, setSwipeDistance] = useState(0);
 
   useEffect(() => {
     fetchPotentialMatches();
@@ -155,6 +157,8 @@ const DiscoverPage = ({ currentUser, onNavigateToChat }: DiscoverPageProps) => {
     setCurrentX(touch.clientX);
     setCurrentY(touch.clientY);
     setIsDragging(true);
+    setSwipeDirection(null);
+    setSwipeDistance(0);
   };
 
   const handleTouchMove = (e: React.TouchEvent) => {
@@ -162,6 +166,15 @@ const DiscoverPage = ({ currentUser, onNavigateToChat }: DiscoverPageProps) => {
     const touch = e.touches[0];
     setCurrentX(touch.clientX);
     setCurrentY(touch.clientY);
+    
+    const deltaX = touch.clientX - startX;
+    const deltaY = Math.abs(touch.clientY - startY);
+    
+    // Only show swipe feedback if horizontal movement is greater than vertical
+    if (Math.abs(deltaX) > deltaY) {
+      setSwipeDistance(Math.abs(deltaX));
+      setSwipeDirection(deltaX > 0 ? 'right' : 'left');
+    }
   };
 
   const handleTouchEnd = (e: React.TouchEvent) => {
@@ -188,6 +201,8 @@ const DiscoverPage = ({ currentUser, onNavigateToChat }: DiscoverPageProps) => {
     setStartY(0);
     setCurrentX(0);
     setCurrentY(0);
+    setSwipeDirection(null);
+    setSwipeDistance(0);
   };
 
   // Mouse event handlers for swipe on desktop
@@ -197,12 +212,23 @@ const DiscoverPage = ({ currentUser, onNavigateToChat }: DiscoverPageProps) => {
     setCurrentX(e.clientX);
     setCurrentY(e.clientY);
     setIsDragging(true);
+    setSwipeDirection(null);
+    setSwipeDistance(0);
   };
 
   const handleMouseMove = (e: React.MouseEvent) => {
     if (!isDragging) return;
     setCurrentX(e.clientX);
     setCurrentY(e.clientY);
+    
+    const deltaX = e.clientX - startX;
+    const deltaY = Math.abs(e.clientY - startY);
+    
+    // Only show swipe feedback if horizontal movement is greater than vertical
+    if (Math.abs(deltaX) > deltaY) {
+      setSwipeDistance(Math.abs(deltaX));
+      setSwipeDirection(deltaX > 0 ? 'right' : 'left');
+    }
   };
 
   const handleMouseUp = (e: React.MouseEvent) => {
@@ -229,6 +255,8 @@ const DiscoverPage = ({ currentUser, onNavigateToChat }: DiscoverPageProps) => {
     setStartY(0);
     setCurrentX(0);
     setCurrentY(0);
+    setSwipeDirection(null);
+    setSwipeDistance(0);
   };
 
   const handleImageAreaClick = (e: React.MouseEvent<HTMLDivElement>) => {
@@ -456,12 +484,17 @@ const DiscoverPage = ({ currentUser, onNavigateToChat }: DiscoverPageProps) => {
     );
   }
 
+  // Calculate swipe overlay opacity and transform
+  const swipeOpacity = Math.min(swipeDistance / 100, 0.8);
+  const cardTransform = isDragging ? `translateX(${currentX - startX}px) rotate(${(currentX - startX) * 0.1}deg)` : '';
+
   return (
     <div className="h-full w-full relative flex flex-col">
       {/* Main Image Area - Fixed height container with reserved space for buttons */}
       <div className="flex-1 relative overflow-hidden pb-32">
         <div 
-          className="h-full w-full cursor-pointer select-none" 
+          className="h-full w-full cursor-pointer select-none relative" 
+          style={{ transform: cardTransform, transition: isDragging ? 'none' : 'transform 0.3s ease-out' }}
           onTouchStart={handleTouchStart}
           onTouchMove={handleTouchMove}
           onTouchEnd={handleTouchEnd}
@@ -470,6 +503,37 @@ const DiscoverPage = ({ currentUser, onNavigateToChat }: DiscoverPageProps) => {
           onMouseUp={handleMouseUp}
           onClick={handleImageAreaClick}
         >
+          {/* Swipe Feedback Overlays */}
+          {isDragging && swipeDirection && (
+            <>
+              {/* Like Overlay (Right Swipe) */}
+              {swipeDirection === 'right' && (
+                <div 
+                  className="absolute inset-0 bg-green-500/20 flex items-center justify-center z-20 pointer-events-none"
+                  style={{ opacity: swipeOpacity }}
+                >
+                  <div className="bg-green-500 text-white px-8 py-4 rounded-full font-bold text-2xl shadow-lg transform rotate-12">
+                    <Heart className="w-8 h-8 inline mr-2" />
+                    LIKE
+                  </div>
+                </div>
+              )}
+              
+              {/* Dislike Overlay (Left Swipe) */}
+              {swipeDirection === 'left' && (
+                <div 
+                  className="absolute inset-0 bg-red-500/20 flex items-center justify-center z-20 pointer-events-none"
+                  style={{ opacity: swipeOpacity }}
+                >
+                  <div className="bg-red-500 text-white px-8 py-4 rounded-full font-bold text-2xl shadow-lg transform -rotate-12">
+                    <X className="w-8 h-8 inline mr-2" />
+                    NOPE
+                  </div>
+                </div>
+              )}
+            </>
+          )}
+
           {currentMatch.images?.length > 0 ? (
             <>
               <img

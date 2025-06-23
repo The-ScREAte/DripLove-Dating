@@ -1,48 +1,33 @@
+
 import React, { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
-import { Users, Heart, MessageCircle, UserX, TrendingUp, Activity, Plus, Search, Shield, Ban, Pause, Trash2, RotateCcw, LogOut, Eye, Calendar } from 'lucide-react';
-import { supabase } from '@/integrations/supabase/client';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Badge } from '@/components/ui/badge';
 import { useToast } from '@/hooks/use-toast';
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from '@/components/ui/table';
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogHeader,
-  DialogTitle,
-  DialogTrigger,
-} from '@/components/ui/dialog';
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select';
-import UserProfileModal from '@/components/UserProfileModal';
+import { supabase } from '@/integrations/supabase/client';
+import { 
+  Users, 
+  Heart, 
+  MessageSquare, 
+  UserX, 
+  TrendingUp,
+  Calendar,
+  Shield,
+  Search,
+  Eye,
+  Ban,
+  Pause,
+  Play,
+  Trash2
+} from 'lucide-react';
 
-interface AdminStats {
-  total_users: number;
-  total_matches: number;
-  total_likes: number;
-  total_blocks: number;
-  active_conversations: number;
-  active_users_today: number;
-  new_users_this_month: number;
-  matches_this_month: number;
+interface AdminPageProps {
+  currentUser: any;
 }
 
-interface AppStatsResponse {
+interface AppStats {
   total_users: number;
   total_matches: number;
   total_likes: number;
@@ -63,375 +48,125 @@ interface UserProfile {
   email: string;
   account_status: string;
   created_at: string;
-  is_admin: boolean;
+  city: string;
+  country: string;
+  age: number;
 }
 
-const AdminPage = () => {
-  const [stats, setStats] = useState<AdminStats | null>(null);
+const AdminPage = ({ currentUser }: AdminPageProps) => {
+  const [stats, setStats] = useState<AppStats | null>(null);
   const [users, setUsers] = useState<UserProfile[]>([]);
-  const [adminUsers, setAdminUsers] = useState<UserProfile[]>([]);
-  const [regularUsers, setRegularUsers] = useState<UserProfile[]>([]);
-  const [filteredUsers, setFilteredUsers] = useState<UserProfile[]>([]);
-  const [filteredAdmins, setFilteredAdmins] = useState<UserProfile[]>([]);
   const [searchTerm, setSearchTerm] = useState('');
+  const [statusFilter, setStatusFilter] = useState('all');
   const [loading, setLoading] = useState(true);
-  const [isAuthorized, setIsAuthorized] = useState(false);
-  const [currentUser, setCurrentUser] = useState<any>(null);
-  const [showCreateAdmin, setShowCreateAdmin] = useState(false);
-  const [showManualMatch, setShowManualMatch] = useState(false);
-  const [selectedUserId, setSelectedUserId] = useState<string | null>(null);
-  const [showProfileModal, setShowProfileModal] = useState(false);
-  const [userPage, setUserPage] = useState(1);
-  const [adminPage, setAdminPage] = useState(1);
-  const [newAdmin, setNewAdmin] = useState({
-    firstName: '',
-    lastName: '',
-    email: '',
-    password: ''
-  });
-  const [matchUsers, setMatchUsers] = useState({
-    user1: '',
-    user2: ''
-  });
+  const [selectedUser, setSelectedUser] = useState<UserProfile | null>(null);
   const { toast } = useToast();
 
-  const USERS_PER_PAGE = 10;
-
   useEffect(() => {
-    checkAdminAccess();
+    fetchAppStats();
+    fetchUsers();
   }, []);
 
-  useEffect(() => {
-    if (isAuthorized) {
-      fetchStats();
-      fetchUsers();
-      
-      // Set up real-time subscriptions
-      const profilesChannel = supabase
-        .channel('admin-profiles')
-        .on('postgres_changes', { event: '*', schema: 'public', table: 'profiles' }, () => {
-          fetchStats();
-          fetchUsers();
-        })
-        .subscribe();
-
-      const matchesChannel = supabase
-        .channel('admin-matches')
-        .on('postgres_changes', { event: '*', schema: 'public', table: 'matches' }, () => {
-          fetchStats();
-        })
-        .subscribe();
-
-      const likesChannel = supabase
-        .channel('admin-likes')
-        .on('postgres_changes', { event: '*', schema: 'public', table: 'likes' }, () => {
-          fetchStats();
-        })
-        .subscribe();
-
-      const chatsChannel = supabase
-        .channel('admin-chats')
-        .on('postgres_changes', { event: '*', schema: 'public', table: 'chats' }, () => {
-          fetchStats();
-        })
-        .subscribe();
-
-      return () => {
-        supabase.removeChannel(profilesChannel);
-        supabase.removeChannel(matchesChannel);
-        supabase.removeChannel(likesChannel);
-        supabase.removeChannel(chatsChannel);
-      };
-    }
-  }, [isAuthorized]);
-
-  useEffect(() => {
-    const admins = users.filter(user => user.is_admin);
-    const regulars = users.filter(user => !user.is_admin);
-    
-    setAdminUsers(admins);
-    setRegularUsers(regulars);
-
-    if (searchTerm) {
-      const filteredRegulars = regulars.filter(user => 
-        user.first_name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        user.last_name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        user.email.toLowerCase().includes(searchTerm.toLowerCase())
-      );
-      const filteredAdminsList = admins.filter(user => 
-        user.first_name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        user.last_name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        user.email.toLowerCase().includes(searchTerm.toLowerCase())
-      );
-      setFilteredUsers(filteredRegulars);
-      setFilteredAdmins(filteredAdminsList);
-    } else {
-      setFilteredUsers(regulars);
-      setFilteredAdmins(admins);
-    }
-  }, [searchTerm, users]);
-
-  const checkAdminAccess = async () => {
+  const fetchAppStats = async () => {
     try {
-      const { data: { session } } = await supabase.auth.getSession();
-      
-      if (!session?.user) {
-        setLoading(false);
-        return;
-      }
-
-      setCurrentUser(session.user);
-
-      const { data: profile, error } = await supabase
-        .from('profiles')
-        .select('is_admin')
-        .eq('id', session.user.id)
-        .single();
-
-      if (error || !profile?.is_admin) {
-        toast({
-          title: "Access Denied",
-          description: "You don't have admin privileges",
-          variant: "destructive",
-        });
-        setLoading(false);
-        return;
-      }
-
-      setIsAuthorized(true);
+      const { data, error } = await supabase.rpc('get_app_stats');
+      if (error) throw error;
+      setStats(data);
     } catch (error) {
-      console.error('Error checking admin access:', error);
+      console.error('Error fetching app stats:', error);
       toast({
-        title: "Error",
-        description: "Failed to verify admin access",
-        variant: "destructive",
-      });
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const fetchStats = async () => {
-    try {
-      // Use the existing get_app_stats function and calculate additional stats
-      const { data: appStats, error: appStatsError } = await supabase.rpc('get_app_stats');
-      
-      if (appStatsError) {
-        console.error('Error fetching app stats:', appStatsError);
-        return;
-      }
-
-      // Type cast the response properly - cast to unknown first, then to our interface
-      const typedAppStats = appStats as unknown as AppStatsResponse;
-
-      // Get additional stats for new requirements
-      const thirtyDaysAgo = new Date();
-      thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
-      
-      const [newUsersData, monthMatchesData, activeConversationsData, activeTodayData] = await Promise.all([
-        supabase
-          .from('profiles')
-          .select('*', { count: 'exact' })
-          .gte('created_at', thirtyDaysAgo.toISOString())
-          .eq('account_status', 'active'),
-        supabase
-          .from('matches')
-          .select('*', { count: 'exact' })
-          .gte('created_at', thirtyDaysAgo.toISOString()),
-        supabase
-          .from('matches')
-          .select('*', { count: 'exact' })
-          .or('user1_unread_count.gt.0,user2_unread_count.gt.0'),
-        supabase
-          .from('chats')
-          .select('sender_id', { count: 'exact' })
-          .gte('created_at', new Date().toISOString().split('T')[0])
-      ]);
-
-      // Count unique active users today
-      const uniqueActiveTodayCount = activeTodayData.data 
-        ? new Set(activeTodayData.data.map(chat => chat.sender_id)).size 
-        : 0;
-
-      const statsData: AdminStats = {
-        total_users: typedAppStats?.total_users || 0,
-        total_matches: typedAppStats?.total_matches || 0,
-        total_likes: typedAppStats?.total_likes || 0,
-        total_blocks: typedAppStats?.total_blocks || 0,
-        active_conversations: activeConversationsData.count || 0,
-        active_users_today: uniqueActiveTodayCount,
-        new_users_this_month: newUsersData.count || 0,
-        matches_this_month: monthMatchesData.count || 0,
-      };
-      
-      setStats(statsData);
-    } catch (error) {
-      console.error('Error fetching admin stats:', error);
-      toast({
-        title: "Error",
-        description: "Failed to fetch admin statistics",
-        variant: "destructive",
+        title: 'Error',
+        description: 'Failed to load app statistics',
+        variant: 'destructive'
       });
     }
   };
 
   const fetchUsers = async () => {
     try {
+      setLoading(true);
       const { data, error } = await supabase
         .from('profiles')
-        .select('id, first_name, last_name, email, account_status, created_at, is_admin')
+        .select('id, first_name, last_name, email, account_status, created_at, city, country, date_of_birth')
+        .eq('is_admin', false)
         .order('created_at', { ascending: false });
-      
+
       if (error) throw error;
-      setUsers(data || []);
+
+      const usersWithAge = data.map(user => ({
+        ...user,
+        age: calculateAge(user.date_of_birth)
+      }));
+
+      setUsers(usersWithAge);
     } catch (error) {
       console.error('Error fetching users:', error);
       toast({
-        title: "Error",
-        description: "Failed to fetch users",
-        variant: "destructive",
+        title: 'Error',
+        description: 'Failed to load users',
+        variant: 'destructive'
       });
+    } finally {
+      setLoading(false);
     }
   };
 
-  const handleLogout = async () => {
-    try {
-      await supabase.auth.signOut();
-      toast({
-        title: "Success",
-        description: "Logged out successfully",
-      });
-      window.location.href = '/';
-    } catch (error) {
-      console.error('Error logging out:', error);
-      toast({
-        title: "Error",
-        description: "Failed to log out",
-        variant: "destructive",
-      });
+  const calculateAge = (dateOfBirth: string) => {
+    const today = new Date();
+    const birthDate = new Date(dateOfBirth);
+    let age = today.getFullYear() - birthDate.getFullYear();
+    const monthDiff = today.getMonth() - birthDate.getMonth();
+
+    if (monthDiff < 0 || (monthDiff === 0 && today.getDate() < birthDate.getDate())) {
+      age--;
     }
-  };
 
-  const handleViewProfile = (userId: string) => {
-    setSelectedUserId(userId);
-    setShowProfileModal(true);
-  };
-
-  const createAdmin = async (e: React.FormEvent) => {
-    e.preventDefault();
-    try {
-      const { data, error } = await supabase.auth.signUp({
-        email: newAdmin.email,
-        password: newAdmin.password,
-        options: {
-          emailRedirectTo: `${window.location.origin}/`,
-        },
-      });
-  
-      if (error) throw error;
-  
-      if (!data.user) throw new Error('No user returned from signup.');
-  
-      const { error: updateError } = await supabase
-        .from('profiles')
-        .update({
-          first_name: newAdmin.firstName,
-          last_name: newAdmin.lastName,
-          is_admin: true,
-          account_status: 'active',
-        })
-        .eq('id', data.user.id);
-  
-      if (updateError) throw updateError;
-  
-      toast({
-        title: "Success",
-        description: "Admin user created. They will need to confirm their email.",
-      });
-  
-      setNewAdmin({
-        firstName: '',
-        lastName: '',
-        email: '',
-        password: ''
-      });
-      setShowCreateAdmin(false);
-      fetchUsers();
-    } catch (error: any) {
-      console.error('Error creating admin:', error);
-      toast({
-        title: "Error",
-        description: error.message || "Failed to create admin user",
-        variant: "destructive",
-      });
-    }
-  };
-
-  const createManualMatch = async (e: React.FormEvent) => {
-    e.preventDefault();
-    try {
-      if (matchUsers.user1 === matchUsers.user2) {
-        toast({
-          title: "Error",
-          description: "Cannot match a user with themselves",
-          variant: "destructive",
-        });
-        return;
-      }
-
-      const { error } = await supabase
-        .from('matches')
-        .insert({
-          user1_id: matchUsers.user1 < matchUsers.user2 ? matchUsers.user1 : matchUsers.user2,
-          user2_id: matchUsers.user1 < matchUsers.user2 ? matchUsers.user2 : matchUsers.user1
-        });
-
-      if (error) throw error;
-
-      toast({
-        title: "Success",
-        description: "Manual match created successfully",
-      });
-
-      setMatchUsers({ user1: '', user2: '' });
-      setShowManualMatch(false);
-      fetchStats();
-    } catch (error: any) {
-      console.error('Error creating manual match:', error);
-      toast({
-        title: "Error",
-        description: error.message || "Failed to create manual match",
-        variant: "destructive",
-      });
-    }
+    return age;
   };
 
   const updateUserStatus = async (userId: string, newStatus: string) => {
     try {
-      const { error } = await supabase
-        .from('profiles')
-        .update({ account_status: newStatus })
-        .eq('id', userId);
+      const { error } = await supabase.rpc('admin_update_account_status', {
+        target_user_id: userId,
+        new_status: newStatus
+      });
 
       if (error) throw error;
 
+      // Update local state
+      setUsers(users.map(user => 
+        user.id === userId ? { ...user, account_status: newStatus } : user
+      ));
+
+      // Update stats
+      await fetchAppStats();
+
+      const statusMessages = {
+        'active': 'User account has been activated',
+        'on_hold': 'User account has been put on hold',
+        'blocked': 'User account has been blocked'
+      };
+
       toast({
-        title: "Success",
-        description: `User status updated to ${newStatus}`,
+        title: 'Success',
+        description: statusMessages[newStatus as keyof typeof statusMessages] || 'User status updated'
       });
 
-      fetchUsers();
-    } catch (error: any) {
+    } catch (error) {
       console.error('Error updating user status:', error);
       toast({
-        title: "Error",
-        description: error.message || "Failed to update user status",
-        variant: "destructive",
+        title: 'Error',
+        description: 'Failed to update user status',
+        variant: 'destructive'
       });
     }
   };
 
   const deleteUser = async (userId: string) => {
+    if (!confirm('Are you sure you want to permanently delete this user? This action cannot be undone.')) {
+      return;
+    }
+
     try {
       const { error } = await supabase.rpc('delete_user_and_data', {
         user_id_to_delete: userId
@@ -439,173 +174,59 @@ const AdminPage = () => {
 
       if (error) throw error;
 
+      // Remove user from local state
+      setUsers(users.filter(user => user.id !== userId));
+      
+      // Update stats
+      await fetchAppStats();
+
       toast({
-        title: "Success",
-        description: "User deleted successfully",
+        title: 'Success',
+        description: 'User has been permanently deleted'
       });
 
-      fetchUsers();
-      fetchStats();
-    } catch (error: any) {
+    } catch (error) {
       console.error('Error deleting user:', error);
       toast({
-        title: "Error",
-        description: error.message || "Failed to delete user",
-        variant: "destructive",
+        title: 'Error',
+        description: 'Failed to delete user',
+        variant: 'destructive'
       });
     }
   };
 
+  const filteredUsers = users.filter(user => {
+    const matchesSearch = user.first_name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                         user.last_name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                         user.email.toLowerCase().includes(searchTerm.toLowerCase());
+    
+    const matchesStatus = statusFilter === 'all' || user.account_status === statusFilter;
+    
+    return matchesSearch && matchesStatus;
+  });
+
   const getStatusBadge = (status: string) => {
-    switch (status) {
-      case 'active': return 'bg-green-100 text-green-800';
-      case 'blocked': return 'bg-red-100 text-red-800';
-      case 'on_hold': return 'bg-yellow-100 text-yellow-800';
-      default: return 'bg-gray-100 text-gray-800';
-    }
-  };
-
-  const renderUserTable = (userList: UserProfile[], page: number, setPage: (page: number) => void, isAdmin: boolean = false) => {
-    const startIndex = (page - 1) * USERS_PER_PAGE;
-    const endIndex = startIndex + USERS_PER_PAGE;
-    const paginatedUsers = userList.slice(startIndex, endIndex);
-    const totalPages = Math.ceil(userList.length / USERS_PER_PAGE);
-
+    const variants = {
+      'active': 'bg-green-100 text-green-800',
+      'on_hold': 'bg-yellow-100 text-yellow-800',
+      'blocked': 'bg-red-100 text-red-800'
+    };
+    
     return (
-      <>
-        <Table>
-          <TableHeader>
-            <TableRow>
-              <TableHead>Name</TableHead>
-              <TableHead className="hidden sm:table-cell">Email</TableHead>
-              <TableHead>Status</TableHead>
-              <TableHead className="hidden md:table-cell">Created</TableHead>
-              <TableHead>Actions</TableHead>
-            </TableRow>
-          </TableHeader>
-          <TableBody>
-            {paginatedUsers.map((user) => (
-              <TableRow key={user.id}>
-                <TableCell className="font-medium">
-                  {user.first_name} {user.last_name}
-                </TableCell>
-                <TableCell className="hidden sm:table-cell">{user.email}</TableCell>
-                <TableCell>
-                  <span className={`px-2 py-1 rounded-full text-xs font-medium ${getStatusBadge(user.account_status)}`}>
-                    {user.account_status}
-                  </span>
-                </TableCell>
-                <TableCell className="hidden md:table-cell">
-                  {new Date(user.created_at).toLocaleDateString()}
-                </TableCell>
-                <TableCell>
-                  <div className="flex flex-wrap gap-1">
-                    <Button
-                      size="sm"
-                      variant="outline"
-                      onClick={() => handleViewProfile(user.id)}
-                      className="min-w-0"
-                    >
-                      <Eye className="w-4 h-4" />
-                    </Button>
-                    {!isAdmin && (
-                      <>
-                        {user.account_status === 'active' && (
-                          <>
-                            <Button
-                              size="sm"
-                              variant="outline"
-                              onClick={() => updateUserStatus(user.id, 'blocked')}
-                              className="min-w-0"
-                            >
-                              <Ban className="w-4 h-4" />
-                            </Button>
-                            <Button
-                              size="sm"
-                              variant="outline"
-                              onClick={() => updateUserStatus(user.id, 'on_hold')}
-                              className="min-w-0"
-                            >
-                              <Pause className="w-4 h-4" />
-                            </Button>
-                          </>
-                        )}
-                        {user.account_status !== 'active' && (
-                          <Button
-                            size="sm"
-                            variant="outline"
-                            onClick={() => updateUserStatus(user.id, 'active')}
-                            className="min-w-0"
-                          >
-                            <RotateCcw className="w-4 h-4" />
-                          </Button>
-                        )}
-                        <Button
-                          size="sm"
-                          variant="destructive"
-                          onClick={() => deleteUser(user.id)}
-                          className="min-w-0"
-                        >
-                          <Trash2 className="w-4 h-4" />
-                        </Button>
-                      </>
-                    )}
-                  </div>
-                </TableCell>
-              </TableRow>
-            ))}
-          </TableBody>
-        </Table>
-        
-        {totalPages > 1 && (
-          <div className="flex justify-between items-center mt-4">
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => setPage(Math.max(1, page - 1))}
-              disabled={page === 1}
-            >
-              Previous
-            </Button>
-            <span className="text-sm text-gray-600">
-              Page {page} of {totalPages}
-            </span>
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => setPage(Math.min(totalPages, page + 1))}
-              disabled={page === totalPages}
-            >
-              Next
-            </Button>
-          </div>
-        )}
-      </>
+      <Badge className={variants[status as keyof typeof variants] || 'bg-gray-100 text-gray-800'}>
+        {status.replace('_', ' ').toUpperCase()}
+      </Badge>
     );
   };
 
-  // Filter out admin users for manual matching
-  const nonAdminUsers = users.filter(user => !user.is_admin);
-
-  if (loading) {
+  if (!currentUser?.is_admin) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-pink-50 to-purple-50 flex items-center justify-center">
-        <div className="animate-spin rounded-full h-32 w-32 border-b-2 border-pink-600"></div>
-      </div>
-    );
-  }
-
-  if (!isAuthorized) {
-    return (
-      <div className="min-h-screen bg-gradient-to-br from-pink-50 to-purple-50 flex items-center justify-center p-4">
+      <div className="flex items-center justify-center h-full">
         <Card className="w-full max-w-md">
           <CardContent className="p-8 text-center">
             <Shield className="w-16 h-16 mx-auto mb-4 text-red-500" />
-            <h2 className="text-2xl font-bold mb-2">Access Denied</h2>
-            <p className="text-gray-600 mb-4">You don't have admin privileges to access this page.</p>
-            <Button onClick={() => window.location.href = '/'}>
-              Go Back
-            </Button>
+            <h2 className="text-xl font-semibold mb-2">Access Denied</h2>
+            <p className="text-gray-600">You don't have permission to access this page.</p>
           </CardContent>
         </Card>
       </div>
@@ -613,269 +234,264 @@ const AdminPage = () => {
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-pink-50 to-purple-50 p-4 sm:p-6">
-      <div className="max-w-7xl mx-auto">
-        <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between mb-8 gap-4">
-          <div className="flex items-center space-x-4">
-            <img 
-              src="/lovable-uploads/ef9367e7-bcc2-40e6-8a31-b92465c0e20b.png" 
-              alt="AfroVibe Logo" 
-              className="w-12 h-12"
-            />
-            <div>
-              <h1 className="text-2xl sm:text-3xl font-bold bg-gradient-to-r from-pink-600 to-purple-600 bg-clip-text text-transparent">
-                AfroVibe Admin Dashboard
-              </h1>
-              <p className="text-gray-600 text-sm sm:text-base">Real-time application statistics and insights</p>
-            </div>
-          </div>
-          
-          <div className="flex flex-wrap gap-2">
-            <Dialog open={showCreateAdmin} onOpenChange={setShowCreateAdmin}>
-              <DialogTrigger asChild>
-                <Button className="bg-gradient-to-r from-purple-500 to-pink-600 hover:from-purple-600 hover:to-pink-700 text-sm">
-                  <Plus className="w-4 h-4 mr-2" />
-                  <span className="hidden sm:inline">Create Admin</span>
-                  <span className="sm:hidden">Admin</span>
-                </Button>
-              </DialogTrigger>
-              <DialogContent>
-                <DialogHeader>
-                  <DialogTitle>Create Admin User</DialogTitle>
-                  <DialogDescription>
-                    Create a new admin user with full dashboard access
-                  </DialogDescription>
-                </DialogHeader>
-                <form onSubmit={createAdmin} className="space-y-4">
-                  <div>
-                    <Label htmlFor="firstName">First Name</Label>
-                    <Input
-                      id="firstName"
-                      value={newAdmin.firstName}
-                      onChange={(e) => setNewAdmin({...newAdmin, firstName: e.target.value})}
-                      required
-                    />
-                  </div>
-                  <div>
-                    <Label htmlFor="lastName">Last Name</Label>
-                    <Input
-                      id="lastName"
-                      value={newAdmin.lastName}
-                      onChange={(e) => setNewAdmin({...newAdmin, lastName: e.target.value})}
-                      required
-                    />
-                  </div>
-                  <div>
-                    <Label htmlFor="email">Email</Label>
-                    <Input
-                      id="email"
-                      type="email"
-                      value={newAdmin.email}
-                      onChange={(e) => setNewAdmin({...newAdmin, email: e.target.value})}
-                      required
-                    />
-                  </div>
-                  <div>
-                    <Label htmlFor="password">Password</Label>
-                    <Input
-                      id="password"
-                      type="password"
-                      value={newAdmin.password}
-                      onChange={(e) => setNewAdmin({...newAdmin, password: e.target.value})}
-                      required
-                    />
-                  </div>
-                  <Button type="submit" className="w-full">Create Admin</Button>
-                </form>
-              </DialogContent>
-            </Dialog>
-
-            <Dialog open={showManualMatch} onOpenChange={setShowManualMatch}>
-              <DialogTrigger asChild>
-                <Button variant="outline" className="text-sm">
-                  <Heart className="w-4 h-4 mr-2" />
-                  <span className="hidden sm:inline">Manual Match</span>
-                  <span className="sm:hidden">Match</span>
-                </Button>
-              </DialogTrigger>
-              <DialogContent>
-                <DialogHeader>
-                  <DialogTitle>Create Manual Match</DialogTitle>
-                  <DialogDescription>
-                    Select two users to create a manual match between them
-                  </DialogDescription>
-                </DialogHeader>
-                <form onSubmit={createManualMatch} className="space-y-4">
-                  <div>
-                    <Label htmlFor="user1">First User</Label>
-                    <Select value={matchUsers.user1} onValueChange={(value) => setMatchUsers({...matchUsers, user1: value})}>
-                      <SelectTrigger>
-                        <SelectValue placeholder="Select first user" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {nonAdminUsers.map((user) => (
-                          <SelectItem key={user.id} value={user.id}>
-                            {user.first_name} {user.last_name} ({user.email})
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  </div>
-                  <div>
-                    <Label htmlFor="user2">Second User</Label>
-                    <Select value={matchUsers.user2} onValueChange={(value) => setMatchUsers({...matchUsers, user2: value})}>
-                      <SelectTrigger>
-                        <SelectValue placeholder="Select second user" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {nonAdminUsers.filter(user => user.id !== matchUsers.user1).map((user) => (
-                          <SelectItem key={user.id} value={user.id}>
-                            {user.first_name} {user.last_name} ({user.email})
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  </div>
-                  <Button type="submit" className="w-full" disabled={!matchUsers.user1 || !matchUsers.user2}>
-                    Create Match
-                  </Button>
-                </form>
-              </DialogContent>
-            </Dialog>
-
-            <Button 
-              variant="destructive" 
-              onClick={handleLogout}
-              className="text-sm"
-            >
-              <LogOut className="w-4 h-4 mr-2" />
-              <span className="hidden sm:inline">Logout</span>
-              <span className="sm:hidden">Out</span>
-            </Button>
-          </div>
-        </div>
-
-        {/* Stats Grid */}
-        <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-6 mb-8">
-          <Card className="border-pink-200 shadow-lg">
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">Total Users</CardTitle>
-              <Users className="h-4 w-4 text-pink-600" />
-            </CardHeader>
-            <CardContent>
-              <div className="text-xl sm:text-2xl font-bold text-pink-600">{stats?.total_users || 0}</div>
-              <p className="text-xs text-gray-600">All registered users</p>
-            </CardContent>
-          </Card>
-
-          <Card className="border-purple-200 shadow-lg">
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">Total Matches</CardTitle>
-              <Heart className="h-4 w-4 text-purple-600" />
-            </CardHeader>
-            <CardContent>
-              <div className="text-xl sm:text-2xl font-bold text-purple-600">{stats?.total_matches || 0}</div>
-              <p className="text-xs text-gray-600">Successful connections</p>
-            </CardContent>
-          </Card>
-
-          <Card className="border-blue-200 shadow-lg">
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">Active Conversations</CardTitle>
-              <MessageCircle className="h-4 w-4 text-blue-600" />
-            </CardHeader>
-            <CardContent>
-              <div className="text-xl sm:text-2xl font-bold text-blue-600">{stats?.active_conversations || 0}</div>
-              <p className="text-xs text-gray-600">Ongoing chats</p>
-            </CardContent>
-          </Card>
-
-          <Card className="border-green-200 shadow-lg">
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">Active Today</CardTitle>
-              <Activity className="h-4 w-4 text-green-600" />
-            </CardHeader>
-            <CardContent>
-              <div className="text-xl sm:text-2xl font-bold text-green-600">{stats?.active_users_today || 0}</div>
-              <p className="text-xs text-gray-600">Users active today</p>
-            </CardContent>
-          </Card>
-
-          <Card className="border-orange-200 shadow-lg">
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">New Users (Month)</CardTitle>
-              <TrendingUp className="h-4 w-4 text-orange-600" />
-            </CardHeader>
-            <CardContent>
-              <div className="text-xl sm:text-2xl font-bold text-orange-600">{stats?.new_users_this_month || 0}</div>
-              <p className="text-xs text-gray-600">Last 30 days</p>
-            </CardContent>
-          </Card>
-
-          <Card className="border-indigo-200 shadow-lg">
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">Matches (Month)</CardTitle>
-              <Calendar className="h-4 w-4 text-indigo-600" />
-            </CardHeader>
-            <CardContent>
-              <div className="text-xl sm:text-2xl font-bold text-indigo-600">{stats?.matches_this_month || 0}</div>
-              <p className="text-xs text-gray-600">Last 30 days</p>
-            </CardContent>
-          </Card>
-        </div>
-
-        {/* User Management */}
-        <div className="space-y-6">
-          {/* Regular Users Section */}
-          <Card className="shadow-lg">
-            <CardHeader>
-              <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
-                <CardTitle className="flex items-center space-x-2">
-                  <Users className="h-5 w-5 text-pink-600" />
-                  <span>Users ({filteredUsers.length})</span>
-                </CardTitle>
-                <div className="flex items-center space-x-2 w-full sm:w-auto">
-                  <Search className="h-4 w-4 text-gray-400" />
-                  <Input
-                    placeholder="Search users..."
-                    value={searchTerm}
-                    onChange={(e) => setSearchTerm(e.target.value)}
-                    className="w-full sm:w-64"
-                  />
-                </div>
-              </div>
-            </CardHeader>
-            <CardContent>
-              {renderUserTable(filteredUsers, userPage, setUserPage)}
-            </CardContent>
-          </Card>
-
-          {/* Admin Users Section */}
-          <Card className="shadow-lg">
-            <CardHeader>
-              <CardTitle className="flex items-center space-x-2">
-                <Shield className="h-5 w-5 text-purple-600" />
-                <span>Administrators ({filteredAdmins.length})</span>
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              {renderUserTable(filteredAdmins, adminPage, setAdminPage, true)}
-            </CardContent>
-          </Card>
-        </div>
-
-        {/* Profile Modal */}
-        {selectedUserId && (
-          <UserProfileModal
-            isOpen={showProfileModal}
-            onClose={() => {
-              setShowProfileModal(false);
-              setSelectedUserId(null);
-            }}
-            userId={selectedUserId}
-          />
-        )}
+    <div className="container mx-auto p-6 space-y-6">
+      <div className="flex items-center justify-between">
+        <h1 className="text-3xl font-bold">Admin Dashboard</h1>
+        <Badge variant="outline" className="text-lg px-4 py-2">
+          <Shield className="w-4 h-4 mr-2" />
+          Administrator
+        </Badge>
       </div>
+
+      {/* Stats Overview */}
+      {stats && (
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+          <Card>
+            <CardContent className="p-4">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-sm text-gray-600">Total Users</p>
+                  <p className="text-2xl font-bold">{stats.total_users}</p>
+                </div>
+                <Users className="w-8 h-8 text-blue-500" />
+              </div>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardContent className="p-4">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-sm text-gray-600">Total Matches</p>
+                  <p className="text-2xl font-bold">{stats.total_matches}</p>
+                </div>
+                <Heart className="w-8 h-8 text-pink-500" />
+              </div>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardContent className="p-4">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-sm text-gray-600">Messages Sent</p>
+                  <p className="text-2xl font-bold">{stats.total_messages}</p>
+                </div>
+                <MessageSquare className="w-8 h-8 text-green-500" />
+              </div>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardContent className="p-4">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-sm text-gray-600">Active Today</p>
+                  <p className="text-2xl font-bold">{stats.active_users_today}</p>
+                </div>
+                <TrendingUp className="w-8 h-8 text-purple-500" />
+              </div>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardContent className="p-4">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-sm text-gray-600">New This Week</p>
+                  <p className="text-2xl font-bold">{stats.new_users_this_week}</p>
+                </div>
+                <Calendar className="w-8 h-8 text-indigo-500" />
+              </div>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardContent className="p-4">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-sm text-gray-600">Users On Hold</p>
+                  <p className="text-2xl font-bold">{stats.users_on_hold}</p>
+                </div>
+                <Pause className="w-8 h-8 text-yellow-500" />
+              </div>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardContent className="p-4">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-sm text-gray-600">Blocked Users</p>
+                  <p className="text-2xl font-bold">{stats.blocked_users}</p>
+                </div>
+                <UserX className="w-8 h-8 text-red-500" />
+              </div>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardContent className="p-4">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-sm text-gray-600">Total Admins</p>
+                  <p className="text-2xl font-bold">{stats.total_admins}</p>
+                </div>
+                <Shield className="w-8 h-8 text-gray-500" />
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+      )}
+
+      {/* User Management */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <Users className="w-5 h-5" />
+            User Management
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          {/* Search and Filter */}
+          <div className="flex gap-4 mb-6">
+            <div className="flex-1 relative">
+              <Search className="absolute left-3 top-3 h-4 w-4 text-gray-400" />
+              <Input
+                placeholder="Search users by name or email..."
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+                className="pl-10"
+              />
+            </div>
+            <Select value={statusFilter} onValueChange={setStatusFilter}>
+              <SelectTrigger className="w-48">
+                <SelectValue placeholder="Filter by status" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All Status</SelectItem>
+                <SelectItem value="active">Active</SelectItem>
+                <SelectItem value="on_hold">On Hold</SelectItem>
+                <SelectItem value="blocked">Blocked</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+
+          {/* Users Table */}
+          {loading ? (
+            <div className="flex justify-center py-8">
+              <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-pink-600"></div>
+            </div>
+          ) : (
+            <div className="overflow-x-auto">
+              <table className="w-full border-collapse border border-gray-200">
+                <thead>
+                  <tr className="bg-gray-50">
+                    <th className="border border-gray-200 px-4 py-2 text-left">User</th>
+                    <th className="border border-gray-200 px-4 py-2 text-left">Email</th>
+                    <th className="border border-gray-200 px-4 py-2 text-left">Location</th>
+                    <th className="border border-gray-200 px-4 py-2 text-left">Age</th>
+                    <th className="border border-gray-200 px-4 py-2 text-left">Status</th>
+                    <th className="border border-gray-200 px-4 py-2 text-left">Joined</th>
+                    <th className="border border-gray-200 px-4 py-2 text-left">Actions</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {filteredUsers.map((user) => (
+                    <tr key={user.id} className="hover:bg-gray-50">
+                      <td className="border border-gray-200 px-4 py-2">
+                        {user.first_name} {user.last_name}
+                      </td>
+                      <td className="border border-gray-200 px-4 py-2">{user.email}</td>
+                      <td className="border border-gray-200 px-4 py-2">
+                        {user.city}, {user.country}
+                      </td>
+                      <td className="border border-gray-200 px-4 py-2">{user.age}</td>
+                      <td className="border border-gray-200 px-4 py-2">
+                        {getStatusBadge(user.account_status)}
+                      </td>
+                      <td className="border border-gray-200 px-4 py-2">
+                        {new Date(user.created_at).toLocaleDateString()}
+                      </td>
+                      <td className="border border-gray-200 px-4 py-2">
+                        <div className="flex gap-2">
+                          {user.account_status === 'active' && (
+                            <>
+                              <Button
+                                size="sm"
+                                variant="outline"
+                                onClick={() => updateUserStatus(user.id, 'on_hold')}
+                                className="text-yellow-600 hover:text-yellow-700"
+                              >
+                                <Pause className="w-4 h-4" />
+                              </Button>
+                              <Button
+                                size="sm"
+                                variant="outline"
+                                onClick={() => updateUserStatus(user.id, 'blocked')}
+                                className="text-red-600 hover:text-red-700"
+                              >
+                                <Ban className="w-4 h-4" />
+                              </Button>
+                            </>
+                          )}
+                          
+                          {user.account_status === 'on_hold' && (
+                            <>
+                              <Button
+                                size="sm"
+                                variant="outline"
+                                onClick={() => updateUserStatus(user.id, 'active')}
+                                className="text-green-600 hover:text-green-700"
+                              >
+                                <Play className="w-4 h-4" />
+                              </Button>
+                              <Button
+                                size="sm"
+                                variant="outline"
+                                onClick={() => updateUserStatus(user.id, 'blocked')}
+                                className="text-red-600 hover:text-red-700"
+                              >
+                                <Ban className="w-4 h-4" />
+                              </Button>
+                            </>
+                          )}
+                          
+                          {user.account_status === 'blocked' && (
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              onClick={() => updateUserStatus(user.id, 'active')}
+                              className="text-green-600 hover:text-green-700"
+                            >
+                              <Play className="w-4 h-4" />
+                            </Button>
+                          )}
+                          
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            onClick={() => deleteUser(user.id)}
+                            className="text-red-600 hover:text-red-700"
+                          >
+                            <Trash2 className="w-4 h-4" />
+                          </Button>
+                        </div>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+              
+              {filteredUsers.length === 0 && (
+                <div className="text-center py-8 text-gray-500">
+                  No users found matching your criteria.
+                </div>
+              )}
+            </div>
+          )}
+        </CardContent>
+      </Card>
     </div>
   );
 };
