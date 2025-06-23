@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -70,7 +71,11 @@ const AdminPage = ({ currentUser }: AdminPageProps) => {
     try {
       const { data, error } = await supabase.rpc('get_app_stats');
       if (error) throw error;
-      setStats(data as AppStats);
+      
+      // Type guard to ensure data is properly structured
+      if (data && typeof data === 'object' && !Array.isArray(data)) {
+        setStats(data as AppStats);
+      }
     } catch (error) {
       console.error('Error fetching app stats:', error);
       toast({
@@ -218,7 +223,8 @@ const AdminPage = ({ currentUser }: AdminPageProps) => {
     );
   };
 
-  if (!currentUser?.is_admin) {
+  // Check if current user is admin - fix the admin check logic
+  if (!currentUser || !currentUser.is_admin) {
     return (
       <div className="flex items-center justify-center h-full">
         <Card className="w-full max-w-md">

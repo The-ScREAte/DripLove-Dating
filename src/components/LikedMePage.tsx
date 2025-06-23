@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -51,7 +50,7 @@ const LikedMePage = ({ currentUser }: LikedMePageProps) => {
       if (error) throw error;
 
       if (data?.like_me_cooldown_until) {
-        const cooldownDate = new Date(data.like_me_cooldown_until);
+        const cooldownDate = new Date(data?.like_me_cooldown_until);
         if (cooldownDate > new Date()) {
           setLockoutEndDate(cooldownDate);
         }
@@ -271,13 +270,15 @@ const LikedMePage = ({ currentUser }: LikedMePageProps) => {
   };
 
   const handleProfileClick = (liker: any, index: number) => {
-    // Free users with active lockout can only view the first profile
-    if (!isPremium() && lockoutEndDate && new Date() < lockoutEndDate && index > 0) {
+    // Check if user is in lockout period and trying to access locked profiles
+    const isInLockout = !isPremium() && lockoutEndDate && new Date() < lockoutEndDate;
+    
+    // For free users in lockout, only allow viewing the first profile (index 0)
+    if (!isPremium() && isInLockout && index > 0) {
       setShowPremiumUpgrade(true);
       return;
     }
 
-    // Allow premium users or free users without lockout to view profiles
     setSelectedProfile(liker);
   };
 
@@ -289,7 +290,9 @@ const LikedMePage = ({ currentUser }: LikedMePageProps) => {
   };
 
   const isProfileLocked = (index: number) => {
-    return !isPremium() && lockoutEndDate && new Date() < lockoutEndDate && index > 0;
+    const isInLockout = !isPremium() && lockoutEndDate && new Date() < lockoutEndDate;
+    // Lock all profiles except the first one (index 0) for free users in lockout
+    return !isPremium() && isInLockout && index > 0;
   };
 
   if (showPremiumUpgrade) {
@@ -470,8 +473,6 @@ const LikedMePage = ({ currentUser }: LikedMePageProps) => {
     );
   }
 
-  const visibleCount = getLikedMeVisibleCount();
-  const hasBlurredProfiles = !isPremium() && visibleCount !== -1 && likers.length > visibleCount;
   const isInLockout = !isPremium() && lockoutEndDate && new Date() < lockoutEndDate;
 
   return (
@@ -482,7 +483,7 @@ const LikedMePage = ({ currentUser }: LikedMePageProps) => {
             <Users className="w-6 h-6 text-pink-600" />
             <h1 className="text-2xl font-bold text-gray-800">People who liked you</h1>
           </div>
-          {(hasBlurredProfiles || isInLockout) && (
+          {isInLockout && (
             <Button
               onClick={() => setShowPremiumUpgrade(true)}
               className="bg-gradient-to-r from-yellow-400 to-yellow-600 hover:from-yellow-500 hover:to-yellow-700 text-black font-bold text-sm px-3 py-1"
@@ -503,12 +504,6 @@ const LikedMePage = ({ currentUser }: LikedMePageProps) => {
               </span>
             </div>
           </div>
-        )}
-        
-        {hasBlurredProfiles && !isInLockout && (
-          <p className="text-sm text-yellow-600 mt-2">
-            Free users can see {visibleCount} profile{visibleCount !== 1 ? 's' : ''}. Upgrade to Premium to see all likes!
-          </p>
         )}
       </div>
       
