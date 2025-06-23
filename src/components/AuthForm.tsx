@@ -10,10 +10,11 @@ import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 
 interface AuthFormProps {
-  onAuthSuccess: (user: any) => void;
+  isLogin: boolean;
+  onToggle: () => void;
 }
 
-const AuthForm = ({ onAuthSuccess }: AuthFormProps) => {
+const AuthForm = ({ isLogin, onToggle }: AuthFormProps) => {
   const navigate = useNavigate();
   const { toast } = useToast();
 
@@ -53,10 +54,10 @@ const AuthForm = ({ onAuthSuccess }: AuthFormProps) => {
         return;
       }
 
-      // Check if user profile exists and get account status
+      // Check if user profile exists
       const { data: profile, error: profileError } = await supabase
         .from('profiles')
-        .select('id, is_admin, account_status')
+        .select('id, is_admin')
         .eq('id', authData.user.id)
         .single();
 
@@ -72,29 +73,6 @@ const AuthForm = ({ onAuthSuccess }: AuthFormProps) => {
         return;
       }
 
-      // Check account status
-      if (profile.account_status === 'on_hold') {
-        await supabase.auth.signOut();
-        toast({
-          title: "Account on Hold",
-          description: "Your account is on hold. Please contact support.",
-          variant: "destructive",
-        });
-        setLoading(false);
-        return;
-      }
-
-      if (profile.account_status === 'blocked') {
-        await supabase.auth.signOut();
-        toast({
-          title: "Account Blocked",
-          description: "Your account has been blocked.",
-          variant: "destructive",
-        });
-        setLoading(false);
-        return;
-      }
-
       // Save profile ID to session
       sessionStorage.setItem('profile_id', profile.id);
 
@@ -103,7 +81,6 @@ const AuthForm = ({ onAuthSuccess }: AuthFormProps) => {
         description: "You've been successfully logged in.",
       });
 
-      onAuthSuccess(authData.user);
       setLoading(false);
     } catch (error: any) {
       console.error('Login error:', error);
@@ -125,10 +102,10 @@ const AuthForm = ({ onAuthSuccess }: AuthFormProps) => {
           </div>
         </div>
         <CardTitle className="text-2xl font-bold bg-gradient-to-r from-pink-600 to-purple-600 bg-clip-text text-transparent">
-          Welcome Back
+          {isLogin ? 'Welcome Back' : 'Create Account'}
         </CardTitle>
         <CardDescription className="text-gray-600">
-          Sign in to your account
+          {isLogin ? 'Sign in to your account' : 'Join LoveConnect today'}
         </CardDescription>
       </CardHeader>
 
@@ -161,7 +138,7 @@ const AuthForm = ({ onAuthSuccess }: AuthFormProps) => {
                 type={showPassword ? "text" : "password"}
                 value={formData.password}
                 onChange={handleInputChange}
-                className="pl-10 pr-10 border-gray-200 focus:border-pink-400 focus: ring-pink-400"
+                className="pl-10 pr-10 border-gray-200 focus:border-pink-400 focus:ring-pink-400"
                 placeholder="Enter your password"
                 required
               />
@@ -180,18 +157,18 @@ const AuthForm = ({ onAuthSuccess }: AuthFormProps) => {
             disabled={loading}
             className="w-full bg-gradient-to-r from-pink-500 to-purple-600 hover:from-pink-600 hover:to-purple-700 text-white font-semibold py-3 rounded-lg transition-all duration-200 transform hover:scale-[1.02]"
           >
-            {loading ? 'Processing...' : 'Sign In'}
+            {loading ? 'Processing...' : isLogin ? 'Sign In' : 'Create Account'}
           </Button>
         </form>
 
         <div className="mt-6 text-center">
           <p className="text-sm text-gray-600">
-            Don't have an account?
+            {isLogin ? "Don't have an account?" : "Already have an account?"}
             <button
-              onClick={() => navigate('/register')}
+              onClick={onToggle}
               className="ml-2 text-pink-600 hover:text-pink-700 font-semibold transition-colors"
             >
-              Sign Up
+              {isLogin ? 'Sign Up' : 'Sign In'}
             </button>
           </p>
         </div>

@@ -406,6 +406,56 @@ const AdminPage = () => {
     }
   };
 
+  const updateUserStatus = async (userId: string, newStatus: string) => {
+    try {
+      const { error } = await supabase
+        .from('profiles')
+        .update({ account_status: newStatus })
+        .eq('id', userId);
+
+      if (error) throw error;
+
+      toast({
+        title: "Success",
+        description: `User status updated to ${newStatus}`,
+      });
+
+      fetchUsers();
+    } catch (error: any) {
+      console.error('Error updating user status:', error);
+      toast({
+        title: "Error",
+        description: error.message || "Failed to update user status",
+        variant: "destructive",
+      });
+    }
+  };
+
+  const deleteUser = async (userId: string) => {
+    try {
+      const { error } = await supabase.rpc('delete_user_and_data', {
+        user_id_to_delete: userId
+      });
+
+      if (error) throw error;
+
+      toast({
+        title: "Success",
+        description: "User deleted successfully",
+      });
+
+      fetchUsers();
+      fetchStats();
+    } catch (error: any) {
+      console.error('Error deleting user:', error);
+      toast({
+        title: "Error",
+        description: error.message || "Failed to delete user",
+        variant: "destructive",
+      });
+    }
+  };
+
   const getStatusBadge = (status: string) => {
     switch (status) {
       case 'active': return 'bg-green-100 text-green-800';
@@ -480,17 +530,7 @@ const AdminPage = () => {
                             </Button>
                           </>
                         )}
-                        {user.account_status === 'blocked' && (
-                          <Button
-                            size="sm"
-                            variant="outline"
-                            onClick={() => updateUserStatus(user.id, 'active')}
-                            className="min-w-0"
-                          >
-                            <RotateCcw className="w-4 h-4" />
-                          </Button>
-                        )}
-                        {user.account_status === 'on_hold' && (
+                        {user.account_status !== 'active' && (
                           <Button
                             size="sm"
                             variant="outline"
