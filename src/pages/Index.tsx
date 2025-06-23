@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import WelcomeScreen from '@/components/WelcomeScreen';
 import AuthForm from '@/components/AuthForm';
@@ -226,7 +225,7 @@ const Index = () => {
   }
 
   if (currentView === 'admin') {
-    return <AdminPage />;
+    return <AdminPage currentUser={user} />;
   }
 
   if (currentView === 'welcome') {

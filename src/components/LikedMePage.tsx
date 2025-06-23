@@ -2,7 +2,7 @@
 import React, { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Users, Heart, X, Calendar, MapPin, Shield, ChevronDown, ChevronUp, Briefcase, GraduationCap, Crown, Lock } from 'lucide-react';
+import { Users, Heart, X, Calendar, MapPin, Shield, ChevronDown, ChevronUp, Briefcase, GraduationCap, Crown, Lock, Clock } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import { useSubscription } from '@/hooks/useSubscription';
@@ -22,18 +22,44 @@ const LikedMePage = ({ currentUser }: LikedMePageProps) => {
   const [imageIndex, setImageIndex] = useState(0);
   const [showMoreInfo, setShowMoreInfo] = useState(false);
   const [showPremiumUpgrade, setShowPremiumUpgrade] = useState(false);
+  const [lockoutEndDate, setLockoutEndDate] = useState<Date | null>(null);
+  const [hasInteractedToday, setHasInteractedToday] = useState(false);
   const { toast } = useToast();
 
   const { subscription, isPremium, getLikedMeVisibleCount } = useSubscription(currentUser?.id);
 
   useEffect(() => {
     fetchLikers();
+    checkLockoutStatus();
   }, [currentUser]);
 
   useEffect(() => {
     setImageIndex(0);
     setShowMoreInfo(false);
   }, [selectedProfile]);
+
+  const checkLockoutStatus = async () => {
+    if (!currentUser?.id || isPremium()) return;
+
+    try {
+      const { data, error } = await supabase
+        .from('profiles')
+        .select('like_me_cooldown_until')
+        .eq('id', currentUser.id)
+        .single();
+
+      if (error) throw error;
+
+      if (data?.like_me_cooldown_until) {
+        const cooldownDate = new Date(data.like_me_cooldown_until);
+        if (cooldownDate > new Date()) {
+          setLockoutEndDate(cooldownDate);
+        }
+      }
+    } catch (error) {
+      console.error('Error checking lockout status:', error);
+    }
+  };
 
   const calculateAge = (dateOfBirth: string) => {
     const today = new Date();
@@ -119,6 +145,26 @@ const LikedMePage = ({ currentUser }: LikedMePageProps) => {
     }
   };
 
+  const setLockoutPeriod = async () => {
+    if (isPremium()) return;
+
+    try {
+      const lockoutDate = new Date();
+      lockoutDate.setDate(lockoutDate.getDate() + 50);
+
+      const { error } = await supabase
+        .from('profiles')
+        .update({ like_me_cooldown_until: lockoutDate.toISOString() })
+        .eq('id', currentUser.id);
+
+      if (error) throw error;
+
+      setLockoutEndDate(lockoutDate);
+    } catch (error) {
+      console.error('Error setting lockout period:', error);
+    }
+  };
+
   const handleTouch = (e: React.TouchEvent<HTMLDivElement>) => {
     const { clientX } = e.changedTouches[0];
     const screenWidth = window.innerWidth;
@@ -157,6 +203,12 @@ const LikedMePage = ({ currentUser }: LikedMePageProps) => {
 
       if (likeError) throw likeError;
 
+      // Set lockout period for free users
+      if (!isPremium() && !hasInteractedToday) {
+        await setLockoutPeriod();
+        setHasInteractedToday(true);
+      }
+
       toast({
         title: "It's a Match! 🎉",
         description: "You can now start chatting!",
@@ -183,6 +235,12 @@ const LikedMePage = ({ currentUser }: LikedMePageProps) => {
         .eq('liked_id', currentUser.id);
 
       if (error) throw error;
+
+      // Set lockout period for free users
+      if (!isPremium() && !hasInteractedToday) {
+        await setLockoutPeriod();
+        setHasInteractedToday(true);
+      }
 
       toast({
         title: "Passed",
@@ -213,15 +271,25 @@ const LikedMePage = ({ currentUser }: LikedMePageProps) => {
   };
 
   const handleProfileClick = (liker: any, index: number) => {
-    const visibleCount = getLikedMeVisibleCount();
-    
-    // If premium or within visible limit, allow click
-    if (isPremium() || visibleCount === -1 || index < visibleCount) {
-      setSelectedProfile(liker);
-    } else {
-      // Show premium upgrade for blurred profiles
+    // Free users with active lockout can only view the first profile
+    if (!isPremium() && lockoutEndDate && new Date() < lockoutEndDate && index > 0) {
       setShowPremiumUpgrade(true);
+      return;
     }
+
+    // Allow premium users or free users without lockout to view profiles
+    setSelectedProfile(liker);
+  };
+
+  const getRemainingDays = () => {
+    if (!lockoutEndDate) return 0;
+    const now = new Date();
+    const diff = lockoutEndDate.getTime() - now.getTime();
+    return Math.ceil(diff / (1000 * 60 * 60 * 24));
+  };
+
+  const isProfileLocked = (index: number) => {
+    return !isPremium() && lockoutEndDate && new Date() < lockoutEndDate && index > 0;
   };
 
   if (showPremiumUpgrade) {
@@ -252,7 +320,7 @@ const LikedMePage = ({ currentUser }: LikedMePageProps) => {
               />
               {/* Image indicators */}
               <div className="absolute top-4 left-1/2 transform -translate-x-1/2 flex gap-1 z-10">
-                {profileImages.map((_, idx) => (
+                {profileImages.map((_,idx) => (
                   <div
                     key={idx}
                     className={`w-2 h-2 rounded-full ${idx === imageIndex ? 'bg-white' : 'bg-white/40'}`}
@@ -404,6 +472,7 @@ const LikedMePage = ({ currentUser }: LikedMePageProps) => {
 
   const visibleCount = getLikedMeVisibleCount();
   const hasBlurredProfiles = !isPremium() && visibleCount !== -1 && likers.length > visibleCount;
+  const isInLockout = !isPremium() && lockoutEndDate && new Date() < lockoutEndDate;
 
   return (
     <div className="h-full flex flex-col">
@@ -413,18 +482,30 @@ const LikedMePage = ({ currentUser }: LikedMePageProps) => {
             <Users className="w-6 h-6 text-pink-600" />
             <h1 className="text-2xl font-bold text-gray-800">People who liked you</h1>
           </div>
-          {hasBlurredProfiles && (
+          {(hasBlurredProfiles || isInLockout) && (
             <Button
               onClick={() => setShowPremiumUpgrade(true)}
               className="bg-gradient-to-r from-yellow-400 to-yellow-600 hover:from-yellow-500 hover:to-yellow-700 text-black font-bold text-sm px-3 py-1"
             >
               <Crown className="w-4 h-4 mr-1" />
-              Upgrade to see all
+              Upgrade to Premium
             </Button>
           )}
         </div>
         <p className="text-gray-600">({likers.length} people)</p>
-        {hasBlurredProfiles && (
+        
+        {isInLockout && (
+          <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-3 mt-3">
+            <div className="flex items-center space-x-2 text-yellow-800">
+              <Clock className="w-4 h-4" />
+              <span className="text-sm font-medium">
+                You can view more profiles in {getRemainingDays()} days or upgrade to Premium
+              </span>
+            </div>
+          </div>
+        )}
+        
+        {hasBlurredProfiles && !isInLockout && (
           <p className="text-sm text-yellow-600 mt-2">
             Free users can see {visibleCount} profile{visibleCount !== 1 ? 's' : ''}. Upgrade to Premium to see all likes!
           </p>
@@ -444,12 +525,12 @@ const LikedMePage = ({ currentUser }: LikedMePageProps) => {
           <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
             {likers.map((liker, index) => {
               const profileImages = userImages[liker.id] || [];
-              const isBlurred = !isPremium() && visibleCount !== -1 && index >= visibleCount;
+              const isLocked = isProfileLocked(index);
               
               return (
                 <Card
                   key={liker.id}
-                  className={`cursor-pointer hover:shadow-lg transition-shadow flex flex-col relative ${isBlurred ? 'opacity-75' : ''}`}
+                  className={`cursor-pointer hover:shadow-lg transition-shadow flex flex-col relative ${isLocked ? 'opacity-75' : ''}`}
                   onClick={() => handleProfileClick(liker, index)}
                 >
                   <div className="relative h-48 flex-shrink-0">
@@ -457,16 +538,16 @@ const LikedMePage = ({ currentUser }: LikedMePageProps) => {
                       <img
                         src={profileImages[0]}
                         alt={`${liker.first_name}'s photo`}
-                        className={`w-full h-full object-cover rounded-t-lg ${isBlurred ? 'blur-md' : ''}`}
+                        className={`w-full h-full object-cover rounded-t-lg ${isLocked ? 'blur-md' : ''}`}
                       />
                     ) : (
-                      <div className={`w-full h-full bg-gradient-to-br from-pink-200 to-purple-200 flex items-center justify-center rounded-t-lg ${isBlurred ? 'blur-md' : ''}`}>
+                      <div className={`w-full h-full bg-gradient-to-br from-pink-200 to-purple-200 flex items-center justify-center rounded-t-lg ${isLocked ? 'blur-md' : ''}`}>
                         <span className="text-2xl font-bold text-gray-700">
                           {liker.first_name?.[0]}{liker.last_name?.[0]}
                         </span>
                       </div>
                     )}
-                    {isBlurred && (
+                    {isLocked && (
                       <div className="absolute inset-0 flex items-center justify-center bg-black/20 rounded-t-lg">
                         <div className="bg-white/90 backdrop-blur-sm rounded-full p-3">
                           <Lock className="w-6 h-6 text-gray-700" />
@@ -475,10 +556,10 @@ const LikedMePage = ({ currentUser }: LikedMePageProps) => {
                     )}
                   </div>
                   <CardContent className="p-3 flex-1">
-                    <h3 className={`font-semibold text-gray-800 truncate ${isBlurred ? 'blur-sm' : ''}`}>
+                    <h3 className={`font-semibold text-gray-800 truncate ${isLocked ? 'blur-sm' : ''}`}>
                       {liker.first_name}, {calculateAge(liker.date_of_birth)}
                     </h3>
-                    <p className={`text-sm text-gray-600 truncate ${isBlurred ? 'blur-sm' : ''}`}>
+                    <p className={`text-sm text-gray-600 truncate ${isLocked ? 'blur-sm' : ''}`}>
                       {liker.city}
                     </p>
                   </CardContent>

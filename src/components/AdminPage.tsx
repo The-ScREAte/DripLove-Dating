@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -71,7 +70,7 @@ const AdminPage = ({ currentUser }: AdminPageProps) => {
     try {
       const { data, error } = await supabase.rpc('get_app_stats');
       if (error) throw error;
-      setStats(data);
+      setStats(data as AppStats);
     } catch (error) {
       console.error('Error fetching app stats:', error);
       toast({
