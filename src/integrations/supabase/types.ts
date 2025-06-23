@@ -67,6 +67,7 @@ export type Database = {
         Row: {
           created_at: string
           id: string
+          is_read: boolean | null
           match_id: string
           message: string
           sender_id: string
@@ -74,6 +75,7 @@ export type Database = {
         Insert: {
           created_at?: string
           id?: string
+          is_read?: boolean | null
           match_id: string
           message: string
           sender_id: string
@@ -81,6 +83,7 @@ export type Database = {
         Update: {
           created_at?: string
           id?: string
+          is_read?: boolean | null
           match_id?: string
           message?: string
           sender_id?: string
@@ -142,6 +145,7 @@ export type Database = {
         Row: {
           created_at: string
           id: string
+          last_msg_at: string | null
           user1_id: string
           user1_unread_count: number | null
           user2_id: string
@@ -150,6 +154,7 @@ export type Database = {
         Insert: {
           created_at?: string
           id?: string
+          last_msg_at?: string | null
           user1_id: string
           user1_unread_count?: number | null
           user2_id: string
@@ -158,6 +163,7 @@ export type Database = {
         Update: {
           created_at?: string
           id?: string
+          last_msg_at?: string | null
           user1_id?: string
           user1_unread_count?: number | null
           user2_id?: string
@@ -251,6 +257,7 @@ export type Database = {
           is_admin: boolean | null
           last_googled: string | null
           last_name: string
+          like_me_cooldown_until: string | null
           messy_organized: number | null
           occupation: string | null
           perfect_first_date: string | null
@@ -284,6 +291,7 @@ export type Database = {
           is_admin?: boolean | null
           last_googled?: string | null
           last_name: string
+          like_me_cooldown_until?: string | null
           messy_organized?: number | null
           occupation?: string | null
           perfect_first_date?: string | null
@@ -317,6 +325,7 @@ export type Database = {
           is_admin?: boolean | null
           last_googled?: string | null
           last_name?: string
+          like_me_cooldown_until?: string | null
           messy_organized?: number | null
           occupation?: string | null
           perfect_first_date?: string | null

@@ -54,10 +54,10 @@ const AuthForm = ({ isLogin, onToggle }: AuthFormProps) => {
         return;
       }
 
-      // Check if user profile exists
+      // Check if user profile exists and get account status
       const { data: profile, error: profileError } = await supabase
         .from('profiles')
-        .select('id, is_admin')
+        .select('id, is_admin, account_status')
         .eq('id', authData.user.id)
         .single();
 
@@ -67,6 +67,29 @@ const AuthForm = ({ isLogin, onToggle }: AuthFormProps) => {
         toast({
           title: "Account Not Found",
           description: "This account doesn't exist in our system. Please register first.",
+          variant: "destructive",
+        });
+        setLoading(false);
+        return;
+      }
+
+      // Check account status and show appropriate messages
+      if (profile.account_status === 'blocked') {
+        await supabase.auth.signOut();
+        toast({
+          title: "Account Blocked",
+          description: "Your account has been blocked.",
+          variant: "destructive",
+        });
+        setLoading(false);
+        return;
+      }
+
+      if (profile.account_status === 'on_hold') {
+        await supabase.auth.signOut();
+        toast({
+          title: "Account On Hold",
+          description: "Your account is on hold. Please contact support.",
           variant: "destructive",
         });
         setLoading(false);

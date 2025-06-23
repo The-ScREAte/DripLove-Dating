@@ -46,6 +46,12 @@ const DiscoverPage = ({ currentUser, onNavigateToChat }: DiscoverPageProps) => {
   const { toast } = useToast();
   
   const { subscription, checkUsageLimit, isPremium } = useSubscription(currentUser?.id);
+  const [lastShuffleTime, setLastShuffleTime] = useState<number>(0);
+  const [startX, setStartX] = useState(0);
+  const [startY, setStartY] = useState(0);
+  const [currentX, setCurrentX] = useState(0);
+  const [currentY, setCurrentY] = useState(0);
+  const [isDragging, setIsDragging] = useState(false);
 
   useEffect(() => {
     fetchPotentialMatches();
@@ -67,6 +73,12 @@ const DiscoverPage = ({ currentUser, onNavigateToChat }: DiscoverPageProps) => {
     }
 
     return age;
+  };
+
+  const shouldReshuffle = () => {
+    const now = Date.now();
+    const tenMinutes = 10 * 60 * 1000; // 10 minutes in milliseconds
+    return now - lastShuffleTime > tenMinutes;
   };
 
   const fetchPotentialMatches = async () => {
@@ -114,12 +126,15 @@ const DiscoverPage = ({ currentUser, onNavigateToChat }: DiscoverPageProps) => {
         })
       );
       
-      // Shuffle client-side
-      const shuffled = matchesWithImages.sort(() => 0.5 - Math.random());
-      setPotentialMatches(shuffled);
-      
+      // Only shuffle if 10 minutes have passed or it's the first load
+      if (shouldReshuffle() || lastShuffleTime === 0) {
+        const shuffled = matchesWithImages.sort(() => 0.5 - Math.random());
+        setPotentialMatches(shuffled);
+        setLastShuffleTime(Date.now());
+      } else {
+        setPotentialMatches(matchesWithImages);
+      }
 
-      setPotentialMatches(matchesWithImages);
     } catch (error) {
       console.error('Error fetching potential matches:', error);
       toast({
@@ -129,6 +144,114 @@ const DiscoverPage = ({ currentUser, onNavigateToChat }: DiscoverPageProps) => {
       });
     } finally {
       setIsLoading(false);
+    }
+  };
+
+  // Touch event handlers for swipe
+  const handleTouchStart = (e: React.TouchEvent) => {
+    const touch = e.touches[0];
+    setStartX(touch.clientX);
+    setStartY(touch.clientY);
+    setCurrentX(touch.clientX);
+    setCurrentY(touch.clientY);
+    setIsDragging(true);
+  };
+
+  const handleTouchMove = (e: React.TouchEvent) => {
+    if (!isDragging) return;
+    const touch = e.touches[0];
+    setCurrentX(touch.clientX);
+    setCurrentY(touch.clientY);
+  };
+
+  const handleTouchEnd = (e: React.TouchEvent) => {
+    if (!isDragging) return;
+    setIsDragging(false);
+
+    const deltaX = currentX - startX;
+    const deltaY = Math.abs(currentY - startY);
+    const minSwipeDistance = 50;
+
+    // Only trigger swipe if horizontal movement is greater than vertical
+    if (Math.abs(deltaX) > minSwipeDistance && Math.abs(deltaX) > deltaY) {
+      if (deltaX > 0) {
+        // Swipe right - like
+        handleLike();
+      } else {
+        // Swipe left - dislike
+        handlePass();
+      }
+    }
+
+    // Reset values
+    setStartX(0);
+    setStartY(0);
+    setCurrentX(0);
+    setCurrentY(0);
+  };
+
+  // Mouse event handlers for swipe on desktop
+  const handleMouseDown = (e: React.MouseEvent) => {
+    setStartX(e.clientX);
+    setStartY(e.clientY);
+    setCurrentX(e.clientX);
+    setCurrentY(e.clientY);
+    setIsDragging(true);
+  };
+
+  const handleMouseMove = (e: React.MouseEvent) => {
+    if (!isDragging) return;
+    setCurrentX(e.clientX);
+    setCurrentY(e.clientY);
+  };
+
+  const handleMouseUp = (e: React.MouseEvent) => {
+    if (!isDragging) return;
+    setIsDragging(false);
+
+    const deltaX = currentX - startX;
+    const deltaY = Math.abs(currentY - startY);
+    const minSwipeDistance = 50;
+
+    // Only trigger swipe if horizontal movement is greater than vertical
+    if (Math.abs(deltaX) > minSwipeDistance && Math.abs(deltaX) > deltaY) {
+      if (deltaX > 0) {
+        // Swipe right - like
+        handleLike();
+      } else {
+        // Swipe left - dislike
+        handlePass();
+      }
+    }
+
+    // Reset values
+    setStartX(0);
+    setStartY(0);
+    setCurrentX(0);
+    setCurrentY(0);
+  };
+
+  const handleImageAreaClick = (e: React.MouseEvent<HTMLDivElement>) => {
+    // Prevent swipe action if dragging occurred
+    if (Math.abs(currentX - startX) > 10) return;
+
+    // Only change image if clicking on empty space (not on text/buttons)
+    const target = e.target as HTMLElement;
+    if (target.closest('.profile-info') || target.closest('button')) {
+      return;
+    }
+
+    const { clientX } = e;
+    const rect = e.currentTarget.getBoundingClientRect();
+    const clickX = clientX - rect.left;
+    const width = rect.width;
+
+    if (clickX < width / 2) {
+      setImageIndex(prev => (prev > 0 ? prev - 1 : prev));
+    } else {
+      setImageIndex(prev =>
+        currentMatch?.images && prev < currentMatch.images.length - 1 ? prev + 1 : prev
+      );
     }
   };
 
@@ -229,48 +352,6 @@ const DiscoverPage = ({ currentUser, onNavigateToChat }: DiscoverPageProps) => {
       title: 'Reversed',
       description: 'Brought back the last passed user.'
     });
-  };
-
-  const handleImageAreaClick = (e: React.MouseEvent<HTMLDivElement>) => {
-    // Only change image if clicking on empty space (not on text/buttons)
-    const target = e.target as HTMLElement;
-    if (target.closest('.profile-info') || target.closest('button')) {
-      return;
-    }
-
-    const { clientX } = e;
-    const rect = e.currentTarget.getBoundingClientRect();
-    const clickX = clientX - rect.left;
-    const width = rect.width;
-
-    if (clickX < width / 2) {
-      setImageIndex(prev => (prev > 0 ? prev - 1 : prev));
-    } else {
-      setImageIndex(prev =>
-        currentMatch?.images && prev < currentMatch.images.length - 1 ? prev + 1 : prev
-      );
-    }
-  };
-
-  const handleTouch = (e: React.TouchEvent<HTMLDivElement>) => {
-    // Only change image if touching empty space (not on text/buttons)
-    const target = e.target as HTMLElement;
-    if (target.closest('.profile-info') || target.closest('button')) {
-      return;
-    }
-
-    const { clientX } = e.changedTouches[0];
-    const rect = e.currentTarget.getBoundingClientRect();
-    const touchX = clientX - rect.left;
-    const width = rect.width;
-
-    if (touchX < width / 2) {
-      setImageIndex(prev => (prev > 0 ? prev - 1 : prev));
-    } else {
-      setImageIndex(prev =>
-        currentMatch?.images && prev < currentMatch.images.length - 1 ? prev + 1 : prev
-      );
-    }
   };
 
   const moveToNext = () => {
@@ -380,8 +461,13 @@ const DiscoverPage = ({ currentUser, onNavigateToChat }: DiscoverPageProps) => {
       {/* Main Image Area - Fixed height container with reserved space for buttons */}
       <div className="flex-1 relative overflow-hidden pb-32">
         <div 
-          className="h-full w-full cursor-pointer" 
-          onTouchEnd={handleTouch}
+          className="h-full w-full cursor-pointer select-none" 
+          onTouchStart={handleTouchStart}
+          onTouchMove={handleTouchMove}
+          onTouchEnd={handleTouchEnd}
+          onMouseDown={handleMouseDown}
+          onMouseMove={handleMouseMove}
+          onMouseUp={handleMouseUp}
           onClick={handleImageAreaClick}
         >
           {currentMatch.images?.length > 0 ? (
@@ -390,6 +476,7 @@ const DiscoverPage = ({ currentUser, onNavigateToChat }: DiscoverPageProps) => {
                 src={currentMatch.images[imageIndex]}
                 alt={`${currentMatch.first_name}'s photo`}
                 className="w-full h-full object-cover object-center"
+                draggable={false}
               />
               {/* Image indicators */}
               <div className="absolute top-4 left-1/2 transform -translate-x-1/2 flex gap-1 z-10">
