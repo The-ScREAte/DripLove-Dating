@@ -1,4 +1,5 @@
-import React, { useState, useEffect } from 'react';
+
+import React, { useState, useEffect, useRef } from 'react';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Heart, X, Undo2, MapPin, Briefcase, GraduationCap, ChevronDown, ChevronUp, Calendar, Crown } from 'lucide-react';
@@ -43,6 +44,14 @@ const DiscoverPage = ({ currentUser, onNavigateToChat }: DiscoverPageProps) => {
   const [isOutOfSwipes, setIsOutOfSwipes] = useState(false);
   const [showMatchAnimation, setShowMatchAnimation] = useState(false);
   const [matchedUser, setMatchedUser] = useState<PotentialMatch | null>(null);
+  const [lastShuffleTime, setLastShuffleTime] = useState<number>(0);
+  
+  // Swipe handling refs
+  const startX = useRef<number>(0);
+  const startY = useRef<number>(0);
+  const isDragging = useRef<boolean>(false);
+  const cardRef = useRef<HTMLDivElement>(null);
+  
   const { toast } = useToast();
   
   const { subscription, checkUsageLimit, isPremium } = useSubscription(currentUser?.id);
@@ -114,12 +123,18 @@ const DiscoverPage = ({ currentUser, onNavigateToChat }: DiscoverPageProps) => {
         })
       );
       
-      // Shuffle client-side
-      const shuffled = matchesWithImages.sort(() => 0.5 - Math.random());
-      setPotentialMatches(shuffled);
+      // Check if we should shuffle (every 10 minutes)
+      const now = Date.now();
+      const tenMinutes = 10 * 60 * 1000;
       
+      if (now - lastShuffleTime > tenMinutes) {
+        const shuffled = matchesWithImages.sort(() => 0.5 - Math.random());
+        setPotentialMatches(shuffled);
+        setLastShuffleTime(now);
+      } else {
+        setPotentialMatches(matchesWithImages);
+      }
 
-      setPotentialMatches(matchesWithImages);
     } catch (error) {
       console.error('Error fetching potential matches:', error);
       toast({
@@ -229,6 +244,97 @@ const DiscoverPage = ({ currentUser, onNavigateToChat }: DiscoverPageProps) => {
       title: 'Reversed',
       description: 'Brought back the last passed user.'
     });
+  };
+
+  // Swipe handling functions
+  const handleTouchStart = (e: React.TouchEvent) => {
+    const touch = e.touches[0];
+    startX.current = touch.clientX;
+    startY.current = touch.clientY;
+    isDragging.current = true;
+  };
+
+  const handleTouchMove = (e: React.TouchEvent) => {
+    if (!isDragging.current || !cardRef.current) return;
+    
+    const touch = e.touches[0];
+    const deltaX = touch.clientX - startX.current;
+    const deltaY = touch.clientY - startY.current;
+    
+    // Only handle horizontal swipes
+    if (Math.abs(deltaX) > Math.abs(deltaY)) {
+      e.preventDefault();
+      cardRef.current.style.transform = `translateX(${deltaX}px) rotate(${deltaX * 0.1}deg)`;
+      cardRef.current.style.opacity = `${1 - Math.abs(deltaX) / 300}`;
+    }
+  };
+
+  const handleTouchEnd = (e: React.TouchEvent) => {
+    if (!isDragging.current || !cardRef.current) return;
+    
+    const touch = e.changedTouches[0];
+    const deltaX = touch.clientX - startX.current;
+    const deltaY = touch.clientY - startY.current;
+    
+    // Reset card position
+    cardRef.current.style.transform = '';
+    cardRef.current.style.opacity = '';
+    
+    isDragging.current = false;
+    
+    // Only handle horizontal swipes
+    if (Math.abs(deltaX) > Math.abs(deltaY) && Math.abs(deltaX) > 100) {
+      if (deltaX > 0) {
+        // Swipe right - like
+        handleLike();
+      } else {
+        // Swipe left - dislike
+        handlePass();
+      }
+    }
+  };
+
+  const handleMouseDown = (e: React.MouseEvent) => {
+    startX.current = e.clientX;
+    startY.current = e.clientY;
+    isDragging.current = true;
+  };
+
+  const handleMouseMove = (e: React.MouseEvent) => {
+    if (!isDragging.current || !cardRef.current) return;
+    
+    const deltaX = e.clientX - startX.current;
+    const deltaY = e.clientY - startY.current;
+    
+    // Only handle horizontal swipes
+    if (Math.abs(deltaX) > Math.abs(deltaY)) {
+      cardRef.current.style.transform = `translateX(${deltaX}px) rotate(${deltaX * 0.1}deg)`;
+      cardRef.current.style.opacity = `${1 - Math.abs(deltaX) / 300}`;
+    }
+  };
+
+  const handleMouseUp = (e: React.MouseEvent) => {
+    if (!isDragging.current || !cardRef.current) return;
+    
+    const deltaX = e.clientX - startX.current;
+    const deltaY = e.clientY - startY.current;
+    
+    // Reset card position
+    cardRef.current.style.transform = '';
+    cardRef.current.style.opacity = '';
+    
+    isDragging.current = false;
+    
+    // Only handle horizontal swipes
+    if (Math.abs(deltaX) > Math.abs(deltaY) && Math.abs(deltaX) > 100) {
+      if (deltaX > 0) {
+        // Swipe right - like
+        handleLike();
+      } else {
+        // Swipe left - dislike
+        handlePass();
+      }
+    }
   };
 
   const handleImageAreaClick = (e: React.MouseEvent<HTMLDivElement>) => {
@@ -380,8 +486,14 @@ const DiscoverPage = ({ currentUser, onNavigateToChat }: DiscoverPageProps) => {
       {/* Main Image Area - Fixed height container with reserved space for buttons */}
       <div className="flex-1 relative overflow-hidden pb-32">
         <div 
-          className="h-full w-full cursor-pointer" 
-          onTouchEnd={handleTouch}
+          ref={cardRef}
+          className="h-full w-full cursor-pointer transition-transform duration-200" 
+          onTouchStart={handleTouchStart}
+          onTouchMove={handleTouchMove}
+          onTouchEnd={handleTouchEnd}
+          onMouseDown={handleMouseDown}
+          onMouseMove={handleMouseMove}
+          onMouseUp={handleMouseUp}
           onClick={handleImageAreaClick}
         >
           {currentMatch.images?.length > 0 ? (
