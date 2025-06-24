@@ -150,9 +150,6 @@ const PremiumUpgrade = ({ currentUser, onClose, preselectedPlan }: PremiumUpgrad
   </CardContent>
 </Card>
 </div>
-<br />
-<br />
-<br />
       </div>
     </div>
   );

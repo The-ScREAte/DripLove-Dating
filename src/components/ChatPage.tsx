@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect, useRef } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -56,23 +55,39 @@ const ChatPage = ({ currentUser, onUnreadChange }: ChatPageProps) => {
         .select(`
           *,
           user1:profiles!matches_user1_id_fkey(id, first_name, last_name, is_admin),
-          user2:profiles!matches_user2_id_fkey(id, first_name, last_name, is_admin)
+          user2:profiles!matches_user2_id_fkey(id, first_name, last_name, is_admin),
+          chats(id, message, created_at, sender_id)
         `)
-        .or(`user1_id.eq.${currentUser.id},user2_id.eq.${currentUser.id}`)
-        .order('created_at', { ascending: false });
+        .or(`user1_id.eq.${currentUser.id},user2_id.eq.${currentUser.id}`);
   
       if (error) throw error;
   
-      const matchesWithPartner = data?.map(match => {
-        const isUser1 = match.user1_id === currentUser.id;
-        const partner = isUser1 ? match.user2 : match.user1;
+      const matchesWithPartner = (data || [])
+        .map(match => {
+          const isUser1 = match.user1_id === currentUser.id;
+          const partner = isUser1 ? match.user2 : match.user1;
   
-        return {
-          ...match,
-          partner,
-          unreadCount: isUser1 ? match.user1_unread_count : match.user2_unread_count
-        };
-      }).filter(match => !match.partner?.is_admin) || [];
+          // Get most recent chat if any
+          const sortedChats = match.chats?.length
+            ? [...match.chats].sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())
+            : [];
+  
+          const lastMessage = sortedChats[0] || null;
+          const unreadCount = isUser1 ? match.user1_unread_count : match.user2_unread_count;
+  
+          return {
+            ...match,
+            partner,
+            unreadCount,
+            last_message: lastMessage,
+          };
+        })
+        .filter(match => match.partner && !match.partner.is_admin)
+        .sort((a, b) => {
+          const aTime = a.last_message?.created_at ? new Date(a.last_message.created_at).getTime() : 0;
+          const bTime = b.last_message?.created_at ? new Date(b.last_message.created_at).getTime() : 0;
+          return bTime - aTime;
+        });
   
       setMatches(matchesWithPartner);
     } catch (error) {
@@ -133,19 +148,34 @@ const ChatPage = ({ currentUser, onUnreadChange }: ChatPageProps) => {
     }
   
     try {
-      const { error } = await supabase
+      const isUser1 = selectedMatch.user1_id === currentUser.id;
+      const unreadField = isUser1 ? 'user2_unread_count' : 'user1_unread_count';
+  
+      // Insert message
+      const { error: insertError } = await supabase
         .from('chats')
         .insert({
           match_id: selectedMatch.id,
           sender_id: currentUser.id,
-          message: newMessage.trim()
+          message: newMessage.trim(),
         });
   
-      if (error) throw error;
+      if (insertError) throw insertError;
+  
+      // 🔐 Prevent race condition by waiting before increment
+      await new Promise(resolve => setTimeout(resolve, 100)); // wait 100ms
+  
+      // Increment unread count for recipient only
+      const { error: rpcError } = await supabase.rpc('increment_unread_count', {
+        match_id_input: selectedMatch.id,
+        field_name: unreadField,
+      });
+  
+      if (rpcError) throw rpcError;
   
       setNewMessage('');
-      fetchMessages();
-      fetchMatches();
+      await fetchMessages();
+      await fetchMatches(); // call once, after all is done
       onUnreadChange?.();
     } catch (error) {
       console.error('Error sending message:', error);
@@ -157,7 +187,6 @@ const ChatPage = ({ currentUser, onUnreadChange }: ChatPageProps) => {
     }
   };
   
-
   const handleEmojiSelect = (emoji: string) => {
     setNewMessage(prev => prev + emoji);
     setShowEmojiPicker(false);
@@ -203,51 +232,58 @@ const ChatPage = ({ currentUser, onUnreadChange }: ChatPageProps) => {
         </div>
 
         <div className="flex-1 overflow-y-auto pb-20">
-          {filteredMatches.length === 0 ? (
-            <div className="flex items-center justify-center h-full">
-              <p className="text-center text-gray-500 p-4">
-                {searchTerm ? 'No matches found' : 'No matches yet'}
-              </p>
-            </div>
-          ) : (
-            <div className="divide-y">
-              {filteredMatches.map((match) => (
-                <div
-                  key={match.id}
-                  onClick={() => setSelectedMatch(match)}
-                  className="p-4 hover:bg-gray-50 transition-colors cursor-pointer"
-                >
-                  <div className="flex items-center space-x-3">
-                  <div className="relative">
-  <ChatUserAvatar 
-    userId={match.partner?.id}
-    firstName={match.partner?.first_name}
-    lastName={match.partner?.last_name}
-    onClick={() => handleUserProfileClick(match.partner?.id)}
-    size="lg"
-  />
-  {match.unreadCount > 0 && (
-    <span className="absolute top-0 right-0 -mt-1 -mr-1 bg-red-500 text-white text-xs font-bold rounded-full h-5 w-5 flex items-center justify-center z-10">
-      {match.unreadCount}
-    </span>
+  {filteredMatches.length === 0 ? (
+    <div className="flex items-center justify-center h-full">
+      <p className="text-center text-gray-500 p-4">
+        {searchTerm ? 'No matches found' : 'No matches yet'}
+      </p>
+    </div>
+  ) : (
+    <div className="divide-y">
+      {filteredMatches.map((match) => (
+        <div
+          key={match.id}
+          onClick={() => setSelectedMatch(match)}
+          className="p-4 hover:bg-gray-50 transition-colors cursor-pointer"
+        >
+          <div className="flex items-center space-x-3">
+  <div className="relative">
+    <ChatUserAvatar 
+      userId={match.partner?.id}
+      firstName={match.partner?.first_name}
+      lastName={match.partner?.last_name}
+      onClick={() => handleUserProfileClick(match.partner?.id)}
+      size="lg"
+    />
+    {/* Unread dot if message is from partner and not yet read */}
+    {match.unreadCount > 0 && (
+  <span className="absolute -top-1 -right-1 h-3 w-3 bg-blue-600 rounded-full border-2 border-white z-10" />
+)}
+  </div>
+
+  <div className="flex-1 min-w-0">
+    <div className="flex justify-between items-center">
+      <span className="font-semibold text-gray-900 truncate">
+        {match.partner?.first_name} {match.partner?.last_name}
+      </span>
+    </div>
+    <p
+  className={`text-sm truncate ${
+    match.unreadCount > 0 ? 'font-bold text-gray-900' : 'text-gray-500'
+  }`}
+>
+  {match.last_message?.message
+    ? `${match.last_message.sender_id === currentUser.id ? 'You: ' : ''}${match.last_message.message}`
+    : 'Tap to start chatting'}
+</p>
+  </div>
+</div>
+
+        </div>
+      ))}
+    </div>
   )}
 </div>
-                    <div className="flex-1 min-w-0">
-                      <div className="flex justify-between items-center">
-                        <span className="font-semibold text-gray-900 truncate">
-                          {match.partner?.first_name} {match.partner?.last_name}
-                        </span>
-                      </div>
-                      <p className="text-sm text-gray-500 truncate">
-                        Tap to start chatting
-                      </p>
-                    </div>
-                  </div>
-                </div>
-              ))}
-            </div>
-          )}
-        </div>
       </div>
     );
   }
@@ -310,8 +346,8 @@ const ChatPage = ({ currentUser, onUnreadChange }: ChatPageProps) => {
       </div>
 
       {/* Message Input - Fixed at bottom */}
-      <div className="border-t p-4 bg-white flex-shrink-0 pb-24">
-        <div className="flex space-x-2 relative">
+      <div className="border-t p-4 bg-white flex-shrink-0 pb-2">
+      <div className="flex space-x-2 relative">
           <div className="flex-1 relative">
             <Input
               value={newMessage}

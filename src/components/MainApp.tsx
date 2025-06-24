@@ -155,10 +155,8 @@ const MainApp = ({ user, onLogout }: MainAppProps) => {
                 <Icon className={`w-5 h-5 ${activeTab === label.toLowerCase() ? 'fill-current' : ''}`} />
                 <span className="text-xs font-medium">{label}</span>
                 {label === 'Chat' && unreadCount > 0 && (
-                  <span className="absolute -top-1 -right-1 bg-red-500 text-white text-xs rounded-full px-1.5 py-0.5 min-w-[16px] text-center">
-                    {unreadCount}
-                  </span>
-                )}
+                <span className="absolute -top-1 -right-1 h-2 w-2 rounded-full bg-pink-600 border border-white z-10" />
+              )}
               </button>
             ))}
           </div>

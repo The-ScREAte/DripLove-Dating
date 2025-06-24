@@ -55,7 +55,11 @@ const ChatUserAvatar = ({ userId, firstName = '', lastName = '', onClick, size =
       className={`${sizeClasses[size]} ${onClick ? 'cursor-pointer hover:ring-2 hover:ring-pink-400 transition-all' : ''}`}
       onClick={onClick}
     >
-      <AvatarImage src={profileImage || ''} alt={`${firstName} ${lastName}`} />
+<AvatarImage
+  src={profileImage || ''}
+  alt={`${firstName} ${lastName}`}
+  className="h-full w-full object-cover"
+/>
       <AvatarFallback className="bg-pink-100 text-pink-700 font-medium">
         {getInitials()}
       </AvatarFallback>

@@ -489,10 +489,10 @@ const DiscoverPage = ({ currentUser, onNavigateToChat }: DiscoverPageProps) => {
   const cardTransform = isDragging ? `translateX(${currentX - startX}px) rotate(${(currentX - startX) * 0.1}deg)` : '';
 
   return (
-    <div className="h-full w-full relative flex flex-col">
-      {/* Main Image Area - Fixed height container with reserved space for buttons */}
-      <div className="flex-1 relative overflow-hidden pb-32">
-        <div 
+<div className="h-full w-full relative flex flex-col pt-0 mt-0">
+{/* Main Image Area - Fixed height container with reserved space for buttons */}
+      <div className="flex-1 relative overflow-hidden">
+      <div 
           className="h-full w-full cursor-pointer select-none relative" 
           style={{ transform: cardTransform, transition: isDragging ? 'none' : 'transform 0.3s ease-out' }}
           onTouchStart={handleTouchStart}
@@ -564,7 +564,7 @@ const DiscoverPage = ({ currentUser, onNavigateToChat }: DiscoverPageProps) => {
           <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-transparent to-transparent pointer-events-none" />
 
           {/* Profile Info Overlay - Positioned to not interfere with buttons */}
-          <div className="absolute bottom-48 left-0 right-0 text-white px-6 profile-info">
+          <div className="absolute bottom-36 left-0 right-0 text-white px-6 profile-info">
             {/* Main info section */}
             <div className="mb-3">
               <h2 className="text-2xl font-bold mb-1">
@@ -644,8 +644,8 @@ const DiscoverPage = ({ currentUser, onNavigateToChat }: DiscoverPageProps) => {
       </div>
 
       {/* Action Buttons - Fixed position at bottom with higher z-index and moved up more */}
-      <div className="absolute bottom-24 left-0 right-0 flex justify-center space-x-6 px-6 z-30">
-        <Button
+      <div className="absolute bottom-14 left-0 right-0 flex justify-center space-x-6 px-6 z-30">
+      <Button
           onClick={handlePass}
           variant="outline"
           className="w-16 h-16 rounded-full border-2 border-red-500 bg-red-500/20 hover:bg-red-500/30 backdrop-blur-sm shadow-lg hover:border-red-400 transition-all duration-200"
