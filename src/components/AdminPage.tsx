@@ -224,9 +224,43 @@ const AdminPage = ({ currentUser }: AdminPageProps) => {
   };
 
   // Check if current user is admin - fix the admin check logic
-  if (!currentUser || !currentUser.is_admin) {
+  const [isAdmin, setIsAdmin] = useState<boolean | null>(null);
+
+  useEffect(() => {
+    const checkAdminStatus = async () => {
+      if (!currentUser?.id) {
+        setIsAdmin(false);
+        return;
+      }
+  
+      const { data, error } = await supabase
+        .from('profiles')
+        .select('is_admin')
+        .eq('id', currentUser.id)
+        .single();
+  
+      if (error || !data) {
+        console.error('Failed to fetch admin status:', error);
+        setIsAdmin(false);
+      } else {
+        setIsAdmin(data.is_admin);
+      }
+    };
+  
+    checkAdminStatus();
+  }, [currentUser]);
+  
+  if (isAdmin === null) {
     return (
-      <div className="flex items-center justify-center h-full">
+      <div className="flex items-center justify-center h-screen">
+        <p className="text-gray-500">Checking admin permissions...</p>
+      </div>
+    );
+  }
+  
+  if (!isAdmin) {
+    return (
+      <div className="flex items-center justify-center h-screen">
         <Card className="w-full max-w-md">
           <CardContent className="p-8 text-center">
             <Shield className="w-16 h-16 mx-auto mb-4 text-red-500" />
@@ -237,7 +271,7 @@ const AdminPage = ({ currentUser }: AdminPageProps) => {
       </div>
     );
   }
-
+  
   return (
     <div className="container mx-auto p-6 space-y-6">
       <div className="flex items-center justify-between">
