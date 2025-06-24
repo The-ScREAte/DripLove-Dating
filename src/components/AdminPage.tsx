@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -611,15 +610,27 @@ const AdminPage = ({ currentUser, onLogout }: AdminPageProps) => {
                             View
                           </Button>
                           
-                          <Button
-                            size="sm"
-                            variant="outline"
-                            onClick={() => updateUserStatus(user.id, 'on_hold')}
-                            className="text-yellow-600 hover:text-yellow-700 text-xs px-2 py-1 h-7"
-                          >
-                            <Pause className="w-3 h-3 mr-1" />
-                            Hold
-                          </Button>
+                          {user.account_status === 'on_hold' ? (
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              onClick={() => updateUserStatus(user.id, 'active')}
+                              className="text-green-600 hover:text-green-700 text-xs px-2 py-1 h-7"
+                            >
+                              <Play className="w-3 h-3 mr-1" />
+                              Activate
+                            </Button>
+                          ) : (
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              onClick={() => updateUserStatus(user.id, 'on_hold')}
+                              className="text-yellow-600 hover:text-yellow-700 text-xs px-2 py-1 h-7"
+                            >
+                              <Pause className="w-3 h-3 mr-1" />
+                              Hold
+                            </Button>
+                          )}
                           
                           <Button
                             size="sm"

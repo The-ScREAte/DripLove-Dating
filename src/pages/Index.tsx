@@ -225,7 +225,7 @@ const Index = () => {
   }
   
   if (currentView === 'admin') {
-    return <AdminPage currentUser={user} />;
+    return <AdminPage currentUser={user} onLogout={handleLogout} />;
   }
   
   
