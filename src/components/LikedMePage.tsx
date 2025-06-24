@@ -270,11 +270,8 @@ const LikedMePage = ({ currentUser }: LikedMePageProps) => {
   };
 
   const handleProfileClick = (liker: any, index: number) => {
-    // Check if user is in lockout period and trying to access locked profiles
-    const isInLockout = !isPremium() && lockoutEndDate && new Date() < lockoutEndDate;
-    
-    // For free users in lockout, only allow viewing the first profile (index 0)
-    if (!isPremium() && isInLockout && index > 0) {
+    // For free users, only allow clicking if they're premium
+    if (!isPremium()) {
       setShowPremiumUpgrade(true);
       return;
     }
@@ -289,19 +286,13 @@ const LikedMePage = ({ currentUser }: LikedMePageProps) => {
     return Math.ceil(diff / (1000 * 60 * 60 * 24));
   };
 
-  const isProfileLocked = (index: number) => {
-    const isInLockout = !isPremium() && lockoutEndDate && new Date() < lockoutEndDate;
-    // Lock all profiles except the first one (index 0) for free users in lockout
-    return !isPremium() && isInLockout && index > 0;
-  };
-
   if (showPremiumUpgrade) {
     return <PremiumUpgrade currentUser={currentUser} onClose={() => setShowPremiumUpgrade(false)} preselectedPlan="premium" />;
   }
 
   if (loading) {
     return (
-      <div className="h-full w-full flex items-center justify-center">
+      <div className="h-full w-full flex items-center justify-center bg-white">
         <div className="animate-spin rounded-full h-32 w-32 border-b-2 border-pink-600"></div>
       </div>
     );
@@ -311,7 +302,7 @@ const LikedMePage = ({ currentUser }: LikedMePageProps) => {
     const profileImages = userImages[selectedProfile.id] || [];
 
     return (
-      <div className="h-full w-full relative flex flex-col">
+      <div className="h-full w-full relative flex flex-col bg-white">
         {/* Main Image Area - takes full available height */}
         <div className="flex-1 relative" onTouchEnd={handleTouch}>
           {profileImages.length > 0 ? (
@@ -476,38 +467,38 @@ const LikedMePage = ({ currentUser }: LikedMePageProps) => {
   const isInLockout = !isPremium() && lockoutEndDate && new Date() < lockoutEndDate;
 
   return (
-    <div className="h-full flex flex-col">
+    <div className="h-full flex flex-col bg-white">
       <div className="flex-shrink-0 bg-white border-b p-4">
         <div className="flex items-center justify-between mb-2">
           <div className="flex items-center space-x-2">
             <Users className="w-6 h-6 text-pink-600" />
-            <h1 className="text-2xl font-bold text-gray-800">People who liked you</h1>
+            <h1 className="text-xl font-bold text-gray-800">People who liked you</h1>
           </div>
-          {isInLockout && (
+          {!isPremium() && (
             <Button
               onClick={() => setShowPremiumUpgrade(true)}
-              className="bg-gradient-to-r from-yellow-400 to-yellow-600 hover:from-yellow-500 hover:to-yellow-700 text-black font-bold text-sm px-3 py-1"
+              className="bg-gradient-to-r from-yellow-400 to-yellow-600 hover:from-yellow-500 hover:to-yellow-700 text-black font-bold text-xs px-2 py-1"
             >
               <Crown className="w-4 h-4 mr-1" />
-              Upgrade to Premium
+              Upgrade
             </Button>
           )}
         </div>
-        <p className="text-gray-600">({likers.length} people)</p>
+        <p className="text-gray-600 text-sm">({likers.length} people)</p>
         
-        {isInLockout && (
+        {!isPremium() && (
           <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-3 mt-3">
             <div className="flex items-center space-x-2 text-yellow-800">
-              <Clock className="w-4 h-4" />
-              <span className="text-sm font-medium">
-                You can view more profiles in {getRemainingDays()} days or upgrade to Premium
+              <Lock className="w-4 h-4" />
+              <span className="text-xs font-medium">
+                Upgrade to Premium to see who liked you and interact with them
               </span>
             </div>
           </div>
         )}
       </div>
       
-      <div className="flex-1 overflow-y-auto p-4 pb-24">
+      <div className="flex-1 overflow-y-auto p-4 pb-24 bg-white">
         {likers.length === 0 ? (
           <div className="flex items-center justify-center h-full">
             <div className="text-center">
@@ -517,10 +508,10 @@ const LikedMePage = ({ currentUser }: LikedMePageProps) => {
             </div>
           </div>
         ) : (
-<div className="grid grid-cols-2 gap-4">
-{likers.map((liker, index) => {
+          <div className="grid grid-cols-2 gap-3">
+            {likers.map((liker, index) => {
               const profileImages = userImages[liker.id] || [];
-              const isLocked = isProfileLocked(index);
+              const isLocked = !isPremium();
               
               return (
                 <Card
@@ -528,34 +519,34 @@ const LikedMePage = ({ currentUser }: LikedMePageProps) => {
                   className={`cursor-pointer hover:shadow-lg transition-shadow flex flex-col relative ${isLocked ? 'opacity-75' : ''}`}
                   onClick={() => handleProfileClick(liker, index)}
                 >
-                <div className="relative aspect-[3/4] w-full overflow-hidden rounded-t-lg">
-                  {profileImages.length > 0 ? (
-                    <img
-                      src={profileImages[0]}
-                      alt={`${liker.first_name}'s photo`}
-                      className={`w-full h-full object-cover ${isLocked ? 'blur-md' : ''}`}
-                    />
-                  ) : (
-                    <div className={`w-full h-full bg-gradient-to-br from-pink-200 to-purple-200 flex items-center justify-center ${isLocked ? 'blur-md' : ''}`}>
-                      <span className="text-2xl font-bold text-gray-700">
-                        {liker.first_name?.[0]}{liker.last_name?.[0]}
-                      </span>
-                    </div>
-                  )}
-                  {isLocked && (
-                    <div className="absolute inset-0 flex items-center justify-center bg-black/20">
-                      <div className="bg-white/90 backdrop-blur-sm rounded-full p-3">
-                        <Lock className="w-6 h-6 text-gray-700" />
+                  <div className="relative aspect-[3/4] w-full overflow-hidden rounded-t-lg">
+                    {profileImages.length > 0 ? (
+                      <img
+                        src={profileImages[0]}
+                        alt={`${liker.first_name}'s photo`}
+                        className={`w-full h-full object-cover ${isLocked ? 'blur-md' : ''}`}
+                      />
+                    ) : (
+                      <div className={`w-full h-full bg-gradient-to-br from-pink-200 to-purple-200 flex items-center justify-center ${isLocked ? 'blur-md' : ''}`}>
+                        <span className="text-2xl font-bold text-gray-700">
+                          {liker.first_name?.[0]}{liker.last_name?.[0]}
+                        </span>
                       </div>
-                    </div>
-                  )}
-                </div>
+                    )}
+                    {isLocked && (
+                      <div className="absolute inset-0 flex items-center justify-center bg-black/20">
+                        <div className="bg-white/90 backdrop-blur-sm rounded-full p-3">
+                          <Lock className="w-6 h-6 text-gray-700" />
+                        </div>
+                      </div>
+                    )}
+                  </div>
 
                   <CardContent className="p-3 flex-1">
-                    <h3 className={`font-semibold text-gray-800 truncate ${isLocked ? 'blur-sm' : ''}`}>
+                    <h3 className={`font-semibold text-gray-800 truncate text-sm ${isLocked ? 'blur-sm' : ''}`}>
                       {liker.first_name}, {calculateAge(liker.date_of_birth)}
                     </h3>
-                    <p className={`text-sm text-gray-600 truncate ${isLocked ? 'blur-sm' : ''}`}>
+                    <p className={`text-xs text-gray-600 truncate ${isLocked ? 'blur-sm' : ''}`}>
                       {liker.city}
                     </p>
                   </CardContent>
