@@ -118,10 +118,10 @@ const MainApp = ({ user, onLogout }: MainAppProps) => {
 
   return (
     <div className="w-full h-screen bg-gray-100">
-      <div className="w-full max-w-[390px] mx-auto h-screen flex flex-col bg-white relative shadow-md overflow-hidden">
+      <div className="w-full h-screen flex flex-col bg-white relative shadow-md overflow-hidden">
         
         {/* Fixed Header */}
-        <div className="fixed top-0 left-1/2 -translate-x-1/2 w-full max-w-[390px] bg-white shadow-sm border-b z-50">
+        <div className="fixed top-0 left-0 right-0 w-full bg-white shadow-sm border-b z-50">
           <div className="px-4 py-2 flex justify-start items-center">
             <img 
               src="/lovable-uploads/0e9bd84b-0f71-493b-8c1f-1a2883e5109d.png" 
@@ -137,7 +137,7 @@ const MainApp = ({ user, onLogout }: MainAppProps) => {
         </div>
 
         {/* Fixed Bottom Nav */}
-        <div className="fixed bottom-0 left-1/2 -translate-x-1/2 w-full max-w-[390px] bg-white border-t border-gray-200 px-2 py-2 z-50">
+        <div className="fixed bottom-0 left-0 right-0 w-full bg-white border-t border-gray-200 px-2 py-2 z-50">
           <div className="flex justify-around items-center">
             {[
               { label: 'Discover', icon: Heart }, 

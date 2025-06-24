@@ -109,6 +109,7 @@
   html, body, #root {
     height: 100vh;
     width: 100vw;
+    max-width: 100vw;
     padding: 0;
     margin: 0;
     display: flex;
@@ -143,7 +144,7 @@
     box-sizing: border-box;
   }
 
-  /* ✅ Ensure full width on all screen sizes */
+  /* ✅ Ensure full width on all screen sizes - Updated for better mobile support */
   @media screen and (max-width: 768px) {
     .mobile-container {
       width: 100vw;
@@ -156,6 +157,29 @@
       width: 100vw;
       max-width: 100vw;
       overflow-x: hidden;
+    }
+    
+    /* Ensure all main containers fill width */
+    .mobile-container > * {
+      width: 100%;
+      max-width: 100%;
+    }
+  }
+
+  /* ✅ Additional mobile optimization */
+  @media screen and (max-width: 480px) {
+    html, body, #root {
+      width: 100vw;
+      max-width: 100vw;
+      margin: 0;
+      padding: 0;
+    }
+    
+    .mobile-container {
+      width: 100vw;
+      max-width: 100vw;
+      margin: 0;
+      padding: 0;
     }
   }
 }
