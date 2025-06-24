@@ -218,43 +218,46 @@ const Index = () => {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-pink-400 via-purple-500 to-indigo-600 flex items-center justify-center">
+      <div className="mobile-container min-h-screen bg-gradient-to-br from-pink-400 via-purple-500 to-indigo-600 flex items-center justify-center">
         <div className="animate-spin rounded-full h-32 w-32 border-b-2 border-white"></div>
       </div>
     );
   }
-
+  
   if (currentView === 'admin') {
     return <AdminPage currentUser={user} />;
   }
+  
+  
+  return (
+    <div className="w-full min-h-screen flex justify-center bg-background">
+      <div className="mobile-container w-full h-full">
+        {currentView === 'welcome' && (
+          <WelcomeScreen onGetStarted={handleGetStarted} onAdminAccess={handleAdminAccess} />
+        )}
 
-  if (currentView === 'welcome') {
-    return <WelcomeScreen onGetStarted={handleGetStarted} onAdminAccess={handleAdminAccess} />;
-  }
+        {currentView === 'login' && (
+          <div className="min-h-screen bg-gradient-to-br from-pink-400 via-purple-500 to-indigo-600 flex items-center justify-center p-4">
+            <AuthForm 
+              isLogin={true}
+              onToggle={handleShowRegister}
+            />
+          </div>
+        )}
 
-  if (currentView === 'login') {
-    return (
-      <div className="min-h-screen bg-gradient-to-br from-pink-400 via-purple-500 to-indigo-600 flex items-center justify-center p-4">
-        <AuthForm 
-          isLogin={true}
-          onToggle={handleShowRegister}
-        />
+        {currentView === 'register' && (
+          <div className="min-h-screen bg-gradient-to-br from-pink-400 via-purple-500 to-indigo-600 flex items-center justify-center p-4">
+            <RegistrationForm 
+              onSubmit={handleRegister}
+              onBackToLogin={handleBackToLogin}
+            />
+          </div>
+        )}
+
+        {currentView === 'app' && <MainApp user={user} onLogout={handleLogout} />}
       </div>
-    );
-  }
-
-  if (currentView === 'register') {
-    return (
-      <div className="min-h-screen bg-gradient-to-br from-pink-400 via-purple-500 to-indigo-600 flex items-center justify-center p-4">
-        <RegistrationForm 
-          onSubmit={handleRegister}
-          onBackToLogin={handleBackToLogin}
-        />
-      </div>
-    );
-  }
-
-  return <MainApp user={user} onLogout={handleLogout} />;
+    </div>
+  );
 };
 
 export default Index;

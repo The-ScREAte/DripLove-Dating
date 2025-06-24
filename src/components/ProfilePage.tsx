@@ -240,8 +240,8 @@ const ProfilePage = ({ currentUser, profile, onProfileUpdate, onLogout }: Profil
             <User className="w-6 h-6 text-pink-600" />
             <h1 className="text-2xl font-bold text-gray-800">Your AfroVibe Profile</h1>
           </div>
-          <div className="flex flex-col sm:flex-row gap-2 w-full sm:w-auto">
-            {!subscriptionLoading && !isPremium() && (
+          <div className="flex flex-col gap-2 w-full">
+          {!subscriptionLoading && !isPremium() && (
               <Button 
                 onClick={() => setShowPremiumUpgrade(true)}
                 className="bg-gradient-to-r from-yellow-400 to-yellow-600 hover:from-yellow-500 hover:to-yellow-700 text-black font-bold w-full sm:w-auto"
@@ -255,8 +255,8 @@ const ProfilePage = ({ currentUser, profile, onProfileUpdate, onLogout }: Profil
                 <Edit className="w-4 h-4 mr-2" /> Edit Profile
               </Button>
             ) : (
-              <div className="flex flex-col sm:flex-row space-y-2 sm:space-y-0 sm:space-x-2 w-full sm:w-auto">
-                <Button onClick={handleSave} disabled={isSaving} className="w-full sm:w-auto">
+<div className="flex flex-col gap-2 w-full">
+<Button onClick={handleSave} disabled={isSaving} className="w-full sm:w-auto">
                   <Save className="w-4 h-4 mr-2" /> {isSaving ? 'Saving...' : 'Save'}
                 </Button>
                 <Button variant="outline" onClick={handleCancel} disabled={isSaving} className="w-full sm:w-auto">

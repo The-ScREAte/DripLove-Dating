@@ -96,7 +96,7 @@ const MainApp = ({ user, onLogout }: MainAppProps) => {
     }
   };
 
-  const handleNavigateToChat = (userId: string) => {
+  const handleNavigateToChat = () => {
     setActiveTab('chat');
   };
 
@@ -116,48 +116,51 @@ const MainApp = ({ user, onLogout }: MainAppProps) => {
   };
 
   return (
-    <div className="h-screen flex flex-col bg-gradient-to-br from-pink-50 to-purple-50">
-      {/* Header */}
-      <div className="bg-white shadow-sm border-b flex-shrink-0">
-        <div className="container mx-auto px-4 py-2 flex justify-start items-center">
-          <img 
-            src="/lovable-uploads/0e9bd84b-0f71-493b-8c1f-1a2883e5109d.png" 
-            alt="AfroVibe Logo" 
-            className="h-10"
-          />
+    <div className="w-full min-h-screen flex justify-center bg-gray-100">
+<div className="w-full h-screen md:max-w-[500px] flex flex-col bg-white relative shadow-md overflow-hidden">
+  
+{/* Fixed Header */}
+        <div className="fixed top-0 left-1/2 -translate-x-1/2 w-full max-w-[390px] bg-white shadow-sm border-b z-50">
+          <div className="px-4 py-2 flex justify-start items-center">
+            <img 
+              src="/lovable-uploads/0e9bd84b-0f71-493b-8c1f-1a2883e5109d.png" 
+              alt="AfroVibe Logo" 
+              className="h-10"
+            />
+          </div>
         </div>
-      </div>
 
-      {/* Main Content */}
-      <div className="flex-1 overflow-hidden">
-        {renderContent()}
-      </div>
+        {/* Main Content */}
+        <div className="flex-1 overflow-y-auto pt-[60px] pb-[70px]">
+          {renderContent()}
+        </div>
 
-      {/* Bottom Nav */}
-      <div className="fixed bottom-0 left-0 right-0 bg-white border-t border-gray-200 px-2 py-2 z-50 flex-shrink-0">
-        <div className="flex justify-around items-center">
-          {[
-            { label: 'Discover', icon: Heart }, 
-            { label: 'Chat', icon: MessageCircle }, 
-            { label: 'Liked', icon: Users }, 
-            { label: 'Profile', icon: User }
-          ].map(({ label, icon: Icon }) => (
-            <button
-              key={label}
-              onClick={() => setActiveTab(label.toLowerCase())}
-              className={`flex flex-col items-center space-y-1 py-2 px-2 rounded-lg transition-colors relative ${
-                activeTab === label.toLowerCase() ? 'text-pink-600' : 'text-gray-500'
-              }`}
-            >
-              <Icon className={`w-5 h-5 ${activeTab === label.toLowerCase() ? 'fill-current' : ''}`} />
-              <span className="text-xs font-medium">{label}</span>
-              {label === 'Chat' && unreadCount > 0 && (
-                <span className="absolute -top-1 -right-1 bg-red-500 text-white text-xs rounded-full px-1.5 py-0.5 min-w-[16px] text-center">
-                  {unreadCount}
-                </span>
-              )}
-            </button>
-          ))}
+        {/* Fixed Bottom Nav */}
+        <div className="fixed bottom-0 left-1/2 -translate-x-1/2 w-full max-w-[390px] bg-white border-t border-gray-200 px-2 py-2 z-50">
+          <div className="flex justify-around items-center">
+            {[
+              { label: 'Discover', icon: Heart }, 
+              { label: 'Chat', icon: MessageCircle }, 
+              { label: 'Liked', icon: Users }, 
+              { label: 'Profile', icon: User }
+            ].map(({ label, icon: Icon }) => (
+              <button
+                key={label}
+                onClick={() => setActiveTab(label.toLowerCase())}
+                className={`flex flex-col items-center space-y-1 py-2 px-2 rounded-lg transition-colors relative ${
+                  activeTab === label.toLowerCase() ? 'text-pink-600' : 'text-gray-500'
+                }`}
+              >
+                <Icon className={`w-5 h-5 ${activeTab === label.toLowerCase() ? 'fill-current' : ''}`} />
+                <span className="text-xs font-medium">{label}</span>
+                {label === 'Chat' && unreadCount > 0 && (
+                  <span className="absolute -top-1 -right-1 bg-red-500 text-white text-xs rounded-full px-1.5 py-0.5 min-w-[16px] text-center">
+                    {unreadCount}
+                  </span>
+                )}
+              </button>
+            ))}
+          </div>
         </div>
       </div>
     </div>

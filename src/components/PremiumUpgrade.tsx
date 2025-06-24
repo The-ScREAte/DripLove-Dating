@@ -73,8 +73,8 @@ const PremiumUpgrade = ({ currentUser, onClose, preselectedPlan }: PremiumUpgrad
           <p className="text-white/80 text-lg">Unlock unlimited features and find your perfect match faster!</p>
         </div>
 
-        <div className="grid md:grid-cols-2 gap-6 mb-8">
-          {/* Free Plan */}
+        <div className="flex flex-col gap-6 mb-8">
+        {/* Free Plan */}
           <Card className="border-2">
             <CardHeader className="text-center">
               <CardTitle className="text-2xl">Free Plan</CardTitle>

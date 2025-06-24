@@ -517,8 +517,8 @@ const LikedMePage = ({ currentUser }: LikedMePageProps) => {
             </div>
           </div>
         ) : (
-          <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
-            {likers.map((liker, index) => {
+<div className="grid grid-cols-2 gap-4">
+{likers.map((liker, index) => {
               const profileImages = userImages[liker.id] || [];
               const isLocked = isProfileLocked(index);
               
@@ -528,28 +528,29 @@ const LikedMePage = ({ currentUser }: LikedMePageProps) => {
                   className={`cursor-pointer hover:shadow-lg transition-shadow flex flex-col relative ${isLocked ? 'opacity-75' : ''}`}
                   onClick={() => handleProfileClick(liker, index)}
                 >
-                  <div className="relative h-48 flex-shrink-0">
-                    {profileImages.length > 0 ? (
-                      <img
-                        src={profileImages[0]}
-                        alt={`${liker.first_name}'s photo`}
-                        className={`w-full h-full object-cover rounded-t-lg ${isLocked ? 'blur-md' : ''}`}
-                      />
-                    ) : (
-                      <div className={`w-full h-full bg-gradient-to-br from-pink-200 to-purple-200 flex items-center justify-center rounded-t-lg ${isLocked ? 'blur-md' : ''}`}>
-                        <span className="text-2xl font-bold text-gray-700">
-                          {liker.first_name?.[0]}{liker.last_name?.[0]}
-                        </span>
+                <div className="relative aspect-[3/4] w-full overflow-hidden rounded-t-lg">
+                  {profileImages.length > 0 ? (
+                    <img
+                      src={profileImages[0]}
+                      alt={`${liker.first_name}'s photo`}
+                      className={`w-full h-full object-cover ${isLocked ? 'blur-md' : ''}`}
+                    />
+                  ) : (
+                    <div className={`w-full h-full bg-gradient-to-br from-pink-200 to-purple-200 flex items-center justify-center ${isLocked ? 'blur-md' : ''}`}>
+                      <span className="text-2xl font-bold text-gray-700">
+                        {liker.first_name?.[0]}{liker.last_name?.[0]}
+                      </span>
+                    </div>
+                  )}
+                  {isLocked && (
+                    <div className="absolute inset-0 flex items-center justify-center bg-black/20">
+                      <div className="bg-white/90 backdrop-blur-sm rounded-full p-3">
+                        <Lock className="w-6 h-6 text-gray-700" />
                       </div>
-                    )}
-                    {isLocked && (
-                      <div className="absolute inset-0 flex items-center justify-center bg-black/20 rounded-t-lg">
-                        <div className="bg-white/90 backdrop-blur-sm rounded-full p-3">
-                          <Lock className="w-6 h-6 text-gray-700" />
-                        </div>
-                      </div>
-                    )}
-                  </div>
+                    </div>
+                  )}
+                </div>
+
                   <CardContent className="p-3 flex-1">
                     <h3 className={`font-semibold text-gray-800 truncate ${isLocked ? 'blur-sm' : ''}`}>
                       {liker.first_name}, {calculateAge(liker.date_of_birth)}

@@ -17,6 +17,10 @@ supabase.auth.getUser().then(({ data: { user } }) => {
 const root = createRoot(container);
 root.render(
   <React.StrictMode>
-    <App />
+    <div className="w-full min-h-screen flex justify-center bg-gray-100">
+      <div className="mobile-container min-h-screen w-full bg-white">
+        <App />
+      </div>
+    </div>
   </React.StrictMode>
 );
