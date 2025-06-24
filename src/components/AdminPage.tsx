@@ -7,6 +7,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Badge } from '@/components/ui/badge';
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
+import UserProfileModal from '@/components/UserProfileModal';
 import { 
   Users, 
   Heart, 
@@ -67,6 +68,8 @@ const AdminPage = ({ currentUser, onLogout }: AdminPageProps) => {
   const [currentPage, setCurrentPage] = useState(1);
   const [matchUser1, setMatchUser1] = useState('');
   const [matchUser2, setMatchUser2] = useState('');
+  const [selectedUserId, setSelectedUserId] = useState<string | null>(null);
+  const [isProfileModalOpen, setIsProfileModalOpen] = useState(false);
   const usersPerPage = 10;
   const { toast } = useToast();
 
@@ -110,7 +113,7 @@ const AdminPage = ({ currentUser, onLogout }: AdminPageProps) => {
       if (error) throw error;
       
       if (data && typeof data === 'object' && !Array.isArray(data)) {
-        setStats(data as AppStats);
+        setStats(data as unknown as AppStats);
       }
     } catch (error) {
       console.error('Error fetching app stats:', error);
@@ -280,6 +283,25 @@ const AdminPage = ({ currentUser, onLogout }: AdminPageProps) => {
     }
   };
 
+  const handleLogout = async () => {
+    try {
+      await supabase.auth.signOut();
+      onLogout();
+    } catch (error) {
+      console.error('Error signing out:', error);
+      toast({
+        title: 'Error',
+        description: 'Failed to sign out',
+        variant: 'destructive'
+      });
+    }
+  };
+
+  const handleViewProfile = (userId: string) => {
+    setSelectedUserId(userId);
+    setIsProfileModalOpen(true);
+  };
+
   const filteredUsers = users.filter(user => {
     const matchesSearch = user.first_name.toLowerCase().includes(searchTerm.toLowerCase()) ||
                          user.last_name.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -345,7 +367,7 @@ const AdminPage = ({ currentUser, onLogout }: AdminPageProps) => {
               <Button
                 variant="outline"
                 size="sm"
-                onClick={onLogout}
+                onClick={handleLogout}
                 className="text-red-600 hover:text-red-700"
               >
                 <LogOut className="w-4 h-4" />
@@ -369,7 +391,7 @@ const AdminPage = ({ currentUser, onLogout }: AdminPageProps) => {
               <Card className="p-3">
                 <div className="flex items-center justify-between">
                   <div>
-                    <p className="text-xs text-gray-600">Matches</p>
+                    <p className="text-xs text-gray-600">Total Matches</p>
                     <p className="text-lg font-bold">{stats.total_matches}</p>
                   </div>
                   <Heart className="w-6 h-6 text-pink-500" />
@@ -379,7 +401,7 @@ const AdminPage = ({ currentUser, onLogout }: AdminPageProps) => {
               <Card className="p-3">
                 <div className="flex items-center justify-between">
                   <div>
-                    <p className="text-xs text-gray-600">Messages</p>
+                    <p className="text-xs text-gray-600">Messages Sent</p>
                     <p className="text-lg font-bold">{stats.total_messages}</p>
                   </div>
                   <MessageSquare className="w-6 h-6 text-green-500" />
@@ -393,6 +415,46 @@ const AdminPage = ({ currentUser, onLogout }: AdminPageProps) => {
                     <p className="text-lg font-bold">{stats.active_users_today}</p>
                   </div>
                   <TrendingUp className="w-6 h-6 text-purple-500" />
+                </div>
+              </Card>
+
+              <Card className="p-3">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="text-xs text-gray-600">New This Week</p>
+                    <p className="text-lg font-bold">{stats.new_users_this_week}</p>
+                  </div>
+                  <Calendar className="w-6 h-6 text-indigo-500" />
+                </div>
+              </Card>
+
+              <Card className="p-3">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="text-xs text-gray-600">Users On Hold</p>
+                    <p className="text-lg font-bold">{stats.users_on_hold}</p>
+                  </div>
+                  <Pause className="w-6 h-6 text-yellow-500" />
+                </div>
+              </Card>
+
+              <Card className="p-3">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="text-xs text-gray-600">Blocked Users</p>
+                    <p className="text-lg font-bold">{stats.blocked_users}</p>
+                  </div>
+                  <UserX className="w-6 h-6 text-red-500" />
+                </div>
+              </Card>
+
+              <Card className="p-3">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="text-xs text-gray-600">Total Admins</p>
+                    <p className="text-lg font-bold">{stats.total_admins}</p>
+                  </div>
+                  <Shield className="w-6 h-6 text-gray-500" />
                 </div>
               </Card>
             </div>
@@ -456,9 +518,20 @@ const AdminPage = ({ currentUser, onLogout }: AdminPageProps) => {
                         <p className="font-medium text-sm">{admin.first_name} {admin.last_name}</p>
                         <p className="text-xs text-gray-600">{admin.email}</p>
                       </div>
-                      <Badge className="bg-blue-100 text-blue-800 text-xs">
-                        ADMIN
-                      </Badge>
+                      <div className="flex items-center gap-2">
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          onClick={() => handleViewProfile(admin.id)}
+                          className="text-blue-600 hover:text-blue-700 text-xs px-2 py-1 h-7"
+                        >
+                          <Eye className="w-3 h-3 mr-1" />
+                          View
+                        </Button>
+                        <Badge className="bg-blue-100 text-blue-800 text-xs">
+                          ADMIN
+                        </Badge>
+                      </div>
                     </div>
                   ))}
                 </div>
@@ -499,35 +572,45 @@ const AdminPage = ({ currentUser, onLogout }: AdminPageProps) => {
                 </Select>
               </div>
 
-              {/* Users List */}
-              {loading ? (
-                <div className="flex justify-center py-8">
-                  <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-pink-600"></div>
-                </div>
-              ) : (
-                <div className="space-y-3 max-h-96 overflow-y-auto">
-                  {paginatedUsers.map((user) => (
-                    <div key={user.id} className="border rounded-lg p-3 space-y-2">
-                      <div className="flex items-start justify-between">
-                        <div className="flex-1 min-w-0">
-                          <h3 className="font-medium text-sm truncate">
-                            {user.first_name} {user.last_name}
-                          </h3>
-                          <p className="text-xs text-gray-600 truncate">{user.email}</p>
-                          <p className="text-xs text-gray-500">
-                            {user.city}, {user.country} • Age {user.age}
-                          </p>
-                          <p className="text-xs text-gray-500">
-                            Joined: {new Date(user.created_at).toLocaleDateString()}
-                          </p>
+              {/* Users List Container */}
+              <div className="border rounded-lg bg-white">
+                {loading ? (
+                  <div className="flex justify-center py-8">
+                    <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-pink-600"></div>
+                  </div>
+                ) : (
+                  <div className="space-y-0 max-h-96 overflow-y-auto">
+                    {paginatedUsers.map((user, index) => (
+                      <div key={user.id} className={`p-3 space-y-2 ${index !== paginatedUsers.length - 1 ? 'border-b' : ''}`}>
+                        <div className="flex items-start justify-between">
+                          <div className="flex-1 min-w-0">
+                            <h3 className="font-medium text-sm truncate">
+                              {user.first_name} {user.last_name}
+                            </h3>
+                            <p className="text-xs text-gray-600 truncate">{user.email}</p>
+                            <p className="text-xs text-gray-500">
+                              {user.city}, {user.country} • Age {user.age}
+                            </p>
+                            <p className="text-xs text-gray-500">
+                              Joined: {new Date(user.created_at).toLocaleDateString()}
+                            </p>
+                          </div>
+                          <div className="ml-2">
+                            {getStatusBadge(user.account_status)}
+                          </div>
                         </div>
-                        <div className="ml-2">
-                          {getStatusBadge(user.account_status)}
-                        </div>
-                      </div>
-                      
-                      <div className="flex gap-1 flex-wrap">
-                        {user.account_status === 'active' && (
+                        
+                        <div className="flex gap-1 flex-wrap">
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            onClick={() => handleViewProfile(user.id)}
+                            className="text-blue-600 hover:text-blue-700 text-xs px-2 py-1 h-7"
+                          >
+                            <Eye className="w-3 h-3 mr-1" />
+                            View
+                          </Button>
+                          
                           <Button
                             size="sm"
                             variant="outline"
@@ -537,93 +620,69 @@ const AdminPage = ({ currentUser, onLogout }: AdminPageProps) => {
                             <Pause className="w-3 h-3 mr-1" />
                             Hold
                           </Button>
-                        )}
-                        
-                        {user.account_status === 'on_hold' && (
+                          
                           <Button
                             size="sm"
                             variant="outline"
-                            onClick={() => updateUserStatus(user.id, 'active')}
-                            className="text-green-600 hover:text-green-700 text-xs px-2 py-1 h-7"
-                          >
-                            <Play className="w-3 h-3 mr-1" />
-                            Activate
-                          </Button>
-                        )}
-                        
-                        {user.account_status === 'blocked' && (
-                          <Button
-                            size="sm"
-                            variant="outline"
-                            onClick={() => updateUserStatus(user.id, 'active')}
-                            className="text-green-600 hover:text-green-700 text-xs px-2 py-1 h-7"
-                          >
-                            <Play className="w-3 h-3 mr-1" />
-                            Unblock
-                          </Button>
-                        )}
-                        
-                        {user.account_status !== 'blocked' && (
-                          <Button
-                            size="sm"
-                            variant="outline"
-                            onClick={() => updateUserStatus(user.id, 'blocked')}
+                            onClick={() => deleteUser(user.id)}
                             className="text-red-600 hover:text-red-700 text-xs px-2 py-1 h-7"
                           >
-                            <Ban className="w-3 h-3 mr-1" />
-                            Block
+                            <Trash2 className="w-3 h-3 mr-1" />
+                            Delete
                           </Button>
-                        )}
-                        
-                        <Button
-                          size="sm"
-                          variant="outline"
-                          onClick={() => deleteUser(user.id)}
-                          className="text-red-600 hover:text-red-700 text-xs px-2 py-1 h-7"
-                        >
-                          <Trash2 className="w-3 h-3 mr-1" />
-                          Delete
-                        </Button>
+                        </div>
                       </div>
-                    </div>
-                  ))}
-                  
-                  {filteredUsers.length === 0 && (
-                    <div className="text-center py-8 text-gray-500 text-sm">
-                      No users found matching your criteria.
-                    </div>
-                  )}
-                </div>
-              )}
+                    ))}
+                    
+                    {filteredUsers.length === 0 && (
+                      <div className="text-center py-8 text-gray-500 text-sm">
+                        No users found matching your criteria.
+                      </div>
+                    )}
+                  </div>
+                )}
 
-              {/* Pagination */}
-              {totalPages > 1 && (
-                <div className="flex justify-between items-center mt-4 pt-4 border-t">
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={() => setCurrentPage(Math.max(1, currentPage - 1))}
-                    disabled={currentPage === 1}
-                  >
-                    Previous
-                  </Button>
-                  <span className="text-sm text-gray-600">
-                    Page {currentPage} of {totalPages}
-                  </span>
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={() => setCurrentPage(Math.min(totalPages, currentPage + 1))}
-                    disabled={currentPage === totalPages}
-                  >
-                    Next
-                  </Button>
-                </div>
-              )}
+                {/* Pagination */}
+                {totalPages > 1 && (
+                  <div className="flex justify-between items-center mt-4 pt-4 border-t px-3 pb-3">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => setCurrentPage(Math.max(1, currentPage - 1))}
+                      disabled={currentPage === 1}
+                    >
+                      Previous
+                    </Button>
+                    <span className="text-sm text-gray-600">
+                      Page {currentPage} of {totalPages}
+                    </span>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => setCurrentPage(Math.min(totalPages, currentPage + 1))}
+                      disabled={currentPage === totalPages}
+                    >
+                      Next
+                    </Button>
+                  </div>
+                )}
+              </div>
             </CardContent>
           </Card>
         </div>
       </div>
+
+      {/* User Profile Modal */}
+      {selectedUserId && (
+        <UserProfileModal
+          isOpen={isProfileModalOpen}
+          onClose={() => {
+            setIsProfileModalOpen(false);
+            setSelectedUserId(null);
+          }}
+          userId={selectedUserId}
+        />
+      )}
     </div>
   );
 };
