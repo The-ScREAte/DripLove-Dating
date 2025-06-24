@@ -1,3 +1,4 @@
+
 import React from "react";
 import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
@@ -16,7 +17,7 @@ const App = () => {
         <Toaster />
         <Sonner />
         
-        {/* ✅ Wrap app in a mobile-sized container */}
+        {/* ✅ Mobile-responsive container that adapts to all screen sizes */}
         <div className="mobile-container">
           <BrowserRouter>
             <Routes>

@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Heart, MessageCircle, Users, User } from 'lucide-react';
@@ -116,10 +117,10 @@ const MainApp = ({ user, onLogout }: MainAppProps) => {
   };
 
   return (
-    <div className="w-full min-h-screen flex justify-center bg-gray-100">
-<div className="w-full h-screen md:max-w-[500px] flex flex-col bg-white relative shadow-md overflow-hidden">
-  
-{/* Fixed Header */}
+    <div className="w-full h-screen bg-gray-100">
+      <div className="w-full max-w-[390px] mx-auto h-screen flex flex-col bg-white relative shadow-md overflow-hidden">
+        
+        {/* Fixed Header */}
         <div className="fixed top-0 left-1/2 -translate-x-1/2 w-full max-w-[390px] bg-white shadow-sm border-b z-50">
           <div className="px-4 py-2 flex justify-start items-center">
             <img 
