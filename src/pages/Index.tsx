@@ -1,262 +1,110 @@
-import React, { useState, useEffect } from 'react';
-import WelcomeScreen from '@/components/WelcomeScreen';
+
+import { useState, useEffect } from 'react';
+import { supabase } from '@/integrations/supabase/client';
 import AuthForm from '@/components/AuthForm';
-import RegistrationForm from '@/components/RegistrationForm';
+import WelcomeScreen from '@/components/WelcomeScreen';
 import MainApp from '@/components/MainApp';
+import AboutUs from '@/components/AboutUs';
 import AdminPage from '@/components/AdminPage';
 import { useToast } from '@/hooks/use-toast';
-import { supabase } from '@/integrations/supabase/client';
 
 const Index = () => {
-  const [currentView, setCurrentView] = useState<'welcome' | 'login' | 'register' | 'app' | 'admin'>('welcome');
   const [user, setUser] = useState<any>(null);
   const [loading, setLoading] = useState(true);
+  const [showAuth, setShowAuth] = useState(false);
+  const [showAdmin, setShowAdmin] = useState(false);
+  const [showAbout, setShowAbout] = useState(false);
   const { toast } = useToast();
 
   useEffect(() => {
-    // Check for existing session
+    // Get initial session
     supabase.auth.getSession().then(({ data: { session } }) => {
-      if (session?.user) {
-        setUser(session.user);
-        checkUserTypeAndRedirect(session.user.id);
-      } else {
-        setLoading(false);
-      }
+      setUser(session?.user ?? null);
+      setLoading(false);
     });
 
     // Listen for auth changes
     const {
       data: { subscription },
     } = supabase.auth.onAuthStateChange((_event, session) => {
-      if (session?.user) {
-        console.log("Auth state changed user ID:", session.user.id);
-        setUser(session.user);
-        checkUserTypeAndRedirect(session.user.id);
-      } else {
-        setUser(null);
-        setCurrentView('welcome');
-        setLoading(false);
-      }
+      setUser(session?.user ?? null);
+      setLoading(false);
     });
-    
+
     return () => subscription.unsubscribe();
   }, []);
 
-  const checkUserTypeAndRedirect = async (userId: string) => {
-    try {
-      const { data: profile, error } = await supabase
-        .from('profiles')
-        .select('is_admin, account_status')
-        .eq('id', userId)
-        .single();
-      
-      if (error || !profile) {
-        console.error('Profile not found for user:', userId);
-        // Sign out user if no profile exists
-        await supabase.auth.signOut();
-        toast({
-          title: "Profile Required",
-          description: "No profile found. Please register to create your account.",
-          variant: "destructive",
-        });
-        setCurrentView('welcome');
-        setLoading(false);
-        return;
-      }
-
-      // Check account status
-      if (profile.account_status === 'blocked') {
-        await supabase.auth.signOut();
-        toast({
-          title: "Account Blocked",
-          description: "Your account has been blocked. Please contact support.",
-          variant: "destructive",
-        });
-        setCurrentView('welcome');
-        setLoading(false);
-        return;
-      }
-
-      if (profile.account_status === 'on_hold') {
-        await supabase.auth.signOut();
-        toast({
-          title: "Account On Hold",
-          description: "Your account is currently on hold. Please contact support.",
-          variant: "destructive",
-        });
-        setCurrentView('welcome');
-        setLoading(false);
-        return;
-      }
-
-      // Redirect based on user type
-      if (profile?.is_admin) {
-        setCurrentView('admin');
-      } else {
-        setCurrentView('app');
-      }
-    } catch (error) {
-      console.error('Error checking user type:', error);
-      // On error, sign out and redirect to welcome
-      await supabase.auth.signOut();
-      setCurrentView('welcome');
-    } finally {
-      setLoading(false);
-    }
-  };
-
   const handleGetStarted = () => {
-    setCurrentView('login');
-  };
-
-  const handleShowRegister = () => {
-    setCurrentView('register');
-  };
-
-  const handleBackToLogin = () => {
-    setCurrentView('login');
+    setShowAuth(true);
   };
 
   const handleAdminAccess = () => {
-    setCurrentView('login'); // Redirect to login instead of direct admin access
+    setShowAdmin(true);
+  };
+
+  const handleAboutUs = () => {
+    setShowAbout(true);
   };
 
   const handleBackToWelcome = () => {
-    setCurrentView('welcome');
+    setShowAuth(false);
+    setShowAdmin(false);
+    setShowAbout(false);
   };
 
-  const handleRegister = async (formData: any) => {
+  const handleLogout = async () => {
     try {
-      if (formData.password !== formData.confirmPassword) {
-        throw new Error("Passwords don't match");
-      }
-
-      // Check if user already exists by attempting to sign in first
-      const { data: existingUser } = await supabase.auth.signInWithPassword({
-        email: formData.email,
-        password: 'dummy_password'
-      });
-
-      if (existingUser?.user) {
-        throw new Error("An account with this email already exists. Please try logging in instead.");
-      }
-
-      // Transform the form data before sending to Supabase
-      const transformedData = {
-        first_name: formData.firstName,
-        last_name: formData.lastName,
-        date_of_birth: formData.dateOfBirth,
-        country: formData.country,
-        city: formData.city,
-        bio: formData.bio,
-        preference: formData.preference,
-        interests: formData.interests,
-        gender: formData.gender,
-        relationship_intent: formData.relationshipIntent,
-        smoking: formData.smoking,
-        drinking: formData.drinking,
-        exercise_level: formData.exerciseLevel,
-        sleeping_schedule: formData.sleepingSchedule,
-        occupation: formData.occupation,
-        industry: formData.industry,
-        education_level: formData.educationLevel,
-        zip_code: formData.zipCode,
-        introvert_extrovert: formData.introvertExtrovert[0],
-        spontaneous_planner: formData.spontaneousPlanner[0],
-        messy_organized: formData.messyOrganized[0],
-        fun_fact: formData.funFact,
-        perfect_first_date: formData.perfectFirstDate,
-        last_googled: formData.lastGoogled,
-      };
-
-      const { data, error } = await supabase.auth.signUp({
-        email: formData.email,
-        password: formData.password,
-        options: {
-          emailRedirectTo: `${window.location.origin}/`,
-          data: transformedData,
-        },
-      });
-      
+      const { error } = await supabase.auth.signOut();
       if (error) throw error;
       
-      if (data.user) {
-        await supabase.from("profiles").insert({
-          id: data.user.id,
-          email: data.user.email,
-          ...transformedData,
-        });
-      }
-      
-
-      if (error) {
-        if (error.message.includes('User already registered')) {
-          throw new Error("An account with this email already exists. Please try logging in instead.");
-        }
-        throw error;
-      }
-
       toast({
-        title: "Welcome to AfroVibe!",
-        description: "Your account has been created successfully!",
+        title: "Logged out successfully",
+        description: "See you soon!",
       });
     } catch (error: any) {
-      console.error('Registration error:', error);
       toast({
-        title: "Registration Error",
-        description: error.message || "Failed to create account. Please try again.",
+        title: "Logout failed",
+        description: error.message,
         variant: "destructive",
       });
     }
   };
 
-  const handleLogout = async () => {
-    await supabase.auth.signOut();
-    setUser(null);
-    setCurrentView('welcome');
-  };
-
   if (loading) {
     return (
-      <div className="mobile-container min-h-screen bg-gradient-to-br from-pink-400 via-purple-500 to-indigo-600 flex items-center justify-center">
+      <div className="h-screen w-screen flex items-center justify-center bg-gradient-to-br from-pink-400 via-purple-500 to-indigo-600">
         <div className="animate-spin rounded-full h-32 w-32 border-b-2 border-white"></div>
       </div>
     );
   }
-  
-  if (currentView === 'admin') {
-    return <AdminPage currentUser={user} onLogout={handleLogout} />;
+
+  // Show About Us page
+  if (showAbout) {
+    return <AboutUs onBack={handleBackToWelcome} />;
   }
-  
-  
+
+  // Show admin page
+  if (showAdmin) {
+    return <AdminPage onBack={handleBackToWelcome} />;
+  }
+
+  // Show auth form
+  if (showAuth && !user) {
+    return <AuthForm onBack={handleBackToWelcome} />;
+  }
+
+  // Show main app if authenticated
+  if (user) {
+    return <MainApp user={user} onLogout={handleLogout} />;
+  }
+
+  // Show welcome screen
   return (
-    <div className="w-full min-h-screen flex justify-center bg-background">
-      <div className="mobile-container w-full h-full">
-        {currentView === 'welcome' && (
-          <WelcomeScreen onGetStarted={handleGetStarted} onAdminAccess={handleAdminAccess} />
-        )}
-
-        {currentView === 'login' && (
-          <div className="min-h-screen bg-gradient-to-br from-pink-400 via-purple-500 to-indigo-600 flex items-center justify-center p-4">
-            <AuthForm 
-              isLogin={true}
-              onToggle={handleShowRegister}
-            />
-          </div>
-        )}
-
-        {currentView === 'register' && (
-          <div className="min-h-screen bg-gradient-to-br from-pink-400 via-purple-500 to-indigo-600 flex items-center justify-center p-4">
-            <RegistrationForm 
-              onSubmit={handleRegister}
-              onBackToLogin={handleBackToLogin}
-            />
-          </div>
-        )}
-
-        {currentView === 'app' && <MainApp user={user} onLogout={handleLogout} />}
-      </div>
-    </div>
+    <WelcomeScreen 
+      onGetStarted={handleGetStarted}
+      onAdminAccess={handleAdminAccess}
+      onAboutUs={handleAboutUs}
+    />
   );
 };
 

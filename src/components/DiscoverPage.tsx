@@ -38,12 +38,15 @@ const DiscoverPage = ({ currentUser, onNavigateToChat }: DiscoverPageProps) => {
   const [currentIndex, setCurrentIndex] = useState(0);
   const [imageIndex, setImageIndex] = useState(0);
   const [isLoading, setIsLoading] = useState(true);
+  const [isLoadingMore, setIsLoadingMore] = useState(false);
+  const [hasMoreProfiles, setHasMoreProfiles] = useState(true);
   const [passedUsers, setPassedUsers] = useState<PassedUser[]>([]);
   const [showMoreInfo, setShowMoreInfo] = useState(false);
   const [showPremiumUpgrade, setShowPremiumUpgrade] = useState(false);
   const [isOutOfSwipes, setIsOutOfSwipes] = useState(false);
   const [showMatchAnimation, setShowMatchAnimation] = useState(false);
   const [matchedUser, setMatchedUser] = useState<PotentialMatch | null>(null);
+  const [offset, setOffset] = useState(0);
   const { toast } = useToast();
   
   const { subscription, checkUsageLimit, isPremium } = useSubscription(currentUser?.id);
@@ -92,11 +95,15 @@ const DiscoverPage = ({ currentUser, onNavigateToChat }: DiscoverPageProps) => {
     return now - lastShuffleTime > tenMinutes;
   }, [lastShuffleTime]);
 
-  const fetchPotentialMatches = useCallback(async () => {
+  const fetchPotentialMatches = useCallback(async (isInitial = false, offsetValue = 0) => {
     if (!currentUser?.id) return;
   
     try {
-      setIsLoading(true);
+      if (isInitial) {
+        setIsLoading(true);
+      } else {
+        setIsLoadingMore(true);
+      }
       
       // Parallel queries for better performance
       const [
@@ -133,51 +140,45 @@ const DiscoverPage = ({ currentUser, onNavigateToChat }: DiscoverPageProps) => {
         .in('gender', allowedGenders)
         .eq('account_status', 'active')
         .eq('is_admin', false)
-        .limit(20); // Reduced limit for faster loading
+        .range(offsetValue, offsetValue + 19) // Load 20 profiles at a time
+        .limit(20);
 
       if (error) throw error;
 
-      // Fetch images only for visible profiles (first 5)
-      const profilesToShow = profiles?.slice(0, 5) || [];
-      const matchesWithImages = await Promise.all([
-        ...profilesToShow.map(async (profile) => {
+      if (!profiles || profiles.length === 0) {
+        setHasMoreProfiles(false);
+        return;
+      }
+
+      // Load only first 3 images initially for fast loading
+      const matchesWithImages = await Promise.all(
+        profiles.map(async (profile) => {
           const { data: images } = await supabase
             .from('user_images')
             .select('image_url')
             .eq('user_id', profile.id)
             .order('image_order', { ascending: true })
-            .limit(3); // Limit images per profile for faster loading
+            .limit(3); // Load first 3 images only
 
           return {
             ...profile,
             images: images?.map(img => img.image_url) || []
           };
-        }),
-        // Add remaining profiles without images initially
-        ...(profiles?.slice(5).map(profile => ({
-          ...profile,
-          images: []
-        })) || [])
-      ]);
-
-      // Load last profile ID and time from localStorage
-      const savedId = localStorage.getItem('afrovibe_last_profile_id');
-      const savedTime = parseInt(localStorage.getItem('afrovibe_last_profile_time') || '0');
-      const twentyFourHours = 24 * 60 * 60 * 1000;
-      const isSavedValid = savedId && Date.now() - savedTime < twentyFourHours;
+        })
+      );
 
       const shuffled = matchesWithImages.sort(() => 0.5 - Math.random());
 
-      let indexToShow = 0;
-      if (isSavedValid) {
-        const savedIndex = shuffled.findIndex(p => p.id === savedId);
-        if (savedIndex !== -1) {
-          indexToShow = savedIndex;
-        }
+      if (isInitial) {
+        setPotentialMatches(shuffled);
+        setCurrentIndex(0);
+        setOffset(20);
+      } else {
+        setPotentialMatches(prev => [...prev, ...shuffled]);
+        setOffset(prev => prev + 20);
       }
 
-      setPotentialMatches(shuffled);
-      setCurrentIndex(indexToShow);
+      setHasMoreProfiles(profiles.length === 20);
       setLastShuffleTime(Date.now());
     } catch (error) {
       console.error('Error fetching potential matches:', error);
@@ -188,50 +189,57 @@ const DiscoverPage = ({ currentUser, onNavigateToChat }: DiscoverPageProps) => {
       });
     } finally {
       setIsLoading(false);
+      setIsLoadingMore(false);
     }
   }, [currentUser, allowedGenders, toast]);
 
-  // Preload images for next profile
-  const preloadNextImages = useCallback(async (nextIndex: number) => {
-    if (nextIndex < potentialMatches.length && potentialMatches[nextIndex].images.length === 0) {
-      const { data: images } = await supabase
-        .from('user_images')
-        .select('image_url')
-        .eq('user_id', potentialMatches[nextIndex].id)
-        .order('image_order', { ascending: true })
-        .limit(3);
+  // Load remaining images when profile is selected for detailed view
+  const loadRemainingImages = useCallback(async (profileId: string) => {
+    const profileIndex = potentialMatches.findIndex(p => p.id === profileId);
+    if (profileIndex === -1 || potentialMatches[profileIndex].images.length >= 7) return;
 
-      if (images?.length) {
-        const updatedMatches = [...potentialMatches];
-        updatedMatches[nextIndex] = {
-          ...updatedMatches[nextIndex],
-          images: images.map(img => img.image_url)
-        };
-        setPotentialMatches(updatedMatches);
-      }
+    const { data: allImages } = await supabase
+      .from('user_images')
+      .select('image_url')
+      .eq('user_id', profileId)
+      .order('image_order', { ascending: true })
+      .limit(7); // Maximum 7 images
+
+    if (allImages?.length && allImages.length > potentialMatches[profileIndex].images.length) {
+      const updatedMatches = [...potentialMatches];
+      updatedMatches[profileIndex] = {
+        ...updatedMatches[profileIndex],
+        images: allImages.map(img => img.image_url)
+      };
+      setPotentialMatches(updatedMatches);
     }
   }, [potentialMatches]);
 
+  // Check if we need to load more profiles (when user is within 5 profiles of the end)
+  const checkAndLoadMore = useCallback(() => {
+    if (!isLoadingMore && hasMoreProfiles && currentIndex >= potentialMatches.length - 5) {
+      fetchPotentialMatches(false, offset);
+    }
+  }, [currentIndex, potentialMatches.length, isLoadingMore, hasMoreProfiles, offset, fetchPotentialMatches]);
+
   useEffect(() => {
     if (currentUser?.id) {
-      fetchPotentialMatches();
+      fetchPotentialMatches(true, 0);
     }
-  }, [currentUser?.id, fetchPotentialMatches]);
+  }, [currentUser?.id]);
 
-  // Save current match state
   useEffect(() => {
-  if (potentialMatches.length > 0) {
-    localStorage.setItem('afrovibe_last_profile_id', potentialMatches[currentIndex]?.id || '');
-    localStorage.setItem('afrovibe_last_profile_time', Date.now().toString());
-  }
-  }, [currentIndex, potentialMatches]);
+    checkAndLoadMore();
+  }, [currentIndex, checkAndLoadMore]);
 
   useEffect(() => {
     setImageIndex(0);
     setShowMoreInfo(false);
-    // Preload next profile images
-    preloadNextImages(currentIndex + 1);
-  }, [currentIndex, preloadNextImages]);
+    // Load remaining images when profile is viewed
+    if (potentialMatches[currentIndex]) {
+      loadRemainingImages(potentialMatches[currentIndex].id);
+    }
+  }, [currentIndex, potentialMatches, loadRemainingImages]);
 
   const handleTouchStart = (e: React.TouchEvent) => {
     const touch = e.touches[0];
@@ -485,8 +493,12 @@ const DiscoverPage = ({ currentUser, onNavigateToChat }: DiscoverPageProps) => {
   const moveToNext = () => {
     if (currentIndex < potentialMatches.length - 1) {
       setCurrentIndex(currentIndex + 1);
+    } else if (hasMoreProfiles) {
+      // Load more profiles when we reach the end
+      fetchPotentialMatches(false, offset);
     } else {
-      fetchPotentialMatches();
+      // No more profiles, reset to beginning
+      fetchPotentialMatches(true, 0);
       setCurrentIndex(0);
     }
   };
@@ -549,7 +561,7 @@ const DiscoverPage = ({ currentUser, onNavigateToChat }: DiscoverPageProps) => {
               <Button 
                 onClick={() => {
                   setIsOutOfSwipes(false);
-                  fetchPotentialMatches();
+                  fetchPotentialMatches(true, 0);
                 }} 
                 variant="outline" 
                 className="w-full"
@@ -565,7 +577,7 @@ const DiscoverPage = ({ currentUser, onNavigateToChat }: DiscoverPageProps) => {
 
   const currentMatch = potentialMatches[currentIndex];
 
-  if (!currentMatch) {
+  if (!currentMatch && !isLoadingMore) {
     return (
       <div className="h-full w-full flex items-center justify-center">
         <Card className="max-w-md w-full mx-4">
@@ -575,11 +587,19 @@ const DiscoverPage = ({ currentUser, onNavigateToChat }: DiscoverPageProps) => {
             <p className="text-gray-600 mb-4">
               You've seen all available profiles. Check back later for new matches!
             </p>
-            <Button onClick={fetchPotentialMatches} className="w-full">
+            <Button onClick={() => fetchPotentialMatches(true, 0)} className="w-full">
               Refresh
             </Button>
           </CardContent>
         </Card>
+      </div>
+    );
+  }
+
+  if (!currentMatch) {
+    return (
+      <div className="h-full w-full flex items-center justify-center">
+        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-pink-600"></div>
       </div>
     );
   }
@@ -776,6 +796,13 @@ const DiscoverPage = ({ currentUser, onNavigateToChat }: DiscoverPageProps) => {
           <Heart className="w-7 h-7 text-green-500" />
         </Button>
       </div>
+
+      {/* Loading indicator for background loading */}
+      {isLoadingMore && (
+        <div className="absolute top-4 right-4 z-30">
+          <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-pink-600 bg-white/80 rounded-full p-1"></div>
+        </div>
+      )}
     </div>
   );
 };

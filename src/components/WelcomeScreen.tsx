@@ -5,9 +5,10 @@ import { Button } from '@/components/ui/button';
 interface WelcomeScreenProps {
   onGetStarted: () => void;
   onAdminAccess: () => void;
+  onAboutUs: () => void;
 }
 
-const WelcomeScreen = ({ onGetStarted, onAdminAccess }: WelcomeScreenProps) => {
+const WelcomeScreen = ({ onGetStarted, onAdminAccess, onAboutUs }: WelcomeScreenProps) => {
   return (
     <div className="min-h-screen bg-gradient-to-br from-pink-400 via-purple-500 to-indigo-600 flex flex-col items-center justify-center text-white relative overflow-hidden">
       {/* Background Pattern */}
@@ -42,13 +43,23 @@ const WelcomeScreen = ({ onGetStarted, onAdminAccess }: WelcomeScreenProps) => {
         <Button 
           onClick={onGetStarted}
           size="lg"
-          className="bg-white text-purple-600 hover:bg-gray-100 font-semibold px-8 py-3 rounded-full text-lg shadow-lg transform hover:scale-105 transition-all duration-200"
+          className="bg-white text-purple-600 hover:bg-gray-100 font-semibold px-8 py-3 rounded-full text-lg shadow-lg transform hover:scale-105 transition-all duration-200 mb-4"
         >
           Get Started
         </Button>
         
+        {/* About Us Link */}
+        <div className="mb-8">
+          <button 
+            onClick={onAboutUs}
+            className="text-sm text-white/80 hover:text-white underline transition-colors"
+          >
+            About Us
+          </button>
+        </div>
+        
         {/* Admin Access */}
-        <div className="mt-8">
+        <div className="mt-4">
           <button 
             onClick={onAdminAccess}
             className="text-sm text-white/70 hover:text-white underline transition-colors"

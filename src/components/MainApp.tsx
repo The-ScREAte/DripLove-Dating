@@ -6,18 +6,21 @@ import DiscoverPage from '@/components/DiscoverPage';
 import ChatPage from '@/components/ChatPage';
 import LikedMePage from '@/components/LikedMePage';
 import ProfilePage from '@/components/ProfilePage';
+import AboutUs from '@/components/AboutUs';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 
 interface MainAppProps {
   user: any;
   onLogout: () => void;
+  onShowAbout?: () => void;
 }
 
-const MainApp = ({ user, onLogout }: MainAppProps) => {
+const MainApp = ({ user, onLogout, onShowAbout }: MainAppProps) => {
   const [activeTab, setActiveTab] = useState('discover');
   const [profile, setProfile] = useState<any>(null);
   const [unreadCount, setUnreadCount] = useState(0);
+  const [showAbout, setShowAbout] = useState(false);
   const { toast } = useToast();
 
   useEffect(() => {
@@ -101,6 +104,18 @@ const MainApp = ({ user, onLogout }: MainAppProps) => {
     setActiveTab('chat');
   };
 
+  const handleShowAbout = () => {
+    setShowAbout(true);
+  };
+
+  const handleCloseAbout = () => {
+    setShowAbout(false);
+  };
+
+  if (showAbout) {
+    return <AboutUs onBack={handleCloseAbout} />;
+  }
+
   const renderContent = () => {
     switch (activeTab) {
       case 'discover':
@@ -110,7 +125,7 @@ const MainApp = ({ user, onLogout }: MainAppProps) => {
       case 'liked':
         return <LikedMePage currentUser={user} />;
       case 'profile':
-        return <ProfilePage currentUser={user} profile={profile} onProfileUpdate={fetchUserProfile} onLogout={onLogout} />;
+        return <ProfilePage currentUser={user} profile={profile} onProfileUpdate={fetchUserProfile} onLogout={onLogout} onShowAbout={handleShowAbout} />;
       default:
         return <DiscoverPage currentUser={user} onNavigateToChat={handleNavigateToChat} />;
     }
