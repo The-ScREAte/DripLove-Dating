@@ -25,6 +25,7 @@ interface PotentialMatch {
   date_of_birth: string;
   interests: string[];
   images: string[];
+  gender: string;
 }
 
 interface PassedUser {
@@ -92,6 +93,17 @@ const DiscoverPage = ({ currentUser, onNavigateToChat }: DiscoverPageProps) => {
     return now - lastShuffleTime > tenMinutes;
   };
 
+  const getGenderFilter = (userPreference: string) => {
+    if (userPreference === 'male') {
+      return ['male'];
+    } else if (userPreference === 'female') {
+      return ['female'];
+    } else if (userPreference === 'everyone' || userPreference === 'both') {
+      return ['male', 'female', 'other'];
+    }
+    return ['male', 'female', 'other']; // default to all
+  };
+
   const fetchPotentialMatches = async () => {
     if (!currentUser?.id) return;
   
@@ -126,13 +138,17 @@ const DiscoverPage = ({ currentUser, onNavigateToChat }: DiscoverPageProps) => {
       }
   
       const hiddenPassedIds = recentPasses?.map(p => p.passed_id) || [];
-  
       const excludedIds = [...likedUserIds, ...blockedUserIds, ...hiddenPassedIds, currentUser.id];
+      
+      // Get gender filter based on user's preference
+      const allowedGenders = getGenderFilter(currentUser.preference);
+      console.log('User preference:', currentUser.preference, 'Allowed genders:', allowedGenders);
   
       const { data: profiles, error } = await supabase
         .from('profiles')
         .select('*')
         .not('id', 'in', `(${excludedIds.join(',')})`)
+        .in('gender', allowedGenders)
         .eq('account_status', 'active')
         .eq('is_admin', false)
         .limit(50); // Load more for better randomization
@@ -270,7 +286,7 @@ const DiscoverPage = ({ currentUser, onNavigateToChat }: DiscoverPageProps) => {
     setIsDragging(false);
 
     const deltaX = currentX - startX;
-    const deltaY = Math.abs(currentY - startY);
+    const deltaY = Math.abs(e.clientY - startY);
     const minSwipeDistance = 80;
 
     // Only trigger swipe if horizontal movement is greater than vertical

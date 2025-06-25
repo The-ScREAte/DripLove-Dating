@@ -1,9 +1,21 @@
+
 import type { CapacitorConfig } from '@capacitor/cli';
 
 const config: CapacitorConfig = {
-  appId: 'com.afrovibe.app',
-  appName: 'afrovibe',
-  webDir: 'dist'
+  appId: 'app.lovable.fef6ab3677bc4046b6f5fc5b2ad8c182',
+  appName: 'AfroVibe',
+  webDir: 'dist',
+  server: {
+    url: 'https://fef6ab36-77bc-4046-b6f5-fc5b2ad8c182.lovableproject.com?forceHideBadge=true',
+    cleartext: true
+  },
+  plugins: {
+    Keyboard: {
+      resize: 'native',
+      style: 'dark',
+      resizeOnFullScreen: true
+    }
+  }
 };
 
 export default config;
