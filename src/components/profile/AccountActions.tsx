@@ -3,7 +3,7 @@ import React, { useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog';
-import { LogOut, AlertTriangle } from 'lucide-react';
+import { LogOut, AlertTriangle, Mail } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 
@@ -64,6 +64,23 @@ const AccountActions = ({ currentUser, onLogout }: AccountActionsProps) => {
         <CardTitle>Account Actions</CardTitle>
       </CardHeader>
       <CardContent className="space-y-4">
+        {/* Support Email */}
+        <div className="bg-gray-50 p-4 rounded-lg border">
+          <div className="flex items-center space-x-2 mb-2">
+            <Mail className="w-4 h-4 text-pink-600" />
+            <span className="font-medium text-gray-700">Need Help?</span>
+          </div>
+          <p className="text-sm text-gray-600 mb-2">
+            Contact our support team for any questions or assistance:
+          </p>
+          <a 
+            href="mailto:support@afrovibe.com" 
+            className="text-pink-600 hover:text-pink-700 font-medium hover:underline"
+          >
+            support@afrovibe.com
+          </a>
+        </div>
+
         <div className="flex flex-col sm:flex-row gap-4">
           <Button 
             onClick={handleLogout}

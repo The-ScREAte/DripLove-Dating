@@ -4,11 +4,12 @@ import AuthForm from '@/components/AuthForm';
 import RegistrationForm from '@/components/RegistrationForm';
 import MainApp from '@/components/MainApp';
 import AdminPage from '@/components/AdminPage';
+import AboutUs from '@/components/AboutUs';
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
 
 const Index = () => {
-  const [currentView, setCurrentView] = useState<'welcome' | 'login' | 'register' | 'app' | 'admin'>('welcome');
+  const [currentView, setCurrentView] = useState<'welcome' | 'login' | 'register' | 'app' | 'admin' | 'about'>('welcome');
   const [user, setUser] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const { toast } = useToast();
@@ -125,6 +126,10 @@ const Index = () => {
     setCurrentView('welcome');
   };
 
+  const handleShowAbout = () => {
+    setCurrentView('about');
+  };
+
   const handleRegister = async (formData: any) => {
     try {
       if (formData.password !== formData.confirmPassword) {
@@ -233,7 +238,15 @@ const Index = () => {
     <div className="w-full min-h-screen flex justify-center bg-background">
       <div className="mobile-container w-full h-full">
         {currentView === 'welcome' && (
-          <WelcomeScreen onGetStarted={handleGetStarted} onAdminAccess={handleAdminAccess} />
+          <WelcomeScreen 
+            onGetStarted={handleGetStarted} 
+            onAdminAccess={handleAdminAccess}
+            onShowAbout={handleShowAbout}
+          />
+        )}
+
+        {currentView === 'about' && (
+          <AboutUs onBack={handleBackToWelcome} />
         )}
 
         {currentView === 'login' && (
