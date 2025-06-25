@@ -2,7 +2,9 @@
 import React, { useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog';
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { LogOut, AlertTriangle, Mail } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
@@ -14,6 +16,9 @@ interface AccountActionsProps {
 
 const AccountActions = ({ currentUser, onLogout }: AccountActionsProps) => {
   const [deletingAccount, setDeletingAccount] = useState(false);
+  const [showPasswordDialog, setShowPasswordDialog] = useState(false);
+  const [password, setPassword] = useState('');
+  const [passwordError, setPasswordError] = useState('');
   const { toast } = useToast();
 
   const handleLogout = async () => {
@@ -29,10 +34,35 @@ const AccountActions = ({ currentUser, onLogout }: AccountActionsProps) => {
     }
   };
 
+  const handleDeleteAccountRequest = () => {
+    setShowPasswordDialog(true);
+    setPassword('');
+    setPasswordError('');
+  };
+
   const handleDeleteAccount = async () => {
+    if (!password.trim()) {
+      setPasswordError('Password is required');
+      return;
+    }
+
     setDeletingAccount(true);
+    setPasswordError('');
     
     try {
+      // First verify the password by attempting to reauthenticate
+      const { error: authError } = await supabase.auth.signInWithPassword({
+        email: currentUser.email,
+        password: password,
+      });
+
+      if (authError) {
+        setPasswordError('Incorrect password');
+        setDeletingAccount(false);
+        return;
+      }
+
+      // If password is correct, proceed with account deletion
       const { error } = await supabase.rpc('delete_user_and_data', {
         user_id_to_delete: currentUser.id
       });
@@ -55,6 +85,7 @@ const AccountActions = ({ currentUser, onLogout }: AccountActionsProps) => {
       });
     } finally {
       setDeletingAccount(false);
+      setShowPasswordDialog(false);
     }
   };
 
@@ -113,22 +144,70 @@ const AccountActions = ({ currentUser, onLogout }: AccountActionsProps) => {
                     <li>Remove all likes given and received</li>
                   </ul>
                   <br />
-                  <strong>This action cannot be undone.</strong>
+                  <strong>This action cannot be undone and your profile won't exist anymore.</strong>
                 </AlertDialogDescription>
               </AlertDialogHeader>
               <AlertDialogFooter>
-                <AlertDialogCancel>Cancel</AlertDialogCancel>
+                <AlertDialogCancel>No, Cancel</AlertDialogCancel>
                 <AlertDialogAction 
-                  disabled={deletingAccount}
-                  onClick={handleDeleteAccount}
+                  onClick={handleDeleteAccountRequest}
                   className="bg-red-600 hover:bg-red-700"
                 >
-                  {deletingAccount ? 'Deleting...' : 'Delete Account Permanently'}
+                  Yes, Delete My Account
                 </AlertDialogAction>
               </AlertDialogFooter>
             </AlertDialogContent>
           </AlertDialog>
         </div>
+
+        {/* Password Confirmation Dialog */}
+        <Dialog open={showPasswordDialog} onOpenChange={setShowPasswordDialog}>
+          <DialogContent className="sm:max-w-md">
+            <DialogHeader>
+              <DialogTitle>Confirm Account Deletion</DialogTitle>
+              <DialogDescription>
+                Please enter your password to confirm you want to delete your account permanently.
+              </DialogDescription>
+            </DialogHeader>
+            <div className="space-y-4">
+              <div>
+                <Input
+                  type="password"
+                  placeholder="Enter your password"
+                  value={password}
+                  onChange={(e) => {
+                    setPassword(e.target.value);
+                    setPasswordError('');
+                  }}
+                  className={passwordError ? 'border-red-500' : ''}
+                />
+                {passwordError && (
+                  <p className="text-red-500 text-sm mt-1">{passwordError}</p>
+                )}
+              </div>
+            </div>
+            <DialogFooter>
+              <Button 
+                variant="outline" 
+                onClick={() => {
+                  setShowPasswordDialog(false);
+                  setPassword('');
+                  setPasswordError('');
+                }}
+                disabled={deletingAccount}
+              >
+                Cancel
+              </Button>
+              <Button 
+                variant="destructive" 
+                onClick={handleDeleteAccount}
+                disabled={deletingAccount || !password.trim()}
+              >
+                {deletingAccount ? 'Deleting...' : 'Delete Account'}
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
       </CardContent>
     </Card>
   );

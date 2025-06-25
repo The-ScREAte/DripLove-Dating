@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -49,12 +48,15 @@ const LikedMePage = ({ currentUser }: LikedMePageProps) => {
         .from('profiles')
         .select('like_me_cooldown_until')
         .eq('id', currentUser.id)
-        .single();
+        .maybeSingle();
 
-      if (error) throw error;
+      if (error) {
+        console.error('Error checking lockout status:', error);
+        return;
+      }
 
       if (data?.like_me_cooldown_until) {
-        const cooldownDate = new Date(data?.like_me_cooldown_until);
+        const cooldownDate = new Date(data.like_me_cooldown_until);
         if (cooldownDate > new Date()) {
           setLockoutEndDate(cooldownDate);
         }
@@ -65,57 +67,88 @@ const LikedMePage = ({ currentUser }: LikedMePageProps) => {
   }, [currentUser?.id, isPremium]);
 
   const fetchLikers = useCallback(async () => {
-    if (!currentUser?.id) return;
+    if (!currentUser?.id) {
+      setLoading(false);
+      return;
+    }
 
     try {
       setLoading(true);
+      console.log('Fetching likers for user:', currentUser.id);
 
-      // Parallel queries for better performance
-      const [
-        { data: likes, error: likesError },
-        { data: matches },
-        { data: blockedUsers }
-      ] = await Promise.all([
-        supabase
-          .from('likes')
-          .select(`*, liker:profiles!likes_liker_id_fkey(*)`)
-          .eq('liked_id', currentUser.id),
-        supabase
-          .from('matches')
-          .select('user1_id, user2_id')
-          .or(`user1_id.eq.${currentUser.id},user2_id.eq.${currentUser.id}`),
-        supabase
-          .from('blocks')
-          .select('blocked_id, blocker_id')
-          .or(`blocker_id.eq.${currentUser.id},blocked_id.eq.${currentUser.id}`)
-      ]);
+      // Simplified query - get likes first, then we'll get profile data
+      const { data: likes, error: likesError } = await supabase
+        .from('likes')
+        .select('liker_id, created_at')
+        .eq('liked_id', currentUser.id);
 
-      if (likesError) throw likesError;
+      if (likesError) {
+        console.error('Error fetching likes:', likesError);
+        throw likesError;
+      }
+
+      console.log('Fetched likes:', likes?.length || 0);
+
+      if (!likes || likes.length === 0) {
+        setLikers([]);
+        setLoading(false);
+        return;
+      }
+
+      // Get matched user IDs to filter out
+      const { data: matches } = await supabase
+        .from('matches')
+        .select('user1_id, user2_id')
+        .or(`user1_id.eq.${currentUser.id},user2_id.eq.${currentUser.id}`);
 
       const matchedIds = matches?.map(match =>
         match.user1_id === currentUser.id ? match.user2_id : match.user1_id
       ) || [];
 
+      // Get blocked user IDs to filter out
+      const { data: blockedUsers } = await supabase
+        .from('blocks')
+        .select('blocked_id, blocker_id')
+        .or(`blocker_id.eq.${currentUser.id},blocked_id.eq.${currentUser.id}`);
+
       const blockedIds = blockedUsers?.map(block =>
         block.blocker_id === currentUser.id ? block.blocked_id : block.blocker_id
       ) || [];
 
-      const filteredLikes = likes?.filter(like =>
-        !matchedIds.includes(like.liker.id) && !blockedIds.includes(like.liker.id) && like.liker.is_admin !== true
-      ) || [];
+      // Get profile data for likers (excluding matched and blocked users)
+      const likerIds = likes
+        .map(like => like.liker_id)
+        .filter(id => !matchedIds.includes(id) && !blockedIds.includes(id));
 
-      const likersData = filteredLikes.map(like => like.liker);
+      if (likerIds.length === 0) {
+        setLikers([]);
+        setLoading(false);
+        return;
+      }
 
-      if (likersData.length > 0) {
-        // Only load images for first few profiles for faster initial load
-        const profilesForImages = likersData.slice(0, 6);
-        const imagePromises = profilesForImages.map(async (profile) => {
+      const { data: profiles, error: profileError } = await supabase
+        .from('profiles')
+        .select('*')
+        .in('id', likerIds)
+        .neq('is_admin', true);
+
+      if (profileError) {
+        console.error('Error fetching profiles:', profileError);
+        throw profileError;
+      }
+
+      console.log('Fetched profiles:', profiles?.length || 0);
+      setLikers(profiles || []);
+
+      // Load first images for grid view only
+      if (profiles && profiles.length > 0) {
+        const imagePromises = profiles.slice(0, 6).map(async (profile) => {
           const { data: images } = await supabase
             .from('user_images')
             .select('image_url')
             .eq('user_id', profile.id)
             .order('image_order')
-            .limit(1); // Only load first image for grid view
+            .limit(1);
 
           return {
             profileId: profile.id,
@@ -131,10 +164,8 @@ const LikedMePage = ({ currentUser }: LikedMePageProps) => {
 
         setUserImages(imageMap);
       }
-
-      setLikers(likersData);
     } catch (error) {
-      console.error('Error fetching likers:', error);
+      console.error('Error in fetchLikers:', error);
       toast({
         title: "Error",
         description: "Failed to load people who liked you",
@@ -165,6 +196,7 @@ const LikedMePage = ({ currentUser }: LikedMePageProps) => {
 
   useEffect(() => {
     if (currentUser?.id) {
+      console.log('Component mounted, fetching data...');
       fetchLikers();
       checkLockoutStatus();
     }
@@ -214,7 +246,7 @@ const LikedMePage = ({ currentUser }: LikedMePageProps) => {
         .select('*')
         .eq('liker_id', currentUser.id)
         .eq('liked_id', profileId)
-        .single();
+        .maybeSingle();
 
       if (existingLike) {
         toast({
