@@ -618,7 +618,7 @@ const DiscoverPage = ({ currentUser, onNavigateToChat }: DiscoverPageProps) => {
           <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-transparent to-transparent pointer-events-none" />
 
           {/* Profile Info Overlay - Positioned to not interfere with buttons */}
-          <div className="absolute bottom-36 left-0 right-0 text-white px-6 profile-info">
+          <div className="absolute bottom-40 left-0 right-0 text-white px-6 profile-info">
             {/* Main info section */}
             <div className="mb-3">
               <h2 className="text-2xl font-bold mb-1">
