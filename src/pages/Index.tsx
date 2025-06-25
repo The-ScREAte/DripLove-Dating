@@ -85,7 +85,7 @@ const Index = () => {
 
   // Show admin page
   if (showAdmin) {
-    return <AdminPage onBack={handleBackToWelcome} />;
+    return <AdminPage />;
   }
 
   // Show auth form

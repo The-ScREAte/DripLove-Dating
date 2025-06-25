@@ -13,10 +13,9 @@ import { useToast } from '@/hooks/use-toast';
 interface MainAppProps {
   user: any;
   onLogout: () => void;
-  onShowAbout?: () => void;
 }
 
-const MainApp = ({ user, onLogout, onShowAbout }: MainAppProps) => {
+const MainApp = ({ user, onLogout }: MainAppProps) => {
   const [activeTab, setActiveTab] = useState('discover');
   const [profile, setProfile] = useState<any>(null);
   const [unreadCount, setUnreadCount] = useState(0);

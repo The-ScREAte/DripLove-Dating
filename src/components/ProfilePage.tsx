@@ -1,7 +1,8 @@
+
 import React, { useState, useEffect } from 'react';
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { User, Edit, Save, X, Crown } from 'lucide-react';
+import { User, Edit, Save, X, Crown, Mail } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import { useSubscription } from '@/hooks/useSubscription';
@@ -23,9 +24,10 @@ interface ProfilePageProps {
   profile: any;
   onProfileUpdate: () => void;
   onLogout: () => void;
+  onShowAbout: () => void;
 }
 
-const ProfilePage = ({ currentUser, profile, onProfileUpdate, onLogout }: ProfilePageProps) => {
+const ProfilePage = ({ currentUser, profile, onProfileUpdate, onLogout, onShowAbout }: ProfilePageProps) => {
   const [isEditing, setIsEditing] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const [showPremiumUpgrade, setShowPremiumUpgrade] = useState(false);
@@ -281,6 +283,32 @@ const ProfilePage = ({ currentUser, profile, onProfileUpdate, onLogout }: Profil
           <PersonalitySection editedProfile={editedProfile} isEditing={isEditing} onSliderChange={handleSliderChange} />
           <FunQuestionsSection editedProfile={editedProfile} isEditing={isEditing} onInputChange={handleInputChange} />
           <InterestsSection editedProfile={editedProfile} profile={profile} isEditing={isEditing} onInterestsChange={handleInterestsChange} />
+          
+          {/* Support Email Section */}
+          <Card>
+            <CardContent className="pt-6">
+              <div className="flex items-center justify-center space-x-2 text-gray-600 mb-4">
+                <Mail className="w-4 h-4" />
+                <span className="text-sm">Need help? Contact us at</span>
+                <a 
+                  href="mailto:support@afrovibe.com" 
+                  className="text-pink-600 hover:text-pink-700 font-medium"
+                >
+                  support@afrovibe.com
+                </a>
+              </div>
+              <div className="text-center mb-4">
+                <Button 
+                  onClick={onShowAbout}
+                  variant="outline"
+                  className="text-gray-600 hover:text-gray-700"
+                >
+                  About AfroVibe
+                </Button>
+              </div>
+            </CardContent>
+          </Card>
+          
           <AccountActions currentUser={currentUser} onLogout={onLogout} />
         </div>
       </div>
