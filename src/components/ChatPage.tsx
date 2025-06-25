@@ -2,12 +2,19 @@ import React, { useState, useEffect, useRef } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Smile, Send, Search, ArrowLeft } from 'lucide-react';
+import { Smile, Send, Search, ArrowLeft, MoreVertical } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import EmojiPicker from './EmojiPicker';
 import ChatUserAvatar from './ChatUserAvatar';
 import UserProfileModal from './UserProfileModal';
+import BlockDialog from './BlockDialog';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
 
 interface ChatPageProps {
   currentUser: any;
@@ -23,6 +30,8 @@ const ChatPage = ({ currentUser, onUnreadChange }: ChatPageProps) => {
   const [searchTerm, setSearchTerm] = useState('');
   const [isUserProfileOpen, setIsUserProfileOpen] = useState(false);
   const [selectedUserId, setSelectedUserId] = useState<string>('');
+  const [isBlockDialogOpen, setIsBlockDialogOpen] = useState(false);
+  const [userToBlock, setUserToBlock] = useState<any>(null);
   const { toast } = useToast();
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const messagesContainerRef = useRef<HTMLDivElement>(null);
@@ -246,11 +255,28 @@ const ChatPage = ({ currentUser, onUnreadChange }: ChatPageProps) => {
     handleUserProfileClick(userId);
   };
 
+  const handleBlockUser = () => {
+    if (selectedMatch?.partner) {
+      setUserToBlock(selectedMatch.partner);
+      setIsBlockDialogOpen(true);
+    }
+  };
+
+  const handleBlockSuccess = () => {
+    // Remove the blocked user from matches and go back to chat list
+    setMatches(prev => prev.filter(match => match.id !== selectedMatch?.id));
+    setSelectedMatch(null);
+    toast({
+      title: "User blocked",
+      description: "This user has been blocked and removed from your matches.",
+    });
+  };
+
   // Show chat list view
   if (!selectedMatch) {
     return (
-<div className="flex flex-col h-screen max-h-screen overflow-hidden">
-<div className="bg-white border-b p-4 flex-shrink-0">
+      <div className="flex flex-col h-screen max-h-screen overflow-hidden">
+        <div className="bg-white border-b p-4 flex-shrink-0">
           <h1 className="text-2xl font-bold text-gray-800 mb-4">Messages</h1>
           <div className="relative">
             <Input
@@ -265,67 +291,67 @@ const ChatPage = ({ currentUser, onUnreadChange }: ChatPageProps) => {
         </div>
 
         <div className="flex-1 overflow-y-auto pb-20">
-  {filteredMatches.length === 0 ? (
-    <div className="flex items-center justify-center h-full">
-      <p className="text-center text-gray-500 p-4">
-        {searchTerm ? 'No matches found' : 'No matches yet'}
-      </p>
-    </div>
-  ) : (
-    <div className="divide-y">
-      {filteredMatches.map((match) => (
-        <div
-          key={match.id}
-          onClick={() => setSelectedMatch(match)}
-          className="p-4 hover:bg-gray-50 transition-colors cursor-pointer"
-        >
-          <div className="flex items-center space-x-3">
-  <div className="relative">
-    <ChatUserAvatar 
-      userId={match.partner?.id}
-      firstName={match.partner?.first_name}
-      lastName={match.partner?.last_name}
-      onClick={() => handleUserProfileClick(match.partner?.id)}
-      size="lg"
-    />
-    {/* Unread dot if message is from partner and not yet read */}
-    {match.unreadCount > 0 && (
-  <span className="absolute -top-1 -right-1 h-3 w-3 bg-blue-600 rounded-full border-2 border-white z-10" />
-)}
-  </div>
+          {filteredMatches.length === 0 ? (
+            <div className="flex items-center justify-center h-full">
+              <p className="text-center text-gray-500 p-4">
+                {searchTerm ? 'No matches found' : 'No matches yet'}
+              </p>
+            </div>
+          ) : (
+            <div className="divide-y">
+              {filteredMatches.map((match) => (
+                <div
+                  key={match.id}
+                  onClick={() => setSelectedMatch(match)}
+                  className="p-4 hover:bg-gray-50 transition-colors cursor-pointer"
+                >
+                  <div className="flex items-center space-x-3">
+                    <div className="relative">
+                      <ChatUserAvatar 
+                        userId={match.partner?.id}
+                        firstName={match.partner?.first_name}
+                        lastName={match.partner?.last_name}
+                        onClick={() => handleUserProfileClick(match.partner?.id)}
+                        size="lg"
+                      />
+                      {/* Unread dot if message is from partner and not yet read */}
+                      {match.unreadCount > 0 && (
+                        <span className="absolute -top-1 -right-1 h-3 w-3 bg-blue-600 rounded-full border-2 border-white z-10" />
+                      )}
+                    </div>
 
-  <div className="flex-1 min-w-0">
-    <div className="flex justify-between items-center">
-      <span className="font-semibold text-gray-900 truncate">
-        {match.partner?.first_name} {match.partner?.last_name}
-      </span>
-    </div>
-    <p
-  className={`text-sm truncate ${
-    match.unreadCount > 0 ? 'font-bold text-gray-900' : 'text-gray-500'
-  }`}
->
-  {match.last_message?.message
-    ? `${match.last_message.sender_id === currentUser.id ? 'You: ' : ''}${match.last_message.message}`
-    : 'Tap to start chatting'}
-</p>
-  </div>
-</div>
+                    <div className="flex-1 min-w-0">
+                      <div className="flex justify-between items-center">
+                        <span className="font-semibold text-gray-900 truncate">
+                          {match.partner?.first_name} {match.partner?.last_name}
+                        </span>
+                      </div>
+                      <p
+                        className={`text-sm truncate ${
+                          match.unreadCount > 0 ? 'font-bold text-gray-900' : 'text-gray-500'
+                        }`}
+                      >
+                        {match.last_message?.message
+                          ? `${match.last_message.sender_id === currentUser.id ? 'You: ' : ''}${match.last_message.message}`
+                          : 'Tap to start chatting'}
+                      </p>
+                    </div>
+                  </div>
 
+                </div>
+              ))}
+            </div>
+          )}
         </div>
-      ))}
-    </div>
-  )}
-</div>
       </div>
     );
   }
 
   // Show individual chat view
   return (
-<div className="flex flex-col h-screen">
-{/* Chat Header */}
-        <div className="bg-white border-b p-4 flex items-center space-x-3 sticky top-0 z-10">
+    <div className="flex flex-col h-screen">
+      {/* Chat Header */}
+      <div className="bg-white border-b p-4 flex items-center space-x-3 sticky top-0 z-10">
         <Button
           onClick={() => setSelectedMatch(null)}
           variant="ghost"
@@ -346,6 +372,23 @@ const ChatPage = ({ currentUser, onUnreadChange }: ChatPageProps) => {
             {selectedMatch.partner?.first_name} {selectedMatch.partner?.last_name}
           </h2>
         </div>
+        
+        {/* Block Menu */}
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+            <Button variant="ghost" size="sm" className="p-1">
+              <MoreVertical className="w-5 h-5" />
+            </Button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="end">
+            <DropdownMenuItem 
+              onClick={handleBlockUser}
+              className="text-red-600 focus:text-red-600"
+            >
+              Block User
+            </DropdownMenuItem>
+          </DropdownMenuContent>
+        </DropdownMenu>
       </div>
 
       {/* Messages - scrollable area */}
@@ -389,7 +432,7 @@ const ChatPage = ({ currentUser, onUnreadChange }: ChatPageProps) => {
 
       {/* Message Input - Fixed at bottom */}
       <div className="fixed bottom-16 left-0 right-0 bg-white border-t p-4 z-20">
-      <div className="flex space-x-2 relative">
+        <div className="flex space-x-2 relative">
           <div className="flex-1 relative">
             <Input
               value={newMessage}
@@ -429,6 +472,15 @@ const ChatPage = ({ currentUser, onUnreadChange }: ChatPageProps) => {
         isOpen={isUserProfileOpen}
         onClose={() => setIsUserProfileOpen(false)}
         userId={selectedUserId}
+      />
+
+      {/* Block Dialog */}
+      <BlockDialog
+        isOpen={isBlockDialogOpen}
+        onClose={() => setIsBlockDialogOpen(false)}
+        userToBlock={userToBlock}
+        currentUserId={currentUser?.id}
+        onBlockSuccess={handleBlockSuccess}
       />
     </div>
   );

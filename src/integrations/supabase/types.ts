@@ -234,6 +234,42 @@ export type Database = {
           },
         ]
       }
+      passes: {
+        Row: {
+          id: string
+          passed_at: string | null
+          passed_id: string | null
+          passer_id: string | null
+        }
+        Insert: {
+          id?: string
+          passed_at?: string | null
+          passed_id?: string | null
+          passer_id?: string | null
+        }
+        Update: {
+          id?: string
+          passed_at?: string | null
+          passed_id?: string | null
+          passer_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "passes_passed_id_fkey"
+            columns: ["passed_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "passes_passer_id_fkey"
+            columns: ["passer_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       profiles: {
         Row: {
           account_status: string | null
@@ -523,6 +559,10 @@ export type Database = {
       get_user_subscription: {
         Args: { user_id_param: string }
         Returns: Json
+      }
+      increment_unread_count: {
+        Args: { match_id_input: string; field_name: string }
+        Returns: undefined
       }
       update_user_usage: {
         Args: {
