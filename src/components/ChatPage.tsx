@@ -39,6 +39,39 @@ const ChatPage = ({ currentUser, onUnreadChange }: ChatPageProps) => {
   }, [selectedMatch]);
 
   useEffect(() => {
+    if (!selectedMatch?.id) return;
+  
+    const channel = supabase
+      .channel('chat-realtime')
+      .on(
+        'postgres_changes',
+        {
+          event: 'INSERT',
+          schema: 'public',
+          table: 'chats',
+          filter: `match_id=eq.${selectedMatch.id}`,
+        },
+        (payload) => {
+          const newMsg = payload.new;
+          if (newMsg.sender_id !== currentUser.id) {
+            setMessages((prev) => [...prev, newMsg]);
+            scrollToBottom();
+  
+            // ✅ Added: Update unread indicators & match list
+            fetchMatches();
+            onUnreadChange?.();
+          }
+        }
+      )
+      .subscribe();
+  
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [selectedMatch?.id]);
+    
+
+  useEffect(() => {
     scrollToBottom();
   }, [messages]);
 
@@ -216,8 +249,8 @@ const ChatPage = ({ currentUser, onUnreadChange }: ChatPageProps) => {
   // Show chat list view
   if (!selectedMatch) {
     return (
-      <div className="h-full flex flex-col">
-        <div className="bg-white border-b p-4 flex-shrink-0">
+<div className="flex flex-col h-screen max-h-screen overflow-hidden">
+<div className="bg-white border-b p-4 flex-shrink-0">
           <h1 className="text-2xl font-bold text-gray-800 mb-4">Messages</h1>
           <div className="relative">
             <Input
@@ -290,9 +323,9 @@ const ChatPage = ({ currentUser, onUnreadChange }: ChatPageProps) => {
 
   // Show individual chat view
   return (
-    <div className="h-full flex flex-col">
-      {/* Chat Header */}
-      <div className="bg-white border-b p-4 flex items-center space-x-3 flex-shrink-0">
+<div className="flex flex-col h-screen">
+{/* Chat Header */}
+        <div className="bg-white border-b p-4 flex items-center space-x-3 sticky top-0 z-10">
         <Button
           onClick={() => setSelectedMatch(null)}
           variant="ghost"
@@ -316,37 +349,46 @@ const ChatPage = ({ currentUser, onUnreadChange }: ChatPageProps) => {
       </div>
 
       {/* Messages - scrollable area */}
-      <div className="flex-1 overflow-y-auto p-4 space-y-4 pb-4">
-        {messages.length === 0 ? (
-          <div className="flex items-center justify-center h-full">
-            <p className="text-center text-gray-500">No messages yet. Start the conversation!</p>
-          </div>
-        ) : (
-          messages.map((message) => (
-            <div
-              key={message.id}
-              className={`flex ${message.sender_id === currentUser.id ? 'justify-end' : 'justify-start'}`}
-            >
-              <div
-                className={`max-w-xs lg:max-w-md px-4 py-2 rounded-2xl ${
-                  message.sender_id === currentUser.id
-                    ? 'bg-pink-600 text-white'
-                    : 'bg-gray-200 text-gray-800'
-                }`}
-              >
-                <p className="text-sm whitespace-pre-wrap">{message.message}</p>
-                <p className="text-xs opacity-70 mt-1">
-                  {new Date(message.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-                </p>
-              </div>
+      <div
+        ref={messagesContainerRef}
+        className="flex-1 overflow-y-auto px-4 pt-4 pb-[160px] space-y-4"
+      >
+        <div className="min-h-[calc(100vh-200px)] flex flex-col justify-center">
+          {messages.length === 0 ? (
+            <div className="flex items-center justify-center">
+              <p className="text-center text-gray-500">No messages yet. Start the conversation!</p>
             </div>
-          ))
-        )}
-        <div ref={messagesEndRef} />
+          ) : (
+            messages.map((message) => (
+              <div
+                key={message.id}
+                className={`flex ${message.sender_id === currentUser.id ? 'justify-end' : 'justify-start'}`}
+              >
+                <div
+                  className={`max-w-xs lg:max-w-md px-4 py-2 rounded-2xl ${
+                    message.sender_id === currentUser.id
+                      ? 'bg-pink-600 text-white'
+                      : 'bg-gray-200 text-gray-800'
+                  }`}
+                >
+                  <p className="text-sm whitespace-pre-wrap">{message.message}</p>
+                  <p className="text-xs opacity-70 mt-1">
+                    {new Date(message.created_at).toLocaleTimeString([], {
+                      hour: '2-digit',
+                      minute: '2-digit',
+                    })}
+                  </p>
+                </div>
+              </div>
+            ))
+          )}
+          <div ref={messagesEndRef} />
+        </div>
       </div>
 
+
       {/* Message Input - Fixed at bottom */}
-      <div className="border-t p-4 bg-white flex-shrink-0 pb-2">
+      <div className="fixed bottom-16 left-0 right-0 bg-white border-t p-4 z-20">
       <div className="flex space-x-2 relative">
           <div className="flex-1 relative">
             <Input

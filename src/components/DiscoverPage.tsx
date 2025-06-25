@@ -59,6 +59,15 @@ const DiscoverPage = ({ currentUser, onNavigateToChat }: DiscoverPageProps) => {
     fetchPotentialMatches();
   }, [currentUser]);
 
+  // Save current match state
+  useEffect(() => {
+  if (potentialMatches.length > 0) {
+    localStorage.setItem('afrovibe_last_profile_id', potentialMatches[currentIndex]?.id || '');
+    localStorage.setItem('afrovibe_last_profile_time', Date.now().toString());
+  }
+  }, [currentIndex, potentialMatches]);
+
+
   useEffect(() => {
     setImageIndex(0);
     setShowMoreInfo(false);
@@ -85,34 +94,51 @@ const DiscoverPage = ({ currentUser, onNavigateToChat }: DiscoverPageProps) => {
 
   const fetchPotentialMatches = async () => {
     if (!currentUser?.id) return;
-
+  
     try {
       setIsLoading(true);
-
+  
       const { data: likedUsers } = await supabase
         .from('likes')
         .select('liked_id')
         .eq('liker_id', currentUser.id);
-
+  
       const { data: blockedUsers } = await supabase
         .from('blocks')
         .select('blocked_id, blocker_id')
         .or(`blocker_id.eq.${currentUser.id},blocked_id.eq.${currentUser.id}`);
-
+  
       const likedUserIds = likedUsers?.map(like => like.liked_id) || [];
       const blockedUserIds = blockedUsers?.flatMap(block => [block.blocked_id, block.blocker_id]) || [];
-      const excludedIds = [...likedUserIds, ...blockedUserIds, currentUser.id];
-
+  
+      const threeDaysAgo = new Date();
+      threeDaysAgo.setDate(threeDaysAgo.getDate() - 3);
+      const isoDate = threeDaysAgo.toISOString();
+  
+      const { data: recentPasses, error: passesError } = await supabase
+        .from('passes')
+        .select('passed_id, passed_at')
+        .match({ passer_id: currentUser.id })
+        .gte('passed_at', isoDate);
+  
+      if (passesError) {
+        console.error('Error fetching recent passes:', passesError.message);
+      }
+  
+      const hiddenPassedIds = recentPasses?.map(p => p.passed_id) || [];
+  
+      const excludedIds = [...likedUserIds, ...blockedUserIds, ...hiddenPassedIds, currentUser.id];
+  
       const { data: profiles, error } = await supabase
         .from('profiles')
         .select('*')
         .not('id', 'in', `(${excludedIds.join(',')})`)
         .eq('account_status', 'active')
         .eq('is_admin', false)
-        .limit(10);
-
+        .limit(50); // Load more for better randomization
+  
       if (error) throw error;
-
+  
       const matchesWithImages = await Promise.all(
         (profiles || []).map(async (profile) => {
           const { data: images } = await supabase
@@ -120,23 +146,33 @@ const DiscoverPage = ({ currentUser, onNavigateToChat }: DiscoverPageProps) => {
             .select('image_url')
             .eq('user_id', profile.id)
             .order('image_order', { ascending: true });
-      
+  
           return {
             ...profile,
             images: images?.map(img => img.image_url) || []
           };
         })
       );
-      
-      // Only shuffle if 10 minutes have passed or it's the first load
-      if (shouldReshuffle() || lastShuffleTime === 0) {
-        const shuffled = matchesWithImages.sort(() => 0.5 - Math.random());
-        setPotentialMatches(shuffled);
-        setLastShuffleTime(Date.now());
-      } else {
-        setPotentialMatches(matchesWithImages);
+  
+      // Load last profile ID and time from localStorage
+      const savedId = localStorage.getItem('afrovibe_last_profile_id');
+      const savedTime = parseInt(localStorage.getItem('afrovibe_last_profile_time') || '0');
+      const twentyFourHours = 24 * 60 * 60 * 1000;
+      const isSavedValid = savedId && Date.now() - savedTime < twentyFourHours;
+  
+      const shuffled = matchesWithImages.sort(() => 0.5 - Math.random());
+  
+      let indexToShow = 0;
+      if (isSavedValid) {
+        const savedIndex = shuffled.findIndex(p => p.id === savedId);
+        if (savedIndex !== -1) {
+          indexToShow = savedIndex;
+        }
       }
-
+  
+      setPotentialMatches(shuffled);
+      setCurrentIndex(indexToShow);
+      setLastShuffleTime(Date.now());
     } catch (error) {
       console.error('Error fetching potential matches:', error);
       toast({
@@ -148,7 +184,7 @@ const DiscoverPage = ({ currentUser, onNavigateToChat }: DiscoverPageProps) => {
       setIsLoading(false);
     }
   };
-
+  
   // Touch event handlers for swipe
   const handleTouchStart = (e: React.TouchEvent) => {
     const touch = e.touches[0];
@@ -180,22 +216,20 @@ const DiscoverPage = ({ currentUser, onNavigateToChat }: DiscoverPageProps) => {
   const handleTouchEnd = (e: React.TouchEvent) => {
     if (!isDragging) return;
     setIsDragging(false);
-
+  
     const deltaX = currentX - startX;
     const deltaY = Math.abs(currentY - startY);
-    const minSwipeDistance = 50;
-
-    // Only trigger swipe if horizontal movement is greater than vertical
+    const screenWidth = window.innerWidth;
+    const minSwipeDistance = screenWidth * 0.4;
+  
     if (Math.abs(deltaX) > minSwipeDistance && Math.abs(deltaX) > deltaY) {
       if (deltaX > 0) {
-        // Swipe right - like
         handleLike();
       } else {
-        // Swipe left - dislike
         handlePass();
       }
     }
-
+  
     // Reset values
     setStartX(0);
     setStartY(0);
@@ -237,7 +271,7 @@ const DiscoverPage = ({ currentUser, onNavigateToChat }: DiscoverPageProps) => {
 
     const deltaX = currentX - startX;
     const deltaY = Math.abs(currentY - startY);
-    const minSwipeDistance = 50;
+    const minSwipeDistance = 80;
 
     // Only trigger swipe if horizontal movement is greater than vertical
     if (Math.abs(deltaX) > minSwipeDistance && Math.abs(deltaX) > deltaY) {
@@ -306,13 +340,16 @@ const DiscoverPage = ({ currentUser, onNavigateToChat }: DiscoverPageProps) => {
 
       if (error) throw error;
 
-      const { data: mutualLike } = await supabase
-        .from('likes')
-        .select('*')
-        .eq('liker_id', currentMatch.id)
-        .eq('liked_id', currentUser.id)
-        .single();
-
+      const { data: mutualLike, error: mutualError } = await supabase
+      .from('likes')
+      .select('*')
+      .match({ liker_id: currentMatch.id, liked_id: currentUser.id })
+      .maybeSingle();
+    
+    if (mutualError) {
+      console.error('Error checking mutual like:', mutualError.message);
+    }
+    
       if (mutualLike) {
         setMatchedUser(currentMatch);
         setShowMatchAnimation(true);
@@ -345,8 +382,24 @@ const DiscoverPage = ({ currentUser, onNavigateToChat }: DiscoverPageProps) => {
       return;
     }
 
-    setPassedUsers(prev => [{ user_id: currentMatch.id, passed_at: new Date() }, ...prev]);
-    moveToNext();
+    try {
+      const { error } = await supabase.from('passes').insert({
+        passer_id: currentUser.id,
+        passed_id: currentMatch.id
+      });
+    
+      if (error) throw error;
+    
+      moveToNext();
+    } catch (err) {
+      console.error('Error saving pass:', err);
+      toast({
+        title: 'Error',
+        description: 'Could not skip this profile.',
+        variant: 'destructive'
+      });
+    }
+        moveToNext();
   };
 
   const handleReverse = async () => {
@@ -489,12 +542,13 @@ const DiscoverPage = ({ currentUser, onNavigateToChat }: DiscoverPageProps) => {
   const cardTransform = isDragging ? `translateX(${currentX - startX}px) rotate(${(currentX - startX) * 0.1}deg)` : '';
 
   return (
-<div className="h-full w-full relative flex flex-col pt-0 mt-0">
+<div className="h-full w-full fixed top-0 left-0 overflow-hidden">
 {/* Main Image Area - Fixed height container with reserved space for buttons */}
-      <div className="flex-1 relative overflow-hidden">
+<div className="flex-1 relative overflow-hidden h-[calc(100vh-80px)]">
       <div 
           className="h-full w-full cursor-pointer select-none relative" 
-          style={{ transform: cardTransform, transition: isDragging ? 'none' : 'transform 0.3s ease-out' }}
+          style={{ transform: cardTransform, transition: isDragging ? 'none' : 'transform 0.3s ease-out'}}
+
           onTouchStart={handleTouchStart}
           onTouchMove={handleTouchMove}
           onTouchEnd={handleTouchEnd}
@@ -596,7 +650,11 @@ const DiscoverPage = ({ currentUser, onNavigateToChat }: DiscoverPageProps) => {
               </Button>
 
               {showMoreInfo && (
-                <div className="space-y-3 bg-black/50 p-3 rounded-lg max-h-32 overflow-y-auto">
+              <div
+                className="space-y-3 bg-black/50 p-3 rounded-lg max-h-32 overflow-y-auto"
+                onTouchStart={(e) => e.stopPropagation()}
+                onTouchMove={(e) => e.stopPropagation()}
+              >
                   {currentMatch.bio && (
                     <div>
                       <h3 className="font-semibold mb-1 text-sm">About</h3>
@@ -644,7 +702,7 @@ const DiscoverPage = ({ currentUser, onNavigateToChat }: DiscoverPageProps) => {
       </div>
 
       {/* Action Buttons - Fixed position at bottom with higher z-index and moved up more */}
-      <div className="absolute bottom-14 left-0 right-0 flex justify-center space-x-6 px-6 z-30">
+      <div className="absolute bottom-28 left-0 right-0 flex justify-center space-x-6 px-6 z-30">
       <Button
           onClick={handlePass}
           variant="outline"
