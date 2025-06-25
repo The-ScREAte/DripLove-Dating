@@ -1,4 +1,5 @@
-import React, { useState, useEffect } from 'react';
+
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Users, Heart, X, Calendar, MapPin, Shield, ChevronDown, ChevronUp, Briefcase, GraduationCap, Crown, Lock, Clock } from 'lucide-react';
@@ -27,17 +28,20 @@ const LikedMePage = ({ currentUser }: LikedMePageProps) => {
 
   const { subscription, isPremium, getLikedMeVisibleCount } = useSubscription(currentUser?.id);
 
-  useEffect(() => {
-    fetchLikers();
-    checkLockoutStatus();
-  }, [currentUser]);
+  const calculateAge = useCallback((dateOfBirth: string) => {
+    const today = new Date();
+    const birthDate = new Date(dateOfBirth);
+    let age = today.getFullYear() - birthDate.getFullYear();
+    const monthDiff = today.getMonth() - birthDate.getMonth();
 
-  useEffect(() => {
-    setImageIndex(0);
-    setShowMoreInfo(false);
-  }, [selectedProfile]);
+    if (monthDiff < 0 || (monthDiff === 0 && today.getDate() < birthDate.getDate())) {
+      age--;
+    }
 
-  const checkLockoutStatus = async () => {
+    return age;
+  }, []);
+
+  const checkLockoutStatus = useCallback(async () => {
     if (!currentUser?.id || isPremium()) return;
 
     try {
@@ -58,45 +62,39 @@ const LikedMePage = ({ currentUser }: LikedMePageProps) => {
     } catch (error) {
       console.error('Error checking lockout status:', error);
     }
-  };
+  }, [currentUser?.id, isPremium]);
 
-  const calculateAge = (dateOfBirth: string) => {
-    const today = new Date();
-    const birthDate = new Date(dateOfBirth);
-    let age = today.getFullYear() - birthDate.getFullYear();
-    const monthDiff = today.getMonth() - birthDate.getMonth();
-
-    if (monthDiff < 0 || (monthDiff === 0 && today.getDate() < birthDate.getDate())) {
-      age--;
-    }
-
-    return age;
-  };
-
-  const fetchLikers = async () => {
+  const fetchLikers = useCallback(async () => {
     if (!currentUser?.id) return;
 
     try {
-      const { data: likes, error } = await supabase
-        .from('likes')
-        .select(`*, liker:profiles!likes_liker_id_fkey(*)`)
-        .eq('liked_id', currentUser.id);
+      setLoading(true);
 
-      if (error) throw error;
+      // Parallel queries for better performance
+      const [
+        { data: likes, error: likesError },
+        { data: matches },
+        { data: blockedUsers }
+      ] = await Promise.all([
+        supabase
+          .from('likes')
+          .select(`*, liker:profiles!likes_liker_id_fkey(*)`)
+          .eq('liked_id', currentUser.id),
+        supabase
+          .from('matches')
+          .select('user1_id, user2_id')
+          .or(`user1_id.eq.${currentUser.id},user2_id.eq.${currentUser.id}`),
+        supabase
+          .from('blocks')
+          .select('blocked_id, blocker_id')
+          .or(`blocker_id.eq.${currentUser.id},blocked_id.eq.${currentUser.id}`)
+      ]);
 
-      const { data: matches } = await supabase
-        .from('matches')
-        .select('user1_id, user2_id')
-        .or(`user1_id.eq.${currentUser.id},user2_id.eq.${currentUser.id}`);
+      if (likesError) throw likesError;
 
       const matchedIds = matches?.map(match =>
         match.user1_id === currentUser.id ? match.user2_id : match.user1_id
       ) || [];
-
-      const { data: blockedUsers } = await supabase
-        .from('blocks')
-        .select('blocked_id, blocker_id')
-        .or(`blocker_id.eq.${currentUser.id},blocked_id.eq.${currentUser.id}`);
 
       const blockedIds = blockedUsers?.map(block =>
         block.blocker_id === currentUser.id ? block.blocked_id : block.blocker_id
@@ -109,12 +107,15 @@ const LikedMePage = ({ currentUser }: LikedMePageProps) => {
       const likersData = filteredLikes.map(like => like.liker);
 
       if (likersData.length > 0) {
-        const imagePromises = likersData.map(async (profile) => {
+        // Only load images for first few profiles for faster initial load
+        const profilesForImages = likersData.slice(0, 6);
+        const imagePromises = profilesForImages.map(async (profile) => {
           const { data: images } = await supabase
             .from('user_images')
             .select('image_url')
             .eq('user_id', profile.id)
-            .order('image_order');
+            .order('image_order')
+            .limit(1); // Only load first image for grid view
 
           return {
             profileId: profile.id,
@@ -142,7 +143,37 @@ const LikedMePage = ({ currentUser }: LikedMePageProps) => {
     } finally {
       setLoading(false);
     }
-  };
+  }, [currentUser?.id, toast]);
+
+  // Load additional images when profile is selected
+  const loadFullImages = useCallback(async (profileId: string) => {
+    if (userImages[profileId]?.length > 1) return; // Already loaded
+
+    const { data: images } = await supabase
+      .from('user_images')
+      .select('image_url')
+      .eq('user_id', profileId)
+      .order('image_order');
+
+    if (images?.length) {
+      setUserImages(prev => ({
+        ...prev,
+        [profileId]: images.map(img => img.image_url)
+      }));
+    }
+  }, [userImages]);
+
+  useEffect(() => {
+    if (currentUser?.id) {
+      fetchLikers();
+      checkLockoutStatus();
+    }
+  }, [currentUser?.id, fetchLikers, checkLockoutStatus]);
+
+  useEffect(() => {
+    setImageIndex(0);
+    setShowMoreInfo(false);
+  }, [selectedProfile]);
 
   const setLockoutPeriod = async () => {
     if (isPremium()) return;
@@ -277,6 +308,8 @@ const LikedMePage = ({ currentUser }: LikedMePageProps) => {
     }
 
     setSelectedProfile(liker);
+    // Load full images when profile is selected
+    loadFullImages(liker.id);
   };
 
   const getRemainingDays = () => {
@@ -285,6 +318,11 @@ const LikedMePage = ({ currentUser }: LikedMePageProps) => {
     const diff = lockoutEndDate.getTime() - now.getTime();
     return Math.ceil(diff / (1000 * 60 * 60 * 24));
   };
+
+  const isInLockout = useMemo(() => 
+    !isPremium() && lockoutEndDate && new Date() < lockoutEndDate,
+    [isPremium, lockoutEndDate]
+  );
 
   if (showPremiumUpgrade) {
     return <PremiumUpgrade currentUser={currentUser} onClose={() => setShowPremiumUpgrade(false)} preselectedPlan="premium" />;
@@ -311,6 +349,7 @@ const LikedMePage = ({ currentUser }: LikedMePageProps) => {
                 src={profileImages[imageIndex]}
                 alt={`${selectedProfile.first_name}'s photo`}
                 className="w-full h-full object-cover"
+                loading="lazy"
               />
               {/* Image indicators */}
               <div className="absolute top-4 left-1/2 transform -translate-x-1/2 flex gap-1 z-10">
@@ -464,8 +503,6 @@ const LikedMePage = ({ currentUser }: LikedMePageProps) => {
     );
   }
 
-  const isInLockout = !isPremium() && lockoutEndDate && new Date() < lockoutEndDate;
-
   return (
     <div className="h-full flex flex-col bg-white">
       <div className="flex-shrink-0 bg-white border-b p-4">
@@ -525,6 +562,7 @@ const LikedMePage = ({ currentUser }: LikedMePageProps) => {
                         src={profileImages[0]}
                         alt={`${liker.first_name}'s photo`}
                         className={`w-full h-full object-cover ${isLocked ? 'blur-md' : ''}`}
+                        loading="lazy"
                       />
                     ) : (
                       <div className={`w-full h-full bg-gradient-to-br from-pink-200 to-purple-200 flex items-center justify-center ${isLocked ? 'blur-md' : ''}`}>

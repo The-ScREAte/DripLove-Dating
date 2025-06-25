@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Heart, X, Undo2, MapPin, Briefcase, GraduationCap, ChevronDown, ChevronUp, Calendar, Crown } from 'lucide-react';
@@ -56,25 +56,24 @@ const DiscoverPage = ({ currentUser, onNavigateToChat }: DiscoverPageProps) => {
   const [swipeDirection, setSwipeDirection] = useState<'left' | 'right' | null>(null);
   const [swipeDistance, setSwipeDistance] = useState(0);
 
-  useEffect(() => {
-    fetchPotentialMatches();
-  }, [currentUser]);
+  // Memoize expensive calculations
+  const getGenderFilter = useCallback((userPreference: string) => {
+    if (userPreference === 'male') {
+      return ['male'];
+    } else if (userPreference === 'female') {
+      return ['female'];
+    } else if (userPreference === 'everyone' || userPreference === 'both') {
+      return ['male', 'female', 'other'];
+    }
+    return ['male', 'female', 'other']; // default to all
+  }, []);
 
-  // Save current match state
-  useEffect(() => {
-  if (potentialMatches.length > 0) {
-    localStorage.setItem('afrovibe_last_profile_id', potentialMatches[currentIndex]?.id || '');
-    localStorage.setItem('afrovibe_last_profile_time', Date.now().toString());
-  }
-  }, [currentIndex, potentialMatches]);
+  const allowedGenders = useMemo(() => 
+    getGenderFilter(currentUser?.preference || 'everyone'), 
+    [currentUser?.preference, getGenderFilter]
+  );
 
-
-  useEffect(() => {
-    setImageIndex(0);
-    setShowMoreInfo(false);
-  }, [currentIndex]);
-
-  const calculateAge = (dateOfBirth: string) => {
+  const calculateAge = useCallback((dateOfBirth: string) => {
     const today = new Date();
     const birthDate = new Date(dateOfBirth);
     let age = today.getFullYear() - birthDate.getFullYear();
@@ -85,99 +84,90 @@ const DiscoverPage = ({ currentUser, onNavigateToChat }: DiscoverPageProps) => {
     }
 
     return age;
-  };
+  }, []);
 
-  const shouldReshuffle = () => {
+  const shouldReshuffle = useCallback(() => {
     const now = Date.now();
     const tenMinutes = 10 * 60 * 1000; // 10 minutes in milliseconds
     return now - lastShuffleTime > tenMinutes;
-  };
+  }, [lastShuffleTime]);
 
-  const getGenderFilter = (userPreference: string) => {
-    if (userPreference === 'male') {
-      return ['male'];
-    } else if (userPreference === 'female') {
-      return ['female'];
-    } else if (userPreference === 'everyone' || userPreference === 'both') {
-      return ['male', 'female', 'other'];
-    }
-    return ['male', 'female', 'other']; // default to all
-  };
-
-  const fetchPotentialMatches = async () => {
+  const fetchPotentialMatches = useCallback(async () => {
     if (!currentUser?.id) return;
   
     try {
       setIsLoading(true);
-  
-      const { data: likedUsers } = await supabase
-        .from('likes')
-        .select('liked_id')
-        .eq('liker_id', currentUser.id);
-  
-      const { data: blockedUsers } = await supabase
-        .from('blocks')
-        .select('blocked_id, blocker_id')
-        .or(`blocker_id.eq.${currentUser.id},blocked_id.eq.${currentUser.id}`);
-  
+      
+      // Parallel queries for better performance
+      const [
+        { data: likedUsers },
+        { data: blockedUsers },
+        { data: recentPasses }
+      ] = await Promise.all([
+        supabase
+          .from('likes')
+          .select('liked_id')
+          .eq('liker_id', currentUser.id),
+        supabase
+          .from('blocks')
+          .select('blocked_id, blocker_id')
+          .or(`blocker_id.eq.${currentUser.id},blocked_id.eq.${currentUser.id}`),
+        supabase
+          .from('passes')
+          .select('passed_id, passed_at')
+          .match({ passer_id: currentUser.id })
+          .gte('passed_at', new Date(Date.now() - 3 * 24 * 60 * 60 * 1000).toISOString())
+      ]);
+
       const likedUserIds = likedUsers?.map(like => like.liked_id) || [];
       const blockedUserIds = blockedUsers?.flatMap(block => [block.blocked_id, block.blocker_id]) || [];
-  
-      const threeDaysAgo = new Date();
-      threeDaysAgo.setDate(threeDaysAgo.getDate() - 3);
-      const isoDate = threeDaysAgo.toISOString();
-  
-      const { data: recentPasses, error: passesError } = await supabase
-        .from('passes')
-        .select('passed_id, passed_at')
-        .match({ passer_id: currentUser.id })
-        .gte('passed_at', isoDate);
-  
-      if (passesError) {
-        console.error('Error fetching recent passes:', passesError.message);
-      }
-  
       const hiddenPassedIds = recentPasses?.map(p => p.passed_id) || [];
       const excludedIds = [...likedUserIds, ...blockedUserIds, ...hiddenPassedIds, currentUser.id];
       
-      // Get gender filter based on user's preference
-      const allowedGenders = getGenderFilter(currentUser.preference);
       console.log('User preference:', currentUser.preference, 'Allowed genders:', allowedGenders);
   
       const { data: profiles, error } = await supabase
         .from('profiles')
-        .select('*')
+        .select('id, first_name, last_name, bio, city, country, occupation, education_level, date_of_birth, interests, gender')
         .not('id', 'in', `(${excludedIds.join(',')})`)
         .in('gender', allowedGenders)
         .eq('account_status', 'active')
         .eq('is_admin', false)
-        .limit(50); // Load more for better randomization
-  
+        .limit(20); // Reduced limit for faster loading
+
       if (error) throw error;
-  
-      const matchesWithImages = await Promise.all(
-        (profiles || []).map(async (profile) => {
+
+      // Fetch images only for visible profiles (first 5)
+      const profilesToShow = profiles?.slice(0, 5) || [];
+      const matchesWithImages = await Promise.all([
+        ...profilesToShow.map(async (profile) => {
           const { data: images } = await supabase
             .from('user_images')
             .select('image_url')
             .eq('user_id', profile.id)
-            .order('image_order', { ascending: true });
-  
+            .order('image_order', { ascending: true })
+            .limit(3); // Limit images per profile for faster loading
+
           return {
             ...profile,
             images: images?.map(img => img.image_url) || []
           };
-        })
-      );
-  
+        }),
+        // Add remaining profiles without images initially
+        ...(profiles?.slice(5).map(profile => ({
+          ...profile,
+          images: []
+        })) || [])
+      ]);
+
       // Load last profile ID and time from localStorage
       const savedId = localStorage.getItem('afrovibe_last_profile_id');
       const savedTime = parseInt(localStorage.getItem('afrovibe_last_profile_time') || '0');
       const twentyFourHours = 24 * 60 * 60 * 1000;
       const isSavedValid = savedId && Date.now() - savedTime < twentyFourHours;
-  
+
       const shuffled = matchesWithImages.sort(() => 0.5 - Math.random());
-  
+
       let indexToShow = 0;
       if (isSavedValid) {
         const savedIndex = shuffled.findIndex(p => p.id === savedId);
@@ -185,7 +175,7 @@ const DiscoverPage = ({ currentUser, onNavigateToChat }: DiscoverPageProps) => {
           indexToShow = savedIndex;
         }
       }
-  
+
       setPotentialMatches(shuffled);
       setCurrentIndex(indexToShow);
       setLastShuffleTime(Date.now());
@@ -199,9 +189,50 @@ const DiscoverPage = ({ currentUser, onNavigateToChat }: DiscoverPageProps) => {
     } finally {
       setIsLoading(false);
     }
-  };
-  
-  // Touch event handlers for swipe
+  }, [currentUser, allowedGenders, toast]);
+
+  // Preload images for next profile
+  const preloadNextImages = useCallback(async (nextIndex: number) => {
+    if (nextIndex < potentialMatches.length && potentialMatches[nextIndex].images.length === 0) {
+      const { data: images } = await supabase
+        .from('user_images')
+        .select('image_url')
+        .eq('user_id', potentialMatches[nextIndex].id)
+        .order('image_order', { ascending: true })
+        .limit(3);
+
+      if (images?.length) {
+        const updatedMatches = [...potentialMatches];
+        updatedMatches[nextIndex] = {
+          ...updatedMatches[nextIndex],
+          images: images.map(img => img.image_url)
+        };
+        setPotentialMatches(updatedMatches);
+      }
+    }
+  }, [potentialMatches]);
+
+  useEffect(() => {
+    if (currentUser?.id) {
+      fetchPotentialMatches();
+    }
+  }, [currentUser?.id, fetchPotentialMatches]);
+
+  // Save current match state
+  useEffect(() => {
+  if (potentialMatches.length > 0) {
+    localStorage.setItem('afrovibe_last_profile_id', potentialMatches[currentIndex]?.id || '');
+    localStorage.setItem('afrovibe_last_profile_time', Date.now().toString());
+  }
+  }, [currentIndex, potentialMatches]);
+
+  useEffect(() => {
+    setImageIndex(0);
+    setShowMoreInfo(false);
+    // Preload next profile images
+    preloadNextImages(currentIndex + 1);
+  }, [currentIndex, preloadNextImages]);
+
   const handleTouchStart = (e: React.TouchEvent) => {
     const touch = e.touches[0];
     setStartX(touch.clientX);
@@ -611,6 +642,7 @@ const DiscoverPage = ({ currentUser, onNavigateToChat }: DiscoverPageProps) => {
                 alt={`${currentMatch.first_name}'s photo`}
                 className="w-full h-full object-cover object-center"
                 draggable={false}
+                loading="lazy"
               />
               {/* Image indicators */}
               <div className="absolute top-4 left-1/2 transform -translate-x-1/2 flex gap-1 z-10">
