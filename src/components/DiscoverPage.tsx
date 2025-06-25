@@ -702,7 +702,7 @@ const DiscoverPage = ({ currentUser, onNavigateToChat }: DiscoverPageProps) => {
       </div>
 
       {/* Action Buttons - Fixed position at bottom with higher z-index and moved up more */}
-      <div className="absolute bottom-28 left-0 right-0 flex justify-center space-x-6 px-6 z-30">
+      <div className="absolute bottom-24 left-0 right-0 flex justify-center space-x-6 px-6 z-30">
       <Button
           onClick={handlePass}
           variant="outline"
