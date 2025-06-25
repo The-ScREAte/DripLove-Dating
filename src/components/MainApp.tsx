@@ -18,11 +18,14 @@ const MainApp = ({ user, onLogout }: MainAppProps) => {
   const [activeTab, setActiveTab] = useState('discover');
   const [profile, setProfile] = useState<any>(null);
   const [unreadCount, setUnreadCount] = useState(0);
+  const [preloadedPages, setPreloadedPages] = useState<Set<string>>(new Set());
   const { toast } = useToast();
 
   useEffect(() => {
     fetchUserProfile();
     fetchUnreadCount();
+    // Start preloading pages immediately
+    preloadPages();
   }, [user]);
 
   useEffect(() => {
@@ -97,6 +100,13 @@ const MainApp = ({ user, onLogout }: MainAppProps) => {
     }
   };
 
+  const preloadPages = () => {
+    // Mark pages as preloaded to render them in hidden divs
+    setTimeout(() => {
+      setPreloadedPages(new Set(['chat', 'liked', 'profile']));
+    }, 100); // Small delay to not block initial render
+  };
+
   const handleNavigateToChat = () => {
     setActiveTab('chat');
   };
@@ -135,6 +145,23 @@ const MainApp = ({ user, onLogout }: MainAppProps) => {
         <div className="flex-1 overflow-y-auto pt-[60px] pb-[70px]">
           {renderContent()}
         </div>
+
+        {/* Preloaded Pages (Hidden) - for faster switching */}
+        {preloadedPages.has('chat') && activeTab !== 'chat' && (
+          <div className="hidden">
+            <ChatPage currentUser={user} onUnreadChange={fetchUnreadCount} />
+          </div>
+        )}
+        {preloadedPages.has('liked') && activeTab !== 'liked' && (
+          <div className="hidden">
+            <LikedMePage currentUser={user} />
+          </div>
+        )}
+        {preloadedPages.has('profile') && activeTab !== 'profile' && (
+          <div className="hidden">
+            <ProfilePage currentUser={user} profile={profile} onProfileUpdate={fetchUserProfile} onLogout={onLogout} />
+          </div>
+        )}
 
         {/* Fixed Bottom Nav */}
         <div className="fixed bottom-0 left-0 right-0 w-full bg-white border-t border-gray-200 px-2 py-2 z-50">
