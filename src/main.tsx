@@ -1,3 +1,4 @@
+
 import React from 'react';
 import { createRoot } from 'react-dom/client';
 import App from './App.tsx';
@@ -6,11 +7,11 @@ import { supabase } from './integrations/supabase/client';
 
 // 👉 Capacitor keyboard handling
 import { Capacitor } from '@capacitor/core';
-import { Keyboard } from '@capacitor/keyboard';
+import { Keyboard, KeyboardResize } from '@capacitor/keyboard';
 
 if (Capacitor.isNativePlatform()) {
   Keyboard.setScroll({ isDisabled: true });
-  Keyboard.setResizeMode({ mode: 'native' });
+  Keyboard.setResizeMode({ mode: KeyboardResize.Native });
 }
 
 const container = document.getElementById("root");
