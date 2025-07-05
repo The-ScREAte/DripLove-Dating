@@ -1,0 +1,28 @@
+PODS:
+  - Capacitor (7.4.0):
+    - CapacitorCordova
+  - CapacitorCordova (7.4.0)
+  - CapacitorKeyboard (7.0.1):
+    - Capacitor
+
+DEPENDENCIES:
+  - "Capacitor (from `../../node_modules/@capacitor/ios`)"
+  - "CapacitorCordova (from `../../node_modules/@capacitor/ios`)"
+  - "CapacitorKeyboard (from `../../node_modules/@capacitor/keyboard`)"
+
+EXTERNAL SOURCES:
+  Capacitor:
+    :path: "../../node_modules/@capacitor/ios"
+  CapacitorCordova:
+    :path: "../../node_modules/@capacitor/ios"
+  CapacitorKeyboard:
+    :path: "../../node_modules/@capacitor/keyboard"
+
+SPEC CHECKSUMS:
+  Capacitor: 10feab36396883c55373328124a677f118cd4b5f
+  CapacitorCordova: 723e017d8a80ab2ede9959fbe37556c35ac860d5
+  CapacitorKeyboard: 09fd91dcde4f8a37313e7f11bde553ad1ed52036
+
+PODFILE CHECKSUM: e5c6735a59ab3ddd1d1efe96c5f099f9320f2bd0
+
+COCOAPODS: 1.16.2
