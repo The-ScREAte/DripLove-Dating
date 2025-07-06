@@ -43,6 +43,7 @@ const PaymentSuccess: React.FC = () => {
             user_id: user.id,
             plan_name: 'premium',
             status: 'active',
+            starts_at: new Date().toISOString(),
             flutterwave_transaction_id: transaction_id,
             updated_at: new Date().toISOString()
           }, { 
