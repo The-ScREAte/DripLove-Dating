@@ -39,13 +39,14 @@ const PaymentSuccess: React.FC = () => {
         }
         const { error } = await supabase
           .from('user_subscriptions')
-          .upsert({
-            user_id: user.id,
+          .update({
             plan_name: 'premium',
             status: 'active',
             flutterwave_transaction_id: transaction_id,
-            tx_ref
-          });
+            tx_ref,
+            updated_at: new Date().toISOString()
+          })
+          .eq('user_id', user.id);
         if (!error) {
           setUpgradeSuccess(true);
           toast({ title: 'Premium Activated!', description: 'Your account has been upgraded.' });

@@ -518,8 +518,14 @@ const DiscoverPage = ({ currentUser, onNavigateToChat }: DiscoverPageProps) => {
     if (status === 'successful' && transaction_id && currentUser?.id) {
       (async () => {
         const { error } = await supabase
-          .from('subscriptions')
-          .upsert({ user_id: currentUser.id, plan_name: 'premium', status: 'active', tx_ref, transaction_id });
+          .from('user_subscriptions')
+          .update({ 
+            plan_name: 'premium', 
+            status: 'active', 
+            flutterwave_transaction_id: transaction_id,
+            updated_at: new Date().toISOString()
+          })
+          .eq('user_id', currentUser.id);
         if (!error) {
           await refetchSubscription();
           toast({ title: 'Premium Activated!', description: 'Your account has been upgraded.' });

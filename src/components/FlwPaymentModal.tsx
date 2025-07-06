@@ -39,11 +39,10 @@ const FlwPaymentModal: React.FC<FlwPaymentModalProps> = ({ isOpen, onClose, amou
 
   const handlePay = async () => {
     await loadFlutterwaveScript();
-    // @ts-expect-error: FlutterwaveCheckout is injected by external script
-    if (window.FlutterwaveCheckout && selectedMethod) {
+    if ((window as any).FlutterwaveCheckout && selectedMethod) {
       let payment_options = 'card';
       if (selectedMethod.type === 'momo') payment_options = 'mobilemoneyghana';
-      window.FlutterwaveCheckout({
+      (window as any).FlutterwaveCheckout({
         public_key: FLW_PUBLIC_KEY,
         tx_ref: `afrovibe-premium-${Date.now()}`,
         amount,

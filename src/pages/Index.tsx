@@ -7,6 +7,7 @@ import AdminPage from '@/components/AdminPage';
 import AboutUs from '@/components/AboutUs';
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
+import { transformFormDataForSubmission } from '@/utils/formValidation';
 
 const Index = () => {
   const [currentView, setCurrentView] = useState<'welcome' | 'login' | 'register' | 'app' | 'admin' | 'about'>('welcome');
