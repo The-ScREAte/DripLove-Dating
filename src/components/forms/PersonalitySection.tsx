@@ -19,14 +19,13 @@ const PersonalitySection = ({ formData, onSliderChange }: PersonalitySectionProp
           <Slider
             value={formData.introvertExtrovert}
             onValueChange={(value) => onSliderChange('introvertExtrovert', value)}
-            max={5}
-            min={1}
+            max={100}
+            min={0}
             step={1}
             className="w-full"
           />
           <div className="flex justify-between text-xs text-gray-500">
             <span>Introvert</span>
-            <span>Balanced</span>
             <span>Extrovert</span>
           </div>
         </div>
@@ -36,14 +35,13 @@ const PersonalitySection = ({ formData, onSliderChange }: PersonalitySectionProp
           <Slider
             value={formData.spontaneousPlanner}
             onValueChange={(value) => onSliderChange('spontaneousPlanner', value)}
-            max={5}
-            min={1}
+            max={100}
+            min={0}
             step={1}
             className="w-full"
           />
           <div className="flex justify-between text-xs text-gray-500">
             <span>Spontaneous</span>
-            <span>Balanced</span>
             <span>Planner</span>
           </div>
         </div>
@@ -53,14 +51,13 @@ const PersonalitySection = ({ formData, onSliderChange }: PersonalitySectionProp
           <Slider
             value={formData.messyOrganized}
             onValueChange={(value) => onSliderChange('messyOrganized', value)}
-            max={5}
-            min={1}
+            max={100}
+            min={0}
             step={1}
             className="w-full"
           />
           <div className="flex justify-between text-xs text-gray-500">
             <span>Messy</span>
-            <span>Balanced</span>
             <span>Organized</span>
           </div>
         </div>

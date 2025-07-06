@@ -13,6 +13,7 @@ import PersonalitySection from '@/components/forms/PersonalitySection';
 import ConversationStartersSection from '@/components/forms/ConversationStartersSection';
 import { validateRegistrationForm, transformFormDataForSubmission } from '@/utils/formValidation';
 import { interests, initialFormData } from '@/constants/formData';
+import { occupationOptions, industryOptions } from '@/constants/professionOptions';
 
 interface RegistrationFormProps {
   onSubmit: (data: any) => void;
@@ -228,30 +229,48 @@ const RegistrationForm = ({ onSubmit, onBackToLogin }: RegistrationFormProps) =>
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
               <div className="space-y-2">
                 <Label htmlFor="occupation" className="text-sm font-medium">Occupation</Label>
-                <div className="relative">
-                  <Briefcase className="absolute left-3 top-3 h-4 w-4 text-gray-400" />
-                  <Input
-                    id="occupation"
-                    name="occupation"
-                    type="text"
-                    value={formData.occupation}
-                    onChange={handleInputChange}
-                    className="pl-10 border-gray-200 focus:border-pink-400 focus:ring-pink-400"
-                    placeholder="Your job title"
-                  />
-                </div>
+                <Select value={formData.occupation} onValueChange={(value) => handleSelectChange('occupation', value)}>
+                  <SelectTrigger className="border-gray-200 focus:border-pink-400 focus:ring-pink-400">
+                    <Briefcase className="w-4 h-4 mr-2 text-gray-400" />
+                    <SelectValue placeholder="Select or type your occupation" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {occupationOptions.map(option => (
+                      <SelectItem key={option} value={option}>{option}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                <Input
+                  id="occupationCustom"
+                  name="occupationCustom"
+                  type="text"
+                  value={formData.occupationCustom || ''}
+                  onChange={e => handleSelectChange('occupation', e.target.value)}
+                  className="mt-2 border-gray-200 focus:border-pink-400 focus:ring-pink-400"
+                  placeholder="Or enter your occupation"
+                />
               </div>
-              
+
               <div className="space-y-2">
                 <Label htmlFor="industry" className="text-sm font-medium">Industry</Label>
+                <Select value={formData.industry} onValueChange={(value) => handleSelectChange('industry', value)}>
+                  <SelectTrigger className="border-gray-200 focus:border-pink-400 focus:ring-pink-400">
+                    <SelectValue placeholder="Select or type your industry" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {industryOptions.map(option => (
+                      <SelectItem key={option} value={option}>{option}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
                 <Input
-                  id="industry"
-                  name="industry"
+                  id="industryCustom"
+                  name="industryCustom"
                   type="text"
-                  value={formData.industry}
-                  onChange={handleInputChange}
-                  className="border-gray-200 focus:border-pink-400 focus:ring-pink-400"
-                  placeholder="Your industry"
+                  value={formData.industryCustom || ''}
+                  onChange={e => handleSelectChange('industry', e.target.value)}
+                  className="mt-2 border-gray-200 focus:border-pink-400 focus:ring-pink-400"
+                  placeholder="Or enter your industry"
                 />
               </div>
               

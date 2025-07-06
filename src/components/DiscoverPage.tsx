@@ -7,6 +7,7 @@ import { useToast } from '@/hooks/use-toast';
 import { useSubscription } from '@/hooks/useSubscription';
 import PremiumUpgrade from './PremiumUpgrade';
 import MatchAnimation from './MatchAnimation';
+import { useLocation, useNavigate } from 'react-router-dom';
 
 interface DiscoverPageProps {
   currentUser: any;
@@ -46,7 +47,7 @@ const DiscoverPage = ({ currentUser, onNavigateToChat }: DiscoverPageProps) => {
   const [matchedUser, setMatchedUser] = useState<PotentialMatch | null>(null);
   const { toast } = useToast();
   
-  const { subscription, checkUsageLimit, isPremium } = useSubscription(currentUser?.id);
+  const { subscription, checkUsageLimit, isPremium, refetchSubscription } = useSubscription(currentUser?.id);
   const [lastShuffleTime, setLastShuffleTime] = useState<number>(0);
   const [startX, setStartX] = useState(0);
   const [startY, setStartY] = useState(0);
@@ -55,17 +56,22 @@ const DiscoverPage = ({ currentUser, onNavigateToChat }: DiscoverPageProps) => {
   const [isDragging, setIsDragging] = useState(false);
   const [swipeDirection, setSwipeDirection] = useState<'left' | 'right' | null>(null);
   const [swipeDistance, setSwipeDistance] = useState(0);
+  const location = useLocation();
+  const navigate = useNavigate();
 
   // Memoize expensive calculations
+  // Map registration/profile values to DB gender values
   const getGenderFilter = useCallback((userPreference: string) => {
-    if (userPreference === 'male') {
-      return ['male'];
-    } else if (userPreference === 'female') {
-      return ['female'];
-    } else if (userPreference === 'everyone' || userPreference === 'both') {
-      return ['male', 'female', 'other'];
+    // Normalize preference values from registration/profile
+    if (userPreference === 'men' || userPreference === 'male' || userPreference === 'man') {
+      return ['man'];
+    } else if (userPreference === 'women' || userPreference === 'female' || userPreference === 'woman') {
+      return ['woman'];
+    } else if (userPreference === 'everyone' || userPreference === 'both' || userPreference === 'other' || userPreference === 'non-binary') {
+      // Show all except admin
+      return ['man', 'woman', 'non-binary', 'other'];
     }
-    return ['male', 'female', 'other']; // default to all
+    return ['man', 'woman', 'non-binary', 'other']; // default to all
   }, []);
 
   const allowedGenders = useMemo(() => 
@@ -502,6 +508,29 @@ const DiscoverPage = ({ currentUser, onNavigateToChat }: DiscoverPageProps) => {
     setShowMatchAnimation(false);
     setMatchedUser(null);
   };
+
+  useEffect(() => {
+    // Check for Flutterwave payment success in query params
+    const params = new URLSearchParams(location.search);
+    const status = params.get('status');
+    const tx_ref = params.get('tx_ref');
+    const transaction_id = params.get('transaction_id');
+    if (status === 'successful' && transaction_id && currentUser?.id) {
+      (async () => {
+        const { error } = await supabase
+          .from('subscriptions')
+          .upsert({ user_id: currentUser.id, plan_name: 'premium', status: 'active', tx_ref, transaction_id });
+        if (!error) {
+          await refetchSubscription();
+          toast({ title: 'Premium Activated!', description: 'Your account has been upgraded.' });
+        } else {
+          console.error('Payment DB update error:', error);
+          toast({ title: 'Payment Error', description: 'Could not activate premium. Contact support.' });
+        }
+        navigate('/discover', { replace: true });
+      })();
+    }
+  }, [location.search, currentUser, toast, navigate, refetchSubscription]);
 
   if (showMatchAnimation && matchedUser) {
     return (

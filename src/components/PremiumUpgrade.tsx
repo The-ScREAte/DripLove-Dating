@@ -1,5 +1,7 @@
 
 import React, { useState } from 'react';
+import FlwPaymentModal from './FlwPaymentModal';
+import { getPremiumPaymentConfig } from '@/utils/paymentConfig';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Crown, Heart, RotateCcw, Users, Check, X } from 'lucide-react';
@@ -15,33 +17,30 @@ interface PremiumUpgradeProps {
 const PremiumUpgrade = ({ currentUser, onClose, preselectedPlan }: PremiumUpgradeProps) => {
   const [loading, setLoading] = useState(false);
   const { toast } = useToast();
+  const [showPaymentModal, setShowPaymentModal] = useState(false);
+  const { price, paymentMethods } = getPremiumPaymentConfig();
 
-  const handleUpgrade = async () => {
-    if (!currentUser?.id) return;
-
-    setLoading(true);
-    try {
-      // For now, we'll just redirect to flutterwave.com
-      // Later you can replace this with actual Flutterwave integration
-      const paymentUrl = `https://flutterwave.com/pay/premium-plan-${currentUser.id}`;
-      
-      // Open payment in new tab
-      window.open(paymentUrl, '_blank');
-      
+  const handleUpgrade = () => {
+    if (!paymentMethods.length) {
       toast({
-        title: 'Redirecting to Payment',
-        description: 'You will be redirected to complete your premium upgrade.',
+        title: 'Payment Method Required',
+        description: 'No payment method is configured. Please contact admin.',
+        variant: 'destructive',
       });
-    } catch (error) {
-      console.error('Error initiating payment:', error);
-      toast({
-        title: 'Error',
-        description: 'Failed to initiate payment. Please try again.',
-        variant: 'destructive'
-      });
-    } finally {
-      setLoading(false);
+      return;
     }
+    setShowPaymentModal(true);
+  };
+
+  const handlePaymentSuccess = () => {
+    toast({
+      title: 'Premium Activated!',
+      description: 'Your account has been upgraded to premium.',
+    });
+    setShowPaymentModal(false);
+    if (onClose) onClose();
+    // Optionally, trigger a refetch of subscription status here
+    window.location.href = '/discover?upgraded=1';
   };
 
   const features = [
@@ -104,7 +103,8 @@ const PremiumUpgrade = ({ currentUser, onClose, preselectedPlan }: PremiumUpgrad
       Premium Plan
     </CardTitle>
     <div className="text-3xl font-bold">
-      $9.99<span className="text-sm font-normal">/month</span>
+      GHS {price}
+      <span className="text-sm font-normal"> one-time</span>
     </div>
   </CardHeader>
   <CardContent className="space-y-4">
@@ -128,21 +128,19 @@ const PremiumUpgrade = ({ currentUser, onClose, preselectedPlan }: PremiumUpgrad
     <div className="pt-6 text-center">
       <Button
         onClick={handleUpgrade}
-        disabled={loading}
         className="bg-gradient-to-r from-yellow-400 to-yellow-600 hover:from-yellow-500 hover:to-yellow-700 text-black font-bold py-3 px-8 rounded-full text-lg shadow-lg transform hover:scale-105 transition-all duration-200"
       >
-        {loading ? (
-          <div className="flex items-center">
-            <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-black mr-2"></div>
-            Processing...
-          </div>
-        ) : (
-          <>
-            <Crown className="w-5 h-5 mr-2" />
-            Upgrade to Premium Now
-          </>
-        )}
+        <Crown className="w-5 h-5 mr-2" />
+        Upgrade to Premium Now
       </Button>
+      <FlwPaymentModal
+        isOpen={showPaymentModal}
+        onClose={() => setShowPaymentModal(false)}
+        amount={parseFloat(price)}
+        email={currentUser?.email || ''}
+        paymentMethods={paymentMethods}
+        onSuccess={handlePaymentSuccess}
+      />
       <p className="text-gray-600 text-sm mt-2">
         Secure payment powered by Flutterwave • Cancel anytime
       </p>

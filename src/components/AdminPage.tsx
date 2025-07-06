@@ -4,6 +4,10 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Badge } from '@/components/ui/badge';
+import { defaultPaymentMethods, PaymentMethod } from '@/constants/flwConfig';
+
+
+
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
 import UserProfileModal from '@/components/UserProfileModal';
@@ -58,6 +62,133 @@ interface UserProfile {
 }
 
 const AdminPage = ({ currentUser, onLogout }: AdminPageProps) => {
+  // Payment methods state for admin
+  const [paymentMethods, setPaymentMethods] = useState<PaymentMethod[]>(() => {
+    if (typeof window !== 'undefined') {
+      const stored = localStorage.getItem('payment_methods');
+      if (stored) return JSON.parse(stored);
+    }
+    return defaultPaymentMethods;
+  });
+
+  const handlePaymentMethodChange = (index: number, field: keyof PaymentMethod, value: string) => {
+    setPaymentMethods(prev => {
+      const updated = [...prev];
+      updated[index] = { ...updated[index], [field]: value };
+      localStorage.setItem('payment_methods', JSON.stringify(updated));
+      return updated;
+    });
+  };
+
+  // Payment methods admin UI
+  // Payment config modal state
+  const [showPaymentConfig, setShowPaymentConfig] = useState(false);
+  const [premiumPrice, setPremiumPrice] = useState(() => {
+    if (typeof window !== 'undefined') {
+      const stored = localStorage.getItem('premium_price');
+      if (stored) return stored;
+    }
+    return '50';
+  });
+
+  const handleSavePaymentConfig = () => {
+    localStorage.setItem('payment_methods', JSON.stringify(paymentMethods));
+    localStorage.setItem('premium_price', premiumPrice);
+    setShowPaymentConfig(false);
+    toast({ title: 'Saved', description: 'Payment methods and price updated.' });
+  };
+
+  const renderPaymentMethodsAdmin = () => (
+    <>
+      <Button className="mb-4" onClick={() => setShowPaymentConfig(true)}>
+        Configure Premium Payment Options
+      </Button>
+      {showPaymentConfig && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
+          <div className="bg-white rounded-lg shadow-lg p-6 w-full max-w-lg relative">
+            <button onClick={() => setShowPaymentConfig(false)} className="absolute top-2 right-2 text-gray-400 hover:text-gray-600">✕</button>
+            <h2 className="text-xl font-bold mb-4">Configure Premium Payment</h2>
+            <div className="mb-4">
+              <label className="block font-medium mb-1">Premium Price (GHS)</label>
+              <Input value={premiumPrice} onChange={e => setPremiumPrice(e.target.value)} type="number" min="1" className="w-full" />
+            </div>
+            <div className="mb-4">
+              <h3 className="font-semibold mb-2">Payment Methods</h3>
+              <div className="space-y-4">
+                {paymentMethods.map((method, idx) => (
+                  <div key={method.type} className="flex flex-col gap-2 border-b pb-2">
+                    <span className="font-medium capitalize">{method.label}</span>
+                    {method.type === 'momo' ? (
+                      <>
+                        <Input
+                          value={method.details}
+                          onChange={e => handlePaymentMethodChange(idx, 'details', e.target.value)}
+                          placeholder="MoMo Number"
+                          className="w-full"
+                        />
+                        <Input
+                          value={method.name || ''}
+                          onChange={e => handlePaymentMethodChange(idx, 'name', e.target.value)}
+                          placeholder="MoMo Name"
+                          className="w-full"
+                        />
+                        <Input
+                          value={method.extra || ''}
+                          onChange={e => handlePaymentMethodChange(idx, 'extra', e.target.value)}
+                          placeholder="MoMo Provider/Network (optional)"
+                          className="w-full"
+                        />
+                      </>
+                    ) : (
+                      <>
+                        <Input
+                          value={method.details}
+                          onChange={e => handlePaymentMethodChange(idx, 'details', e.target.value)}
+                          placeholder="Card/Account Details"
+                          className="w-full"
+                        />
+                        <Input
+                          value={method.extra || ''}
+                          onChange={e => handlePaymentMethodChange(idx, 'extra', e.target.value)}
+                          placeholder="Bank Name/Info (optional)"
+                          className="w-full"
+                        />
+                      </>
+                    )}
+                  </div>
+                ))}
+              </div>
+            </div>
+            <Button onClick={handleSavePaymentConfig} className="w-full bg-pink-600 text-white mt-2">Save</Button>
+          </div>
+        </div>
+      )}
+
+      {/* Show saved payment methods below the form */}
+      <div className="mt-8">
+        <h3 className="font-semibold mb-2">Saved Payment Accounts (Receiving)</h3>
+        <div className="space-y-2">
+          {paymentMethods.map((method, idx) => (
+            <div key={method.type + idx} className="border rounded p-3 bg-gray-50">
+              <span className="font-bold capitalize">{method.label} Account</span>
+              {method.type === 'momo' ? (
+                <div className="text-sm mt-1">
+                  <div>MoMo Name: <span className="font-mono">{method.name}</span></div>
+                  <div>MoMo Number: <span className="font-mono">{method.details}</span></div>
+                  {method.extra && <div>Provider: <span className="font-mono">{method.extra}</span></div>}
+                </div>
+              ) : (
+                <div className="text-sm mt-1">
+                  <div>Card/Account: <span className="font-mono">{method.details}</span></div>
+                  {method.extra && <div>Bank: <span className="font-mono">{method.extra}</span></div>}
+                </div>
+              )}
+            </div>
+          ))}
+        </div>
+      </div>
+    </>
+  );
   const [stats, setStats] = useState<AppStats | null>(null);
   const [users, setUsers] = useState<UserProfile[]>([]);
   const [adminUsers, setAdminUsers] = useState<UserProfile[]>([]);
@@ -356,6 +487,7 @@ const AdminPage = ({ currentUser, onLogout }: AdminPageProps) => {
     <div className="w-full min-h-screen bg-gray-100">
       <div className="w-full max-w-[390px] mx-auto bg-white min-h-screen">
         <div className="p-4 space-y-4">
+          {isAdmin && renderPaymentMethodsAdmin()}
           <div className="flex items-center justify-between">
             <h1 className="text-2xl font-bold">Admin Dashboard</h1>
             <div className="flex items-center gap-2">
@@ -377,85 +509,80 @@ const AdminPage = ({ currentUser, onLogout }: AdminPageProps) => {
           {/* Stats Overview */}
           {stats && (
             <div className="grid grid-cols-2 gap-3">
-              <Card className="p-3">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <p className="text-xs text-gray-600">Total Users</p>
-                    <p className="text-lg font-bold">{stats.total_users}</p>
+              <React.Fragment>
+                <Card className="p-3">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <p className="text-xs text-gray-600">Total Users</p>
+                      <p className="text-lg font-bold">{stats.total_users}</p>
+                    </div>
+                    <Users className="w-6 h-6 text-blue-500" />
                   </div>
-                  <Users className="w-6 h-6 text-blue-500" />
-                </div>
-              </Card>
-
-              <Card className="p-3">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <p className="text-xs text-gray-600">Total Matches</p>
-                    <p className="text-lg font-bold">{stats.total_matches}</p>
+                </Card>
+                <Card className="p-3">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <p className="text-xs text-gray-600">Total Matches</p>
+                      <p className="text-lg font-bold">{stats.total_matches}</p>
+                    </div>
+                    <Heart className="w-6 h-6 text-pink-500" />
                   </div>
-                  <Heart className="w-6 h-6 text-pink-500" />
-                </div>
-              </Card>
-
-              <Card className="p-3">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <p className="text-xs text-gray-600">Messages Sent</p>
-                    <p className="text-lg font-bold">{stats.total_messages}</p>
+                </Card>
+                <Card className="p-3">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <p className="text-xs text-gray-600">Messages Sent</p>
+                      <p className="text-lg font-bold">{stats.total_messages}</p>
+                    </div>
+                    <MessageSquare className="w-6 h-6 text-green-500" />
                   </div>
-                  <MessageSquare className="w-6 h-6 text-green-500" />
-                </div>
-              </Card>
-
-              <Card className="p-3">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <p className="text-xs text-gray-600">Active Today</p>
-                    <p className="text-lg font-bold">{stats.active_users_today}</p>
+                </Card>
+                <Card className="p-3">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <p className="text-xs text-gray-600">Active Today</p>
+                      <p className="text-lg font-bold">{stats.active_users_today}</p>
+                    </div>
+                    <TrendingUp className="w-6 h-6 text-purple-500" />
                   </div>
-                  <TrendingUp className="w-6 h-6 text-purple-500" />
-                </div>
-              </Card>
-
-              <Card className="p-3">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <p className="text-xs text-gray-600">New This Week</p>
-                    <p className="text-lg font-bold">{stats.new_users_this_week}</p>
+                </Card>
+                <Card className="p-3">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <p className="text-xs text-gray-600">New This Week</p>
+                      <p className="text-lg font-bold">{stats.new_users_this_week}</p>
+                    </div>
+                    <Calendar className="w-6 h-6 text-indigo-500" />
                   </div>
-                  <Calendar className="w-6 h-6 text-indigo-500" />
-                </div>
-              </Card>
-
-              <Card className="p-3">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <p className="text-xs text-gray-600">Users On Hold</p>
-                    <p className="text-lg font-bold">{stats.users_on_hold}</p>
+                </Card>
+                <Card className="p-3">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <p className="text-xs text-gray-600">Users On Hold</p>
+                      <p className="text-lg font-bold">{stats.users_on_hold}</p>
+                    </div>
+                    <Pause className="w-6 h-6 text-yellow-500" />
                   </div>
-                  <Pause className="w-6 h-6 text-yellow-500" />
-                </div>
-              </Card>
-
-              <Card className="p-3">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <p className="text-xs text-gray-600">Blocked Users</p>
-                    <p className="text-lg font-bold">{stats.blocked_users}</p>
+                </Card>
+                <Card className="p-3">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <p className="text-xs text-gray-600">Blocked Users</p>
+                      <p className="text-lg font-bold">{stats.blocked_users}</p>
+                    </div>
+                    <UserX className="w-6 h-6 text-red-500" />
                   </div>
-                  <UserX className="w-6 h-6 text-red-500" />
-                </div>
-              </Card>
-
-              <Card className="p-3">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <p className="text-xs text-gray-600">Total Admins</p>
-                    <p className="text-lg font-bold">{stats.total_admins}</p>
+                </Card>
+                <Card className="p-3">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <p className="text-xs text-gray-600">Total Admins</p>
+                      <p className="text-lg font-bold">{stats.total_admins}</p>
+                    </div>
+                    <Shield className="w-6 h-6 text-gray-500" />
                   </div>
-                  <Shield className="w-6 h-6 text-gray-500" />
-                </div>
-              </Card>
+                </Card>
+              </React.Fragment>
             </div>
           )}
 

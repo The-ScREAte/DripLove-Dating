@@ -146,33 +146,8 @@ const Index = () => {
         throw new Error("An account with this email already exists. Please try logging in instead.");
       }
 
-      // Transform the form data before sending to Supabase
-      const transformedData = {
-        first_name: formData.firstName,
-        last_name: formData.lastName,
-        date_of_birth: formData.dateOfBirth,
-        country: formData.country,
-        city: formData.city,
-        bio: formData.bio,
-        preference: formData.preference,
-        interests: formData.interests,
-        gender: formData.gender,
-        relationship_intent: formData.relationshipIntent,
-        smoking: formData.smoking,
-        drinking: formData.drinking,
-        exercise_level: formData.exerciseLevel,
-        sleeping_schedule: formData.sleepingSchedule,
-        occupation: formData.occupation,
-        industry: formData.industry,
-        education_level: formData.educationLevel,
-        zip_code: formData.zipCode,
-        introvert_extrovert: formData.introvertExtrovert[0],
-        spontaneous_planner: formData.spontaneousPlanner[0],
-        messy_organized: formData.messyOrganized[0],
-        fun_fact: formData.funFact,
-        perfect_first_date: formData.perfectFirstDate,
-        last_googled: formData.lastGoogled,
-      };
+      // Transform the form data before sending to Supabase (use the same as profile)
+      const transformedData = transformFormDataForSubmission(formData);
 
       const { data, error } = await supabase.auth.signUp({
         email: formData.email,
