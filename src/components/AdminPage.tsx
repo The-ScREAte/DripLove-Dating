@@ -81,7 +81,7 @@ const AdminPage = ({ currentUser, onLogout }: AdminPageProps) => {
       if (!error && data) {
         // If payment_methods is missing, fallback to default
         let methods = data.payment_methods && Array.isArray(data.payment_methods)
-          ? data.payment_methods
+          ? (data.payment_methods as unknown as PaymentMethod[])
           : defaultPaymentMethods;
         // Ensure all default methods are present (for backward compatibility)
         methods = defaultPaymentMethods.map(def => {
@@ -119,7 +119,7 @@ const AdminPage = ({ currentUser, onLogout }: AdminPageProps) => {
       .from('payment_config')
       .upsert({
         id: '00000000-0000-0000-0000-000000000000', // always use same id for singleton
-        payment_methods: paymentMethods,
+        payment_methods: paymentMethods as any,
         premium_price: Number(premiumPrice),
         updated_at: new Date().toISOString(),
       }, { onConflict: 'id' });
