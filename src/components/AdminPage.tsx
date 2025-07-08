@@ -75,11 +75,24 @@ const AdminPage = ({ currentUser, onLogout }: AdminPageProps) => {
       const { data, error } = await supabase
         .from('payment_config')
         .select('payment_methods, premium_price')
+        .order('updated_at', { ascending: false })
         .limit(1)
-        .single();
+        .maybeSingle();
       if (!error && data) {
-        setPaymentMethods(data.payment_methods || defaultPaymentMethods);
+        // If payment_methods is missing, fallback to default
+        let methods = data.payment_methods && Array.isArray(data.payment_methods)
+          ? data.payment_methods
+          : defaultPaymentMethods;
+        // Ensure all default methods are present (for backward compatibility)
+        methods = defaultPaymentMethods.map(def => {
+          const found = methods.find((m: any) => m.type === def.type);
+          return found ? { ...def, ...found } : def;
+        });
+        setPaymentMethods(methods);
         setPremiumPrice(data.premium_price?.toString() || '50');
+      } else {
+        setPaymentMethods(defaultPaymentMethods);
+        setPremiumPrice('50');
       }
       setLoadingConfig(false);
     };
@@ -830,19 +843,18 @@ const AdminPage = ({ currentUser, onLogout }: AdminPageProps) => {
             </CardContent>
           </Card>
         </div>
+        {/* User Profile Modal */}
+        {selectedUserId && (
+          <UserProfileModal
+            isOpen={isProfileModalOpen}
+            onClose={() => {
+              setIsProfileModalOpen(false);
+              setSelectedUserId(null);
+            }}
+            userId={selectedUserId}
+          />
+        )}
       </div>
-
-      {/* User Profile Modal */}
-      {selectedUserId && (
-        <UserProfileModal
-          isOpen={isProfileModalOpen}
-          onClose={() => {
-            setIsProfileModalOpen(false);
-            setSelectedUserId(null);
-          }}
-          userId={selectedUserId}
-        />
-      )}
     </div>
   );
 };
