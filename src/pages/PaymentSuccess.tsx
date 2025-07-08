@@ -37,19 +37,44 @@ const PaymentSuccess: React.FC = () => {
           setUpgrading(false);
           return;
         }
+        // Fetch transaction details from Flutterwave
+        let flwToken = null;
+        let flwSubscriptionId = null;
+        let paymentType = null;
+        try {
+          const flwRes = await fetch(`https://api.flutterwave.com/v3/transactions/${transaction_id}/verify`, {
+            headers: {
+              Authorization: `Bearer ${import.meta.env.VITE_FLW_SECRET_KEY}`,
+            },
+          });
+          const flwData = await flwRes.json();
+          // Card tokenization
+          flwToken = flwData?.data?.card?.token || null;
+          // MoMo tokenization (if available)
+          if (!flwToken && flwData?.data?.meta?.authorization) {
+            flwToken = flwData.data.meta.authorization.token;
+          }
+          // Subscription ID (if available)
+          flwSubscriptionId = flwData?.data?.subscription?.id || null;
+          paymentType = flwData?.data?.payment_type || null;
+        } catch (err) {
+          // If fetch fails, continue but don't save token
+          console.error('Failed to fetch Flutterwave transaction:', err);
+        }
+        // Only update, do not insert
+        const updateObj: any = {
+          plan_name: 'premium',
+          status: 'active',
+          flutterwave_transaction_id: transaction_id,
+          updated_at: new Date().toISOString(),
+        };
+        if (flwToken && paymentType === 'card') updateObj.flw_card_token = flwToken;
+        if (flwToken && paymentType === 'mobilemoneyghana') updateObj.flw_momo_token = flwToken;
+        if (flwSubscriptionId) updateObj.flw_subscription_id = flwSubscriptionId;
         const { error } = await supabase
           .from('user_subscriptions')
-          .upsert({
-            user_id: user.id,
-            plan_name: 'premium',
-            status: 'active',
-            starts_at: new Date().toISOString(),
-            flutterwave_transaction_id: transaction_id,
-            updated_at: new Date().toISOString()
-          }, { 
-            onConflict: 'user_id',
-            ignoreDuplicates: false 
-          });
+          .update(updateObj)
+          .eq('user_id', user.id);
         if (!error) {
           setUpgradeSuccess(true);
           toast({ title: 'Premium Activated!', description: 'Your account has been upgraded.' });
@@ -63,27 +88,30 @@ const PaymentSuccess: React.FC = () => {
 
   return (
     <div className="min-h-screen flex flex-col items-center justify-center bg-gradient-to-br from-pink-400 via-purple-500 to-indigo-600 p-4">
-      <div className="bg-white rounded-lg shadow-lg p-8 max-w-md w-full text-center">
-        <Crown className="w-12 h-12 text-yellow-400 mx-auto mb-4" />
-        <h1 className="text-3xl font-bold mb-2 text-gray-800">Thank You for Upgrading!</h1>
-        <p className="mb-4 text-gray-700">Your payment was successful. You now have access to all premium features:</p>
-        <ul className="mb-6 text-left">
+      <div className="bg-white rounded-3xl shadow-2xl p-8 max-w-md w-full text-center border-4 border-yellow-300/60 relative animate-fade-in">
+        <div className="absolute -top-10 left-1/2 -translate-x-1/2 bg-gradient-to-br from-yellow-300 to-yellow-500 rounded-full p-3 shadow-lg animate-bounce">
+          <Crown className="w-14 h-14 text-yellow-600" />
+        </div>
+        <h1 className="text-4xl font-extrabold mb-3 mt-8 text-gray-900 tracking-tight drop-shadow-lg">Welcome to Premium!</h1>
+        <p className="mb-6 text-lg text-gray-700 font-medium">Your payment was successful.<br/>You now have access to:</p>
+        <ul className="mb-8 text-left space-y-3">
           {premiumFeatures.map((feature, idx) => (
-            <li key={feature.name} className="flex items-center mb-2">
-              <feature.icon className="w-5 h-5 text-pink-500 mr-2" />
-              <span className="text-gray-800">{feature.name}</span>
+            <li key={feature.name} className="flex items-center gap-3 bg-gradient-to-r from-pink-100 to-yellow-100 rounded-xl px-4 py-2 shadow-sm">
+              <span className="inline-flex items-center justify-center bg-pink-200 rounded-full p-2"><feature.icon className="w-6 h-6 text-pink-500" /></span>
+              <span className="text-gray-900 font-semibold text-base">{feature.name}</span>
             </li>
           ))}
         </ul>
-        {upgrading && <div className="mb-4 text-pink-600 font-semibold">Activating premium...</div>}
-        {error && <div className="mb-4 text-red-600 font-semibold">{error}</div>}
+        {upgrading && <div className="mb-4 text-pink-600 font-semibold animate-pulse">Activating premium...</div>}
+        {error && <div className="mb-4 text-red-600 font-semibold animate-shake">{error}</div>}
         <Button
-          className="w-full bg-gradient-to-r from-yellow-400 to-yellow-600 text-black font-bold py-3 px-8 rounded-full text-lg shadow-lg hover:scale-105 transition-all duration-200"
+          className="w-full bg-gradient-to-r from-yellow-400 to-yellow-600 text-black font-extrabold py-3 px-8 rounded-full text-xl shadow-xl hover:scale-105 hover:shadow-2xl transition-all duration-200 mt-2"
           onClick={() => navigate('/')}
           disabled={upgrading}
         >
-          Go to Discover
+          Start Discovering Now
         </Button>
+        <div className="mt-6 text-xs text-gray-400">Enjoy your premium experience! 🎉</div>
       </div>
     </div>
   );

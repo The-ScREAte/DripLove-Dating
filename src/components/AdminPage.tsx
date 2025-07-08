@@ -63,19 +63,33 @@ interface UserProfile {
 
 const AdminPage = ({ currentUser, onLogout }: AdminPageProps) => {
   // Payment methods state for admin
-  const [paymentMethods, setPaymentMethods] = useState<PaymentMethod[]>(() => {
-    if (typeof window !== 'undefined') {
-      const stored = localStorage.getItem('payment_methods');
-      if (stored) return JSON.parse(stored);
-    }
-    return defaultPaymentMethods;
-  });
+  // Payment config state
+  const [paymentMethods, setPaymentMethods] = useState<PaymentMethod[]>(defaultPaymentMethods);
+  const [premiumPrice, setPremiumPrice] = useState('50');
+  const [loadingConfig, setLoadingConfig] = useState(true);
+
+  // Fetch payment config from DB on mount
+  useEffect(() => {
+    const fetchConfig = async () => {
+      setLoadingConfig(true);
+      const { data, error } = await supabase
+        .from('payment_config')
+        .select('payment_methods, premium_price')
+        .limit(1)
+        .single();
+      if (!error && data) {
+        setPaymentMethods(data.payment_methods || defaultPaymentMethods);
+        setPremiumPrice(data.premium_price?.toString() || '50');
+      }
+      setLoadingConfig(false);
+    };
+    fetchConfig();
+  }, []);
 
   const handlePaymentMethodChange = (index: number, field: keyof PaymentMethod, value: string) => {
     setPaymentMethods(prev => {
       const updated = [...prev];
       updated[index] = { ...updated[index], [field]: value };
-      localStorage.setItem('payment_methods', JSON.stringify(updated));
       return updated;
     });
   };
@@ -83,27 +97,35 @@ const AdminPage = ({ currentUser, onLogout }: AdminPageProps) => {
   // Payment methods admin UI
   // Payment config modal state
   const [showPaymentConfig, setShowPaymentConfig] = useState(false);
-  const [premiumPrice, setPremiumPrice] = useState(() => {
-    if (typeof window !== 'undefined') {
-      const stored = localStorage.getItem('premium_price');
-      if (stored) return stored;
-    }
-    return '50';
-  });
 
-  const handleSavePaymentConfig = () => {
-    localStorage.setItem('payment_methods', JSON.stringify(paymentMethods));
-    localStorage.setItem('premium_price', premiumPrice);
+  // Save payment config to DB
+  const handleSavePaymentConfig = async () => {
+    setLoadingConfig(true);
+    // Upsert singleton config row
+    const { error } = await supabase
+      .from('payment_config')
+      .upsert({
+        id: '00000000-0000-0000-0000-000000000000', // always use same id for singleton
+        payment_methods: paymentMethods,
+        premium_price: Number(premiumPrice),
+        updated_at: new Date().toISOString(),
+      }, { onConflict: 'id' });
     setShowPaymentConfig(false);
-    toast({ title: 'Saved', description: 'Payment methods and price updated.' });
+    setLoadingConfig(false);
+    if (!error) {
+      toast({ title: 'Saved', description: 'Payment methods and price updated.' });
+    } else {
+      toast({ title: 'Error', description: 'Failed to save payment config', variant: 'destructive' });
+    }
   };
 
   const renderPaymentMethodsAdmin = () => (
     <>
-      <Button className="mb-4" onClick={() => setShowPaymentConfig(true)}>
+      <Button className="mb-4" onClick={() => setShowPaymentConfig(true)} disabled={loadingConfig}>
         Configure Premium Payment Options
       </Button>
-      {showPaymentConfig && (
+      {loadingConfig && <div className="text-center text-sm text-gray-500 mb-2">Loading payment config...</div>}
+      {showPaymentConfig && !loadingConfig && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
           <div className="bg-white rounded-lg shadow-lg p-6 w-full max-w-lg relative">
             <button onClick={() => setShowPaymentConfig(false)} className="absolute top-2 right-2 text-gray-400 hover:text-gray-600">✕</button>

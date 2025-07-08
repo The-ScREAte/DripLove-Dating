@@ -41,7 +41,11 @@ const FlwPaymentModal: React.FC<FlwPaymentModalProps> = ({ isOpen, onClose, amou
     await loadFlutterwaveScript();
     if ((window as any).FlutterwaveCheckout && selectedMethod) {
       let payment_options = 'card';
-      if (selectedMethod.type === 'momo') payment_options = 'mobilemoneyghana';
+      let meta: any = { charge_type: 'recurring' };
+      if (selectedMethod.type === 'momo') {
+        payment_options = 'mobilemoneyghana';
+        meta = { ...meta, payment_type: 'mobilemoneyghana' };
+      }
       (window as any).FlutterwaveCheckout({
         public_key: FLW_PUBLIC_KEY,
         tx_ref: `afrovibe-premium-${Date.now()}`,
@@ -51,6 +55,7 @@ const FlwPaymentModal: React.FC<FlwPaymentModalProps> = ({ isOpen, onClose, amou
         customer: {
           email,
         },
+        meta,
         redirect_url: window.location.origin + '/payment-success',
         customizations: {
           title: 'Afrovibe Premium',

@@ -1,4 +1,30 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
+// Utility to calculate profile completion percentage
+// Improved: Profile completion logic matches visible/required fields, and progress bar is more accurate
+import { UserProfile } from '../types';
+
+function getProfileCompletion(profile: UserProfile, imagesCount: number = 0) {
+  // Only count fields that are actually visible/editable in the profile UI
+  const fields = [
+    profile.first_name,
+    profile.last_name,
+    profile.bio && profile.bio.length > 10,
+    profile.city,
+    profile.country,
+    profile.gender && profile.gender !== 'not_specified',
+    profile.preference && profile.preference !== 'not_specified',
+    profile.relationship_intent && profile.relationship_intent !== 'open_to_anything',
+    profile.occupation,
+    profile.education_level,
+    Array.isArray(profile.interests) && profile.interests.length > 0,
+    imagesCount > 0,
+  ];
+  // Count true values
+  const filled = fields.filter(Boolean).length;
+  const total = fields.length;
+  const percent = Math.min(100, Math.round((filled / total) * 100));
+  return percent;
+}
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { User, Edit, Save, X, Crown } from 'lucide-react';
@@ -19,8 +45,8 @@ import ProfileSummaryCard from './ProfileSummaryCard';
 import PremiumUpgrade from './PremiumUpgrade';
 
 interface ProfilePageProps {
-  currentUser: any;
-  profile: any;
+  currentUser: UserProfile | null;
+  profile: UserProfile;
   onProfileUpdate: () => void;
   onLogout: () => void;
 }
@@ -32,7 +58,7 @@ const ProfilePage = ({ currentUser, profile, onProfileUpdate, onLogout }: Profil
   const { toast } = useToast();
   const { subscription, loading: subscriptionLoading, isPremium } = useSubscription(currentUser?.id);
 
-  const [editedProfile, setEditedProfile] = useState({
+  const [editedProfile, setEditedProfile] = useState(() => ({
     first_name: '',
     last_name: '',
     bio: '',
@@ -57,7 +83,32 @@ const ProfilePage = ({ currentUser, profile, onProfileUpdate, onLogout }: Profil
     perfect_first_date: '',
     last_googled: '',
     interests: [] as string[],
-  });
+  }));
+  const [imagesCount, setImagesCount] = useState(0);
+  const [showProfileToast, setShowProfileToast] = useState(false);
+  const profileToastShown = useRef(false);
+  // Listen for image uploads (assume ImageManagement can call this via prop or event)
+  // For now, we will just check profile?.images if available, else leave as 0
+  useEffect(() => {
+    if (profile && Array.isArray(profile.images)) {
+      setImagesCount(profile.images.length);
+    }
+  }, [profile]);
+  // Calculate completion
+  const completion = getProfileCompletion(editedProfile, imagesCount);
+  // Show a toast notification once per session if profile is incomplete
+  useEffect(() => {
+    if (completion < 100 && !profileToastShown.current) {
+      setShowProfileToast(true);
+      toast({
+        title: 'Complete your profile',
+        description: 'Finish your profile for better matches and more visibility!',
+        variant: 'default',
+        duration: 6000,
+      });
+      profileToastShown.current = true;
+    }
+  }, [completion, toast]);
 
   useEffect(() => {
     if (profile) {
@@ -187,7 +238,7 @@ const ProfilePage = ({ currentUser, profile, onProfileUpdate, onLogout }: Profil
       setIsEditing(false);
       onProfileUpdate();
       toast({ title: 'Profile updated', description: 'Your AfroVibe profile has been saved successfully.' });
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error('🚨 Save failed:', error);
       toast({ title: 'Error', description: error.message || 'Failed to update profile.', variant: 'destructive' });
     } finally {
@@ -233,6 +284,23 @@ const ProfilePage = ({ currentUser, profile, onProfileUpdate, onLogout }: Profil
 
   return (
     <div className="h-full flex flex-col">
+      {/* Profile Completion Progress Bar */}
+      {completion < 100 && (
+        <div className="w-full bg-yellow-100 border-b border-yellow-300 py-2 px-4 flex flex-col items-center animate-fade-in">
+          <div className="w-full max-w-xl flex flex-col items-center">
+            <div className="w-full bg-yellow-200 rounded-full h-3 mb-1 overflow-hidden">
+              <div
+                className="bg-gradient-to-r from-pink-400 to-yellow-400 h-3 rounded-full transition-all duration-500"
+                style={{ width: `${completion}%` }}
+              />
+            </div>
+            <div className="text-sm font-semibold text-yellow-700">
+              Profile {completion}% complete
+            </div>
+            <div className="text-xs text-yellow-600 mt-1">Complete your profile for better, more accurate matches!</div>
+          </div>
+        </div>
+      )}
       {/* Fixed Header */}
       <div className="flex-shrink-0 bg-white border-b p-4">
         <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
