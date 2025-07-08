@@ -90,12 +90,12 @@ const ProfilePage = ({ currentUser, profile, onProfileUpdate, onLogout }: Profil
   // Listen for image uploads (assume ImageManagement can call this via prop or event)
   // For now, we will just check profile?.images if available, else leave as 0
   useEffect(() => {
-    if (profile && Array.isArray(profile.images)) {
-      setImagesCount(profile.images.length);
-    }
+    // Images are stored separately in user_images table, not in profile
+    // We'll set imagesCount based on actual images from ImageManagement component
+    setImagesCount(0); // Default to 0, will be updated by ImageManagement
   }, [profile]);
   // Calculate completion
-  const completion = getProfileCompletion(editedProfile, imagesCount);
+  const completion = getProfileCompletion(profile, imagesCount);
   // Show a toast notification once per session if profile is incomplete
   useEffect(() => {
     if (completion < 100 && !profileToastShown.current) {
@@ -171,7 +171,7 @@ const ProfilePage = ({ currentUser, profile, onProfileUpdate, onLogout }: Profil
         bio: editedProfile.bio?.trim() || null,
         city: editedProfile.city?.trim() || null,
         country: editedProfile.country?.trim() || null,
-        date_of_birth: profile?.date_of_birth || currentUser?.user_metadata?.date_of_birth || '1990-01-01',
+        date_of_birth: profile?.date_of_birth || '1990-01-01',
         email: currentUser.email,
         distance_preference: editedProfile.distance_preference || 25,
         gender: editedProfile.gender || 'not_specified',
@@ -240,7 +240,7 @@ const ProfilePage = ({ currentUser, profile, onProfileUpdate, onLogout }: Profil
       toast({ title: 'Profile updated', description: 'Your AfroVibe profile has been saved successfully.' });
     } catch (error: unknown) {
       console.error('🚨 Save failed:', error);
-      toast({ title: 'Error', description: error.message || 'Failed to update profile.', variant: 'destructive' });
+      toast({ title: 'Error', description: (error as Error).message || 'Failed to update profile.', variant: 'destructive' });
     } finally {
       setIsSaving(false);
     }
