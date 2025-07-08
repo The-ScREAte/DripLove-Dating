@@ -522,7 +522,6 @@ const AdminPage = ({ currentUser, onLogout }: AdminPageProps) => {
     <div className="w-full min-h-screen bg-gray-100">
       <div className="w-full max-w-[390px] mx-auto bg-white min-h-screen">
         <div className="p-4 space-y-4">
-          {isAdmin && renderPaymentMethodsAdmin()}
           <div className="flex items-center justify-between">
             <h1 className="text-2xl font-bold">Admin Dashboard</h1>
             <div className="flex items-center gap-2">
@@ -842,6 +841,9 @@ const AdminPage = ({ currentUser, onLogout }: AdminPageProps) => {
               </div>
             </CardContent>
           </Card>
+
+          {/* Payment Configuration */}
+          {isAdmin && renderPaymentMethodsAdmin()}
         </div>
         {/* User Profile Modal */}
         {selectedUserId && (
