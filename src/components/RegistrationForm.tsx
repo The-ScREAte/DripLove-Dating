@@ -72,21 +72,21 @@ const RegistrationForm = ({ onSubmit, onBackToLogin }: RegistrationFormProps) =>
   };
 
   return (
-    <Card className="w-full max-w-md mx-auto backdrop-blur-sm bg-white/90 shadow-2xl border-0">
+    <Card className="w-full max-w-md mx-auto backdrop-blur-sm bg-white/90 shadow-2xl border-0 animate-fade-in">
       <CardHeader className="text-center pb-6">
         <div className="flex justify-center mb-4">
-          <div className="p-3 bg-gradient-to-r from-pink-500 to-purple-600 rounded-full">
+          <div className="p-3 bg-gradient-to-r from-pink-500 to-purple-600 rounded-full hover-scale">
             <Heart className="w-8 h-8 text-white" />
           </div>
         </div>
-        <CardTitle className="text-2xl font-bold bg-gradient-to-r from-pink-600 to-purple-600 bg-clip-text text-transparent">
+        <CardTitle className="text-2xl font-bold bg-gradient-to-r from-pink-600 to-purple-600 bg-clip-text text-transparent animate-fade-in">
           Create Your Account
         </CardTitle>
-        <CardDescription className="text-gray-600">
+        <CardDescription className="text-gray-600 animate-fade-in">
           Just a few details to get started. You can complete your profile later for better matches!
         </CardDescription>
       </CardHeader>
-      <CardContent>
+      <CardContent className="animate-fade-in">
         <form onSubmit={handleSubmit} className="space-y-8">
           <BasicInfoSection
             formData={formData}
@@ -99,7 +99,7 @@ const RegistrationForm = ({ onSubmit, onBackToLogin }: RegistrationFormProps) =>
             onToggleConfirmPassword={() => setShowConfirmPassword(!showConfirmPassword)}
           />
           {/* Location */}
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 animate-scale-in">
             <div className="space-y-2">
               <Label className="text-sm font-medium">City</Label>
               <Input
@@ -127,7 +127,7 @@ const RegistrationForm = ({ onSubmit, onBackToLogin }: RegistrationFormProps) =>
           </div>
 
           {/* Gender and Preference */}
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 animate-scale-in">
             <div className="space-y-2">
               <Label className="text-sm font-medium">I am *</Label>
               <Select value={formData.gender} onValueChange={(value) => handleSelectChange('gender', value)}>
@@ -159,7 +159,7 @@ const RegistrationForm = ({ onSubmit, onBackToLogin }: RegistrationFormProps) =>
           </div>
 
           {/* Relationship Intent */}
-          <div className="space-y-2">
+          <div className="space-y-2 animate-scale-in">
             <Label className="text-sm font-medium">Relationship Intent</Label>
             <Select value={formData.relationshipIntent} onValueChange={(value) => handleSelectChange('relationshipIntent', value)}>
               <SelectTrigger className={`border-gray-200 focus:border-pink-400 focus:ring-pink-400 ${errors.relationshipIntent ? 'border-red-500' : ''}`}>
@@ -175,7 +175,7 @@ const RegistrationForm = ({ onSubmit, onBackToLogin }: RegistrationFormProps) =>
           </div>
 
           {/* Work & Education */}
-          <div className="space-y-4">
+          <div className="space-y-4 animate-scale-in">
             <h4 className="text-lg font-semibold text-gray-800">Work & Education</h4>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div className="space-y-2">
@@ -224,15 +224,15 @@ const RegistrationForm = ({ onSubmit, onBackToLogin }: RegistrationFormProps) =>
           </div>
           <Button 
             type="submit" 
-            className="w-full bg-gradient-to-r from-pink-500 to-purple-600 hover:from-pink-600 hover:to-purple-700 text-white font-semibold py-3 rounded-lg transition-all duration-200 transform hover:scale-[1.02]"
+            className="w-full bg-gradient-to-r from-pink-500 to-purple-600 hover:from-pink-600 hover:to-purple-700 text-white font-semibold py-3 rounded-lg transition-all duration-200 transform hover:scale-[1.02] hover-scale animate-fade-in"
           >
             Create Account
           </Button>
-          <div className="text-center">
+          <div className="text-center animate-fade-in">
             <button
               type="button"
               onClick={onBackToLogin}
-              className="text-pink-600 hover:text-pink-700 font-semibold transition-colors"
+              className="text-pink-600 hover:text-pink-700 font-semibold transition-colors story-link"
             >
               Already have an account? Sign In
             </button>
