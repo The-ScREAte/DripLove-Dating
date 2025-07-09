@@ -23,6 +23,7 @@ const RegistrationForm = ({ onSubmit, onBackToLogin }: RegistrationFormProps) =>
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [errors, setErrors] = useState<Record<string, string>>({});
+  const [currentStep, setCurrentStep] = useState(1);
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
     setFormData({
@@ -61,8 +62,65 @@ const RegistrationForm = ({ onSubmit, onBackToLogin }: RegistrationFormProps) =>
     }));
   };
 
+  const handleContinue = () => {
+    // Validate first step fields
+    const firstStepErrors: Record<string, string> = {};
+    if (!formData.firstName.trim()) firstStepErrors.firstName = 'First name is required';
+    if (!formData.lastName.trim()) firstStepErrors.lastName = 'Last name is required';
+    if (!formData.email.trim()) firstStepErrors.email = 'Email is required';
+    if (!formData.password) firstStepErrors.password = 'Password is required';
+    if (!formData.confirmPassword) firstStepErrors.confirmPassword = 'Please confirm your password';
+    if (!formData.dateOfBirth) firstStepErrors.dateOfBirth = 'Date of birth is required';
+    if (!formData.country) firstStepErrors.country = 'Country is required';
+    
+    // Email validation
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (formData.email && !emailRegex.test(formData.email)) {
+      firstStepErrors.email = 'Please enter a valid email address';
+    }
+    
+    // Password validation
+    if (formData.password && formData.password.length < 6) {
+      firstStepErrors.password = 'Password must be at least 6 characters long';
+    }
+    
+    // Password confirmation
+    if (formData.password !== formData.confirmPassword) {
+      firstStepErrors.confirmPassword = 'Passwords do not match';
+    }
+    
+    // Age validation (must be 18+)
+    if (formData.dateOfBirth) {
+      const today = new Date();
+      const birthDate = new Date(formData.dateOfBirth);
+      let age = today.getFullYear() - birthDate.getFullYear();
+      const monthDiff = today.getMonth() - birthDate.getMonth();
+      
+      if (monthDiff < 0 || (monthDiff === 0 && today.getDate() < birthDate.getDate())) {
+        age--;
+      }
+      
+      if (age < 18) {
+        firstStepErrors.dateOfBirth = 'You must be at least 18 years old';
+      }
+    }
+
+    if (Object.keys(firstStepErrors).length > 0) {
+      setErrors(firstStepErrors);
+      return;
+    }
+    
+    setErrors({});
+    setCurrentStep(2);
+  };
+
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
+    if (currentStep === 1) {
+      handleContinue();
+      return;
+    }
+    
     const validationErrors = validateRegistrationForm(formData);
     if (Object.keys(validationErrors).length > 0) {
       setErrors(validationErrors);
@@ -81,14 +139,19 @@ const RegistrationForm = ({ onSubmit, onBackToLogin }: RegistrationFormProps) =>
           </div>
         </div>
         <CardTitle className="text-2xl font-bold bg-gradient-to-r from-pink-600 to-purple-600 bg-clip-text text-transparent animate-fade-in">
-          Create Your Account
+          {currentStep === 1 ? 'Create Your Account' : 'Tell Us More About You'}
         </CardTitle>
         <CardDescription className="text-gray-600 animate-fade-in">
-          Just a few details to get started. You can complete your profile later for better matches!
+          {currentStep === 1 
+            ? 'Just a few details to get started. You can complete your profile later for better matches!'
+            : 'Help us find your perfect match with a few more details!'
+          }
         </CardDescription>
       </CardHeader>
       <CardContent className="animate-fade-in">
         <form onSubmit={handleSubmit} className="space-y-8">
+          {currentStep === 1 && (
+            <div className="space-y-6 animate-fade-in">
           <BasicInfoSection
             formData={formData}
             errors={errors}
@@ -126,6 +189,11 @@ const RegistrationForm = ({ onSubmit, onBackToLogin }: RegistrationFormProps) =>
               {errors.zipCode && <p className="text-red-500 text-xs mt-1">{errors.zipCode}</p>}
             </div>
           </div>
+          </div>
+          )}
+
+          {currentStep === 2 && (
+            <div className="space-y-6 animate-fade-in">
 
           {/* Gender and Preference */}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4 animate-scale-in">
@@ -227,12 +295,27 @@ const RegistrationForm = ({ onSubmit, onBackToLogin }: RegistrationFormProps) =>
               {errors.educationLevel && <p className="text-red-500 text-xs mt-1">{errors.educationLevel}</p>}
             </div>
           </div>
-          <Button 
-            type="submit" 
-            className="w-full bg-gradient-to-r from-pink-500 to-purple-600 hover:from-pink-600 hover:to-purple-700 text-white font-semibold py-3 rounded-lg transition-all duration-200 transform hover:scale-[1.02] hover-scale animate-fade-in"
-          >
-            Create Account
-          </Button>
+          </div>
+          )}
+
+          <div className="flex flex-col gap-4">
+            {currentStep === 2 && (
+              <Button 
+                type="button" 
+                variant="outline"
+                onClick={() => setCurrentStep(1)}
+                className="w-full border-pink-400 text-pink-600 hover:bg-pink-50 transition-all duration-200 animate-fade-in"
+              >
+                Back
+              </Button>
+            )}
+            <Button 
+              type="submit" 
+              className="w-full bg-gradient-to-r from-pink-500 to-purple-600 hover:from-pink-600 hover:to-purple-700 text-white font-semibold py-3 rounded-lg transition-all duration-200 transform hover:scale-[1.02] hover-scale animate-fade-in"
+            >
+              {currentStep === 1 ? 'Continue' : 'Create Account'}
+            </Button>
+          </div>
           <div className="text-center animate-fade-in">
             <button
               type="button"
