@@ -149,55 +149,17 @@ const Index = () => {
         preference: formData.preference,
       };
 
-      // Register user with Supabase Auth
+      // Register user with Supabase Auth - the trigger will create the profile automatically
       const { data, error } = await supabase.auth.signUp({
         email: essentials.email,
         password: formData.password,
         options: {
-          // No email confirmation/redirect
           data: essentials,
         },
       });
       if (error) throw error;
 
-
-      // Insert minimal profile row with all possible fields (safe defaults)
       if (data.user) {
-        const profileInsert = {
-          id: data.user.id,
-          first_name: formData.firstName,
-          last_name: formData.lastName,
-          email: formData.email,
-          date_of_birth: formData.dateOfBirth,
-          gender: formData.gender,
-          preference: formData.preference,
-          country: formData.country,
-          // Safe defaults for all other possible columns - use null for optional fields
-          bio: null,
-          city: null,
-          zip_code: null,
-          relationship_intent: null,
-          smoking: null,
-          drinking: null,
-          exercise_level: null,
-          sleeping_schedule: null,
-          occupation: null,
-          industry: null,
-          education_level: null,
-          introvert_extrovert: 50,
-          spontaneous_planner: 50,
-          messy_organized: 50,
-          fun_fact: null,
-          perfect_first_date: null,
-          last_googled: null,
-          interests: [],
-          account_status: 'active',
-        };
-        const { error: profileError } = await supabase.from("profiles").insert(profileInsert);
-        if (profileError) {
-          console.error('Profile insert error:', profileError);
-          throw new Error(profileError.message || 'Database error saving new user');
-        }
         setUser(data.user);
         setCurrentView('app');
       }
