@@ -98,6 +98,34 @@ const RegistrationForm = ({ onSubmit, onBackToLogin }: RegistrationFormProps) =>
             onTogglePassword={() => setShowPassword(!showPassword)}
             onToggleConfirmPassword={() => setShowConfirmPassword(!showConfirmPassword)}
           />
+          {/* Location */}
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div className="space-y-2">
+              <Label className="text-sm font-medium">City</Label>
+              <Input
+                type="text"
+                name="city"
+                value={formData.city}
+                onChange={handleInputChange}
+                placeholder="Enter your city"
+                className={`border-gray-200 focus:border-pink-400 focus:ring-pink-400 ${errors.city ? 'border-red-500' : ''}`}
+              />
+              {errors.city && <p className="text-red-500 text-xs mt-1">{errors.city}</p>}
+            </div>
+            <div className="space-y-2">
+              <Label className="text-sm font-medium">Zip Code</Label>
+              <Input
+                type="text"
+                name="zipCode"
+                value={formData.zipCode}
+                onChange={handleInputChange}
+                placeholder="Enter zip code"
+                className={`border-gray-200 focus:border-pink-400 focus:ring-pink-400 ${errors.zipCode ? 'border-red-500' : ''}`}
+              />
+              {errors.zipCode && <p className="text-red-500 text-xs mt-1">{errors.zipCode}</p>}
+            </div>
+          </div>
+
           {/* Gender and Preference */}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div className="space-y-2">
@@ -127,6 +155,71 @@ const RegistrationForm = ({ onSubmit, onBackToLogin }: RegistrationFormProps) =>
                 </SelectContent>
               </Select>
               {errors.preference && <p className="text-red-500 text-xs mt-1">{errors.preference}</p>}
+            </div>
+          </div>
+
+          {/* Relationship Intent */}
+          <div className="space-y-2">
+            <Label className="text-sm font-medium">Relationship Intent</Label>
+            <Select value={formData.relationshipIntent} onValueChange={(value) => handleSelectChange('relationshipIntent', value)}>
+              <SelectTrigger className={`border-gray-200 focus:border-pink-400 focus:ring-pink-400 ${errors.relationshipIntent ? 'border-red-500' : ''}`}>
+                <SelectValue placeholder="What are you looking for?" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="casual">Casual</SelectItem>
+                <SelectItem value="serious">Serious</SelectItem>
+                <SelectItem value="open_to_anything">Open to Anything</SelectItem>
+              </SelectContent>
+            </Select>
+            {errors.relationshipIntent && <p className="text-red-500 text-xs mt-1">{errors.relationshipIntent}</p>}
+          </div>
+
+          {/* Work & Education */}
+          <div className="space-y-4">
+            <h4 className="text-lg font-semibold text-gray-800">Work & Education</h4>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label className="text-sm font-medium">Occupation</Label>
+                <Input
+                  type="text"
+                  name="occupation"
+                  value={formData.occupation}
+                  onChange={handleInputChange}
+                  placeholder="Your job title"
+                  className={`border-gray-200 focus:border-pink-400 focus:ring-pink-400 ${errors.occupation ? 'border-red-500' : ''}`}
+                />
+                {errors.occupation && <p className="text-red-500 text-xs mt-1">{errors.occupation}</p>}
+              </div>
+              <div className="space-y-2">
+                <Label className="text-sm font-medium">Industry</Label>
+                <Input
+                  type="text"
+                  name="industry"
+                  value={formData.industry}
+                  onChange={handleInputChange}
+                  placeholder="Your industry"
+                  className={`border-gray-200 focus:border-pink-400 focus:ring-pink-400 ${errors.industry ? 'border-red-500' : ''}`}
+                />
+                {errors.industry && <p className="text-red-500 text-xs mt-1">{errors.industry}</p>}
+              </div>
+            </div>
+            <div className="space-y-2">
+              <Label className="text-sm font-medium">Education Level</Label>
+              <Select value={formData.educationLevel} onValueChange={(value) => handleSelectChange('educationLevel', value)}>
+                <SelectTrigger className={`border-gray-200 focus:border-pink-400 focus:ring-pink-400 ${errors.educationLevel ? 'border-red-500' : ''}`}>
+                  <SelectValue placeholder="Select your education level" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="High School">High School</SelectItem>
+                  <SelectItem value="Some College">Some College</SelectItem>
+                  <SelectItem value="Associate Degree">Associate Degree</SelectItem>
+                  <SelectItem value="Bachelor's Degree">Bachelor's Degree</SelectItem>
+                  <SelectItem value="Master's Degree">Master's Degree</SelectItem>
+                  <SelectItem value="Doctorate">Doctorate</SelectItem>
+                  <SelectItem value="Other">Other</SelectItem>
+                </SelectContent>
+              </Select>
+              {errors.educationLevel && <p className="text-red-500 text-xs mt-1">{errors.educationLevel}</p>}
             </div>
           </div>
           <Button 

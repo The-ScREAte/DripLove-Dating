@@ -138,15 +138,21 @@ const Index = () => {
         throw new Error("Passwords don't match");
       }
 
-      // Only keep essentials for registration
+      // Include the new registration fields
       const essentials = {
         first_name: formData.firstName,
         last_name: formData.lastName,
         email: formData.email,
         date_of_birth: formData.dateOfBirth,
         country: formData.country,
+        city: formData.city,
+        zip_code: formData.zipCode,
         gender: formData.gender,
         preference: formData.preference,
+        relationship_intent: formData.relationshipIntent,
+        occupation: formData.occupation,
+        industry: formData.industry,
+        education_level: formData.educationLevel,
       };
 
       console.log('Registration essentials:', essentials);
