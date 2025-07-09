@@ -303,7 +303,7 @@ export type Database = {
         Row: {
           account_status: string | null
           bio: string | null
-          city: string
+          city: string | null
           country: string
           created_at: string | null
           date_of_birth: string
@@ -337,7 +337,7 @@ export type Database = {
         Insert: {
           account_status?: string | null
           bio?: string | null
-          city: string
+          city?: string | null
           country: string
           created_at?: string | null
           date_of_birth: string
@@ -371,7 +371,7 @@ export type Database = {
         Update: {
           account_status?: string | null
           bio?: string | null
-          city?: string
+          city?: string | null
           country?: string
           created_at?: string | null
           date_of_birth?: string
