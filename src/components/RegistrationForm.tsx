@@ -107,9 +107,8 @@ const RegistrationForm = ({ onSubmit, onBackToLogin }: RegistrationFormProps) =>
                   <SelectValue placeholder="Select gender" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="man">Man</SelectItem>
-                  <SelectItem value="woman">Woman</SelectItem>
-                  <SelectItem value="non-binary">Non-binary</SelectItem>
+                  <SelectItem value="male">Male</SelectItem>
+                  <SelectItem value="female">Female</SelectItem>
                   <SelectItem value="other">Other</SelectItem>
                 </SelectContent>
               </Select>
@@ -122,8 +121,8 @@ const RegistrationForm = ({ onSubmit, onBackToLogin }: RegistrationFormProps) =>
                   <SelectValue placeholder="Select preference" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="men">Men</SelectItem>
-                  <SelectItem value="women">Women</SelectItem>
+                  <SelectItem value="male">Male</SelectItem>
+                  <SelectItem value="female">Female</SelectItem>
                   <SelectItem value="everyone">Everyone</SelectItem>
                 </SelectContent>
               </Select>
