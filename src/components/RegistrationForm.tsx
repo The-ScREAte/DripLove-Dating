@@ -62,15 +62,13 @@ const RegistrationForm = ({ onSubmit, onBackToLogin }: RegistrationFormProps) =>
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    
     const validationErrors = validateRegistrationForm(formData);
     if (Object.keys(validationErrors).length > 0) {
       setErrors(validationErrors);
       return;
     }
-
-    const submitData = transformFormDataForSubmission(formData);
-    onSubmit(submitData);
+    // Pass the raw formData so password fields are included
+    onSubmit(formData);
   };
 
   return (

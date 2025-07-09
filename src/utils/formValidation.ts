@@ -9,11 +9,8 @@ export const validateRegistrationForm = (formData: any) => {
   if (!formData.password) newErrors.password = 'Password is required';
   if (!formData.confirmPassword) newErrors.confirmPassword = 'Please confirm your password';
   if (!formData.dateOfBirth) newErrors.dateOfBirth = 'Date of birth is required';
-  if (!formData.country) newErrors.country = 'Country is required';
-  if (!formData.city.trim()) newErrors.city = 'City is required';
   if (!formData.gender) newErrors.gender = 'Gender is required';
   if (!formData.preference) newErrors.preference = 'Preference is required';
-  if (!formData.relationshipIntent) newErrors.relationshipIntent = 'Relationship intent is required';
 
   // Email validation
   const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;

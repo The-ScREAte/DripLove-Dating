@@ -131,50 +131,74 @@ const Index = () => {
     setCurrentView('about');
   };
 
+  // Shortest possible registration: essentials only
   const handleRegister = async (formData: any) => {
     try {
       if (formData.password !== formData.confirmPassword) {
         throw new Error("Passwords don't match");
       }
 
-      // Check if user already exists by attempting to sign in first
-      const { data: existingUser } = await supabase.auth.signInWithPassword({
+      // Only keep essentials for registration
+      const essentials = {
+        first_name: formData.firstName,
+        last_name: formData.lastName,
         email: formData.email,
-        password: 'dummy_password'
-      });
+        date_of_birth: formData.dateOfBirth,
+        gender: formData.gender,
+        preference: formData.preference,
+      };
 
-      if (existingUser?.user) {
-        throw new Error("An account with this email already exists. Please try logging in instead.");
-      }
-
-      // Transform the form data before sending to Supabase (use the same as profile)
-      const transformedData = transformFormDataForSubmission(formData);
-
+      // Register user with Supabase Auth
       const { data, error } = await supabase.auth.signUp({
-        email: formData.email,
+        email: essentials.email,
         password: formData.password,
         options: {
-          emailRedirectTo: `${window.location.origin}/`,
-          data: transformedData,
+          // No email confirmation/redirect
+          data: essentials,
         },
       });
-      
       if (error) throw error;
-      
-      if (data.user) {
-        await supabase.from("profiles").insert({
-          id: data.user.id,
-          email: data.user.email,
-          ...transformedData,
-        });
-      }
-      
 
-      if (error) {
-        if (error.message.includes('User already registered')) {
-          throw new Error("An account with this email already exists. Please try logging in instead.");
+
+      // Insert minimal profile row with all possible fields (safe defaults)
+      if (data.user) {
+        const profileInsert = {
+          id: data.user.id,
+          first_name: formData.firstName,
+          last_name: formData.lastName,
+          email: formData.email,
+          date_of_birth: formData.dateOfBirth,
+          gender: formData.gender,
+          preference: formData.preference,
+          // Safe defaults for all other possible columns
+          bio: '',
+          city: '',
+          country: '',
+          zip_code: '',
+          relationship_intent: '',
+          smoking: '',
+          drinking: '',
+          exercise_level: '',
+          sleeping_schedule: '',
+          occupation: '',
+          industry: '',
+          education_level: '',
+          introvert_extrovert: 50,
+          spontaneous_planner: 50,
+          messy_organized: 50,
+          fun_fact: '',
+          perfect_first_date: '',
+          last_googled: '',
+          interests: [],
+          account_status: 'active',
+        };
+        const { error: profileError } = await supabase.from("profiles").insert(profileInsert);
+        if (profileError) {
+          console.error('Profile insert error:', profileError);
+          throw new Error(profileError.message || 'Database error saving new user');
         }
-        throw error;
+        setUser(data.user);
+        setCurrentView('app');
       }
 
       toast({

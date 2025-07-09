@@ -1,0 +1,21 @@
+# Example iOS Info.plist Permissions for AfroVibe
+
+<!-- Add these entries to Info.plist if your app uses these features -->
+
+<!-- Camera Access -->
+<key>NSCameraUsageDescription</key>
+<string>This app requires camera access to let you upload profile photos.</string>
+
+<!-- Photo Library Access -->
+<key>NSPhotoLibraryUsageDescription</key>
+<string>This app requires access to your photo library to let you select profile images.</string>
+
+<!-- Location Access (if needed) -->
+<key>NSLocationWhenInUseUsageDescription</key>
+<string>This app uses your location to improve match suggestions.</string>
+
+<!-- Push Notifications (if needed) -->
+<key>NSUserNotificationUsageDescription</key>
+<string>This app uses notifications to alert you about new matches and messages.</string>
+
+# To use: Copy the relevant <key>...</key> blocks into your ios/App/App/Info.plist file as needed.

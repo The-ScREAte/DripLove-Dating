@@ -134,56 +134,19 @@ const BasicInfoSection = ({
         </div>
       </div>
       
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-        <div className="space-y-2">
-          <Label htmlFor="dateOfBirth" className="text-sm font-medium">Date of Birth *</Label>
-          <div className="relative">
-            <Calendar className="absolute left-3 top-3 h-4 w-4 text-gray-400" />
-            <Input
-              id="dateOfBirth"
-              name="dateOfBirth"
-              type="date"
-              value={formData.dateOfBirth}
-              onChange={onInputChange}
-              className={`pl-10 border-gray-200 focus:border-pink-400 focus:ring-pink-400 ${errors.dateOfBirth ? 'border-red-500' : ''}`}
-            />
-            {errors.dateOfBirth && <p className="text-red-500 text-xs mt-1">{errors.dateOfBirth}</p>}
-          </div>
-        </div>
-        
-        <div className="space-y-2">
-          <Label className="text-sm font-medium">Country *</Label>
-          <Select value={formData.country} onValueChange={(value) => onSelectChange('country', value)}>
-            <SelectTrigger className={`border-gray-200 focus:border-pink-400 focus:ring-pink-400 ${errors.country ? 'border-red-500' : ''}`}>
-              <Globe className="w-4 h-4 mr-2 text-gray-400" />
-              <SelectValue placeholder="Select country" />
-            </SelectTrigger>
-            <SelectContent>
-              {countries.map((country) => (
-                <SelectItem key={country} value={country}>
-                  {country}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-          {errors.country && <p className="text-red-500 text-xs mt-1">{errors.country}</p>}
-        </div>
-        
-        <div className="space-y-2">
-          <Label htmlFor="city" className="text-sm font-medium">City *</Label>
-          <div className="relative">
-            <MapPin className="absolute left-3 top-3 h-4 w-4 text-gray-400" />
-            <Input
-              id="city"
-              name="city"
-              type="text"
-              value={formData.city}
-              onChange={onInputChange}
-              className={`pl-10 border-gray-200 focus:border-pink-400 focus:ring-pink-400 ${errors.city ? 'border-red-500' : ''}`}
-              placeholder="Enter your city"
-            />
-            {errors.city && <p className="text-red-500 text-xs mt-1">{errors.city}</p>}
-          </div>
+      <div className="space-y-2">
+        <Label htmlFor="dateOfBirth" className="text-sm font-medium">Date of Birth *</Label>
+        <div className="relative">
+          <Calendar className="absolute left-3 top-3 h-4 w-4 text-gray-400" />
+          <Input
+            id="dateOfBirth"
+            name="dateOfBirth"
+            type="date"
+            value={formData.dateOfBirth}
+            onChange={onInputChange}
+            className={`pl-10 border-gray-200 focus:border-pink-400 focus:ring-pink-400 ${errors.dateOfBirth ? 'border-red-500' : ''}`}
+          />
+          {errors.dateOfBirth && <p className="text-red-500 text-xs mt-1">{errors.dateOfBirth}</p>}
         </div>
       </div>
     </div>
