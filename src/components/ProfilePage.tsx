@@ -1,30 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
-// Utility to calculate profile completion percentage
-// Improved: Profile completion logic matches visible/required fields, and progress bar is more accurate
-import { UserProfile } from '../types';
-
-function getProfileCompletion(profile: UserProfile, imagesCount: number = 0) {
-  // Only count fields that are actually visible/editable in the profile UI
-  const fields = [
-    profile.first_name,
-    profile.last_name,
-    profile.bio && profile.bio.length > 10,
-    profile.city,
-    profile.country,
-    profile.gender && profile.gender !== 'not_specified',
-    profile.preference && profile.preference !== 'not_specified',
-    profile.relationship_intent && profile.relationship_intent !== 'open_to_anything',
-    profile.occupation,
-    profile.education_level,
-    Array.isArray(profile.interests) && profile.interests.length > 0,
-    imagesCount > 0,
-  ];
-  // Count true values
-  const filled = fields.filter(Boolean).length;
-  const total = fields.length;
-  const percent = Math.min(100, Math.round((filled / total) * 100));
-  return percent;
-}
+import React, { useState, useEffect } from 'react';
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { User, Edit, Save, X, Crown } from 'lucide-react';
@@ -45,8 +19,8 @@ import ProfileSummaryCard from './ProfileSummaryCard';
 import PremiumUpgrade from './PremiumUpgrade';
 
 interface ProfilePageProps {
-  currentUser: UserProfile | null;
-  profile: UserProfile;
+  currentUser: any;
+  profile: any;
   onProfileUpdate: () => void;
   onLogout: () => void;
 }
@@ -58,7 +32,7 @@ const ProfilePage = ({ currentUser, profile, onProfileUpdate, onLogout }: Profil
   const { toast } = useToast();
   const { subscription, loading: subscriptionLoading, isPremium } = useSubscription(currentUser?.id);
 
-  const [editedProfile, setEditedProfile] = useState(() => ({
+  const [editedProfile, setEditedProfile] = useState({
     first_name: '',
     last_name: '',
     bio: '',
@@ -83,32 +57,7 @@ const ProfilePage = ({ currentUser, profile, onProfileUpdate, onLogout }: Profil
     perfect_first_date: '',
     last_googled: '',
     interests: [] as string[],
-  }));
-  const [imagesCount, setImagesCount] = useState(0);
-  const [showProfileToast, setShowProfileToast] = useState(false);
-  const profileToastShown = useRef(false);
-  // Listen for image uploads (assume ImageManagement can call this via prop or event)
-  // For now, we will just check profile?.images if available, else leave as 0
-  useEffect(() => {
-    // Images are stored separately in user_images table, not in profile
-    // We'll set imagesCount based on actual images from ImageManagement component
-    setImagesCount(0); // Default to 0, will be updated by ImageManagement
-  }, [profile]);
-  // Calculate completion
-  const completion = getProfileCompletion(profile, imagesCount);
-  // Show a toast notification once per session if profile is incomplete
-  useEffect(() => {
-    if (completion < 100 && !profileToastShown.current) {
-      setShowProfileToast(true);
-      toast({
-        title: 'Complete your profile',
-        description: 'Finish your profile for better matches and more visibility!',
-        variant: 'default',
-        duration: 6000,
-      });
-      profileToastShown.current = true;
-    }
-  }, [completion, toast]);
+  });
 
   useEffect(() => {
     if (profile) {
@@ -171,7 +120,7 @@ const ProfilePage = ({ currentUser, profile, onProfileUpdate, onLogout }: Profil
         bio: editedProfile.bio?.trim() || null,
         city: editedProfile.city?.trim() || null,
         country: editedProfile.country?.trim() || null,
-        date_of_birth: profile?.date_of_birth || '1990-01-01',
+        date_of_birth: profile?.date_of_birth || currentUser?.user_metadata?.date_of_birth || '1990-01-01',
         email: currentUser.email,
         distance_preference: editedProfile.distance_preference || 25,
         gender: editedProfile.gender || 'not_specified',
@@ -238,9 +187,9 @@ const ProfilePage = ({ currentUser, profile, onProfileUpdate, onLogout }: Profil
       setIsEditing(false);
       onProfileUpdate();
       toast({ title: 'Profile updated', description: 'Your AfroVibe profile has been saved successfully.' });
-    } catch (error: unknown) {
+    } catch (error: any) {
       console.error('🚨 Save failed:', error);
-      toast({ title: 'Error', description: (error as Error).message || 'Failed to update profile.', variant: 'destructive' });
+      toast({ title: 'Error', description: error.message || 'Failed to update profile.', variant: 'destructive' });
     } finally {
       setIsSaving(false);
     }
@@ -279,28 +228,32 @@ const ProfilePage = ({ currentUser, profile, onProfileUpdate, onLogout }: Profil
   };
 
   if (showPremiumUpgrade) {
-    return <PremiumUpgrade currentUser={currentUser} onClose={() => setShowPremiumUpgrade(false)} />;
+    // Match LikedMePage: pass preselectedPlan="premium" for correct upgrade modal
+    return (
+      <PremiumUpgrade currentUser={currentUser} onClose={() => setShowPremiumUpgrade(false)} preselectedPlan="premium" />
+    );
   }
+
+  // --- BEGIN: Improved Profile Progress Bar and Actionable Feedback ---
+  // Calculate profile completion
+  const requiredFields = [
+    'first_name', 'last_name', 'bio', 'city', 'country', 'gender', 'preference',
+    'relationship_intent', 'occupation', 'education_level', 'interests', 'images'
+  ];
+  const profileImages = profile?.images || [];
+  const missingFields = requiredFields.filter(field => {
+    if (field === 'interests') return !profile?.interests || profile.interests.length === 0;
+    if (field === 'images') return !profileImages || profileImages.length === 0;
+    return !profile?.[field] || (typeof profile[field] === 'string' && profile[field].trim() === '');
+  });
+  const completion = Math.round(((requiredFields.length - missingFields.length) / requiredFields.length) * 100);
+
+  // --- END: Improved Profile Progress Bar and Actionable Feedback ---
+
+  const [hideProfileCompletion, setHideProfileCompletion] = useState(false);
 
   return (
     <div className="h-full flex flex-col">
-      {/* Profile Completion Progress Bar */}
-      {completion < 100 && (
-        <div className="w-full bg-yellow-100 border-b border-yellow-300 py-2 px-4 flex flex-col items-center animate-fade-in">
-          <div className="w-full max-w-xl flex flex-col items-center">
-            <div className="w-full bg-yellow-200 rounded-full h-3 mb-1 overflow-hidden">
-              <div
-                className="bg-gradient-to-r from-pink-400 to-yellow-400 h-3 rounded-full transition-all duration-500"
-                style={{ width: `${completion}%` }}
-              />
-            </div>
-            <div className="text-sm font-semibold text-yellow-700">
-              Profile {completion}% complete
-            </div>
-            <div className="text-xs text-yellow-600 mt-1">Complete your profile for better, more accurate matches!</div>
-          </div>
-        </div>
-      )}
       {/* Fixed Header */}
       <div className="flex-shrink-0 bg-white border-b p-4">
         <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
@@ -308,8 +261,8 @@ const ProfilePage = ({ currentUser, profile, onProfileUpdate, onLogout }: Profil
             <User className="w-6 h-6 text-pink-600" />
             <h1 className="text-2xl font-bold text-gray-800">Your AfroVibe Profile</h1>
           </div>
-          <div className="flex flex-col gap-2 w-full">
-          {!subscriptionLoading && !isPremium() && (
+          <div className="flex flex-row gap-2 w-full">
+            {!subscriptionLoading && !isPremium() && (
               <Button 
                 onClick={() => setShowPremiumUpgrade(true)}
                 className="bg-gradient-to-r from-yellow-400 to-yellow-600 hover:from-yellow-500 hover:to-yellow-700 text-black font-bold w-full sm:w-auto"
@@ -323,8 +276,8 @@ const ProfilePage = ({ currentUser, profile, onProfileUpdate, onLogout }: Profil
                 <Edit className="w-4 h-4 mr-2" /> Edit Profile
               </Button>
             ) : (
-<div className="flex flex-col gap-2 w-full">
-<Button onClick={handleSave} disabled={isSaving} className="w-full sm:w-auto">
+              <div className="flex flex-row gap-2 w-full">
+                <Button onClick={handleSave} disabled={isSaving} className="w-full sm:w-auto">
                   <Save className="w-4 h-4 mr-2" /> {isSaving ? 'Saving...' : 'Save'}
                 </Button>
                 <Button variant="outline" onClick={handleCancel} disabled={isSaving} className="w-full sm:w-auto">
@@ -333,6 +286,35 @@ const ProfilePage = ({ currentUser, profile, onProfileUpdate, onLogout }: Profil
               </div>
             )}
           </div>
+        </div>
+        {/* Profile Completion Progress Bar */}
+        <div className="mt-4">
+          <div className="flex items-center gap-2">
+            <div className="flex-1 h-3 bg-gray-200 rounded-full overflow-hidden">
+              <div
+                className="h-3 bg-pink-500 transition-all duration-500"
+                style={{ width: `${completion}%` }}
+              />
+            </div>
+            <span className="text-xs font-semibold text-gray-700 min-w-[40px] text-right">{completion}%</span>
+          </div>
+          {missingFields.length > 0 && !hideProfileCompletion && (
+            <div className="mt-2 text-xs text-yellow-700 bg-yellow-100 rounded px-3 py-2 relative">
+              <button
+                className="absolute top-2 right-2 text-yellow-700 hover:text-yellow-900 text-lg font-bold focus:outline-none"
+                aria-label="Dismiss profile completion"
+                onClick={() => setHideProfileCompletion(true)}
+              >
+                ×
+              </button>
+              <span className="font-semibold">Complete your profile:</span>
+              <ul className="list-disc ml-5 mt-1">
+                {missingFields.map(field => (
+                  <li key={field}>{field.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase())}</li>
+                ))}
+              </ul>
+            </div>
+          )}
         </div>
       </div>
 

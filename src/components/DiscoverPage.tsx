@@ -7,7 +7,6 @@ import { useToast } from '@/hooks/use-toast';
 import { useSubscription } from '@/hooks/useSubscription';
 import PremiumUpgrade from './PremiumUpgrade';
 import MatchAnimation from './MatchAnimation';
-import { useLocation, useNavigate } from 'react-router-dom';
 
 interface DiscoverPageProps {
   currentUser: any;
@@ -45,9 +44,11 @@ const DiscoverPage = ({ currentUser, onNavigateToChat }: DiscoverPageProps) => {
   const [isOutOfSwipes, setIsOutOfSwipes] = useState(false);
   const [showMatchAnimation, setShowMatchAnimation] = useState(false);
   const [matchedUser, setMatchedUser] = useState<PotentialMatch | null>(null);
+  // New: Store images by userId for instant access
+  const [userImages, setUserImages] = useState<{ [key: string]: string[] }>({});
   const { toast } = useToast();
   
-  const { subscription, checkUsageLimit, isPremium, refetchSubscription } = useSubscription(currentUser?.id);
+  const { subscription, checkUsageLimit, isPremium } = useSubscription(currentUser?.id);
   const [lastShuffleTime, setLastShuffleTime] = useState<number>(0);
   const [startX, setStartX] = useState(0);
   const [startY, setStartY] = useState(0);
@@ -56,22 +57,17 @@ const DiscoverPage = ({ currentUser, onNavigateToChat }: DiscoverPageProps) => {
   const [isDragging, setIsDragging] = useState(false);
   const [swipeDirection, setSwipeDirection] = useState<'left' | 'right' | null>(null);
   const [swipeDistance, setSwipeDistance] = useState(0);
-  const location = useLocation();
-  const navigate = useNavigate();
 
   // Memoize expensive calculations
-  // Map registration/profile values to DB gender values
   const getGenderFilter = useCallback((userPreference: string) => {
-    // Normalize preference values from registration/profile
-    if (userPreference === 'men' || userPreference === 'male' || userPreference === 'man') {
-      return ['man'];
-    } else if (userPreference === 'women' || userPreference === 'female' || userPreference === 'woman') {
-      return ['woman'];
-    } else if (userPreference === 'everyone' || userPreference === 'both' || userPreference === 'other' || userPreference === 'non-binary') {
-      // Show all except admin
-      return ['man', 'woman', 'non-binary', 'other'];
+    if (userPreference === 'male') {
+      return ['male'];
+    } else if (userPreference === 'female') {
+      return ['female'];
+    } else if (userPreference === 'everyone' || userPreference === 'both') {
+      return ['male', 'female', 'other'];
     }
-    return ['man', 'woman', 'non-binary', 'other']; // default to all
+    return ['male', 'female', 'other']; // default to all
   }, []);
 
   const allowedGenders = useMemo(() => 
@@ -143,36 +139,14 @@ const DiscoverPage = ({ currentUser, onNavigateToChat }: DiscoverPageProps) => {
 
       if (error) throw error;
 
-      // Fetch images only for visible profiles (first 5)
-      const profilesToShow = profiles?.slice(0, 5) || [];
-      const matchesWithImages = await Promise.all([
-        ...profilesToShow.map(async (profile) => {
-          const { data: images } = await supabase
-            .from('user_images')
-            .select('image_url')
-            .eq('user_id', profile.id)
-            .order('image_order', { ascending: true })
-            .limit(3); // Limit images per profile for faster loading
-
-          return {
-            ...profile,
-            images: images?.map(img => img.image_url) || []
-          };
-        }),
-        // Add remaining profiles without images initially
-        ...(profiles?.slice(5).map(profile => ({
-          ...profile,
-          images: []
-        })) || [])
-      ]);
+      // New: Don't fetch images here, just set up profiles and preload images below
+      const shuffled = (profiles || []).sort(() => 0.5 - Math.random());
 
       // Load last profile ID and time from localStorage
       const savedId = localStorage.getItem('afrovibe_last_profile_id');
       const savedTime = parseInt(localStorage.getItem('afrovibe_last_profile_time') || '0');
       const twentyFourHours = 24 * 60 * 60 * 1000;
       const isSavedValid = savedId && Date.now() - savedTime < twentyFourHours;
-
-      const shuffled = matchesWithImages.sort(() => 0.5 - Math.random());
 
       let indexToShow = 0;
       if (isSavedValid) {
@@ -185,6 +159,9 @@ const DiscoverPage = ({ currentUser, onNavigateToChat }: DiscoverPageProps) => {
       setPotentialMatches(shuffled);
       setCurrentIndex(indexToShow);
       setLastShuffleTime(Date.now());
+
+      // Preload images for the first 3 profiles
+      preloadNextProfileImages(shuffled, {}, 0);
     } catch (error) {
       console.error('Error fetching potential matches:', error);
       toast({
@@ -197,26 +174,31 @@ const DiscoverPage = ({ currentUser, onNavigateToChat }: DiscoverPageProps) => {
     }
   }, [currentUser, allowedGenders, toast]);
 
-  // Preload images for next profile
-  const preloadNextImages = useCallback(async (nextIndex: number) => {
-    if (nextIndex < potentialMatches.length && potentialMatches[nextIndex].images.length === 0) {
-      const { data: images } = await supabase
-        .from('user_images')
-        .select('image_url')
-        .eq('user_id', potentialMatches[nextIndex].id)
-        .order('image_order', { ascending: true })
-        .limit(3);
 
-      if (images?.length) {
-        const updatedMatches = [...potentialMatches];
-        updatedMatches[nextIndex] = {
-          ...updatedMatches[nextIndex],
-          images: images.map(img => img.image_url)
-        };
-        setPotentialMatches(updatedMatches);
-      }
+  // Preload images for the next N profiles (like LikedMePage)
+  const loadFullImages = useCallback(async (profileId: string) => {
+    if (userImages[profileId]?.length > 0) return; // Already loaded
+    const { data: images } = await supabase
+      .from('user_images')
+      .select('image_url')
+      .eq('user_id', profileId)
+      .order('image_order', { ascending: true });
+    if (images?.length) {
+      setUserImages(prev => ({
+        ...prev,
+        [profileId]: images.map(img => img.image_url)
+      }));
     }
-  }, [potentialMatches]);
+  }, [userImages]);
+
+  // Preload images for the next N profiles for smoother UX
+  const preloadNextProfileImages = useCallback((matches: PotentialMatch[], alreadyLoaded: { [key: string]: string[] }, startIdx: number) => {
+    // Preload for the next 2 profiles (can adjust as needed)
+    const toPreload = matches.slice(startIdx, startIdx + 2).filter(match => !alreadyLoaded[match.id] || alreadyLoaded[match.id].length === 0);
+    for (const match of toPreload) {
+      void loadFullImages(match.id);
+    }
+  }, [loadFullImages]);
 
   useEffect(() => {
     if (currentUser?.id) {
@@ -226,18 +208,18 @@ const DiscoverPage = ({ currentUser, onNavigateToChat }: DiscoverPageProps) => {
 
   // Save current match state
   useEffect(() => {
-  if (potentialMatches.length > 0) {
-    localStorage.setItem('afrovibe_last_profile_id', potentialMatches[currentIndex]?.id || '');
-    localStorage.setItem('afrovibe_last_profile_time', Date.now().toString());
-  }
+    if (potentialMatches.length > 0) {
+      localStorage.setItem('afrovibe_last_profile_id', potentialMatches[currentIndex]?.id || '');
+      localStorage.setItem('afrovibe_last_profile_time', Date.now().toString());
+    }
   }, [currentIndex, potentialMatches]);
 
   useEffect(() => {
     setImageIndex(0);
     setShowMoreInfo(false);
-    // Preload next profile images
-    preloadNextImages(currentIndex + 1);
-  }, [currentIndex, preloadNextImages]);
+    // Preload images for the next 2 profiles
+    preloadNextProfileImages(potentialMatches, userImages, currentIndex + 1);
+  }, [currentIndex, potentialMatches, userImages, preloadNextProfileImages]);
 
   const handleTouchStart = (e: React.TouchEvent) => {
     const touch = e.touches[0];
@@ -370,11 +352,14 @@ const DiscoverPage = ({ currentUser, onNavigateToChat }: DiscoverPageProps) => {
     }
   };
 
+  // Optimistic UI: move to next card instantly, then process like in background
   const handleLike = async () => {
     const currentMatch = potentialMatches[currentIndex];
     if (!currentMatch) return;
 
-    // Check swipe limit before proceeding
+    moveToNext(); // Move UI instantly
+
+    // Check swipe limit before proceeding (but UI is already updated)
     const usageResult = await checkUsageLimit('swipe');
     if (!usageResult.success) {
       setIsOutOfSwipes(true);
@@ -394,21 +379,19 @@ const DiscoverPage = ({ currentUser, onNavigateToChat }: DiscoverPageProps) => {
       if (error) throw error;
 
       const { data: mutualLike, error: mutualError } = await supabase
-      .from('likes')
-      .select('*')
-      .match({ liker_id: currentMatch.id, liked_id: currentUser.id })
-      .maybeSingle();
-    
-    if (mutualError) {
-      console.error('Error checking mutual like:', mutualError.message);
-    }
-    
+        .from('likes')
+        .select('*')
+        .match({ liker_id: currentMatch.id, liked_id: currentUser.id })
+        .maybeSingle();
+
+      if (mutualError) {
+        console.error('Error checking mutual like:', mutualError.message);
+      }
+
       if (mutualLike) {
         setMatchedUser(currentMatch);
         setShowMatchAnimation(true);
       }
-
-      moveToNext();
     } catch (error) {
       console.error('Error liking user:', error);
       toast({
@@ -419,11 +402,14 @@ const DiscoverPage = ({ currentUser, onNavigateToChat }: DiscoverPageProps) => {
     }
   };
 
+  // Optimistic UI: move to next card instantly, then process pass in background
   const handlePass = async () => {
     const currentMatch = potentialMatches[currentIndex];
     if (!currentMatch) return;
 
-    // Check swipe limit before proceeding
+    moveToNext(); // Move UI instantly
+
+    // Check swipe limit before proceeding (but UI is already updated)
     const usageResult = await checkUsageLimit('swipe');
     if (!usageResult.success) {
       setIsOutOfSwipes(true);
@@ -440,10 +426,7 @@ const DiscoverPage = ({ currentUser, onNavigateToChat }: DiscoverPageProps) => {
         passer_id: currentUser.id,
         passed_id: currentMatch.id
       });
-    
       if (error) throw error;
-    
-      moveToNext();
     } catch (err) {
       console.error('Error saving pass:', err);
       toast({
@@ -452,7 +435,6 @@ const DiscoverPage = ({ currentUser, onNavigateToChat }: DiscoverPageProps) => {
         variant: 'destructive'
       });
     }
-        moveToNext();
   };
 
   const handleReverse = async () => {
@@ -509,39 +491,6 @@ const DiscoverPage = ({ currentUser, onNavigateToChat }: DiscoverPageProps) => {
     setMatchedUser(null);
   };
 
-  useEffect(() => {
-    // Check for Flutterwave payment success in query params
-    const params = new URLSearchParams(location.search);
-    const status = params.get('status');
-    const tx_ref = params.get('tx_ref');
-    const transaction_id = params.get('transaction_id');
-    if (status === 'successful' && transaction_id && currentUser?.id) {
-      (async () => {
-        const { error } = await supabase
-          .from('user_subscriptions')
-          .upsert({ 
-            user_id: currentUser.id,
-            plan_name: 'premium', 
-            status: 'active',
-            starts_at: new Date().toISOString(),
-            flutterwave_transaction_id: transaction_id,
-            updated_at: new Date().toISOString()
-          }, {
-            onConflict: 'user_id',
-            ignoreDuplicates: false
-          });
-        if (!error) {
-          await refetchSubscription();
-          toast({ title: 'Premium Activated!', description: 'Your account has been upgraded.' });
-        } else {
-          console.error('Payment DB update error:', error);
-          toast({ title: 'Payment Error', description: 'Could not activate premium. Contact support.' });
-        }
-        navigate('/discover', { replace: true });
-      })();
-    }
-  }, [location.search, currentUser, toast, navigate, refetchSubscription]);
-
   if (showMatchAnimation && matchedUser) {
     return (
       <MatchAnimation
@@ -556,7 +505,18 @@ const DiscoverPage = ({ currentUser, onNavigateToChat }: DiscoverPageProps) => {
   }
 
   if (showPremiumUpgrade) {
-    return <PremiumUpgrade currentUser={currentUser} onClose={() => setShowPremiumUpgrade(false)} />;
+    return (
+      <div className="h-full flex flex-col items-center justify-center">
+        <div className="w-full max-w-lg">
+          <PremiumUpgrade currentUser={currentUser} onClose={() => setShowPremiumUpgrade(false)} />
+          <div className="flex justify-center mt-4">
+            <Button variant="outline" onClick={() => setShowPremiumUpgrade(false)}>
+              Cancel
+            </Button>
+          </div>
+        </div>
+      </div>
+    );
   }
 
   if (isLoading) {
@@ -578,13 +538,13 @@ const DiscoverPage = ({ currentUser, onNavigateToChat }: DiscoverPageProps) => {
               Free users get 12 swipes per day. Come back tomorrow or upgrade to Premium for unlimited swipes!
             </p>
             <div className="space-y-3">
-              <Button 
-                onClick={() => setShowPremiumUpgrade(true)} 
-                className="w-full bg-gradient-to-r from-yellow-400 to-yellow-600 hover:from-yellow-500 hover:to-yellow-700 text-black font-bold"
-              >
-                <Crown className="w-4 h-4 mr-2" />
-                Upgrade to Premium
-              </Button>
+            <Button 
+              onClick={() => setShowPremiumUpgrade(true)} 
+              className="w-full bg-gradient-to-r from-yellow-400 to-yellow-600 hover:from-yellow-500 hover:to-yellow-700 text-black font-bold"
+            >
+              <Crown className="w-4 h-4 mr-2" />
+              Upgrade to Premium
+            </Button>
               <Button 
                 onClick={() => {
                   setIsOutOfSwipes(false);
@@ -603,6 +563,10 @@ const DiscoverPage = ({ currentUser, onNavigateToChat }: DiscoverPageProps) => {
   }
 
   const currentMatch = potentialMatches[currentIndex];
+  // Use preloaded images for current and next card
+  const currentMatchImages = currentMatch ? (userImages[currentMatch.id] || []) : [];
+  const nextMatch = potentialMatches[currentIndex + 1];
+  const nextMatchImages = nextMatch ? (userImages[nextMatch.id] || []) : [];
 
   if (!currentMatch) {
     return (
@@ -614,6 +578,7 @@ const DiscoverPage = ({ currentUser, onNavigateToChat }: DiscoverPageProps) => {
             <p className="text-gray-600 mb-4">
               You've seen all available profiles. Check back later for new matches!
             </p>
+
             <Button onClick={fetchPotentialMatches} className="w-full">
               Refresh
             </Button>
@@ -627,14 +592,48 @@ const DiscoverPage = ({ currentUser, onNavigateToChat }: DiscoverPageProps) => {
   const swipeOpacity = Math.min(swipeDistance / 100, 0.8);
   const cardTransform = isDragging ? `translateX(${currentX - startX}px) rotate(${(currentX - startX) * 0.1}deg)` : '';
 
-  return (
-<div className="h-full w-full fixed top-0 left-0 overflow-hidden">
-{/* Main Image Area - Fixed height container with reserved space for buttons */}
-<div className="flex-1 relative overflow-hidden h-[calc(100vh-80px)]">
-      <div 
-          className="h-full w-full cursor-pointer select-none relative" 
-          style={{ transform: cardTransform, transition: isDragging ? 'none' : 'transform 0.3s ease-out'}}
 
+
+  return (
+    <div className="h-full w-full fixed top-0 left-0 overflow-hidden">
+      {/* Main Image Area - Card stack */}
+      <div className="flex-1 relative overflow-hidden h-[calc(100vh-80px)]">
+        {/* Next card (preloaded, below) */}
+        {nextMatch && (
+          <div
+            className={`absolute inset-0 z-0 scale-95 opacity-80 pointer-events-none transition-all duration-300 ${isDragging ? 'blur-[1.5px]' : ''}`}
+            style={{
+              filter: isDragging ? 'blur(1.5px)' : 'none',
+              transition: 'filter 0.2s, opacity 0.2s, transform 0.2s',
+            }}
+          >
+            {nextMatchImages.length > 0 ? (
+              <img
+                src={nextMatchImages[0]}
+                alt={`${nextMatch.first_name}'s photo`}
+                className="w-full h-full object-cover object-center"
+                draggable={false}
+                loading="eager"
+              />
+            ) : (
+              <div className="w-full h-full bg-gradient-to-br from-pink-200 to-purple-200 flex items-center justify-center">
+                <span className="text-6xl font-bold text-gray-700">
+                  {nextMatch.first_name?.[0]}{nextMatch.last_name?.[0]}
+                </span>
+              </div>
+            )}
+            <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-transparent to-transparent pointer-events-none" />
+          </div>
+        )}
+
+        {/* Current card (top) */}
+        <div
+          className="h-full w-full cursor-pointer select-none relative z-10"
+          style={{
+            transform: cardTransform,
+            transition: isDragging ? 'none' : 'transform 0.3s cubic-bezier(0.22, 1, 0.36, 1)',
+            boxShadow: isDragging ? '0 8px 32px 0 rgba(0,0,0,0.25)' : '0 4px 16px 0 rgba(0,0,0,0.10)'
+          }}
           onTouchStart={handleTouchStart}
           onTouchMove={handleTouchMove}
           onTouchEnd={handleTouchEnd}
@@ -648,7 +647,7 @@ const DiscoverPage = ({ currentUser, onNavigateToChat }: DiscoverPageProps) => {
             <>
               {/* Like Overlay (Right Swipe) */}
               {swipeDirection === 'right' && (
-                <div 
+                <div
                   className="absolute inset-0 bg-green-500/20 flex items-center justify-center z-20 pointer-events-none"
                   style={{ opacity: swipeOpacity }}
                 >
@@ -658,10 +657,10 @@ const DiscoverPage = ({ currentUser, onNavigateToChat }: DiscoverPageProps) => {
                   </div>
                 </div>
               )}
-              
+
               {/* Dislike Overlay (Left Swipe) */}
               {swipeDirection === 'left' && (
-                <div 
+                <div
                   className="absolute inset-0 bg-red-500/20 flex items-center justify-center z-20 pointer-events-none"
                   style={{ opacity: swipeOpacity }}
                 >
@@ -674,10 +673,10 @@ const DiscoverPage = ({ currentUser, onNavigateToChat }: DiscoverPageProps) => {
             </>
           )}
 
-          {currentMatch.images?.length > 0 ? (
+          {currentMatchImages.length > 0 ? (
             <>
               <img
-                src={currentMatch.images[imageIndex]}
+                src={currentMatchImages[imageIndex]}
                 alt={`${currentMatch.first_name}'s photo`}
                 className="w-full h-full object-cover object-center"
                 draggable={false}
@@ -685,7 +684,7 @@ const DiscoverPage = ({ currentUser, onNavigateToChat }: DiscoverPageProps) => {
               />
               {/* Image indicators */}
               <div className="absolute top-4 left-1/2 transform -translate-x-1/2 flex gap-1 z-10">
-                {currentMatch.images.map((_, idx) => (
+                {currentMatchImages.map((_, idx) => (
                   <div
                     key={idx}
                     className={`w-2 h-2 rounded-full ${idx === imageIndex ? 'bg-white' : 'bg-white/40'}`}
@@ -737,11 +736,11 @@ const DiscoverPage = ({ currentUser, onNavigateToChat }: DiscoverPageProps) => {
               </Button>
 
               {showMoreInfo && (
-              <div
-                className="space-y-3 bg-black/50 p-3 rounded-lg max-h-32 overflow-y-auto"
-                onTouchStart={(e) => e.stopPropagation()}
-                onTouchMove={(e) => e.stopPropagation()}
-              >
+                <div
+                  className="space-y-3 bg-black/50 p-3 rounded-lg max-h-32 overflow-y-auto"
+                  onTouchStart={(e) => e.stopPropagation()}
+                  onTouchMove={(e) => e.stopPropagation()}
+                >
                   {currentMatch.bio && (
                     <div>
                       <h3 className="font-semibold mb-1 text-sm">About</h3>
@@ -786,37 +785,37 @@ const DiscoverPage = ({ currentUser, onNavigateToChat }: DiscoverPageProps) => {
             </div>
           </div>
         </div>
-      </div>
 
-      {/* Action Buttons - Fixed position at bottom with higher z-index and moved up more */}
-      <div className="absolute bottom-24 left-0 right-0 flex justify-center space-x-6 px-6 z-30">
-      <Button
-          onClick={handlePass}
-          variant="outline"
-          className="w-16 h-16 rounded-full border-2 border-red-500 bg-red-500/20 hover:bg-red-500/30 backdrop-blur-sm shadow-lg hover:border-red-400 transition-all duration-200"
-        >
-          <X className="w-7 h-7 text-red-500" />
-        </Button>
+        {/* Action Buttons - Fixed position at bottom with higher z-index and moved up more */}
+        <div className="absolute bottom-8 left-0 right-0 flex justify-center space-x-6 px-6 z-30">
+          <Button
+            onClick={handlePass}
+            variant="outline"
+            className="w-16 h-16 rounded-full border-2 border-red-500 bg-red-500/20 hover:bg-red-500/30 backdrop-blur-sm shadow-lg hover:border-red-400 transition-all duration-200"
+          >
+            <X className="w-7 h-7 text-red-500" />
+          </Button>
 
-        <Button
-          onClick={handleReverse}
-          variant="outline"
-          disabled={!passedUsers.length}
-          className="w-16 h-16 rounded-full border-2 border-yellow-500 bg-yellow-500/20 hover:bg-yellow-500/30 disabled:opacity-30 backdrop-blur-sm shadow-lg hover:border-yellow-400 transition-all duration-200"
-        >
-          <Undo2 className="w-7 h-7 text-yellow-500" />
-        </Button>
+          <Button
+            onClick={handleReverse}
+            variant="outline"
+            disabled={!passedUsers.length}
+            className="w-16 h-16 rounded-full border-2 border-yellow-500 bg-yellow-500/20 hover:bg-yellow-500/30 disabled:opacity-30 backdrop-blur-sm shadow-lg hover:border-yellow-400 transition-all duration-200"
+          >
+            <Undo2 className="w-7 h-7 text-yellow-500" />
+          </Button>
 
-        <Button
-          onClick={handleLike}
-          variant="outline"
-          className="w-16 h-16 rounded-full border-2 border-green-500 bg-green-500/20 hover:bg-green-500/30 backdrop-blur-sm shadow-lg hover:border-green-400 transition-all duration-200"
-        >
-          <Heart className="w-7 h-7 text-green-500" />
-        </Button>
+          <Button
+            onClick={handleLike}
+            variant="outline"
+            className="w-16 h-16 rounded-full border-2 border-green-500 bg-green-500/20 hover:bg-green-500/30 backdrop-blur-sm shadow-lg hover:border-green-400 transition-all duration-200"
+          >
+            <Heart className="w-7 h-7 text-green-500" />
+          </Button>
+        </div>
       </div>
     </div>
   );
-};
+}
 
 export default DiscoverPage;
