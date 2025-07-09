@@ -11,6 +11,7 @@ import { Heart, MapPin, Briefcase, GraduationCap } from 'lucide-react';
 import BasicInfoSection from '@/components/forms/BasicInfoSection';
 import { validateRegistrationForm, transformFormDataForSubmission } from '@/utils/formValidation';
 import { initialFormData } from '@/constants/formData';
+import { occupationOptions, industryOptions } from '@/constants/professionOptions';
 
 interface RegistrationFormProps {
   onSubmit: (data: any) => void;
@@ -180,26 +181,30 @@ const RegistrationForm = ({ onSubmit, onBackToLogin }: RegistrationFormProps) =>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div className="space-y-2">
                 <Label className="text-sm font-medium">Occupation</Label>
-                <Input
-                  type="text"
-                  name="occupation"
-                  value={formData.occupation}
-                  onChange={handleInputChange}
-                  placeholder="Your job title"
-                  className={`border-gray-200 focus:border-pink-400 focus:ring-pink-400 ${errors.occupation ? 'border-red-500' : ''}`}
-                />
+                <Select value={formData.occupation} onValueChange={(value) => handleSelectChange('occupation', value)}>
+                  <SelectTrigger className={`border-gray-200 focus:border-pink-400 focus:ring-pink-400 ${errors.occupation ? 'border-red-500' : ''}`}>
+                    <SelectValue placeholder="Select your occupation" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {occupationOptions.map(option => (
+                      <SelectItem key={option} value={option}>{option}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
                 {errors.occupation && <p className="text-red-500 text-xs mt-1">{errors.occupation}</p>}
               </div>
               <div className="space-y-2">
                 <Label className="text-sm font-medium">Industry</Label>
-                <Input
-                  type="text"
-                  name="industry"
-                  value={formData.industry}
-                  onChange={handleInputChange}
-                  placeholder="Your industry"
-                  className={`border-gray-200 focus:border-pink-400 focus:ring-pink-400 ${errors.industry ? 'border-red-500' : ''}`}
-                />
+                <Select value={formData.industry} onValueChange={(value) => handleSelectChange('industry', value)}>
+                  <SelectTrigger className={`border-gray-200 focus:border-pink-400 focus:ring-pink-400 ${errors.industry ? 'border-red-500' : ''}`}>
+                    <SelectValue placeholder="Select your industry" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {industryOptions.map(option => (
+                      <SelectItem key={option} value={option}>{option}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
                 {errors.industry && <p className="text-red-500 text-xs mt-1">{errors.industry}</p>}
               </div>
             </div>
