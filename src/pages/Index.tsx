@@ -144,6 +144,7 @@ const Index = () => {
         last_name: formData.lastName,
         email: formData.email,
         date_of_birth: formData.dateOfBirth,
+        country: formData.country,
         gender: formData.gender,
         preference: formData.preference,
       };
@@ -173,7 +174,7 @@ const Index = () => {
           // Safe defaults for all other possible columns
           bio: '',
           city: '',
-          country: '',
+          country: formData.country,
           zip_code: '',
           relationship_intent: '',
           smoking: '',
