@@ -149,6 +149,8 @@ const Index = () => {
         preference: formData.preference,
       };
 
+      console.log('Registration essentials:', essentials);
+
       // Register user with Supabase Auth - the trigger will create the profile automatically
       const { data, error } = await supabase.auth.signUp({
         email: essentials.email,
