@@ -173,23 +173,23 @@ class PhotoModerationService {
       };
     }
 
-    // More aggressive thresholds for dating app context to catch inappropriate content
-    if (skinToneRatio > 0.80) { // 80%+ skin tone - flag as explicit content
-      explicitContent = 90;
+    // More aggressive thresholds to catch inappropriate content
+    if (skinToneRatio > 0.65) { // 65%+ skin tone - flag as explicit content
+      explicitContent = 95;
       flags.push(MODERATION_FLAGS.EXPLICIT_CONTENT);
-      console.log('🚨 Explicit content detected - 80%+ skin tone');
+      console.log('🚨 Explicit content detected - 65%+ skin tone');
     }
-    else if (skinToneRatio > 0.70) { // 70%+ skin tone - flag as adult content  
+    else if (skinToneRatio > 0.50) { // 50%+ skin tone - flag as adult content  
       adultContent = 85;
       flags.push(MODERATION_FLAGS.ADULT_CONTENT);
-      console.log('🚨 Adult content detected - 70%+ skin tone');
+      console.log('🚨 Adult content detected - 50%+ skin tone');
     }
-    else if (skinToneRatio > 0.60) { // 60%+ skin tone - flag as suggestive
+    else if (skinToneRatio > 0.35) { // 35%+ skin tone - flag as suggestive
       suggestiveContent = 80;
-      console.log('⚠️ Suggestive content detected - 60%+ skin tone, requires review');
+      console.log('⚠️ Suggestive content detected - 35%+ skin tone, requires review');
     }
     else {
-      // For 25-60% skin tone, approve without flags (includes normal dating photos)
+      // For 25-35% skin tone, approve without flags (normal dating photos)
       console.log('✅ Acceptable skin tone ratio for dating profile');
     }
 
@@ -415,20 +415,19 @@ class PhotoModerationService {
    * Helper function to detect skin tones with very restrictive criteria
    */
   private isSkinTone(r: number, g: number, b: number): boolean {
-    // EXTREMELY restrictive skin tone detection to avoid false positives on normal photos
-    const max = Math.max(r, g, b);
-    const min = Math.min(r, g, b);
+    // More balanced skin tone detection that catches inappropriate content
+    // while still being reasonable for normal photos
     
-    // Skip very dark, very light, or very colorful pixels
-    if (max < 100 || min > 200 || max - min < 20) return false;
+    // Skip very dark or very bright pixels
+    if (r < 80 || g < 60 || b < 50 || r > 250 || g > 230 || b > 200) return false;
     
-    // Much more restrictive criteria - only match very obvious skin tones
+    // Basic skin tone criteria - much more permissive to catch actual skin
     return (
-      r > 120 && g > 80 && b > 60 && // Much higher minimum thresholds
-      r > g + 20 && r > b + 30 && // Strong red dominance required
-      g > b + 10 && // Green should be higher than blue
-      Math.abs(r - g) > 10 && Math.abs(r - g) < 50 && // Reasonable red-green ratio
-      r - b > 20 && r - b < 80 // Specific red-blue difference for skin
+      r > 95 && g > 50 && b > 40 && // Lower minimum thresholds to catch more skin
+      r > g + 15 && r > b + 20 && // Red dominance (but less strict)
+      g > b + 5 && // Green slightly higher than blue
+      r - b > 10 && r - b < 100 && // Red-blue difference for skin detection
+      Math.abs(r - g) < 60 // Allow more variation in red-green ratio
     );
   }
 }
