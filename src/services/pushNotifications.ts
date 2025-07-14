@@ -94,9 +94,6 @@ class PushNotificationService {
 
   private async saveTokenToDatabase(userId: string, token: string, platform?: string): Promise<void> {
     try {
-      // TODO: Apply migration first (supabase/migrations/20250714_add_push_tokens.sql)
-      // Then uncomment this block:
-      /*
       const { error } = await supabase
         .from('push_tokens')
         .upsert({
@@ -105,7 +102,7 @@ class PushNotificationService {
           platform: platform || Capacitor.getPlatform(),
           updated_at: new Date().toISOString()
         }, {
-          onConflict: 'user_id'
+          onConflict: 'user_id,platform'
         });
 
       if (error) {
@@ -113,13 +110,6 @@ class PushNotificationService {
       } else {
         console.log('✅ Push token saved to database');
       }
-      */
-      
-      console.log('📝 Push token ready to save (apply migration first):', { 
-        userId, 
-        token: `${token.substring(0, 10)}...`, // Truncate for privacy
-        platform: platform || Capacitor.getPlatform() 
-      });
     } catch (error) {
       console.error('❌ Error saving push token:', error);
     }
