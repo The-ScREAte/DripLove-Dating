@@ -76,7 +76,7 @@ class LocationService {
       // Get all potential matches
       const { data: profiles, error: profilesError } = await supabase
         .from('profiles')
-        .select('id, first_name, age, country, country_code, city, latitude, longitude')
+        .select('id, first_name, date_of_birth, country, country_code, city, latitude, longitude')
         .neq('id', userId);
 
       if (profilesError || !profiles) {
@@ -93,6 +93,9 @@ class LocationService {
 
         let distance = 999; // Default high distance
         let includeProfile = false;
+
+        // Calculate age from date_of_birth
+        const age = profile.date_of_birth ? this.calculateAge(profile.date_of_birth) : undefined;
 
         // If both users have coordinates, calculate exact distance
         if (
@@ -112,7 +115,7 @@ class LocationService {
           // Same country gets priority
           if (profile.country_code === currentUser.country_code) {
             // Same city gets even higher priority
-            if (profile.city.toLowerCase() === currentUser.city.toLowerCase()) {
+            if (profile.city && currentUser.city && profile.city.toLowerCase() === currentUser.city.toLowerCase()) {
               distance = 0; // Same city
               includeProfile = true;
             } else {
@@ -121,7 +124,7 @@ class LocationService {
             }
           }
           // Different country but within region could be considered
-          else if (this.areCountriesInSameRegion(currentUser.country_code, profile.country_code)) {
+          else if (currentUser.country_code && this.areCountriesInSameRegion(currentUser.country_code, profile.country_code)) {
             distance = 100; // Regional match
             includeProfile = searchDistance >= 100;
           }
@@ -134,7 +137,7 @@ class LocationService {
             city: profile.city,
             country_code: profile.country_code,
             first_name: profile.first_name,
-            age: profile.age
+            age: age
           });
         }
       }
@@ -231,6 +234,22 @@ class LocationService {
       console.error('❌ Error getting user location:', error);
       return null;
     }
+  }
+
+  /**
+   * Calculate age from date of birth
+   */
+  private calculateAge(dateOfBirth: string): number {
+    const today = new Date();
+    const birthDate = new Date(dateOfBirth);
+    let age = today.getFullYear() - birthDate.getFullYear();
+    const monthDiff = today.getMonth() - birthDate.getMonth();
+
+    if (monthDiff < 0 || (monthDiff === 0 && today.getDate() < birthDate.getDate())) {
+      age--;
+    }
+
+    return age;
   }
 
   /**

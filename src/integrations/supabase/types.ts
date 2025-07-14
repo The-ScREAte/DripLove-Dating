@@ -305,6 +305,7 @@ export type Database = {
           bio: string | null
           city: string | null
           country: string
+          country_code: string | null
           created_at: string | null
           date_of_birth: string
           distance_preference: number | null
@@ -320,9 +321,13 @@ export type Database = {
           interests: string[] | null
           introvert_extrovert: number | null
           is_admin: boolean | null
+          is_custom_city: boolean | null
           last_googled: string | null
           last_name: string
+          latitude: number | null
           like_me_cooldown_until: string | null
+          longitude: number | null
+          max_distance: number | null
           messy_organized: number | null
           occupation: string | null
           perfect_first_date: string | null
@@ -339,6 +344,7 @@ export type Database = {
           bio?: string | null
           city?: string | null
           country: string
+          country_code?: string | null
           created_at?: string | null
           date_of_birth: string
           distance_preference?: number | null
@@ -354,9 +360,13 @@ export type Database = {
           interests?: string[] | null
           introvert_extrovert?: number | null
           is_admin?: boolean | null
+          is_custom_city?: boolean | null
           last_googled?: string | null
           last_name: string
+          latitude?: number | null
           like_me_cooldown_until?: string | null
+          longitude?: number | null
+          max_distance?: number | null
           messy_organized?: number | null
           occupation?: string | null
           perfect_first_date?: string | null
@@ -373,6 +383,7 @@ export type Database = {
           bio?: string | null
           city?: string | null
           country?: string
+          country_code?: string | null
           created_at?: string | null
           date_of_birth?: string
           distance_preference?: number | null
@@ -388,9 +399,13 @@ export type Database = {
           interests?: string[] | null
           introvert_extrovert?: number | null
           is_admin?: boolean | null
+          is_custom_city?: boolean | null
           last_googled?: string | null
           last_name?: string
+          latitude?: number | null
           like_me_cooldown_until?: string | null
+          longitude?: number | null
+          max_distance?: number | null
           messy_organized?: number | null
           occupation?: string | null
           perfect_first_date?: string | null
@@ -565,6 +580,10 @@ export type Database = {
         Args: { target_user_id: string; new_status: string }
         Returns: undefined
       }
+      calculate_distance: {
+        Args: { lat1: number; lon1: number; lat2: number; lon2: number }
+        Returns: number
+      }
       create_admin_user: {
         Args: {
           admin_email: string
@@ -580,6 +599,15 @@ export type Database = {
       delete_user_and_data: {
         Args: { user_id_to_delete: string }
         Returns: undefined
+      }
+      find_matches_by_location: {
+        Args: { user_id: string; max_distance_km?: number }
+        Returns: {
+          profile_id: string
+          distance_km: number
+          city: string
+          country_code: string
+        }[]
       }
       get_app_stats: {
         Args: Record<PropertyKey, never>

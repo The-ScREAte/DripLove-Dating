@@ -42,6 +42,7 @@ const ProfilePage = ({ currentUser, profile, onProfileUpdate, onLogout, onShowTe
     bio: '',
     city: '',
     country: '',
+    country_code: '',
     distance_preference: 50,
     gender: '',
     preference: '',
@@ -56,6 +57,7 @@ const ProfilePage = ({ currentUser, profile, onProfileUpdate, onLogout, onShowTe
     zip_code: '',
     latitude: null as number | null,
     longitude: null as number | null,
+    is_custom_city: false,
     introvert_extrovert: 50,
     spontaneous_planner: 50,
     messy_organized: 50,
@@ -73,6 +75,7 @@ const ProfilePage = ({ currentUser, profile, onProfileUpdate, onLogout, onShowTe
         bio: profile.bio || '',
         city: profile.city || '',
         country: profile.country || '',
+        country_code: profile.country_code || '',
         distance_preference: profile.distance_preference || profile.max_distance || 50,
         gender: profile.gender || '',
         preference: profile.preference || '',
@@ -87,6 +90,7 @@ const ProfilePage = ({ currentUser, profile, onProfileUpdate, onLogout, onShowTe
         zip_code: profile.zip_code || '',
         latitude: profile.latitude || null,
         longitude: profile.longitude || null,
+        is_custom_city: profile.is_custom_city || false,
         introvert_extrovert: profile.introvert_extrovert || 50,
         spontaneous_planner: profile.spontaneous_planner || 50,
         messy_organized: profile.messy_organized || 50,
@@ -123,10 +127,12 @@ const ProfilePage = ({ currentUser, profile, onProfileUpdate, onLogout, onShowTe
     setEditedProfile(prev => ({
       ...prev,
       country: location.country,
+      country_code: location.countryCode,
       city: location.city,
       zip_code: location.zipCode,
       latitude: location.latitude,
       longitude: location.longitude,
+      is_custom_city: location.isCustomCity || false,
     }));
   };
 
@@ -151,6 +157,7 @@ const ProfilePage = ({ currentUser, profile, onProfileUpdate, onLogout, onShowTe
         bio: editedProfile.bio?.trim() || null,
         city: editedProfile.city?.trim() || null,
         country: editedProfile.country?.trim() || null,
+        country_code: editedProfile.country_code?.trim() || null,
         date_of_birth: profile?.date_of_birth || currentUser?.user_metadata?.date_of_birth || '1990-01-01',
         email: currentUser.email,
         max_distance: editedProfile.distance_preference || 25,
@@ -167,6 +174,7 @@ const ProfilePage = ({ currentUser, profile, onProfileUpdate, onLogout, onShowTe
         zip_code: editedProfile.zip_code?.trim() || null,
         latitude: editedProfile.latitude || null,
         longitude: editedProfile.longitude || null,
+        is_custom_city: editedProfile.is_custom_city || false,
         introvert_extrovert:
           typeof editedProfile.introvert_extrovert === 'number' &&
           editedProfile.introvert_extrovert >= 0 &&
@@ -236,6 +244,7 @@ const ProfilePage = ({ currentUser, profile, onProfileUpdate, onLogout, onShowTe
         bio: profile.bio || '',
         city: profile.city || '',
         country: profile.country || '',
+        country_code: profile.country_code || '',
         distance_preference: profile.distance_preference || profile.max_distance || 50,
         gender: profile.gender || '',
         preference: profile.preference || '',
@@ -250,6 +259,7 @@ const ProfilePage = ({ currentUser, profile, onProfileUpdate, onLogout, onShowTe
         zip_code: profile.zip_code || '',
         latitude: profile.latitude || null,
         longitude: profile.longitude || null,
+        is_custom_city: profile.is_custom_city || false,
         introvert_extrovert: profile.introvert_extrovert || 50,
         spontaneous_planner: profile.spontaneous_planner || 50,
         messy_organized: profile.messy_organized || 50,

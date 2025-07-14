@@ -21,6 +21,7 @@ interface PotentialMatch {
   bio: string;
   city: string;
   country: string;
+  country_code: string;
   occupation: string;
   education_level: string;
   date_of_birth: string;
@@ -133,7 +134,7 @@ const DiscoverPage = ({ currentUser, onNavigateToChat }: DiscoverPageProps) => {
   
       const { data: profiles, error } = await supabase
         .from('profiles')
-        .select('id, first_name, last_name, bio, city, country, occupation, education_level, date_of_birth, interests, gender, latitude, longitude')
+        .select('id, first_name, last_name, bio, city, country, country_code, occupation, education_level, date_of_birth, interests, gender, latitude, longitude')
         .not('id', 'in', `(${excludedIds.join(',')})`)
         .in('gender', allowedGenders)
         .eq('account_status', 'active')
@@ -144,7 +145,8 @@ const DiscoverPage = ({ currentUser, onNavigateToChat }: DiscoverPageProps) => {
 
       // Apply distance filtering if current user has coordinates and distance preference
       let filteredProfiles = profiles || [];
-      if (currentUser.latitude && currentUser.longitude && currentUser.max_distance) {
+      const userMaxDistance = currentUser.max_distance || currentUser.distance_preference || 50;
+      if (currentUser.latitude && currentUser.longitude && userMaxDistance) {
         filteredProfiles = (profiles || []).filter(profile => {
           // If profile doesn't have coordinates, include it (fallback to country/city matching)
           if (!profile.latitude || !profile.longitude) {
@@ -159,10 +161,10 @@ const DiscoverPage = ({ currentUser, onNavigateToChat }: DiscoverPageProps) => {
             profile.longitude
           );
 
-          return distance <= currentUser.max_distance;
+          return distance <= userMaxDistance;
         });
 
-        console.log(`Applied distance filter: ${profiles.length} -> ${filteredProfiles.length} profiles within ${currentUser.max_distance}km`);
+        console.log(`Applied distance filter: ${profiles.length} -> ${filteredProfiles.length} profiles within ${userMaxDistance}km`);
       } else {
         console.log('No distance filtering applied - missing coordinates or preference');
       }
@@ -213,27 +215,14 @@ const DiscoverPage = ({ currentUser, onNavigateToChat }: DiscoverPageProps) => {
     if (userImages[profileId]?.length > 0) return; // Already loaded
     
     try {
-      // Try to fetch approved images first
-      let { data: images, error } = await supabase
+      // Always use basic query for now to avoid moderation column issues
+      const { data: images, error } = await supabase
         .from('user_images')
         .select('image_url')
         .eq('user_id', profileId)
-        .eq('is_approved', true) // Only show approved images
         .order('image_order', { ascending: true });
 
-      // If moderation columns don't exist, fall back to basic query
-      if (error && error.message.includes('does not exist')) {
-        const { data: fallbackImages, error: fallbackError } = await supabase
-          .from('user_images')
-          .select('image_url')
-          .eq('user_id', profileId)
-          .order('image_order', { ascending: true });
-
-        if (fallbackError) throw fallbackError;
-        images = fallbackImages;
-      } else if (error) {
-        throw error;
-      }
+      if (error) throw error;
 
       if (images?.length) {
         setUserImages(prev => ({
@@ -244,12 +233,12 @@ const DiscoverPage = ({ currentUser, onNavigateToChat }: DiscoverPageProps) => {
     } catch (error) {
       console.error('Error loading user images:', error);
     }
-  }, [userImages]);
+  }, []);
 
   // Preload images for the next N profiles for smoother UX
   const preloadNextProfileImages = useCallback((matches: PotentialMatch[], alreadyLoaded: { [key: string]: string[] }, startIdx: number) => {
     // Preload for the next 2 profiles (can adjust as needed)
-    const toPreload = matches.slice(startIdx, startIdx + 2).filter(match => !alreadyLoaded[match.id] || alreadyLoaded[match.id].length === 0);
+    const toPreload = matches.slice(startIdx, startIdx + 2).filter(match => !alreadyLoaded[match.id] || alreadyLoaded[match.id]?.length === 0);
     for (const match of toPreload) {
       void loadFullImages(match.id);
     }

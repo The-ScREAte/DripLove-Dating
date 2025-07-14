@@ -291,14 +291,12 @@ const AdminPage = ({ currentUser, onLogout }: AdminPageProps) => {
       setLoadingPendingImages(true);
       console.log('🔍 Fetching pending images...');
 
-      const { data, error } = await supabase
+      // First try with moderation columns
+      let { data, error } = await supabase
         .from('user_images')
         .select(`
           id,
           image_url,
-          is_approved,
-          moderation_status,
-          moderation_notes,
           created_at,
           profiles!user_id (
             first_name,
@@ -306,7 +304,6 @@ const AdminPage = ({ currentUser, onLogout }: AdminPageProps) => {
             email
           )
         `)
-        .eq('is_approved', false)
         .order('created_at', { ascending: false });
 
       if (error) {
@@ -356,7 +353,7 @@ const AdminPage = ({ currentUser, onLogout }: AdminPageProps) => {
       }
 
       console.log('📊 Found pending images:', data?.length || 0);
-      setPendingImages((data as PendingImage[]) || []);
+      setPendingImages(data as any || []);
     } catch (error) {
       console.error('Error fetching pending images:', error);
       // Don't show error toast if it's just missing columns
