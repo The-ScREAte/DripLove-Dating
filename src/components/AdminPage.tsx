@@ -291,79 +291,69 @@ const AdminPage = ({ currentUser, onLogout }: AdminPageProps) => {
       setLoadingPendingImages(true);
       console.log('🔍 Fetching pending images...');
 
-      // First try with moderation columns
-      let { data, error } = await supabase
+      // Fetch images that need approval (either is_approved = false OR moderation_status = 'pending')
+      const { data, error } = await supabase
         .from('user_images')
         .select(`
           id,
           image_url,
+          is_approved,
+          moderation_status,
+          moderation_notes,
           created_at,
-          profiles!user_id (
-            first_name,
-            last_name,
-            email
-          )
+          user_id
         `)
+        .or('is_approved.eq.false,moderation_status.eq.pending')
         .order('created_at', { ascending: false });
 
       if (error) {
         console.error('❌ Error fetching pending images:', error);
-        if (error.message.includes('does not exist')) {
-          console.log('⚠️ Moderation columns do not exist, trying workaround with image_order = -1');
-          
-          // Workaround: fetch images with image_order = -1 (our pending marker)
-          const { data: workaroundData, error: workaroundError } = await supabase
-            .from('user_images')
-            .select(`
-              id,
-              image_url,
-              image_order,
-              created_at,
-              profiles!user_id (
-                first_name,
-                last_name,
-                email
-              )
-            `)
-            .eq('image_order', -1)
-            .order('created_at', { ascending: false });
-
-          if (workaroundError) {
-            console.error('Workaround query failed:', workaroundError);
-            setPendingImages([]);
-            return;
-          }
-
-          // Transform the data to match expected format
-          const transformedData = workaroundData?.map(img => ({
-            id: img.id,
-            image_url: img.image_url,
-            is_approved: false,
-            moderation_status: 'pending',
-            moderation_notes: 'Pending approval (workaround mode)',
-            created_at: img.created_at,
-            profile: img.profiles
-          })) || [];
-
-          console.log('📊 Found pending images (workaround):', transformedData.length);
-          setPendingImages(transformedData);
-          return;
-        }
-        throw error;
-      }
-
-      console.log('📊 Found pending images:', data?.length || 0);
-      setPendingImages(data as any || []);
-    } catch (error) {
-      console.error('Error fetching pending images:', error);
-      // Don't show error toast if it's just missing columns
-      if (!error?.message?.includes('does not exist')) {
+        setPendingImages([]);
         toast({
           title: 'Error',
           description: 'Failed to load pending images',
           variant: 'destructive'
         });
+        return;
       }
+
+      console.log('📊 Found pending images:', data?.length || 0);
+      
+      if (!data || data.length === 0) {
+        setPendingImages([]);
+        return;
+      }
+
+      // Get user profiles for the images
+      const userIds = [...new Set(data.map(img => img.user_id))];
+      const { data: profiles } = await supabase
+        .from('profiles')
+        .select('id, first_name, last_name, email')
+        .in('id', userIds);
+
+      // Transform the data to match expected format
+      const transformedData = data.map(img => ({
+        id: img.id,
+        image_url: img.image_url,
+        is_approved: img.is_approved ?? false,
+        moderation_status: img.moderation_status ?? 'pending',
+        moderation_notes: img.moderation_notes,
+        created_at: img.created_at,
+        profile: profiles?.find(p => p.id === img.user_id) || {
+          first_name: 'Unknown',
+          last_name: 'User',
+          email: 'unknown@example.com'
+        }
+      }));
+
+      setPendingImages(transformedData);
+    } catch (error) {
+      console.error('Error fetching pending images:', error);
+      toast({
+        title: 'Error',
+        description: 'Failed to load pending images',
+        variant: 'destructive'
+      });
       setPendingImages([]);
     } finally {
       setLoadingPendingImages(false);
@@ -374,35 +364,33 @@ const AdminPage = ({ currentUser, onLogout }: AdminPageProps) => {
     try {
       setApprovingImages(prev => ({ ...prev, [imageId]: true }));
 
-      const updateData = {
-        is_approved: true,
-        moderation_status: 'approved',
-        reviewed_at: new Date().toISOString(),
-        reviewed_by: currentUser.id
-      };
-
-      const { error } = await supabase
-        .from('user_images')
-        .update(updateData as Record<string, unknown>) // Type assertion for columns that may not exist yet
-        .eq('id', imageId);
+      // Use the approve_image function if available, otherwise direct update
+      const { data, error } = await supabase.rpc('approve_image', {
+        image_id: imageId,
+        admin_notes: 'Approved by admin'
+      });
 
       if (error) {
-        if (error.message.includes('does not exist')) {
-          // Workaround: Update image_order to positive value to mark as approved
-          console.log('Using workaround: updating image_order to approve image');
-          const { error: workaroundError } = await supabase
+        if (error.message.includes('function') && error.message.includes('does not exist')) {
+          // Fallback to direct update if function doesn't exist
+          console.log('Function not available, using direct update');
+          const { error: updateError } = await supabase
             .from('user_images')
-            .update({ image_order: 1 }) // Change from -1 to positive
+            .update({
+              is_approved: true,
+              moderation_status: 'approved',
+              moderated_at: new Date().toISOString(),
+              moderated_by: currentUser.id
+            })
             .eq('id', imageId);
 
-          if (workaroundError) {
-            throw workaroundError;
-          }
+          if (updateError) throw updateError;
         } else {
           throw error;
         }
       }
 
+      // Remove from pending list
       setPendingImages(prev => prev.filter(img => img.id !== imageId));
       
       toast({
@@ -410,8 +398,8 @@ const AdminPage = ({ currentUser, onLogout }: AdminPageProps) => {
         description: 'Image approved successfully'
       });
 
-      // Refresh stats to reflect the change
-      await fetchAppStats();
+      // Refresh stats and pending images
+      await Promise.all([fetchAppStats(), fetchPendingImages()]);
 
     } catch (error) {
       console.error('Error approving image:', error);
@@ -429,13 +417,47 @@ const AdminPage = ({ currentUser, onLogout }: AdminPageProps) => {
     try {
       setRejectingImages(prev => ({ ...prev, [imageId]: true }));
 
-      const { error } = await supabase
-        .from('user_images')
-        .delete()
-        .eq('id', imageId);
+      // Use the reject_image function if available, otherwise direct delete
+      const { data, error } = await supabase.rpc('reject_image', {
+        image_id: imageId,
+        admin_notes: 'Rejected by admin'
+      });
 
-      if (error) throw error;
+      if (error) {
+        if (error.message.includes('function') && error.message.includes('does not exist')) {
+          // Fallback to direct delete if function doesn't exist
+          console.log('Function not available, using direct delete');
+          
+          // First get the image URL for storage cleanup
+          const { data: imageData } = await supabase
+            .from('user_images')
+            .select('image_url')
+            .eq('id', imageId)
+            .single();
 
+          if (imageData?.image_url) {
+            // Delete from storage
+            const urlParts = imageData.image_url.split('/');
+            const bucketIndex = urlParts.findIndex(part => part === 'user-photos');
+            if (bucketIndex !== -1) {
+              const filePath = urlParts.slice(bucketIndex + 1).join('/');
+              await supabase.storage.from('user-photos').remove([filePath]);
+            }
+          }
+
+          // Delete from database
+          const { error: deleteError } = await supabase
+            .from('user_images')
+            .delete()
+            .eq('id', imageId);
+
+          if (deleteError) throw deleteError;
+        } else {
+          throw error;
+        }
+      }
+
+      // Remove from pending list
       setPendingImages(prev => prev.filter(img => img.id !== imageId));
       
       toast({
@@ -443,8 +465,8 @@ const AdminPage = ({ currentUser, onLogout }: AdminPageProps) => {
         description: 'Image rejected and deleted successfully'
       });
 
-      // Refresh stats to reflect the change
-      await fetchAppStats();
+      // Refresh stats and pending images
+      await Promise.all([fetchAppStats(), fetchPendingImages()]);
 
     } catch (error) {
       console.error('Error rejecting image:', error);

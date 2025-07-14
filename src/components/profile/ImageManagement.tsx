@@ -399,18 +399,29 @@ const ImageManagement = ({ currentUser }: ImageManagementProps) => {
     setDeleting(true);
 
     try {
-      const urlParts = imageUrl.split('/');
-      const bucketIndex = urlParts.findIndex(part => part === 'user-photos');
-      if (bucketIndex !== -1 && bucketIndex < urlParts.length - 1) {
-        const filePath = urlParts.slice(bucketIndex + 1).join('/');
-        await supabase.storage.from('user-photos').remove([filePath]);
-      }
-
-      await supabase
+      // Delete from database first
+      const { error: dbError } = await supabase
         .from('user_images')
         .delete()
         .eq('user_id', currentUser.id)
         .eq('image_url', imageUrl);
+
+      if (dbError) throw dbError;
+
+      // Then delete from storage
+      const urlParts = imageUrl.split('/');
+      const bucketIndex = urlParts.findIndex(part => part === 'user-photos');
+      if (bucketIndex !== -1 && bucketIndex < urlParts.length - 1) {
+        const filePath = urlParts.slice(bucketIndex + 1).join('/');
+        const { error: storageError } = await supabase.storage
+          .from('user-photos')
+          .remove([filePath]);
+        
+        if (storageError) {
+          console.warn('Storage deletion warning:', storageError);
+          // Don't throw here as database deletion succeeded
+        }
+      }
 
       await fetchUserImages();
       toast({ title: "Image deleted", description: "Your image has been deleted successfully." });
