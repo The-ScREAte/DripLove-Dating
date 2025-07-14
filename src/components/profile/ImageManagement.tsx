@@ -123,18 +123,20 @@ const ImageManagement = ({ currentUser }: ImageManagementProps) => {
     setModerating(true);
     setModerationResult(null);
 
+    let moderationResult: any = null;
+
     try {
       console.log('🔍 Starting image moderation for file:', file.name, file.size, file.type);
-      const moderation = await moderateImage(file);
-      console.log('📊 Moderation result:', moderation);
-      setModerationResult(moderation);
+      moderationResult = await moderateImage(file);
+      console.log('📊 Moderation result:', moderationResult);
+      setModerationResult(moderationResult);
       
       // Only reject if explicitly not approved (truly inappropriate content)
-      if (!moderation.isApproved) {
-        console.log('❌ Image rejected:', moderation.message);
+      if (!moderationResult.isApproved) {
+        console.log('❌ Image rejected:', moderationResult.message);
         toast({ 
-          title: "Image not approved", 
-          description: moderation.message || "This image cannot be uploaded due to content policy violations.", 
+          title: "Image rejected", 
+          description: moderationResult.message || "This image cannot be uploaded due to content policy violations.", 
           variant: "destructive" 
         });
         setModerating(false);
@@ -142,48 +144,16 @@ const ImageManagement = ({ currentUser }: ImageManagementProps) => {
         return;
       }
 
-      // Show info for images that require review
-      if (moderation.details?.requiresReview) {
-        console.log('🔍 Image requires review:', moderation.message);
-        // Show immediate feedback for pending review
-        toast({ 
-          title: "⚠️ Image pending approval", 
-          description: "Your image has been uploaded but requires admin review before others can see it. You'll be notified once it's approved.",
-          variant: "default"
-        });
-      }
-      // Show warning for images that passed but have quality issues
-      else if (moderation.confidence < 80) {
-        console.log('⚠️ Image approved with warning:', moderation.message);
-        toast({ 
-          title: "✅ Image uploaded", 
-          description: moderation.message,
-          variant: "default"
-        });
-      } else {
-        console.log('✅ Image fully approved:', moderation.message);
-        toast({ 
-          title: "✅ Image uploaded successfully", 
-          description: "Your image has been approved and is now visible to others.",
-          variant: "default"
-        });
-      }
-
     } catch (error) {
       console.error('❌ Moderation error:', error);
       // Continue with upload even if moderation fails
-      toast({ 
-        title: "Moderation check skipped", 
-        description: "Unable to verify image content, but upload will continue.", 
-        variant: "default"
-      });
-      setModerationResult({
+      moderationResult = {
         isApproved: true,
         confidence: 50,
         flags: [],
-        details: {},
-        message: "Moderation check skipped - upload proceeding"
-      });
+        details: { requiresReview: true },
+        message: "Moderation check failed - uploading for manual review"
+      };
     }
 
     setModerating(false);
@@ -193,6 +163,7 @@ const ImageManagement = ({ currentUser }: ImageManagementProps) => {
       const fileExt = file.name.split('.').pop();
       const fileName = `${currentUser.id}/${Date.now()}-${Math.random().toString(36).substring(2)}.${fileExt}`;
 
+      // Upload to storage
       const { data: uploadData, error: uploadError } = await supabase.storage
         .from('user-photos')
         .upload(fileName, file, { cacheControl: '3600', upsert: false });
@@ -207,12 +178,11 @@ const ImageManagement = ({ currentUser }: ImageManagementProps) => {
 
       const publicUrl = urlData.publicUrl;
       
-      // Get the next available image order by checking the database
+      // Get the next available image order
       const { data: existingImages, error: orderError } = await supabase
         .from('user_images')
         .select('image_order')
         .eq('user_id', currentUser.id)
-        .neq('image_order', -1) // Exclude pending images marked with -1
         .order('image_order', { ascending: true });
 
       if (orderError) {
@@ -220,7 +190,7 @@ const ImageManagement = ({ currentUser }: ImageManagementProps) => {
         throw orderError;
       }
 
-      // Find the next available order (handle gaps from deleted images)
+      // Find the next available order
       let nextImageOrder = 1;
       const existingOrders = existingImages?.map(img => img.image_order).filter(order => order > 0).sort((a, b) => a - b) || [];
       
@@ -231,96 +201,55 @@ const ImageManagement = ({ currentUser }: ImageManagementProps) => {
         }
       }
 
-      // Add timestamp to make order more unique in case of race conditions
-      const uniqueOrder = nextImageOrder;
-
       console.log('📊 Image order calculation:', {
         existingOrders,
-        nextImageOrder: uniqueOrder,
+        nextImageOrder,
         totalImages: existingOrders.length
       });
 
-      // Store image with moderation info
-      const imageData = {
-        user_id: currentUser.id, 
-        image_url: publicUrl, 
-        image_order: uniqueOrder
-      };
-
-      // Check if image requires admin review (uncertain content)
+      // Determine if image needs review
       const requiresReview = moderationResult?.details?.requiresReview || false;
       
-      console.log('🔍 Upload decision:', {
-        requiresReview,
-        moderationResult: moderationResult?.details,
-        message: moderationResult?.message
-      });
+      // Prepare insert data
+      const insertData = {
+        user_id: currentUser.id, 
+        image_url: publicUrl, 
+        image_order: nextImageOrder,
+        is_approved: !requiresReview,
+        moderation_status: requiresReview ? 'pending' : 'approved',
+        moderation_notes: requiresReview 
+          ? `AI flagged: ${moderationResult?.message || 'Requires manual review'}`
+          : `Auto-approved: ${moderationResult?.message || 'Passed content guidelines'}`,
+        flagged_content: moderationResult?.flags || [],
+        confidence_score: Math.round(moderationResult?.confidence || 50)
+      };
+
+      console.log('📝 Inserting image with data:', insertData);
+
+      // Insert to database
+      const { error: dbError } = await supabase
+        .from('user_images')
+        .insert(insertData);
+
+      if (dbError) {
+        console.error('❌ Database error:', dbError);
+        throw dbError;
+      }
+        
+      // Refresh the image list
+      await fetchUserImages();
       
+      // Show appropriate success message AFTER successful upload
       if (requiresReview) {
-        console.log('🔒 Uploading as pending approval...');
-        
-        // Try to insert with moderation columns for pending approval
-        const insertData = {
-          ...imageData,
-          is_approved: false,
-          moderation_status: 'pending',
-          moderation_notes: `AI review: ${moderationResult?.message || 'Requires manual review'}`,
-          flagged_content: moderationResult?.flags || [],
-          confidence_score: moderationResult?.confidence || 0
-        };
-
-        console.log('📝 Inserting pending image with data:', insertData);
-
-        const { error: dbError } = await supabase
-          .from('user_images')
-          .insert(insertData);
-
-        if (dbError) {
-          console.error('❌ Database error:', dbError);
-          throw dbError;
-        }
-        
-        // Refresh the image list to show the new image with proper status
-        await fetchUserImages();
-        
-        // Show different message for pending images with delay
-        setTimeout(() => {
-          toast({ 
-            title: "🔒 Upload complete - PENDING APPROVAL", 
-            description: "Your image is uploaded but locked until admin approval. Check admin panel for review queue.",
-            variant: "default"
-          });
-        }, 500);
-      } else {
-        console.log('✅ Uploading as approved...');
-        
-        // Image passed moderation fully, insert with explicit approval status
-        const insertData = {
-          ...imageData,
-          is_approved: true,
-          moderation_status: 'approved',
-          moderation_notes: `Auto-approved: ${moderationResult?.message || 'Passed content guidelines'}`,
-          flagged_content: moderationResult?.flags || [],
-          confidence_score: moderationResult?.confidence || 95
-        };
-
-        console.log('📝 Inserting approved image with data:', insertData);
-
-        const { error: dbError } = await supabase
-          .from('user_images')
-          .insert(insertData);
-
-        if (dbError) {
-          console.error('❌ Database error:', dbError);
-          throw dbError;
-        }
-        
-        // Refresh the image list
-        await fetchUserImages();
-        
         toast({ 
-          title: "Image uploaded successfully", 
-          description: "Your image has been uploaded and is now visible to others.",
+          title: "🔒 Image uploaded - Pending approval", 
+          description: "Your image requires admin review before others can see it.",
+          variant: "default"
+        });
+      } else {
+        toast({ 
+          title: "✅ Image uploaded successfully", 
+          description: "Your image has been approved and is now visible to others.",
           variant: "default"
         });
       }
