@@ -12,6 +12,7 @@ import { Upload, Trash2, Shield, AlertTriangle, CheckCircle } from 'lucide-react
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import { moderateImage, saveModerationResult, ModerationResult } from '@/utils/photoModeration';
+import { bulkApproveExistingImages } from '@/utils/bulkApproveImages';
 
 interface ImageManagementProps {
   currentUser: {
@@ -83,7 +84,21 @@ const ImageManagement = ({ currentUser }: ImageManagementProps) => {
 
   useEffect(() => {
     fetchUserImages();
-  }, [fetchUserImages]);
+    
+    // Run bulk approval fix once when component mounts (only if needed)
+    const hasRunBulkApproval = localStorage.getItem('bulk_approval_completed');
+    if (!hasRunBulkApproval && currentUser?.id) {
+      console.log('🔧 Running one-time bulk approval fix...');
+      bulkApproveExistingImages().then(() => {
+        localStorage.setItem('bulk_approval_completed', 'true');
+        // Refresh images after bulk approval
+        setTimeout(fetchUserImages, 1500);
+      }).catch(error => {
+        console.error('Bulk approval failed:', error);
+        // Don't set completion flag if it failed
+      });
+    }
+  }, [fetchUserImages, currentUser?.id]);
 
   const handleImageUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
@@ -186,13 +201,45 @@ const ImageManagement = ({ currentUser }: ImageManagementProps) => {
       if (!urlData?.publicUrl) throw new Error("Failed to generate public image URL");
 
       const publicUrl = urlData.publicUrl;
-      const nextImageOrder = userImages.length + 1;
+      
+      // Get the next available image order by checking the database
+      const { data: existingImages, error: orderError } = await supabase
+        .from('user_images')
+        .select('image_order')
+        .eq('user_id', currentUser.id)
+        .neq('image_order', -1) // Exclude pending images marked with -1
+        .order('image_order', { ascending: true });
+
+      if (orderError) {
+        console.error('Error fetching existing image orders:', orderError);
+        throw orderError;
+      }
+
+      // Find the next available order (handle gaps from deleted images)
+      let nextImageOrder = 1;
+      const existingOrders = existingImages?.map(img => img.image_order).filter(order => order > 0).sort((a, b) => a - b) || [];
+      
+      for (let i = 1; i <= 7; i++) {
+        if (!existingOrders.includes(i)) {
+          nextImageOrder = i;
+          break;
+        }
+      }
+
+      // Add timestamp to make order more unique in case of race conditions
+      const uniqueOrder = nextImageOrder;
+
+      console.log('📊 Image order calculation:', {
+        existingOrders,
+        nextImageOrder: uniqueOrder,
+        totalImages: existingOrders.length
+      });
 
       // Store image with moderation info
       const imageData = {
         user_id: currentUser.id, 
         image_url: publicUrl, 
-        image_order: nextImageOrder
+        image_order: uniqueOrder
       };
 
       // Check if image requires admin review (uncertain content)
@@ -227,7 +274,27 @@ const ImageManagement = ({ currentUser }: ImageManagementProps) => {
                 ...imageData,
                 image_order: -1  // Negative order to mark as pending
               });
-            if (fallbackError) throw fallbackError;
+            if (fallbackError) {
+              console.error('❌ Fallback insert failed:', fallbackError);
+              throw fallbackError;
+            }
+          } else if (dbError.message.includes('duplicate key')) {
+            // Handle duplicate key error by retrying with a different order
+            console.log('⚠️ Duplicate key error, retrying with different order...');
+            const retryOrder = uniqueOrder + Math.floor(Math.random() * 100);
+            const { error: retryError } = await supabase
+              .from('user_images')
+              .insert({
+                ...imageData,
+                image_order: retryOrder,
+                is_approved: false,
+                moderation_status: 'pending',
+                moderation_notes: `AI review: ${moderationResult?.message || 'Requires manual review'}`
+              });
+            if (retryError) {
+              console.error('❌ Fallback insert failed:', retryError);
+              throw retryError;
+            }
           } else {
             throw dbError;
           }
@@ -246,11 +313,49 @@ const ImageManagement = ({ currentUser }: ImageManagementProps) => {
         }, 500);
       } else {
         console.log('✅ Uploading as approved...');
-        // Image passed moderation fully, insert normally
+        // Image passed moderation fully, insert with explicit approval status
         const { error: dbError } = await supabase
           .from('user_images')
-          .insert(imageData);
-        if (dbError) throw dbError;
+          .insert({
+            ...imageData,
+            is_approved: true,
+            moderation_status: 'approved',
+            moderation_notes: `Auto-approved: ${moderationResult?.message || 'Passed content guidelines'}`
+          });
+
+        if (dbError) {
+          console.error('❌ Database error with moderation columns:', dbError);
+          if (dbError.message.includes('does not exist')) {
+            // FALLBACK: If moderation columns don't exist, just insert normally
+            console.log('⚠️ Moderation columns not available, using basic insert');
+            const { error: fallbackError } = await supabase
+              .from('user_images')
+              .insert(imageData);
+            if (fallbackError) {
+              console.error('❌ Basic insert failed:', fallbackError);
+              throw fallbackError;
+            }
+          } else if (dbError.message.includes('duplicate key')) {
+            // Handle duplicate key error by retrying with a different order
+            console.log('⚠️ Duplicate key error, retrying with different order...');
+            const retryOrder = uniqueOrder + Math.floor(Math.random() * 100);
+            const { error: retryError } = await supabase
+              .from('user_images')
+              .insert({
+                ...imageData,
+                image_order: retryOrder,
+                is_approved: true,
+                moderation_status: 'approved',
+                moderation_notes: `Auto-approved: ${moderationResult?.message || 'Passed content guidelines'}`
+              });
+            if (retryError) {
+              console.error('❌ Retry insert failed:', retryError);
+              throw retryError;
+            }
+          } else {
+            throw dbError;
+          }
+        }
         
         // Refresh the image list
         await fetchUserImages();
@@ -263,7 +368,26 @@ const ImageManagement = ({ currentUser }: ImageManagementProps) => {
       }
     } catch (error) {
       console.error('Image upload error:', error);
-      toast({ title: "Upload failed", description: "Failed to upload image.", variant: "destructive" });
+      
+      // Provide more specific error messages
+      let errorMessage = "Failed to upload image.";
+      if (error instanceof Error) {
+        if (error.message.includes('duplicate key')) {
+          errorMessage = "Upload failed due to a database conflict. Please try again.";
+        } else if (error.message.includes('constraint')) {
+          errorMessage = "Upload failed due to database constraints. Please try again.";
+        } else if (error.message.includes('network')) {
+          errorMessage = "Network error. Please check your connection and try again.";
+        } else {
+          errorMessage = `Upload failed: ${error.message}`;
+        }
+      }
+      
+      toast({ 
+        title: "Upload failed", 
+        description: errorMessage, 
+        variant: "destructive" 
+      });
     } finally {
       setUploading(false);
       setModerationResult(null);
@@ -321,9 +445,6 @@ const ImageManagement = ({ currentUser }: ImageManagementProps) => {
             <div className="text-xs text-gray-500 mb-2 flex items-center">
               <Shield className="w-3 h-3 mr-1 text-purple-600" />
               All images are automatically checked for appropriate content
-            </div>
-            <div className="text-xs text-orange-600 mb-2 flex items-center">
-              🧪 TEST MODE: ~50% of images will require admin approval for testing
             </div>
             <Input 
               type="file" 

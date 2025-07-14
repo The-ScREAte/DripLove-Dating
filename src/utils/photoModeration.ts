@@ -149,30 +149,56 @@ class PhotoModerationService {
     const skinToneRatio = skinTonePixels / pixels;
     const redDominantRatio = redDominantPixels / pixels;
     
+    console.log('📊 Content analysis:', {
+      skinToneRatio: (skinToneRatio * 100).toFixed(1) + '%',
+      redDominantRatio: (redDominantRatio * 100).toFixed(1) + '%',
+      pixels
+    });
+    
     const flags: string[] = [];
     let adultContent = 0;
     let explicitContent = 0;
     let suggestiveContent = 0;
 
-    // Threshold-based detection - requiring admin review for questionable content
-    if (skinToneRatio > 0.4) {
-      suggestiveContent = Math.min(skinToneRatio * 100, 95);
-      
-      if (skinToneRatio > 0.5) {
-        adultContent = Math.min(skinToneRatio * 120, 95);
-        flags.push(MODERATION_FLAGS.ADULT_CONTENT);
-      }
-      
-      if (skinToneRatio > 0.6) {
-        explicitContent = Math.min(skinToneRatio * 150, 95);
-        flags.push(MODERATION_FLAGS.EXPLICIT_CONTENT);
-      }
+    // Quick bypass: if skin tone ratio is very low, likely a normal photo
+    if (skinToneRatio < 0.3) { // Less than 30% skin tone - very likely a normal photo
+      console.log('✅ Normal photo detected - low skin tone ratio, auto-approving');
+      return {
+        flags: [],
+        details: {
+          adultContent: 0,
+          explicitContent: 0,
+          suggestiveContent: 0
+        }
+      };
     }
 
-    // Additional inappropriate content indicators
-    if (redDominantRatio > 0.3) {
+    // Properly balanced thresholds for dating app context
+    // Many legitimate dating photos show 60-80% skin (beach, gym, casual summer photos)
+    if (skinToneRatio > 0.90) { // 90%+ skin tone - very likely explicit content
+      explicitContent = 90;
+      flags.push(MODERATION_FLAGS.EXPLICIT_CONTENT);
+      console.log('🚨 Explicit content detected - 90%+ skin tone');
+    }
+    else if (skinToneRatio > 0.85) { // 85%+ skin tone - likely adult content
+      adultContent = 80;
+      flags.push(MODERATION_FLAGS.ADULT_CONTENT);
+      console.log('🚨 Adult content detected - 85%+ skin tone');
+    }
+    else if (skinToneRatio > 0.80) { // 80%+ skin tone - potentially suggestive but allow
+      suggestiveContent = 70;
+      console.log('⚠️ High skin content detected but allowed - 80%+ skin tone');
+    }
+    else {
+      // For 30-80% skin tone, approve without flags (includes beach, gym, summer photos)
+      console.log('✅ Acceptable skin tone ratio for dating profile');
+    }
+
+    // Additional check for extremely red-dominant images (very rare)
+    if (redDominantRatio > 0.8) { // 80% red dominant
       flags.push(MODERATION_FLAGS.INAPPROPRIATE);
-      adultContent = Math.max(adultContent, 60);
+      adultContent = Math.max(adultContent, 75);
+      console.log('🚨 Inappropriate content detected - 80%+ red dominant');
     }
 
     return {
@@ -317,6 +343,11 @@ class PhotoModerationService {
       ...curr.details
     }), {} as ModerationResult['details']);
 
+    console.log('📊 Moderation analysis:', {
+      flags: allFlags,
+      details: combinedDetails
+    });
+
     const hasBlockingFlags = allFlags.some(flag =>
       flag === MODERATION_FLAGS.INVALID_IMAGE
     );
@@ -337,21 +368,29 @@ class PhotoModerationService {
       isApproved = false;
       confidence = 95;
       message = 'Image file is corrupted or invalid and cannot be uploaded.';
+      console.log('❌ Image blocked: Invalid file');
     }
-    // All content-related flags require admin review
+    // Only require admin review for clearly inappropriate content
     else if (
       hasContentFlags ||
-      (combinedDetails.adultContent && combinedDetails.adultContent > 10) ||
-      (combinedDetails.explicitContent && combinedDetails.explicitContent > 5) ||
-      (combinedDetails.suggestiveContent && combinedDetails.suggestiveContent > 15)
+      (combinedDetails.adultContent && combinedDetails.adultContent >= 80) ||
+      (combinedDetails.explicitContent && combinedDetails.explicitContent >= 90) ||
+      (combinedDetails.suggestiveContent && combinedDetails.suggestiveContent > 80)
     ) {
       isApproved = true; // Allow upload but mark for review
       requiresReview = true;
-      confidence = 50;
+      confidence = 30;
       message = 'Image uploaded successfully but requires admin approval before being visible to others.';
+      console.log('🔍 Image requires review:', {
+        hasContentFlags,
+        adultContent: combinedDetails.adultContent,
+        explicitContent: combinedDetails.explicitContent,
+        suggestiveContent: combinedDetails.suggestiveContent
+      });
     }
     else {
       message = 'Image approved and uploaded successfully.';
+      console.log('✅ Image approved automatically');
       if (allFlags.includes(MODERATION_FLAGS.NO_FACE_DETECTED)) {
         message += ' Tip: Profile photos work best when they clearly show your face.';
       }
@@ -367,19 +406,23 @@ class PhotoModerationService {
   }
 
   /**
-   * Helper function to detect skin tones
+   * Helper function to detect skin tones with very restrictive criteria
    */
   private isSkinTone(r: number, g: number, b: number): boolean {
-    // Basic skin tone detection algorithm
+    // EXTREMELY restrictive skin tone detection to avoid false positives on normal photos
     const max = Math.max(r, g, b);
     const min = Math.min(r, g, b);
     
-    // Skin tone characteristics
+    // Skip very dark, very light, or very colorful pixels
+    if (max < 100 || min > 200 || max - min < 20) return false;
+    
+    // Much more restrictive criteria - only match very obvious skin tones
     return (
-      r > 60 && g > 40 && b > 20 && // Minimum values
-      max - min > 15 && // Some variation
-      r > g && r > b && // Red dominance
-      Math.abs(r - g) < 15 // But not too much
+      r > 120 && g > 80 && b > 60 && // Much higher minimum thresholds
+      r > g + 20 && r > b + 30 && // Strong red dominance required
+      g > b + 10 && // Green should be higher than blue
+      Math.abs(r - g) > 10 && Math.abs(r - g) < 50 && // Reasonable red-green ratio
+      r - b > 20 && r - b < 80 // Specific red-blue difference for skin
     );
   }
 }
@@ -440,10 +483,26 @@ export async function saveModerationResult(
   }
 }
 
+interface PendingImage {
+  id: string;
+  image_url: string;
+  is_approved: boolean;
+  moderation_status: string;
+  moderation_notes?: string;
+  flagged_content?: string[];
+  confidence_score?: number;
+  created_at: string;
+  profiles: {
+    first_name?: string;
+    last_name?: string;
+    email?: string;
+  };
+}
+
 /**
  * Get pending images for admin review
  */
-export async function getPendingImages(): Promise<any[]> {
+export async function getPendingImages(): Promise<PendingImage[]> {
   try {
     const { data, error } = await supabase
       .from('user_images')

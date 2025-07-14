@@ -5,7 +5,7 @@ import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Badge } from '@/components/ui/badge';
 import { defaultPaymentMethods, PaymentMethod } from '@/constants/flwConfig';
-
+import { bulkApproveExistingImages } from '@/utils/bulkApproveImages';
 
 
 import { useToast } from '@/hooks/use-toast';
@@ -1040,9 +1040,24 @@ const AdminPage = ({ currentUser, onLogout }: AdminPageProps) => {
           {/* Pending Images Management */}
           <Card>
             <CardHeader className="pb-3">
-              <CardTitle className="flex items-center gap-2 text-lg">
-                <Eye className="w-5 h-5" />
-                Pending Images ({pendingImages.length})
+              <CardTitle className="flex items-center justify-between text-lg">
+                <div className="flex items-center gap-2">
+                  <Eye className="w-5 h-5" />
+                  Pending Images ({pendingImages.length})
+                </div>
+                <Button
+                  onClick={async () => {
+                    toast({ title: "Bulk approval started", description: "Approving all existing images..." });
+                    await bulkApproveExistingImages();
+                    await fetchPendingImages();
+                    toast({ title: "✅ Bulk approval complete", description: "All appropriate images have been approved." });
+                  }}
+                  variant="outline"
+                  size="sm"
+                  className="text-xs"
+                >
+                  🔧 Bulk Approve All
+                </Button>
               </CardTitle>
             </CardHeader>
             <CardContent>
