@@ -448,27 +448,55 @@ export type Database = {
       }
       user_images: {
         Row: {
+          confidence_score: number | null
           created_at: string | null
+          flagged_content: string[] | null
           id: string
           image_order: number
           image_url: string
+          is_approved: boolean | null
+          moderated_at: string | null
+          moderated_by: string | null
+          moderation_notes: string | null
+          moderation_status: string | null
           user_id: string
         }
         Insert: {
+          confidence_score?: number | null
           created_at?: string | null
+          flagged_content?: string[] | null
           id?: string
           image_order: number
           image_url: string
+          is_approved?: boolean | null
+          moderated_at?: string | null
+          moderated_by?: string | null
+          moderation_notes?: string | null
+          moderation_status?: string | null
           user_id: string
         }
         Update: {
+          confidence_score?: number | null
           created_at?: string | null
+          flagged_content?: string[] | null
           id?: string
           image_order?: number
           image_url?: string
+          is_approved?: boolean | null
+          moderated_at?: string | null
+          moderated_by?: string | null
+          moderation_notes?: string | null
+          moderation_status?: string | null
           user_id?: string
         }
         Relationships: [
+          {
+            foreignKeyName: "fk_moderated_by"
+            columns: ["moderated_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "user_images_user_id_fkey"
             columns: ["user_id"]
@@ -580,6 +608,10 @@ export type Database = {
         Args: { target_user_id: string; new_status: string }
         Returns: undefined
       }
+      approve_image: {
+        Args: { image_id: string; admin_notes?: string }
+        Returns: boolean
+      }
       calculate_distance: {
         Args: { lat1: number; lon1: number; lat2: number; lon2: number }
         Returns: number
@@ -620,6 +652,10 @@ export type Database = {
       increment_unread_count: {
         Args: { match_id_input: string; field_name: string }
         Returns: undefined
+      }
+      reject_image: {
+        Args: { image_id: string; admin_notes?: string }
+        Returns: boolean
       }
       update_user_usage: {
         Args: {

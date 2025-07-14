@@ -11,7 +11,7 @@ import {
 import { Upload, Trash2, Shield, AlertTriangle, CheckCircle } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
-import { photoModerationService, ModerationResult } from '@/utils/photoModeration';
+import { moderateImage, saveModerationResult, ModerationResult } from '@/utils/photoModeration';
 
 interface ImageManagementProps {
   currentUser: {
@@ -110,7 +110,7 @@ const ImageManagement = ({ currentUser }: ImageManagementProps) => {
 
     try {
       console.log('🔍 Starting image moderation for file:', file.name, file.size, file.type);
-      const moderation = await photoModerationService.moderateImage(file);
+      const moderation = await moderateImage(file);
       console.log('📊 Moderation result:', moderation);
       setModerationResult(moderation);
       
