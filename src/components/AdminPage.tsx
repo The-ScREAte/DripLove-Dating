@@ -416,48 +416,58 @@ const AdminPage = ({ currentUser, onLogout }: AdminPageProps) => {
   const rejectImage = async (imageId: string) => {
     try {
       setRejectingImages(prev => ({ ...prev, [imageId]: true }));
+      console.log('🗑️ Rejecting image:', imageId);
 
-      // Use the reject_image function if available, otherwise direct delete
-      const { data, error } = await supabase.rpc('reject_image', {
-        image_id: imageId,
-        admin_notes: 'Rejected by admin'
-      });
+      // Get the image data first to access the storage file
+      const { data: imageData, error: fetchError } = await supabase
+        .from('user_images')
+        .select('image_url')
+        .eq('id', imageId)
+        .single();
 
-      if (error) {
-        if (error.message.includes('function') && error.message.includes('does not exist')) {
-          // Fallback to direct delete if function doesn't exist
-          console.log('Function not available, using direct delete');
-          
-          // First get the image URL for storage cleanup
-          const { data: imageData } = await supabase
-            .from('user_images')
-            .select('image_url')
-            .eq('id', imageId)
-            .single();
+      if (fetchError) {
+        console.error('❌ Error fetching image data:', fetchError);
+        throw fetchError;
+      }
 
-          if (imageData?.image_url) {
-            // Delete from storage
-            const urlParts = imageData.image_url.split('/');
-            const bucketIndex = urlParts.findIndex(part => part === 'user-photos');
-            if (bucketIndex !== -1) {
-              const filePath = urlParts.slice(bucketIndex + 1).join('/');
-              await supabase.storage.from('user-photos').remove([filePath]);
+      // Delete from database first
+      const { error: deleteError } = await supabase
+        .from('user_images')
+        .delete()
+        .eq('id', imageId);
+
+      if (deleteError) {
+        console.error('❌ Error deleting from database:', deleteError);
+        throw deleteError;
+      }
+
+      console.log('✅ Image deleted from database');
+
+      // Then delete from storage if we have the URL
+      if (imageData?.image_url) {
+        try {
+          const urlParts = imageData.image_url.split('/');
+          const bucketIndex = urlParts.findIndex(part => part === 'user-photos');
+          if (bucketIndex !== -1) {
+            const filePath = urlParts.slice(bucketIndex + 1).join('/');
+            const { error: storageError } = await supabase.storage
+              .from('user-photos')
+              .remove([filePath]);
+            
+            if (storageError) {
+              console.warn('⚠️ Storage deletion warning (non-critical):', storageError);
+              // Don't throw here as database deletion succeeded
+            } else {
+              console.log('✅ Image deleted from storage');
             }
           }
-
-          // Delete from database
-          const { error: deleteError } = await supabase
-            .from('user_images')
-            .delete()
-            .eq('id', imageId);
-
-          if (deleteError) throw deleteError;
-        } else {
-          throw error;
+        } catch (storageError) {
+          console.warn('⚠️ Storage cleanup failed (non-critical):', storageError);
+          // Continue as database deletion succeeded
         }
       }
 
-      // Remove from pending list
+      // Remove from pending list immediately
       setPendingImages(prev => prev.filter(img => img.id !== imageId));
       
       toast({
@@ -465,14 +475,13 @@ const AdminPage = ({ currentUser, onLogout }: AdminPageProps) => {
         description: 'Image rejected and deleted successfully'
       });
 
-      // Refresh stats and pending images
-      await Promise.all([fetchAppStats(), fetchPendingImages()]);
+      console.log('✅ Image rejection complete');
 
     } catch (error) {
-      console.error('Error rejecting image:', error);
+      console.error('❌ Error rejecting image:', error);
       toast({
         title: 'Error',
-        description: 'Failed to reject image',
+        description: 'Failed to reject image. Please try again.',
         variant: 'destructive'
       });
     } finally {
