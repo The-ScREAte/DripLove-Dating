@@ -9,6 +9,7 @@ import { Checkbox } from '@/components/ui/checkbox';
 import { Textarea } from '@/components/ui/textarea';
 import { Heart, MapPin, Briefcase, GraduationCap } from 'lucide-react';
 import BasicInfoSection from '@/components/forms/BasicInfoSection';
+import LocationInput from '@/components/forms/LocationInput';
 import { validateRegistrationForm, transformFormDataForSubmission } from '@/utils/formValidation';
 import { initialFormData } from '@/constants/formData';
 import { occupationOptions, industryOptions } from '@/constants/professionOptions';
@@ -46,6 +47,37 @@ const RegistrationForm = ({ onSubmit, onBackToLogin }: RegistrationFormProps) =>
     }
   };
 
+  const handleLocationChange = (location: {
+    country: string;
+    countryCode: string;
+    city: string;
+    zipCode: string;
+    latitude?: number;
+    longitude?: number;
+    isCustomCity?: boolean;
+  }) => {
+    setFormData(prev => ({
+      ...prev,
+      country: location.country,
+      countryCode: location.countryCode,
+      city: location.city,
+      zipCode: location.zipCode,
+      latitude: location.latitude,
+      longitude: location.longitude,
+      isCustomCity: location.isCustomCity || false
+    }));
+
+    // Clear location-related errors
+    if (errors.country || errors.city || errors.zipCode) {
+      setErrors(prev => ({
+        ...prev,
+        country: '',
+        city: '',
+        zipCode: ''
+      }));
+    }
+  };
+
   const handleSliderChange = (field: string, value: number[]) => {
     setFormData({
       ...formData,
@@ -72,6 +104,7 @@ const RegistrationForm = ({ onSubmit, onBackToLogin }: RegistrationFormProps) =>
     if (!formData.confirmPassword) firstStepErrors.confirmPassword = 'Please confirm your password';
     if (!formData.dateOfBirth) firstStepErrors.dateOfBirth = 'Date of birth is required';
     if (!formData.country) firstStepErrors.country = 'Country is required';
+    if (!formData.city.trim()) firstStepErrors.city = 'City is required';
     
     // Email validation
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
@@ -162,32 +195,21 @@ const RegistrationForm = ({ onSubmit, onBackToLogin }: RegistrationFormProps) =>
             onTogglePassword={() => setShowPassword(!showPassword)}
             onToggleConfirmPassword={() => setShowConfirmPassword(!showConfirmPassword)}
           />
-          {/* Location */}
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 animate-scale-in">
-            <div className="space-y-2">
-              <Label className="text-sm font-medium">City</Label>
-              <Input
-                type="text"
-                name="city"
-                value={formData.city}
-                onChange={handleInputChange}
-                placeholder="Enter your city"
-                className={`border-gray-200 focus:border-pink-400 focus:ring-pink-400 ${errors.city ? 'border-red-500' : ''}`}
-              />
-              {errors.city && <p className="text-red-500 text-xs mt-1">{errors.city}</p>}
-            </div>
-            <div className="space-y-2">
-              <Label className="text-sm font-medium">Zip Code</Label>
-              <Input
-                type="text"
-                name="zipCode"
-                value={formData.zipCode}
-                onChange={handleInputChange}
-                placeholder="Enter zip code"
-                className={`border-gray-200 focus:border-pink-400 focus:ring-pink-400 ${errors.zipCode ? 'border-red-500' : ''}`}
-              />
-              {errors.zipCode && <p className="text-red-500 text-xs mt-1">{errors.zipCode}</p>}
-            </div>
+          
+          {/* Location Section */}
+          <div className="animate-scale-in">
+            <LocationInput
+              country={formData.country}
+              city={formData.city}
+              zipCode={formData.zipCode}
+              onLocationChange={handleLocationChange}
+              errors={{
+                country: errors.country,
+                city: errors.city,
+                zipCode: errors.zipCode
+              }}
+              required={true}
+            />
           </div>
           </div>
           )}

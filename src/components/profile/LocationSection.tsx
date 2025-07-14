@@ -3,59 +3,138 @@ import React from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { Slider } from '@/components/ui/slider';
+import LocationInput from '@/components/forms/LocationInput';
 
 interface LocationSectionProps {
   editedProfile: any;
   isEditing: boolean;
   onInputChange: (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => void;
+  onLocationChange?: (location: {
+    country: string;
+    countryCode: string;
+    city: string;
+    zipCode: string;
+    latitude?: number;
+    longitude?: number;
+    isCustomCity?: boolean;
+  }) => void;
+  onDistanceChange?: (distance: number[]) => void;
 }
 
-const LocationSection = ({ editedProfile, isEditing, onInputChange }: LocationSectionProps) => {
+const LocationSection = ({ 
+  editedProfile, 
+  isEditing, 
+  onInputChange, 
+  onLocationChange,
+  onDistanceChange 
+}: LocationSectionProps) => {
   return (
     <Card>
       <CardHeader>
-        <CardTitle>Location Information</CardTitle>
+        <CardTitle>Location & Matching Preferences</CardTitle>
       </CardHeader>
       <CardContent>
-        <div className="space-y-4">
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div>
-              <Label htmlFor="city">City</Label>
-              <Input
-                type="text"
-                id="city"
-                name="city"
-                value={editedProfile.city}
-                onChange={onInputChange}
-                disabled={!isEditing}
-                className="w-full"
-              />
-            </div>
-            <div>
-              <Label htmlFor="country">Country</Label>
-              <Input
-                type="text"
-                id="country"
-                name="country"
-                value={editedProfile.country}
-                onChange={onInputChange}
-                disabled={!isEditing}
-                className="w-full"
-              />
-            </div>
-          </div>
-          <div>
-            <Label htmlFor="zip_code">Zip Code</Label>
-            <Input
-              type="text"
-              id="zip_code"
-              name="zip_code"
-              value={editedProfile.zip_code}
-              onChange={onInputChange}
-              disabled={!isEditing}
-              className="w-full"
+        <div className="space-y-6">
+          {isEditing && onLocationChange ? (
+            <LocationInput
+              country={editedProfile.country || ''}
+              city={editedProfile.city || ''}
+              zipCode={editedProfile.zip_code || ''}
+              onLocationChange={onLocationChange}
+              required={false}
             />
+          ) : (
+            // Display mode
+            <div className="space-y-4">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                  <Label htmlFor="city">City</Label>
+                  <Input
+                    type="text"
+                    id="city"
+                    name="city"
+                    value={editedProfile.city || ''}
+                    onChange={onInputChange}
+                    disabled={!isEditing}
+                    className="w-full"
+                  />
+                </div>
+                <div>
+                  <Label htmlFor="country">Country</Label>
+                  <Input
+                    type="text"
+                    id="country"
+                    name="country"
+                    value={editedProfile.country || ''}
+                    onChange={onInputChange}
+                    disabled={!isEditing}
+                    className="w-full"
+                  />
+                </div>
+              </div>
+              <div>
+                <Label htmlFor="zip_code">ZIP/Postal Code</Label>
+                <Input
+                  type="text"
+                  id="zip_code"
+                  name="zip_code"
+                  value={editedProfile.zip_code || ''}
+                  onChange={onInputChange}
+                  disabled={!isEditing}
+                  className="w-full"
+                />
+              </div>
+            </div>
+          )}
+
+          {/* Distance Preference */}
+          <div className="space-y-3">
+            <Label>Maximum Distance for Matches</Label>
+            <div className="px-3">
+              <Slider
+                value={[editedProfile.distance_preference || 50]}
+                onValueChange={onDistanceChange || (() => {})}
+                max={500}
+                min={1}
+                step={5}
+                className="w-full"
+                disabled={!isEditing}
+              />
+              <div className="flex justify-between text-xs text-gray-500 mt-1">
+                <span>1 km</span>
+                <span className="font-medium">{editedProfile.distance_preference || 50} km</span>
+                <span>500 km</span>
+              </div>
+            </div>
+            <div className="text-sm text-gray-600">
+              Set how far you're willing to match with other users. 
+              Smaller distances mean more local matches.
+            </div>
           </div>
+
+          {/* Location Status */}
+          {editedProfile.latitude && editedProfile.longitude && (
+            <div className="p-3 bg-green-50 rounded-lg">
+              <div className="text-sm text-green-800 font-medium">
+                ✅ Precise Location Available
+              </div>
+              <div className="text-xs text-green-600">
+                Your city coordinates are known, enabling accurate distance matching.
+              </div>
+            </div>
+          )}
+
+          {editedProfile.city && !editedProfile.latitude && (
+            <div className="p-3 bg-orange-50 rounded-lg">
+              <div className="text-sm text-orange-800 font-medium">
+                ⚠️ Approximate Location
+              </div>
+              <div className="text-xs text-orange-600">
+                Your city isn't in our database. You'll still get matches based on country/region.
+              </div>
+            </div>
+          )}
         </div>
       </CardContent>
     </Card>

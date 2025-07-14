@@ -149,26 +149,6 @@ const BasicInfoSection = ({
           {errors.dateOfBirth && <p className="text-red-500 text-xs mt-1">{errors.dateOfBirth}</p>}
         </div>
       </div>
-
-      <div className="space-y-2">
-        <Label htmlFor="country" className="text-sm font-medium">Country *</Label>
-        <div className="relative">
-          <Globe className="absolute left-3 top-3 h-4 w-4 text-gray-400" />
-          <Select value={formData.country} onValueChange={(value) => onSelectChange('country', value)}>
-            <SelectTrigger className={`pl-10 border-gray-200 focus:border-pink-400 focus:ring-pink-400 ${errors.country ? 'border-red-500' : ''}`}>
-              <SelectValue placeholder="Select your country" />
-            </SelectTrigger>
-            <SelectContent>
-              {countries.map((country) => (
-                <SelectItem key={country} value={country}>
-                  {country}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-          {errors.country && <p className="text-red-500 text-xs mt-1">{errors.country}</p>}
-        </div>
-      </div>
     </div>
   );
 };

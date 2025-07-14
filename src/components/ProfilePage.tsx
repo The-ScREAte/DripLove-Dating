@@ -17,6 +17,7 @@ import ImageManagement from './profile/ImageManagement';
 import AccountActions from './profile/AccountActions';
 import ProfileSummaryCard from './ProfileSummaryCard';
 import PremiumUpgrade from './PremiumUpgrade';
+import PushNotificationSettings from './PushNotificationSettings';
 
 interface ProfilePageProps {
   currentUser: any;
@@ -31,6 +32,7 @@ const ProfilePage = ({ currentUser, profile, onProfileUpdate, onLogout, onShowTe
   const [isEditing, setIsEditing] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const [showPremiumUpgrade, setShowPremiumUpgrade] = useState(false);
+  const [hideProfileCompletion, setHideProfileCompletion] = useState(false);
   const { toast } = useToast();
   const { subscription, loading: subscriptionLoading, isPremium } = useSubscription(currentUser?.id);
 
@@ -52,6 +54,8 @@ const ProfilePage = ({ currentUser, profile, onProfileUpdate, onLogout, onShowTe
     industry: '',
     education_level: '',
     zip_code: '',
+    latitude: null as number | null,
+    longitude: null as number | null,
     introvert_extrovert: 50,
     spontaneous_planner: 50,
     messy_organized: 50,
@@ -69,7 +73,7 @@ const ProfilePage = ({ currentUser, profile, onProfileUpdate, onLogout, onShowTe
         bio: profile.bio || '',
         city: profile.city || '',
         country: profile.country || '',
-        distance_preference: profile.distance_preference || 50,
+        distance_preference: profile.distance_preference || profile.max_distance || 50,
         gender: profile.gender || '',
         preference: profile.preference || '',
         relationship_intent: profile.relationship_intent || '',
@@ -81,6 +85,8 @@ const ProfilePage = ({ currentUser, profile, onProfileUpdate, onLogout, onShowTe
         industry: profile.industry || '',
         education_level: profile.education_level || '',
         zip_code: profile.zip_code || '',
+        latitude: profile.latitude || null,
+        longitude: profile.longitude || null,
         introvert_extrovert: profile.introvert_extrovert || 50,
         spontaneous_planner: profile.spontaneous_planner || 50,
         messy_organized: profile.messy_organized || 50,
@@ -105,6 +111,29 @@ const ProfilePage = ({ currentUser, profile, onProfileUpdate, onLogout, onShowTe
     setEditedProfile(prev => ({ ...prev, [name]: value }));
   };
 
+  const handleLocationChange = (location: {
+    country: string;
+    countryCode: string;
+    city: string;
+    zipCode: string;
+    latitude?: number;
+    longitude?: number;
+    isCustomCity?: boolean;
+  }) => {
+    setEditedProfile(prev => ({
+      ...prev,
+      country: location.country,
+      city: location.city,
+      zip_code: location.zipCode,
+      latitude: location.latitude,
+      longitude: location.longitude,
+    }));
+  };
+
+  const handleDistanceChange = (distance: number[]) => {
+    setEditedProfile(prev => ({ ...prev, distance_preference: distance[0] }));
+  };
+
   const handleInterestsChange = (interests: string[]) => {
     if (isEditing) {
       setEditedProfile(prev => ({ ...prev, interests }));
@@ -124,7 +153,7 @@ const ProfilePage = ({ currentUser, profile, onProfileUpdate, onLogout, onShowTe
         country: editedProfile.country?.trim() || null,
         date_of_birth: profile?.date_of_birth || currentUser?.user_metadata?.date_of_birth || '1990-01-01',
         email: currentUser.email,
-        distance_preference: editedProfile.distance_preference || 25,
+        max_distance: editedProfile.distance_preference || 25,
         gender: editedProfile.gender || 'not_specified',
         preference: editedProfile.preference || 'not_specified',
         relationship_intent: editedProfile.relationship_intent || 'open_to_anything',
@@ -136,6 +165,8 @@ const ProfilePage = ({ currentUser, profile, onProfileUpdate, onLogout, onShowTe
         industry: editedProfile.industry?.trim() || null,
         education_level: editedProfile.education_level || null,
         zip_code: editedProfile.zip_code?.trim() || null,
+        latitude: editedProfile.latitude || null,
+        longitude: editedProfile.longitude || null,
         introvert_extrovert:
           typeof editedProfile.introvert_extrovert === 'number' &&
           editedProfile.introvert_extrovert >= 0 &&
@@ -205,7 +236,7 @@ const ProfilePage = ({ currentUser, profile, onProfileUpdate, onLogout, onShowTe
         bio: profile.bio || '',
         city: profile.city || '',
         country: profile.country || '',
-        distance_preference: profile.distance_preference || 50,
+        distance_preference: profile.distance_preference || profile.max_distance || 50,
         gender: profile.gender || '',
         preference: profile.preference || '',
         relationship_intent: profile.relationship_intent || '',
@@ -217,6 +248,8 @@ const ProfilePage = ({ currentUser, profile, onProfileUpdate, onLogout, onShowTe
         industry: profile.industry || '',
         education_level: profile.education_level || '',
         zip_code: profile.zip_code || '',
+        latitude: profile.latitude || null,
+        longitude: profile.longitude || null,
         introvert_extrovert: profile.introvert_extrovert || 50,
         spontaneous_planner: profile.spontaneous_planner || 50,
         messy_organized: profile.messy_organized || 50,
@@ -252,17 +285,12 @@ const ProfilePage = ({ currentUser, profile, onProfileUpdate, onLogout, onShowTe
 
   // --- END: Improved Profile Progress Bar and Actionable Feedback ---
 
-  const [hideProfileCompletion, setHideProfileCompletion] = useState(false);
-
   return (
     <div className="h-full flex flex-col">
       {/* Fixed Header */}
       <div className="flex-shrink-0 bg-white border-b p-4">
         <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
-          <div className="flex items-center space-x-2">
-            <User className="w-6 h-6 text-pink-600" />
-            <h1 className="text-2xl font-bold text-gray-800">Your AfroVibe Profile</h1>
-          </div>
+         
           <div className="flex flex-row gap-2 w-full">
             {!subscriptionLoading && !isPremium() && (
               <Button 
@@ -326,13 +354,20 @@ const ProfilePage = ({ currentUser, profile, onProfileUpdate, onLogout, onShowTe
           <ProfileSummaryCard currentUser={currentUser} />
           <ImageManagement currentUser={currentUser} />
           <BasicInfoSection editedProfile={editedProfile} isEditing={isEditing} onInputChange={handleInputChange} />
-          <LocationSection editedProfile={editedProfile} isEditing={isEditing} onInputChange={handleInputChange} />
+          <LocationSection 
+            editedProfile={editedProfile} 
+            isEditing={isEditing} 
+            onInputChange={handleInputChange}
+            onLocationChange={handleLocationChange}
+            onDistanceChange={handleDistanceChange}
+          />
           <PreferencesSection editedProfile={editedProfile} isEditing={isEditing} onSliderChange={handleSliderChange} onSelectChange={handleSelectChange} />
           <LifestyleSection editedProfile={editedProfile} isEditing={isEditing} onSelectChange={handleSelectChange} />
           <WorkEducationSection editedProfile={editedProfile} isEditing={isEditing} onInputChange={handleInputChange} />
           <PersonalitySection editedProfile={editedProfile} isEditing={isEditing} onSliderChange={handleSliderChange} />
           <FunQuestionsSection editedProfile={editedProfile} isEditing={isEditing} onInputChange={handleInputChange} />
           <InterestsSection editedProfile={editedProfile} profile={profile} isEditing={isEditing} onInterestsChange={handleInterestsChange} />
+          <PushNotificationSettings currentUser={currentUser} />
           <AccountActions 
             currentUser={currentUser} 
             onLogout={onLogout} 

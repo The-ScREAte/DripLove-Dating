@@ -1,5 +1,5 @@
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -8,40 +8,82 @@ import {
   AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription,
   AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger
 } from '@/components/ui/alert-dialog';
-import { Upload, Trash2 } from 'lucide-react';
+import { Upload, Trash2, Shield, AlertTriangle, CheckCircle } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
+import { photoModerationService, ModerationResult } from '@/utils/photoModeration';
 
 interface ImageManagementProps {
-  currentUser: any;
+  currentUser: {
+    id: string;
+    email?: string;
+  } | null;
+}
+
+interface UserImage {
+  image_url: string;
+  is_approved?: boolean;
+  moderation_status?: string;
 }
 
 const ImageManagement = ({ currentUser }: ImageManagementProps) => {
-  const [userImages, setUserImages] = useState<string[]>([]);
+  const [userImages, setUserImages] = useState<UserImage[]>([]);
   const [uploading, setUploading] = useState(false);
   const [deleting, setDeleting] = useState(false);
+  const [moderating, setModerating] = useState(false);
+  const [moderationResult, setModerationResult] = useState<ModerationResult | null>(null);
   const { toast } = useToast();
 
-  useEffect(() => {
-    fetchUserImages();
-  }, [currentUser]);
-
-  const fetchUserImages = async () => {
+  const fetchUserImages = useCallback(async () => {
     if (!currentUser?.id) return;
 
     try {
+      // Try to fetch with moderation columns first
       const { data: images, error } = await supabase
         .from('user_images')
-        .select('image_url')
+        .select('image_url, is_approved, moderation_status')
         .eq('user_id', currentUser.id)
         .order('image_order', { ascending: true });
 
-      if (error) throw error;
-      setUserImages(images?.map(img => img.image_url) || []);
+      if (error && error.message.includes('does not exist')) {
+        // Fallback to basic fetch if moderation columns don't exist yet
+        console.log('Moderation columns not available, using basic fetch');
+        const { data: basicImages, error: basicError } = await supabase
+          .from('user_images')
+          .select('image_url, image_order')
+          .eq('user_id', currentUser.id)
+          .order('image_order', { ascending: true });
+        
+        if (basicError) throw basicError;
+        setUserImages(basicImages?.map(img => ({ 
+          image_url: img.image_url,
+          is_approved: img.image_order === -1 ? false : true, // -1 means pending
+          moderation_status: img.image_order === -1 ? 'pending' : 'approved'
+        })) || []);
+      } else if (error) {
+        throw error;
+      } else if (images) {
+        // Type assertion for the successful case - convert via unknown first
+        const typedImages = images as unknown as Array<{
+          image_url: string;
+          is_approved?: boolean;
+          moderation_status?: string;
+        }>;
+        
+        setUserImages(typedImages.map(img => ({
+          image_url: img.image_url,
+          is_approved: img.is_approved ?? true,
+          moderation_status: img.moderation_status ?? 'approved'
+        })));
+      }
     } catch (error) {
       console.error('Error fetching user images:', error);
     }
-  };
+  }, [currentUser?.id]);
+
+  useEffect(() => {
+    fetchUserImages();
+  }, [fetchUserImages]);
 
   const handleImageUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
@@ -62,6 +104,69 @@ const ImageManagement = ({ currentUser }: ImageManagementProps) => {
       return;
     }
 
+    // Step 1: AI Moderation Check
+    setModerating(true);
+    setModerationResult(null);
+
+    try {
+      console.log('🔍 Starting image moderation for file:', file.name, file.size, file.type);
+      const moderation = await photoModerationService.moderateImage(file);
+      console.log('📊 Moderation result:', moderation);
+      setModerationResult(moderation);
+      
+      // Only reject if explicitly not approved (truly inappropriate content)
+      if (!moderation.isApproved) {
+        console.log('❌ Image rejected:', moderation.message);
+        toast({ 
+          title: "Image not approved", 
+          description: moderation.message || "This image cannot be uploaded due to content policy violations.", 
+          variant: "destructive" 
+        });
+        setModerating(false);
+        event.target.value = '';
+        return;
+      }
+
+      // Show info for images that require review
+      if (moderation.details?.requiresReview) {
+        console.log('🔍 Image requires review:', moderation.message);
+        // Show immediate feedback for pending review
+        toast({ 
+          title: "⚠️ Image will require admin review", 
+          description: "This image will be uploaded but needs approval before others can see it.",
+          variant: "default"
+        });
+      }
+      // Show warning for images that passed but have quality issues
+      else if (moderation.confidence < 80) {
+        console.log('⚠️ Image approved with warning:', moderation.message);
+        toast({ 
+          title: "Image uploaded with warning", 
+          description: moderation.message,
+          variant: "default"
+        });
+      } else {
+        console.log('✅ Image fully approved:', moderation.message);
+      }
+
+    } catch (error) {
+      console.error('❌ Moderation error:', error);
+      // Continue with upload even if moderation fails
+      toast({ 
+        title: "Moderation check skipped", 
+        description: "Unable to verify image content, but upload will continue.", 
+        variant: "default"
+      });
+      setModerationResult({
+        isApproved: true,
+        confidence: 50,
+        flags: [],
+        details: {},
+        message: "Moderation check skipped - upload proceeding"
+      });
+    }
+
+    setModerating(false);
     setUploading(true);
 
     try {
@@ -83,19 +188,85 @@ const ImageManagement = ({ currentUser }: ImageManagementProps) => {
       const publicUrl = urlData.publicUrl;
       const nextImageOrder = userImages.length + 1;
 
-      const { error: dbError } = await supabase
-        .from('user_images')
-        .insert({ user_id: currentUser.id, image_url: publicUrl, image_order: nextImageOrder });
+      // Store image with moderation info
+      const imageData = {
+        user_id: currentUser.id, 
+        image_url: publicUrl, 
+        image_order: nextImageOrder
+      };
 
-      if (dbError) throw dbError;
+      // Check if image requires admin review (uncertain content)
+      const requiresReview = moderationResult?.details?.requiresReview || false;
+      
+      console.log('🔍 Upload decision:', {
+        requiresReview,
+        moderationResult: moderationResult?.details,
+        message: moderationResult?.message
+      });
+      
+      if (requiresReview) {
+        console.log('🔒 Uploading as pending approval...');
+        // Try to insert with moderation columns for pending approval
+        const { error: dbError } = await supabase
+          .from('user_images')
+          .insert({ 
+            ...imageData,
+            is_approved: false,
+            moderation_status: 'pending',
+            moderation_notes: `AI review: ${moderationResult?.message || 'Requires manual review'}`
+          });
 
-      await fetchUserImages();
-      toast({ title: "Image uploaded", description: "Your image has been uploaded successfully." });
-    } catch (error: any) {
+        if (dbError) {
+          console.error('❌ Database error with moderation columns:', dbError);
+          if (dbError.message.includes('does not exist')) {
+            // WORKAROUND: Use image_order = -1 to mark pending images when columns don't exist
+            console.log('⚠️ Moderation columns not available, using workaround with image_order = -1');
+            const { error: fallbackError } = await supabase
+              .from('user_images')
+              .insert({
+                ...imageData,
+                image_order: -1  // Negative order to mark as pending
+              });
+            if (fallbackError) throw fallbackError;
+          } else {
+            throw dbError;
+          }
+        }
+        
+        // Refresh the image list to show the new image with proper status
+        await fetchUserImages();
+        
+        // Show different message for pending images with delay
+        setTimeout(() => {
+          toast({ 
+            title: "🔒 Upload complete - PENDING APPROVAL", 
+            description: "Your image is uploaded but locked until admin approval. Check admin panel for review queue.",
+            variant: "default"
+          });
+        }, 500);
+      } else {
+        console.log('✅ Uploading as approved...');
+        // Image passed moderation fully, insert normally
+        const { error: dbError } = await supabase
+          .from('user_images')
+          .insert(imageData);
+        if (dbError) throw dbError;
+        
+        // Refresh the image list
+        await fetchUserImages();
+        
+        toast({ 
+          title: "Image uploaded successfully", 
+          description: "Your image has been uploaded and is now visible to others.",
+          variant: "default"
+        });
+      }
+    } catch (error) {
       console.error('Image upload error:', error);
-      toast({ title: "Upload failed", description: error.message || "Failed to upload image.", variant: "destructive" });
+      toast({ title: "Upload failed", description: "Failed to upload image.", variant: "destructive" });
     } finally {
       setUploading(false);
+      setModerationResult(null);
       event.target.value = '';
     }
   };
@@ -119,7 +290,7 @@ const ImageManagement = ({ currentUser }: ImageManagementProps) => {
 
       await fetchUserImages();
       toast({ title: "Image deleted", description: "Your image has been deleted successfully." });
-    } catch (error: any) {
+    } catch (error) {
       console.error('Image deletion error:', error);
       toast({ title: "Error", description: "Failed to delete image. Please try again.", variant: "destructive" });
     } finally {
@@ -132,22 +303,75 @@ const ImageManagement = ({ currentUser }: ImageManagementProps) => {
       <CardHeader>
         <CardTitle className="flex items-center justify-between">
           <span>Your Photos ({userImages.length}/7)</span>
-          <Upload className="w-5 h-5 text-pink-600" />
+          <div className="flex items-center space-x-2">
+            <div className="relative group">
+              <Shield className="w-4 h-4 text-purple-600" />
+              <div className="absolute bottom-6 left-1/2 transform -translate-x-1/2 bg-gray-800 text-white text-xs rounded py-1 px-2 opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap">
+                AI Content Moderation Active
+              </div>
+            </div>
+            <Upload className="w-5 h-5 text-pink-600" />
+          </div>
         </CardTitle>
       </CardHeader>
       <CardContent>
         {userImages.length < 7 && (
           <div className="mb-6">
             <Label htmlFor="image_upload" className="block mb-2">Upload Image</Label>
-            <Input type="file" id="image_upload" accept="image/*" onChange={handleImageUpload} disabled={uploading} className="w-full" />
-            {uploading && <p className="text-sm text-gray-500 mt-2 flex items-center"><div className="animate-spin rounded-full h-4 w-4 border-b-2 border-pink-600 mr-2"></div>Uploading...</p>}
+            <div className="text-xs text-gray-500 mb-2 flex items-center">
+              <Shield className="w-3 h-3 mr-1 text-purple-600" />
+              All images are automatically checked for appropriate content
+            </div>
+            <div className="text-xs text-orange-600 mb-2 flex items-center">
+              🧪 TEST MODE: ~50% of images will require admin approval for testing
+            </div>
+            <Input 
+              type="file" 
+              id="image_upload" 
+              accept="image/*" 
+              onChange={handleImageUpload} 
+              disabled={uploading || moderating} 
+              className="w-full" 
+            />
+            {moderating && (
+              <div className="text-sm text-purple-600 mt-2 flex items-center">
+                <Shield className="animate-pulse w-4 h-4 mr-2" />
+                Checking image content...
+              </div>
+            )}
+            {uploading && (
+              <div className="text-sm text-gray-500 mt-2 flex items-center">
+                <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-pink-600 mr-2"></div>
+                Uploading...
+              </div>
+            )}
+            {moderationResult && !uploading && (
+              <div className={`text-sm mt-2 flex items-center ${
+                moderationResult.isApproved ? 'text-green-600' : 'text-red-600'
+              }`}>
+                {moderationResult.isApproved ? (
+                  <CheckCircle className="w-4 h-4 mr-2" />
+                ) : (
+                  <AlertTriangle className="w-4 h-4 mr-2" />
+                )}
+                {moderationResult.message}
+              </div>
+            )}
           </div>
         )}
 
         <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-4">
-          {userImages.map((imageUrl, index) => (
-            <div key={imageUrl} className="relative group">
-              <img src={imageUrl} alt={`User Image ${index + 1}`} className="w-full h-32 sm:h-40 object-cover rounded-lg shadow-sm" />
+          {userImages.map((userImage, index) => (
+            <div key={userImage.image_url} className="relative group">
+              <img src={userImage.image_url} alt={`User Image ${index + 1}`} className="w-full h-32 sm:h-40 object-cover rounded-lg shadow-sm" />
+              
+              {/* Pending approval indicator */}
+              {userImage.is_approved === false && (
+                <div className="absolute top-2 left-2 bg-orange-500 text-white text-xs px-2 py-1 rounded-full flex items-center">
+                  🔒 Pending Review
+                </div>
+              )}
+              
               <AlertDialog>
                 <AlertDialogTrigger asChild>
                   <Button variant="destructive" size="sm" className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity p-1 h-8 w-8">
@@ -161,7 +385,7 @@ const ImageManagement = ({ currentUser }: ImageManagementProps) => {
                   </AlertDialogHeader>
                   <AlertDialogFooter>
                     <AlertDialogCancel>Cancel</AlertDialogCancel>
-                    <AlertDialogAction disabled={deleting} onClick={() => handleDeleteImage(imageUrl)} className="bg-red-600 hover:bg-red-700">
+                    <AlertDialogAction disabled={deleting} onClick={() => handleDeleteImage(userImage.image_url)} className="bg-red-600 hover:bg-red-700">
                       {deleting ? 'Deleting...' : 'Delete'}
                     </AlertDialogAction>
                   </AlertDialogFooter>

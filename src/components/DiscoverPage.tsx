@@ -5,6 +5,7 @@ import { Heart, X, Undo2, MapPin, Briefcase, GraduationCap, ChevronDown, Chevron
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import { useSubscription } from '@/hooks/useSubscription';
+import { calculateDistance } from '@/constants/locationData';
 import PremiumUpgrade from './PremiumUpgrade';
 import MatchAnimation from './MatchAnimation';
 
@@ -26,6 +27,8 @@ interface PotentialMatch {
   interests: string[];
   images: string[];
   gender: string;
+  latitude?: number;
+  longitude?: number;
 }
 
 interface PassedUser {
@@ -130,17 +133,47 @@ const DiscoverPage = ({ currentUser, onNavigateToChat }: DiscoverPageProps) => {
   
       const { data: profiles, error } = await supabase
         .from('profiles')
-        .select('id, first_name, last_name, bio, city, country, occupation, education_level, date_of_birth, interests, gender')
+        .select('id, first_name, last_name, bio, city, country, occupation, education_level, date_of_birth, interests, gender, latitude, longitude')
         .not('id', 'in', `(${excludedIds.join(',')})`)
         .in('gender', allowedGenders)
         .eq('account_status', 'active')
         .eq('is_admin', false)
-        .limit(20); // Reduced limit for faster loading
+        .limit(50); // Increased limit to account for distance filtering
 
       if (error) throw error;
 
-      // New: Don't fetch images here, just set up profiles and preload images below
-      const shuffled = (profiles || []).sort(() => 0.5 - Math.random());
+      // Apply distance filtering if current user has coordinates and distance preference
+      let filteredProfiles = profiles || [];
+      if (currentUser.latitude && currentUser.longitude && currentUser.max_distance) {
+        filteredProfiles = (profiles || []).filter(profile => {
+          // If profile doesn't have coordinates, include it (fallback to country/city matching)
+          if (!profile.latitude || !profile.longitude) {
+            return profile.country === currentUser.country;
+          }
+
+          // Calculate distance between users
+          const distance = calculateDistance(
+            currentUser.latitude,
+            currentUser.longitude,
+            profile.latitude,
+            profile.longitude
+          );
+
+          return distance <= currentUser.max_distance;
+        });
+
+        console.log(`Applied distance filter: ${profiles.length} -> ${filteredProfiles.length} profiles within ${currentUser.max_distance}km`);
+      } else {
+        console.log('No distance filtering applied - missing coordinates or preference');
+      }
+
+      // Add empty images array to match interface
+      const profilesWithImages = filteredProfiles.map(profile => ({
+        ...profile,
+        images: [] // Will be loaded separately
+      }));
+
+      const shuffled = profilesWithImages.sort(() => 0.5 - Math.random());
 
       // Load last profile ID and time from localStorage
       const savedId = localStorage.getItem('afrovibe_last_profile_id');
@@ -178,16 +211,38 @@ const DiscoverPage = ({ currentUser, onNavigateToChat }: DiscoverPageProps) => {
   // Preload images for the next N profiles (like LikedMePage)
   const loadFullImages = useCallback(async (profileId: string) => {
     if (userImages[profileId]?.length > 0) return; // Already loaded
-    const { data: images } = await supabase
-      .from('user_images')
-      .select('image_url')
-      .eq('user_id', profileId)
-      .order('image_order', { ascending: true });
-    if (images?.length) {
-      setUserImages(prev => ({
-        ...prev,
-        [profileId]: images.map(img => img.image_url)
-      }));
+    
+    try {
+      // Try to fetch approved images first
+      let { data: images, error } = await supabase
+        .from('user_images')
+        .select('image_url')
+        .eq('user_id', profileId)
+        .eq('is_approved', true) // Only show approved images
+        .order('image_order', { ascending: true });
+
+      // If moderation columns don't exist, fall back to basic query
+      if (error && error.message.includes('does not exist')) {
+        const { data: fallbackImages, error: fallbackError } = await supabase
+          .from('user_images')
+          .select('image_url')
+          .eq('user_id', profileId)
+          .order('image_order', { ascending: true });
+
+        if (fallbackError) throw fallbackError;
+        images = fallbackImages;
+      } else if (error) {
+        throw error;
+      }
+
+      if (images?.length) {
+        setUserImages(prev => ({
+          ...prev,
+          [profileId]: images.map(img => img.image_url)
+        }));
+      }
+    } catch (error) {
+      console.error('Error loading user images:', error);
     }
   }, [userImages]);
 
@@ -717,7 +772,20 @@ const DiscoverPage = ({ currentUser, onNavigateToChat }: DiscoverPageProps) => {
                 </div>
                 <div className="flex items-center">
                   <MapPin className="w-4 h-4 mr-1" />
-                  <span>{currentMatch.city}, {currentMatch.country}</span>
+                  <span>
+                    {currentMatch.city}, {currentMatch.country}
+                    {currentUser.latitude && currentUser.longitude && 
+                     currentMatch.latitude && currentMatch.longitude && (
+                      <span className="text-pink-600 ml-2">
+                        • {Math.round(calculateDistance(
+                          currentUser.latitude,
+                          currentUser.longitude,
+                          currentMatch.latitude,
+                          currentMatch.longitude
+                        ))} km away
+                      </span>
+                    )}
+                  </span>
                 </div>
               </div>
             </div>

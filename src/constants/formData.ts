@@ -19,8 +19,13 @@ export const initialFormData = {
   confirmPassword: '',
   dateOfBirth: '',
   country: '',
+  countryCode: '',
   city: '',
   zipCode: '',
+  latitude: undefined as number | undefined,
+  longitude: undefined as number | undefined,
+  isCustomCity: false,
+  maxDistance: 50, // Default 50km radius for matching
   bio: '',
   preference: '',
   interests: [] as string[],

@@ -9,6 +9,7 @@ import TermsOfService from '@/components/TermsOfService';
 import PrivacyPolicy from '@/components/PrivacyPolicy';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
+import { usePushNotifications } from '@/hooks/usePushNotifications';
 
 interface MainAppProps {
   user: any;
@@ -22,6 +23,36 @@ const MainApp = ({ user, onLogout }: MainAppProps) => {
   const [profile, setProfile] = useState<any>(null);
   const [unreadCount, setUnreadCount] = useState(0);
   const { toast } = useToast();
+
+  // Initialize push notifications
+  const {
+    isInitialized: pushInitialized,
+    isSupported: pushSupported,
+    deviceToken,
+    error: pushError,
+    sendMatchNotification,
+    sendMessageNotification,
+    sendLikeNotification
+  } = usePushNotifications(user?.id);
+
+  // Show push notification status
+  useEffect(() => {
+    if (pushSupported && pushInitialized) {
+      toast({
+        title: '🔔 Push Notifications Enabled',
+        description: 'You\'ll receive notifications for matches, messages, and likes!',
+        variant: 'default'
+      });
+    } else if (pushSupported && pushError) {
+      toast({
+        title: '⚠️ Push Notifications Issue',
+        description: pushError,
+        variant: 'destructive'
+      });
+    } else if (!pushSupported) {
+      console.log('📱 Push notifications not supported on this platform');
+    }
+  }, [pushInitialized, pushSupported, pushError, toast]);
 
   useEffect(() => {
     fetchUserProfile();

@@ -146,16 +146,36 @@ const LikedMePage = ({ currentUser }: LikedMePageProps) => {
         throw profileError;
       }
       setLikers(profiles || []);
-      // 5. Fetch all first images for these profiles in one query
+      // 5. Fetch all first images for these profiles in one query - only approved ones
       if (likerIds.length > 0) {
-        const { data: imagesData, error: imagesError } = await supabase
-          .from('user_images')
-          .select('user_id, image_url, image_order')
-          .in('user_id', likerIds)
-          .order('image_order', { ascending: true });
-        if (imagesError) {
-          console.error('Supabase imagesError:', imagesError, 'likerIds:', likerIds);
-          throw imagesError;
+        let imagesData = null;
+        try {
+          // Try to fetch approved images first
+          const { data: approvedImages, error: imagesError } = await supabase
+            .from('user_images')
+            .select('user_id, image_url, image_order')
+            .in('user_id', likerIds)
+            .eq('is_approved', true) // Only show approved images
+            .order('image_order', { ascending: true });
+
+          // If moderation columns don't exist, fall back to basic query
+          if (imagesError && imagesError.message.includes('does not exist')) {
+            const { data: fallbackImages, error: fallbackError } = await supabase
+              .from('user_images')
+              .select('user_id, image_url, image_order')
+              .in('user_id', likerIds)
+              .order('image_order', { ascending: true });
+
+            if (fallbackError) throw fallbackError;
+            imagesData = fallbackImages;
+          } else if (imagesError) {
+            throw imagesError;
+          } else {
+            imagesData = approvedImages;
+          }
+        } catch (error) {
+          console.error('Supabase imagesError:', error, 'likerIds:', likerIds);
+          throw error;
         }
         // Only keep the first image for each user
         const imageMap: { [key: string]: string[] } = {};
@@ -186,21 +206,41 @@ const LikedMePage = ({ currentUser }: LikedMePageProps) => {
     }
   }, [currentUser?.id, toast]);
 
-  // Load additional images when profile is selected
+  // Load additional images when profile is selected - only approved ones
   const loadFullImages = useCallback(async (profileId: string) => {
     if (userImages[profileId]?.length > 1) return; // Already loaded
 
-    const { data: images } = await supabase
-      .from('user_images')
-      .select('image_url')
-      .eq('user_id', profileId)
-      .order('image_order');
+    try {
+      // Try to fetch approved images first
+      let { data: images, error } = await supabase
+        .from('user_images')
+        .select('image_url')
+        .eq('user_id', profileId)
+        .eq('is_approved', true) // Only show approved images
+        .order('image_order');
 
-    if (images?.length) {
-      setUserImages(prev => ({
-        ...prev,
-        [profileId]: images.map(img => img.image_url)
-      }));
+      // If moderation columns don't exist, fall back to basic query
+      if (error && error.message.includes('does not exist')) {
+        const { data: fallbackImages, error: fallbackError } = await supabase
+          .from('user_images')
+          .select('image_url')
+          .eq('user_id', profileId)
+          .order('image_order');
+
+        if (fallbackError) return; // Silent fail for fallback
+        images = fallbackImages;
+      } else if (error) {
+        return; // Silent fail
+      }
+
+      if (images?.length) {
+        setUserImages(prev => ({
+          ...prev,
+          [profileId]: images.map(img => img.image_url)
+        }));
+      }
+    } catch (error) {
+      console.error('Error loading additional images:', error);
     }
   }, [userImages]);
 

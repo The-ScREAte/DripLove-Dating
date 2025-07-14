@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -59,6 +59,20 @@ interface UserProfile {
   country: string;
   age: number;
   is_admin: boolean;
+}
+
+interface PendingImage {
+  id: string;
+  image_url: string;
+  is_approved: boolean;
+  moderation_status: string;
+  moderation_notes?: string;
+  created_at: string;
+  profile?: {
+    first_name: string;
+    last_name: string;
+    email: string;
+  };
 }
 
 const AdminPage = ({ currentUser, onLogout }: AdminPageProps) => {
@@ -235,6 +249,13 @@ const AdminPage = ({ currentUser, onLogout }: AdminPageProps) => {
   const [matchUser2, setMatchUser2] = useState('');
   const [selectedUserId, setSelectedUserId] = useState<string | null>(null);
   const [isProfileModalOpen, setIsProfileModalOpen] = useState(false);
+  
+  // Pending images state
+  const [pendingImages, setPendingImages] = useState<PendingImage[]>([]);
+  const [loadingPendingImages, setLoadingPendingImages] = useState(false);
+  const [approvingImages, setApprovingImages] = useState<Record<string, boolean>>({});
+  const [rejectingImages, setRejectingImages] = useState<Record<string, boolean>>({});
+  
   const usersPerPage = 10;
   const { toast } = useToast();
 
@@ -265,14 +286,182 @@ const AdminPage = ({ currentUser, onLogout }: AdminPageProps) => {
     checkAdminStatus();
   }, [currentUser]);
 
-  useEffect(() => {
-    if (isAdmin) {
-      fetchAppStats();
-      fetchUsers();
-    }
-  }, [isAdmin]);
+  const fetchPendingImages = useCallback(async () => {
+    try {
+      setLoadingPendingImages(true);
+      console.log('🔍 Fetching pending images...');
 
-  const fetchAppStats = async () => {
+      const { data, error } = await supabase
+        .from('user_images')
+        .select(`
+          id,
+          image_url,
+          is_approved,
+          moderation_status,
+          moderation_notes,
+          created_at,
+          profiles!user_id (
+            first_name,
+            last_name,
+            email
+          )
+        `)
+        .eq('is_approved', false)
+        .order('created_at', { ascending: false });
+
+      if (error) {
+        console.error('❌ Error fetching pending images:', error);
+        if (error.message.includes('does not exist')) {
+          console.log('⚠️ Moderation columns do not exist, trying workaround with image_order = -1');
+          
+          // Workaround: fetch images with image_order = -1 (our pending marker)
+          const { data: workaroundData, error: workaroundError } = await supabase
+            .from('user_images')
+            .select(`
+              id,
+              image_url,
+              image_order,
+              created_at,
+              profiles!user_id (
+                first_name,
+                last_name,
+                email
+              )
+            `)
+            .eq('image_order', -1)
+            .order('created_at', { ascending: false });
+
+          if (workaroundError) {
+            console.error('Workaround query failed:', workaroundError);
+            setPendingImages([]);
+            return;
+          }
+
+          // Transform the data to match expected format
+          const transformedData = workaroundData?.map(img => ({
+            id: img.id,
+            image_url: img.image_url,
+            is_approved: false,
+            moderation_status: 'pending',
+            moderation_notes: 'Pending approval (workaround mode)',
+            created_at: img.created_at,
+            profile: img.profiles
+          })) || [];
+
+          console.log('📊 Found pending images (workaround):', transformedData.length);
+          setPendingImages(transformedData);
+          return;
+        }
+        throw error;
+      }
+
+      console.log('📊 Found pending images:', data?.length || 0);
+      setPendingImages((data as PendingImage[]) || []);
+    } catch (error) {
+      console.error('Error fetching pending images:', error);
+      // Don't show error toast if it's just missing columns
+      if (!error?.message?.includes('does not exist')) {
+        toast({
+          title: 'Error',
+          description: 'Failed to load pending images',
+          variant: 'destructive'
+        });
+      }
+      setPendingImages([]);
+    } finally {
+      setLoadingPendingImages(false);
+    }
+  }, [toast]);
+
+  const approveImage = async (imageId: string) => {
+    try {
+      setApprovingImages(prev => ({ ...prev, [imageId]: true }));
+
+      const updateData = {
+        is_approved: true,
+        moderation_status: 'approved',
+        reviewed_at: new Date().toISOString(),
+        reviewed_by: currentUser.id
+      };
+
+      const { error } = await supabase
+        .from('user_images')
+        .update(updateData as Record<string, unknown>) // Type assertion for columns that may not exist yet
+        .eq('id', imageId);
+
+      if (error) {
+        if (error.message.includes('does not exist')) {
+          // Workaround: Update image_order to positive value to mark as approved
+          console.log('Using workaround: updating image_order to approve image');
+          const { error: workaroundError } = await supabase
+            .from('user_images')
+            .update({ image_order: 1 }) // Change from -1 to positive
+            .eq('id', imageId);
+
+          if (workaroundError) {
+            throw workaroundError;
+          }
+        } else {
+          throw error;
+        }
+      }
+
+      setPendingImages(prev => prev.filter(img => img.id !== imageId));
+      
+      toast({
+        title: 'Success',
+        description: 'Image approved successfully'
+      });
+
+      // Refresh stats to reflect the change
+      await fetchAppStats();
+
+    } catch (error) {
+      console.error('Error approving image:', error);
+      toast({
+        title: 'Error',
+        description: 'Failed to approve image',
+        variant: 'destructive'
+      });
+    } finally {
+      setApprovingImages(prev => ({ ...prev, [imageId]: false }));
+    }
+  };
+
+  const rejectImage = async (imageId: string) => {
+    try {
+      setRejectingImages(prev => ({ ...prev, [imageId]: true }));
+
+      const { error } = await supabase
+        .from('user_images')
+        .delete()
+        .eq('id', imageId);
+
+      if (error) throw error;
+
+      setPendingImages(prev => prev.filter(img => img.id !== imageId));
+      
+      toast({
+        title: 'Success',
+        description: 'Image rejected and deleted successfully'
+      });
+
+      // Refresh stats to reflect the change
+      await fetchAppStats();
+
+    } catch (error) {
+      console.error('Error rejecting image:', error);
+      toast({
+        title: 'Error',
+        description: 'Failed to reject image',
+        variant: 'destructive'
+      });
+    } finally {
+      setRejectingImages(prev => ({ ...prev, [imageId]: false }));
+    }
+  };
+
+  const fetchAppStats = useCallback(async () => {
     try {
       const { data, error } = await supabase.rpc('get_app_stats');
       if (error) throw error;
@@ -288,9 +477,9 @@ const AdminPage = ({ currentUser, onLogout }: AdminPageProps) => {
         variant: 'destructive'
       });
     }
-  };
+  }, [toast]);
 
-  const fetchUsers = async () => {
+  const fetchUsers = useCallback(async () => {
     try {
       setLoading(true);
       const { data, error } = await supabase
@@ -321,7 +510,7 @@ const AdminPage = ({ currentUser, onLogout }: AdminPageProps) => {
     } finally {
       setLoading(false);
     }
-  };
+  }, [toast]);
 
   const calculateAge = (dateOfBirth: string) => {
     const today = new Date();
@@ -335,6 +524,15 @@ const AdminPage = ({ currentUser, onLogout }: AdminPageProps) => {
 
     return age;
   };
+
+  // Second useEffect for fetching data after admin status is confirmed
+  useEffect(() => {
+    if (isAdmin) {
+      fetchAppStats();
+      fetchUsers();
+      fetchPendingImages();
+    }
+  }, [isAdmin, fetchAppStats, fetchUsers, fetchPendingImages]);
 
   const updateUserStatus = async (userId: string, newStatus: string) => {
     try {
@@ -839,6 +1037,79 @@ const AdminPage = ({ currentUser, onLogout }: AdminPageProps) => {
                   </div>
                 )}
               </div>
+            </CardContent>
+          </Card>
+
+          {/* Pending Images Management */}
+          <Card>
+            <CardHeader className="pb-3">
+              <CardTitle className="flex items-center gap-2 text-lg">
+                <Eye className="w-5 h-5" />
+                Pending Images ({pendingImages.length})
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              {loadingPendingImages ? (
+                <div className="flex justify-center py-8">
+                  <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-pink-600"></div>
+                </div>
+              ) : pendingImages.length === 0 ? (
+                <div className="text-center py-8 text-gray-500 text-sm">
+                  No pending images to review.
+                </div>
+              ) : (
+                <div className="space-y-4">
+                  {pendingImages.map((image) => (
+                    <div key={image.id} className="border rounded-lg p-4 bg-gray-50">
+                      <div className="flex items-start gap-4">
+                        <div className="flex-shrink-0">
+                          <img
+                            src={image.image_url}
+                            alt="Pending image"
+                            className="w-20 h-20 object-cover rounded-lg border"
+                          />
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <h4 className="font-medium text-sm">
+                            {image.profile?.first_name} {image.profile?.last_name}
+                          </h4>
+                          <p className="text-xs text-gray-600">{image.profile?.email}</p>
+                          <p className="text-xs text-gray-500 mt-1">
+                            Uploaded: {new Date(image.created_at).toLocaleDateString()}
+                          </p>
+                          <p className="text-xs text-gray-500">
+                            Status: <span className="font-medium">{image.moderation_status}</span>
+                          </p>
+                          {image.moderation_notes && (
+                            <p className="text-xs text-orange-600 mt-1">
+                              Note: {image.moderation_notes}
+                            </p>
+                          )}
+                        </div>
+                        <div className="flex flex-col gap-2">
+                          <Button
+                            size="sm"
+                            onClick={() => approveImage(image.id)}
+                            disabled={approvingImages[image.id]}
+                            className="bg-green-600 hover:bg-green-700 text-white text-xs px-3 py-1 h-8"
+                          >
+                            {approvingImages[image.id] ? 'Approving...' : 'Approve'}
+                          </Button>
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            onClick={() => rejectImage(image.id)}
+                            disabled={rejectingImages[image.id]}
+                            className="text-red-600 hover:text-red-700 border-red-300 hover:bg-red-50 text-xs px-3 py-1 h-8"
+                          >
+                            {rejectingImages[image.id] ? 'Rejecting...' : 'Reject'}
+                          </Button>
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
             </CardContent>
           </Card>
 
