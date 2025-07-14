@@ -1,7 +1,7 @@
+import { supabase } from '@/integrations/supabase/client';
 import { PushNotifications, Token, PushNotificationSchema, ActionPerformed } from '@capacitor/push-notifications';
 import { Capacitor } from '@capacitor/core';
-import { supabase } from '@/integrations/supabase/client';
-import { initializeFirebase, getFirebaseToken, setupFirebaseMessageListener } from '@/config/firebase';
+import { RealtimeChannel } from '@supabase/supabase-js';
 
 export interface NotificationPayload {
   title: string;
@@ -11,85 +11,108 @@ export interface NotificationPayload {
   type?: 'match' | 'message' | 'like' | 'system' | 'admin';
 }
 
-class PushNotificationService {
+interface RealtimeNotification {
+  id: string;
+  user_id: string;
+  title: string;
+  message: string;
+  type: string;
+  is_read: boolean;
+  created_at: string;
+  related_user_id?: string | null;
+}
+
+class SupabasePushNotificationService {
   private isInitialized = false;
   private deviceToken: string | null = null;
-  private firebaseToken: string | null = null;
+  private realtimeChannel: RealtimeChannel | null = null;
+  private currentUserId: string | null = null;
 
   async initialize(userId: string): Promise<boolean> {
     if (this.isInitialized) return true;
 
     try {
-      console.log('🔔 Initializing push notifications...');
+      console.log('🔔 Initializing Supabase push notifications...');
+      this.currentUserId = userId;
 
-      // Initialize Firebase for web notifications
-      if (!Capacitor.isNativePlatform()) {
-        console.log('🌐 Initializing Firebase for web notifications...');
-        await initializeFirebase();
-        
-        // Get Firebase token for web
-        this.firebaseToken = await getFirebaseToken();
-        if (this.firebaseToken) {
-          await this.saveTokenToDatabase(userId, this.firebaseToken, 'firebase');
-          console.log('✅ Firebase token registered for web');
-        }
-
-        // Setup Firebase message listener for foreground messages
-        setupFirebaseMessageListener((payload) => {
-          console.log('📨 Firebase message received:', payload);
-          this.handleFirebaseMessage(payload);
-        });
-
-        this.isInitialized = true;
-        return true;
+      // Initialize native push notifications if on mobile
+      if (Capacitor.isNativePlatform()) {
+        await this.initializeNativePushNotifications(userId);
       }
 
-      // Native platform initialization
-      console.log('� Initializing native push notifications...');
-
-      // Request permission for push notifications
-      const permission = await PushNotifications.requestPermissions();
-      
-      if (permission.receive !== 'granted') {
-        console.log('❌ Push notification permission not granted');
-        return false;
-      }
-
-      // Register for push notifications
-      await PushNotifications.register();
-
-      // Listen for registration token
-      PushNotifications.addListener('registration', async (token: Token) => {
-        console.log('📝 Push registration successful, token:', token.value);
-        this.deviceToken = token.value;
-        await this.saveTokenToDatabase(userId, token.value, 'native');
-      });
-
-      // Listen for registration errors
-      PushNotifications.addListener('registrationError', (error: { error: string }) => {
-        console.error('❌ Push registration failed:', error);
-      });
-
-      // Listen for push notifications received while app is in foreground
-      PushNotifications.addListener('pushNotificationReceived', (notification: PushNotificationSchema) => {
-        console.log('📨 Push notification received in foreground:', notification);
-        this.handleForegroundNotification(notification);
-      });
-
-      // Listen for push notification actions (when user taps notification)
-      PushNotifications.addListener('pushNotificationActionPerformed', (action: ActionPerformed) => {
-        console.log('👆 Push notification action performed:', action);
-        this.handleNotificationAction(action);
-      });
+      // Initialize Supabase Realtime for web notifications
+      await this.initializeRealtimeNotifications(userId);
 
       this.isInitialized = true;
-      console.log('✅ Push notifications initialized successfully');
+      console.log('✅ Supabase push notifications initialized successfully');
       return true;
 
     } catch (error) {
-      console.error('❌ Failed to initialize push notifications:', error);
+      console.error('❌ Error initializing push notifications:', error);
       return false;
     }
+  }
+
+  private async initializeNativePushNotifications(userId: string): Promise<void> {
+    console.log('📱 Initializing native push notifications...');
+
+    // Request permission for push notifications
+    const permissionStatus = await PushNotifications.requestPermissions();
+    
+    if (permissionStatus.receive === 'granted') {
+      console.log('✅ Push notification permission granted');
+      
+      // Register for push notifications
+      await PushNotifications.register();
+      
+      // Set up event listeners
+      PushNotifications.addListener('registration', async (token: Token) => {
+        console.log('📱 Device registered for push notifications:', token.value);
+        this.deviceToken = token.value;
+        await this.saveTokenToDatabase(userId, token.value, Capacitor.getPlatform());
+      });
+
+      PushNotifications.addListener('registrationError', (error: unknown) => {
+        console.error('❌ Error registering for push notifications:', error);
+      });
+
+      PushNotifications.addListener('pushNotificationReceived', (notification: PushNotificationSchema) => {
+        console.log('📨 Push notification received:', notification);
+        this.handleForegroundNotification(notification);
+      });
+
+      PushNotifications.addListener('pushNotificationActionPerformed', (notification: ActionPerformed) => {
+        console.log('👆 Push notification action performed:', notification);
+        this.handleNotificationAction(notification);
+      });
+
+    } else {
+      console.warn('⚠️ Push notification permission not granted');
+    }
+  }
+
+  private async initializeRealtimeNotifications(userId: string): Promise<void> {
+    console.log('🔄 Setting up Supabase Realtime notifications...');
+
+    // Subscribe to real-time notifications for this user
+    this.realtimeChannel = supabase
+      .channel(`notifications:${userId}`)
+      .on(
+        'postgres_changes',
+        {
+          event: 'INSERT',
+          schema: 'public',
+          table: 'notifications',
+          filter: `user_id=eq.${userId}`,
+        },
+        (payload) => {
+          console.log('📨 New notification from Supabase:', payload);
+          this.handleRealtimeNotification(payload.new as RealtimeNotification);
+        }
+      )
+      .subscribe();
+
+    console.log('✅ Supabase Realtime notifications channel subscribed');
   }
 
   private async saveTokenToDatabase(userId: string, token: string, platform?: string): Promise<void> {
@@ -115,177 +138,200 @@ class PushNotificationService {
     }
   }
 
-  private handleFirebaseMessage(payload: { notification?: { title?: string; body?: string }; data?: Record<string, string> }): void {
-    // Show in-app notification for Firebase messages
-    const toast = document.createElement('div');
-    toast.className = 'fixed top-4 right-4 bg-purple-600 text-white px-4 py-2 rounded-lg shadow-lg z-50 max-w-sm';
-    toast.innerHTML = `
-      <div class="font-semibold">${payload.notification?.title || 'New notification'}</div>
-      <div class="text-sm opacity-90">${payload.notification?.body || ''}</div>
-    `;
+  private handleRealtimeNotification(notification: RealtimeNotification): void {
+    console.log('🔔 Handling realtime notification:', notification);
     
-    document.body.appendChild(toast);
-    
-    // Auto-remove after 5 seconds
-    setTimeout(() => {
-      if (toast.parentNode) {
-        toast.parentNode.removeChild(toast);
-      }
-    }, 5000);
-
-    // Add click handler to dismiss
-    toast.addEventListener('click', () => {
-      if (toast.parentNode) {
-        toast.parentNode.removeChild(toast);
-      }
+    // Show in-app notification
+    this.showInAppNotification({
+      title: notification.title,
+      body: notification.message,
+      data: { notificationId: notification.id },
+      type: notification.type as 'match' | 'message' | 'like' | 'system' | 'admin'
     });
-  }
 
-  private handleForegroundNotification(notification: PushNotificationSchema): void {
-    // Show in-app notification when app is in foreground
-    const toast = document.createElement('div');
-    toast.className = 'fixed top-4 right-4 bg-purple-600 text-white px-4 py-2 rounded-lg shadow-lg z-50 max-w-sm';
-    toast.innerHTML = `
-      <div class="font-semibold">${notification.title}</div>
-      <div class="text-sm opacity-90">${notification.body}</div>
-    `;
-    
-    document.body.appendChild(toast);
-    
-    // Auto-remove after 5 seconds
-    setTimeout(() => {
-      if (toast.parentNode) {
-        toast.parentNode.removeChild(toast);
-      }
-    }, 5000);
-
-    // Add click handler to dismiss
-    toast.addEventListener('click', () => {
-      if (toast.parentNode) {
-        toast.parentNode.removeChild(toast);
-      }
-    });
-  }
-
-  private handleNotificationAction(action: ActionPerformed): void {
-    const data = action.notification.data;
-    
-    // Handle different notification types
-    switch (data?.type) {
-      case 'match':
-        // Navigate to matches page
-        window.location.hash = '/matches';
-        break;
-      case 'message':
-        // Navigate to chat with specific user
-        if (data.chatId) {
-          window.location.hash = `/chat/${data.chatId}`;
-        }
-        break;
-      case 'like':
-        // Navigate to liked me page
-        window.location.hash = '/liked-me';
-        break;
-      case 'admin':
-        // Navigate to admin notifications
-        window.location.hash = '/admin';
-        break;
-      default:
-        // Navigate to main app
-        window.location.hash = '/dashboard';
+    // If on web and browser supports notifications, show browser notification
+    if (!Capacitor.isNativePlatform() && 'Notification' in window && Notification.permission === 'granted') {
+      new Notification(notification.title, {
+        body: notification.message,
+        icon: '/favicon.ico',
+        data: { notificationId: notification.id, type: notification.type }
+      });
     }
   }
 
-  async sendNotification(notification: NotificationPayload): Promise<boolean> {
-    try {
-      console.log('📤 Sending push notification:', notification);
+  private handleForegroundNotification(notification: PushNotificationSchema): void {
+    console.log('📱 Handling foreground notification:', notification);
+    
+    this.showInAppNotification({
+      title: notification.title,
+      body: notification.body,
+      data: notification.data
+    });
+  }
 
-      const { error } = await supabase.functions.invoke('send-push-notification', {
-        body: notification
+  private handleNotificationAction(notification: ActionPerformed): void {
+    console.log('👆 Handling notification action:', notification);
+    
+    // Handle notification tap/action
+    const data = notification.notification.data;
+    if (data?.type === 'message') {
+      // Navigate to chat
+      window.location.href = `/chat/${data.chatId}`;
+    } else if (data?.type === 'match') {
+      // Navigate to matches
+      window.location.href = '/matches';
+    } else if (data?.type === 'like') {
+      // Navigate to likes
+      window.location.href = '/likes';
+    }
+  }
+
+  private showInAppNotification(payload: NotificationPayload): void {
+    // Create and show in-app notification toast
+    const toast = document.createElement('div');
+    toast.className = 'fixed top-4 right-4 bg-purple-600 text-white px-4 py-2 rounded-lg shadow-lg z-50 max-w-sm cursor-pointer transition-all hover:bg-purple-700';
+    toast.innerHTML = `
+      <div class="font-semibold">${payload.title}</div>
+      <div class="text-sm opacity-90">${payload.body}</div>
+      <div class="text-xs opacity-70 mt-1">${payload.type ? `• ${payload.type}` : ''}</div>
+    `;
+    
+    document.body.appendChild(toast);
+    
+    // Auto-remove after 5 seconds
+    const timeout = setTimeout(() => {
+      if (toast.parentNode) {
+        toast.parentNode.removeChild(toast);
+      }
+    }, 5000);
+
+    // Add click handler to dismiss and potentially navigate
+    toast.addEventListener('click', () => {
+      clearTimeout(timeout);
+      if (toast.parentNode) {
+        toast.parentNode.removeChild(toast);
+      }
+      
+      // Handle navigation based on notification type
+      if (payload.data?.chatId) {
+        window.location.href = `/chat/${payload.data.chatId}`;
+      } else if (payload.type === 'match') {
+        window.location.href = '/matches';
+      } else if (payload.type === 'like') {
+        window.location.href = '/likes';
+      }
+    });
+  }
+
+  async sendNotification(payload: NotificationPayload): Promise<boolean> {
+    try {
+      console.log('📤 Sending notification via Supabase:', payload);
+
+      // Call Supabase Edge Function to send push notification
+      const { data, error } = await supabase.functions.invoke('send-push-notification', {
+        body: {
+          title: payload.title,
+          body: payload.body,
+          userId: payload.userId,
+          type: payload.type || 'system',
+          data: payload.data || {}
+        }
       });
 
       if (error) {
-        console.error('❌ Failed to send push notification:', error);
+        console.error('❌ Error sending notification:', error);
         return false;
       }
 
-      console.log('✅ Push notification sent successfully');
+      console.log('✅ Notification sent successfully:', data);
       return true;
+
     } catch (error) {
-      console.error('❌ Error sending push notification:', error);
+      console.error('❌ Error sending notification:', error);
       return false;
     }
   }
 
-  async sendMatchNotification(matchedUserId: string, currentUserName: string): Promise<void> {
-    await this.sendNotification({
-      title: '💕 New Match!',
-      body: `You matched with ${currentUserName}! Start chatting now.`,
-      userId: matchedUserId,
-      type: 'match',
-      data: {
-        type: 'match',
-        fromUser: currentUserName
-      }
-    });
+  async requestWebNotificationPermission(): Promise<boolean> {
+    if (!('Notification' in window)) {
+      console.warn('⚠️ Browser does not support notifications');
+      return false;
+    }
+
+    if (Notification.permission === 'granted') {
+      return true;
+    }
+
+    if (Notification.permission !== 'denied') {
+      const permission = await Notification.requestPermission();
+      return permission === 'granted';
+    }
+
+    return false;
   }
 
-  async sendMessageNotification(recipientId: string, senderName: string, messagePreview: string): Promise<void> {
-    await this.sendNotification({
-      title: `💬 ${senderName}`,
-      body: messagePreview,
-      userId: recipientId,
-      type: 'message',
-      data: {
-        type: 'message',
-        sender: senderName
-      }
-    });
-  }
-
-  async sendLikeNotification(likedUserId: string, likerName: string): Promise<void> {
-    await this.sendNotification({
-      title: '❤️ Someone likes you!',
-      body: `${likerName} liked your profile. Check it out!`,
-      userId: likedUserId,
-      type: 'like',
-      data: {
-        type: 'like',
-        fromUser: likerName
-      }
-    });
-  }
-
-  async sendAdminNotification(userId: string, title: string, message: string): Promise<void> {
-    await this.sendNotification({
-      title: `🔔 ${title}`,
-      body: message,
-      userId,
-      type: 'admin',
-      data: {
-        type: 'admin'
-      }
-    });
-  }
-
-  async unregister(): Promise<void> {
+  async markNotificationAsRead(notificationId: string): Promise<boolean> {
     try {
-      await PushNotifications.removeAllListeners();
-      this.isInitialized = false;
-      this.deviceToken = null;
-      console.log('✅ Push notifications unregistered');
+      const { error } = await supabase
+        .from('notifications')
+        .update({ is_read: true })
+        .eq('id', notificationId);
+
+      if (error) {
+        console.error('❌ Error marking notification as read:', error);
+        return false;
+      }
+
+      return true;
     } catch (error) {
-      console.error('❌ Failed to unregister push notifications:', error);
+      console.error('❌ Error marking notification as read:', error);
+      return false;
     }
   }
 
-  getDeviceToken(): string | null {
-    return this.deviceToken;
+  async getUnreadNotifications(userId: string): Promise<RealtimeNotification[]> {
+    try {
+      const { data, error } = await supabase
+        .from('notifications')
+        .select('*')
+        .eq('user_id', userId)
+        .eq('is_read', false)
+        .order('created_at', { ascending: false });
+
+      if (error) {
+        console.error('❌ Error fetching unread notifications:', error);
+        return [];
+      }
+
+      return data || [];
+    } catch (error) {
+      console.error('❌ Error fetching unread notifications:', error);
+      return [];
+    }
   }
 
-  isSupported(): boolean {
-    return Capacitor.isNativePlatform();
+  cleanup(): void {
+    if (this.realtimeChannel) {
+      supabase.removeChannel(this.realtimeChannel);
+      this.realtimeChannel = null;
+    }
+    
+    if (Capacitor.isNativePlatform()) {
+      PushNotifications.removeAllListeners();
+    }
+    
+    this.isInitialized = false;
+    this.currentUserId = null;
   }
 }
 
-export const pushNotificationService = new PushNotificationService();
+// Create singleton instance
+export const pushNotificationService = new SupabasePushNotificationService();
+
+// Export convenience functions
+export const initializePushNotifications = (userId: string) => pushNotificationService.initialize(userId);
+export const sendPushNotification = (payload: NotificationPayload) => pushNotificationService.sendNotification(payload);
+export const requestNotificationPermission = () => pushNotificationService.requestWebNotificationPermission();
+export const markNotificationRead = (notificationId: string) => pushNotificationService.markNotificationAsRead(notificationId);
+export const getUnreadNotifications = (userId: string) => pushNotificationService.getUnreadNotifications(userId);
+export const cleanupPushNotifications = () => pushNotificationService.cleanup();

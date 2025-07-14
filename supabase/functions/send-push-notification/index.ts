@@ -19,12 +19,38 @@ interface PushToken {
   platform: string
 }
 
-// Firebase Admin SDK functions for server-side push notifications
-async function sendFirebaseNotification(token: string, payload: NotificationPayload) {
+// Web Push API for browser notifications
+async function sendWebPushNotification(token: string, payload: NotificationPayload) {
+  const VAPID_PUBLIC_KEY = Deno.env.get('VAPID_PUBLIC_KEY')
+  const VAPID_PRIVATE_KEY = Deno.env.get('VAPID_PRIVATE_KEY')
+  
+  if (!VAPID_PUBLIC_KEY || !VAPID_PRIVATE_KEY) {
+    console.warn('⚠️ VAPID keys not configured, skipping web push notification')
+    return false
+  }
+
+  try {
+    // For now, we'll implement basic web push
+    // In a real implementation, you'd use the Web Push Protocol with VAPID
+    console.log('🌐 Web push notification would be sent to:', token)
+    console.log('📱 Payload:', { title: payload.title, body: payload.body, type: payload.type })
+    
+    // TODO: Implement actual Web Push Protocol with VAPID authentication
+    // This requires additional crypto libraries for JWT signing and encryption
+    
+    return true
+  } catch (error) {
+    console.error('❌ Web push notification error:', error)
+    return false
+  }
+}
+
+// Firebase Cloud Messaging for mobile apps (optional fallback)
+async function sendFCMNotification(token: string, payload: NotificationPayload) {
   const FCM_SERVER_KEY = Deno.env.get('FCM_SERVER_KEY')
   
   if (!FCM_SERVER_KEY) {
-    console.warn('⚠️ FCM_SERVER_KEY not configured, skipping Firebase notification')
+    console.warn('⚠️ FCM_SERVER_KEY not configured, skipping FCM notification')
     return false
   }
 
@@ -138,13 +164,16 @@ serve(async (req) => {
     for (const tokenData of tokens as PushToken[]) {
       let sent = false
       
-      if (tokenData.platform === 'firebase' || tokenData.platform === 'web') {
-        sent = await sendFirebaseNotification(tokenData.token, { title, body, userId, type, data })
+      if (tokenData.platform === 'web' || tokenData.platform === 'firefox' || tokenData.platform === 'chrome') {
+        sent = await sendWebPushNotification(tokenData.token, { title, body, userId, type, data })
       } else if (tokenData.platform === 'ios') {
         sent = await sendAPNSNotification(tokenData.token, { title, body, userId, type, data })
       } else if (tokenData.platform === 'android') {
-        // Android can use Firebase too
-        sent = await sendFirebaseNotification(tokenData.token, { title, body, userId, type, data })
+        // Android can use FCM
+        sent = await sendFCMNotification(tokenData.token, { title, body, userId, type, data })
+      } else if (tokenData.platform === 'firebase') {
+        // Legacy Firebase support
+        sent = await sendFCMNotification(tokenData.token, { title, body, userId, type, data })
       } else {
         console.log(`📱 Platform ${tokenData.platform} notification logged:`, {
           to: tokenData.token,

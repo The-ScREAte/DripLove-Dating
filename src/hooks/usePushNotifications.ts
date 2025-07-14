@@ -1,30 +1,47 @@
 import { useEffect, useState } from 'react';
-import { pushNotificationService } from '@/services/pushNotifications';
+import { 
+  initializePushNotifications, 
+  sendPushNotification, 
+  requestNotificationPermission,
+  markNotificationRead,
+  getUnreadNotifications,
+  cleanupPushNotifications,
+  NotificationPayload
+} from '@/services/pushNotifications';
 
 export const usePushNotifications = (userId?: string) => {
   const [isInitialized, setIsInitialized] = useState(false);
   const [isSupported, setIsSupported] = useState(false);
   const [deviceToken, setDeviceToken] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [unreadCount, setUnreadCount] = useState(0);
 
   useEffect(() => {
-    const initializePushNotifications = async () => {
+    const initializePushNotificationsAsync = async () => {
       if (!userId) return;
 
       try {
-        setIsSupported(pushNotificationService.isSupported());
+        // Check if push notifications are supported
+        const webSupported = 'Notification' in window;
+        setIsSupported(webSupported);
         
-        if (!pushNotificationService.isSupported()) {
+        if (!webSupported) {
           console.log('📱 Push notifications not supported on this platform');
           return;
         }
 
-        const initialized = await pushNotificationService.initialize(userId);
+        // Request web notification permission
+        const permissionGranted = await requestNotificationPermission();
+        
+        // Initialize the service
+        const initialized = await initializePushNotifications(userId);
         setIsInitialized(initialized);
         
         if (initialized) {
-          setDeviceToken(pushNotificationService.getDeviceToken());
           setError(null);
+          // Load unread notifications count
+          const unreadNotifications = await getUnreadNotifications(userId);
+          setUnreadCount(unreadNotifications.length);
         } else {
           setError('Failed to initialize push notifications');
         }
@@ -35,27 +52,85 @@ export const usePushNotifications = (userId?: string) => {
       }
     };
 
-    initializePushNotifications();
+    initializePushNotificationsAsync();
 
     // Cleanup on unmount
     return () => {
-      pushNotificationService.unregister();
+      cleanupPushNotifications();
     };
   }, [userId]);
 
-  const sendNotification = async (notification: {
-    title: string;
-    body: string;
-    userId?: string;
-    type?: 'match' | 'message' | 'like' | 'system' | 'admin';
-    data?: Record<string, string | number | boolean>;
-  }) => {
+  const sendNotification = async (notification: NotificationPayload) => {
     try {
-      const success = await pushNotificationService.sendNotification(notification);
+      const success = await sendPushNotification(notification);
       return success;
     } catch (err) {
       console.error('❌ Error sending notification:', err);
       return false;
+    }
+  };
+
+  const sendMatchNotification = async (matchedUserName: string, targetUserId: string) => {
+    return sendNotification({
+      title: "🎉 It's a Match!",
+      body: `You and ${matchedUserName} liked each other!`,
+      userId: targetUserId,
+      type: 'match',
+      data: { matchedUserName }
+    });
+  };
+
+  const sendMessageNotification = async (senderName: string, message: string, targetUserId: string, chatId: string) => {
+    return sendNotification({
+      title: `💬 ${senderName}`,
+      body: message,
+      userId: targetUserId,
+      type: 'message',
+      data: { senderName, chatId }
+    });
+  };
+
+  const sendLikeNotification = async (likerName: string, targetUserId: string) => {
+    return sendNotification({
+      title: "💖 Someone likes you!",
+      body: `${likerName} likes you. Check them out!`,
+      userId: targetUserId,
+      type: 'like',
+      data: { likerName }
+    });
+  };
+
+  const sendAdminNotification = async (title: string, message: string, targetUserId: string) => {
+    return sendNotification({
+      title,
+      body: message,
+      userId: targetUserId,
+      type: 'admin'
+    });
+  };
+
+  const markAsRead = async (notificationId: string) => {
+    try {
+      const success = await markNotificationRead(notificationId);
+      if (success && userId) {
+        // Refresh unread count
+        const unreadNotifications = await getUnreadNotifications(userId);
+        setUnreadCount(unreadNotifications.length);
+      }
+      return success;
+    } catch (err) {
+      console.error('❌ Error marking notification as read:', err);
+      return false;
+    }
+  };
+
+  const refreshUnreadCount = async () => {
+    if (!userId) return;
+    try {
+      const unreadNotifications = await getUnreadNotifications(userId);
+      setUnreadCount(unreadNotifications.length);
+    } catch (err) {
+      console.error('❌ Error refreshing unread count:', err);
     }
   };
 
@@ -64,11 +139,13 @@ export const usePushNotifications = (userId?: string) => {
     isSupported,
     deviceToken,
     error,
+    unreadCount,
     sendNotification,
-    // Convenience methods
-    sendMatchNotification: pushNotificationService.sendMatchNotification.bind(pushNotificationService),
-    sendMessageNotification: pushNotificationService.sendMessageNotification.bind(pushNotificationService),
-    sendLikeNotification: pushNotificationService.sendLikeNotification.bind(pushNotificationService),
-    sendAdminNotification: pushNotificationService.sendAdminNotification.bind(pushNotificationService),
+    sendMatchNotification,
+    sendMessageNotification,
+    sendLikeNotification,
+    sendAdminNotification,
+    markAsRead,
+    refreshUnreadCount
   };
 };

@@ -5,7 +5,7 @@ import { Bell, BellOff, Smartphone, Globe } from 'lucide-react';
 import { usePushNotifications } from '@/hooks/usePushNotifications';
 import { useToast } from '@/hooks/use-toast';
 import { Capacitor } from '@capacitor/core';
-import { getFirebaseToken } from '@/config/firebase';
+import { requestNotificationPermission } from '@/services/pushNotifications';
 
 interface PushNotificationSettingsProps {
   currentUser: {
@@ -20,29 +20,21 @@ const PushNotificationSettings = ({ currentUser }: PushNotificationSettingsProps
     isSupported,
     deviceToken,
     error,
+    unreadCount,
     sendMatchNotification,
     sendMessageNotification,
     sendLikeNotification,
     sendAdminNotification
   } = usePushNotifications(currentUser?.id);
 
-  const [firebaseToken, setFirebaseToken] = useState<string | null>(null);
-  const [firebaseError, setFirebaseError] = useState<string | null>(null);
+  const [webPermission, setWebPermission] = useState<NotificationPermission | null>(null);
+  const [webError, setWebError] = useState<string | null>(null);
   const { toast } = useToast();
 
-  // Check Firebase token on web
+  // Check web notification permission
   useEffect(() => {
-    if (!Capacitor.isNativePlatform()) {
-      getFirebaseToken()
-        .then(token => {
-          setFirebaseToken(token);
-          if (!token) {
-            setFirebaseError('Firebase not configured or permission denied');
-          }
-        })
-        .catch(err => {
-          setFirebaseError(err.message);
-        });
+    if (!Capacitor.isNativePlatform() && 'Notification' in window) {
+      setWebPermission(Notification.permission);
     }
   }, []);
 
@@ -50,33 +42,53 @@ const PushNotificationSettings = ({ currentUser }: PushNotificationSettingsProps
     ? `Native (${Capacitor.getPlatform()})`
     : 'Web Browser';
 
-  const hasFirebaseSupport = !Capacitor.isNativePlatform() && firebaseToken;
+  const hasWebSupport = !Capacitor.isNativePlatform() && isSupported && webPermission === 'granted';
   const hasNativeSupport = Capacitor.isNativePlatform() && isSupported;
+
+  const requestWebPermission = async () => {
+    if (!Capacitor.isNativePlatform()) {
+      try {
+        const granted = await requestNotificationPermission();
+        setWebPermission(granted ? 'granted' : 'denied');
+        if (granted) {
+          setWebError(null);
+          toast({
+            title: "✅ Notifications Enabled",
+            description: "You'll now receive push notifications in your browser.",
+          });
+        } else {
+          setWebError('Permission denied by user');
+        }
+      } catch (err) {
+        setWebError(err instanceof Error ? err.message : 'Unknown error');
+      }
+    }
+  };
 
   const testNotifications = [
     {
       title: 'Test Match Notification',
-      action: () => sendMatchNotification(currentUser?.id || '', 'Test User'),
+      action: () => sendMatchNotification('Test User', currentUser?.id || ''),
       icon: '💕'
     },
     {
       title: 'Test Message Notification', 
-      action: () => sendMessageNotification(currentUser?.id || '', 'Test User', 'Hey there! 👋'),
+      action: () => sendMessageNotification('Test User', 'Hey there! 👋', currentUser?.id || '', 'test-chat-123'),
       icon: '💬'
     },
     {
       title: 'Test Like Notification',
-      action: () => sendLikeNotification(currentUser?.id || '', 'Test User'),
+      action: () => sendLikeNotification('Test User', currentUser?.id || ''),
       icon: '❤️'
     },
     {
       title: 'Test Admin Notification',
-      action: () => sendAdminNotification(currentUser?.id || '', 'Welcome!', 'Your profile has been approved.'),
+      action: () => sendAdminNotification('Welcome!', 'Your profile has been approved.', currentUser?.id || ''),
       icon: '🔔'
     }
   ];
 
-  const handleTestNotification = async (testFn: () => Promise<void>, title: string) => {
+  const handleTestNotification = async (testFn: () => Promise<boolean>, title: string) => {
     try {
       await testFn();
       toast({
@@ -122,9 +134,9 @@ const PushNotificationSettings = ({ currentUser }: PushNotificationSettingsProps
               <span className="font-medium">Push Notifications</span>
             </div>
             <div className={`px-2 py-1 rounded text-sm ${
-              (hasNativeSupport || hasFirebaseSupport) ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'
+              (hasNativeSupport || hasWebSupport) ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'
             }`}>
-              {(hasNativeSupport || hasFirebaseSupport) ? '✅ Available' : '❌ Not Available'}
+              {(hasNativeSupport || hasWebSupport) ? '✅ Available' : '❌ Not Available'}
             </div>
           </div>
 
@@ -148,12 +160,22 @@ const PushNotificationSettings = ({ currentUser }: PushNotificationSettingsProps
             <div className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
               <div className="flex items-center gap-2">
                 <Globe className="w-4 h-4" />
-                <span className="font-medium">Firebase Status</span>
+                <span className="font-medium">Web Notifications</span>
               </div>
-              <div className={`px-2 py-1 rounded text-sm ${
-                firebaseToken ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'
-              }`}>
-                {firebaseToken ? '✅ Ready' : '❌ Not Configured'}
+              <div className="flex items-center gap-2">
+                <div className={`px-2 py-1 rounded text-sm ${
+                  webPermission === 'granted' ? 'bg-green-100 text-green-800' : 
+                  webPermission === 'denied' ? 'bg-red-100 text-red-800' : 
+                  'bg-yellow-100 text-yellow-800'
+                }`}>
+                  {webPermission === 'granted' ? '✅ Enabled' : 
+                   webPermission === 'denied' ? '❌ Denied' : '⏳ Not Requested'}
+                </div>
+                {webPermission !== 'granted' && (
+                  <Button size="sm" onClick={requestWebPermission} variant="outline">
+                    Enable
+                  </Button>
+                )}
               </div>
             </div>
           )}
@@ -167,23 +189,23 @@ const PushNotificationSettings = ({ currentUser }: PushNotificationSettingsProps
             </div>
           )}
 
-          {firebaseToken && (
-            <div className="p-3 bg-purple-50 rounded-lg">
-              <div className="text-sm font-medium text-purple-800 mb-1">Firebase Token</div>
-              <div className="text-xs text-purple-600 font-mono break-all">
-                {firebaseToken.substring(0, 32)}...
+          {unreadCount > 0 && (
+            <div className="p-3 bg-blue-50 rounded-lg">
+              <div className="text-sm font-medium text-blue-800 mb-1">Unread Notifications</div>
+              <div className="text-xs text-blue-600">
+                You have {unreadCount} unread notification{unreadCount > 1 ? 's' : ''}
               </div>
             </div>
           )}
 
-          {(error || firebaseError) && (
+          {(error || webError) && (
             <div className="p-3 bg-red-50 rounded-lg">
               <div className="text-sm font-medium text-red-800 mb-1">Error</div>
               <div className="text-xs text-red-600">
-                {error || firebaseError}
-                {!Capacitor.isNativePlatform() && firebaseError && (
+                {error || webError}
+                {!Capacitor.isNativePlatform() && webError && (
                   <div className="mt-2 text-xs">
-                    💡 <strong>Need Firebase setup?</strong> Check the <code>FIREBASE_SETUP.md</code> guide
+                    💡 <strong>Need help?</strong> Check your browser notification settings
                   </div>
                 )}
               </div>

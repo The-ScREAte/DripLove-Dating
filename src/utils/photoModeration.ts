@@ -161,7 +161,7 @@ class PhotoModerationService {
     let suggestiveContent = 0;
 
     // Quick bypass: if skin tone ratio is very low, likely a normal photo
-    if (skinToneRatio < 0.25) { // Less than 25% skin tone - very likely a normal photo
+    if (skinToneRatio < 0.15) { // Less than 15% skin tone - very likely a normal photo (face/hands only)
       console.log('✅ Normal photo detected - low skin tone ratio, auto-approving');
       return {
         flags: [],
@@ -173,23 +173,29 @@ class PhotoModerationService {
       };
     }
 
-    // More aggressive thresholds to catch inappropriate content
-    if (skinToneRatio > 0.65) { // 65%+ skin tone - flag as explicit content
+    // More strict thresholds for dating app context
+    // Shirtless/bikini photos should be flagged for review
+    if (skinToneRatio > 0.75) { // 75%+ skin tone - very likely explicit content
       explicitContent = 95;
       flags.push(MODERATION_FLAGS.EXPLICIT_CONTENT);
-      console.log('🚨 Explicit content detected - 65%+ skin tone');
+      console.log('🚨 Explicit content detected - 75%+ skin tone');
     }
-    else if (skinToneRatio > 0.50) { // 50%+ skin tone - flag as adult content  
+    else if (skinToneRatio > 0.60) { // 60%+ skin tone - likely adult content  
       adultContent = 85;
       flags.push(MODERATION_FLAGS.ADULT_CONTENT);
-      console.log('🚨 Adult content detected - 50%+ skin tone');
+      console.log('🚨 Adult content detected - 60%+ skin tone');
     }
-    else if (skinToneRatio > 0.35) { // 35%+ skin tone - flag as suggestive
+    else if (skinToneRatio > 0.40) { // 40%+ skin tone - potentially suggestive (shirtless, bikini)
       suggestiveContent = 80;
-      console.log('⚠️ Suggestive content detected - 35%+ skin tone, requires review');
+      flags.push(MODERATION_FLAGS.INAPPROPRIATE);
+      console.log('⚠️ Suggestive content detected - 40%+ skin tone, requires review');
+    }
+    else if (skinToneRatio > 0.25) { // 25-40% skin tone - moderate exposure, flag for review
+      suggestiveContent = 60;
+      console.log('⚠️ Moderate skin exposure detected - 25-40% skin tone, may require review');
     }
     else {
-      // For 25-35% skin tone, approve without flags (normal dating photos)
+      // For 15-25% skin tone, approve without flags (normal dating photos with some skin showing)
       console.log('✅ Acceptable skin tone ratio for dating profile');
     }
 
@@ -381,7 +387,7 @@ class PhotoModerationService {
     else if (
       (combinedDetails.adultContent && combinedDetails.adultContent >= 70) ||
       (combinedDetails.explicitContent && combinedDetails.explicitContent >= 80) ||
-      (combinedDetails.suggestiveContent && combinedDetails.suggestiveContent >= 75)
+      (combinedDetails.suggestiveContent && combinedDetails.suggestiveContent >= 60) // Lowered from 75 to 60
     ) {
       isApproved = true; // Allow upload but require review
       requiresReview = true;
