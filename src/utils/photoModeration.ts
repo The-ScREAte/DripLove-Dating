@@ -161,7 +161,7 @@ class PhotoModerationService {
     let suggestiveContent = 0;
 
     // Quick bypass: if skin tone ratio is very low, likely a normal photo
-    if (skinToneRatio < 0.3) { // Less than 30% skin tone - very likely a normal photo
+    if (skinToneRatio < 0.25) { // Less than 25% skin tone - very likely a normal photo
       console.log('✅ Normal photo detected - low skin tone ratio, auto-approving');
       return {
         flags: [],
@@ -173,24 +173,23 @@ class PhotoModerationService {
       };
     }
 
-    // Properly balanced thresholds for dating app context
-    // Many legitimate dating photos show 60-80% skin (beach, gym, casual summer photos)
-    if (skinToneRatio > 0.90) { // 90%+ skin tone - very likely explicit content
+    // More aggressive thresholds for dating app context to catch inappropriate content
+    if (skinToneRatio > 0.80) { // 80%+ skin tone - flag as explicit content
       explicitContent = 90;
       flags.push(MODERATION_FLAGS.EXPLICIT_CONTENT);
-      console.log('🚨 Explicit content detected - 90%+ skin tone');
+      console.log('🚨 Explicit content detected - 80%+ skin tone');
     }
-    else if (skinToneRatio > 0.85) { // 85%+ skin tone - likely adult content
-      adultContent = 80;
+    else if (skinToneRatio > 0.70) { // 70%+ skin tone - flag as adult content  
+      adultContent = 85;
       flags.push(MODERATION_FLAGS.ADULT_CONTENT);
-      console.log('🚨 Adult content detected - 85%+ skin tone');
+      console.log('🚨 Adult content detected - 70%+ skin tone');
     }
-    else if (skinToneRatio > 0.80) { // 80%+ skin tone - potentially suggestive but allow
-      suggestiveContent = 70;
-      console.log('⚠️ High skin content detected but allowed - 80%+ skin tone');
+    else if (skinToneRatio > 0.60) { // 60%+ skin tone - flag as suggestive
+      suggestiveContent = 80;
+      console.log('⚠️ Suggestive content detected - 60%+ skin tone, requires review');
     }
     else {
-      // For 30-80% skin tone, approve without flags (includes beach, gym, summer photos)
+      // For 25-60% skin tone, approve without flags (includes normal dating photos)
       console.log('✅ Acceptable skin tone ratio for dating profile');
     }
 

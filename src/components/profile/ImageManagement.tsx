@@ -258,51 +258,26 @@ const ImageManagement = ({ currentUser }: ImageManagementProps) => {
       
       if (requiresReview) {
         console.log('🔒 Uploading as pending approval...');
+        
         // Try to insert with moderation columns for pending approval
+        const insertData = {
+          ...imageData,
+          is_approved: false,
+          moderation_status: 'pending',
+          moderation_notes: `AI review: ${moderationResult?.message || 'Requires manual review'}`,
+          flagged_content: moderationResult?.flags || [],
+          confidence_score: moderationResult?.confidence || 0
+        };
+
+        console.log('📝 Inserting pending image with data:', insertData);
+
         const { error: dbError } = await supabase
           .from('user_images')
-          .insert({ 
-            ...imageData,
-            is_approved: false,
-            moderation_status: 'pending',
-            moderation_notes: `AI review: ${moderationResult?.message || 'Requires manual review'}`
-          });
+          .insert(insertData);
 
         if (dbError) {
-          console.error('❌ Database error with moderation columns:', dbError);
-          if (dbError.message.includes('does not exist')) {
-            // WORKAROUND: Use image_order = -1 to mark pending images when columns don't exist
-            console.log('⚠️ Moderation columns not available, using workaround with image_order = -1');
-            const { error: fallbackError } = await supabase
-              .from('user_images')
-              .insert({
-                ...imageData,
-                image_order: -1  // Negative order to mark as pending
-              });
-            if (fallbackError) {
-              console.error('❌ Fallback insert failed:', fallbackError);
-              throw fallbackError;
-            }
-          } else if (dbError.message.includes('duplicate key')) {
-            // Handle duplicate key error by retrying with a different order
-            console.log('⚠️ Duplicate key error, retrying with different order...');
-            const retryOrder = uniqueOrder + Math.floor(Math.random() * 100);
-            const { error: retryError } = await supabase
-              .from('user_images')
-              .insert({
-                ...imageData,
-                image_order: retryOrder,
-                is_approved: false,
-                moderation_status: 'pending',
-                moderation_notes: `AI review: ${moderationResult?.message || 'Requires manual review'}`
-              });
-            if (retryError) {
-              console.error('❌ Fallback insert failed:', retryError);
-              throw retryError;
-            }
-          } else {
-            throw dbError;
-          }
+          console.error('❌ Database error:', dbError);
+          throw dbError;
         }
         
         // Refresh the image list to show the new image with proper status
@@ -318,48 +293,26 @@ const ImageManagement = ({ currentUser }: ImageManagementProps) => {
         }, 500);
       } else {
         console.log('✅ Uploading as approved...');
+        
         // Image passed moderation fully, insert with explicit approval status
+        const insertData = {
+          ...imageData,
+          is_approved: true,
+          moderation_status: 'approved',
+          moderation_notes: `Auto-approved: ${moderationResult?.message || 'Passed content guidelines'}`,
+          flagged_content: moderationResult?.flags || [],
+          confidence_score: moderationResult?.confidence || 95
+        };
+
+        console.log('📝 Inserting approved image with data:', insertData);
+
         const { error: dbError } = await supabase
           .from('user_images')
-          .insert({
-            ...imageData,
-            is_approved: true,
-            moderation_status: 'approved',
-            moderation_notes: `Auto-approved: ${moderationResult?.message || 'Passed content guidelines'}`
-          });
+          .insert(insertData);
 
         if (dbError) {
-          console.error('❌ Database error with moderation columns:', dbError);
-          if (dbError.message.includes('does not exist')) {
-            // FALLBACK: If moderation columns don't exist, just insert normally
-            console.log('⚠️ Moderation columns not available, using basic insert');
-            const { error: fallbackError } = await supabase
-              .from('user_images')
-              .insert(imageData);
-            if (fallbackError) {
-              console.error('❌ Basic insert failed:', fallbackError);
-              throw fallbackError;
-            }
-          } else if (dbError.message.includes('duplicate key')) {
-            // Handle duplicate key error by retrying with a different order
-            console.log('⚠️ Duplicate key error, retrying with different order...');
-            const retryOrder = uniqueOrder + Math.floor(Math.random() * 100);
-            const { error: retryError } = await supabase
-              .from('user_images')
-              .insert({
-                ...imageData,
-                image_order: retryOrder,
-                is_approved: true,
-                moderation_status: 'approved',
-                moderation_notes: `Auto-approved: ${moderationResult?.message || 'Passed content guidelines'}`
-              });
-            if (retryError) {
-              console.error('❌ Retry insert failed:', retryError);
-              throw retryError;
-            }
-          } else {
-            throw dbError;
-          }
+          console.error('❌ Database error:', dbError);
+          throw dbError;
         }
         
         // Refresh the image list
