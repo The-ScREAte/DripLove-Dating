@@ -1,23 +1,25 @@
 // Firebase service worker for background push notifications
-import { initializeApp } from 'firebase/app';
-import { getMessaging, onBackgroundMessage } from 'firebase/messaging/sw';
+// Service workers must use importScripts, not ES6 imports
+
+importScripts('https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js');
+importScripts('https://www.gstatic.com/firebasejs/9.23.0/firebase-messaging-compat.js');
 
 // Same config as main app - keep in sync with src/config/firebase.ts
 const firebaseConfig = {
-  apiKey: "AIzaSyBK9QJ8X-example", // Replace with your Firebase API key
-  authDomain: "dataing-buddy-auth-hub.firebaseapp.com", // Replace with your domain
-  projectId: "dataing-buddy-auth-hub", // Replace with your project ID
-  storageBucket: "dataing-buddy-auth-hub.firebasestorage.app", // Replace with your storage bucket
-  messagingSenderId: "123456789", // Replace with your sender ID
-  appId: "1:123456789:web:example" // Replace with your app ID
+  apiKey: "AIzaSyDummy-ForTesting-ReplaceWithReal", // Replace with your real Firebase API key
+  authDomain: "your-project.firebaseapp.com", // Replace with your real domain
+  projectId: "your-project-id", // Replace with your real project ID
+  storageBucket: "your-project.firebasestorage.app", // Replace with your real storage bucket
+  messagingSenderId: "123456789", // Replace with your real sender ID
+  appId: "1:123456789:web:abcd1234" // Replace with your real app ID
 };
 
 // Initialize Firebase in service worker
-const app = initializeApp(firebaseConfig);
-const messaging = getMessaging(app);
+firebase.initializeApp(firebaseConfig);
+const messaging = firebase.messaging();
 
 // Handle background messages
-onBackgroundMessage(messaging, (payload) => {
+messaging.onBackgroundMessage((payload) => {
   console.log('[firebase-messaging-sw.js] Received background message:', payload);
   
   const notificationTitle = payload.notification?.title || 'New notification';
