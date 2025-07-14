@@ -416,66 +416,24 @@ const AdminPage = ({ currentUser, onLogout }: AdminPageProps) => {
   const rejectImage = async (imageId: string) => {
     try {
       setRejectingImages(prev => ({ ...prev, [imageId]: true }));
-      console.log('🗑️ Rejecting image:', imageId);
 
-      // Get the image data first to access the storage file
-      const { data: imageData, error: fetchError } = await supabase
-        .from('user_images')
-        .select('image_url')
-        .eq('id', imageId)
-        .single();
+      // Use the reject_image function which has admin privileges and deletes the image
+      const { error } = await supabase.rpc('reject_image', {
+        image_id: imageId,
+        admin_notes: 'Rejected by admin'
+      });
 
-      if (fetchError) {
-        console.error('❌ Error fetching image data:', fetchError);
-        throw fetchError;
-      }
-
-      // Delete from database first
-      const { error: deleteError } = await supabase
-        .from('user_images')
-        .delete()
-        .eq('id', imageId);
-
-      if (deleteError) {
-        console.error('❌ Error deleting from database:', deleteError);
-        throw deleteError;
-      }
-
-      console.log('✅ Image deleted from database');
-
-      // Then delete from storage if we have the URL
-      if (imageData?.image_url) {
-        try {
-          const urlParts = imageData.image_url.split('/');
-          const bucketIndex = urlParts.findIndex(part => part === 'user-photos');
-          if (bucketIndex !== -1) {
-            const filePath = urlParts.slice(bucketIndex + 1).join('/');
-            const { error: storageError } = await supabase.storage
-              .from('user-photos')
-              .remove([filePath]);
-            
-            if (storageError) {
-              console.warn('⚠️ Storage deletion warning (non-critical):', storageError);
-              // Don't throw here as database deletion succeeded
-            } else {
-              console.log('✅ Image deleted from storage');
-            }
-          }
-        } catch (storageError) {
-          console.warn('⚠️ Storage cleanup failed (non-critical):', storageError);
-          // Continue as database deletion succeeded
-        }
+      if (error) {
+        throw error;
       }
 
       // Remove from pending list immediately
       setPendingImages(prev => prev.filter(img => img.id !== imageId));
       
       toast({
-        title: 'Success',
-        description: 'Image rejected and deleted successfully'
+        title: 'Image rejected',
+        description: 'Image permanently deleted from database'
       });
-
-      console.log('✅ Image rejection complete');
 
     } catch (error) {
       console.error('❌ Error rejecting image:', error);
