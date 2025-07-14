@@ -363,26 +363,32 @@ class PhotoModerationService {
     let message = '';
     let requiresReview = false;
 
-    // Only reject completely invalid files
+    // Block completely invalid files
     if (hasBlockingFlags) {
       isApproved = false;
       confidence = 95;
       message = 'Image file is corrupted or invalid and cannot be uploaded.';
       console.log('❌ Image blocked: Invalid file');
     }
-    // Only require admin review for clearly inappropriate content
+    // Send inappropriate content to admin review
+    else if (hasContentFlags) {
+      isApproved = true; // Allow upload but require review
+      requiresReview = true;
+      confidence = 20;
+      message = 'Image uploaded but requires admin approval due to potentially inappropriate content.';
+      console.log('🔍 Image flagged for admin review due to content flags');
+    }
+    // Send high-risk content scores to admin review  
     else if (
-      hasContentFlags ||
-      (combinedDetails.adultContent && combinedDetails.adultContent >= 80) ||
-      (combinedDetails.explicitContent && combinedDetails.explicitContent >= 90) ||
-      (combinedDetails.suggestiveContent && combinedDetails.suggestiveContent > 80)
+      (combinedDetails.adultContent && combinedDetails.adultContent >= 70) ||
+      (combinedDetails.explicitContent && combinedDetails.explicitContent >= 80) ||
+      (combinedDetails.suggestiveContent && combinedDetails.suggestiveContent >= 75)
     ) {
-      isApproved = true; // Allow upload but mark for review
+      isApproved = true; // Allow upload but require review
       requiresReview = true;
       confidence = 30;
-      message = 'Image uploaded successfully but requires admin approval before being visible to others.';
-      console.log('🔍 Image requires review:', {
-        hasContentFlags,
+      message = 'Image uploaded but requires admin approval before being visible to others.';
+      console.log('🔍 Image requires review due to content scores:', {
         adultContent: combinedDetails.adultContent,
         explicitContent: combinedDetails.explicitContent,
         suggestiveContent: combinedDetails.suggestiveContent
@@ -390,6 +396,7 @@ class PhotoModerationService {
     }
     else {
       message = 'Image approved and uploaded successfully.';
+      confidence = 95;
       console.log('✅ Image approved automatically');
       if (allFlags.includes(MODERATION_FLAGS.NO_FACE_DETECTED)) {
         message += ' Tip: Profile photos work best when they clearly show your face.';

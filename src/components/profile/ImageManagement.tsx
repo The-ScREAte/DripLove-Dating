@@ -147,8 +147,8 @@ const ImageManagement = ({ currentUser }: ImageManagementProps) => {
         console.log('🔍 Image requires review:', moderation.message);
         // Show immediate feedback for pending review
         toast({ 
-          title: "⚠️ Image will require admin review", 
-          description: "This image will be uploaded but needs approval before others can see it.",
+          title: "⚠️ Image pending approval", 
+          description: "Your image has been uploaded but requires admin review before others can see it. You'll be notified once it's approved.",
           variant: "default"
         });
       }
@@ -156,12 +156,17 @@ const ImageManagement = ({ currentUser }: ImageManagementProps) => {
       else if (moderation.confidence < 80) {
         console.log('⚠️ Image approved with warning:', moderation.message);
         toast({ 
-          title: "Image uploaded with warning", 
+          title: "✅ Image uploaded", 
           description: moderation.message,
           variant: "default"
         });
       } else {
         console.log('✅ Image fully approved:', moderation.message);
+        toast({ 
+          title: "✅ Image uploaded successfully", 
+          description: "Your image has been approved and is now visible to others.",
+          variant: "default"
+        });
       }
 
     } catch (error) {
