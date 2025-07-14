@@ -5,6 +5,8 @@ import DiscoverPage from '@/components/DiscoverPage';
 import ChatPage from '@/components/ChatPage';
 import LikedMePage from '@/components/LikedMePage';
 import ProfilePage from '@/components/ProfilePage';
+import TermsOfService from '@/components/TermsOfService';
+import PrivacyPolicy from '@/components/PrivacyPolicy';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 
@@ -15,6 +17,8 @@ interface MainAppProps {
 
 const MainApp = ({ user, onLogout }: MainAppProps) => {
   const [activeTab, setActiveTab] = useState('discover');
+  const [showTerms, setShowTerms] = useState(false);
+  const [showPrivacy, setShowPrivacy] = useState(false);
   const [profile, setProfile] = useState<any>(null);
   const [unreadCount, setUnreadCount] = useState(0);
   const { toast } = useToast();
@@ -100,7 +104,31 @@ const MainApp = ({ user, onLogout }: MainAppProps) => {
     setActiveTab('chat');
   };
 
+  const handleShowTerms = () => {
+    setShowTerms(true);
+  };
+
+  const handleShowPrivacy = () => {
+    setShowPrivacy(true);
+  };
+
+  const handleBackFromTerms = () => {
+    setShowTerms(false);
+  };
+
+  const handleBackFromPrivacy = () => {
+    setShowPrivacy(false);
+  };
+
   const renderContent = () => {
+    if (showTerms) {
+      return <TermsOfService onBack={handleBackFromTerms} />;
+    }
+    
+    if (showPrivacy) {
+      return <PrivacyPolicy onBack={handleBackFromPrivacy} />;
+    }
+
     switch (activeTab) {
       case 'discover':
         return <DiscoverPage currentUser={profile} onNavigateToChat={handleNavigateToChat} />;
@@ -109,7 +137,16 @@ const MainApp = ({ user, onLogout }: MainAppProps) => {
       case 'liked':
         return <LikedMePage currentUser={profile} />;
       case 'profile':
-        return <ProfilePage currentUser={profile} profile={profile} onProfileUpdate={fetchUserProfile} onLogout={onLogout} />;
+        return (
+          <ProfilePage 
+            currentUser={profile} 
+            profile={profile} 
+            onProfileUpdate={fetchUserProfile} 
+            onLogout={onLogout}
+            onShowTerms={handleShowTerms}
+            onShowPrivacy={handleShowPrivacy}
+          />
+        );
       default:
         return <DiscoverPage currentUser={profile} onNavigateToChat={handleNavigateToChat} />;
     }
@@ -119,47 +156,51 @@ const MainApp = ({ user, onLogout }: MainAppProps) => {
     <div className="w-full h-screen bg-gray-100">
       <div className="w-full h-screen flex flex-col bg-white relative shadow-md overflow-hidden">
         
-        {/* Fixed Header */}
-        <div className="fixed top-0 left-0 right-0 w-full bg-white shadow-sm border-b z-50">
-          <div className="px-4 py-2 flex justify-start items-center">
-            <img 
-              src="/lovable-uploads/0e9bd84b-0f71-493b-8c1f-1a2883e5109d.png" 
-              alt="AfroVibe Logo" 
-              className="h-10"
-            />
+        {/* Fixed Header - Hide when showing terms/privacy */}
+        {!showTerms && !showPrivacy && (
+          <div className="fixed top-0 left-0 right-0 w-full bg-white shadow-sm border-b z-50">
+            <div className="px-4 py-2 flex justify-start items-center">
+              <img 
+                src="/lovable-uploads/0e9bd84b-0f71-493b-8c1f-1a2883e5109d.png" 
+                alt="AfroVibe Logo" 
+                className="h-10"
+              />
+            </div>
           </div>
-        </div>
+        )}
 
         {/* Main Content */}
-        <div className="flex-1 overflow-y-auto pt-[60px] pb-[70px]">
+        <div className={`flex-1 overflow-y-auto ${!showTerms && !showPrivacy ? 'pt-[60px] pb-[70px]' : ''}`}>
           {renderContent()}
         </div>
 
-        {/* Fixed Bottom Nav */}
-        <div className="fixed bottom-0 left-0 right-0 w-full bg-white border-t border-gray-200 px-2 py-2 z-50">
-          <div className="flex justify-around items-center">
-            {[
-              { label: 'Discover', icon: Heart }, 
-              { label: 'Chat', icon: MessageCircle }, 
-              { label: 'Liked', icon: Users }, 
-              { label: 'Profile', icon: User }
-            ].map(({ label, icon: Icon }) => (
-              <button
-                key={label}
-                onClick={() => setActiveTab(label.toLowerCase())}
-                className={`flex flex-col items-center space-y-1 py-2 px-2 rounded-lg transition-colors relative ${
-                  activeTab === label.toLowerCase() ? 'text-pink-600' : 'text-gray-500'
-                }`}
-              >
-                <Icon className={`w-5 h-5 ${activeTab === label.toLowerCase() ? 'fill-current' : ''}`} />
-                <span className="text-xs font-medium">{label}</span>
-                {label === 'Chat' && unreadCount > 0 && (
-                <span className="absolute -top-1 -right-1 h-2 w-2 rounded-full bg-pink-600 border border-white z-10" />
-              )}
-              </button>
-            ))}
+        {/* Fixed Bottom Nav - Hide when showing terms/privacy */}
+        {!showTerms && !showPrivacy && (
+          <div className="fixed bottom-0 left-0 right-0 w-full bg-white border-t border-gray-200 px-2 py-2 z-50">
+            <div className="flex justify-around items-center">
+              {[
+                { label: 'Discover', icon: Heart }, 
+                { label: 'Chat', icon: MessageCircle }, 
+                { label: 'Liked', icon: Users }, 
+                { label: 'Profile', icon: User }
+              ].map(({ label, icon: Icon }) => (
+                <button
+                  key={label}
+                  onClick={() => setActiveTab(label.toLowerCase())}
+                  className={`flex flex-col items-center space-y-1 py-2 px-2 rounded-lg transition-colors relative ${
+                    activeTab === label.toLowerCase() ? 'text-pink-600' : 'text-gray-500'
+                  }`}
+                >
+                  <Icon className={`w-5 h-5 ${activeTab === label.toLowerCase() ? 'fill-current' : ''}`} />
+                  <span className="text-xs font-medium">{label}</span>
+                  {label === 'Chat' && unreadCount > 0 && (
+                  <span className="absolute -top-1 -right-1 h-2 w-2 rounded-full bg-pink-600 border border-white z-10" />
+                )}
+                </button>
+              ))}
+            </div>
           </div>
-        </div>
+        )}
       </div>
     </div>
   );

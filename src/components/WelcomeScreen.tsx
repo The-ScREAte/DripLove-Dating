@@ -6,9 +6,11 @@ interface WelcomeScreenProps {
   onGetStarted: () => void;
   onAdminAccess: () => void;
   onShowAbout: () => void;
+  onShowTerms: () => void;
+  onShowPrivacy: () => void;
 }
 
-const WelcomeScreen = ({ onGetStarted, onAdminAccess, onShowAbout }: WelcomeScreenProps) => {
+const WelcomeScreen = ({ onGetStarted, onAdminAccess, onShowAbout, onShowTerms, onShowPrivacy }: WelcomeScreenProps) => {
   return (
     <div className="min-h-screen bg-gradient-to-br from-pink-400 via-purple-500 to-indigo-600 flex flex-col items-center justify-center text-white relative overflow-hidden">
       {/* Background Pattern */}
@@ -69,8 +71,23 @@ const WelcomeScreen = ({ onGetStarted, onAdminAccess, onShowAbout }: WelcomeScre
       </div>
       
       {/* Footer */}
-      <div className="absolute bottom-8 text-center text-white/60 text-sm">
-        <p>Join thousands finding love across continents</p>
+      <div className="absolute bottom-8 text-center text-white/60 text-sm w-full px-4">
+        <p className="mb-3">Join thousands finding love across continents</p>
+        <div className="flex justify-center space-x-4">
+          <button 
+            onClick={onShowTerms}
+            className="text-white/70 hover:text-white underline transition-colors text-xs"
+          >
+            Terms of Service
+          </button>
+          <span className="text-white/50">•</span>
+          <button 
+            onClick={onShowPrivacy}
+            className="text-white/70 hover:text-white underline transition-colors text-xs"
+          >
+            Privacy Policy
+          </button>
+        </div>
       </div>
     </div>
   );

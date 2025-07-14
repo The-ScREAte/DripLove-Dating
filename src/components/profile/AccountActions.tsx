@@ -12,9 +12,11 @@ import { useToast } from '@/hooks/use-toast';
 interface AccountActionsProps {
   currentUser: any;
   onLogout: () => void;
+  onShowTerms?: () => void;
+  onShowPrivacy?: () => void;
 }
 
-const AccountActions = ({ currentUser, onLogout }: AccountActionsProps) => {
+const AccountActions = ({ currentUser, onLogout, onShowTerms, onShowPrivacy }: AccountActionsProps) => {
   const [deletingAccount, setDeletingAccount] = useState(false);
   const [showPasswordDialog, setShowPasswordDialog] = useState(false);
   const [password, setPassword] = useState('');
@@ -111,6 +113,33 @@ const AccountActions = ({ currentUser, onLogout }: AccountActionsProps) => {
             support@afrovibe.com
           </a>
         </div>
+
+        {/* Legal Links */}
+        {(onShowTerms || onShowPrivacy) && (
+          <div className="bg-gray-50 p-4 rounded-lg border">
+            <div className="flex flex-wrap justify-center gap-4 text-sm">
+              {onShowTerms && (
+                <button 
+                  onClick={onShowTerms}
+                  className="text-purple-600 hover:text-purple-700 hover:underline transition-colors"
+                >
+                  Terms of Service
+                </button>
+              )}
+              {onShowTerms && onShowPrivacy && (
+                <span className="text-gray-400">•</span>
+              )}
+              {onShowPrivacy && (
+                <button 
+                  onClick={onShowPrivacy}
+                  className="text-purple-600 hover:text-purple-700 hover:underline transition-colors"
+                >
+                  Privacy Policy
+                </button>
+              )}
+            </div>
+          </div>
+        )}
 
         <div className="flex flex-col sm:flex-row gap-4">
           <Button 

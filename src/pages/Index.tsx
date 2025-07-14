@@ -5,12 +5,14 @@ import RegistrationForm from '@/components/RegistrationForm';
 import MainApp from '@/components/MainApp';
 import AdminPage from '@/components/AdminPage';
 import AboutUs from '@/components/AboutUs';
+import TermsOfService from '@/components/TermsOfService';
+import PrivacyPolicy from '@/components/PrivacyPolicy';
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
 import { transformFormDataForSubmission } from '@/utils/formValidation';
 
 const Index = () => {
-  const [currentView, setCurrentView] = useState<'welcome' | 'login' | 'register' | 'app' | 'admin' | 'about'>('welcome');
+  const [currentView, setCurrentView] = useState<'welcome' | 'login' | 'register' | 'app' | 'admin' | 'about' | 'terms' | 'privacy'>('welcome');
   const [user, setUser] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const { toast } = useToast();
@@ -131,6 +133,14 @@ const Index = () => {
     setCurrentView('about');
   };
 
+  const handleShowTerms = () => {
+    setCurrentView('terms');
+  };
+
+  const handleShowPrivacy = () => {
+    setCurrentView('privacy');
+  };
+
   // Shortest possible registration: essentials only
   const handleRegister = async (formData: any) => {
     try {
@@ -213,11 +223,21 @@ const Index = () => {
             onGetStarted={handleGetStarted} 
             onAdminAccess={handleAdminAccess}
             onShowAbout={handleShowAbout}
+            onShowTerms={handleShowTerms}
+            onShowPrivacy={handleShowPrivacy}
           />
         )}
 
         {currentView === 'about' && (
           <AboutUs onBack={handleBackToWelcome} />
+        )}
+
+        {currentView === 'terms' && (
+          <TermsOfService onBack={handleBackToWelcome} />
+        )}
+
+        {currentView === 'privacy' && (
+          <PrivacyPolicy onBack={handleBackToWelcome} />
         )}
 
         {currentView === 'login' && (

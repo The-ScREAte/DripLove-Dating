@@ -23,9 +23,11 @@ interface ProfilePageProps {
   profile: any;
   onProfileUpdate: () => void;
   onLogout: () => void;
+  onShowTerms?: () => void;
+  onShowPrivacy?: () => void;
 }
 
-const ProfilePage = ({ currentUser, profile, onProfileUpdate, onLogout }: ProfilePageProps) => {
+const ProfilePage = ({ currentUser, profile, onProfileUpdate, onLogout, onShowTerms, onShowPrivacy }: ProfilePageProps) => {
   const [isEditing, setIsEditing] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const [showPremiumUpgrade, setShowPremiumUpgrade] = useState(false);
@@ -331,7 +333,12 @@ const ProfilePage = ({ currentUser, profile, onProfileUpdate, onLogout }: Profil
           <PersonalitySection editedProfile={editedProfile} isEditing={isEditing} onSliderChange={handleSliderChange} />
           <FunQuestionsSection editedProfile={editedProfile} isEditing={isEditing} onInputChange={handleInputChange} />
           <InterestsSection editedProfile={editedProfile} profile={profile} isEditing={isEditing} onInterestsChange={handleInterestsChange} />
-          <AccountActions currentUser={currentUser} onLogout={onLogout} />
+          <AccountActions 
+            currentUser={currentUser} 
+            onLogout={onLogout} 
+            onShowTerms={onShowTerms}
+            onShowPrivacy={onShowPrivacy}
+          />
         </div>
       </div>
     </div>
