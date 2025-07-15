@@ -153,10 +153,7 @@ class PhotoModerationService {
       skinToneRatio: (skinToneRatio * 100).toFixed(1) + '%',
       redDominantRatio: (redDominantRatio * 100).toFixed(1) + '%',
       pixels,
-      skinTonePixels,
-      threshold15Percent: '15%',
-      threshold30Percent: '30%',
-      threshold50Percent: '50%'
+      skinTonePixels
     });
     
     const flags: string[] = [];
@@ -164,30 +161,27 @@ class PhotoModerationService {
     let explicitContent = 0;
     let suggestiveContent = 0;
 
-    // STRICT DATING APP MODERATION - NO AUTO-BYPASS
-    // All images must pass through proper content analysis
-    console.log('📊 Applying strict moderation thresholds for dating app');
-    console.log('🔍 Checking thresholds: 15%=' + (skinToneRatio > 0.15) + ', 30%=' + (skinToneRatio > 0.30) + ', 50%=' + (skinToneRatio > 0.50));
+    // BALANCED DATING APP MODERATION - Realistic thresholds
+    console.log('📊 Applying balanced moderation thresholds for dating app');
 
-    // Much stricter thresholds - 15% skin tone threshold as requested
-    if (skinToneRatio > 0.50) { // 50%+ skin tone - explicit content
-      explicitContent = 95;
+    // Balanced thresholds that work for real dating photos
+    if (skinToneRatio > 0.70) { // 70%+ skin tone - very high exposure (swimwear focus, etc.)
+      explicitContent = 85;
       flags.push(MODERATION_FLAGS.EXPLICIT_CONTENT);
-      console.log('🚨 FLAGGED: Explicit content detected - 50%+ skin tone');
+      console.log('🚨 FLAGGED: High skin exposure detected - 70%+ skin tone (likely needs review)');
     }
-    else if (skinToneRatio > 0.30) { // 30%+ skin tone - adult content (shirtless, bikini, etc.)
-      adultContent = 85;
+    else if (skinToneRatio > 0.55) { // 55%+ skin tone - shirtless/bikini/workout
+      adultContent = 75;
       flags.push(MODERATION_FLAGS.ADULT_CONTENT);
-      console.log('🚨 FLAGGED: Adult content detected - 30%+ skin tone (likely shirtless/bikini)');
+      console.log('⚠️ FLAGGED: Moderate skin exposure - 55%+ skin tone (shirtless/bikini, requires review)');
     }
-    else if (skinToneRatio > 0.15) { // 15%+ skin tone - suggestive, requires review
-      suggestiveContent = 80;
-      flags.push(MODERATION_FLAGS.INAPPROPRIATE);
-      console.log('⚠️ FLAGGED: Suggestive content detected - 15%+ skin tone, requires admin review');
+    else if (skinToneRatio > 0.40) { // 40%+ skin tone - tank tops, summer wear
+      suggestiveContent = 60;
+      console.log('⚠️ MODERATE: Some skin exposure detected - 40%+ skin tone (may require review)');
     }
     else {
-      // Only images with very minimal skin exposure (face/hands only) auto-approve
-      console.log('✅ PASSED: Minimal skin exposure detected - likely appropriate profile photo');
+      // 0-40% skin tone - normal dating photos (face, arms, casual clothing)
+      console.log('✅ PASSED: Normal skin exposure detected - appropriate profile photo');
     }
 
     // Additional check for extremely red-dominant images (very rare)
@@ -366,24 +360,24 @@ class PhotoModerationService {
       message = 'Image file is corrupted or invalid and cannot be uploaded.';
       console.log('❌ Image blocked: Invalid file');
     }
-    // Send inappropriate content to admin review - BLOCK UPLOAD COMPLETELY
+    // Send inappropriate content to admin review
     else if (hasContentFlags) {
-      isApproved = false; // Changed: Block upload completely
-      requiresReview = false; // No upload means no review needed
-      confidence = 95;
-      message = 'Image rejected: Contains inappropriate content and cannot be uploaded.';
-      console.log('❌ Image completely blocked due to content flags');
-    }
-    // Send high-risk content scores to admin review with stricter thresholds
-    else if (
-      (combinedDetails.adultContent && combinedDetails.adultContent >= 50) ||
-      (combinedDetails.explicitContent && combinedDetails.explicitContent >= 50) ||
-      (combinedDetails.suggestiveContent && combinedDetails.suggestiveContent >= 50) // Much stricter threshold
-    ) {
       isApproved = true; // Allow upload but require review
       requiresReview = true;
       confidence = 20;
-      message = 'Image uploaded but requires admin approval before being visible to others due to potential inappropriate content.';
+      message = 'Image uploaded but requires admin approval due to potentially inappropriate content.';
+      console.log('🔍 Image flagged for admin review due to content flags');
+    }
+    // Send high-risk content scores to admin review  
+    else if (
+      (combinedDetails.adultContent && combinedDetails.adultContent >= 70) ||
+      (combinedDetails.explicitContent && combinedDetails.explicitContent >= 80) ||
+      (combinedDetails.suggestiveContent && combinedDetails.suggestiveContent >= 60)
+    ) {
+      isApproved = true; // Allow upload but require review
+      requiresReview = true;
+      confidence = 30;
+      message = 'Image uploaded but requires admin approval before being visible to others.';
       console.log('🔍 Image requires review due to content scores:', {
         adultContent: combinedDetails.adultContent,
         explicitContent: combinedDetails.explicitContent,
@@ -409,41 +403,36 @@ class PhotoModerationService {
   }
 
   /**
-   * Enhanced skin tone detection with improved accuracy for dating app content
+   * Proper skin tone detection for dating app moderation
    */
   private isSkinTone(r: number, g: number, b: number): boolean {
-    // Enhanced skin tone detection for better moderation
-    // Catches more skin tones including different ethnicities and lighting conditions
+    // More accurate skin tone detection that catches actual skin
+    // Based on dermatology research and computer vision standards
     
-    // Skip very dark or very bright pixels (shadows, highlights, non-skin)
-    if (r < 70 || g < 50 || b < 40 || r > 245 || g > 220 || b > 190) return false;
+    // Skip extreme values (shadows, highlights, non-skin colors)
+    if (r < 60 || g < 40 || b < 30 || r > 255 || g > 240 || b > 200) return false;
     
-    // Enhanced skin tone criteria - more comprehensive detection
-    const isBasicSkin = (
-      r > 90 && g > 45 && b > 35 && // Broader minimum thresholds
-      r > g + 10 && r > b + 15 && // Red dominance (key for skin)
-      g > b && // Green higher than blue
-      r - b > 8 && r - b < 120 && // Red-blue difference range
-      Math.abs(r - g) < 70 // Red-green variation tolerance
+    // YCbCr color space is better for skin detection
+    const y = 0.299 * r + 0.587 * g + 0.114 * b;
+    const cb = -0.168736 * r - 0.331264 * g + 0.5 * b + 128;
+    const cr = 0.5 * r - 0.418688 * g - 0.081312 * b + 128;
+    
+    // Skin tone ranges in YCbCr color space (more accurate)
+    const isSkinYCbCr = (
+      y >= 80 && y <= 255 &&        // Luminance range
+      cb >= 85 && cb <= 135 &&      // Blue chroma range  
+      cr >= 135 && cr <= 180        // Red chroma range
     );
     
-    // Additional check for darker skin tones
-    const isDarkerSkin = (
-      r > 80 && g > 60 && b > 45 &&
-      r > g + 5 && r > b + 10 &&
-      r - b > 5 && r - b < 60 &&
-      Math.abs(r - g) < 40
+    // RGB-based backup detection for edge cases
+    const isSkinRGB = (
+      r > 95 && g > 40 && b > 20 &&           // Minimum thresholds
+      Math.max(r, g, b) - Math.min(r, g, b) > 15 && // Color variation
+      Math.abs(r - g) > 15 &&                 // Red-green difference
+      r > g && r > b                          // Red dominance
     );
     
-    // Additional check for lighter/tanned skin
-    const isLighterSkin = (
-      r > 120 && g > 80 && b > 60 &&
-      r > g + 20 && r > b + 30 &&
-      r - b > 15 && r - b < 90 &&
-      Math.abs(r - g) < 50
-    );
-    
-    return isBasicSkin || isDarkerSkin || isLighterSkin;
+    return isSkinYCbCr || isSkinRGB;
   }
 }
 

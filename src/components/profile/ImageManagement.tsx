@@ -123,7 +123,7 @@ const ImageManagement = ({ currentUser }: ImageManagementProps) => {
     setModerating(true);
     setModerationResult(null);
 
-    let moderationResult: any = null;
+    let moderationResult: ModerationResult | null = null;
 
     try {
       console.log('🔍 Starting image moderation for file:', file.name, file.size, file.type);
@@ -131,17 +131,27 @@ const ImageManagement = ({ currentUser }: ImageManagementProps) => {
       console.log('📊 Moderation result:', moderationResult);
       setModerationResult(moderationResult);
       
-      // STRICT: Block images that are not approved OR require review
-      if (!moderationResult.isApproved || moderationResult.details?.requiresReview) {
+      // Only block if image is completely rejected (not approved)
+      if (!moderationResult.isApproved) {
         console.log('❌ Image blocked:', moderationResult.message);
         toast({ 
-          title: "Image requires review", 
-          description: moderationResult.message || "This image needs admin approval before it can be uploaded.", 
+          title: "Image rejected", 
+          description: moderationResult.message || "This image cannot be uploaded.", 
           variant: "destructive" 
         });
         setModerating(false);
         event.target.value = '';
         return;
+      }
+      
+      // Show info toast if image requires review
+      if (moderationResult.details?.requiresReview) {
+        console.log('🔍 Image will require admin review');
+        toast({ 
+          title: "Image uploaded", 
+          description: "Your image has been uploaded but requires admin approval before being visible to others.", 
+          variant: "default" 
+        });
       }
 
     } catch (error) {
