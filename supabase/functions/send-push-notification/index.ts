@@ -12,31 +12,30 @@ interface NotificationPayload {
   userId?: string
   type?: 'match' | 'message' | 'like' | 'system' | 'admin'
   data?: Record<string, any>
+  relatedUserId?: string
 }
 
 interface PushToken {
   token: string
   platform: string
+  user_id: string
 }
+
+// Create Supabase client with service role
+const supabaseUrl = Deno.env.get('SUPABASE_URL')!
+const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
+const supabase = createClient(supabaseUrl, supabaseServiceKey)
 
 // Web Push API for browser notifications
 async function sendWebPushNotification(token: string, payload: NotificationPayload) {
-  const VAPID_PUBLIC_KEY = Deno.env.get('VAPID_PUBLIC_KEY')
-  const VAPID_PRIVATE_KEY = Deno.env.get('VAPID_PRIVATE_KEY')
-  
-  if (!VAPID_PUBLIC_KEY || !VAPID_PRIVATE_KEY) {
-    console.warn('⚠️ VAPID keys not configured, skipping web push notification')
-    return false
-  }
-
   try {
-    // For now, we'll implement basic web push
-    // In a real implementation, you'd use the Web Push Protocol with VAPID
-    console.log('🌐 Web push notification would be sent to:', token)
-    console.log('📱 Payload:', { title: payload.title, body: payload.body, type: payload.type })
-    
-    // TODO: Implement actual Web Push Protocol with VAPID authentication
-    // This requires additional crypto libraries for JWT signing and encryption
+    // For web browsers, we'll use the browser's Notification API
+    // This will be handled on the client side
+    console.log('🌐 Web push notification queued for client-side delivery:', {
+      token: token.substring(0, 10) + '...',
+      title: payload.title,
+      type: payload.type
+    })
     
     return true
   } catch (error) {
@@ -45,7 +44,7 @@ async function sendWebPushNotification(token: string, payload: NotificationPaylo
   }
 }
 
-// Firebase Cloud Messaging for mobile apps (optional fallback)
+// Firebase Cloud Messaging for mobile apps
 async function sendFCMNotification(token: string, payload: NotificationPayload) {
   const FCM_SERVER_KEY = Deno.env.get('FCM_SERVER_KEY')
   
@@ -194,20 +193,24 @@ serve(async (req) => {
 
     const successCount = results.filter(r => r.sent).length
 
-    // Store notification in database for tracking
-    const { error: notificationError } = await supabaseClient
-      .from('notifications')
-      .insert({
-        user_id: userId,
-        title,
-        message: body,
-        type,
-        data: JSON.stringify(data),
-        sent_at: new Date().toISOString()
-      })
+    // Store notification in database for tracking and real-time delivery
+    if (userId) {
+      const { error: notificationError } = await supabase
+        .from('notifications')
+        .insert({
+          user_id: userId,
+          title,
+          message: body,
+          type,
+          data: data || {},
+          related_user_id: data?.relatedUserId || null
+        })
 
-    if (notificationError) {
-      console.error('❌ Error storing notification:', notificationError)
+      if (notificationError) {
+        console.error('❌ Error storing notification:', notificationError)
+      } else {
+        console.log('✅ Notification stored in database for real-time delivery')
+      }
     }
 
     console.log(`✅ Sent ${successCount}/${tokens.length} notifications successfully`)

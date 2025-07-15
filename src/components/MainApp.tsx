@@ -24,7 +24,7 @@ const MainApp = ({ user, onLogout }: MainAppProps) => {
   const [unreadCount, setUnreadCount] = useState(0);
   const { toast } = useToast();
 
-  // Initialize push notifications
+  // Initialize push notifications silently in background
   const {
     isInitialized: pushInitialized,
     isSupported: pushSupported,
@@ -35,24 +35,16 @@ const MainApp = ({ user, onLogout }: MainAppProps) => {
     sendLikeNotification
   } = usePushNotifications(user?.id);
 
-  // Show push notification status
+  // Silent push notification initialization - no user notifications
   useEffect(() => {
     if (pushSupported && pushInitialized) {
-      toast({
-        title: '🔔 Push Notifications Enabled',
-        description: 'You\'ll receive notifications for matches, messages, and likes!',
-        variant: 'default'
-      });
+      console.log('🔔 Push notifications initialized silently');
     } else if (pushSupported && pushError) {
-      toast({
-        title: '⚠️ Push Notifications Issue',
-        description: pushError,
-        variant: 'destructive'
-      });
+      console.log('⚠️ Push notifications error:', pushError);
     } else if (!pushSupported) {
       console.log('📱 Push notifications not supported on this platform');
     }
-  }, [pushInitialized, pushSupported, pushError, toast]);
+  }, [pushInitialized, pushSupported, pushError]);
 
   useEffect(() => {
     fetchUserProfile();

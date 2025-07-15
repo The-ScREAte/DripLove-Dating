@@ -350,10 +350,7 @@ const ImageManagement = ({ currentUser }: ImageManagementProps) => {
         {userImages.length < 7 && (
           <div className="mb-6">
             <Label htmlFor="image_upload" className="block mb-2">Upload Image</Label>
-            <div className="text-xs text-gray-500 mb-2 flex items-center">
-              <Shield className="w-3 h-3 mr-1 text-purple-600" />
-              All images are automatically checked for appropriate content
-            </div>
+         
             <Input 
               type="file" 
               id="image_upload" 
@@ -397,7 +394,7 @@ const ImageManagement = ({ currentUser }: ImageManagementProps) => {
               {/* Pending approval indicator */}
               {userImage.is_approved === false && (
                 <div className="absolute top-2 left-2 bg-orange-500 text-white text-xs px-2 py-1 rounded-full flex items-center">
-                  🔒 Pending Review
+                  🔒 Pending Review, Max 24hrs
                 </div>
               )}
               

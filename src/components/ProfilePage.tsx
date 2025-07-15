@@ -17,7 +17,6 @@ import ImageManagement from './profile/ImageManagement';
 import AccountActions from './profile/AccountActions';
 import ProfileSummaryCard from './ProfileSummaryCard';
 import PremiumUpgrade from './PremiumUpgrade';
-import PushNotificationSettings from './PushNotificationSettings';
 
 interface ProfilePageProps {
   currentUser: any;
@@ -377,7 +376,6 @@ const ProfilePage = ({ currentUser, profile, onProfileUpdate, onLogout, onShowTe
           <PersonalitySection editedProfile={editedProfile} isEditing={isEditing} onSliderChange={handleSliderChange} />
           <FunQuestionsSection editedProfile={editedProfile} isEditing={isEditing} onInputChange={handleInputChange} />
           <InterestsSection editedProfile={editedProfile} profile={profile} isEditing={isEditing} onInterestsChange={handleInterestsChange} />
-          <PushNotificationSettings currentUser={currentUser} />
           <AccountActions 
             currentUser={currentUser} 
             onLogout={onLogout} 

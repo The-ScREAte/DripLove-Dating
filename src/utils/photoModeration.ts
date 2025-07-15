@@ -165,29 +165,28 @@ class PhotoModerationService {
     // AGGRESSIVE MODERATION - Much stricter for nude content detection
     console.log('� Applying AGGRESSIVE moderation thresholds to catch nude content');
 
-    // Much more aggressive thresholds - designed to catch nude images
-    if (skinToneRatio > 0.60) { // 60%+ skin tone - very likely nude/explicit
+    // Balanced thresholds for dating app moderation
+    if (skinToneRatio > 0.65) { // 65%+ skin tone - very likely nude/explicit
       explicitContent = 95;
       flags.push(MODERATION_FLAGS.EXPLICIT_CONTENT);
-      console.log('🚨 FLAGGED: Very high skin exposure - 60%+ skin tone (likely nude/explicit)');
+      console.log('🚨 FLAGGED: Very high skin exposure - 65%+ skin tone (nude/explicit content)');
     }
-    else if (skinToneRatio > 0.40) { // 40%+ skin tone - nude/shirtless/bikini
+    else if (skinToneRatio > 0.50) { // 50-65% skin tone - shirtless/bikini content
       adultContent = 85;
       flags.push(MODERATION_FLAGS.ADULT_CONTENT);
-      console.log('🚨 FLAGGED: High skin exposure - 40%+ skin tone (nude/shirtless/bikini)');
+      console.log('🚨 FLAGGED: High skin exposure - 50-65% skin tone (shirtless/bikini, requires review)');
     }
-    else if (skinToneRatio > 0.25) { // 25%+ skin tone - suggestive content
-      suggestiveContent = 75;
-      flags.push(MODERATION_FLAGS.INAPPROPRIATE);
-      console.log('⚠️ FLAGGED: Moderate skin exposure - 25%+ skin tone (suggestive, requires review)');
+    else if (skinToneRatio > 0.35) { // 35-50% skin tone - tank tops, summer clothing
+      suggestiveContent = 45; // Lower score to allow auto-approval
+      console.log('✅ PASSED: Moderate skin exposure - 35-50% skin tone (summer clothing, auto-approved)');
     }
-    else if (skinToneRatio > 0.15) { // 15%+ skin tone - monitor closely
-      suggestiveContent = 50;
-      console.log('⚠️ MONITOR: Some skin exposure detected - 15%+ skin tone (may require review)');
+    else if (skinToneRatio > 0.15) { // 15-35% skin tone - casual clothing
+      suggestiveContent = 25; // Low score to allow auto-approval
+      console.log('✅ PASSED: Light skin exposure - 15-35% skin tone (casual clothing, auto-approved)');
     }
     else {
-      // 0-15% skin tone - likely normal photos
-      console.log('✅ PASSED: Minimal skin exposure detected - appropriate profile photo');
+      // 0-15% skin tone - normal face/portrait photos
+      console.log('✅ PASSED: Minimal skin exposure - 0-15% skin tone (normal portrait, auto-approved)');
     }
 
     // Additional check for extremely red-dominant images (very rare)
@@ -376,9 +375,9 @@ class PhotoModerationService {
     }
     // Send high-risk content scores to admin review  
     else if (
-      (combinedDetails.adultContent && combinedDetails.adultContent >= 60) ||  // Lowered from 70
-      (combinedDetails.explicitContent && combinedDetails.explicitContent >= 70) || // Lowered from 80
-      (combinedDetails.suggestiveContent && combinedDetails.suggestiveContent >= 50)  // Lowered from 60
+      (combinedDetails.adultContent && combinedDetails.adultContent >= 75) ||  // Raised from 60 to 75
+      (combinedDetails.explicitContent && combinedDetails.explicitContent >= 80) || // Raised from 70 to 80
+      (combinedDetails.suggestiveContent && combinedDetails.suggestiveContent >= 70)  // Raised from 50 to 70
     ) {
       isApproved = true; // Allow upload but require review
       requiresReview = true;

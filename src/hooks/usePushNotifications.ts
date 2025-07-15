@@ -30,8 +30,8 @@ export const usePushNotifications = (userId?: string) => {
           return;
         }
 
-        // Request web notification permission
-        const permissionGranted = await requestNotificationPermission();
+        // Only check permission, don't request it automatically
+        const hasPermission = 'Notification' in window && Notification.permission === 'granted';
         
         // Initialize the service
         const initialized = await initializePushNotifications(userId);
@@ -42,6 +42,12 @@ export const usePushNotifications = (userId?: string) => {
           // Load unread notifications count
           const unreadNotifications = await getUnreadNotifications(userId);
           setUnreadCount(unreadNotifications.length);
+          
+          if (hasPermission) {
+            console.log('🔔 Push notifications ready - permission already granted');
+          } else {
+            console.log('🔔 Push notifications initialized - permission not yet granted');
+          }
         } else {
           setError('Failed to initialize push notifications');
         }
