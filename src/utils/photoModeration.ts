@@ -160,43 +160,29 @@ class PhotoModerationService {
     let explicitContent = 0;
     let suggestiveContent = 0;
 
-    // Quick bypass: if skin tone ratio is very low, likely a normal photo
-    if (skinToneRatio < 0.15) { // Less than 15% skin tone - very likely a normal photo (face/hands only)
-      console.log('✅ Normal photo detected - low skin tone ratio, auto-approving');
-      return {
-        flags: [],
-        details: {
-          adultContent: 0,
-          explicitContent: 0,
-          suggestiveContent: 0
-        }
-      };
-    }
+    // STRICT DATING APP MODERATION - NO AUTO-BYPASS
+    // All images must pass through proper content analysis
+    console.log('📊 Applying strict moderation thresholds for dating app');
 
-    // More strict thresholds for dating app context
-    // Shirtless/bikini photos should be flagged for review
-    if (skinToneRatio > 0.75) { // 75%+ skin tone - very likely explicit content
+    // Much stricter thresholds - 15% skin tone threshold as requested
+    if (skinToneRatio > 0.50) { // 50%+ skin tone - explicit content
       explicitContent = 95;
       flags.push(MODERATION_FLAGS.EXPLICIT_CONTENT);
-      console.log('🚨 Explicit content detected - 75%+ skin tone');
+      console.log('🚨 Explicit content detected - 50%+ skin tone');
     }
-    else if (skinToneRatio > 0.60) { // 60%+ skin tone - likely adult content  
+    else if (skinToneRatio > 0.30) { // 30%+ skin tone - adult content (shirtless, bikini, etc.)
       adultContent = 85;
       flags.push(MODERATION_FLAGS.ADULT_CONTENT);
-      console.log('🚨 Adult content detected - 60%+ skin tone');
+      console.log('🚨 Adult content detected - 30%+ skin tone (likely shirtless/bikini)');
     }
-    else if (skinToneRatio > 0.40) { // 40%+ skin tone - potentially suggestive (shirtless, bikini)
+    else if (skinToneRatio > 0.15) { // 15%+ skin tone - suggestive, requires review
       suggestiveContent = 80;
       flags.push(MODERATION_FLAGS.INAPPROPRIATE);
-      console.log('⚠️ Suggestive content detected - 40%+ skin tone, requires review');
-    }
-    else if (skinToneRatio > 0.25) { // 25-40% skin tone - moderate exposure, flag for review
-      suggestiveContent = 60;
-      console.log('⚠️ Moderate skin exposure detected - 25-40% skin tone, may require review');
+      console.log('⚠️ Suggestive content detected - 15%+ skin tone, requires admin review');
     }
     else {
-      // For 15-25% skin tone, approve without flags (normal dating photos with some skin showing)
-      console.log('✅ Acceptable skin tone ratio for dating profile');
+      // Only images with very minimal skin exposure (face/hands only) auto-approve
+      console.log('✅ Minimal skin exposure detected - likely appropriate profile photo');
     }
 
     // Additional check for extremely red-dominant images (very rare)
@@ -383,16 +369,16 @@ class PhotoModerationService {
       message = 'Image uploaded but requires admin approval due to potentially inappropriate content.';
       console.log('🔍 Image flagged for admin review due to content flags');
     }
-    // Send high-risk content scores to admin review  
+    // Send high-risk content scores to admin review with stricter thresholds
     else if (
-      (combinedDetails.adultContent && combinedDetails.adultContent >= 70) ||
-      (combinedDetails.explicitContent && combinedDetails.explicitContent >= 80) ||
-      (combinedDetails.suggestiveContent && combinedDetails.suggestiveContent >= 60) // Lowered from 75 to 60
+      (combinedDetails.adultContent && combinedDetails.adultContent >= 50) ||
+      (combinedDetails.explicitContent && combinedDetails.explicitContent >= 50) ||
+      (combinedDetails.suggestiveContent && combinedDetails.suggestiveContent >= 50) // Much stricter threshold
     ) {
       isApproved = true; // Allow upload but require review
       requiresReview = true;
-      confidence = 30;
-      message = 'Image uploaded but requires admin approval before being visible to others.';
+      confidence = 20;
+      message = 'Image uploaded but requires admin approval before being visible to others due to potential inappropriate content.';
       console.log('🔍 Image requires review due to content scores:', {
         adultContent: combinedDetails.adultContent,
         explicitContent: combinedDetails.explicitContent,
@@ -418,23 +404,41 @@ class PhotoModerationService {
   }
 
   /**
-   * Helper function to detect skin tones with very restrictive criteria
+   * Enhanced skin tone detection with improved accuracy for dating app content
    */
   private isSkinTone(r: number, g: number, b: number): boolean {
-    // More balanced skin tone detection that catches inappropriate content
-    // while still being reasonable for normal photos
+    // Enhanced skin tone detection for better moderation
+    // Catches more skin tones including different ethnicities and lighting conditions
     
-    // Skip very dark or very bright pixels
-    if (r < 80 || g < 60 || b < 50 || r > 250 || g > 230 || b > 200) return false;
+    // Skip very dark or very bright pixels (shadows, highlights, non-skin)
+    if (r < 70 || g < 50 || b < 40 || r > 245 || g > 220 || b > 190) return false;
     
-    // Basic skin tone criteria - much more permissive to catch actual skin
-    return (
-      r > 95 && g > 50 && b > 40 && // Lower minimum thresholds to catch more skin
-      r > g + 15 && r > b + 20 && // Red dominance (but less strict)
-      g > b + 5 && // Green slightly higher than blue
-      r - b > 10 && r - b < 100 && // Red-blue difference for skin detection
-      Math.abs(r - g) < 60 // Allow more variation in red-green ratio
+    // Enhanced skin tone criteria - more comprehensive detection
+    const isBasicSkin = (
+      r > 90 && g > 45 && b > 35 && // Broader minimum thresholds
+      r > g + 10 && r > b + 15 && // Red dominance (key for skin)
+      g > b && // Green higher than blue
+      r - b > 8 && r - b < 120 && // Red-blue difference range
+      Math.abs(r - g) < 70 // Red-green variation tolerance
     );
+    
+    // Additional check for darker skin tones
+    const isDarkerSkin = (
+      r > 80 && g > 60 && b > 45 &&
+      r > g + 5 && r > b + 10 &&
+      r - b > 5 && r - b < 60 &&
+      Math.abs(r - g) < 40
+    );
+    
+    // Additional check for lighter/tanned skin
+    const isLighterSkin = (
+      r > 120 && g > 80 && b > 60 &&
+      r > g + 20 && r > b + 30 &&
+      r - b > 15 && r - b < 90 &&
+      Math.abs(r - g) < 50
+    );
+    
+    return isBasicSkin || isDarkerSkin || isLighterSkin;
   }
 }
 
