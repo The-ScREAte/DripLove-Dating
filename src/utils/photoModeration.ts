@@ -361,13 +361,13 @@ class PhotoModerationService {
       message = 'Image file is corrupted or invalid and cannot be uploaded.';
       console.log('❌ Image blocked: Invalid file');
     }
-    // Send inappropriate content to admin review
+    // Send inappropriate content to admin review - BLOCK UPLOAD COMPLETELY
     else if (hasContentFlags) {
-      isApproved = true; // Allow upload but require review
-      requiresReview = true;
-      confidence = 20;
-      message = 'Image uploaded but requires admin approval due to potentially inappropriate content.';
-      console.log('🔍 Image flagged for admin review due to content flags');
+      isApproved = false; // Changed: Block upload completely
+      requiresReview = false; // No upload means no review needed
+      confidence = 95;
+      message = 'Image rejected: Contains inappropriate content and cannot be uploaded.';
+      console.log('❌ Image completely blocked due to content flags');
     }
     // Send high-risk content scores to admin review with stricter thresholds
     else if (
