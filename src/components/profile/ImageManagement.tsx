@@ -131,12 +131,12 @@ const ImageManagement = ({ currentUser }: ImageManagementProps) => {
       console.log('📊 Moderation result:', moderationResult);
       setModerationResult(moderationResult);
       
-      // Only reject if explicitly not approved (truly inappropriate content)
-      if (!moderationResult.isApproved) {
-        console.log('❌ Image rejected:', moderationResult.message);
+      // STRICT: Block images that are not approved OR require review
+      if (!moderationResult.isApproved || moderationResult.details?.requiresReview) {
+        console.log('❌ Image blocked:', moderationResult.message);
         toast({ 
-          title: "Image rejected", 
-          description: moderationResult.message || "This image cannot be uploaded due to content policy violations.", 
+          title: "Image requires review", 
+          description: moderationResult.message || "This image needs admin approval before it can be uploaded.", 
           variant: "destructive" 
         });
         setModerating(false);
@@ -146,13 +146,13 @@ const ImageManagement = ({ currentUser }: ImageManagementProps) => {
 
     } catch (error) {
       console.error('❌ Moderation error:', error);
-      // Continue with upload even if moderation fails
+      // STRICT: If moderation fails, require manual review
       moderationResult = {
-        isApproved: true,
-        confidence: 50,
-        flags: [],
+        isApproved: false, // Changed to false - no auto-approval on error
+        confidence: 0,
+        flags: ['MODERATION_FAILED'],
         details: { requiresReview: true },
-        message: "Moderation check failed - uploading for manual review"
+        message: "Moderation check failed - image requires admin review before approval"
       };
     }
 
