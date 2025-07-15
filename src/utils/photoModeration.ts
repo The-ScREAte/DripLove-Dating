@@ -152,7 +152,11 @@ class PhotoModerationService {
     console.log('📊 Content analysis:', {
       skinToneRatio: (skinToneRatio * 100).toFixed(1) + '%',
       redDominantRatio: (redDominantRatio * 100).toFixed(1) + '%',
-      pixels
+      pixels,
+      skinTonePixels,
+      threshold15Percent: '15%',
+      threshold30Percent: '30%',
+      threshold50Percent: '50%'
     });
     
     const flags: string[] = [];
@@ -163,26 +167,27 @@ class PhotoModerationService {
     // STRICT DATING APP MODERATION - NO AUTO-BYPASS
     // All images must pass through proper content analysis
     console.log('📊 Applying strict moderation thresholds for dating app');
+    console.log('🔍 Checking thresholds: 15%=' + (skinToneRatio > 0.15) + ', 30%=' + (skinToneRatio > 0.30) + ', 50%=' + (skinToneRatio > 0.50));
 
     // Much stricter thresholds - 15% skin tone threshold as requested
     if (skinToneRatio > 0.50) { // 50%+ skin tone - explicit content
       explicitContent = 95;
       flags.push(MODERATION_FLAGS.EXPLICIT_CONTENT);
-      console.log('🚨 Explicit content detected - 50%+ skin tone');
+      console.log('🚨 FLAGGED: Explicit content detected - 50%+ skin tone');
     }
     else if (skinToneRatio > 0.30) { // 30%+ skin tone - adult content (shirtless, bikini, etc.)
       adultContent = 85;
       flags.push(MODERATION_FLAGS.ADULT_CONTENT);
-      console.log('🚨 Adult content detected - 30%+ skin tone (likely shirtless/bikini)');
+      console.log('🚨 FLAGGED: Adult content detected - 30%+ skin tone (likely shirtless/bikini)');
     }
     else if (skinToneRatio > 0.15) { // 15%+ skin tone - suggestive, requires review
       suggestiveContent = 80;
       flags.push(MODERATION_FLAGS.INAPPROPRIATE);
-      console.log('⚠️ Suggestive content detected - 15%+ skin tone, requires admin review');
+      console.log('⚠️ FLAGGED: Suggestive content detected - 15%+ skin tone, requires admin review');
     }
     else {
       // Only images with very minimal skin exposure (face/hands only) auto-approve
-      console.log('✅ Minimal skin exposure detected - likely appropriate profile photo');
+      console.log('✅ PASSED: Minimal skin exposure detected - likely appropriate profile photo');
     }
 
     // Additional check for extremely red-dominant images (very rare)
