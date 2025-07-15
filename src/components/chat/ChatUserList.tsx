@@ -10,6 +10,7 @@ interface ChatUserListProps {
   searchTerm: string;
   onMatchSelect: (match: ChatMatch) => void;
   onUserProfileOpen: (userId: string) => void;
+  onSearchChange?: (searchTerm: string) => void;
 }
 
 const ChatUserList: React.FC<ChatUserListProps> = ({
@@ -17,30 +18,38 @@ const ChatUserList: React.FC<ChatUserListProps> = ({
   selectedMatch,
   searchTerm,
   onMatchSelect,
-  onUserProfileOpen
+  onUserProfileOpen,
+  onSearchChange
 }) => {
   const [localSearchTerm, setLocalSearchTerm] = React.useState(searchTerm);
+
+  const handleSearchChange = (value: string) => {
+    setLocalSearchTerm(value);
+    onSearchChange?.(value);
+  };
 
   const filteredMatches = matches.filter(match =>
     `${match.first_name} ${match.last_name}`.toLowerCase().includes(localSearchTerm.toLowerCase())
   );
 
   return (
-    <div className="w-full md:w-80 border-r bg-white overflow-hidden flex flex-col">
-      <div className="p-4 border-b bg-gradient-to-r from-pink-500 to-purple-600 text-white">
+    <div className="w-full h-full flex flex-col">
+      {/* Sticky Header with gradient background */}
+      <div className="sticky top-0 z-10 p-4 bg-gradient-to-r from-pink-500 to-purple-600 text-white flex-shrink-0">
         <h2 className="text-xl font-bold mb-4">Messages</h2>
         <div className="relative">
           <Input
             type="text"
             placeholder="Search conversations..."
             value={localSearchTerm}
-            onChange={(e) => setLocalSearchTerm(e.target.value)}
+            onChange={(e) => handleSearchChange(e.target.value)}
             className="pr-10 bg-white text-gray-900"
           />
           <Search className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4" />
         </div>
       </div>
       
+      {/* Scrollable conversations list */}
       <div className="flex-1 overflow-y-auto">
         {filteredMatches.length === 0 ? (
           <div className="p-4 text-center text-gray-500">

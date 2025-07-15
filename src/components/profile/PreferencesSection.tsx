@@ -19,21 +19,6 @@ const PreferencesSection = ({ editedProfile, isEditing, onSliderChange, onSelect
       </CardHeader>
       <CardContent>
         <div className="space-y-4">
-          <div>
-            <Label htmlFor="distance_preference">Distance Preference: {editedProfile.distance_preference} km</Label>
-            <div className="mt-2">
-              <Slider
-                id="distance_preference"
-                name="distance_preference"
-                value={[editedProfile.distance_preference]}
-                onValueChange={(value) => onSliderChange('distance_preference', value)}
-                max={200}
-                step={1}
-                disabled={!isEditing}
-                className="w-full"
-              />
-            </div>
-          </div>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div>
               <Label htmlFor="gender">Gender</Label>

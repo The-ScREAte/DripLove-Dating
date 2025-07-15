@@ -1,5 +1,5 @@
 import React from 'react';
-import { MapPin, Briefcase, GraduationCap, Calendar, Crown } from 'lucide-react';
+import { MapPin, Briefcase, GraduationCap, Calendar, Crown, Shield } from 'lucide-react';
 import { PotentialMatch } from '@/types';
 
 interface MatchCardProps {
@@ -7,6 +7,7 @@ interface MatchCardProps {
   imageIndex: number;
   showMoreInfo: boolean;
   isPremium: boolean;
+  isVerified?: boolean; // New prop for verified status
   currentUserLatitude?: number;
   currentUserLongitude?: number;
   onImageClick: () => void;
@@ -22,6 +23,7 @@ const MatchCard: React.FC<MatchCardProps> = ({
   imageIndex,
   showMoreInfo,
   isPremium,
+  isVerified = false, // Default to false if not provided
   currentUserLatitude,
   currentUserLongitude,
   onImageClick,
@@ -88,6 +90,14 @@ const MatchCard: React.FC<MatchCardProps> = ({
         {isPremium && (
           <div className="absolute top-4 right-4 bg-yellow-500 text-white p-2 rounded-full shadow-lg z-10">
             <Crown className="w-4 h-4" />
+          </div>
+        )}
+
+        {/* Verified badge */}
+        {isVerified && (
+          <div className="absolute top-4 left-4 bg-green-500 text-white px-2 py-1 rounded-full shadow-lg z-10 flex items-center text-xs font-semibold">
+            <Shield className="w-3 h-3 mr-1" />
+            Verified
           </div>
         )}
 

@@ -96,15 +96,13 @@ const ChatPage = ({ currentUser, onUnreadChange }: ChatPageProps) => {
         const partner = match.user1_id === currentUser.id ? match.user2 : match.user1;
         const lastMessage = match.chats?.[match.chats.length - 1];
         
-        // Count unread messages (simplified since is_read might not be available)
-        const unreadCount = 0; // We'll handle this differently
+        const unreadCount = 0;
 
         return {
           ...match,
           partner,
           last_message_obj: lastMessage,
           unreadCount,
-          // For compatibility with ChatMatch interface
           id: match.id,
           first_name: partner?.first_name || '',
           last_name: partner?.last_name || '',
@@ -139,7 +137,6 @@ const ChatPage = ({ currentUser, onUnreadChange }: ChatPageProps) => {
 
       if (error) throw error;
 
-      // Map to match ChatMessage interface
       const mappedMessages = data?.map(msg => ({
         ...msg,
         sent_at: msg.created_at,
@@ -181,7 +178,6 @@ const ChatPage = ({ currentUser, onUnreadChange }: ChatPageProps) => {
   const sendMessage = async () => {
     if (!newMessage.trim() || !selectedMatch) return;
 
-    // Check if trying to message an admin
     if (selectedMatch.partner?.is_admin) {
       toast({
         title: "Cannot send message",
@@ -205,9 +201,8 @@ const ChatPage = ({ currentUser, onUnreadChange }: ChatPageProps) => {
 
       if (error) throw error;
 
-      // Update unread count for the receiver
       const updateData: Record<string, number> = {};
-      updateData[unreadField] = 1; // Just increment by 1
+      updateData[unreadField] = 1;
       
       await supabase
         .from('matches')
@@ -258,26 +253,94 @@ const ChatPage = ({ currentUser, onUnreadChange }: ChatPageProps) => {
     });
   };
 
-  // Show chat list view
   if (!selectedMatch) {
     return (
-      <div className="flex flex-col h-screen max-h-screen overflow-hidden">
-        <ChatUserList
-          matches={filteredMatches}
-          selectedMatch={selectedMatch}
-          searchTerm={searchTerm}
-          onMatchSelect={setSelectedMatch}
-          onUserProfileOpen={handleUserProfileClick}
-        />
+      <div className="h-screen flex flex-col bg-white relative">
+        <div className="fixed top-12 left-0 right-0 z-30">
+          <div className="p-4 bg-gradient-to-r from-pink-500 to-purple-600 text-white">
+            <h2 className="text-xl font-bold mb-4">Messages</h2>
+            <div className="relative">
+              <input
+                type="text"
+                placeholder="Search conversations..."
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+                className="w-full pr-10 bg-white text-gray-900 rounded-lg px-4 py-2"
+              />
+              <svg className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="m21 21-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+              </svg>
+            </div>
+          </div>
+        </div>
 
-        {/* User Profile Modal */}
+        <div 
+          className="flex-1 bg-white"
+          style={{ 
+            marginTop: '152px',
+            marginBottom: '80px',
+            maxHeight: filteredMatches.length > 6 ? 'calc(100vh - 232px)' : 'auto',
+            overflowY: filteredMatches.length > 6 ? 'auto' : 'visible'
+          }}
+        >
+          {filteredMatches.length === 0 ? (
+            <div className="p-4 text-center text-gray-500">
+              {searchTerm ? 'No matches found' : 'No conversations yet'}
+            </div>
+          ) : (
+            filteredMatches.map((match) => (
+              <div
+                key={match.id}
+                className={`p-4 border-b cursor-pointer hover:bg-gray-50 transition-colors ${
+                  selectedMatch?.id === match.id ? 'bg-pink-50 border-pink-200' : ''
+                }`}
+                onClick={() => setSelectedMatch(match)}
+              >
+                <div className="flex items-center space-x-3">
+                  <div className="relative">
+                    <div className="w-12 h-12 bg-pink-100 rounded-full flex items-center justify-center">
+                      <span className="text-pink-600 font-semibold">
+                        {match.first_name?.charAt(0) || 'U'}{match.last_name?.charAt(0) || ''}
+                      </span>
+                    </div>
+                    {match.unread_messages && match.unread_messages > 0 && (
+                      <div className="absolute -top-1 -right-1 bg-red-500 text-white text-xs rounded-full w-5 h-5 flex items-center justify-center">
+                        {match.unread_messages > 9 ? '9+' : match.unread_messages}
+                      </div>
+                    )}
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <div className="flex justify-between items-start">
+                      <h3 className="font-semibold text-gray-900 truncate">
+                        {match.first_name} {match.last_name}
+                      </h3>
+                      {match.last_message_time && (
+                        <span className="text-xs text-gray-500 ml-2">
+                          {new Date(match.last_message_time).toLocaleTimeString([], {
+                            hour: '2-digit',
+                            minute: '2-digit'
+                          })}
+                        </span>
+                      )}
+                    </div>
+                    {match.last_message && (
+                      <p className="text-sm text-gray-600 truncate mt-1">
+                        {match.last_message}
+                      </p>
+                    )}
+                  </div>
+                </div>
+              </div>
+            ))
+          )}
+        </div>
+
         <UserProfileModal
           isOpen={isUserProfileOpen}
           onClose={() => setIsUserProfileOpen(false)}
           userId={selectedUserId}
         />
 
-        {/* Block Dialog */}
         <BlockDialog
           isOpen={isBlockDialogOpen}
           onClose={() => setIsBlockDialogOpen(false)}
@@ -290,8 +353,8 @@ const ChatPage = ({ currentUser, onUnreadChange }: ChatPageProps) => {
   }
 
   return (
-    <div className="flex h-screen max-h-screen overflow-hidden">
-      <div className="flex-1 flex flex-col">
+    <div className="h-screen flex flex-col bg-white relative">
+      <div className="fixed top-12 left-0 right-0 z-30 bg-white">
         <ChatHeader
           selectedMatch={selectedMatch}
           onBack={() => setSelectedMatch(null)}
@@ -299,31 +362,38 @@ const ChatPage = ({ currentUser, onUnreadChange }: ChatPageProps) => {
           onBlockUser={handleBlockClick}
           isMobile={true}
         />
+      </div>
 
-        {/* Messages */}
-        <div 
-          ref={messagesContainerRef}
-          className="flex-1 overflow-y-auto p-4 space-y-2"
-        >
-          {messages.map((message, index) => {
-            const prevMessage = messages[index - 1];
-            const isConsecutive = prevMessage && 
-              prevMessage.sender_id === message.sender_id &&
-              new Date(message.created_at || message.sent_at || '').getTime() - 
-              new Date(prevMessage.created_at || prevMessage.sent_at || '').getTime() < 300000; // 5 minutes
+      <div 
+        ref={messagesContainerRef}
+        className="flex-1 px-4 space-y-2 bg-white"
+        style={{ 
+          marginTop: '92px',
+          marginBottom: '160px',
+          maxHeight: messages.length > 8 ? 'calc(100vh - 252px)' : 'auto',
+          overflowY: messages.length > 8 ? 'auto' : 'visible'
+        }}
+      >
+        {messages.map((message, index) => {
+          const prevMessage = messages[index - 1];
+          const isConsecutive = prevMessage && 
+            prevMessage.sender_id === message.sender_id &&
+            new Date(message.created_at || message.sent_at || '').getTime() - 
+            new Date(prevMessage.created_at || prevMessage.sent_at || '').getTime() < 300000;
 
-            return (
-              <MessageBubble
-                key={message.id}
-                message={message}
-                currentUser={currentUser}
-                isConsecutive={isConsecutive}
-              />
-            );
-          })}
-          <div ref={messagesEndRef} />
-        </div>
+          return (
+            <MessageBubble
+              key={message.id}
+              message={message}
+              currentUser={currentUser}
+              isConsecutive={isConsecutive}
+            />
+          );
+        })}
+        <div ref={messagesEndRef} />
+      </div>
 
+      <div className="fixed bottom-16 left-0 right-0 z-30 bg-white border-t">
         <MessageInput
           newMessage={newMessage}
           onMessageChange={setNewMessage}
@@ -331,14 +401,12 @@ const ChatPage = ({ currentUser, onUnreadChange }: ChatPageProps) => {
         />
       </div>
 
-      {/* User Profile Modal */}
       <UserProfileModal
         isOpen={isUserProfileOpen}
         onClose={() => setIsUserProfileOpen(false)}
         userId={selectedUserId}
       />
 
-      {/* Block Dialog */}
       <BlockDialog
         isOpen={isBlockDialogOpen}
         onClose={() => setIsBlockDialogOpen(false)}

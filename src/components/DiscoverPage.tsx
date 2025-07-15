@@ -382,6 +382,43 @@ const DiscoverPage = ({ currentUser, onNavigateToChat }: DiscoverPageProps) => {
     }
   };
 
+  // Function to check if a profile is verified (90%+ completion with photos and basic info)
+  const calculateProfileVerification = useCallback((profile: PotentialMatch) => {
+    if (!profile) return false;
+
+    // Check if profile has at least 3 images (similar to ProfilePage logic)
+    const profileImages = userImages[profile.id] || [];
+    const hasEnoughPhotos = profileImages.length >= 3;
+
+    // Check basic info completion (fields available in PotentialMatch)
+    const hasBasicInfo = !!(
+      profile.first_name?.trim() &&
+      profile.last_name?.trim() &&
+      profile.bio?.trim() &&
+      profile.date_of_birth
+    );
+
+    // Check other available completion criteria
+    const hasLocation = !!(profile.city?.trim() && profile.country?.trim());
+    const hasWork = !!(profile.occupation?.trim() && profile.education_level);
+    const hasInterests = (profile.interests || []).length >= 3;
+
+    // Simplified completion check - count completed sections out of 5 key areas
+    let completedSections = 0;
+    const totalSections = 5;
+
+    if (hasEnoughPhotos) completedSections += 1; // Photos
+    if (hasBasicInfo) completedSections += 1; // Basic info 
+    if (hasLocation) completedSections += 1; // Location
+    if (hasWork) completedSections += 1; // Work & Education
+    if (hasInterests) completedSections += 1; // Interests
+
+    const completionPercentage = Math.round((completedSections / totalSections) * 100);
+
+    // Return verified if 80%+ (4/5 sections) AND has photos + basic info
+    return completionPercentage >= 80 && hasEnoughPhotos && hasBasicInfo;
+  }, [userImages]);
+
   // Optimistic UI: move to next card instantly, then process like in background
   const handleLike = async () => {
     const currentMatch = potentialMatches[currentIndex];
@@ -716,6 +753,7 @@ const DiscoverPage = ({ currentUser, onNavigateToChat }: DiscoverPageProps) => {
             calculateDistance={calculateDistance}
             swipeDirection={swipeDirection}
             swipeDistance={swipeDistance}
+            isVerified={calculateProfileVerification(currentMatch)} // Pass verification status
           />
         </div>
 

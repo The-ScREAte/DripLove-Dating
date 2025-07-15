@@ -42,7 +42,7 @@ const ProfilePage = ({ currentUser, profile, onProfileUpdate, onLogout, onShowTe
     city: '',
     country: '',
     country_code: '',
-    distance_preference: 50,
+    max_distance: 50,
     gender: '',
     preference: '',
     relationship_intent: '',
@@ -66,6 +66,9 @@ const ProfilePage = ({ currentUser, profile, onProfileUpdate, onLogout, onShowTe
     interests: [] as string[],
   });
 
+  // Initialize userImages state
+  const [userImages, setUserImages] = useState<any[]>([]);
+
   useEffect(() => {
     if (profile) {
       setEditedProfile({
@@ -75,7 +78,7 @@ const ProfilePage = ({ currentUser, profile, onProfileUpdate, onLogout, onShowTe
         city: profile.city || '',
         country: profile.country || '',
         country_code: profile.country_code || '',
-        distance_preference: profile.distance_preference || profile.max_distance || 50,
+        max_distance: profile.max_distance || profile.distance_preference || 50,
         gender: profile.gender || '',
         preference: profile.preference || '',
         relationship_intent: profile.relationship_intent || '',
@@ -136,7 +139,7 @@ const ProfilePage = ({ currentUser, profile, onProfileUpdate, onLogout, onShowTe
   };
 
   const handleDistanceChange = (distance: number[]) => {
-    setEditedProfile(prev => ({ ...prev, distance_preference: distance[0] }));
+    setEditedProfile(prev => ({ ...prev, max_distance: distance[0] }));
   };
 
   const handleInterestsChange = (interests: string[]) => {
@@ -159,7 +162,7 @@ const ProfilePage = ({ currentUser, profile, onProfileUpdate, onLogout, onShowTe
         country_code: editedProfile.country_code?.trim() || null,
         date_of_birth: profile?.date_of_birth || currentUser?.user_metadata?.date_of_birth || '1990-01-01',
         email: currentUser.email,
-        max_distance: editedProfile.distance_preference || 25,
+        max_distance: editedProfile.max_distance || 50,
         gender: editedProfile.gender || 'not_specified',
         preference: editedProfile.preference || 'not_specified',
         relationship_intent: editedProfile.relationship_intent || 'open_to_anything',
@@ -244,7 +247,7 @@ const ProfilePage = ({ currentUser, profile, onProfileUpdate, onLogout, onShowTe
         city: profile.city || '',
         country: profile.country || '',
         country_code: profile.country_code || '',
-        distance_preference: profile.distance_preference || profile.max_distance || 50,
+        max_distance: profile.max_distance || profile.distance_preference || 50,
         gender: profile.gender || '',
         preference: profile.preference || '',
         relationship_intent: profile.relationship_intent || '',
@@ -278,21 +281,177 @@ const ProfilePage = ({ currentUser, profile, onProfileUpdate, onLogout, onShowTe
     );
   }
 
-  // --- BEGIN: Improved Profile Progress Bar and Actionable Feedback ---
-  // Calculate profile completion
-  const requiredFields = [
-    'first_name', 'last_name', 'bio', 'city', 'country', 'gender', 'preference',
-    'relationship_intent', 'occupation', 'education_level', 'interests', 'images'
-  ];
-  const profileImages = profile?.images || [];
-  const missingFields = requiredFields.filter(field => {
-    if (field === 'interests') return !profile?.interests || profile.interests.length === 0;
-    if (field === 'images') return !profileImages || profileImages.length === 0;
-    return !profile?.[field] || (typeof profile[field] === 'string' && profile[field].trim() === '');
-  });
-  const completion = Math.round(((requiredFields.length - missingFields.length) / requiredFields.length) * 100);
+  // --- BEGIN: Comprehensive Profile Progress Bar ---
+  // Calculate profile completion based on specific criteria
+  const calculateProfileCompletion = () => {
+    if (!profile) return { completion: 0, missingFields: [], showVerifiedBadge: false };
 
-  // --- END: Improved Profile Progress Bar and Actionable Feedback ---
+    const completionCriteria = {
+      // Your Photos (3 approved images)
+      photos: {
+        weight: 15,
+        completed: false,
+        description: "Upload 3 approved photos"
+      },
+      // Basic Information 
+      basicInfo: {
+        weight: 15,
+        completed: false,
+        description: "Complete basic information"
+      },
+      // Location & Matching Preferences
+      location: {
+        weight: 10,
+        completed: false,
+        description: "Set location and distance preferences"
+      },
+      // Preferences
+      preferences: {
+        weight: 10,
+        completed: false,
+        description: "Set gender preferences"
+      },
+      // Lifestyle
+      lifestyle: {
+        weight: 10,
+        completed: false,
+        description: "Complete lifestyle preferences"
+      },
+      // Work & Education
+      workEducation: {
+        weight: 10,
+        completed: false,
+        description: "Add work and education details"
+      },
+      // Personality
+      personality: {
+        weight: 10,
+        completed: false,
+        description: "Complete personality sliders"
+      },
+      // Fun Questions
+      funQuestions: {
+        weight: 10,
+        completed: false,
+        description: "Answer fun questions"
+      },
+      // Interests (at least 3)
+      interests: {
+        weight: 10,
+        completed: false,
+        description: "Select at least 3 interests"
+      }
+    };
+
+    // Check Photos (3 approved images) - now safely check userImages
+    const approvedImages = userImages?.filter(img => img.is_approved !== false) || [];
+    completionCriteria.photos.completed = approvedImages.length >= 3;
+
+    // Check Basic Information (first_name, last_name, bio, date_of_birth)
+    completionCriteria.basicInfo.completed = !!(
+      profile.first_name?.trim() &&
+      profile.last_name?.trim() &&
+      profile.bio?.trim() &&
+      profile.date_of_birth
+    );
+
+    // Check Location & Matching Preferences (city, country, max_distance)
+    completionCriteria.location.completed = !!(
+      profile.city?.trim() &&
+      profile.country?.trim() &&
+      (profile.max_distance || profile.distance_preference)
+    );
+
+    // Check Preferences (gender, preference)
+    completionCriteria.preferences.completed = !!(
+      profile.gender &&
+      profile.preference
+    );
+
+    // Check Lifestyle (smoking, drinking, exercise_level, sleeping_schedule)
+    completionCriteria.lifestyle.completed = !!(
+      profile.smoking &&
+      profile.drinking &&
+      profile.exercise_level &&
+      profile.sleeping_schedule
+    );
+
+    // Check Work & Education (occupation, education_level)
+    completionCriteria.workEducation.completed = !!(
+      profile.occupation?.trim() &&
+      profile.education_level
+    );
+
+    // Check Personality (personality sliders completed)
+    completionCriteria.personality.completed = !!(
+      typeof profile.introvert_extrovert === 'number' &&
+      typeof profile.spontaneous_planner === 'number' &&
+      typeof profile.messy_organized === 'number'
+    );
+
+    // Check Fun Questions (at least one question answered)
+    completionCriteria.funQuestions.completed = !!(
+      profile.fun_fact?.trim() ||
+      profile.perfect_first_date?.trim() ||
+      profile.last_googled?.trim()
+    );
+
+    // Check Interests (at least 3 selected)
+    const userInterests = profile.interests || [];
+    completionCriteria.interests.completed = userInterests.length >= 3;
+
+    // Calculate total completion percentage
+    let totalWeight = 0;
+    let completedWeight = 0;
+    const missingFields = [];
+
+    Object.entries(completionCriteria).forEach(([key, criteria]) => {
+      totalWeight += criteria.weight;
+      if (criteria.completed) {
+        completedWeight += criteria.weight;
+      } else {
+        missingFields.push(criteria.description);
+      }
+    });
+
+    const completion = Math.round((completedWeight / totalWeight) * 100);
+
+    // Show verified badge at 90% if photos and basic info are complete
+    const showVerifiedBadge = completion >= 90 && 
+                             completionCriteria.photos.completed && 
+                             completionCriteria.basicInfo.completed;
+
+    return { completion, missingFields, showVerifiedBadge };
+  };
+
+  const { completion, missingFields, showVerifiedBadge } = calculateProfileCompletion();
+
+  // Fetch user images for photo completion calculation
+  useEffect(() => {
+    const fetchUserImages = async () => {
+      if (!currentUser?.id) return;
+
+      try {
+        const { data: images, error } = await supabase
+          .from('user_images')
+          .select('image_url, is_approved, moderation_status')
+          .eq('user_id', currentUser.id);
+
+        if (error && !error.message.includes('does not exist')) {
+          throw error;
+        }
+
+        setUserImages(images || []);
+      } catch (error) {
+        console.error('Error fetching user images for progress:', error);
+        setUserImages([]);
+      }
+    };
+
+    fetchUserImages();
+  }, [currentUser?.id, profile]);
+
+  // --- END: Comprehensive Profile Progress Bar ---
 
   return (
     <div className="h-full flex flex-col">
@@ -326,18 +485,27 @@ const ProfilePage = ({ currentUser, profile, onProfileUpdate, onLogout, onShowTe
             )}
           </div>
         </div>
-        {/* Profile Completion Progress Bar */}
+        {/* Profile Completion Progress Bar - Always show */}
         <div className="mt-4">
           <div className="flex items-center gap-2">
             <div className="flex-1 h-3 bg-gray-200 rounded-full overflow-hidden">
               <div
-                className="h-3 bg-pink-500 transition-all duration-500"
+                className={`h-3 transition-all duration-500 ${
+                  completion >= 90 ? 'bg-green-500' : 'bg-pink-500'
+                }`}
                 style={{ width: `${completion}%` }}
               />
             </div>
             <span className="text-xs font-semibold text-gray-700 min-w-[40px] text-right">{completion}%</span>
+            {showVerifiedBadge && (
+              <div className="flex items-center bg-green-100 text-green-800 text-xs px-2 py-1 rounded-full ml-2">
+                <span className="mr-1">✓</span>
+                Verified
+              </div>
+            )}
           </div>
-          {missingFields.length > 0 && !hideProfileCompletion && (
+          {/* Only show completion notice when profile is not complete */}
+          {completion < 100 && missingFields.length > 0 && !hideProfileCompletion && (
             <div className="mt-2 text-xs text-yellow-700 bg-yellow-100 rounded px-3 py-2 relative">
               <button
                 className="absolute top-2 right-2 text-yellow-700 hover:text-yellow-900 text-lg font-bold focus:outline-none"
@@ -348,8 +516,8 @@ const ProfilePage = ({ currentUser, profile, onProfileUpdate, onLogout, onShowTe
               </button>
               <span className="font-semibold">Complete your profile:</span>
               <ul className="list-disc ml-5 mt-1">
-                {missingFields.map(field => (
-                  <li key={field}>{field.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase())}</li>
+                {missingFields.map((field, index) => (
+                  <li key={index}>{field}</li>
                 ))}
               </ul>
             </div>
