@@ -6,46 +6,33 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Badge } from '@/components/ui/badge';
 import { defaultPaymentMethods, PaymentMethod } from '@/constants/flwConfig';
 import { bulkApproveExistingImages } from '@/utils/bulkApproveImages';
-
-
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
 import UserProfileModal from '@/components/UserProfileModal';
+import StatsCard from './admin/StatsCard';
+import UserModerationPanel from './admin/UserModerationPanel';
 import { 
+  LogOut, 
+  Shield, 
   Users, 
   Heart, 
   MessageSquare, 
+  TrendingUp, 
+  Calendar, 
+  Pause, 
   UserX, 
-  TrendingUp,
-  Calendar,
-  Shield,
-  Search,
-  Eye,
-  Ban,
-  Pause,
+  UserPlus, 
+  Eye, 
+  Search, 
   Play,
-  Trash2,
-  LogOut,
-  UserPlus
+  Trash2
 } from 'lucide-react';
+import { CurrentUser, AdminStats, AdminUser } from '@/types';
+import { Json } from '@/integrations/supabase/types';
 
 interface AdminPageProps {
-  currentUser: any;
+  currentUser: CurrentUser;
   onLogout: () => void;
-}
-
-interface AppStats {
-  total_users: number;
-  total_matches: number;
-  total_likes: number;
-  total_blocks: number;
-  total_messages: number;
-  active_users_today: number;
-  new_users_this_week: number;
-  matches_this_week: number;
-  blocked_users: number;
-  users_on_hold: number;
-  total_admins: number;
 }
 
 interface UserProfile {
@@ -99,7 +86,7 @@ const AdminPage = ({ currentUser, onLogout }: AdminPageProps) => {
           : defaultPaymentMethods;
         // Ensure all default methods are present (for backward compatibility)
         methods = defaultPaymentMethods.map(def => {
-          const found = methods.find((m: any) => m.type === def.type);
+          const found = methods.find((m: PaymentMethod) => m.type === def.type);
           return found ? { ...def, ...found } : def;
         });
         setPaymentMethods(methods);
@@ -133,7 +120,7 @@ const AdminPage = ({ currentUser, onLogout }: AdminPageProps) => {
       .from('payment_config')
       .upsert({
         id: '00000000-0000-0000-0000-000000000000', // always use same id for singleton
-        payment_methods: paymentMethods as any,
+        payment_methods: paymentMethods as unknown as Json,
         premium_price: Number(premiumPrice),
         updated_at: new Date().toISOString(),
       }, { onConflict: 'id' });
@@ -238,7 +225,7 @@ const AdminPage = ({ currentUser, onLogout }: AdminPageProps) => {
       </div>
     </>
   );
-  const [stats, setStats] = useState<AppStats | null>(null);
+  const [stats, setStats] = useState<AdminStats | null>(null);
   const [users, setUsers] = useState<UserProfile[]>([]);
   const [adminUsers, setAdminUsers] = useState<UserProfile[]>([]);
   const [searchTerm, setSearchTerm] = useState('');
@@ -453,7 +440,7 @@ const AdminPage = ({ currentUser, onLogout }: AdminPageProps) => {
       if (error) throw error;
       
       if (data && typeof data === 'object' && !Array.isArray(data)) {
-        setStats(data as unknown as AppStats);
+        setStats(data as unknown as AdminStats);
       }
     } catch (error) {
       console.error('Error fetching app stats:', error);

@@ -1,35 +1,20 @@
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Heart, X, Undo2, MapPin, Briefcase, GraduationCap, ChevronDown, ChevronUp, Calendar, Crown } from 'lucide-react';
+import { Heart, X, Crown, Calendar, MapPin, ChevronDown, ChevronUp, Briefcase, GraduationCap, Undo2 } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import { useSubscription } from '@/hooks/useSubscription';
 import { calculateDistance } from '@/constants/locationData';
 import PremiumUpgrade from './PremiumUpgrade';
 import MatchAnimation from './MatchAnimation';
+import MatchCard from './discover/MatchCard';
+import SwipeButtons from './discover/SwipeButtons';
+import { CurrentUser, PotentialMatch } from '@/types';
 
 interface DiscoverPageProps {
-  currentUser: any;
+  currentUser: CurrentUser;
   onNavigateToChat?: (userId: string) => void;
-}
-
-interface PotentialMatch {
-  id: string;
-  first_name: string;
-  last_name: string;
-  bio: string;
-  city: string;
-  country: string;
-  country_code: string;
-  occupation: string;
-  education_level: string;
-  date_of_birth: string;
-  interests: string[];
-  images: string[];
-  gender: string;
-  latitude?: number;
-  longitude?: number;
 }
 
 interface PassedUser {
@@ -207,6 +192,7 @@ const DiscoverPage = ({ currentUser, onNavigateToChat }: DiscoverPageProps) => {
     } finally {
       setIsLoading(false);
     }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [currentUser, allowedGenders, toast]);
 
 
@@ -233,7 +219,7 @@ const DiscoverPage = ({ currentUser, onNavigateToChat }: DiscoverPageProps) => {
     } catch (error) {
       console.error('Error loading user images:', error);
     }
-  }, []);
+  }, [userImages]);
 
   // Preload images for the next N profiles for smoother UX
   const preloadNextProfileImages = useCallback((matches: PotentialMatch[], alreadyLoaded: { [key: string]: string[] }, startIdx: number) => {
@@ -717,159 +703,29 @@ const DiscoverPage = ({ currentUser, onNavigateToChat }: DiscoverPageProps) => {
             </>
           )}
 
-          {currentMatchImages.length > 0 ? (
-            <>
-              <img
-                src={currentMatchImages[imageIndex]}
-                alt={`${currentMatch.first_name}'s photo`}
-                className="w-full h-full object-cover object-center"
-                draggable={false}
-                loading="lazy"
-              />
-              {/* Image indicators */}
-              <div className="absolute top-4 left-1/2 transform -translate-x-1/2 flex gap-1 z-10">
-                {currentMatchImages.map((_, idx) => (
-                  <div
-                    key={idx}
-                    className={`w-2 h-2 rounded-full ${idx === imageIndex ? 'bg-white' : 'bg-white/40'}`}
-                  />
-                ))}
-              </div>
-            </>
-          ) : (
-            <div className="w-full h-full bg-gradient-to-br from-pink-200 to-purple-200 flex items-center justify-center">
-              <span className="text-6xl font-bold text-gray-700">
-                {currentMatch.first_name?.[0]}{currentMatch.last_name?.[0]}
-              </span>
-            </div>
-          )}
-
-          {/* Gradient overlay for text readability */}
-          <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-transparent to-transparent pointer-events-none" />
-
-          {/* Profile Info Overlay - Positioned to not interfere with buttons */}
-          <div className="absolute bottom-32 left-0 right-0 text-white px-6 profile-info">
-            {/* Main info section */}
-            <div className="mb-3">
-              <h2 className="text-2xl font-bold mb-1">
-                {currentMatch.first_name} {currentMatch.last_name}
-              </h2>
-              <div className="flex items-center space-x-4 text-sm">
-                <div className="flex items-center">
-                  <Calendar className="w-4 h-4 mr-1" />
-                  <span>{calculateAge(currentMatch.date_of_birth)} years old</span>
-                </div>
-                <div className="flex items-center">
-                  <MapPin className="w-4 h-4 mr-1" />
-                  <span>
-                    {currentMatch.city}, {currentMatch.country}
-                    {currentUser.latitude && currentUser.longitude && 
-                     currentMatch.latitude && currentMatch.longitude && (
-                      <span className="text-pink-600 ml-2">
-                        • {Math.round(calculateDistance(
-                          currentUser.latitude,
-                          currentUser.longitude,
-                          currentMatch.latitude,
-                          currentMatch.longitude
-                        ))} km away
-                      </span>
-                    )}
-                  </span>
-                </div>
-              </div>
-            </div>
-
-            {/* Expandable Info Section */}
-            <div>
-              <Button
-                onClick={() => setShowMoreInfo(!showMoreInfo)}
-                variant="ghost"
-                className="text-white p-0 h-auto font-normal text-left mb-2 hover:bg-transparent"
-              >
-                <span className="flex items-center text-sm">
-                  {showMoreInfo ? 'Show Less' : 'Show More'}
-                  {showMoreInfo ? <ChevronUp className="w-4 h-4 ml-1" /> : <ChevronDown className="w-4 h-4 ml-1" />}
-                </span>
-              </Button>
-
-              {showMoreInfo && (
-                <div
-                  className="space-y-3 bg-black/50 p-3 rounded-lg max-h-32 overflow-y-auto"
-                  onTouchStart={(e) => e.stopPropagation()}
-                  onTouchMove={(e) => e.stopPropagation()}
-                >
-                  {currentMatch.bio && (
-                    <div>
-                      <h3 className="font-semibold mb-1 text-sm">About</h3>
-                      <p className="text-xs leading-relaxed">{currentMatch.bio}</p>
-                    </div>
-                  )}
-
-                  {(currentMatch.occupation || currentMatch.education_level) && (
-                    <div className="space-y-2">
-                      {currentMatch.occupation && (
-                        <div className="flex items-center text-xs">
-                          <Briefcase className="w-3 h-3 mr-2 flex-shrink-0" />
-                          <span>{currentMatch.occupation}</span>
-                        </div>
-                      )}
-                      {currentMatch.education_level && (
-                        <div className="flex items-center text-xs">
-                          <GraduationCap className="w-3 h-3 mr-2 flex-shrink-0" />
-                          <span>{currentMatch.education_level}</span>
-                        </div>
-                      )}
-                    </div>
-                  )}
-
-                  {currentMatch.interests?.length > 0 && (
-                    <div>
-                      <h3 className="font-semibold mb-2 text-sm">Interests</h3>
-                      <div className="flex flex-wrap gap-1">
-                        {currentMatch.interests.map((interest, index) => (
-                          <span
-                            key={index}
-                            className="px-2 py-1 bg-white/20 rounded-full text-xs"
-                          >
-                            {interest}
-                          </span>
-                        ))}
-                      </div>
-                    </div>
-                  )}
-                </div>
-              )}
-            </div>
-          </div>
+          <MatchCard
+            match={currentMatch}
+            imageIndex={imageIndex}
+            showMoreInfo={showMoreInfo}
+            isPremium={isPremium()}
+            currentUserLatitude={currentUser.latitude}
+            currentUserLongitude={currentUser.longitude}
+            onImageClick={() => handleImageAreaClick({} as React.MouseEvent<HTMLDivElement>)}
+            onToggleInfo={() => setShowMoreInfo(!showMoreInfo)}
+            calculateAge={calculateAge}
+            calculateDistance={calculateDistance}
+            swipeDirection={swipeDirection}
+            swipeDistance={swipeDistance}
+          />
         </div>
 
-        {/* Action Buttons - Fixed position at bottom with higher z-index and moved up more */}
-        <div className="absolute bottom-8 left-0 right-0 flex justify-center space-x-6 px-6 z-30">
-          <Button
-            onClick={handlePass}
-            variant="outline"
-            className="w-16 h-16 rounded-full border-2 border-red-500 bg-red-500/20 hover:bg-red-500/30 backdrop-blur-sm shadow-lg hover:border-red-400 transition-all duration-200"
-          >
-            <X className="w-7 h-7 text-red-500" />
-          </Button>
-
-          <Button
-            onClick={handleReverse}
-            variant="outline"
-            disabled={!passedUsers.length}
-            className="w-16 h-16 rounded-full border-2 border-yellow-500 bg-yellow-500/20 hover:bg-yellow-500/30 disabled:opacity-30 backdrop-blur-sm shadow-lg hover:border-yellow-400 transition-all duration-200"
-          >
-            <Undo2 className="w-7 h-7 text-yellow-500" />
-          </Button>
-
-          <Button
-            onClick={handleLike}
-            variant="outline"
-            className="w-16 h-16 rounded-full border-2 border-green-500 bg-green-500/20 hover:bg-green-500/30 backdrop-blur-sm shadow-lg hover:border-green-400 transition-all duration-200"
-          >
-            <Heart className="w-7 h-7 text-green-500" />
-          </Button>
-        </div>
+        {/* Action Buttons */}
+        <SwipeButtons
+          onPass={handlePass}
+          onReverse={handleReverse}
+          onLike={handleLike}
+          canReverse={passedUsers.length > 0}
+        />
       </div>
     </div>
   );
