@@ -119,7 +119,7 @@ const DiscoverPage = ({ currentUser, onNavigateToChat }: DiscoverPageProps) => {
   
       const { data: profiles, error } = await supabase
         .from('profiles')
-        .select('id, first_name, last_name, bio, city, country, country_code, occupation, education_level, date_of_birth, interests, gender, latitude, longitude')
+        .select('id, first_name, last_name, bio, city, country, country_code, occupation, education_level, date_of_birth, interests, gender, latitude, longitude, fun_fact, perfect_first_date, last_googled')
         .not('id', 'in', `(${excludedIds.join(',')})`)
         .in('gender', allowedGenders)
         .eq('account_status', 'active')

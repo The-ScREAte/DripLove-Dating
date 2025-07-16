@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { MapPin, Briefcase, GraduationCap, Calendar, Crown, Shield, ChevronDown, ChevronUp, User, Quote } from 'lucide-react';
+import { MapPin, Briefcase, GraduationCap, Calendar, Crown, Shield, ChevronDown, ChevronUp, User, Quote, Heart, Coffee, Search } from 'lucide-react';
 import { PotentialMatch } from '@/types';
 
 interface MatchCardProps {
@@ -37,7 +37,21 @@ const MatchCard: React.FC<MatchCardProps> = ({
 }) => {
   const [currentSlide, setCurrentSlide] = useState(0);
   
-  // Create slides: user images + bio slide
+  // Random gradient backgrounds for fun questions
+  const gradients = [
+    'from-blue-500 via-purple-500 to-pink-500',
+    'from-green-500 via-teal-500 to-blue-500',
+    'from-orange-500 via-red-500 to-pink-500',
+    'from-purple-500 via-pink-500 to-red-500',
+    'from-teal-500 via-green-500 to-lime-500',
+    'from-indigo-500 via-purple-500 to-pink-500',
+    'from-yellow-500 via-orange-500 to-red-500',
+    'from-cyan-500 via-blue-500 to-purple-500',
+    'from-rose-500 via-pink-500 to-purple-500',
+    'from-emerald-500 via-teal-500 to-cyan-500'
+  ];
+  
+  // Create slides: mix images with bio and fun questions
   const slides = React.useMemo(() => {
     const imageSlides = userImages.map((image, index) => ({
       type: 'image' as const,
@@ -45,24 +59,89 @@ const MatchCard: React.FC<MatchCardProps> = ({
       index
     }));
     
-    // Add bio slide if bio exists
-    const bioSlide = match.bio?.trim() ? [{
-      type: 'bio' as const,
-      content: match.bio,
-      index: imageSlides.length
-    }] : [];
+    // Collect all non-image content
+    const nonImageContent = [];
     
-    // If no images and no bio, create a placeholder
-    if (imageSlides.length === 0 && bioSlide.length === 0) {
+    if (match.bio?.trim()) {
+      nonImageContent.push({
+        type: 'bio' as const,
+        content: match.bio,
+        index: -1
+      });
+    }
+    
+    if (match.fun_fact?.trim()) {
+      nonImageContent.push({
+        type: 'fun_fact' as const,
+        content: match.fun_fact,
+        index: -1
+      });
+    }
+    
+    if (match.perfect_first_date?.trim()) {
+      nonImageContent.push({
+        type: 'perfect_first_date' as const,
+        content: match.perfect_first_date,
+        index: -1
+      });
+    }
+    
+    if (match.last_googled?.trim()) {
+      nonImageContent.push({
+        type: 'last_googled' as const,
+        content: match.last_googled,
+        index: -1
+      });
+    }
+    
+    // If no images, show non-image content first, then placeholder
+    if (imageSlides.length === 0) {
+      if (nonImageContent.length > 0) {
+        const shuffled = nonImageContent.sort(() => Math.random() - 0.5);
+        return [...shuffled, {
+          type: 'placeholder' as const,
+          content: '',
+          index: -1
+        }];
+      }
       return [{
         type: 'placeholder' as const,
         content: '',
-        index: 0
+        index: -1
       }];
     }
     
-    return [...imageSlides, ...bioSlide];
-  }, [userImages, match.bio]);
+    // Mix images with non-image content
+    const mixedSlides = [];
+    
+    // Always start with first image
+    mixedSlides.push(imageSlides[0]);
+    
+    // Shuffle non-image content
+    const shuffledNonImage = nonImageContent.sort(() => Math.random() - 0.5);
+    
+    // Interleave remaining images with non-image content
+    let nonImageIndex = 0;
+    
+    for (let i = 1; i < imageSlides.length; i++) {
+      // Add non-image content between images if available
+      if (nonImageIndex < shuffledNonImage.length && Math.random() > 0.3) {
+        mixedSlides.push(shuffledNonImage[nonImageIndex]);
+        nonImageIndex++;
+      }
+      
+      // Add the image
+      mixedSlides.push(imageSlides[i]);
+    }
+    
+    // Add any remaining non-image content at the end
+    while (nonImageIndex < shuffledNonImage.length) {
+      mixedSlides.push(shuffledNonImage[nonImageIndex]);
+      nonImageIndex++;
+    }
+    
+    return mixedSlides;
+  }, [userImages, match.bio, match.fun_fact, match.perfect_first_date, match.last_googled]);
 
   const handleSlideClick = (e: React.MouseEvent<HTMLDivElement>) => {
     e.stopPropagation();
@@ -131,6 +210,48 @@ const MatchCard: React.FC<MatchCardProps> = ({
                     </div>
                   </div>
                   <h3 className="text-xl font-bold text-gray-800 mb-4 text-center">About {match.first_name}</h3>
+                  <p className="text-gray-700 text-base leading-relaxed text-center font-medium">
+                    {slides[currentSlide].content}
+                  </p>
+                </div>
+              </div>
+            ) : slides[currentSlide]?.type === 'fun_fact' ? (
+              <div className={`w-full h-full bg-gradient-to-br ${gradients[currentSlide % gradients.length]} flex items-center justify-center p-8 transition-all duration-300`}>
+                <div className="bg-white/95 backdrop-blur-sm rounded-3xl p-8 max-w-sm mx-auto shadow-2xl border border-white/20 transform transition-all duration-300 hover:scale-105">
+                  <div className="flex items-center justify-center mb-6">
+                    <div className="bg-gradient-to-r from-yellow-500 to-orange-600 rounded-full p-4 shadow-lg">
+                      <Heart className="w-8 h-8 text-white" />
+                    </div>
+                  </div>
+                  <h3 className="text-xl font-bold text-gray-800 mb-4 text-center">Fun Fact</h3>
+                  <p className="text-gray-700 text-base leading-relaxed text-center font-medium">
+                    {slides[currentSlide].content}
+                  </p>
+                </div>
+              </div>
+            ) : slides[currentSlide]?.type === 'perfect_first_date' ? (
+              <div className={`w-full h-full bg-gradient-to-br ${gradients[(currentSlide + 1) % gradients.length]} flex items-center justify-center p-8 transition-all duration-300`}>
+                <div className="bg-white/95 backdrop-blur-sm rounded-3xl p-8 max-w-sm mx-auto shadow-2xl border border-white/20 transform transition-all duration-300 hover:scale-105">
+                  <div className="flex items-center justify-center mb-6">
+                    <div className="bg-gradient-to-r from-rose-500 to-pink-600 rounded-full p-4 shadow-lg">
+                      <Coffee className="w-8 h-8 text-white" />
+                    </div>
+                  </div>
+                  <h3 className="text-xl font-bold text-gray-800 mb-4 text-center">Perfect First Date</h3>
+                  <p className="text-gray-700 text-base leading-relaxed text-center font-medium">
+                    {slides[currentSlide].content}
+                  </p>
+                </div>
+              </div>
+            ) : slides[currentSlide]?.type === 'last_googled' ? (
+              <div className={`w-full h-full bg-gradient-to-br ${gradients[(currentSlide + 2) % gradients.length]} flex items-center justify-center p-8 transition-all duration-300`}>
+                <div className="bg-white/95 backdrop-blur-sm rounded-3xl p-8 max-w-sm mx-auto shadow-2xl border border-white/20 transform transition-all duration-300 hover:scale-105">
+                  <div className="flex items-center justify-center mb-6">
+                    <div className="bg-gradient-to-r from-blue-500 to-purple-600 rounded-full p-4 shadow-lg">
+                      <Search className="w-8 h-8 text-white" />
+                    </div>
+                  </div>
+                  <h3 className="text-xl font-bold text-gray-800 mb-4 text-center">Last Googled</h3>
                   <p className="text-gray-700 text-base leading-relaxed text-center font-medium">
                     {slides[currentSlide].content}
                   </p>

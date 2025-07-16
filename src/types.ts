@@ -22,6 +22,9 @@ export interface PotentialMatch {
   gender: string;
   latitude?: number;
   longitude?: number;
+  fun_fact?: string;
+  perfect_first_date?: string;
+  last_googled?: string;
 }
 
 export interface ChatMatch {
