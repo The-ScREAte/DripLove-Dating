@@ -653,7 +653,7 @@ const DiscoverPage = ({ currentUser, onNavigateToChat }: DiscoverPageProps) => {
   return (
     <div className="h-full w-full fixed top-0 left-0 overflow-hidden">
       {/* Main Image Area - Card stack */}
-      <div className="flex-1 relative overflow-hidden h-[calc(100vh-100px)]">
+      <div className="flex-1 relative overflow-hidden h-[calc(100vh-80px)]">
         {/* Next card (preloaded, below) */}
         {nextMatch && (
           <div

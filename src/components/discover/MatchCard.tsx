@@ -37,19 +37,35 @@ const MatchCard: React.FC<MatchCardProps> = ({
 }) => {
   const [currentSlide, setCurrentSlide] = useState(0);
   
-  // Random gradient backgrounds for fun questions
-  const gradients = [
-    'from-blue-500 via-purple-500 to-pink-500',
-    'from-green-500 via-teal-500 to-blue-500',
-    'from-orange-500 via-red-500 to-pink-500',
-    'from-purple-500 via-pink-500 to-red-500',
-    'from-teal-500 via-green-500 to-lime-500',
-    'from-indigo-500 via-purple-500 to-pink-500',
-    'from-yellow-500 via-orange-500 to-red-500',
-    'from-cyan-500 via-blue-500 to-purple-500',
-    'from-rose-500 via-pink-500 to-purple-500',
-    'from-emerald-500 via-teal-500 to-cyan-500'
+  // Random background colors for fun questions and about - ensuring good contrast
+  const backgroundColors = [
+    'bg-gradient-to-br from-blue-400 to-blue-600',
+    'bg-gradient-to-br from-green-400 to-green-600',
+    'bg-gradient-to-br from-purple-400 to-purple-600',
+    'bg-gradient-to-br from-pink-400 to-pink-600',
+    'bg-gradient-to-br from-indigo-400 to-indigo-600',
+    'bg-gradient-to-br from-teal-400 to-teal-600',
+    'bg-gradient-to-br from-cyan-400 to-cyan-600',
+    'bg-gradient-to-br from-rose-400 to-rose-600',
+    'bg-gradient-to-br from-orange-400 to-orange-600',
+    'bg-gradient-to-br from-emerald-400 to-emerald-600'
   ];
+
+  // Generate consistent color for this user based on their ID
+  const getUserColor = () => {
+    if (!match.id) return backgroundColors[0];
+    // Simple hash function to convert user ID to a consistent index
+    let hash = 0;
+    const str = match.id.toString();
+    for (let i = 0; i < str.length; i++) {
+      const char = str.charCodeAt(i);
+      hash = ((hash << 5) - hash) + char;
+      hash = hash & hash; // Convert to 32-bit integer
+    }
+    return backgroundColors[Math.abs(hash) % backgroundColors.length];
+  };
+
+  const userBackgroundColor = getUserColor();
   
   // Create slides: mix images with bio and fun questions
   const slides = React.useMemo(() => {
@@ -70,28 +86,29 @@ const MatchCard: React.FC<MatchCardProps> = ({
       });
     }
     
-    if (match.fun_fact?.trim()) {
-      nonImageContent.push({
+    // Select only one random fun question
+    const funQuestions = [
+      match.fun_fact?.trim() && {
         type: 'fun_fact' as const,
         content: match.fun_fact,
         index: -1
-      });
-    }
-    
-    if (match.perfect_first_date?.trim()) {
-      nonImageContent.push({
+      },
+      match.perfect_first_date?.trim() && {
         type: 'perfect_first_date' as const,
         content: match.perfect_first_date,
         index: -1
-      });
-    }
-    
-    if (match.last_googled?.trim()) {
-      nonImageContent.push({
+      },
+      match.last_googled?.trim() && {
         type: 'last_googled' as const,
         content: match.last_googled,
         index: -1
-      });
+      }
+    ].filter(Boolean);
+    
+    // Add only one random fun question if any exist
+    if (funQuestions.length > 0) {
+      const randomIndex = Math.floor(Math.random() * funQuestions.length);
+      nonImageContent.push(funQuestions[randomIndex]);
     }
     
     // If no images, show non-image content first, then placeholder
@@ -202,57 +219,57 @@ const MatchCard: React.FC<MatchCardProps> = ({
                 draggable={false}
               />
             ) : slides[currentSlide]?.type === 'bio' ? (
-              <div className="w-full h-full bg-gradient-to-br from-purple-500 via-pink-500 to-red-500 flex items-center justify-center p-8 transition-all duration-300">
-                <div className="bg-white/95 backdrop-blur-sm rounded-3xl p-8 max-w-sm mx-auto shadow-2xl border border-white/20 transform transition-all duration-300 hover:scale-105">
+              <div className={`w-full h-full ${userBackgroundColor} flex items-center justify-center p-8`}>
+                <div className="max-w-sm mx-auto text-center">
                   <div className="flex items-center justify-center mb-6">
-                    <div className="bg-gradient-to-r from-pink-500 to-purple-600 rounded-full p-4 shadow-lg">
+                    <div className="bg-white/20 backdrop-blur-sm rounded-full p-4 shadow-lg">
                       <Quote className="w-8 h-8 text-white" />
                     </div>
                   </div>
-                  <h3 className="text-xl font-bold text-gray-800 mb-4 text-center">About {match.first_name}</h3>
-                  <p className="text-gray-700 text-base leading-relaxed text-center font-medium">
+                  <h3 className="text-2xl font-bold text-white mb-6">About {match.first_name}</h3>
+                  <p className="text-white text-lg leading-relaxed font-medium">
                     {slides[currentSlide].content}
                   </p>
                 </div>
               </div>
             ) : slides[currentSlide]?.type === 'fun_fact' ? (
-              <div className={`w-full h-full bg-gradient-to-br ${gradients[currentSlide % gradients.length]} flex items-center justify-center p-8 transition-all duration-300`}>
-                <div className="bg-white/95 backdrop-blur-sm rounded-3xl p-8 max-w-sm mx-auto shadow-2xl border border-white/20 transform transition-all duration-300 hover:scale-105">
+              <div className={`w-full h-full ${userBackgroundColor} flex items-center justify-center p-8`}>
+                <div className="max-w-sm mx-auto text-center">
                   <div className="flex items-center justify-center mb-6">
-                    <div className="bg-gradient-to-r from-yellow-500 to-orange-600 rounded-full p-4 shadow-lg">
+                    <div className="bg-white/20 backdrop-blur-sm rounded-full p-4 shadow-lg">
                       <Heart className="w-8 h-8 text-white" />
                     </div>
                   </div>
-                  <h3 className="text-xl font-bold text-gray-800 mb-4 text-center">Fun Fact</h3>
-                  <p className="text-gray-700 text-base leading-relaxed text-center font-medium">
+                  <h3 className="text-2xl font-bold text-white mb-6">Fun Fact</h3>
+                  <p className="text-white text-lg leading-relaxed font-medium">
                     {slides[currentSlide].content}
                   </p>
                 </div>
               </div>
             ) : slides[currentSlide]?.type === 'perfect_first_date' ? (
-              <div className={`w-full h-full bg-gradient-to-br ${gradients[(currentSlide + 1) % gradients.length]} flex items-center justify-center p-8 transition-all duration-300`}>
-                <div className="bg-white/95 backdrop-blur-sm rounded-3xl p-8 max-w-sm mx-auto shadow-2xl border border-white/20 transform transition-all duration-300 hover:scale-105">
+              <div className={`w-full h-full ${userBackgroundColor} flex items-center justify-center p-8`}>
+                <div className="max-w-sm mx-auto text-center">
                   <div className="flex items-center justify-center mb-6">
-                    <div className="bg-gradient-to-r from-rose-500 to-pink-600 rounded-full p-4 shadow-lg">
+                    <div className="bg-white/20 backdrop-blur-sm rounded-full p-4 shadow-lg">
                       <Coffee className="w-8 h-8 text-white" />
                     </div>
                   </div>
-                  <h3 className="text-xl font-bold text-gray-800 mb-4 text-center">Perfect First Date</h3>
-                  <p className="text-gray-700 text-base leading-relaxed text-center font-medium">
+                  <h3 className="text-2xl font-bold text-white mb-6">Perfect First Date</h3>
+                  <p className="text-white text-lg leading-relaxed font-medium">
                     {slides[currentSlide].content}
                   </p>
                 </div>
               </div>
             ) : slides[currentSlide]?.type === 'last_googled' ? (
-              <div className={`w-full h-full bg-gradient-to-br ${gradients[(currentSlide + 2) % gradients.length]} flex items-center justify-center p-8 transition-all duration-300`}>
-                <div className="bg-white/95 backdrop-blur-sm rounded-3xl p-8 max-w-sm mx-auto shadow-2xl border border-white/20 transform transition-all duration-300 hover:scale-105">
+              <div className={`w-full h-full ${userBackgroundColor} flex items-center justify-center p-8`}>
+                <div className="max-w-sm mx-auto text-center">
                   <div className="flex items-center justify-center mb-6">
-                    <div className="bg-gradient-to-r from-blue-500 to-purple-600 rounded-full p-4 shadow-lg">
+                    <div className="bg-white/20 backdrop-blur-sm rounded-full p-4 shadow-lg">
                       <Search className="w-8 h-8 text-white" />
                     </div>
                   </div>
-                  <h3 className="text-xl font-bold text-gray-800 mb-4 text-center">Last Googled</h3>
-                  <p className="text-gray-700 text-base leading-relaxed text-center font-medium">
+                  <h3 className="text-2xl font-bold text-white mb-6">Last Googled</h3>
+                  <p className="text-white text-lg leading-relaxed font-medium">
                     {slides[currentSlide].content}
                   </p>
                 </div>
@@ -296,12 +313,7 @@ const MatchCard: React.FC<MatchCardProps> = ({
         )}
 
         {/* Verified badge */}
-        {isVerified && (
-          <div className="absolute top-4 left-4 bg-green-500 text-white px-2 py-1 rounded-full shadow-lg z-10 flex items-center text-xs font-semibold">
-            <Shield className="w-3 h-3 mr-1" />
-            Verified
-          </div>
-        )}
+        {/* Moved to beside name and age in user info section */}
 
         {/* Navigation hints */}
         {slides.length > 1 && (
@@ -339,6 +351,13 @@ const MatchCard: React.FC<MatchCardProps> = ({
               <span className="text-lg text-gray-600">
                 {calculateAge(match.date_of_birth)}
               </span>
+              {/* Verified badge beside name and age */}
+              {isVerified && (
+                <div className="bg-green-500 text-white px-2 py-1 rounded-full flex items-center text-xs font-semibold">
+                  <Shield className="w-3 h-3 mr-1" />
+                  Verified
+                </div>
+              )}
             </div>
             
             {match.city && (

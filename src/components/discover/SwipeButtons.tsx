@@ -16,33 +16,15 @@ const SwipeButtons: React.FC<SwipeButtonsProps> = ({
   canReverse
 }) => {
   return (
-    <div className="absolute bottom-2 left-0 right-0 flex justify-center space-x-3 sm:space-x-6 px-4 sm:px-6 z-30">
-      <Button
-        onClick={onPass}
-        variant="outline"
-        className="w-12 h-12 sm:w-16 sm:h-16 rounded-full border-2 border-red-500 bg-red-500/20 hover:bg-red-500/30 backdrop-blur-sm shadow-lg hover:border-red-400 transition-all duration-200"
-        aria-label="Pass on this match"
-      >
-        <X className="w-5 h-5 sm:w-7 sm:h-7 text-red-500" />
-      </Button>
-
+    <div className="absolute bottom-4 right-4 z-30">
       <Button
         onClick={onReverse}
         variant="outline"
         disabled={!canReverse}
-        className="w-12 h-12 sm:w-16 sm:h-16 rounded-full border-2 border-yellow-500 bg-yellow-500/20 hover:bg-yellow-500/30 disabled:opacity-30 backdrop-blur-sm shadow-lg hover:border-yellow-400 transition-all duration-200"
+        className="w-12 h-12 sm:w-14 sm:h-14 rounded-full border-2 border-yellow-500 bg-yellow-500/20 hover:bg-yellow-500/30 disabled:opacity-30 backdrop-blur-sm shadow-lg hover:border-yellow-400 transition-all duration-200"
         aria-label="Undo last action"
       >
-        <Undo2 className="w-5 h-5 sm:w-7 sm:h-7 text-yellow-500" />
-      </Button>
-
-      <Button
-        onClick={onLike}
-        variant="outline"
-        className="w-12 h-12 sm:w-16 sm:h-16 rounded-full border-2 border-green-500 bg-green-500/20 hover:bg-green-500/30 backdrop-blur-sm shadow-lg hover:border-green-400 transition-all duration-200"
-        aria-label="Like this match"
-      >
-        <Heart className="w-5 h-5 sm:w-7 sm:h-7 text-green-500" />
+        <Undo2 className="w-5 h-5 sm:w-6 sm:h-6 text-yellow-500" />
       </Button>
     </div>
   );
