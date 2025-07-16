@@ -247,9 +247,14 @@ const DiscoverPage = ({ currentUser, onNavigateToChat }: DiscoverPageProps) => {
   useEffect(() => {
     setImageIndex(0);
     setShowMoreInfo(false);
+    // Load images for current match if not already loaded
+    const currentMatch = potentialMatches[currentIndex];
+    if (currentMatch && !userImages[currentMatch.id]) {
+      loadFullImages(currentMatch.id);
+    }
     // Preload images for the next 2 profiles
     preloadNextProfileImages(potentialMatches, userImages, currentIndex + 1);
-  }, [currentIndex, potentialMatches, userImages, preloadNextProfileImages]);
+  }, [currentIndex, potentialMatches, userImages, preloadNextProfileImages, loadFullImages]);
 
   const handleTouchStart = (e: React.TouchEvent) => {
     const touch = e.touches[0];
@@ -362,24 +367,8 @@ const DiscoverPage = ({ currentUser, onNavigateToChat }: DiscoverPageProps) => {
     // Prevent swipe action if dragging occurred
     if (Math.abs(currentX - startX) > 10) return;
 
-    // Only change image if clicking on empty space (not on text/buttons)
-    const target = e.target as HTMLElement;
-    if (target.closest('.profile-info') || target.closest('button')) {
-      return;
-    }
-
-    const { clientX } = e;
-    const rect = e.currentTarget.getBoundingClientRect();
-    const clickX = clientX - rect.left;
-    const width = rect.width;
-
-    if (clickX < width / 2) {
-      setImageIndex(prev => (prev > 0 ? prev - 1 : prev));
-    } else {
-      setImageIndex(prev =>
-        currentMatch?.images && prev < currentMatch.images.length - 1 ? prev + 1 : prev
-      );
-    }
+    // This function is now mainly used for compatibility
+    // The actual image/slide navigation is handled within MatchCard
   };
 
   // Function to check if a profile is verified (90%+ completion with photos and basic info)
@@ -745,6 +734,7 @@ const DiscoverPage = ({ currentUser, onNavigateToChat }: DiscoverPageProps) => {
             imageIndex={imageIndex}
             showMoreInfo={showMoreInfo}
             isPremium={isPremium()}
+            userImages={currentMatchImages}
             currentUserLatitude={currentUser.latitude}
             currentUserLongitude={currentUser.longitude}
             onImageClick={() => handleImageAreaClick({} as React.MouseEvent<HTMLDivElement>)}

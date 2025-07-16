@@ -21,20 +21,55 @@ const AuthForm = ({ isLogin, onToggle, onOAuthSuccess }: AuthFormProps) => {
 
   const [formData, setFormData] = useState({
     email: '',
-    password: ''
+    password: '',
+    confirmPassword: ''
   });
   const [showPassword, setShowPassword] = useState(false);
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [loading, setLoading] = useState(false);
   const [oauthLoading, setOauthLoading] = useState<'google' | null>(null);
+  const [errors, setErrors] = useState<{[key: string]: string}>({});
+
+  const validateForm = () => {
+    const newErrors: {[key: string]: string} = {};
+    
+    // Email validation
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!formData.email) {
+      newErrors.email = 'Email is required';
+    } else if (!emailRegex.test(formData.email)) {
+      newErrors.email = 'Please enter a valid email address';
+    }
+    
+    // Password validation
+    if (!formData.password) {
+      newErrors.password = 'Password is required';
+    } else if (formData.password.length < 6) {
+      newErrors.password = 'Password must be at least 6 characters long';
+    }
+    
+    // Confirm password validation (only for registration)
+    if (!isLogin) {
+      if (!formData.confirmPassword) {
+        newErrors.confirmPassword = 'Please confirm your password';
+      } else if (formData.password !== formData.confirmPassword) {
+        newErrors.confirmPassword = 'Passwords do not match';
+      }
+    }
+    
+    setErrors(newErrors);
+    return Object.keys(newErrors).length === 0;
+  };
 
   const handleOAuthSignIn = async (provider: 'google') => {
     setOauthLoading(provider);
-
+    
     try {
       const { data, error } = await supabase.auth.signInWithOAuth({
         provider: provider,
-        // Don't override redirectTo - let Supabase handle the callback
-        // This will default to: https://tgjisyvihabsovironesw.supabase.co/auth/v1/callback
+        options: {
+          redirectTo: `${window.location.origin}/auth/callback`
+        }
       });
 
       if (error) {
@@ -47,8 +82,8 @@ const AuthForm = ({ isLogin, onToggle, onOAuthSuccess }: AuthFormProps) => {
         return;
       }
 
-      // OAuth will redirect to the callback URL, so we don't need to handle success here
-      // The main app will handle the session when the user returns
+      // OAuth will redirect to the callback URL
+      // The callback handler will check if user exists and handle accordingly
     } catch (error: any) {
       console.error('OAuth error:', error);
       toast({
@@ -61,89 +96,188 @@ const AuthForm = ({ isLogin, onToggle, onOAuthSuccess }: AuthFormProps) => {
   };
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const { name, value } = e.target;
     setFormData({
       ...formData,
-      [e.target.name]: e.target.value
+      [name]: value
     });
+    
+    // Clear error when user starts typing
+    if (errors[name]) {
+      setErrors({
+        ...errors,
+        [name]: ''
+      });
+    }
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    
+    if (!validateForm()) {
+      return;
+    }
+    
     setLoading(true);
-
     const { email, password } = formData;
 
     try {
-      const { data: authData, error: authError } = await supabase.auth.signInWithPassword({
-        email,
-        password
-      });
-
-      if (authError || !authData.user) {
-        toast({
-          title: "Login Failed",
-          description: authError?.message || 'Invalid credentials',
-          variant: "destructive",
+      if (isLogin) {
+        // Login flow
+        const { data: authData, error: authError } = await supabase.auth.signInWithPassword({
+          email,
+          password
         });
-        setLoading(false);
-        return;
-      }
 
-      // Check if user profile exists and get account status
-      const { data: profile, error: profileError } = await supabase
-        .from('profiles')
-        .select('id, is_admin, account_status')
-        .eq('id', authData.user.id)
-        .single();
+        if (authError || !authData.user) {
+          toast({
+            title: "Login Failed",
+            description: authError?.message || 'Invalid credentials',
+            variant: "destructive",
+          });
+          setLoading(false);
+          return;
+        }
 
-      if (profileError || !profile) {
-        // Sign out the user since they don't have a profile
-        await supabase.auth.signOut();
+        // Check if user profile exists and get account status
+        const { data: profile, error: profileError } = await supabase
+          .from('profiles')
+          .select('id, is_admin, account_status')
+          .eq('id', authData.user.id)
+          .single();
+
+        if (profileError || !profile) {
+          // Sign out the user since they don't have a profile
+          await supabase.auth.signOut();
+          toast({
+            title: "Account Not Found",
+            description: "This account doesn't exist in our system. Please register first.",
+            variant: "destructive",
+          });
+          setLoading(false);
+          return;
+        }
+
+        // Check account status
+        if (profile.account_status === 'blocked') {
+          await supabase.auth.signOut();
+          toast({
+            title: "Account Blocked",
+            description: "Your account has been blocked.",
+            variant: "destructive",
+          });
+          setLoading(false);
+          return;
+        }
+
+        if (profile.account_status === 'on_hold') {
+          await supabase.auth.signOut();
+          toast({
+            title: "Account On Hold",
+            description: "Your account is on hold. Please contact support.",
+            variant: "destructive",
+          });
+          setLoading(false);
+          return;
+        }
+
+        // Save profile ID to session
+        sessionStorage.setItem('profile_id', profile.id);
+
         toast({
-          title: "Account Not Found",
-          description: "This account doesn't exist in our system. Please register first.",
-          variant: "destructive",
+          title: "Welcome back!",
+          description: "You've been successfully logged in.",
         });
-        setLoading(false);
-        return;
-      }
 
-      // Check account status and show appropriate messages
-      if (profile.account_status === 'blocked') {
-        await supabase.auth.signOut();
+        // Always redirect to home page and let the main app handle routing
+        // The auth state change will trigger the proper view (admin/app)
+        navigate('/');
+
+      } else {
+        // Registration flow
+        const { data: authData, error: authError } = await supabase.auth.signUp({
+          email,
+          password
+        });
+
+        if (authError) {
+          toast({
+            title: "Registration Failed",
+            description: authError.message,
+            variant: "destructive",
+          });
+          setLoading(false);
+          return;
+        }
+
+        if (!authData.user) {
+          toast({
+            title: "Registration Failed",
+            description: "Failed to create account. Please try again.",
+            variant: "destructive",
+          });
+          setLoading(false);
+          return;
+        }
+
+        // Check if email confirmation is required
+        if (!authData.session) {
+          toast({
+            title: "Registration Successful",
+            description: "Please check your email to confirm your account before signing in.",
+          });
+          setLoading(false);
+          return;
+        }
+
+        // Create a basic profile for manual registration users
+        // This allows them to skip the profile completion flow (which is only for Google OAuth)
+        const { error: profileError } = await supabase
+          .from('profiles')
+          .insert({
+            id: authData.user.id,
+            email: authData.user.email || email,
+            first_name: 'User', // Basic placeholder
+            last_name: 'Profile', // Basic placeholder
+            date_of_birth: '1990-01-01',
+            country: 'US',
+            city: 'Unknown',
+            gender: 'prefer-not-to-say',
+            preference: 'both',
+            relationship_intent: 'not-sure',
+            occupation: 'Not specified',
+            industry: 'Not specified',
+            education_level: 'not-specified',
+            account_status: 'active',
+            is_admin: false
+          });
+
+        if (profileError) {
+          console.error('Profile creation error:', profileError);
+          toast({
+            title: "Registration Error",
+            description: "Failed to create profile. Please try again.",
+            variant: "destructive",
+          });
+          setLoading(false);
+          return;
+        }
+
         toast({
-          title: "Account Blocked",
-          description: "Your account has been blocked.",
-          variant: "destructive",
+          title: "Registration Successful",
+          description: "Account created successfully. Welcome to LoveConnect!",
         });
-        setLoading(false);
-        return;
+
+        // Navigate to home - user can update their profile later from the main app
+        navigate('/');
+
       }
-
-      if (profile.account_status === 'on_hold') {
-        await supabase.auth.signOut();
-        toast({
-          title: "Account On Hold",
-          description: "Your account is on hold. Please contact support.",
-          variant: "destructive",
-        });
-        setLoading(false);
-        return;
-      }
-
-      // Save profile ID to session
-      sessionStorage.setItem('profile_id', profile.id);
-
-      toast({
-        title: "Welcome back!",
-        description: "You've been successfully logged in.",
-      });
 
       setLoading(false);
     } catch (error: any) {
-      console.error('Login error:', error);
+      console.error('Auth error:', error);
       toast({
-        title: "Login Error",
+        title: isLogin ? "Login Error" : "Registration Error",
         description: "An unexpected error occurred. Please try again.",
         variant: "destructive",
       });
@@ -213,10 +347,15 @@ const AuthForm = ({ isLogin, onToggle, onOAuthSuccess }: AuthFormProps) => {
                 type="email"
                 value={formData.email}
                 onChange={handleInputChange}
-                className="pl-10 border-gray-200 focus:border-pink-400 focus:ring-pink-400"
+                className={`pl-10 border-gray-200 focus:border-pink-400 focus:ring-pink-400 ${
+                  errors.email ? 'border-red-500 focus:border-red-500' : ''
+                }`}
                 placeholder="Enter your email"
                 required
               />
+              {errors.email && (
+                <p className="text-red-500 text-xs mt-1">{errors.email}</p>
+              )}
             </div>
           </div>
 
@@ -230,7 +369,9 @@ const AuthForm = ({ isLogin, onToggle, onOAuthSuccess }: AuthFormProps) => {
                 type={showPassword ? "text" : "password"}
                 value={formData.password}
                 onChange={handleInputChange}
-                className="pl-10 pr-10 border-gray-200 focus:border-pink-400 focus:ring-pink-400"
+                className={`pl-10 pr-10 border-gray-200 focus:border-pink-400 focus:ring-pink-400 ${
+                  errors.password ? 'border-red-500 focus:border-red-500' : ''
+                }`}
                 placeholder="Enter your password"
                 required
               />
@@ -241,8 +382,42 @@ const AuthForm = ({ isLogin, onToggle, onOAuthSuccess }: AuthFormProps) => {
               >
                 {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
               </button>
+              {errors.password && (
+                <p className="text-red-500 text-xs mt-1">{errors.password}</p>
+              )}
             </div>
           </div>
+
+          {!isLogin && (
+            <div className="space-y-2">
+              <Label htmlFor="confirmPassword" className="text-sm font-medium">Confirm Password</Label>
+              <div className="relative">
+                <Lock className="absolute left-3 top-3 h-4 w-4 text-gray-400" />
+                <Input
+                  id="confirmPassword"
+                  name="confirmPassword"
+                  type={showConfirmPassword ? "text" : "password"}
+                  value={formData.confirmPassword}
+                  onChange={handleInputChange}
+                  className={`pl-10 pr-10 border-gray-200 focus:border-pink-400 focus:ring-pink-400 ${
+                    errors.confirmPassword ? 'border-red-500 focus:border-red-500' : ''
+                  }`}
+                  placeholder="Confirm your password"
+                  required
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowConfirmPassword(!showConfirmPassword)}
+                  className="absolute right-3 top-3 text-gray-400 hover:text-gray-600"
+                >
+                  {showConfirmPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                </button>
+                {errors.confirmPassword && (
+                  <p className="text-red-500 text-xs mt-1">{errors.confirmPassword}</p>
+                )}
+              </div>
+            </div>
+          )}
 
           <Button
             type="submit"

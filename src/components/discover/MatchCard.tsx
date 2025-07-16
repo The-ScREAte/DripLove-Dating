@@ -1,5 +1,5 @@
-import React from 'react';
-import { MapPin, Briefcase, GraduationCap, Calendar, Crown, Shield } from 'lucide-react';
+import React, { useState } from 'react';
+import { MapPin, Briefcase, GraduationCap, Calendar, Crown, Shield, ChevronDown, ChevronUp, User, Quote } from 'lucide-react';
 import { PotentialMatch } from '@/types';
 
 interface MatchCardProps {
@@ -10,6 +10,7 @@ interface MatchCardProps {
   isVerified?: boolean; // New prop for verified status
   currentUserLatitude?: number;
   currentUserLongitude?: number;
+  userImages: string[]; // New prop for user images
   onImageClick: () => void;
   onToggleInfo: () => void;
   calculateAge: (dateOfBirth: string) => number;
@@ -26,6 +27,7 @@ const MatchCard: React.FC<MatchCardProps> = ({
   isVerified = false, // Default to false if not provided
   currentUserLatitude,
   currentUserLongitude,
+  userImages,
   onImageClick,
   onToggleInfo,
   calculateAge,
@@ -33,6 +35,50 @@ const MatchCard: React.FC<MatchCardProps> = ({
   swipeDirection,
   swipeDistance
 }) => {
+  const [currentSlide, setCurrentSlide] = useState(0);
+  
+  // Create slides: user images + bio slide
+  const slides = React.useMemo(() => {
+    const imageSlides = userImages.map((image, index) => ({
+      type: 'image' as const,
+      content: image,
+      index
+    }));
+    
+    // Add bio slide if bio exists
+    const bioSlide = match.bio?.trim() ? [{
+      type: 'bio' as const,
+      content: match.bio,
+      index: imageSlides.length
+    }] : [];
+    
+    // If no images and no bio, create a placeholder
+    if (imageSlides.length === 0 && bioSlide.length === 0) {
+      return [{
+        type: 'placeholder' as const,
+        content: '',
+        index: 0
+      }];
+    }
+    
+    return [...imageSlides, ...bioSlide];
+  }, [userImages, match.bio]);
+
+  const handleSlideClick = (e: React.MouseEvent<HTMLDivElement>) => {
+    e.stopPropagation();
+    
+    const rect = e.currentTarget.getBoundingClientRect();
+    const clickX = e.clientX - rect.left;
+    const width = rect.width;
+    
+    if (clickX < width / 2) {
+      // Left side - previous slide
+      setCurrentSlide(prev => (prev > 0 ? prev - 1 : prev));
+    } else {
+      // Right side - next slide
+      setCurrentSlide(prev => (prev < slides.length - 1 ? prev + 1 : prev));
+    }
+  };
   const getSwipeTransform = () => {
     if (!swipeDirection) return 'translateX(0) rotate(0deg)';
     
@@ -64,22 +110,57 @@ const MatchCard: React.FC<MatchCardProps> = ({
         </div>
       )}
 
-      {/* Image Container */}
-      <div className="relative h-3/4 overflow-hidden" onClick={onImageClick}>
-        <img
-          src={match.images?.[imageIndex] || '/placeholder.svg'}
-          alt={`${match.first_name} ${match.last_name}`}
-          className="w-full h-full object-cover"
-        />
+      {/* Image/Bio Container */}
+      <div className="relative h-[75%] overflow-hidden" onClick={handleSlideClick}>
+        {/* Current slide content */}
+        {slides.length > 0 && (
+          <div className="w-full h-full transition-all duration-300 ease-in-out">
+            {slides[currentSlide]?.type === 'image' ? (
+              <img
+                src={slides[currentSlide].content}
+                alt={`${match.first_name} ${match.last_name}`}
+                className="w-full h-full object-cover transition-opacity duration-300"
+                draggable={false}
+              />
+            ) : slides[currentSlide]?.type === 'bio' ? (
+              <div className="w-full h-full bg-gradient-to-br from-purple-500 via-pink-500 to-red-500 flex items-center justify-center p-8 transition-all duration-300">
+                <div className="bg-white/95 backdrop-blur-sm rounded-3xl p-8 max-w-sm mx-auto shadow-2xl border border-white/20 transform transition-all duration-300 hover:scale-105">
+                  <div className="flex items-center justify-center mb-6">
+                    <div className="bg-gradient-to-r from-pink-500 to-purple-600 rounded-full p-4 shadow-lg">
+                      <Quote className="w-8 h-8 text-white" />
+                    </div>
+                  </div>
+                  <h3 className="text-xl font-bold text-gray-800 mb-4 text-center">About {match.first_name}</h3>
+                  <p className="text-gray-700 text-base leading-relaxed text-center font-medium">
+                    {slides[currentSlide].content}
+                  </p>
+                </div>
+              </div>
+            ) : (
+              // Fallback for no images - show placeholder with initials
+              <div className="w-full h-full bg-gradient-to-br from-pink-200 to-purple-200 flex items-center justify-center transition-all duration-300">
+                <div className="text-center">
+                  <div className="bg-white/80 rounded-full p-8 mb-4 shadow-xl">
+                    <User className="w-16 h-16 mx-auto text-gray-500" />
+                  </div>
+                  <span className="text-6xl font-bold text-gray-700 bg-white/50 rounded-full px-6 py-3">
+                    {match.first_name?.[0]}{match.last_name?.[0]}
+                  </span>
+                  <p className="text-gray-600 mt-4 text-sm">No photos uploaded yet</p>
+                </div>
+              </div>
+            )}
+          </div>
+        )}
         
-        {/* Image indicators */}
-        {match.images && match.images.length > 1 && (
+        {/* Slide indicators */}
+        {slides.length > 1 && (
           <div className="absolute top-4 left-4 right-4 flex space-x-1 z-10">
-            {match.images.map((_, index) => (
+            {slides.map((_, index) => (
               <div
                 key={index}
-                className={`flex-1 h-1 rounded-full ${
-                  index === imageIndex ? 'bg-white' : 'bg-white/30'
+                className={`flex-1 h-1 rounded-full transition-all duration-300 ${
+                  index === currentSlide ? 'bg-white shadow-lg' : 'bg-white/30'
                 }`}
               />
             ))}
@@ -101,98 +182,135 @@ const MatchCard: React.FC<MatchCardProps> = ({
           </div>
         )}
 
-        {/* Basic info overlay */}
-        <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/70 to-transparent p-4 text-white">
-          <div className="flex items-center justify-between">
-            <div>
-              <h2 className="text-2xl font-bold">
-                {match.first_name} {match.last_name}
-              </h2>
-              <p className="text-lg opacity-90">
-                {calculateAge(match.date_of_birth)} years old
-              </p>
-              {match.city && (
-                <div className="flex items-center mt-1">
-                  <MapPin className="w-4 h-4 mr-1" />
-                  <span className="text-sm">
-                    {match.city}, {match.country}
-                    {currentUserLatitude && currentUserLongitude && match.latitude && match.longitude && (
-                      <span className="ml-2">
-                        • {Math.round(calculateDistance(
-                          currentUserLatitude,
-                          currentUserLongitude,
-                          match.latitude,
-                          match.longitude
-                        ))} km away
-                      </span>
-                    )}
-                  </span>
+        {/* Navigation hints */}
+        {slides.length > 1 && (
+          <>
+            {/* Left navigation area */}
+            <div className="absolute left-2 top-1/2 transform -translate-y-1/2 z-10 pointer-events-none">
+              {currentSlide > 0 && (
+                <div className="bg-black/40 text-white rounded-full p-2 backdrop-blur-sm shadow-lg animate-pulse">
+                  <ChevronUp className="w-5 h-5 transform -rotate-90" />
                 </div>
               )}
             </div>
-            <button
-              onClick={(e) => {
-                e.stopPropagation();
-                onToggleInfo();
-              }}
-              className="bg-white/20 backdrop-blur-sm rounded-full p-2 hover:bg-white/30 transition-colors"
-              aria-label={showMoreInfo ? "Hide details" : "Show details"}
-            >
-              <span className="text-2xl">ℹ️</span>
-            </button>
-          </div>
-        </div>
+            
+            {/* Right navigation area */}
+            <div className="absolute right-2 top-1/2 transform -translate-y-1/2 z-10 pointer-events-none">
+              {currentSlide < slides.length - 1 && (
+                <div className="bg-black/40 text-white rounded-full p-2 backdrop-blur-sm shadow-lg animate-pulse">
+                  <ChevronUp className="w-5 h-5 transform rotate-90" />
+                </div>
+              )}
+            </div>
+          </>
+        )}
       </div>
 
-      {/* More Info Section */}
-      {showMoreInfo && (
-        <div className="absolute inset-0 bg-black/90 backdrop-blur-sm flex items-end z-10">
-          <div
-            className="w-full p-6 space-y-4 text-white max-h-full overflow-y-auto"
-            onClick={(e) => e.stopPropagation()}
-          >
-            {match.bio && (
-              <div>
-                <h3 className="font-semibold mb-1 text-sm">About</h3>
-                <p className="text-xs leading-relaxed">{match.bio}</p>
-              </div>
-            )}
-
-            {(match.occupation || match.education_level) && (
-              <div className="space-y-2">
-                {match.occupation && (
-                  <div className="flex items-center text-xs">
-                    <Briefcase className="w-3 h-3 mr-2 flex-shrink-0" />
-                    <span>{match.occupation}</span>
-                  </div>
-                )}
-                {match.education_level && (
-                  <div className="flex items-center text-xs">
-                    <GraduationCap className="w-3 h-3 mr-2 flex-shrink-0" />
-                    <span>{match.education_level}</span>
-                  </div>
-                )}
-              </div>
-            )}
-
-            {match.interests?.length > 0 && (
-              <div>
-                <h3 className="font-semibold mb-2 text-sm">Interests</h3>
-                <div className="flex flex-wrap gap-1">
-                  {match.interests.map((interest, index) => (
-                    <span
-                      key={index}
-                      className="px-2 py-1 bg-white/20 rounded-full text-xs"
-                    >
-                      {interest}
+      {/* User Info Section */}
+      <div className="h-[25%] bg-white flex flex-col min-h-[120px]">
+        {/* Basic user info - always visible */}
+        <div className="p-4 flex items-center justify-between">
+          <div className="flex-1">
+            <div className="flex items-center space-x-2">
+              <h2 className="text-xl font-bold text-gray-800">
+                {match.first_name} {match.last_name}
+              </h2>
+              <span className="text-lg text-gray-600">
+                {calculateAge(match.date_of_birth)}
+              </span>
+            </div>
+            
+            {match.city && (
+              <div className="flex items-center mt-1 text-gray-600">
+                <MapPin className="w-4 h-4 mr-1" />
+                <span className="text-sm">
+                  {match.city}, {match.country}
+                  {currentUserLatitude && currentUserLongitude && match.latitude && match.longitude && (
+                    <span className="ml-2">
+                      • {Math.round(calculateDistance(
+                        currentUserLatitude,
+                        currentUserLongitude,
+                        match.latitude,
+                        match.longitude
+                      ))} km away
                     </span>
-                  ))}
-                </div>
+                  )}
+                </span>
               </div>
             )}
           </div>
+
+          {/* Expandable info button */}
+          <button
+            onClick={(e) => {
+              e.stopPropagation();
+              onToggleInfo();
+            }}
+            className="bg-pink-500 hover:bg-pink-600 text-white rounded-full p-3 transition-colors shadow-lg"
+            aria-label={showMoreInfo ? "Hide details" : "Show details"}
+          >
+            {showMoreInfo ? (
+              <ChevronUp className="w-5 h-5" />
+            ) : (
+              <ChevronDown className="w-5 h-5" />
+            )}
+          </button>
         </div>
-      )}
+
+        {/* Expandable details - appears below basic info */}
+        {showMoreInfo && (
+          <div className="flex-1 bg-gray-50 border-t border-gray-200 overflow-y-auto">
+            <div className="p-4 space-y-3 text-sm">
+              {/* Bio */}
+              {match.bio && (
+                <div className="bg-white rounded-lg p-3 shadow-sm">
+                  <h4 className="font-semibold text-pink-600 mb-1">About</h4>
+                  <p className="text-gray-700 text-xs leading-relaxed">{match.bio}</p>
+                </div>
+              )}
+
+              {/* Work & Education */}
+              {(match.occupation || match.education_level) && (
+                <div className="bg-white rounded-lg p-3 shadow-sm">
+                  <h4 className="font-semibold text-pink-600 mb-2">Work & Education</h4>
+                  <div className="space-y-2">
+                    {match.occupation && (
+                      <div className="flex items-center text-xs">
+                        <Briefcase className="w-3 h-3 mr-2 flex-shrink-0 text-pink-500" />
+                        <span className="text-gray-700">{match.occupation}</span>
+                      </div>
+                    )}
+                    {match.education_level && (
+                      <div className="flex items-center text-xs">
+                        <GraduationCap className="w-3 h-3 mr-2 flex-shrink-0 text-pink-500" />
+                        <span className="text-gray-700">{match.education_level}</span>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              )}
+
+              {/* Interests */}
+              {match.interests?.length > 0 && (
+                <div className="bg-white rounded-lg p-3 shadow-sm">
+                  <h4 className="font-semibold text-pink-600 mb-2">Interests</h4>
+                  <div className="flex flex-wrap gap-1">
+                    {match.interests.map((interest, index) => (
+                      <span
+                        key={index}
+                        className="px-2 py-1 bg-pink-100 text-pink-700 rounded-full text-xs"
+                      >
+                        {interest}
+                      </span>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </div>
+          </div>
+        )}
+      </div>
+
     </div>
   );
 };

@@ -89,13 +89,22 @@ const Index = () => {
       }
 
       // Check if profile is incomplete (missing required fields)
+      // Only redirect to profile completion for OAuth users (Google)
+      // Manual registration users get basic profiles and can update later
       const requiredFields = ['first_name', 'last_name', 'date_of_birth', 'country', 'city', 'gender', 'preference', 'relationship_intent', 'occupation', 'industry', 'education_level'];
       const isIncomplete = requiredFields.some(field => !profile[field]);
 
       if (isIncomplete) {
-        setCurrentView('profile-completion');
-        setLoading(false);
-        return;
+        // Check if this is an OAuth user by looking at the auth provider
+        const { data: { user } } = await supabase.auth.getUser();
+        const isOAuthUser = user?.app_metadata?.provider === 'google';
+        
+        if (isOAuthUser) {
+          setCurrentView('profile-completion');
+          setLoading(false);
+          return;
+        }
+        // Manual registration users skip profile completion and go directly to app
       }
 
       // Redirect based on user type
