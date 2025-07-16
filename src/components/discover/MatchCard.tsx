@@ -111,7 +111,7 @@ const MatchCard: React.FC<MatchCardProps> = ({
       )}
 
       {/* Image/Bio Container */}
-      <div className="relative h-[75%] overflow-hidden" onClick={handleSlideClick}>
+      <div className={`relative ${showMoreInfo ? 'h-[65%]' : 'h-[75%]'} overflow-hidden transition-all duration-300`} onClick={handleSlideClick}>
         {/* Current slide content */}
         {slides.length > 0 && (
           <div className="w-full h-full transition-all duration-300 ease-in-out">
@@ -207,7 +207,7 @@ const MatchCard: React.FC<MatchCardProps> = ({
       </div>
 
       {/* User Info Section */}
-      <div className="h-[25%] bg-white flex flex-col min-h-[120px]">
+      <div className={`${showMoreInfo ? 'h-[35%]' : 'h-[25%]'} bg-white flex flex-col min-h-[120px] transition-all duration-300`}>
         {/* Basic user info - always visible */}
         <div className="p-4 flex items-center justify-between">
           <div className="flex-1">
