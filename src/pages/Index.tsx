@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import WelcomeScreen from '@/components/WelcomeScreen';
 import AuthForm from '@/components/AuthForm';
 import RegistrationForm from '@/components/RegistrationForm';
+import ProfileCompletionForm from '@/components/ProfileCompletionForm';
 import MainApp from '@/components/MainApp';
 import AdminPage from '@/components/AdminPage';
 import AboutUs from '@/components/AboutUs';
@@ -12,7 +13,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { transformFormDataForSubmission } from '@/utils/formValidation';
 
 const Index = () => {
-  const [currentView, setCurrentView] = useState<'welcome' | 'login' | 'register' | 'app' | 'admin' | 'about' | 'terms' | 'privacy'>('welcome');
+  const [currentView, setCurrentView] = useState<'welcome' | 'login' | 'register' | 'profile-completion' | 'app' | 'admin' | 'about' | 'terms' | 'privacy'>('welcome');
   const [user, setUser] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const { toast } = useToast();
@@ -50,20 +51,14 @@ const Index = () => {
     try {
       const { data: profile, error } = await supabase
         .from('profiles')
-        .select('is_admin, account_status')
+        .select('is_admin, account_status, first_name, last_name, date_of_birth, country, city, gender, preference, relationship_intent, occupation, industry, education_level')
         .eq('id', userId)
         .single();
       
       if (error || !profile) {
         console.error('Profile not found for user:', userId);
-        // Sign out user if no profile exists
-        await supabase.auth.signOut();
-        toast({
-          title: "Profile Required",
-          description: "No profile found. Please register to create your account.",
-          variant: "destructive",
-        });
-        setCurrentView('welcome');
+        // For OAuth users, they might not have a profile yet, redirect to profile completion
+        setCurrentView('profile-completion');
         setLoading(false);
         return;
       }
@@ -89,6 +84,16 @@ const Index = () => {
           variant: "destructive",
         });
         setCurrentView('welcome');
+        setLoading(false);
+        return;
+      }
+
+      // Check if profile is incomplete (missing required fields)
+      const requiredFields = ['first_name', 'last_name', 'date_of_birth', 'country', 'city', 'gender', 'preference', 'relationship_intent', 'occupation', 'industry', 'education_level'];
+      const isIncomplete = requiredFields.some(field => !profile[field]);
+
+      if (isIncomplete) {
+        setCurrentView('profile-completion');
         setLoading(false);
         return;
       }
@@ -196,6 +201,24 @@ const Index = () => {
     }
   };
 
+  const handleProfileComplete = () => {
+    // Re-check user type after profile completion
+    if (user) {
+      checkUserTypeAndRedirect(user.id);
+    }
+  };
+
+  const handleProfileCancel = async () => {
+    // Sign out the user if they cancel profile completion
+    await supabase.auth.signOut();
+    setUser(null);
+    setCurrentView('welcome');
+    toast({
+      title: "Profile completion cancelled",
+      description: "You need to complete your profile to use the app.",
+    });
+  };
+
   const handleLogout = async () => {
     await supabase.auth.signOut();
     setUser(null);
@@ -254,6 +277,16 @@ const Index = () => {
             <RegistrationForm 
               onSubmit={handleRegister}
               onBackToLogin={handleBackToLogin}
+            />
+          </div>
+        )}
+
+        {currentView === 'profile-completion' && user && (
+          <div className="min-h-screen bg-gradient-to-br from-pink-400 via-purple-500 to-indigo-600 flex items-center justify-center p-4">
+            <ProfileCompletionForm
+              user={user}
+              onComplete={handleProfileComplete}
+              onCancel={handleProfileCancel}
             />
           </div>
         )}
