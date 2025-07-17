@@ -280,8 +280,7 @@ const ProfileCompletionForm = ({ user, onComplete, onCancel }: ProfileCompletion
                   <SelectContent>
                     <SelectItem value="male">Male</SelectItem>
                     <SelectItem value="female">Female</SelectItem>
-                    <SelectItem value="non-binary">Non-binary</SelectItem>
-                    <SelectItem value="prefer-not-to-say">Prefer not to say</SelectItem>
+                    <SelectItem value="other">Other</SelectItem>
                   </SelectContent>
                 </Select>
                 {errors.gender && <p className="text-sm text-red-500">{errors.gender}</p>}
@@ -297,9 +296,9 @@ const ProfileCompletionForm = ({ user, onComplete, onCancel }: ProfileCompletion
                     <SelectValue placeholder="Select your preference" />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="men">Men</SelectItem>
-                    <SelectItem value="women">Women</SelectItem>
-                    <SelectItem value="everyone">Everyone</SelectItem>
+                    <SelectItem value="male">Male</SelectItem>
+                    <SelectItem value="female">Female</SelectItem>
+                    <SelectItem value="everyone">Both</SelectItem>
                   </SelectContent>
                 </Select>
                 {errors.preference && <p className="text-sm text-red-500">{errors.preference}</p>}
@@ -316,10 +315,9 @@ const ProfileCompletionForm = ({ user, onComplete, onCancel }: ProfileCompletion
                   <SelectValue placeholder="What are you looking for?" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="serious-relationship">Serious Relationship</SelectItem>
-                  <SelectItem value="casual-dating">Casual Dating</SelectItem>
-                  <SelectItem value="friendship">Friendship</SelectItem>
-                  <SelectItem value="not-sure">Not Sure</SelectItem>
+                  <SelectItem value="casual">Casual</SelectItem>
+                  <SelectItem value="serious">Serious</SelectItem>
+                  <SelectItem value="open_to_anything">Open to Anything</SelectItem>
                 </SelectContent>
               </Select>
               {errors.relationshipIntent && <p className="text-sm text-red-500">{errors.relationshipIntent}</p>}
@@ -390,13 +388,13 @@ const ProfileCompletionForm = ({ user, onComplete, onCancel }: ProfileCompletion
                 <SelectValue placeholder="Select your education level" />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="high_school">High School</SelectItem>
-                <SelectItem value="some_college">Some College</SelectItem>
-                <SelectItem value="bachelors">Bachelor's Degree</SelectItem>
-                <SelectItem value="masters">Master's Degree</SelectItem>
-                <SelectItem value="doctorate">Doctorate</SelectItem>
-                <SelectItem value="trade_school">Trade School</SelectItem>
-                <SelectItem value="other">Other</SelectItem>
+                <SelectItem value="High School">High School</SelectItem>
+                <SelectItem value="Some College">Some College</SelectItem>
+                <SelectItem value="Associate Degree">Associate Degree</SelectItem>
+                <SelectItem value="Bachelor's Degree">Bachelor's Degree</SelectItem>
+                <SelectItem value="Master's Degree">Master's Degree</SelectItem>
+                <SelectItem value="Doctorate">Doctorate</SelectItem>
+                <SelectItem value="Other">Other</SelectItem>
               </SelectContent>
             </Select>
             {errors.educationLevel && <p className="text-sm text-red-500">{errors.educationLevel}</p>}

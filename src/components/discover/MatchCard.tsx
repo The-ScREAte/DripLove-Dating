@@ -378,6 +378,15 @@ const MatchCard: React.FC<MatchCardProps> = ({
                 </span>
               </div>
             )}
+            
+            {match.relationship_intent && (
+              <div className="flex items-center mt-1 text-gray-600">
+                <Heart className="w-4 h-4 mr-1" />
+                <span className="text-sm capitalize">
+                  {match.relationship_intent === 'open_to_anything' ? 'Open to anything' : match.relationship_intent}
+                </span>
+              </div>
+            )}
           </div>
 
           {/* Expandable info button */}
@@ -443,6 +452,120 @@ const MatchCard: React.FC<MatchCardProps> = ({
                         {interest}
                       </span>
                     ))}
+                  </div>
+                </div>
+              )}
+
+              {/* Lifestyle */}
+              {(match.smoking || match.drinking || match.exercise_level || match.sleeping_schedule) && (
+                <div className="bg-white rounded-lg p-3 shadow-sm">
+                  <h4 className="font-semibold text-pink-600 mb-2">Lifestyle</h4>
+                  <div className="space-y-2">
+                    {match.smoking && (
+                      <div className="flex items-center text-xs">
+                        <div className="w-3 h-3 mr-2 flex-shrink-0 text-pink-500">🚬</div>
+                        <span className="text-gray-700">Smoking: {match.smoking}</span>
+                      </div>
+                    )}
+                    {match.drinking && (
+                      <div className="flex items-center text-xs">
+                        <div className="w-3 h-3 mr-2 flex-shrink-0 text-pink-500">🍷</div>
+                        <span className="text-gray-700">Drinking: {match.drinking}</span>
+                      </div>
+                    )}
+                    {match.exercise_level && (
+                      <div className="flex items-center text-xs">
+                        <div className="w-3 h-3 mr-2 flex-shrink-0 text-pink-500">💪</div>
+                        <span className="text-gray-700">Exercise: {match.exercise_level}</span>
+                      </div>
+                    )}
+                    {match.sleeping_schedule && (
+                      <div className="flex items-center text-xs">
+                        <div className="w-3 h-3 mr-2 flex-shrink-0 text-pink-500">😴</div>
+                        <span className="text-gray-700">Sleep: {match.sleeping_schedule}</span>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              )}
+
+              {/* Personality */}
+              {(match.introvert_extrovert !== undefined || match.spontaneous_planner !== undefined || match.messy_organized !== undefined) && (
+                <div className="bg-white rounded-lg p-3 shadow-sm">
+                  <h4 className="font-semibold text-pink-600 mb-2">Personality</h4>
+                  <div className="space-y-2">
+                    {match.introvert_extrovert !== undefined && (
+                      <div className="flex items-center justify-between text-xs">
+                        <span className="text-gray-700">Introvert</span>
+                        <div className="flex-1 mx-2 bg-gray-200 rounded-full h-2">
+                          <div 
+                            className="bg-pink-500 h-2 rounded-full" 
+                            style={{ width: `${match.introvert_extrovert}%` }}
+                          ></div>
+                        </div>
+                        <span className="text-gray-700">Extrovert</span>
+                      </div>
+                    )}
+                    {match.spontaneous_planner !== undefined && (
+                      <div className="flex items-center justify-between text-xs">
+                        <span className="text-gray-700">Spontaneous</span>
+                        <div className="flex-1 mx-2 bg-gray-200 rounded-full h-2">
+                          <div 
+                            className="bg-pink-500 h-2 rounded-full" 
+                            style={{ width: `${match.spontaneous_planner}%` }}
+                          ></div>
+                        </div>
+                        <span className="text-gray-700">Planner</span>
+                      </div>
+                    )}
+                    {match.messy_organized !== undefined && (
+                      <div className="flex items-center justify-between text-xs">
+                        <span className="text-gray-700">Messy</span>
+                        <div className="flex-1 mx-2 bg-gray-200 rounded-full h-2">
+                          <div 
+                            className="bg-pink-500 h-2 rounded-full" 
+                            style={{ width: `${match.messy_organized}%` }}
+                          ></div>
+                        </div>
+                        <span className="text-gray-700">Organized</span>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              )}
+
+              {/* Fun Questions */}
+              {(match.fun_fact || match.perfect_first_date || match.last_googled) && (
+                <div className="bg-white rounded-lg p-3 shadow-sm">
+                  <h4 className="font-semibold text-pink-600 mb-2">Fun Questions</h4>
+                  <div className="space-y-2">
+                    {match.fun_fact && (
+                      <div className="text-xs">
+                        <div className="flex items-center mb-1">
+                          <Quote className="w-3 h-3 mr-1 text-pink-500" />
+                          <span className="font-medium text-gray-700">Fun Fact:</span>
+                        </div>
+                        <p className="text-gray-600 leading-relaxed ml-4">{match.fun_fact}</p>
+                      </div>
+                    )}
+                    {match.perfect_first_date && (
+                      <div className="text-xs">
+                        <div className="flex items-center mb-1">
+                          <Coffee className="w-3 h-3 mr-1 text-pink-500" />
+                          <span className="font-medium text-gray-700">Perfect First Date:</span>
+                        </div>
+                        <p className="text-gray-600 leading-relaxed ml-4">{match.perfect_first_date}</p>
+                      </div>
+                    )}
+                    {match.last_googled && (
+                      <div className="text-xs">
+                        <div className="flex items-center mb-1">
+                          <Search className="w-3 h-3 mr-1 text-pink-500" />
+                          <span className="font-medium text-gray-700">Last Googled:</span>
+                        </div>
+                        <p className="text-gray-600 leading-relaxed ml-4">{match.last_googled}</p>
+                      </div>
+                    )}
                   </div>
                 </div>
               )}

@@ -25,6 +25,14 @@ export interface PotentialMatch {
   fun_fact?: string;
   perfect_first_date?: string;
   last_googled?: string;
+  relationship_intent?: string;
+  smoking?: string;
+  drinking?: string;
+  exercise_level?: string;
+  sleeping_schedule?: string;
+  introvert_extrovert?: number;
+  spontaneous_planner?: number;
+  messy_organized?: number;
 }
 
 export interface ChatMatch {
