@@ -46,13 +46,13 @@ const ChatPage = ({ currentUser, onUnreadChange }: ChatPageProps) => {
   useEffect(() => {
     if (selectedMatch) {
       const channel = supabase
-        .channel(`messages:${selectedMatch.id}`)
+        .channel(`chats:${selectedMatch.id}`)
         .on(
           'postgres_changes',
           {
             event: 'INSERT',
             schema: 'public',
-            table: 'messages',
+            table: 'chats',
             filter: `match_id=eq.${selectedMatch.id}`,
           },
           (payload) => {
@@ -82,7 +82,7 @@ const ChatPage = ({ currentUser, onUnreadChange }: ChatPageProps) => {
           *,
           user1:profiles!matches_user1_id_fkey(id, first_name, last_name, is_admin),
           user2:profiles!matches_user2_id_fkey(id, first_name, last_name, is_admin),
-          messages(id, message, created_at, sender_id)
+          chats(id, message, created_at, sender_id, is_read)
         `)
         .or(`user1_id.eq.${currentUser.id},user2_id.eq.${currentUser.id}`)
         .order('created_at', { ascending: false });
@@ -91,17 +91,18 @@ const ChatPage = ({ currentUser, onUnreadChange }: ChatPageProps) => {
 
       const matchesWithPartner = matches?.map(match => {
         const partner = match.user1_id === currentUser.id ? match.user2 : match.user1;
-        const lastMessage = match.messages?.[match.messages.length - 1];
+        const lastMessage = match.chats?.[match.chats.length - 1];
         
         // Count unread messages
-        const unreadCount = match.messages?.filter(msg => 
+        const unreadCount = match.chats?.filter(msg => 
           msg.sender_id !== currentUser.id && !msg.is_read
         ).length || 0;
 
         return {
           ...match,
           partner,
-          last_message: lastMessage,
+          last_message: lastMessage?.message || '',
+          last_message_obj: lastMessage,
           unreadCount,
           // For compatibility with ChatMatch interface
           id: match.id,
@@ -127,10 +128,10 @@ const ChatPage = ({ currentUser, onUnreadChange }: ChatPageProps) => {
 
     try {
       const { data, error } = await supabase
-        .from('messages')
+        .from('chats')
         .select(`
           *,
-          sender:profiles!messages_sender_id_fkey(first_name, last_name)
+          sender:profiles!chats_sender_id_fkey(first_name, last_name)
         `)
         .eq('match_id', selectedMatch.id)
         .order('created_at', { ascending: true });
@@ -157,7 +158,7 @@ const ChatPage = ({ currentUser, onUnreadChange }: ChatPageProps) => {
 
     try {
       const isUser1 = selectedMatch.user1_id === currentUser.id;
-      const unreadField = isUser1 ? 'user1_unread' : 'user2_unread';
+      const unreadField = isUser1 ? 'user1_unread_count' : 'user2_unread_count';
 
       await supabase
         .from('matches')
@@ -165,7 +166,7 @@ const ChatPage = ({ currentUser, onUnreadChange }: ChatPageProps) => {
         .eq('id', selectedMatch.id);
 
       await supabase
-        .from('messages')
+        .from('chats')
         .update({ is_read: true })
         .eq('match_id', selectedMatch.id)
         .neq('sender_id', currentUser.id);
@@ -191,10 +192,10 @@ const ChatPage = ({ currentUser, onUnreadChange }: ChatPageProps) => {
 
     try {
       const isUser1 = selectedMatch.user1_id === currentUser.id;
-      const unreadField = isUser1 ? 'user2_unread' : 'user1_unread';
+      const unreadField = isUser1 ? 'user2_unread_count' : 'user1_unread_count';
 
       const { error } = await supabase
-        .from('messages')
+        .from('chats')
         .insert({
           match_id: selectedMatch.id,
           sender_id: currentUser.id,
@@ -203,11 +204,11 @@ const ChatPage = ({ currentUser, onUnreadChange }: ChatPageProps) => {
 
       if (error) throw error;
 
-      // Update unread count for the receiver
-      await supabase
-        .from('matches')
-        .update({ [unreadField]: supabase.raw(`${unreadField} + 1`) })
-        .eq('id', selectedMatch.id);
+      // Update unread count for the receiver  
+      await supabase.rpc('increment_unread_count', { 
+        match_id_input: selectedMatch.id, 
+        field_name: unreadField 
+      });
 
       setNewMessage('');
       onUnreadChange?.();
