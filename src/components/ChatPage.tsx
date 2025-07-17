@@ -1,6 +1,8 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
+import { usePushNotifications } from '@/hooks/usePushNotifications';
+import { requestNotificationPermission } from '@/services/pushNotifications';
 import UserProfileModal from './UserProfileModal';
 import BlockDialog from './BlockDialog';
 import ChatUserList from './chat/ChatUserList';
@@ -26,6 +28,7 @@ const ChatPage = ({ currentUser, onUnreadChange }: ChatPageProps) => {
   const [isBlockDialogOpen, setIsBlockDialogOpen] = useState(false);
   const [userToBlock, setUserToBlock] = useState<ChatMatch | null>(null);
   const { toast } = useToast();
+  const { sendMessageNotification, isInitialized, isSupported } = usePushNotifications(currentUser.id);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const messagesContainerRef = useRef<HTMLDivElement>(null);
 
@@ -222,6 +225,25 @@ const ChatPage = ({ currentUser, onUnreadChange }: ChatPageProps) => {
 
       if (error) throw error;
 
+      // Send push notification to the recipient
+      const recipientId = selectedMatch.user1_id === currentUser.id 
+        ? selectedMatch.user2_id 
+        : selectedMatch.user1_id;
+      
+      const senderName = `${currentUser.first_name || ''} ${currentUser.last_name || ''}`.trim() || 'Someone';
+      
+      // Send notification (don't await to avoid blocking UI)
+      if (isSupported && isInitialized) {
+        sendMessageNotification(
+          senderName,
+          newMessage.trim(),
+          recipientId,
+          selectedMatch.id
+        ).catch(() => {
+          // Silently handle notification errors
+        });
+      }
+
       // Try to update unread count (only if field exists)
       try {
         const isUser1 = selectedMatch.user1_id === currentUser.id;
@@ -243,6 +265,62 @@ const ChatPage = ({ currentUser, onUnreadChange }: ChatPageProps) => {
       toast({
         title: 'Error',
         description: 'Failed to send message. Please try again.',
+        variant: 'destructive'
+      });
+    }
+  };
+
+  const testNotification = async () => {
+    try {
+      // First check if browser supports notifications
+      if (!('Notification' in window)) {
+        toast({
+          title: 'Not Supported',
+          description: 'This browser does not support notifications.',
+          variant: 'destructive'
+        });
+        return;
+      }
+
+      // Check current permission
+      if (Notification.permission === 'denied') {
+        toast({
+          title: 'Permission Denied',
+          description: 'Notifications are blocked. Please enable them in your browser settings.',
+          variant: 'destructive'
+        });
+        return;
+      }
+
+      // Request permission if not granted
+      if (Notification.permission === 'default') {
+        const granted = await requestNotificationPermission();
+        if (!granted) {
+          toast({
+            title: 'Permission Required',
+            description: 'Please allow notifications to receive message alerts.',
+            variant: 'destructive'
+          });
+          return;
+        }
+      }
+
+      // Send test notification
+      if (Notification.permission === 'granted') {
+        new Notification('DripLove Test 🔔', {
+          body: 'Notifications are working! You\'ll receive alerts for new messages.',
+          icon: '/favicon.ico'
+        });
+        
+        toast({
+          title: 'Test Successful! 🎉',
+          description: 'You should see a notification. Message alerts are now enabled.',
+        });
+      }
+    } catch (error) {
+      toast({
+        title: 'Test Failed',
+        description: 'Something went wrong testing notifications.',
         variant: 'destructive'
       });
     }
@@ -395,6 +473,7 @@ const ChatPage = ({ currentUser, onUnreadChange }: ChatPageProps) => {
           onBack={() => setSelectedMatch(null)}
           onUserProfileOpen={handleUserProfileClick}
           onBlockUser={handleBlockClick}
+          onTestNotification={testNotification}
           isMobile={true}
           currentUserId={currentUser.id}
         />

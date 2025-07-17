@@ -35,16 +35,12 @@ const MainApp = ({ user, onLogout }: MainAppProps) => {
     sendLikeNotification
   } = usePushNotifications(user?.id);
 
-  // Silent push notification initialization - no user notifications
+    // Silent push notification initialization - no user notifications
   useEffect(() => {
-    if (pushSupported && pushInitialized) {
-      console.log('🔔 Push notifications initialized silently');
-    } else if (pushSupported && pushError) {
-      console.log('⚠️ Push notifications error:', pushError);
-    } else if (!pushSupported) {
-      console.log('📱 Push notifications not supported on this platform');
+    if (pushSupported && !pushError) {
+      // Silently initialize notifications
     }
-  }, [pushInitialized, pushSupported, pushError]);
+  }, [pushSupported, pushError]);
 
   useEffect(() => {
     fetchUserProfile();

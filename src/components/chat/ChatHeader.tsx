@@ -15,6 +15,7 @@ interface ChatHeaderProps {
   onBack: () => void;
   onUserProfileOpen: (userId: string) => void;
   onBlockUser: (user: ChatMatch) => void;
+  onTestNotification?: () => void;
   isMobile?: boolean;
   currentUserId?: string;
 }
@@ -24,6 +25,7 @@ const ChatHeader: React.FC<ChatHeaderProps> = ({
   onBack,
   onUserProfileOpen,
   onBlockUser,
+  onTestNotification,
   isMobile = false,
   currentUserId
 }) => {
@@ -69,6 +71,14 @@ const ChatHeader: React.FC<ChatHeaderProps> = ({
           </Button>
         </DropdownMenuTrigger>
         <DropdownMenuContent align="end">
+          {onTestNotification && (
+            <DropdownMenuItem 
+              onClick={onTestNotification}
+              className="text-blue-600"
+            >
+              🔔 Test Notifications
+            </DropdownMenuItem>
+          )}
           <DropdownMenuItem 
             onClick={() => onBlockUser(selectedMatch)}
             className="text-red-600"

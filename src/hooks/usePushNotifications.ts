@@ -26,7 +26,6 @@ export const usePushNotifications = (userId?: string) => {
         setIsSupported(webSupported);
         
         if (!webSupported) {
-          console.log('📱 Push notifications not supported on this platform');
           return;
         }
 
@@ -42,17 +41,10 @@ export const usePushNotifications = (userId?: string) => {
           // Load unread notifications count
           const unreadNotifications = await getUnreadNotifications(userId);
           setUnreadCount(unreadNotifications.length);
-          
-          if (hasPermission) {
-            console.log('🔔 Push notifications ready - permission already granted');
-          } else {
-            console.log('🔔 Push notifications initialized - permission not yet granted');
-          }
         } else {
           setError('Failed to initialize push notifications');
         }
       } catch (err) {
-        console.error('❌ Error initializing push notifications:', err);
         setError(err instanceof Error ? err.message : 'Unknown error');
         setIsInitialized(false);
       }
@@ -71,7 +63,6 @@ export const usePushNotifications = (userId?: string) => {
       const success = await sendPushNotification(notification);
       return success;
     } catch (err) {
-      console.error('❌ Error sending notification:', err);
       return false;
     }
   };
@@ -125,7 +116,6 @@ export const usePushNotifications = (userId?: string) => {
       }
       return success;
     } catch (err) {
-      console.error('❌ Error marking notification as read:', err);
       return false;
     }
   };
@@ -136,7 +126,7 @@ export const usePushNotifications = (userId?: string) => {
       const unreadNotifications = await getUnreadNotifications(userId);
       setUnreadCount(unreadNotifications.length);
     } catch (err) {
-      console.error('❌ Error refreshing unread count:', err);
+      // Silently handle errors
     }
   };
 
