@@ -30,8 +30,17 @@ const TermsOfService = ({ onBack }: TermsOfServiceProps) => {
           <section>
             <h2 className="text-2xl font-semibold text-gray-800 mb-4">1. Acceptance of Terms</h2>
             <p className="text-gray-600 leading-relaxed">
-              By accessing and using AfroVibe ("the Service"), you accept and agree to be bound by the terms and provision of this agreement. 
+              By accessing and using DripLove ("the Service"), you accept and agree to be bound by the terms and provision of this agreement. 
               If you do not agree to abide by the above, please do not use this service.
+            </p>
+            
+            <p className="text-gray-700 mb-6">
+              DripLove is a property of The ScREAte Ltd, a technology company dedicated to creating innovative digital solutions.
+            </p>
+            
+            <h3 className="text-xl font-semibold text-gray-900 mb-4">Service Description</h3>
+            <p className="text-gray-700 mb-6">
+              DripLove is a dating platform designed to connect individuals from diverse backgrounds worldwide.
             </p>
           </section>
 
@@ -53,7 +62,7 @@ const TermsOfService = ({ onBack }: TermsOfServiceProps) => {
           <section>
             <h2 className="text-2xl font-semibold text-gray-800 mb-4">3. User Eligibility</h2>
             <div className="text-gray-600 leading-relaxed space-y-3">
-              <p>To use AfroVibe, you must:</p>
+              <p>To use DripLove, you must:</p>
               <ul className="list-disc list-inside space-y-2">
                 <li>Be at least 18 years of age</li>
                 <li>Provide accurate and truthful information</li>
@@ -83,7 +92,7 @@ const TermsOfService = ({ onBack }: TermsOfServiceProps) => {
           <section>
             <h2 className="text-2xl font-semibold text-gray-800 mb-4">5. Premium Subscription</h2>
             <div className="text-gray-600 leading-relaxed space-y-3">
-              <p>AfroVibe offers premium subscription features including:</p>
+              <p>DripLove offers premium subscription features including:</p>
               <ul className="list-disc list-inside space-y-2">
                 <li>Unlimited likes and super likes</li>
                 <li>Advanced filtering options</li>
@@ -107,16 +116,16 @@ const TermsOfService = ({ onBack }: TermsOfServiceProps) => {
 
           <section>
             <h2 className="text-2xl font-semibold text-gray-800 mb-4">7. Content and Intellectual Property</h2>
-            <div className="text-gray-600 leading-relaxed space-y-3">
-              <p>
-                Users retain ownership of content they upload but grant AfroVibe a license to use, display, and distribute such content 
-                for the purpose of providing and improving our service.
-              </p>
-              <p>
-                All AfroVibe branding, logos, and proprietary content remain the exclusive property of AfroVibe and may not be used 
-                without express written permission.
-              </p>
-            </div>
+            <ul className="text-gray-600 leading-relaxed space-y-3">
+              <li>
+                Users retain ownership of content they upload but grant DripLove a license to use, display, and distribute such content 
+                within the platform for its intended purpose.
+              </li>
+              <li>
+                All DripLove branding, logos, and proprietary content remain the exclusive property of The ScREAte Ltd and may not be used 
+                without explicit written permission.
+              </li>
+            </ul>
           </section>
 
           <section>
@@ -144,7 +153,7 @@ const TermsOfService = ({ onBack }: TermsOfServiceProps) => {
           <section>
             <h2 className="text-2xl font-semibold text-gray-800 mb-4">10. Limitation of Liability</h2>
             <p className="text-gray-600 leading-relaxed">
-              AfroVibe provides the service "as is" without warranties. We are not liable for any damages resulting from use of our platform, 
+              DripLove provides the service "as is" without warranties. We are not liable for any damages resulting from use of our platform, 
               including but not limited to interactions between users, technical issues, or data loss.
             </p>
           </section>
@@ -162,8 +171,8 @@ const TermsOfService = ({ onBack }: TermsOfServiceProps) => {
             <div className="text-gray-600 leading-relaxed">
               <p>For questions about these Terms of Service, please contact us at:</p>
               <div className="mt-3 bg-gray-50 p-4 rounded-lg">
-                <p>Email: support@afrovibe.com</p>
-                <p>Address: AfroVibe Support Team</p>
+                <p>Email: support@driplove.com</p>
+                <p>Address: The ScREAte Ltd Support Team</p>
                 <p>Phone: +1 (555) 123-4567</p>
               </div>
             </div>

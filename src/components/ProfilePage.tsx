@@ -43,6 +43,8 @@ const ProfilePage = ({ currentUser, profile, onProfileUpdate, onLogout, onShowTe
     country: '',
     country_code: '',
     max_distance: 50,
+    min_age: 18,
+    max_age: 99,
     gender: '',
     preference: '',
     relationship_intent: '',
@@ -79,6 +81,8 @@ const ProfilePage = ({ currentUser, profile, onProfileUpdate, onLogout, onShowTe
         country: profile.country || '',
         country_code: profile.country_code || '',
         max_distance: profile.max_distance || profile.distance_preference || 50,
+        min_age: profile.min_age || 18,
+        max_age: profile.max_age || 99,
         gender: profile.gender || '',
         preference: profile.preference || '',
         relationship_intent: profile.relationship_intent || '',
@@ -111,6 +115,10 @@ const ProfilePage = ({ currentUser, profile, onProfileUpdate, onLogout, onShowTe
 
   const handleSliderChange = (name: string, value: number[]) => {
     setEditedProfile(prev => ({ ...prev, [name]: value[0] }));
+  };
+
+  const handleAgeRangeChange = (range: number[]) => {
+    setEditedProfile(prev => ({ ...prev, min_age: range[0], max_age: range[1] }));
   };
 
   const handleSelectChange = (name: string, value: string) => {
@@ -163,6 +171,8 @@ const ProfilePage = ({ currentUser, profile, onProfileUpdate, onLogout, onShowTe
         date_of_birth: profile?.date_of_birth || currentUser?.user_metadata?.date_of_birth || '1990-01-01',
         email: currentUser.email,
         max_distance: editedProfile.max_distance || 50,
+        min_age: editedProfile.min_age || 18,
+        max_age: editedProfile.max_age || 99,
         gender: editedProfile.gender || 'not_specified',
         preference: editedProfile.preference || 'not_specified',
         relationship_intent: editedProfile.relationship_intent || 'open_to_anything',
@@ -229,7 +239,7 @@ const ProfilePage = ({ currentUser, profile, onProfileUpdate, onLogout, onShowTe
 
       setIsEditing(false);
       onProfileUpdate();
-      toast({ title: 'Profile updated', description: 'Your AfroVibe profile has been saved successfully.' });
+      toast({ title: 'Profile updated', description: 'Your DripLove profile has been saved successfully.' });
     } catch (error: any) {
       console.error('🚨 Save failed:', error);
       toast({ title: 'Error', description: error.message || 'Failed to update profile.', variant: 'destructive' });
@@ -248,6 +258,8 @@ const ProfilePage = ({ currentUser, profile, onProfileUpdate, onLogout, onShowTe
         country: profile.country || '',
         country_code: profile.country_code || '',
         max_distance: profile.max_distance || profile.distance_preference || 50,
+        min_age: profile.min_age || 18,
+        max_age: profile.max_age || 99,
         gender: profile.gender || '',
         preference: profile.preference || '',
         relationship_intent: profile.relationship_intent || '',
@@ -538,7 +550,13 @@ const ProfilePage = ({ currentUser, profile, onProfileUpdate, onLogout, onShowTe
             onLocationChange={handleLocationChange}
             onDistanceChange={handleDistanceChange}
           />
-          <PreferencesSection editedProfile={editedProfile} isEditing={isEditing} onSliderChange={handleSliderChange} onSelectChange={handleSelectChange} />
+          <PreferencesSection 
+            editedProfile={editedProfile} 
+            isEditing={isEditing} 
+            onSliderChange={handleSliderChange} 
+            onSelectChange={handleSelectChange} 
+            onAgeRangeChange={handleAgeRangeChange} 
+          />
           <LifestyleSection editedProfile={editedProfile} isEditing={isEditing} onSelectChange={handleSelectChange} />
           <WorkEducationSection editedProfile={editedProfile} isEditing={isEditing} onInputChange={handleInputChange} />
           <PersonalitySection editedProfile={editedProfile} isEditing={isEditing} onSliderChange={handleSliderChange} />

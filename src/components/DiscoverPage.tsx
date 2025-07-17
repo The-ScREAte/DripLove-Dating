@@ -6,6 +6,21 @@ import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import { useSubscription } from '@/hooks/useSubscription';
 import { calculateDistance } from '@/constants/locationData';
+
+// Helper function to calculate age from date of birth
+const calculateAge = (dateOfBirth: string): number => {
+  const today = new Date();
+  const birthDate = new Date(dateOfBirth);
+  let age = today.getFullYear() - birthDate.getFullYear();
+  const monthDiff = today.getMonth() - birthDate.getMonth();
+  
+  if (monthDiff < 0 || (monthDiff === 0 && today.getDate() < birthDate.getDate())) {
+    age--;
+  }
+  
+  return age;
+};
+
 import PremiumUpgrade from './PremiumUpgrade';
 import MatchAnimation from './MatchAnimation';
 import MatchCard from './discover/MatchCard';
@@ -154,6 +169,20 @@ const DiscoverPage = ({ currentUser, onNavigateToChat }: DiscoverPageProps) => {
         console.log('No distance filtering applied - missing coordinates or preference');
       }
 
+      // Apply age filtering based on user preferences
+      const userMinAge = currentUser.min_age || 18;
+      const userMaxAge = currentUser.max_age || 99;
+      
+      const beforeAgeFilter = filteredProfiles.length;
+      filteredProfiles = filteredProfiles.filter(profile => {
+        if (!profile.date_of_birth) return false; // Exclude profiles without birth date
+        
+        const age = calculateAge(profile.date_of_birth);
+        return age >= userMinAge && age <= userMaxAge;
+      });
+
+      console.log(`Applied age filter: ${beforeAgeFilter} -> ${filteredProfiles.length} profiles within ${userMinAge}-${userMaxAge} age range`);
+
       // Add empty images array to match interface
       const profilesWithImages = filteredProfiles.map(profile => ({
         ...profile,
@@ -163,8 +192,8 @@ const DiscoverPage = ({ currentUser, onNavigateToChat }: DiscoverPageProps) => {
       const shuffled = profilesWithImages.sort(() => 0.5 - Math.random());
 
       // Load last profile ID and time from localStorage
-      const savedId = localStorage.getItem('afrovibe_last_profile_id');
-      const savedTime = parseInt(localStorage.getItem('afrovibe_last_profile_time') || '0');
+      const savedId = localStorage.getItem('driplove_last_profile_id');
+      const savedTime = parseInt(localStorage.getItem('driplove_last_profile_time') || '0');
       const twentyFourHours = 24 * 60 * 60 * 1000;
       const isSavedValid = savedId && Date.now() - savedTime < twentyFourHours;
 
@@ -239,8 +268,8 @@ const DiscoverPage = ({ currentUser, onNavigateToChat }: DiscoverPageProps) => {
   // Save current match state
   useEffect(() => {
     if (potentialMatches.length > 0) {
-      localStorage.setItem('afrovibe_last_profile_id', potentialMatches[currentIndex]?.id || '');
-      localStorage.setItem('afrovibe_last_profile_time', Date.now().toString());
+      localStorage.setItem('driplove_last_profile_id', potentialMatches[currentIndex]?.id || '');
+      localStorage.setItem('driplove_last_profile_time', Date.now().toString());
     }
   }, [currentIndex, potentialMatches]);
 

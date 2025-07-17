@@ -9,9 +9,10 @@ interface PreferencesSectionProps {
   isEditing: boolean;
   onSliderChange: (name: string, value: number[]) => void;
   onSelectChange: (name: string, value: string) => void;
+  onAgeRangeChange?: (range: number[]) => void;
 }
 
-const PreferencesSection = ({ editedProfile, isEditing, onSliderChange, onSelectChange }: PreferencesSectionProps) => {
+const PreferencesSection = ({ editedProfile, isEditing, onSliderChange, onSelectChange, onAgeRangeChange }: PreferencesSectionProps) => {
   return (
     <Card>
       <CardHeader>
@@ -45,6 +46,33 @@ const PreferencesSection = ({ editedProfile, isEditing, onSliderChange, onSelect
                   <SelectItem value="everyone">Both</SelectItem>
                   </SelectContent>
               </Select>
+            </div>
+          </div>
+          
+          {/* Age Range Preference */}
+          <div className="space-y-3">
+            <Label>Age Range for Matches</Label>
+            <div className="px-3">
+              <Slider
+                value={[editedProfile.min_age || 18, editedProfile.max_age || 99]}
+                onValueChange={onAgeRangeChange || (() => {})}
+                max={99}
+                min={18}
+                step={1}
+                className="w-full"
+                disabled={!isEditing}
+              />
+              <div className="flex justify-between text-xs text-gray-500 mt-1">
+                <span>18 years</span>
+                <span className="font-medium">
+                  {editedProfile.min_age || 18} - {editedProfile.max_age || 99} years
+                </span>
+                <span>99 years</span>
+              </div>
+            </div>
+            <div className="text-sm text-gray-600">
+              Set the age range for potential matches. 
+              You'll only see profiles within this age range.
             </div>
           </div>
         </div>

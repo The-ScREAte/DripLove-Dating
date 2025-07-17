@@ -107,10 +107,10 @@ const AccountActions = ({ currentUser, onLogout, onShowTerms, onShowPrivacy }: A
             Contact our support team for any questions or assistance:
           </p>
           <a 
-            href="mailto:support@afrovibe.com" 
-            className="text-pink-600 hover:text-pink-700 font-medium hover:underline"
+            href="mailto:support@driplove.com" 
+            className="text-blue-600 hover:text-blue-800 underline"
           >
-            support@afrovibe.com
+            support@driplove.com
           </a>
         </div>
 

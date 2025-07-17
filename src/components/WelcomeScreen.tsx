@@ -26,19 +26,19 @@ const WelcomeScreen = ({ onGetStarted, onAdminAccess, onShowAbout, onShowTerms, 
         {/* Logo */}
         <div className="mb-8 flex justify-center">
           <img 
-            src="/lovable-uploads/0e9bd84b-0f71-493b-8c1f-1a2883e5109d.png" 
-            alt="AfroVibe Logo" 
-            className="h-32 w-auto"
+            src="/driplove-logo.png" 
+            alt="DripLove Logo" 
+            className="h-56 w-auto"
           />
         </div>
         
         {/* Tagline */}
         <h2 className="text-2xl md:text-3xl font-bold mb-4 leading-tight">
-          Where African Hearts Connect
+          Where Hearts Connect Worldwide
         </h2>
         
         <p className="text-lg md:text-xl mb-8 opacity-90 leading-relaxed">
-          Discover meaningful connections within the vibrant African diaspora community
+          Discover meaningful connections with people from all walks of life
         </p>
         
         {/* CTA Button */}

@@ -28,21 +28,21 @@ const AboutUs = ({ onBack }: AboutUsProps) => {
           {/* Logo */}
           <div className="text-center mb-8">
             <img 
-              src="/lovable-uploads/0e9bd84b-0f71-493b-8c1f-1a2883e5109d.png" 
-              alt="AfroVibe Logo" 
-              className="h-24 w-auto mx-auto mb-4"
+              src="/driplove-logo.png" 
+              alt="DripLove Logo" 
+              className="h-32 w-auto mx-auto mb-4"
             />
-            <h1 className="text-3xl font-bold text-gray-900 mb-2">Where African Hearts Connect</h1>
+            <h1 className="text-3xl font-bold text-gray-900 mb-2">Where Hearts Connect Worldwide</h1>
           </div>
 
           {/* Main Description */}
           <div className="space-y-6 text-gray-700 leading-relaxed mb-12">
             <p className="text-lg">
-              AfroVibe is more than just a dating platform – it's a vibrant community where African hearts connect across continents. Born from the vision of bringing together the rich diversity of the African diaspora, we understand the unique beauty of African culture, values, and traditions that make our community special. Whether you're in Lagos, London, New York, or anywhere in between, AfroVibe creates meaningful connections that transcend geographical boundaries.
+              DripLove is more than just a dating platform – it's a vibrant community where hearts connect across continents. Born from the vision of bringing together people from diverse backgrounds, we create meaningful connections that transcend geographical boundaries. Whether you're in New York, London, Tokyo, or anywhere in between, DripLove creates meaningful connections worldwide.
             </p>
             
             <p className="text-lg">
-              Our mission is to foster authentic relationships built on shared heritage, mutual respect, and genuine compatibility. We believe that love knows no borders, and through our carefully crafted matching system, we help you discover someone who not only captures your heart but also understands your journey. At AfroVibe, every swipe brings you closer to finding your perfect match within our beautiful, diverse African community worldwide.
+              Our mission is to foster authentic relationships built on genuine compatibility and shared values. We believe that love knows no borders, and through our carefully crafted matching system, we help you discover someone who not only captures your heart but also understands your journey. At DripLove, every swipe brings you closer to finding your perfect match within our beautiful, diverse global community.
             </p>
           </div>
 
@@ -57,7 +57,7 @@ const AboutUs = ({ onBack }: AboutUsProps) => {
             <div className="text-center p-6 bg-purple-50 rounded-lg">
               <Users className="w-12 h-12 text-purple-600 mx-auto mb-4" />
               <h3 className="text-xl font-semibold text-gray-900 mb-3">Diverse Community</h3>
-              <p className="text-gray-600">Connect with African singles from all walks of life across the globe</p>
+              <p className="text-gray-600">Connect with singles from all walks of life across the globe</p>
             </div>
 
             <div className="text-center p-6 bg-indigo-50 rounded-lg">
@@ -71,7 +71,7 @@ const AboutUs = ({ onBack }: AboutUsProps) => {
           <div className="bg-gray-50 rounded-lg p-8 mb-12">
             <h2 className="text-2xl font-bold text-gray-900 mb-4">About The Company</h2>
             <p className="text-gray-700 leading-relaxed">
-              AfroVibe is proudly developed by The ScREAte Company Ltd, a technology company dedicated to creating innovative solutions that bring communities together. We are committed to building safe, inclusive, and empowering digital spaces for the African diaspora.
+              DripLove is proudly developed by The ScREAte Company Ltd, a technology company dedicated to creating innovative solutions that bring communities together. We are committed to building safe, inclusive, and empowering digital spaces for people worldwide.
             </p>
           </div>
 
@@ -80,13 +80,13 @@ const AboutUs = ({ onBack }: AboutUsProps) => {
             <Mail className="w-12 h-12 text-pink-600 mx-auto mb-4" />
             <h2 className="text-2xl font-bold text-gray-900 mb-4">Need Help?</h2>
             <p className="text-gray-700 mb-4">
-              Our support team is here to help you make the most of your AfroVibe experience.
+              Our support team is here to help you make the most of your DripLove experience.
             </p>
             <a 
-              href="mailto:support@afrovibe.com" 
+              href="mailto:support@driplove.com" 
               className="text-pink-600 hover:text-pink-700 font-semibold text-lg hover:underline"
             >
-              support@afrovibe.com
+              support@driplove.com
             </a>
           </div>
         </div>

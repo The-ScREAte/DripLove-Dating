@@ -354,7 +354,9 @@ export type Database = {
           like_me_cooldown_until: string | null
           longitude: number | null
           max_distance: number | null
+          max_age: number | null
           messy_organized: number | null
+          min_age: number | null
           occupation: string | null
           perfect_first_date: string | null
           preference: string
@@ -395,7 +397,9 @@ export type Database = {
           like_me_cooldown_until?: string | null
           longitude?: number | null
           max_distance?: number | null
+          max_age?: number | null
           messy_organized?: number | null
+          min_age?: number | null
           occupation?: string | null
           perfect_first_date?: string | null
           preference: string
@@ -436,7 +440,9 @@ export type Database = {
           like_me_cooldown_until?: string | null
           longitude?: number | null
           max_distance?: number | null
+          max_age?: number | null
           messy_organized?: number | null
+          min_age?: number | null
           occupation?: string | null
           perfect_first_date?: string | null
           preference?: string

@@ -48,7 +48,7 @@ const FlwPaymentModal: React.FC<FlwPaymentModalProps> = ({ isOpen, onClose, amou
       }
       (window as any).FlutterwaveCheckout({
         public_key: FLW_PUBLIC_KEY,
-        tx_ref: `afrovibe-premium-${Date.now()}`,
+        tx_ref: `driplove-premium-${Date.now()}`,
         amount,
         currency,
         payment_options,
@@ -58,7 +58,7 @@ const FlwPaymentModal: React.FC<FlwPaymentModalProps> = ({ isOpen, onClose, amou
         meta,
         redirect_url: window.location.origin + '/payment-success',
         customizations: {
-          title: 'Afrovibe Premium',
+          title: 'DripLove Premium',
           description: 'Upgrade to premium',
           logo: '/favicon.ico',
         },

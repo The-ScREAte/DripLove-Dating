@@ -22,6 +22,8 @@ export interface PotentialMatch {
   gender: string;
   latitude?: number;
   longitude?: number;
+  min_age?: number;
+  max_age?: number;
   fun_fact?: string;
   perfect_first_date?: string;
   last_googled?: string;

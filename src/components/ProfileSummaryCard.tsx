@@ -68,7 +68,7 @@ const ProfileSummaryCard = ({ currentUser }: ProfileSummaryCardProps) => {
       <CardHeader>
         <CardTitle className="flex items-center space-x-2">
           <Users className="w-5 h-5 text-pink-600" />
-          <span>Your AfroVibe Summary</span>
+          <span>Your DripLove Summary</span>
         </CardTitle>
       </CardHeader>
       <CardContent>

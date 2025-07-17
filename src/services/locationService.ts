@@ -254,25 +254,15 @@ class LocationService {
 
   /**
    * Check if two countries are in the same region (for broader matching)
+   * Updated for global compatibility - all users can connect worldwide
    */
   private areCountriesInSameRegion(country1: string, country2: string): boolean {
-    const africanCountries = ['NG', 'GH', 'KE', 'UG', 'TZ', 'ZA', 'EG', 'MA', 'SN', 'ET', 'ZW'];
-    const europeanCountries = ['GB', 'FR', 'DE', 'IT', 'ES', 'NL', 'SE', 'NO', 'DK'];
-    const northAmericanCountries = ['US', 'CA', 'MX'];
-
-    const isAfrican1 = africanCountries.includes(country1);
-    const isAfrican2 = africanCountries.includes(country2);
-    if (isAfrican1 && isAfrican2) return true;
-
-    const isEuropean1 = europeanCountries.includes(country1);
-    const isEuropean2 = europeanCountries.includes(country2);
-    if (isEuropean1 && isEuropean2) return true;
-
-    const isNorthAmerican1 = northAmericanCountries.includes(country1);
-    const isNorthAmerican2 = northAmericanCountries.includes(country2);
-    if (isNorthAmerican1 && isNorthAmerican2) return true;
-
-    return false;
+    // For global compatibility, we'll prioritize same country matches
+    // but allow connections worldwide
+    if (country1 === country2) return true;
+    
+    // All users worldwide can connect regardless of region
+    return true;
   }
 
   /**

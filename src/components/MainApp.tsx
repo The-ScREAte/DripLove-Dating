@@ -184,9 +184,9 @@ const MainApp = ({ user, onLogout }: MainAppProps) => {
           <div className="fixed top-0 left-0 right-0 w-full bg-white shadow-sm border-b z-50">
             <div className="px-4 py-2 flex justify-start items-center">
               <img 
-                src="/lovable-uploads/0e9bd84b-0f71-493b-8c1f-1a2883e5109d.png" 
-                alt="AfroVibe Logo" 
-                className="h-10"
+                src="/driplove-logo.png" 
+                alt="DripLove Logo" 
+                className="h-12"
               />
             </div>
           </div>

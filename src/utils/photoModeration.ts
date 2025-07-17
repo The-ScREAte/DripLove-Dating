@@ -1,5 +1,5 @@
 /**
- * AI Photo Moderation Service for AfroVibe
+ * AI Photo Moderation Service for DripLove
  * Provides content moderation capabilities for user uploaded images
  */
 
