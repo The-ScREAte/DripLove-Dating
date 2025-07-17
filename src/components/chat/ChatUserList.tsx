@@ -11,6 +11,7 @@ interface ChatUserListProps {
   onMatchSelect: (match: ChatMatch) => void;
   onUserProfileOpen: (userId: string) => void;
   onSearchChange?: (searchTerm: string) => void;
+  currentUserId?: string;
 }
 
 const ChatUserList: React.FC<ChatUserListProps> = ({
@@ -19,7 +20,8 @@ const ChatUserList: React.FC<ChatUserListProps> = ({
   searchTerm,
   onMatchSelect,
   onUserProfileOpen,
-  onSearchChange
+  onSearchChange,
+  currentUserId
 }) => {
   const [localSearchTerm, setLocalSearchTerm] = React.useState(searchTerm);
 
@@ -35,7 +37,7 @@ const ChatUserList: React.FC<ChatUserListProps> = ({
   return (
     <div className="w-full h-full flex flex-col">
       {/* Sticky Header with gradient background */}
-      <div className="sticky top-0 z-10 p-4 bg-gradient-to-r from-pink-500 to-purple-600 text-white flex-shrink-0">
+      <div className="sticky top-0 z-10 p-4 bg-gradient-to-r from-blue-600 to-blue-700 text-white flex-shrink-0">
         <h2 className="text-xl font-bold mb-4">Messages</h2>
         <div className="relative">
           <Input
@@ -56,28 +58,33 @@ const ChatUserList: React.FC<ChatUserListProps> = ({
             {localSearchTerm ? 'No matches found' : 'No conversations yet'}
           </div>
         ) : (
-          filteredMatches.map((match) => (
-            <div
-              key={match.id}
-              className={`p-4 border-b cursor-pointer hover:bg-gray-50 transition-colors ${
-                selectedMatch?.id === match.id ? 'bg-pink-50 border-pink-200' : ''
-              }`}
-              onClick={() => onMatchSelect(match)}
-            >
-              <div className="flex items-center space-x-3">
-                <div className="relative">
-                  <ChatUserAvatar
-                    userId={match.id}
-                    firstName={match.first_name}
-                    lastName={match.last_name}
-                    onClick={() => onUserProfileOpen(match.id)}
-                  />
-                  {match.unread_messages && match.unread_messages > 0 && (
-                    <div className="absolute -top-1 -right-1 bg-red-500 text-white text-xs rounded-full w-5 h-5 flex items-center justify-center">
-                      {match.unread_messages > 9 ? '9+' : match.unread_messages}
-                    </div>
-                  )}
-                </div>
+          filteredMatches.map((match) => {
+            // Determine the correct partner ID for avatar
+            const partnerId = match.partner?.id || 
+                             (currentUserId && match.user1_id === currentUserId ? match.user2_id : match.user1_id);
+            
+            return (
+              <div
+                key={match.id}
+                className={`p-4 border-b cursor-pointer hover:bg-gray-50 transition-colors ${
+                  selectedMatch?.id === match.id ? 'bg-blue-50 border-blue-200' : ''
+                }`}
+                onClick={() => onMatchSelect(match)}
+              >
+                <div className="flex items-center space-x-3">
+                  <div className="relative">
+                    <ChatUserAvatar
+                      userId={partnerId}
+                      firstName={match.first_name}
+                      lastName={match.last_name}
+                      onClick={() => onUserProfileOpen(partnerId)}
+                    />
+                    {match.unread_messages > 0 && (
+                      <div className="absolute -top-1 -right-1 bg-red-500 text-white text-xs rounded-full w-5 h-5 flex items-center justify-center">
+                        {match.unread_messages > 9 ? '9+' : match.unread_messages}
+                      </div>
+                    )}
+                  </div>
                 <div className="flex-1 min-w-0">
                   <div className="flex justify-between items-start">
                     <h3 className="font-semibold text-gray-900 truncate">
@@ -100,7 +107,8 @@ const ChatUserList: React.FC<ChatUserListProps> = ({
                 </div>
               </div>
             </div>
-          ))
+            );
+          })
         )}
       </div>
     </div>

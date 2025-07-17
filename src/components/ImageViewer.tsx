@@ -1,6 +1,6 @@
 
 import React, { useState, useEffect } from 'react';
-import { Dialog, DialogContent } from '@/components/ui/dialog';
+import { Dialog, DialogContent, DialogTitle, DialogDescription } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { ChevronLeft, ChevronRight, X } from 'lucide-react';
 import { Carousel, CarouselContent, CarouselItem, CarouselNext, CarouselPrevious, CarouselApi } from '@/components/ui/carousel';
@@ -35,6 +35,8 @@ const ImageViewer = ({ isOpen, onClose, images, initialIndex = 0 }: ImageViewerP
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
+      <DialogTitle className="sr-only">Image Viewer</DialogTitle>
+      <DialogDescription className="sr-only">View and navigate through user photos</DialogDescription>
       <DialogContent className="max-w-4xl max-h-[90vh] p-0 bg-black/95">
         <div className="relative w-full h-full">
           {/* Close button */}

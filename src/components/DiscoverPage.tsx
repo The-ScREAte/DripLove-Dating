@@ -154,7 +154,7 @@ const DiscoverPage = ({ currentUser, onNavigateToChat }: DiscoverPageProps) => {
       const hiddenPassedIds = recentPasses?.map(p => p.passed_id) || [];
       const excludedIds = [...likedUserIds, ...blockedUserIds, ...hiddenPassedIds, currentUser.id];
       
-      console.log('User preference:', currentUser.preference, 'Allowed genders:', allowedGenders);
+      // User preference filtering applied
   
       const { data: profiles, error } = await supabase
         .from('profiles')
@@ -188,9 +188,9 @@ const DiscoverPage = ({ currentUser, onNavigateToChat }: DiscoverPageProps) => {
           return distance <= userMaxDistance;
         });
 
-        console.log(`Applied distance filter: ${profiles.length} -> ${filteredProfiles.length} profiles within ${userMaxDistance}km`);
+        // Applied distance filter: reduced profiles based on distance preferences
       } else {
-        console.log('No distance filtering applied - missing coordinates or preference');
+      // No distance filtering applied - missing coordinates or preference
       }
 
       // Apply age filtering based on user preferences
@@ -205,7 +205,7 @@ const DiscoverPage = ({ currentUser, onNavigateToChat }: DiscoverPageProps) => {
         return age >= userMinAge && age <= userMaxAge;
       });
 
-      console.log(`Applied age filter: ${beforeAgeFilter} -> ${filteredProfiles.length} profiles within ${userMinAge}-${userMaxAge} age range`);
+      // Applied age filter to match user preferences
 
       // Add empty images array to match interface
       const profilesWithImages = filteredProfiles.map(profile => ({

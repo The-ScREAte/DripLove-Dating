@@ -21,20 +21,28 @@ const ChatUserAvatar = ({ userId, firstName = '', lastName = '', onClick, size =
   };
 
   useEffect(() => {
-    fetchProfileImage();
+    if (userId) {
+      fetchProfileImage();
+    }
   }, [userId]);
 
   const fetchProfileImage = async () => {
+    if (!userId) return;
+    
     try {
       const { data: images, error } = await supabase
         .from('user_images')
-        .select('image_url')
+        .select('image_url, is_approved')
         .eq('user_id', userId)
+        .eq('is_approved', true)
         .order('image_order', { ascending: true })
         .limit(1);
 
       if (error) {
-        console.error('Error fetching profile image:', error);
+        // Only log actual errors, not missing table errors
+        if (!error.message.includes('does not exist') && !error.message.includes('relation')) {
+          console.error('Error fetching profile image:', error);
+        }
         return;
       }
 
@@ -52,7 +60,7 @@ const ChatUserAvatar = ({ userId, firstName = '', lastName = '', onClick, size =
 
   return (
     <Avatar 
-      className={`${sizeClasses[size]} ${onClick ? 'cursor-pointer hover:ring-2 hover:ring-pink-400 transition-all' : ''}`}
+      className={`${sizeClasses[size]} ${onClick ? 'cursor-pointer hover:ring-2 hover:ring-blue-400 transition-all' : ''}`}
       onClick={onClick}
     >
 <AvatarImage
@@ -60,7 +68,7 @@ const ChatUserAvatar = ({ userId, firstName = '', lastName = '', onClick, size =
   alt={`${firstName} ${lastName}`}
   className="h-full w-full object-cover"
 />
-      <AvatarFallback className="bg-pink-100 text-pink-700 font-medium">
+      <AvatarFallback className="bg-blue-100 text-blue-700 font-medium">
         {getInitials()}
       </AvatarFallback>
     </Avatar>

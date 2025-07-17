@@ -35,7 +35,7 @@ const Index = () => {
       data: { subscription },
     } = supabase.auth.onAuthStateChange((_event, session) => {
       if (session?.user) {
-        console.log("Auth state changed user ID:", session.user.id);
+        // Auth state changed for user ID: session.user.id
         setUser(session.user);
         checkUserTypeAndRedirect(session.user.id);
       } else {
@@ -187,7 +187,7 @@ const Index = () => {
         education_level: formData.educationLevel,
       };
 
-      console.log('Registration essentials:', essentials);
+      // Registration essentials processed
 
       // Register user with Supabase Auth - the trigger will create the profile automatically
       const { data, error } = await supabase.auth.signUp({

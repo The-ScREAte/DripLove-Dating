@@ -73,38 +73,75 @@ const ProfilePage = ({ currentUser, profile, onProfileUpdate, onLogout, onShowTe
 
   useEffect(() => {
     if (profile) {
-      setEditedProfile({
-        first_name: profile.first_name || '',
-        last_name: profile.last_name || '',
-        bio: profile.bio || '',
-        city: profile.city || '',
-        country: profile.country || '',
-        country_code: profile.country_code || '',
-        max_distance: profile.max_distance || profile.distance_preference || 50,
-        min_age: profile.min_age || 18,
-        max_age: profile.max_age || 99,
-        gender: profile.gender || '',
-        preference: profile.preference || '',
-        relationship_intent: profile.relationship_intent || '',
-        smoking: profile.smoking || '',
-        drinking: profile.drinking || '',
-        exercise_level: profile.exercise_level || '',
-        sleeping_schedule: profile.sleeping_schedule || '',
-        occupation: profile.occupation || '',
-        industry: profile.industry || '',
-        education_level: profile.education_level || '',
-        zip_code: profile.zip_code || '',
-        latitude: profile.latitude || null,
-        longitude: profile.longitude || null,
-        is_custom_city: profile.is_custom_city || false,
-        introvert_extrovert: profile.introvert_extrovert || 50,
-        spontaneous_planner: profile.spontaneous_planner || 50,
-        messy_organized: profile.messy_organized || 50,
-        fun_fact: profile.fun_fact || '',
-        perfect_first_date: profile.perfect_first_date || '',
-        last_googled: profile.last_googled || '',
-        interests: profile.interests || [],
-      });
+      try {
+        setEditedProfile({
+          first_name: profile.first_name || '',
+          last_name: profile.last_name || '',
+          bio: profile.bio || '',
+          city: profile.city || '',
+          country: profile.country || '',
+          country_code: profile.country_code || '',
+          max_distance: profile.max_distance || profile.distance_preference || 50,
+          min_age: profile.min_age || 18,
+          max_age: profile.max_age || 99,
+          gender: profile.gender || '',
+          preference: profile.preference || '',
+          relationship_intent: profile.relationship_intent || '',
+          smoking: profile.smoking || '',
+          drinking: profile.drinking || '',
+          exercise_level: profile.exercise_level || '',
+          sleeping_schedule: profile.sleeping_schedule || '',
+          occupation: profile.occupation || '',
+          industry: profile.industry || '',
+          education_level: profile.education_level || '',
+          zip_code: profile.zip_code || '',
+          latitude: profile.latitude || null,
+          longitude: profile.longitude || null,
+          is_custom_city: profile.is_custom_city || false,
+          introvert_extrovert: profile.introvert_extrovert || 50,
+          spontaneous_planner: profile.spontaneous_planner || 50,
+          messy_organized: profile.messy_organized || 50,
+          fun_fact: profile.fun_fact || '',
+          perfect_first_date: profile.perfect_first_date || '',
+          last_googled: profile.last_googled || '',
+          interests: Array.isArray(profile.interests) ? profile.interests : [],
+        });
+      } catch (error) {
+        console.error('Error initializing profile data:', error);
+        // Set default values if profile data is corrupted
+        setEditedProfile({
+          first_name: '',
+          last_name: '',
+          bio: '',
+          city: '',
+          country: '',
+          country_code: '',
+          max_distance: 50,
+          min_age: 18,
+          max_age: 99,
+          gender: '',
+          preference: '',
+          relationship_intent: '',
+          smoking: '',
+          drinking: '',
+          exercise_level: '',
+          sleeping_schedule: '',
+          occupation: '',
+          industry: '',
+          education_level: '',
+          zip_code: '',
+          latitude: null,
+          longitude: null,
+          is_custom_city: false,
+          introvert_extrovert: 50,
+          spontaneous_planner: 50,
+          messy_organized: 50,
+          fun_fact: '',
+          perfect_first_date: '',
+          last_googled: '',
+          interests: [],
+        });
+      }
     }
   }, [profile]);
 
@@ -348,62 +385,66 @@ const ProfilePage = ({ currentUser, profile, onProfileUpdate, onLogout, onShowTe
       }
     };
 
-    // Check Photos (3 approved images) - now safely check userImages
-    const approvedImages = userImages?.filter(img => img.is_approved !== false) || [];
-    completionCriteria.photos.completed = approvedImages.length >= 3;
+    try {
+      // Check Photos (3 approved images) - now safely check userImages
+      const approvedImages = userImages?.filter(img => img?.is_approved !== false) || [];
+      completionCriteria.photos.completed = approvedImages.length >= 3;
 
-    // Check Basic Information (first_name, last_name, bio, date_of_birth)
-    completionCriteria.basicInfo.completed = !!(
-      profile.first_name?.trim() &&
-      profile.last_name?.trim() &&
-      profile.bio?.trim() &&
-      profile.date_of_birth
-    );
+      // Check Basic Information (first_name, last_name, bio, date_of_birth)
+      completionCriteria.basicInfo.completed = !!(
+        profile?.first_name?.trim() &&
+        profile?.last_name?.trim() &&
+        profile?.bio?.trim() &&
+        profile?.date_of_birth
+      );
 
-    // Check Location & Matching Preferences (city, country, max_distance)
-    completionCriteria.location.completed = !!(
-      profile.city?.trim() &&
-      profile.country?.trim() &&
-      (profile.max_distance || profile.distance_preference)
-    );
+      // Check Location & Matching Preferences (city, country, max_distance)
+      completionCriteria.location.completed = !!(
+        profile?.city?.trim() &&
+        profile?.country?.trim() &&
+        (profile?.max_distance || profile?.distance_preference)
+      );
 
-    // Check Preferences (gender, preference)
-    completionCriteria.preferences.completed = !!(
-      profile.gender &&
-      profile.preference
-    );
+      // Check Preferences (gender, preference)
+      completionCriteria.preferences.completed = !!(
+        profile?.gender &&
+        profile?.preference
+      );
 
-    // Check Lifestyle (smoking, drinking, exercise_level, sleeping_schedule)
-    completionCriteria.lifestyle.completed = !!(
-      profile.smoking &&
-      profile.drinking &&
-      profile.exercise_level &&
-      profile.sleeping_schedule
-    );
+      // Check Lifestyle (smoking, drinking, exercise_level, sleeping_schedule)
+      completionCriteria.lifestyle.completed = !!(
+        profile?.smoking &&
+        profile?.drinking &&
+        profile?.exercise_level &&
+        profile?.sleeping_schedule
+      );
 
-    // Check Work & Education (occupation, education_level)
-    completionCriteria.workEducation.completed = !!(
-      profile.occupation?.trim() &&
-      profile.education_level
-    );
+      // Check Work & Education (occupation, education_level)
+      completionCriteria.workEducation.completed = !!(
+        profile?.occupation?.trim() &&
+        profile?.education_level
+      );
 
-    // Check Personality (personality sliders completed)
-    completionCriteria.personality.completed = !!(
-      typeof profile.introvert_extrovert === 'number' &&
-      typeof profile.spontaneous_planner === 'number' &&
-      typeof profile.messy_organized === 'number'
-    );
+      // Check Personality (personality sliders completed)
+      completionCriteria.personality.completed = !!(
+        typeof profile?.introvert_extrovert === 'number' &&
+        typeof profile?.spontaneous_planner === 'number' &&
+        typeof profile?.messy_organized === 'number'
+      );
 
-    // Check Fun Questions (at least one question answered)
-    completionCriteria.funQuestions.completed = !!(
-      profile.fun_fact?.trim() ||
-      profile.perfect_first_date?.trim() ||
-      profile.last_googled?.trim()
-    );
+      // Check Fun Questions (at least one question answered)
+      completionCriteria.funQuestions.completed = !!(
+        profile?.fun_fact?.trim() ||
+        profile?.perfect_first_date?.trim() ||
+        profile?.last_googled?.trim()
+      );
 
-    // Check Interests (at least 3 selected)
-    const userInterests = profile.interests || [];
-    completionCriteria.interests.completed = userInterests.length >= 3;
+      // Check Interests (at least 3 selected)
+      const userInterests = profile?.interests || [];
+      completionCriteria.interests.completed = Array.isArray(userInterests) && userInterests.length >= 3;
+    } catch (error) {
+      console.error('Error calculating profile completion:', error);
+    }
 
     // Calculate total completion percentage
     let totalWeight = 0;
@@ -434,7 +475,10 @@ const ProfilePage = ({ currentUser, profile, onProfileUpdate, onLogout, onShowTe
   // Fetch user images for photo completion calculation
   useEffect(() => {
     const fetchUserImages = async () => {
-      if (!currentUser?.id) return;
+      if (!currentUser?.id) {
+        setUserImages([]);
+        return;
+      }
 
       try {
         const { data: images, error } = await supabase
@@ -442,8 +486,13 @@ const ProfilePage = ({ currentUser, profile, onProfileUpdate, onLogout, onShowTe
           .select('image_url, is_approved, moderation_status')
           .eq('user_id', currentUser.id);
 
-        if (error && !error.message.includes('does not exist')) {
-          throw error;
+        if (error) {
+          // Only log non-table existence errors
+          if (!error.message.includes('does not exist') && !error.message.includes('relation') && !error.message.includes('table')) {
+            console.error('Error fetching user images for progress:', error);
+          }
+          setUserImages([]);
+          return;
         }
 
         setUserImages(images || []);
@@ -462,6 +511,18 @@ const ProfilePage = ({ currentUser, profile, onProfileUpdate, onLogout, onShowTe
     // Match LikedMePage: pass preselectedPlan="premium" for correct upgrade modal
     return (
       <PremiumUpgrade currentUser={currentUser} onClose={() => setShowPremiumUpgrade(false)} preselectedPlan="premium" />
+    );
+  }
+
+  // Safety check for required data
+  if (!currentUser) {
+    return (
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-500 mx-auto mb-4"></div>
+          <p className="text-gray-600">Loading profile...</p>
+        </div>
+      </div>
     );
   }
 
@@ -623,8 +684,8 @@ const ProfilePage = ({ currentUser, profile, onProfileUpdate, onLogout, onShowTe
             onShowPrivacy={onShowPrivacy}
           />
         </div>
-      </div>
-    );
+    </div>
+  );
 };
 
 export default ProfilePage;

@@ -19,12 +19,12 @@ const MessageBubble: React.FC<MessageBubbleProps> = ({
       <div
         className={`max-w-xs lg:max-w-md px-4 py-2 rounded-lg ${
           isOwnMessage
-            ? 'bg-pink-500 text-white'
+            ? 'bg-blue-500 text-white'
             : 'bg-gray-200 text-gray-900'
         } ${isConsecutive ? '' : 'shadow-sm'}`}
       >
         <p className="text-sm">{message.message}</p>
-        <div className={`text-xs mt-1 ${isOwnMessage ? 'text-pink-100' : 'text-gray-500'}`}>
+        <div className={`text-xs mt-1 ${isOwnMessage ? 'text-blue-100' : 'text-gray-500'}`}>
           {new Date(message.sent_at).toLocaleTimeString([], {
             hour: '2-digit',
             minute: '2-digit'

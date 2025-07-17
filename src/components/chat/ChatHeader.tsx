@@ -16,6 +16,7 @@ interface ChatHeaderProps {
   onUserProfileOpen: (userId: string) => void;
   onBlockUser: (user: ChatMatch) => void;
   isMobile?: boolean;
+  currentUserId?: string;
 }
 
 const ChatHeader: React.FC<ChatHeaderProps> = ({
@@ -23,10 +24,15 @@ const ChatHeader: React.FC<ChatHeaderProps> = ({
   onBack,
   onUserProfileOpen,
   onBlockUser,
-  isMobile = false
+  isMobile = false,
+  currentUserId
 }) => {
+  // Determine partner ID correctly
+  const partnerId = selectedMatch.partner?.id || 
+                   (selectedMatch.user1_id === currentUserId ? selectedMatch.user2_id : selectedMatch.user1_id);
+
   return (
-    <div className="p-4 border-b bg-white flex items-center justify-between">
+    <div className="p-6 border-b bg-white flex items-center justify-between">
       <div className="flex items-center space-x-3">
         {isMobile && (
           <Button 
@@ -40,16 +46,16 @@ const ChatHeader: React.FC<ChatHeaderProps> = ({
           </Button>
         )}
         <ChatUserAvatar
-          userId={selectedMatch.id}
+          userId={partnerId}
           firstName={selectedMatch.first_name}
           lastName={selectedMatch.last_name}
-          onClick={() => onUserProfileOpen(selectedMatch.id)}
+          onClick={() => onUserProfileOpen(partnerId)}
         />
         <div>
           <h3 className="font-semibold text-gray-900">
             {selectedMatch.first_name} {selectedMatch.last_name}
           </h3>
-          <p className="text-sm text-gray-500">Online</p>
+          <p className="text-sm text-gray-500">Active on DripLove</p>
         </div>
       </div>
       
@@ -63,9 +69,6 @@ const ChatHeader: React.FC<ChatHeaderProps> = ({
           </Button>
         </DropdownMenuTrigger>
         <DropdownMenuContent align="end">
-          <DropdownMenuItem onClick={() => onUserProfileOpen(selectedMatch.id)}>
-            View Profile
-          </DropdownMenuItem>
           <DropdownMenuItem 
             onClick={() => onBlockUser(selectedMatch)}
             className="text-red-600"

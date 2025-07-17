@@ -44,4 +44,18 @@ export default defineConfig(({ mode }) => ({
       'lucide-react'
     ],
   },
+  // Build configuration
+  build: {
+    chunkSizeWarningLimit: 1000, // Increase from default 500kb to 1000kb
+    rollupOptions: {
+      output: {
+        manualChunks: {
+          // Separate vendor chunks to optimize loading
+          'react-vendor': ['react', 'react-dom'],
+          'supabase-vendor': ['@supabase/supabase-js'],
+          'ui-vendor': ['lucide-react', '@radix-ui/react-dialog', '@radix-ui/react-alert-dialog'],
+        },
+      },
+    },
+  },
 }));

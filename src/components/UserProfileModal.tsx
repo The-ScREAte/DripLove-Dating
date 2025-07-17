@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
 import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { MapPin, Heart, Briefcase, GraduationCap, User } from 'lucide-react';
@@ -35,7 +35,11 @@ const UserProfileModal = ({ isOpen, onClose, userId }: UserProfileModalProps) =>
         .eq('id', userId)
         .single();
 
-      if (error) throw error;
+      if (error) {
+        console.error('Profile fetch error:', error);
+        throw error;
+      }
+      
       setProfile(data);
     } catch (error) {
       console.error('Error fetching user profile:', error);
@@ -45,14 +49,24 @@ const UserProfileModal = ({ isOpen, onClose, userId }: UserProfileModalProps) =>
   };
 
   const fetchUserImages = async () => {
+    if (!userId) return;
+    
     try {
       const { data: images, error } = await supabase
         .from('user_images')
-        .select('image_url')
+        .select('image_url, is_approved')
         .eq('user_id', userId)
+        .eq('is_approved', true)
         .order('image_order', { ascending: true });
 
-      if (error) throw error;
+      if (error) {
+        // Only log actual errors, not missing table errors
+        if (!error.message.includes('does not exist') && !error.message.includes('relation')) {
+          console.error('Error fetching user images:', error);
+        }
+        return;
+      }
+      
       setUserImages(images?.map(img => img.image_url) || []);
     } catch (error) {
       console.error('Error fetching user images:', error);
@@ -75,15 +89,37 @@ const UserProfileModal = ({ isOpen, onClose, userId }: UserProfileModalProps) =>
     setIsImageViewerOpen(true);
   };
 
+  if (loading) {
+    return (
+      <Dialog open={isOpen} onOpenChange={onClose}>
+        <DialogContent className="max-w-2xl max-h-[80vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>User Profile</DialogTitle>
+            <DialogDescription>Loading user profile information...</DialogDescription>
+          </DialogHeader>
+          <div className="flex items-center justify-center py-8">
+            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
+            <span className="ml-3 text-gray-600">Loading profile...</span>
+          </div>
+        </DialogContent>
+      </Dialog>
+    );
+  }
+
   if (!profile && !loading) {
     return (
       <Dialog open={isOpen} onOpenChange={onClose}>
         <DialogContent className="max-w-2xl max-h-[80vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>User Profile</DialogTitle>
+            <DialogDescription>This user's profile is not available.</DialogDescription>
           </DialogHeader>
           <div className="text-center py-8">
-            <p className="text-gray-500">Profile not found</p>
+            <div className="w-16 h-16 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-4">
+              <User className="w-8 h-8 text-gray-400" />
+            </div>
+            <p className="text-gray-500 mb-2">Profile not found</p>
+            <p className="text-sm text-gray-400">This user's profile is not available or has been removed.</p>
           </div>
         </DialogContent>
       </Dialog>
@@ -95,27 +131,27 @@ const UserProfileModal = ({ isOpen, onClose, userId }: UserProfileModalProps) =>
       <Dialog open={isOpen} onOpenChange={onClose}>
         <DialogContent className="max-w-2xl max-h-[80vh] overflow-y-auto">
           <DialogHeader>
-            <DialogTitle>User Profile</DialogTitle>
+            <DialogTitle className="text-xl text-gray-800">
+              {profile?.first_name} {profile?.last_name}'s Profile
+            </DialogTitle>
+            <DialogDescription>
+              View detailed profile information, photos, and interests.
+            </DialogDescription>
           </DialogHeader>
           
-          {loading ? (
-            <div className="flex items-center justify-center py-8">
-              <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-pink-600"></div>
-            </div>
-          ) : (
-            <div className="space-y-6">
+          <div className="space-y-6">
               {/* Header with main image and basic info */}
               <div className="text-center">
                 {userImages.length > 0 ? (
                   <img 
                     src={userImages[0]} 
                     alt={`${profile?.first_name} ${profile?.last_name}`}
-                    className="w-32 h-32 rounded-full mx-auto object-cover mb-4 cursor-pointer hover:opacity-90 transition-opacity"
+                    className="w-32 h-32 rounded-full mx-auto object-cover mb-4 cursor-pointer hover:opacity-90 transition-opacity border-4 border-blue-100"
                     onClick={() => handleImageClick(0)}
                   />
                 ) : (
                   <Avatar className="w-32 h-32 mx-auto mb-4">
-                    <AvatarFallback className="bg-pink-100 text-pink-700 text-2xl">
+                    <AvatarFallback className="bg-blue-100 text-blue-700 text-2xl">
                       {profile?.first_name?.charAt(0)}{profile?.last_name?.charAt(0)}
                     </AvatarFallback>
                   </Avatar>
@@ -139,6 +175,29 @@ const UserProfileModal = ({ isOpen, onClose, userId }: UserProfileModalProps) =>
                 )}
               </div>
 
+              {/* Photo Gallery */}
+              {userImages.length > 1 && (
+                <Card>
+                  <CardContent className="pt-6">
+                    <h3 className="font-semibold text-gray-800 mb-4 flex items-center">
+                      <User className="w-4 h-4 mr-2" />
+                      Photos ({userImages.length})
+                    </h3>
+                    <div className="grid grid-cols-3 gap-2">
+                      {userImages.slice(0, 6).map((image, index) => (
+                        <img
+                          key={index}
+                          src={image}
+                          alt={`Photo ${index + 1}`}
+                          className="w-full h-24 object-cover rounded-lg cursor-pointer hover:opacity-90 transition-opacity"
+                          onClick={() => handleImageClick(index)}
+                        />
+                      ))}
+                    </div>
+                  </CardContent>
+                </Card>
+              )}
+
               {/* Bio */}
               {profile?.bio && (
                 <Card>
@@ -148,47 +207,26 @@ const UserProfileModal = ({ isOpen, onClose, userId }: UserProfileModalProps) =>
                 </Card>
               )}
 
-              {/* Additional Images */}
-              {userImages.length > 1 && (
-                <Card>
-                  <CardContent className="pt-6">
-                    <h3 className="font-semibold mb-3 flex items-center">
-                      <User className="w-4 h-4 mr-2 text-pink-600" />
-                      More Photos
-                    </h3>
-                    <div className="grid grid-cols-3 gap-2">
-                      {userImages.slice(1).map((image, index) => (
-                        <img 
-                          key={index}
-                          src={image} 
-                          alt={`Photo ${index + 2}`}
-                          className="aspect-square object-cover rounded-lg cursor-pointer hover:opacity-90 transition-opacity"
-                          onClick={() => handleImageClick(index + 1)}
-                        />
-                      ))}
-                    </div>
-                  </CardContent>
-                </Card>
-              )}
-
+              {/* Additional Images - REMOVED DUPLICATE */}
+              
               {/* Basic Info */}
               <Card>
                 <CardContent className="pt-6">
                   <h3 className="font-semibold mb-3 flex items-center">
-                    <Heart className="w-4 h-4 mr-2 text-pink-600" />
+                    <Heart className="w-4 h-4 mr-2 text-blue-600" />
                     Looking For
                   </h3>
                   <div className="space-y-2">
                     {profile?.preference && (
                       <div className="flex justify-between">
                         <span className="text-gray-600">Interested in:</span>
-                        <Badge variant="secondary" className="capitalize">{profile.preference}</Badge>
+                        <Badge variant="secondary" className="capitalize bg-blue-50 text-blue-700 border-blue-200">{profile.preference}</Badge>
                       </div>
                     )}
                     {profile?.relationship_intent && (
                       <div className="flex justify-between">
                         <span className="text-gray-600">Looking for:</span>
-                        <Badge variant="secondary" className="capitalize">{profile.relationship_intent}</Badge>
+                        <Badge variant="secondary" className="capitalize bg-blue-50 text-blue-700 border-blue-200">{profile.relationship_intent}</Badge>
                       </div>
                     )}
                   </div>
@@ -235,7 +273,7 @@ const UserProfileModal = ({ isOpen, onClose, userId }: UserProfileModalProps) =>
                 <Card>
                   <CardContent className="pt-6">
                     <h3 className="font-semibold mb-3 flex items-center">
-                      <Briefcase className="w-4 h-4 mr-2 text-pink-600" />
+                      <Briefcase className="w-4 h-4 mr-2 text-blue-600" />
                       Work & Education
                     </h3>
                     <div className="space-y-3">
@@ -257,6 +295,59 @@ const UserProfileModal = ({ isOpen, onClose, userId }: UserProfileModalProps) =>
                             <GraduationCap className="w-4 h-4 mr-1" /> Education:
                           </span>
                           <span className="block font-medium">{profile.education_level}</span>
+                        </div>
+                      )}
+                    </div>
+                  </CardContent>
+                </Card>
+              )}
+
+              {/* Personality Traits */}
+              {(typeof profile?.introvert_extrovert === 'number' || typeof profile?.spontaneous_planner === 'number' || typeof profile?.messy_organized === 'number') && (
+                <Card>
+                  <CardContent className="pt-6">
+                    <h3 className="font-semibold mb-3">Personality</h3>
+                    <div className="space-y-3">
+                      {typeof profile?.introvert_extrovert === 'number' && (
+                        <div>
+                          <div className="flex justify-between text-sm mb-1">
+                            <span>Introvert</span>
+                            <span>Extrovert</span>
+                          </div>
+                          <div className="w-full bg-gray-200 rounded-full h-2">
+                            <div 
+                              className="bg-blue-500 h-2 rounded-full" 
+                              style={{ width: `${profile.introvert_extrovert}%` }}
+                            ></div>
+                          </div>
+                        </div>
+                      )}
+                      {typeof profile?.spontaneous_planner === 'number' && (
+                        <div>
+                          <div className="flex justify-between text-sm mb-1">
+                            <span>Planner</span>
+                            <span>Spontaneous</span>
+                          </div>
+                          <div className="w-full bg-gray-200 rounded-full h-2">
+                            <div 
+                              className="bg-blue-500 h-2 rounded-full" 
+                              style={{ width: `${profile.spontaneous_planner}%` }}
+                            ></div>
+                          </div>
+                        </div>
+                      )}
+                      {typeof profile?.messy_organized === 'number' && (
+                        <div>
+                          <div className="flex justify-between text-sm mb-1">
+                            <span>Organized</span>
+                            <span>Messy</span>
+                          </div>
+                          <div className="w-full bg-gray-200 rounded-full h-2">
+                            <div 
+                              className="bg-blue-500 h-2 rounded-full" 
+                              style={{ width: `${profile.messy_organized}%` }}
+                            ></div>
+                          </div>
                         </div>
                       )}
                     </div>
@@ -300,7 +391,7 @@ const UserProfileModal = ({ isOpen, onClose, userId }: UserProfileModalProps) =>
                     <h3 className="font-semibold mb-3">Interests</h3>
                     <div className="flex flex-wrap gap-2">
                       {profile.interests.map((interest: string) => (
-                        <Badge key={interest} variant="outline" className="bg-pink-50 text-pink-800 border-pink-200">
+                        <Badge key={interest} variant="outline" className="bg-blue-50 text-blue-800 border-blue-200">
                           {interest}
                         </Badge>
                       ))}
@@ -309,7 +400,6 @@ const UserProfileModal = ({ isOpen, onClose, userId }: UserProfileModalProps) =>
                 </Card>
               )}
             </div>
-          )}
         </DialogContent>
       </Dialog>
 

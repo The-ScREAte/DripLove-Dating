@@ -267,7 +267,6 @@ const LikedMePage = ({ currentUser }: LikedMePageProps) => {
       setUserImages({});
       return;
     }
-    console.log('Component mounted, fetching data...');
     fetchLikers();
     checkLockoutStatus();
     // eslint-disable-next-line react-hooks/exhaustive-deps

@@ -1,6 +1,6 @@
 
 import React, { useState } from 'react';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
 import { Label } from '@/components/ui/label';
@@ -66,14 +66,12 @@ const BlockDialog = ({ isOpen, onClose, userToBlock, currentUserId, onBlockSucce
           <DialogTitle>
             Block {userToBlock?.first_name} {userToBlock?.last_name}?
           </DialogTitle>
+          <DialogDescription>
+            This user will no longer be able to see your profile or contact you. You won't see them in your discover feed either.
+          </DialogDescription>
         </DialogHeader>
         
         <div className="space-y-4">
-          <p className="text-sm text-gray-600">
-            This user will no longer be able to see your profile or contact you. 
-            You won't see them in your discover feed either.
-          </p>
-          
           <div>
             <Label htmlFor="reason">Reason (optional)</Label>
             <Textarea
