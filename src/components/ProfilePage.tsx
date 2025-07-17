@@ -286,13 +286,6 @@ const ProfilePage = ({ currentUser, profile, onProfileUpdate, onLogout, onShowTe
     setIsEditing(false);
   };
 
-  if (showPremiumUpgrade) {
-    // Match LikedMePage: pass preselectedPlan="premium" for correct upgrade modal
-    return (
-      <PremiumUpgrade currentUser={currentUser} onClose={() => setShowPremiumUpgrade(false)} preselectedPlan="premium" />
-    );
-  }
-
   // --- BEGIN: Comprehensive Profile Progress Bar ---
   // Calculate profile completion based on specific criteria
   const calculateProfileCompletion = () => {
@@ -465,84 +458,124 @@ const ProfilePage = ({ currentUser, profile, onProfileUpdate, onLogout, onShowTe
 
   // --- END: Comprehensive Profile Progress Bar ---
 
+  if (showPremiumUpgrade) {
+    // Match LikedMePage: pass preselectedPlan="premium" for correct upgrade modal
+    return (
+      <PremiumUpgrade currentUser={currentUser} onClose={() => setShowPremiumUpgrade(false)} preselectedPlan="premium" />
+    );
+  }
+
   return (
-    <div className="h-full flex flex-col">
-      {/* Fixed Header */}
-      <div className="flex-shrink-0 bg-white border-b p-4">
-        <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
-         
-          <div className="flex flex-row gap-2 w-full">
-            {!subscriptionLoading && !isPremium() && (
-              <Button 
-                onClick={() => setShowPremiumUpgrade(true)}
-                className="bg-gradient-to-r from-yellow-400 to-yellow-600 hover:from-yellow-500 hover:to-yellow-700 text-black font-bold w-full sm:w-auto"
-              >
-                <Crown className="w-4 h-4 mr-2" />
-                Upgrade to Premium
-              </Button>
-            )}
-            {!isEditing ? (
-              <Button onClick={() => setIsEditing(true)} className="w-full sm:w-auto">
-                <Edit className="w-4 h-4 mr-2" /> Edit Profile
-              </Button>
-            ) : (
-              <div className="flex flex-row gap-2 w-full">
-                <Button onClick={handleSave} disabled={isSaving} className="w-full sm:w-auto">
-                  <Save className="w-4 h-4 mr-2" /> {isSaving ? 'Saving...' : 'Save'}
+    <div className="min-h-screen bg-gray-50"> 
+      {/* Sticky Header with Progress Bar */}
+      <div className="sticky top-0 z-50 bg-white border-b border-gray-200 shadow-sm">
+        <div className="p-6">
+          <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+            <div className="flex flex-row gap-3 w-full">
+              {!isPremium() && (
+                <Button
+                  onClick={() => setShowPremiumUpgrade(true)}
+                  className="bg-gradient-to-r from-yellow-400 to-yellow-500 hover:from-yellow-500 hover:to-yellow-600 text-white font-semibold w-full sm:w-auto shadow-md hover:shadow-lg transition-all duration-200"
+                >
+                  <Crown className="w-4 h-4 mr-2" />
+                  Upgrade to Premium
                 </Button>
-                <Button variant="outline" onClick={handleCancel} disabled={isSaving} className="w-full sm:w-auto">
-                  <X className="w-4 h-4 mr-2" /> Cancel
+              )}
+              {!isEditing ? (
+                <Button 
+                  onClick={() => setIsEditing(true)} 
+                  className="w-full sm:w-auto bg-gray-900 hover:bg-gray-800 text-white font-medium"
+                >
+                  <Edit className="w-4 h-4 mr-2" /> 
+                  Edit Profile
                 </Button>
+              ) : (
+                <div className="flex flex-row gap-3 w-full">
+                  <Button 
+                    onClick={handleSave} 
+                    disabled={isSaving} 
+                    className="w-full sm:w-auto bg-emerald-600 hover:bg-emerald-700 text-white font-medium disabled:opacity-50"
+                  >
+                    <Save className="w-4 h-4 mr-2" /> 
+                    {isSaving ? 'Saving...' : 'Save'}
+                  </Button>
+                  <Button 
+                    variant="outline" 
+                    onClick={handleCancel} 
+                    disabled={isSaving} 
+                    className="w-full sm:w-auto border-gray-300 text-gray-700 hover:bg-gray-50 disabled:opacity-50"
+                  >
+                    <X className="w-4 h-4 mr-2" /> 
+                    Cancel
+                  </Button>
+                </div>
+              )}
+            </div>
+          </div>
+          
+          {/* Profile Completion Progress Bar */}
+          <div className="mt-6">
+            <div className="flex items-center gap-3">
+              <div className="flex-1 h-2 bg-gray-200 rounded-full overflow-hidden">
+                <div
+                  className={`h-2 transition-all duration-500 rounded-full ${
+                    completion >= 90 ? 'bg-emerald-500' : 'bg-blue-500'
+                  }`}
+                  style={{ width: `${completion}%` }}
+                />
+              </div>
+              <span className="text-sm font-semibold text-gray-700 min-w-[45px] text-right">
+                {completion}%
+              </span>
+              {showVerifiedBadge && (
+                <div className="flex items-center bg-emerald-100 text-emerald-800 text-xs px-3 py-1 rounded-full">
+                  <span className="mr-1">✓</span>
+                  Verified
+                </div>
+              )}
+            </div>
+            
+            {/* Profile completion notice */}
+            {completion < 100 && missingFields.length > 0 && !hideProfileCompletion && (
+              <div className="mt-4 bg-blue-50 border border-blue-200 rounded-lg px-4 py-3 relative">
+                <button
+                  className="absolute top-2 right-3 text-blue-700 hover:text-blue-900 text-lg font-bold focus:outline-none"
+                  aria-label="Dismiss profile completion"
+                  onClick={() => setHideProfileCompletion(true)}
+                >
+                  ×
+                </button>
+                <div className="pr-8">
+                  <h4 className="font-semibold text-blue-900 mb-2">Complete your profile to get better matches:</h4>
+                  <ul className="text-sm text-blue-800 space-y-1">
+                    {missingFields.slice(0, 3).map((field, index) => (
+                      <li key={index} className="flex items-start">
+                        <span className="text-blue-500 mr-2">•</span>
+                        {field}
+                      </li>
+                    ))}
+                    {missingFields.length > 3 && (
+                      <li className="text-blue-600 font-medium">
+                        +{missingFields.length - 3} more items
+                      </li>
+                    )}
+                  </ul>
+                </div>
               </div>
             )}
           </div>
-        </div>
-        {/* Profile Completion Progress Bar - Always show */}
-        <div className="mt-4">
-          <div className="flex items-center gap-2">
-            <div className="flex-1 h-3 bg-gray-200 rounded-full overflow-hidden">
-              <div
-                className={`h-3 transition-all duration-500 ${
-                  completion >= 90 ? 'bg-green-500' : 'bg-pink-500'
-                }`}
-                style={{ width: `${completion}%` }}
-              />
-            </div>
-            <span className="text-xs font-semibold text-gray-700 min-w-[40px] text-right">{completion}%</span>
-            {showVerifiedBadge && (
-              <div className="flex items-center bg-green-100 text-green-800 text-xs px-2 py-1 rounded-full ml-2">
-                <span className="mr-1">✓</span>
-                Verified
-              </div>
-            )}
-          </div>
-          {/* Only show completion notice when profile is not complete */}
-          {completion < 100 && missingFields.length > 0 && !hideProfileCompletion && (
-            <div className="mt-2 text-xs text-yellow-700 bg-yellow-100 rounded px-3 py-2 relative">
-              <button
-                className="absolute top-2 right-2 text-yellow-700 hover:text-yellow-900 text-lg font-bold focus:outline-none"
-                aria-label="Dismiss profile completion"
-                onClick={() => setHideProfileCompletion(true)}
-              >
-                ×
-              </button>
-              <span className="font-semibold">Complete your profile:</span>
-              <ul className="list-disc ml-5 mt-1">
-                {missingFields.map((field, index) => (
-                  <li key={index}>{field}</li>
-                ))}
-              </ul>
-            </div>
-          )}
         </div>
       </div>
 
       {/* Scrollable Content */}
-      <div className="flex-1 overflow-y-auto p-4 pb-24">
-        <div className="max-w-4xl mx-auto space-y-6">
+      <div className="max-w-4xl mx-auto p-6 pt-8 pb-12 space-y-8">
           <ProfileSummaryCard currentUser={currentUser} />
           <ImageManagement currentUser={currentUser} />
-          <BasicInfoSection editedProfile={editedProfile} isEditing={isEditing} onInputChange={handleInputChange} />
+          <BasicInfoSection 
+            editedProfile={editedProfile} 
+            isEditing={isEditing} 
+            onInputChange={handleInputChange} 
+          />
           <LocationSection 
             editedProfile={editedProfile} 
             isEditing={isEditing} 
@@ -557,11 +590,32 @@ const ProfilePage = ({ currentUser, profile, onProfileUpdate, onLogout, onShowTe
             onSelectChange={handleSelectChange} 
             onAgeRangeChange={handleAgeRangeChange} 
           />
-          <LifestyleSection editedProfile={editedProfile} isEditing={isEditing} onSelectChange={handleSelectChange} />
-          <WorkEducationSection editedProfile={editedProfile} isEditing={isEditing} onInputChange={handleInputChange} />
-          <PersonalitySection editedProfile={editedProfile} isEditing={isEditing} onSliderChange={handleSliderChange} />
-          <FunQuestionsSection editedProfile={editedProfile} isEditing={isEditing} onInputChange={handleInputChange} />
-          <InterestsSection editedProfile={editedProfile} profile={profile} isEditing={isEditing} onInterestsChange={handleInterestsChange} />
+          <LifestyleSection 
+            editedProfile={editedProfile} 
+            isEditing={isEditing} 
+            onSelectChange={handleSelectChange} 
+          />
+          <WorkEducationSection 
+            editedProfile={editedProfile} 
+            isEditing={isEditing} 
+            onInputChange={handleInputChange} 
+          />
+          <PersonalitySection 
+            editedProfile={editedProfile} 
+            isEditing={isEditing} 
+            onSliderChange={handleSliderChange} 
+          />
+          <FunQuestionsSection 
+            editedProfile={editedProfile} 
+            isEditing={isEditing} 
+            onInputChange={handleInputChange} 
+          />
+          <InterestsSection 
+            editedProfile={editedProfile} 
+            profile={profile} 
+            isEditing={isEditing} 
+            onInterestsChange={handleInterestsChange} 
+          />
           <AccountActions 
             currentUser={currentUser} 
             onLogout={onLogout} 
@@ -570,8 +624,7 @@ const ProfilePage = ({ currentUser, profile, onProfileUpdate, onLogout, onShowTe
           />
         </div>
       </div>
-    </div>
-  );
+    );
 };
 
 export default ProfilePage;

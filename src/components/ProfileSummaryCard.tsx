@@ -70,7 +70,7 @@ const ProfileSummaryCard = ({ currentUser }: ProfileSummaryCardProps) => {
           <Users className="w-5 h-5 text-pink-600" />
           <span>Your DripLove Summary</span>
         </CardTitle>
-      </CardHeader>
+      </CardHeader> 
       <CardContent>
         <div className="grid grid-cols-3 gap-4 text-center">
           <div className="space-y-2">

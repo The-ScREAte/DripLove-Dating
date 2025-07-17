@@ -255,9 +255,9 @@ const ChatPage = ({ currentUser, onUnreadChange }: ChatPageProps) => {
 
   if (!selectedMatch) {
     return (
-      <div className="h-screen flex flex-col bg-white relative">
+      <div className="h-screen flex flex-col bg-gray-50 relative">
         <div className="fixed top-12 left-0 right-0 z-30">
-          <div className="p-4 bg-gradient-to-r from-pink-500 to-purple-600 text-white">
+          <div className="p-4 bg-gradient-to-r from-blue-600 to-blue-700 text-white">
             <h2 className="text-xl font-bold mb-4">Messages</h2>
             <div className="relative">
               <input
@@ -265,7 +265,7 @@ const ChatPage = ({ currentUser, onUnreadChange }: ChatPageProps) => {
                 placeholder="Search conversations..."
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
-                className="w-full pr-10 bg-white text-gray-900 rounded-lg px-4 py-2"
+                className="w-full pr-10 bg-white text-gray-900 rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-blue-300"
               />
               <svg className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="m21 21-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
@@ -275,7 +275,7 @@ const ChatPage = ({ currentUser, onUnreadChange }: ChatPageProps) => {
         </div>
 
         <div 
-          className="flex-1 bg-white"
+          className="flex-1 bg-gray-50"
           style={{ 
             marginTop: '152px',
             marginBottom: '80px',
@@ -291,15 +291,15 @@ const ChatPage = ({ currentUser, onUnreadChange }: ChatPageProps) => {
             filteredMatches.map((match) => (
               <div
                 key={match.id}
-                className={`p-4 border-b cursor-pointer hover:bg-gray-50 transition-colors ${
-                  selectedMatch?.id === match.id ? 'bg-pink-50 border-pink-200' : ''
+                className={`p-4 border-b border-gray-200 cursor-pointer hover:bg-gray-100 transition-colors ${
+                  selectedMatch?.id === match.id ? 'bg-blue-50 border-blue-200' : 'bg-white'
                 }`}
                 onClick={() => setSelectedMatch(match)}
               >
                 <div className="flex items-center space-x-3">
                   <div className="relative">
-                    <div className="w-12 h-12 bg-pink-100 rounded-full flex items-center justify-center">
-                      <span className="text-pink-600 font-semibold">
+                    <div className="w-12 h-12 bg-gradient-to-br from-blue-500 to-blue-600 rounded-full flex items-center justify-center">
+                      <span className="text-white font-semibold">
                         {match.first_name?.charAt(0) || 'U'}{match.last_name?.charAt(0) || ''}
                       </span>
                     </div>
@@ -353,8 +353,8 @@ const ChatPage = ({ currentUser, onUnreadChange }: ChatPageProps) => {
   }
 
   return (
-    <div className="h-screen flex flex-col bg-white relative">
-      <div className="fixed top-12 left-0 right-0 z-30 bg-white">
+    <div className="h-screen flex flex-col bg-gray-50 relative">
+      <div className="fixed top-12 left-0 right-0 z-30 bg-white border-b border-gray-200 shadow-sm">
         <ChatHeader
           selectedMatch={selectedMatch}
           onBack={() => setSelectedMatch(null)}
@@ -366,7 +366,7 @@ const ChatPage = ({ currentUser, onUnreadChange }: ChatPageProps) => {
 
       <div 
         ref={messagesContainerRef}
-        className="flex-1 px-4 space-y-2 bg-white"
+        className="flex-1 px-4 space-y-2 bg-gray-50"
         style={{ 
           marginTop: '92px',
           marginBottom: '160px',
