@@ -3,6 +3,7 @@ import WelcomeScreen from '@/components/WelcomeScreen';
 import AuthForm from '@/components/AuthForm';
 import RegistrationForm from '@/components/RegistrationForm';
 import ProfileCompletionForm from '@/components/ProfileCompletionForm';
+import TermsAcceptance from '@/components/TermsAcceptance';
 import MainApp from '@/components/MainApp';
 import AdminPage from '@/components/AdminPage';
 import AboutUs from '@/components/AboutUs';
@@ -13,7 +14,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { transformFormDataForSubmission } from '@/utils/formValidation';
 
 const Index = () => {
-  const [currentView, setCurrentView] = useState<'welcome' | 'login' | 'register' | 'profile-completion' | 'app' | 'admin' | 'about' | 'terms' | 'privacy'>('welcome');
+  const [currentView, setCurrentView] = useState<'welcome' | 'login' | 'register' | 'profile-completion' | 'terms-acceptance' | 'app' | 'admin' | 'about' | 'terms' | 'privacy'>('welcome');
   const [user, setUser] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const { toast } = useToast();
@@ -51,7 +52,7 @@ const Index = () => {
     try {
       const { data: profile, error } = await supabase
         .from('profiles')
-        .select('is_admin, account_status, first_name, last_name, date_of_birth, country, city, gender, preference, relationship_intent, occupation, industry, education_level')
+        .select('is_admin, account_status, first_name, last_name, date_of_birth, country, city, gender, preference, relationship_intent, occupation, industry, education_level, terms_accepted')
         .eq('id', userId)
         .single();
       
@@ -84,6 +85,13 @@ const Index = () => {
           variant: "destructive",
         });
         setCurrentView('welcome');
+        setLoading(false);
+        return;
+      }
+
+      // Check if user has accepted terms
+      if (!profile.terms_accepted) {
+        setCurrentView('terms-acceptance');
         setLoading(false);
         return;
       }
@@ -193,12 +201,13 @@ const Index = () => {
 
       if (data.user) {
         setUser(data.user);
-        setCurrentView('app');
+        // After registration, show terms acceptance
+        setCurrentView('terms-acceptance');
       }
 
       toast({
-        title: "Welcome to AfroVibe!",
-        description: "Your account has been created successfully!",
+        title: "Registration Successful!",
+        description: "Please review and accept our terms to continue.",
       });
     } catch (error: any) {
       console.error('Registration error:', error);
@@ -211,10 +220,8 @@ const Index = () => {
   };
 
   const handleProfileComplete = () => {
-    // Re-check user type after profile completion
-    if (user) {
-      checkUserTypeAndRedirect(user.id);
-    }
+    // After profile completion, show terms acceptance
+    setCurrentView('terms-acceptance');
   };
 
   const handleProfileCancel = async () => {
@@ -232,6 +239,10 @@ const Index = () => {
     await supabase.auth.signOut();
     setUser(null);
     setCurrentView('welcome');
+  };
+
+  const handleTermsAccept = () => {
+    setCurrentView('app');
   };
 
   if (loading) {
@@ -298,6 +309,13 @@ const Index = () => {
               onCancel={handleProfileCancel}
             />
           </div>
+        )}
+
+        {currentView === 'terms-acceptance' && user && (
+          <TermsAcceptance
+            user={user}
+            onAccept={handleTermsAccept}
+          />
         )}
 
         {currentView === 'app' && <MainApp user={user} onLogout={handleLogout} />}

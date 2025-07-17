@@ -3,12 +3,14 @@ import { useNavigate } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import ProfileCompletionForm from './ProfileCompletionForm';
+import TermsAcceptance from './TermsAcceptance';
 
 const ProfileCompletionPage = () => {
   const navigate = useNavigate();
   const { toast } = useToast();
   const [user, setUser] = useState<any>(null);
   const [loading, setLoading] = useState(true);
+  const [showTermsAcceptance, setShowTermsAcceptance] = useState(false);
 
   useEffect(() => {
     const getUser = async () => {
@@ -38,10 +40,15 @@ const ProfileCompletionPage = () => {
     getUser();
   }, [navigate]);
 
-  const handleComplete = () => {
+  const handleProfileComplete = () => {
+    // Show terms acceptance after profile completion
+    setShowTermsAcceptance(true);
+  };
+
+  const handleTermsAccept = () => {
     toast({
-      title: "Profile Completed!",
-      description: "Your profile has been successfully completed.",
+      title: "Welcome to AfroVibe!",
+      description: "Your profile has been completed and terms accepted. Welcome to the community!",
     });
     navigate('/');
   };
@@ -67,11 +74,21 @@ const ProfileCompletionPage = () => {
     return null; // Will redirect in useEffect
   }
 
+  // Show terms acceptance after profile completion
+  if (showTermsAcceptance) {
+    return (
+      <TermsAcceptance
+        user={user}
+        onAccept={handleTermsAccept}
+      />
+    );
+  }
+
   return (
     <div className="min-h-screen bg-gradient-to-br from-pink-50 to-purple-50 flex items-center justify-center p-4">
       <ProfileCompletionForm
         user={user}
-        onComplete={handleComplete}
+        onComplete={handleProfileComplete}
         onCancel={handleCancel}
       />
     </div>
