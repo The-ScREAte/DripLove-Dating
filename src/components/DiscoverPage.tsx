@@ -492,6 +492,12 @@ const DiscoverPage = ({ currentUser, onNavigateToChat }: DiscoverPageProps) => {
     const currentMatch = potentialMatches[currentIndex];
     if (!currentMatch) return;
 
+    // Add to passed users list for potential reverse
+    setPassedUsers(prev => [{
+      user_id: currentMatch.id,
+      passed_at: new Date()
+    }, ...prev.slice(0, 9)]); // Keep only last 10 passed users
+
     moveToNext(); // Move UI instantly
 
     // Check swipe limit before proceeding (but UI is already updated)
@@ -539,20 +545,70 @@ const DiscoverPage = ({ currentUser, onNavigateToChat }: DiscoverPageProps) => {
     }
 
     const lastPassedUser = passedUsers[0];
-    const passedUserData = potentialMatches.find(match => match.id === lastPassedUser.user_id);
+    
+    try {
+      // Actually delete the pass record from the database
+      const { error: deleteError } = await supabase
+        .from('passes')
+        .delete()
+        .match({ 
+          passer_id: currentUser.id, 
+          passed_id: lastPassedUser.user_id 
+        });
 
-    if (passedUserData) {
-      const newMatches = [...potentialMatches];
-      newMatches.splice(currentIndex, 0, passedUserData);
-      setPotentialMatches(newMatches);
+      if (deleteError) {
+        console.error('Error deleting pass record:', deleteError);
+        toast({
+          title: 'Error',
+          description: 'Could not reverse the dislike. Please try again.',
+          variant: 'destructive'
+        });
+        return;
+      }
+
+      // Find the passed user data and bring them back to the front
+      const passedUserData = potentialMatches.find(match => match.id === lastPassedUser.user_id);
+      
+      if (passedUserData) {
+        // Insert the user at the current index so they appear as the next card
+        const newMatches = [...potentialMatches];
+        newMatches.splice(currentIndex, 0, passedUserData);
+        setPotentialMatches(newMatches);
+      } else {
+        // If not in current matches, try to fetch their profile data
+        const { data: profileData, error: profileError } = await supabase
+          .from('profiles')
+          .select('id, first_name, last_name, bio, city, country, country_code, occupation, education_level, date_of_birth, interests, gender, latitude, longitude, fun_fact, perfect_first_date, last_googled, relationship_intent, smoking, drinking, exercise_level, sleeping_schedule, introvert_extrovert, spontaneous_planner, messy_organized')
+          .eq('id', lastPassedUser.user_id)
+          .eq('account_status', 'active')
+          .single();
+
+        if (!profileError && profileData) {
+          // Add the user back with empty images array (will be loaded when needed)
+          const userWithImages = { ...profileData, images: [] };
+          const newMatches = [...potentialMatches];
+          newMatches.splice(currentIndex, 0, userWithImages);
+          setPotentialMatches(newMatches);
+        }
+      }
+
+      // Remove from passed users list
+      setPassedUsers(prev => prev.slice(1));
+
+      toast({
+        title: 'Undo Successful',
+        description: 'Your last dislike has been reversed.',
+        variant: 'default'
+      });
+
+    } catch (error) {
+      console.error('Error reversing dislike:', error);
+      toast({
+        title: 'Error',
+        description: 'Could not reverse the dislike. Please try again.',
+        variant: 'destructive'
+      });
     }
-
-    setPassedUsers(prev => prev.slice(1));
-
-    toast({
-      title: 'Reversed',
-      description: 'Brought back the last passed user.'
-    });
   };
 
   const moveToNext = () => {

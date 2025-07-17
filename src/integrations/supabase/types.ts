@@ -1,4 +1,3 @@
-
 export type Json =
   | string
   | number
@@ -12,31 +11,6 @@ export type Database = {
   // instead of createClient<Database, { PostgrestVersion: 'XX' }>(URL, KEY)
   __InternalSupabase: {
     PostgrestVersion: "12.2.3 (519615d)"
-  }
-  graphql_public: {
-    Tables: {
-      [_ in never]: never
-    }
-    Views: {
-      [_ in never]: never
-    }
-    Functions: {
-      graphql: {
-        Args: {
-          operationName?: string
-          query?: string
-          variables?: Json
-          extensions?: Json
-        }
-        Returns: Json
-      }
-    }
-    Enums: {
-      [_ in never]: never
-    }
-    CompositeTypes: {
-      [_ in never]: never
-    }
   }
   public: {
     Tables: {
@@ -353,8 +327,8 @@ export type Database = {
           latitude: number | null
           like_me_cooldown_until: string | null
           longitude: number | null
-          max_distance: number | null
           max_age: number | null
+          max_distance: number | null
           messy_organized: number | null
           min_age: number | null
           occupation: string | null
@@ -396,8 +370,8 @@ export type Database = {
           latitude?: number | null
           like_me_cooldown_until?: string | null
           longitude?: number | null
-          max_distance?: number | null
           max_age?: number | null
+          max_distance?: number | null
           messy_organized?: number | null
           min_age?: number | null
           occupation?: string | null
@@ -439,8 +413,8 @@ export type Database = {
           latitude?: number | null
           like_me_cooldown_until?: string | null
           longitude?: number | null
-          max_distance?: number | null
           max_age?: number | null
+          max_distance?: number | null
           messy_organized?: number | null
           min_age?: number | null
           occupation?: string | null
@@ -866,9 +840,6 @@ export type CompositeTypes<
     : never
 
 export const Constants = {
-  graphql_public: {
-    Enums: {},
-  },
   public: {
     Enums: {},
   },
