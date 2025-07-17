@@ -50,9 +50,33 @@ const DiscoverPage = ({ currentUser, onNavigateToChat }: DiscoverPageProps) => {
   const [matchedUser, setMatchedUser] = useState<PotentialMatch | null>(null);
   // New: Store images by userId for instant access
   const [userImages, setUserImages] = useState<{ [key: string]: string[] }>({});
+  const [reverseUsageToday, setReverseUsageToday] = useState(0);
   const { toast } = useToast();
   
   const { subscription, checkUsageLimit, isPremium } = useSubscription(currentUser?.id);
+
+  // Fetch current reverse usage for today
+  const fetchReverseUsage = useCallback(async () => {
+    if (!currentUser?.id) return;
+    
+    try {
+      const { data, error } = await supabase
+        .from('user_usage')
+        .select('reverse_dislikes_used')
+        .eq('user_id', currentUser.id)
+        .eq('date', new Date().toISOString().split('T')[0])
+        .maybeSingle();
+
+      if (error && error.code !== 'PGRST116') {
+        console.error('Error fetching reverse usage:', error);
+        return;
+      }
+
+      setReverseUsageToday(data?.reverse_dislikes_used || 0);
+    } catch (error) {
+      console.error('Error fetching reverse usage:', error);
+    }
+  }, [currentUser?.id]);
   const [lastShuffleTime, setLastShuffleTime] = useState<number>(0);
   const [startX, setStartX] = useState(0);
   const [startY, setStartY] = useState(0);
@@ -262,8 +286,9 @@ const DiscoverPage = ({ currentUser, onNavigateToChat }: DiscoverPageProps) => {
   useEffect(() => {
     if (currentUser?.id) {
       fetchPotentialMatches();
+      fetchReverseUsage();
     }
-  }, [currentUser?.id, fetchPotentialMatches]);
+  }, [currentUser?.id, fetchPotentialMatches, fetchReverseUsage]);
 
   // Save current match state
   useEffect(() => {
@@ -595,6 +620,11 @@ const DiscoverPage = ({ currentUser, onNavigateToChat }: DiscoverPageProps) => {
       // Remove from passed users list
       setPassedUsers(prev => prev.slice(1));
 
+      // Update reverse usage count if not premium
+      if (!isPremium()) {
+        setReverseUsageToday(prev => prev + 1);
+      }
+
       toast({
         title: 'Undo Successful',
         description: 'Your last dislike has been reversed.',
@@ -838,6 +868,8 @@ const DiscoverPage = ({ currentUser, onNavigateToChat }: DiscoverPageProps) => {
           onReverse={handleReverse}
           onLike={handleLike}
           canReverse={passedUsers.length > 0}
+          reversesLeft={isPremium() ? undefined : Math.max(0, 2 - reverseUsageToday)}
+          isPremium={isPremium()}
         />
       </div>
     </div>
