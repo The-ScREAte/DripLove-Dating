@@ -140,8 +140,6 @@ class SupabasePushNotificationService {
   }
 
   private handleForegroundNotification(notification: PushNotificationSchema): void {
-    console.log('📱 Handling foreground notification:', notification);
-    
     this.showInAppNotification({
       title: notification.title,
       body: notification.body,
@@ -150,8 +148,6 @@ class SupabasePushNotificationService {
   }
 
   private handleNotificationAction(notification: ActionPerformed): void {
-    console.log('👆 Handling notification action:', notification);
-    
     // Handle notification tap/action
     const data = notification.notification.data;
     if (data?.type === 'message') {

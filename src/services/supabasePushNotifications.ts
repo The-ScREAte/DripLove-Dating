@@ -32,7 +32,6 @@ class SupabasePushNotificationService {
     if (this.isInitialized) return true;
 
     try {
-      console.log('🔔 Initializing Supabase push notifications...');
       this.currentUserId = userId;
 
       // Initialize native push notifications if on mobile
@@ -44,56 +43,42 @@ class SupabasePushNotificationService {
       await this.initializeRealtimeNotifications(userId);
 
       this.isInitialized = true;
-      console.log('✅ Supabase push notifications initialized successfully');
       return true;
 
     } catch (error) {
-      console.error('❌ Error initializing push notifications:', error);
       return false;
     }
   }
 
   private async initializeNativePushNotifications(userId: string): Promise<void> {
-    console.log('📱 Initializing native push notifications...');
-
     // Request permission for push notifications
     const permissionStatus = await PushNotifications.requestPermissions();
     
     if (permissionStatus.receive === 'granted') {
-      console.log('✅ Push notification permission granted');
-      
       // Register for push notifications
       await PushNotifications.register();
       
       // Set up event listeners
       PushNotifications.addListener('registration', async (token: Token) => {
-        console.log('📱 Device registered for push notifications:', token.value);
         this.deviceToken = token.value;
         await this.saveTokenToDatabase(userId, token.value, Capacitor.getPlatform());
       });
 
       PushNotifications.addListener('registrationError', (error: unknown) => {
-        console.error('❌ Error registering for push notifications:', error);
+        // Error registering for push notifications
       });
 
       PushNotifications.addListener('pushNotificationReceived', (notification: PushNotificationSchema) => {
-        console.log('📨 Push notification received:', notification);
         this.handleForegroundNotification(notification);
       });
 
       PushNotifications.addListener('pushNotificationActionPerformed', (notification: ActionPerformed) => {
-        console.log('👆 Push notification action performed:', notification);
         this.handleNotificationAction(notification);
       });
-
-    } else {
-      console.warn('⚠️ Push notification permission not granted');
     }
   }
 
   private async initializeRealtimeNotifications(userId: string): Promise<void> {
-    console.log('🔄 Setting up Supabase Realtime notifications...');
-
     // Subscribe to real-time notifications for this user
     this.realtimeChannel = supabase
       .channel(`notifications:${userId}`)
@@ -106,13 +91,10 @@ class SupabasePushNotificationService {
           filter: `user_id=eq.${userId}`,
         },
         (payload) => {
-          console.log('📨 New notification from Supabase:', payload);
           this.handleRealtimeNotification(payload.new as RealtimeNotification);
         }
       )
       .subscribe();
-
-    console.log('✅ Supabase Realtime notifications channel subscribed');
   }
 
   private async saveTokenToDatabase(userId: string, token: string, platform?: string): Promise<void> {
@@ -129,18 +111,14 @@ class SupabasePushNotificationService {
         });
 
       if (error) {
-        console.error('❌ Failed to save push token:', error);
-      } else {
-        console.log('✅ Push token saved to database');
+        // Failed to save push token
       }
     } catch (error) {
-      console.error('❌ Error saving push token:', error);
+      // Error saving push token
     }
   }
 
   private handleRealtimeNotification(notification: RealtimeNotification): void {
-    console.log('🔔 Handling realtime notification:', notification);
-    
     // Show in-app notification
     this.showInAppNotification({
       title: notification.title,
@@ -160,8 +138,6 @@ class SupabasePushNotificationService {
   }
 
   private handleForegroundNotification(notification: PushNotificationSchema): void {
-    console.log('📱 Handling foreground notification:', notification);
-    
     this.showInAppNotification({
       title: notification.title,
       body: notification.body,
@@ -170,8 +146,6 @@ class SupabasePushNotificationService {
   }
 
   private handleNotificationAction(notification: ActionPerformed): void {
-    console.log('👆 Handling notification action:', notification);
-    
     // Handle notification tap/action
     const data = notification.notification.data;
     if (data?.type === 'message') {
@@ -225,8 +199,6 @@ class SupabasePushNotificationService {
 
   async sendNotification(payload: NotificationPayload): Promise<boolean> {
     try {
-      console.log('📤 Sending notification via Supabase:', payload);
-
       // Call Supabase Edge Function to send push notification
       const { data, error } = await supabase.functions.invoke('send-push-notification', {
         body: {
@@ -243,7 +215,6 @@ class SupabasePushNotificationService {
         return false;
       }
 
-      console.log('✅ Notification sent successfully:', data);
       return true;
 
     } catch (error) {

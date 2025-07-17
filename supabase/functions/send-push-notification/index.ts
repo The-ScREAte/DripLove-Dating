@@ -31,7 +31,6 @@ async function sendWebPushNotification(token: string, payload: NotificationPaylo
   try {
     // For web browsers, we'll use the browser's Notification API
     // This will be handled on the client side
-    console.log('🌐 Web push notification queued for client-side delivery:', {
       token: token.substring(0, 10) + '...',
       title: payload.title,
       type: payload.type
@@ -78,7 +77,6 @@ async function sendFCMNotification(token: string, payload: NotificationPayload) 
     })
 
     if (response.ok) {
-      console.log('✅ Firebase notification sent successfully')
       return true
     } else {
       const error = await response.text()
@@ -105,7 +103,6 @@ async function sendAPNSNotification(token: string, payload: NotificationPayload)
   try {
     // TODO: Implement APNS notification with JWT authentication
     // This requires crypto libraries for JWT signing
-    console.log('📱 APNS notification would be sent to:', token)
     return true
   } catch (error) {
     console.error('❌ APNS notification error:', error)
@@ -127,7 +124,6 @@ serve(async (req) => {
 
     const { title, body, userId, type = 'system', data = {} } = await req.json() as NotificationPayload
 
-    console.log('📤 Sending push notification:', { title, body, userId, type })
 
     // Get device tokens for the user(s)
     let tokensQuery = supabaseClient
@@ -146,7 +142,6 @@ serve(async (req) => {
     }
 
     if (!tokens || tokens.length === 0) {
-      console.log('⚠️ No push tokens found for user(s)')
       return new Response(
         JSON.stringify({ success: false, message: 'No push tokens found' }),
         { 
@@ -156,7 +151,6 @@ serve(async (req) => {
       )
     }
 
-    console.log(`📱 Found ${tokens.length} device token(s)`)
 
     // Send notifications to all platforms
     const results: Array<{ token: string; platform: string; sent: boolean }> = []
@@ -174,7 +168,6 @@ serve(async (req) => {
         // Legacy Firebase support
         sent = await sendFCMNotification(tokenData.token, { title, body, userId, type, data })
       } else {
-        console.log(`📱 Platform ${tokenData.platform} notification logged:`, {
           to: tokenData.token,
           title,
           body,
@@ -209,11 +202,9 @@ serve(async (req) => {
       if (notificationError) {
         console.error('❌ Error storing notification:', notificationError)
       } else {
-        console.log('✅ Notification stored in database for real-time delivery')
       }
     }
 
-    console.log(`✅ Sent ${successCount}/${tokens.length} notifications successfully`)
 
     return new Response(
       JSON.stringify({ 

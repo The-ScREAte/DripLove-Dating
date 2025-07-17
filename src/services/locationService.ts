@@ -36,12 +36,9 @@ class LocationService {
         });
 
       if (!dbError && dbMatches) {
-        console.log(`📍 Found ${dbMatches.length} location-based matches via database`);
         return dbMatches;
       }
 
-      console.log('📍 Database function not available, using fallback matching');
-      
       // Fallback to manual location matching
       return await this.getFallbackLocationMatches(userId, maxDistance);
       
@@ -145,7 +142,6 @@ class LocationService {
       // Sort by distance
       matches.sort((a, b) => a.distance_km - b.distance_km);
 
-      console.log(`📍 Found ${matches.length} fallback location matches`);
       return matches;
 
     } catch (error) {
@@ -196,7 +192,6 @@ class LocationService {
         return false;
       }
 
-      console.log('✅ User location updated successfully');
       return true;
 
     } catch (error) {

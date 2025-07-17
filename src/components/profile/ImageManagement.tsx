@@ -48,7 +48,6 @@ const ImageManagement = ({ currentUser }: ImageManagementProps) => {
 
       if (error && error.message.includes('does not exist')) {
         // Fallback to basic fetch if moderation columns don't exist yet
-        console.log('Moderation columns not available, using basic fetch');
         const { data: basicImages, error: basicError } = await supabase
           .from('user_images')
           .select('image_url, image_order')
@@ -88,7 +87,6 @@ const ImageManagement = ({ currentUser }: ImageManagementProps) => {
     // Run bulk approval fix once when component mounts (only if needed)
     const hasRunBulkApproval = localStorage.getItem('bulk_approval_completed');
     if (!hasRunBulkApproval && currentUser?.id) {
-      console.log('🔧 Running one-time bulk approval fix...');
       bulkApproveExistingImages().then(() => {
         localStorage.setItem('bulk_approval_completed', 'true');
         // Refresh images after bulk approval
@@ -126,14 +124,11 @@ const ImageManagement = ({ currentUser }: ImageManagementProps) => {
     let moderationResult: ModerationResult | null = null;
 
     try {
-      console.log('🔍 Starting image moderation for file:', file.name, file.size, file.type);
       moderationResult = await moderateImage(file);
-      console.log('📊 Moderation result:', moderationResult);
       setModerationResult(moderationResult);
       
       // Only block if image is completely rejected (not approved)
       if (!moderationResult.isApproved) {
-        console.log('❌ Image blocked:', moderationResult.message);
         toast({ 
           title: "Image rejected", 
           description: moderationResult.message || "This image cannot be uploaded.", 
@@ -146,7 +141,6 @@ const ImageManagement = ({ currentUser }: ImageManagementProps) => {
       
       // Show info toast if image requires review
       if (moderationResult.details?.requiresReview) {
-        console.log('🔍 Image will require admin review');
         toast({ 
           title: "Image uploaded", 
           description: "Your image has been uploaded but requires admin approval before being visible to others.", 
@@ -211,12 +205,6 @@ const ImageManagement = ({ currentUser }: ImageManagementProps) => {
         }
       }
 
-      console.log('📊 Image order calculation:', {
-        existingOrders,
-        nextImageOrder,
-        totalImages: existingOrders.length
-      });
-
       // Determine if image needs review
       const requiresReview = moderationResult?.details?.requiresReview || false;
       
@@ -233,8 +221,6 @@ const ImageManagement = ({ currentUser }: ImageManagementProps) => {
         flagged_content: moderationResult?.flags || [],
         confidence_score: Math.round(moderationResult?.confidence || 50)
       };
-
-      console.log('📝 Inserting image with data:', insertData);
 
       // Insert to database
       const { error: dbError } = await supabase

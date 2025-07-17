@@ -6,8 +6,6 @@
 import { supabase } from '@/integrations/supabase/client';
 
 export async function bulkApproveExistingImages(): Promise<void> {
-  console.log('🔧 Starting bulk approval of existing images...');
-  
   try {
     // First, check the current state
     const { data: countData, error: countError } = await supabase
@@ -25,10 +23,7 @@ export async function bulkApproveExistingImages(): Promise<void> {
       img.is_approved === false || img.moderation_status === 'pending'
     ).length || 0;
 
-    console.log(`📊 Found ${totalImages} total images, ${pendingImages} pending approval`);
-
     if (pendingImages === 0) {
-      console.log('✅ No images need approval - all good!');
       return;
     }
 
@@ -46,9 +41,6 @@ export async function bulkApproveExistingImages(): Promise<void> {
       console.error('Error bulk approving images:', updateError);
       return;
     }
-
-    console.log(`✅ Successfully bulk approved ${pendingImages} images!`);
-    console.log('🔄 Please refresh the page to see the changes');
     
   } catch (error) {
     console.error('Bulk approval failed:', error);

@@ -19,10 +19,8 @@ if (!container) {
   throw new Error("Root element not found");
 } 
 
-// 🔍 Log current auth user ID
-supabase.auth.getUser().then(({ data: { user } }) => {
-  console.log("Logged-in Supabase user ID:", user?.id || "No user logged in");
-});
+// Get current auth user
+supabase.auth.getUser();
 
 const root = createRoot(container);
 root.render(

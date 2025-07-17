@@ -276,7 +276,6 @@ const AdminPage = ({ currentUser, onLogout }: AdminPageProps) => {
   const fetchPendingImages = useCallback(async () => {
     try {
       setLoadingPendingImages(true);
-      console.log('🔍 Fetching pending images...');
 
       // Fetch images that need approval (either is_approved = false OR moderation_status = 'pending')
       const { data, error } = await supabase
@@ -303,8 +302,6 @@ const AdminPage = ({ currentUser, onLogout }: AdminPageProps) => {
         });
         return;
       }
-
-      console.log('📊 Found pending images:', data?.length || 0);
       
       if (!data || data.length === 0) {
         setPendingImages([]);
@@ -360,7 +357,6 @@ const AdminPage = ({ currentUser, onLogout }: AdminPageProps) => {
       if (error) {
         if (error.message.includes('function') && error.message.includes('does not exist')) {
           // Fallback to direct update if function doesn't exist
-          console.log('Function not available, using direct update');
           const { error: updateError } = await supabase
             .from('user_images')
             .update({

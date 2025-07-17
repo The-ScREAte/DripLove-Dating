@@ -59,8 +59,6 @@ class PhotoModerationService {
    */
   async moderateImage(file: File): Promise<ModerationResult> {
     try {
-      console.log('🔍 Starting image moderation for:', file.name);
-      
       const imageData = await this.loadImage(file);
       const analyses = await Promise.all([
         this.analyzeImageContent(imageData),
@@ -70,7 +68,6 @@ class PhotoModerationService {
       ]);
 
       const result = this.combineResults(analyses);
-      console.log('✅ Moderation complete:', result);
       
       return result;
     } catch (error) {
@@ -149,51 +146,43 @@ class PhotoModerationService {
     const skinToneRatio = skinTonePixels / pixels;
     const redDominantRatio = redDominantPixels / pixels;
     
-    console.log('📊 Content analysis:', {
-      skinToneRatio: (skinToneRatio * 100).toFixed(1) + '%',
-      redDominantRatio: (redDominantRatio * 100).toFixed(1) + '%',
-      pixels,
-      skinTonePixels,
-      threshold: 'AGGRESSIVE MODE - Lower thresholds for nude detection'
-    });
-    
     const flags: string[] = [];
     let adultContent = 0;
     let explicitContent = 0;
     let suggestiveContent = 0;
 
     // AGGRESSIVE MODERATION - Much stricter for nude content detection
-    console.log('� Applying AGGRESSIVE moderation thresholds to catch nude content');
+    // Apply AGGRESSIVE moderation thresholds to catch nude content
 
     // Balanced thresholds for dating app moderation
     if (skinToneRatio > 0.65) { // 65%+ skin tone - very likely nude/explicit
       explicitContent = 95;
       flags.push(MODERATION_FLAGS.EXPLICIT_CONTENT);
-      console.log('🚨 FLAGGED: Very high skin exposure - 65%+ skin tone (nude/explicit content)');
+      // FLAGGED: Very high skin exposure - 65%+ skin tone (nude/explicit content)
     }
     else if (skinToneRatio > 0.50) { // 50-65% skin tone - shirtless/bikini content
       adultContent = 85;
       flags.push(MODERATION_FLAGS.ADULT_CONTENT);
-      console.log('🚨 FLAGGED: High skin exposure - 50-65% skin tone (shirtless/bikini, requires review)');
+      // FLAGGED: High skin exposure - 50-65% skin tone (shirtless/bikini, requires review)
     }
     else if (skinToneRatio > 0.35) { // 35-50% skin tone - tank tops, summer clothing
       suggestiveContent = 45; // Lower score to allow auto-approval
-      console.log('✅ PASSED: Moderate skin exposure - 35-50% skin tone (summer clothing, auto-approved)');
+      // PASSED: Moderate skin exposure - 35-50% skin tone (summer clothing, auto-approved)
     }
     else if (skinToneRatio > 0.15) { // 15-35% skin tone - casual clothing
       suggestiveContent = 25; // Low score to allow auto-approval
-      console.log('✅ PASSED: Light skin exposure - 15-35% skin tone (casual clothing, auto-approved)');
+      // PASSED: Light skin exposure - 15-35% skin tone (casual clothing, auto-approved)
     }
     else {
       // 0-15% skin tone - normal face/portrait photos
-      console.log('✅ PASSED: Minimal skin exposure - 0-15% skin tone (normal portrait, auto-approved)');
+      // PASSED: Minimal skin exposure - 0-15% skin tone (normal portrait, auto-approved)
     }
 
     // Additional check for extremely red-dominant images (very rare)
     if (redDominantRatio > 0.8) { // 80% red dominant
       flags.push(MODERATION_FLAGS.INAPPROPRIATE);
       adultContent = Math.max(adultContent, 75);
-      console.log('🚨 Inappropriate content detected - 80%+ red dominant');
+      // Inappropriate content detected - 80%+ red dominant
     }
 
     return {
@@ -338,11 +327,6 @@ class PhotoModerationService {
       ...curr.details
     }), {} as ModerationResult['details']);
 
-    console.log('📊 Moderation analysis:', {
-      flags: allFlags,
-      details: combinedDetails
-    });
-
     const hasBlockingFlags = allFlags.some(flag =>
       flag === MODERATION_FLAGS.INVALID_IMAGE
     );
@@ -363,7 +347,7 @@ class PhotoModerationService {
       isApproved = false;
       confidence = 95;
       message = 'Image file is corrupted or invalid and cannot be uploaded.';
-      console.log('❌ Image blocked: Invalid file');
+      // Image blocked: Invalid file
     }
     // Send inappropriate content to admin review
     else if (hasContentFlags) {
@@ -371,7 +355,7 @@ class PhotoModerationService {
       requiresReview = true;
       confidence = 20;
       message = 'Image uploaded but requires admin approval due to potentially inappropriate content.';
-      console.log('🔍 Image flagged for admin review due to content flags');
+      // Image flagged for admin review due to content flags
     }
     // Send high-risk content scores to admin review  
     else if (
@@ -383,16 +367,11 @@ class PhotoModerationService {
       requiresReview = true;
       confidence = 30;
       message = 'Image uploaded but requires admin approval before being visible to others.';
-      console.log('🔍 Image requires review due to content scores:', {
-        adultContent: combinedDetails.adultContent,
-        explicitContent: combinedDetails.explicitContent,
-        suggestiveContent: combinedDetails.suggestiveContent
-      });
     }
     else {
       message = 'Image approved and uploaded successfully.';
       confidence = 95;
-      console.log('✅ Image approved automatically');
+      // Image approved automatically
       if (allFlags.includes(MODERATION_FLAGS.NO_FACE_DETECTED)) {
         message += ' Tip: Profile photos work best when they clearly show your face.';
       }
@@ -521,7 +500,7 @@ export async function saveModerationResult(
       return false;
     }
 
-    console.log('✅ Moderation result saved for image:', imageId);
+    // Moderation result saved for image
     return true;
 
   } catch (error) {
@@ -599,7 +578,7 @@ export async function approveImage(imageId: string, notes?: string): Promise<boo
       return false;
     }
 
-    console.log('✅ Image approved:', imageId);
+    // Image approved
     return true;
 
   } catch (error) {
@@ -623,7 +602,7 @@ export async function rejectImage(imageId: string, notes?: string): Promise<bool
       return false;
     }
 
-    console.log('✅ Image rejected:', imageId);
+    // Image rejected
     return true;
 
   } catch (error) {
