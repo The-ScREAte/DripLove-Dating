@@ -8,10 +8,10 @@ interface PrivacyPolicyProps {
 
 const PrivacyPolicy = ({ onBack }: PrivacyPolicyProps) => {
   return (
-    <div className="min-h-screen bg-gradient-to-br from-pink-400 via-purple-500 to-indigo-600 p-4">
+    <div className="min-h-screen bg-gradient-to-br from-pink-400 via-purple-500 to-indigo-600 p-4 pt-safe pb-safe">
       <div className="max-w-4xl mx-auto bg-white rounded-lg shadow-lg overflow-hidden">
         {/* Header */}
-        <div className="bg-gradient-to-r from-purple-600 to-pink-600 text-white p-6">
+        <div className="bg-gradient-to-r from-purple-600 to-pink-600 text-white p-6 sticky top-0 z-10 rounded-t-lg">
           <Button
             onClick={onBack}
             variant="ghost"
