@@ -17,6 +17,8 @@ interface MatchCardProps {
   calculateDistance: (lat1: number, lon1: number, lat2: number, lon2: number) => number;
   swipeDirection: 'left' | 'right' | null;
   swipeDistance: number;
+  isSwipeAreaOnly?: boolean; // New prop to render only swipeable image area
+  isDetailsAreaOnly?: boolean; // New prop to render only details area
 }
 
 const MatchCard: React.FC<MatchCardProps> = ({
@@ -33,7 +35,9 @@ const MatchCard: React.FC<MatchCardProps> = ({
   calculateAge,
   calculateDistance,
   swipeDirection,
-  swipeDistance
+  swipeDistance,
+  isSwipeAreaOnly = false,
+  isDetailsAreaOnly = false
 }) => {
   const [currentSlide, setCurrentSlide] = useState(0);
   
@@ -191,161 +195,125 @@ const MatchCard: React.FC<MatchCardProps> = ({
     return 'rgba(239, 68, 68, 0.8)';
   };
 
-  return (
-    <div
-      className="relative w-full h-full bg-white rounded-xl shadow-lg overflow-hidden transition-transform duration-200"
-      style={{ transform: getSwipeTransform() }}
-    >
-      {/* Swipe Indicator Overlay */}
-      {swipeDirection && Math.abs(swipeDistance) > 50 && (
-        <div
-          className="absolute inset-0 z-20 flex items-center justify-center text-white text-6xl font-bold"
-          style={{ backgroundColor: getSwipeColor() }}
-        >
-          {swipeDirection === 'right' ? '❤️' : '✗'}
+  // Handle split rendering modes
+  if (isSwipeAreaOnly) {
+    // Render only the swipeable image area
+    return (
+      <div className="relative w-full h-full overflow-hidden">
+        {/* Image/Bio Container - Swipeable Area Only */}
+        <div className="relative w-full h-full overflow-hidden" onClick={handleSlideClick}>
+          {/* Current slide content */}
+          {slides.length > 0 && (
+            <div className="w-full h-full transition-all duration-300 ease-in-out">
+              {slides[currentSlide]?.type === 'image' ? (
+                <img
+                  src={slides[currentSlide].content}
+                  alt={`${match.first_name} ${match.last_name}`}
+                  className="w-full h-full object-contain bg-black transition-opacity duration-300"
+                  draggable={false}
+                />
+              ) : slides[currentSlide]?.type === 'bio' ? (
+                <div className={`w-full h-full ${userBackgroundColor} flex items-center justify-center p-8`}>
+                  <div className="max-w-sm mx-auto text-center">
+                    <div className="flex items-center justify-center mb-6">
+                      <div className="bg-white/20 backdrop-blur-sm rounded-full p-4 shadow-lg">
+                        <Quote className="w-8 h-8 text-white" />
+                      </div>
+                    </div>
+                    <h3 className="text-2xl font-bold text-white mb-6">About {match.first_name}</h3>
+                    <p className="text-white text-lg leading-relaxed font-medium">
+                      {slides[currentSlide].content}
+                    </p>
+                  </div>
+                </div>
+              ) : slides[currentSlide]?.type === 'fun_fact' ? (
+                <div className={`w-full h-full ${userBackgroundColor} flex items-center justify-center p-8`}>
+                  <div className="max-w-sm mx-auto text-center">
+                    <div className="flex items-center justify-center mb-6">
+                      <div className="bg-white/20 backdrop-blur-sm rounded-full p-4 shadow-lg">
+                        <Heart className="w-8 h-8 text-white" />
+                      </div>
+                    </div>
+                    <h3 className="text-2xl font-bold text-white mb-6">Fun Fact</h3>
+                    <p className="text-white text-lg leading-relaxed font-medium">
+                      {slides[currentSlide].content}
+                    </p>
+                  </div>
+                </div>
+              ) : slides[currentSlide]?.type === 'perfect_first_date' ? (
+                <div className={`w-full h-full ${userBackgroundColor} flex items-center justify-center p-8`}>
+                  <div className="max-w-sm mx-auto text-center">
+                    <div className="flex items-center justify-center mb-6">
+                      <div className="bg-white/20 backdrop-blur-sm rounded-full p-4 shadow-lg">
+                        <Coffee className="w-8 h-8 text-white" />
+                      </div>
+                    </div>
+                    <h3 className="text-2xl font-bold text-white mb-6">Perfect First Date</h3>
+                    <p className="text-white text-lg leading-relaxed font-medium">
+                      {slides[currentSlide].content}
+                    </p>
+                  </div>
+                </div>
+              ) : slides[currentSlide]?.type === 'last_googled' ? (
+                <div className={`w-full h-full ${userBackgroundColor} flex items-center justify-center p-8`}>
+                  <div className="max-w-sm mx-auto text-center">
+                    <div className="flex items-center justify-center mb-6">
+                      <div className="bg-white/20 backdrop-blur-sm rounded-full p-4 shadow-lg">
+                        <Search className="w-8 h-8 text-white" />
+                      </div>
+                    </div>
+                    <h3 className="text-2xl font-bold text-white mb-6">Last Googled</h3>
+                    <p className="text-white text-lg leading-relaxed font-medium">
+                      {slides[currentSlide].content}
+                    </p>
+                  </div>
+                </div>
+              ) : (
+                // Fallback for no images - show placeholder with initials
+                <div className="w-full h-full bg-gradient-to-br from-pink-200 to-purple-200 flex items-center justify-center transition-all duration-300">
+                  <div className="text-center">
+                    <div className="bg-white/80 rounded-full p-8 mb-4 shadow-xl">
+                      <User className="w-16 h-16 mx-auto text-gray-500" />
+                    </div>
+                    <span className="text-6xl font-bold text-gray-700 bg-white/50 rounded-full px-6 py-3">
+                      {match.first_name?.[0]}{match.last_name?.[0]}
+                    </span>
+                    <p className="text-gray-600 mt-4 text-sm">No photos uploaded yet</p>
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
+          
+          {/* Slide indicators */}
+          {slides.length > 1 && (
+            <div className="absolute top-4 left-4 right-4 flex space-x-1 z-10">
+              {slides.map((_, index) => (
+                <div
+                  key={index}
+                  className={`flex-1 h-1 rounded-full transition-all duration-300 ${
+                    index === currentSlide 
+                      ? 'bg-white shadow-lg' 
+                      : 'bg-white/30'
+                  }`}
+                />
+              ))}
+            </div>
+          )}
         </div>
-      )}
-
-      {/* Image/Bio Container */}
-      <div className={`relative ${showMoreInfo ? 'h-[65%]' : 'h-[75%]'} overflow-hidden transition-all duration-300`} onClick={handleSlideClick}>
-        {/* Current slide content */}
-        {slides.length > 0 && (
-          <div className="w-full h-full transition-all duration-300 ease-in-out">
-            {slides[currentSlide]?.type === 'image' ? (
-              <img
-                src={slides[currentSlide].content}
-                alt={`${match.first_name} ${match.last_name}`}
-                className="w-full h-full object-cover transition-opacity duration-300"
-                draggable={false}
-              />
-            ) : slides[currentSlide]?.type === 'bio' ? (
-              <div className={`w-full h-full ${userBackgroundColor} flex items-center justify-center p-8`}>
-                <div className="max-w-sm mx-auto text-center">
-                  <div className="flex items-center justify-center mb-6">
-                    <div className="bg-white/20 backdrop-blur-sm rounded-full p-4 shadow-lg">
-                      <Quote className="w-8 h-8 text-white" />
-                    </div>
-                  </div>
-                  <h3 className="text-2xl font-bold text-white mb-6">About {match.first_name}</h3>
-                  <p className="text-white text-lg leading-relaxed font-medium">
-                    {slides[currentSlide].content}
-                  </p>
-                </div>
-              </div>
-            ) : slides[currentSlide]?.type === 'fun_fact' ? (
-              <div className={`w-full h-full ${userBackgroundColor} flex items-center justify-center p-8`}>
-                <div className="max-w-sm mx-auto text-center">
-                  <div className="flex items-center justify-center mb-6">
-                    <div className="bg-white/20 backdrop-blur-sm rounded-full p-4 shadow-lg">
-                      <Heart className="w-8 h-8 text-white" />
-                    </div>
-                  </div>
-                  <h3 className="text-2xl font-bold text-white mb-6">Fun Fact</h3>
-                  <p className="text-white text-lg leading-relaxed font-medium">
-                    {slides[currentSlide].content}
-                  </p>
-                </div>
-              </div>
-            ) : slides[currentSlide]?.type === 'perfect_first_date' ? (
-              <div className={`w-full h-full ${userBackgroundColor} flex items-center justify-center p-8`}>
-                <div className="max-w-sm mx-auto text-center">
-                  <div className="flex items-center justify-center mb-6">
-                    <div className="bg-white/20 backdrop-blur-sm rounded-full p-4 shadow-lg">
-                      <Coffee className="w-8 h-8 text-white" />
-                    </div>
-                  </div>
-                  <h3 className="text-2xl font-bold text-white mb-6">Perfect First Date</h3>
-                  <p className="text-white text-lg leading-relaxed font-medium">
-                    {slides[currentSlide].content}
-                  </p>
-                </div>
-              </div>
-            ) : slides[currentSlide]?.type === 'last_googled' ? (
-              <div className={`w-full h-full ${userBackgroundColor} flex items-center justify-center p-8`}>
-                <div className="max-w-sm mx-auto text-center">
-                  <div className="flex items-center justify-center mb-6">
-                    <div className="bg-white/20 backdrop-blur-sm rounded-full p-4 shadow-lg">
-                      <Search className="w-8 h-8 text-white" />
-                    </div>
-                  </div>
-                  <h3 className="text-2xl font-bold text-white mb-6">Last Googled</h3>
-                  <p className="text-white text-lg leading-relaxed font-medium">
-                    {slides[currentSlide].content}
-                  </p>
-                </div>
-              </div>
-            ) : (
-              // Fallback for no images - show placeholder with initials
-              <div className="w-full h-full bg-gradient-to-br from-pink-200 to-purple-200 flex items-center justify-center transition-all duration-300">
-                <div className="text-center">
-                  <div className="bg-white/80 rounded-full p-8 mb-4 shadow-xl">
-                    <User className="w-16 h-16 mx-auto text-gray-500" />
-                  </div>
-                  <span className="text-6xl font-bold text-gray-700 bg-white/50 rounded-full px-6 py-3">
-                    {match.first_name?.[0]}{match.last_name?.[0]}
-                  </span>
-                  <p className="text-gray-600 mt-4 text-sm">No photos uploaded yet</p>
-                </div>
-              </div>
-            )}
-          </div>
-        )}
-        
-        {/* Slide indicators */}
-        {slides.length > 1 && (
-          <div className="absolute top-4 left-4 right-4 flex space-x-1 z-10">
-            {slides.map((_, index) => (
-              <div
-                key={index}
-                className={`flex-1 h-1 rounded-full transition-all duration-300 ${
-                  index === currentSlide ? 'bg-white shadow-lg' : 'bg-white/30'
-                }`}
-              />
-            ))}
-          </div>
-        )}
-
-        {/* Premium badge */}
-        {isPremium && (
-          <div className="absolute top-4 right-4 bg-yellow-500 text-white p-2 rounded-full shadow-lg z-10">
-            <Crown className="w-4 h-4" />
-          </div>
-        )}
-
-        {/* Verified badge */}
-        {/* Moved to beside name and age in user info section */}
-
-        {/* Navigation hints */}
-        {slides.length > 1 && (
-          <>
-            {/* Left navigation area */}
-            <div className="absolute left-2 top-1/2 transform -translate-y-1/2 z-10 pointer-events-none">
-              {currentSlide > 0 && (
-                <div className="bg-black/40 text-white rounded-full p-2 backdrop-blur-sm shadow-lg animate-pulse">
-                  <ChevronUp className="w-5 h-5 transform -rotate-90" />
-                </div>
-              )}
-            </div>
-            
-            {/* Right navigation area */}
-            <div className="absolute right-2 top-1/2 transform -translate-y-1/2 z-10 pointer-events-none">
-              {currentSlide < slides.length - 1 && (
-                <div className="bg-black/40 text-white rounded-full p-2 backdrop-blur-sm shadow-lg animate-pulse">
-                  <ChevronUp className="w-5 h-5 transform rotate-90" />
-                </div>
-              )}
-            </div>
-          </>
-        )}
       </div>
+    );
+  }
 
-      {/* User Info Section */}
-      <div className={`${showMoreInfo ? 'h-[35%]' : 'h-[25%]'} bg-white flex flex-col min-h-[120px] transition-all duration-300`}>
-        {/* Basic user info - always visible */}
-        <div className="p-4 flex items-center justify-between">
+  if (isDetailsAreaOnly) {
+    // Render only the non-swipeable details area
+    return (
+      <div className="w-full h-full">
+        {/* Basic Info - Always shown */}
+        <div className="flex justify-between items-start">
           <div className="flex-1">
-            <div className="flex items-center space-x-2">
-              <h2 className="text-xl font-bold text-gray-800">
+            <div className="flex items-center gap-2 mb-1">
+              <h2 className="text-xl font-bold text-gray-900">
                 {match.first_name} {match.last_name}
               </h2>
               <span className="text-lg text-gray-600">
@@ -408,174 +376,57 @@ const MatchCard: React.FC<MatchCardProps> = ({
 
         {/* Expandable details - appears below basic info */}
         {showMoreInfo && (
-          <div className="flex-1 bg-gray-50 border-t border-gray-200 overflow-y-auto">
-            <div className="p-4 space-y-3 text-sm">
-              {/* Bio */}
-              {match.bio && (
-                <div className="bg-white rounded-lg p-3 shadow-sm">
-                  <h4 className="font-semibold text-pink-600 mb-1">About</h4>
-                  <p className="text-gray-700 text-xs leading-relaxed">{match.bio}</p>
-                </div>
-              )}
+          <div className="mt-4 space-y-3 text-sm">
+            {/* Bio */}
+            {match.bio && (
+              <div className="bg-gray-50 rounded-lg p-3">
+                <h4 className="font-semibold text-pink-600 mb-1">About</h4>
+                <p className="text-gray-700 text-xs leading-relaxed">{match.bio}</p>
+              </div>
+            )}
 
-              {/* Work & Education */}
-              {(match.occupation || match.education_level) && (
-                <div className="bg-white rounded-lg p-3 shadow-sm">
-                  <h4 className="font-semibold text-pink-600 mb-2">Work & Education</h4>
-                  <div className="space-y-2">
-                    {match.occupation && (
-                      <div className="flex items-center text-xs">
-                        <Briefcase className="w-3 h-3 mr-2 flex-shrink-0 text-pink-500" />
-                        <span className="text-gray-700">{match.occupation}</span>
-                      </div>
-                    )}
-                    {match.education_level && (
-                      <div className="flex items-center text-xs">
-                        <GraduationCap className="w-3 h-3 mr-2 flex-shrink-0 text-pink-500" />
-                        <span className="text-gray-700">{match.education_level}</span>
-                      </div>
-                    )}
-                  </div>
+            {/* Work & Education */}
+            {(match.occupation || match.education_level) && (
+              <div className="bg-gray-50 rounded-lg p-3">
+                <h4 className="font-semibold text-pink-600 mb-2">Work & Education</h4>
+                <div className="space-y-2">
+                  {match.occupation && (
+                    <div className="flex items-center text-xs">
+                      <Briefcase className="w-3 h-3 mr-2 flex-shrink-0 text-pink-500" />
+                      <span className="text-gray-700">{match.occupation}</span>
+                    </div>
+                  )}
+                  {match.education_level && (
+                    <div className="flex items-center text-xs">
+                      <GraduationCap className="w-3 h-3 mr-2 flex-shrink-0 text-pink-500" />
+                      <span className="text-gray-700">{match.education_level}</span>
+                    </div>
+                  )}
                 </div>
-              )}
+              </div>
+            )}
 
-              {/* Interests */}
-              {match.interests?.length > 0 && (
-                <div className="bg-white rounded-lg p-3 shadow-sm">
-                  <h4 className="font-semibold text-pink-600 mb-2">Interests</h4>
-                  <div className="flex flex-wrap gap-1">
-                    {match.interests.map((interest, index) => (
-                      <span
-                        key={index}
-                        className="px-2 py-1 bg-pink-100 text-pink-700 rounded-full text-xs"
-                      >
-                        {interest}
-                      </span>
-                    ))}
-                  </div>
+            {/* Interests */}
+            {match.interests?.length > 0 && (
+              <div className="bg-gray-50 rounded-lg p-3">
+                <h4 className="font-semibold text-pink-600 mb-2">Interests</h4>
+                <div className="flex flex-wrap gap-1">
+                  {match.interests.map((interest, index) => (
+                    <span
+                      key={index}
+                      className="px-2 py-1 bg-pink-100 text-pink-700 rounded-full text-xs"
+                    >
+                      {interest}
+                    </span>
+                  ))}
                 </div>
-              )}
-
-              {/* Lifestyle */}
-              {(match.smoking || match.drinking || match.exercise_level || match.sleeping_schedule) && (
-                <div className="bg-white rounded-lg p-3 shadow-sm">
-                  <h4 className="font-semibold text-pink-600 mb-2">Lifestyle</h4>
-                  <div className="space-y-2">
-                    {match.smoking && (
-                      <div className="flex items-center text-xs">
-                        <div className="w-3 h-3 mr-2 flex-shrink-0 text-pink-500">🚬</div>
-                        <span className="text-gray-700">Smoking: {match.smoking}</span>
-                      </div>
-                    )}
-                    {match.drinking && (
-                      <div className="flex items-center text-xs">
-                        <div className="w-3 h-3 mr-2 flex-shrink-0 text-pink-500">🍷</div>
-                        <span className="text-gray-700">Drinking: {match.drinking}</span>
-                      </div>
-                    )}
-                    {match.exercise_level && (
-                      <div className="flex items-center text-xs">
-                        <div className="w-3 h-3 mr-2 flex-shrink-0 text-pink-500">💪</div>
-                        <span className="text-gray-700">Exercise: {match.exercise_level}</span>
-                      </div>
-                    )}
-                    {match.sleeping_schedule && (
-                      <div className="flex items-center text-xs">
-                        <div className="w-3 h-3 mr-2 flex-shrink-0 text-pink-500">😴</div>
-                        <span className="text-gray-700">Sleep: {match.sleeping_schedule}</span>
-                      </div>
-                    )}
-                  </div>
-                </div>
-              )}
-
-              {/* Personality */}
-              {(match.introvert_extrovert !== undefined || match.spontaneous_planner !== undefined || match.messy_organized !== undefined) && (
-                <div className="bg-white rounded-lg p-3 shadow-sm">
-                  <h4 className="font-semibold text-pink-600 mb-2">Personality</h4>
-                  <div className="space-y-2">
-                    {match.introvert_extrovert !== undefined && (
-                      <div className="flex items-center justify-between text-xs">
-                        <span className="text-gray-700">Introvert</span>
-                        <div className="flex-1 mx-2 bg-gray-200 rounded-full h-2">
-                          <div 
-                            className="bg-pink-500 h-2 rounded-full" 
-                            style={{ width: `${match.introvert_extrovert}%` }}
-                          ></div>
-                        </div>
-                        <span className="text-gray-700">Extrovert</span>
-                      </div>
-                    )}
-                    {match.spontaneous_planner !== undefined && (
-                      <div className="flex items-center justify-between text-xs">
-                        <span className="text-gray-700">Spontaneous</span>
-                        <div className="flex-1 mx-2 bg-gray-200 rounded-full h-2">
-                          <div 
-                            className="bg-pink-500 h-2 rounded-full" 
-                            style={{ width: `${match.spontaneous_planner}%` }}
-                          ></div>
-                        </div>
-                        <span className="text-gray-700">Planner</span>
-                      </div>
-                    )}
-                    {match.messy_organized !== undefined && (
-                      <div className="flex items-center justify-between text-xs">
-                        <span className="text-gray-700">Messy</span>
-                        <div className="flex-1 mx-2 bg-gray-200 rounded-full h-2">
-                          <div 
-                            className="bg-pink-500 h-2 rounded-full" 
-                            style={{ width: `${match.messy_organized}%` }}
-                          ></div>
-                        </div>
-                        <span className="text-gray-700">Organized</span>
-                      </div>
-                    )}
-                  </div>
-                </div>
-              )}
-
-              {/* Fun Questions */}
-              {(match.fun_fact || match.perfect_first_date || match.last_googled) && (
-                <div className="bg-white rounded-lg p-3 shadow-sm">
-                  <h4 className="font-semibold text-pink-600 mb-2">Fun Questions</h4>
-                  <div className="space-y-2">
-                    {match.fun_fact && (
-                      <div className="text-xs">
-                        <div className="flex items-center mb-1">
-                          <Quote className="w-3 h-3 mr-1 text-pink-500" />
-                          <span className="font-medium text-gray-700">Fun Fact:</span>
-                        </div>
-                        <p className="text-gray-600 leading-relaxed ml-4">{match.fun_fact}</p>
-                      </div>
-                    )}
-                    {match.perfect_first_date && (
-                      <div className="text-xs">
-                        <div className="flex items-center mb-1">
-                          <Coffee className="w-3 h-3 mr-1 text-pink-500" />
-                          <span className="font-medium text-gray-700">Perfect First Date:</span>
-                        </div>
-                        <p className="text-gray-600 leading-relaxed ml-4">{match.perfect_first_date}</p>
-                      </div>
-                    )}
-                    {match.last_googled && (
-                      <div className="text-xs">
-                        <div className="flex items-center mb-1">
-                          <Search className="w-3 h-3 mr-1 text-pink-500" />
-                          <span className="font-medium text-gray-700">Last Googled:</span>
-                        </div>
-                        <p className="text-gray-600 leading-relaxed ml-4">{match.last_googled}</p>
-                      </div>
-                    )}
-                  </div>
-                </div>
-              )}
-            </div>
+              </div>
+            )}
           </div>
         )}
       </div>
-
-    </div>
-  );
+    );
+  }
 };
 
 export default MatchCard;

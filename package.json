@@ -7,12 +7,21 @@
     "dev": "vite",
     "build": "tsc && vite build",
     "lint": "eslint .",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "android:build": "npm run build && cap sync android",
+    "android:dev": "npm run build && cap sync android && cap open android",
+    "android:run": "npm run build && cap sync android && cap run android",
+    "ios:build": "npm run build && cap sync ios",
+    "ios:dev": "npm run build && cap sync ios && cap open ios",
+    "ios:run": "npm run build && cap sync ios && cap run ios"
   },
   "dependencies": {
+    "@capacitor/android": "^7.4.2",
     "@capacitor/core": "^7.4.2",
+    "@capacitor/ios": "^7.4.2",
     "@capacitor/keyboard": "^7.0.1",
     "@capacitor/push-notifications": "^7.0.1",
+    "@capacitor/status-bar": "^7.0.1",
     "@radix-ui/react-accordion": "^1.2.11",
     "@radix-ui/react-alert-dialog": "^1.1.14",
     "@radix-ui/react-aspect-ratio": "^1.1.7",
@@ -63,6 +72,7 @@
     "vaul": "^1.1.2"
   },
   "devDependencies": {
+    "@capacitor/cli": "^7.4.2",
     "@types/react": "^18.3.3",
     "@types/react-dom": "^18.3.0",
     "@vitejs/plugin-react-swc": "^3.5.0",

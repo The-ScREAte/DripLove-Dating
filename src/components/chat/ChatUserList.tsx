@@ -37,7 +37,7 @@ const ChatUserList: React.FC<ChatUserListProps> = ({
   return (
     <div className="w-full h-full flex flex-col">
       {/* Sticky Header with gradient background */}
-      <div className="sticky top-0 z-10 p-4 bg-gradient-to-r from-blue-600 to-blue-700 text-white flex-shrink-0">
+      <div className="sticky top-0 z-10 p-4 bg-gradient-to-r from-pink-500 to-purple-600 text-white flex-shrink-0">
         <h2 className="text-xl font-bold mb-4">Messages</h2>
         <div className="relative">
           <Input
@@ -45,7 +45,7 @@ const ChatUserList: React.FC<ChatUserListProps> = ({
             placeholder="Search conversations..."
             value={localSearchTerm}
             onChange={(e) => handleSearchChange(e.target.value)}
-            className="pr-10 bg-white text-gray-900"
+            className="pr-10 bg-white text-gray-900 focus:ring-pink-300"
           />
           <Search className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4" />
         </div>
@@ -67,7 +67,7 @@ const ChatUserList: React.FC<ChatUserListProps> = ({
               <div
                 key={match.id}
                 className={`p-4 border-b cursor-pointer hover:bg-gray-50 transition-colors ${
-                  selectedMatch?.id === match.id ? 'bg-blue-50 border-blue-200' : ''
+                  selectedMatch?.id === match.id ? 'bg-pink-50 border-pink-200' : ''
                 }`}
                 onClick={() => onMatchSelect(match)}
               >

@@ -360,34 +360,26 @@ const ChatPage = ({ currentUser, onUnreadChange }: ChatPageProps) => {
 
   if (!selectedMatch) {
     return (
-      <div className="h-screen flex flex-col bg-gray-50 relative">
-        <div className="fixed top-12 left-0 right-0 z-30">
-          <div className="p-4 bg-gradient-to-r from-blue-600 to-blue-700 text-white">
-            <h2 className="text-xl font-bold mb-4">Messages</h2>
-            <div className="relative">
-              <input
-                type="text"
-                placeholder="Search conversations..."
-                value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
-                className="w-full pr-10 bg-white text-gray-900 rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-blue-300"
-              />
-              <svg className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="m21 21-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
-              </svg>
-            </div>
+      <div className="h-full flex flex-col bg-gray-50">
+        {/* Sticky Search Header */}
+        <div className="sticky top-0 z-30 bg-gradient-to-r from-pink-500 to-purple-600 text-white p-4 pt-safe">
+          <h2 className="text-xl font-bold mb-4">Messages</h2>
+          <div className="relative">
+            <input
+              type="text"
+              placeholder="Search conversations..."
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+              className="w-full pr-10 bg-white text-gray-900 rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-pink-300"
+            />
+            <svg className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="m21 21-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+            </svg>
           </div>
         </div>
 
-        <div 
-          className="flex-1 bg-gray-50"
-          style={{ 
-            marginTop: '152px',
-            marginBottom: '80px',
-            maxHeight: filteredMatches.length > 6 ? 'calc(100vh - 232px)' : 'auto',
-            overflowY: filteredMatches.length > 6 ? 'auto' : 'visible'
-          }}
-        >
+        {/* Scrollable Chat List */}
+        <div className="flex-1 overflow-y-auto pb-safe">
           {filteredMatches.length === 0 ? (
             <div className="p-4 text-center text-gray-500">
               {searchTerm ? 'No matches found' : 'No conversations yet'}
@@ -402,7 +394,7 @@ const ChatPage = ({ currentUser, onUnreadChange }: ChatPageProps) => {
                 <div
                   key={match.id}
                   className={`p-4 border-b border-gray-200 cursor-pointer hover:bg-gray-100 transition-colors ${
-                    selectedMatch?.id === match.id ? 'bg-blue-50 border-blue-200' : 'bg-white'
+                    selectedMatch?.id === match.id ? 'bg-pink-50 border-pink-200' : 'bg-white'
                   }`}
                   onClick={() => setSelectedMatch(match)}
                 >
@@ -466,8 +458,9 @@ const ChatPage = ({ currentUser, onUnreadChange }: ChatPageProps) => {
   }
 
   return (
-    <div className="h-screen flex flex-col bg-gray-50 relative">
-      <div className="fixed top-12 left-0 right-0 z-30 bg-white border-b border-gray-200 shadow-sm">
+    <div className="h-full flex flex-col bg-gray-50">
+      {/* Sticky Chat Header */}
+      <div className="sticky top-0 z-30 bg-white border-b border-gray-200 shadow-sm pt-safe">
         <ChatHeader
           selectedMatch={selectedMatch}
           onBack={() => setSelectedMatch(null)}
@@ -479,14 +472,13 @@ const ChatPage = ({ currentUser, onUnreadChange }: ChatPageProps) => {
         />
       </div>
 
+      {/* Scrollable Messages Area */}
       <div 
         ref={messagesContainerRef}
-        className="flex-1 px-4 space-y-2 bg-gray-50"
+        className="flex-1 px-4 space-y-2 bg-gray-50 overflow-y-auto"
         style={{ 
-          marginTop: '92px',
-          marginBottom: '160px',
-          maxHeight: messages.length > 8 ? 'calc(100vh - 252px)' : 'auto',
-          overflowY: messages.length > 8 ? 'auto' : 'visible'
+          paddingBottom: '20px',
+          paddingTop: '20px'
         }}
       >
         {messages.map((message, index) => {
@@ -508,7 +500,8 @@ const ChatPage = ({ currentUser, onUnreadChange }: ChatPageProps) => {
         <div ref={messagesEndRef} />
       </div>
 
-      <div className="fixed bottom-16 left-0 right-0 z-30 bg-white border-t">
+      {/* Sticky Message Input Footer */}
+      <div className="sticky bottom-0 z-30 bg-white border-t border-gray-200 pb-safe">
         <MessageInput
           newMessage={newMessage}
           onMessageChange={setNewMessage}

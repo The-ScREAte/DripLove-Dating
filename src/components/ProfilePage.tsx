@@ -527,7 +527,7 @@ const ProfilePage = ({ currentUser, profile, onProfileUpdate, onLogout, onShowTe
   }
 
   return (
-    <div className="min-h-screen bg-gray-50"> 
+    <div className="min-h-screen bg-gray-50 overflow-x-hidden w-full max-w-full"> 
       {/* Sticky Header with Progress Bar */}
       <div className="sticky top-0 z-50 bg-white border-b border-gray-200 shadow-sm">
         <div className="p-6">
@@ -539,37 +539,42 @@ const ProfilePage = ({ currentUser, profile, onProfileUpdate, onLogout, onShowTe
                   className="bg-gradient-to-r from-yellow-400 to-yellow-500 hover:from-yellow-500 hover:to-yellow-600 text-white font-semibold w-full sm:w-auto shadow-md hover:shadow-lg transition-all duration-200"
                 >
                   <Crown className="w-4 h-4 mr-2" />
-                  Upgrade to Premium
+                  Upgrade
                 </Button>
               )}
-              {!isEditing ? (
-                <Button 
-                  onClick={() => setIsEditing(true)} 
-                  className="w-full sm:w-auto bg-gray-900 hover:bg-gray-800 text-white font-medium"
-                >
-                  <Edit className="w-4 h-4 mr-2" /> 
-                  Edit Profile
-                </Button>
-              ) : (
-                <div className="flex flex-row gap-3 w-full">
-                  <Button 
-                    onClick={handleSave} 
-                    disabled={isSaving} 
-                    className="w-full sm:w-auto bg-emerald-600 hover:bg-emerald-700 text-white font-medium disabled:opacity-50"
-                  >
-                    <Save className="w-4 h-4 mr-2" /> 
-                    {isSaving ? 'Saving...' : 'Save'}
-                  </Button>
-                  <Button 
-                    variant="outline" 
-                    onClick={handleCancel} 
-                    disabled={isSaving} 
-                    className="w-full sm:w-auto border-gray-300 text-gray-700 hover:bg-gray-50 disabled:opacity-50"
-                  >
+              {/* Single toggle button - Edit becomes Cancel */}
+              <Button 
+                onClick={isEditing ? handleCancel : () => setIsEditing(true)}
+                disabled={isSaving}
+                className={`w-full sm:w-auto font-medium transition-all duration-200 ${
+                  isEditing 
+                    ? 'border-gray-300 text-gray-700 hover:bg-gray-50 disabled:opacity-50 bg-white border' 
+                    : 'bg-gray-900 hover:bg-gray-800 text-white'
+                }`}
+                variant={isEditing ? 'outline' : 'default'}
+              >
+                {isEditing ? (
+                  <>
                     <X className="w-4 h-4 mr-2" /> 
                     Cancel
-                  </Button>
-                </div>
+                  </>
+                ) : (
+                  <>
+                    <Edit className="w-4 h-4 mr-2" /> 
+                    Edit Profile
+                  </>
+                )}
+              </Button>
+              {/* Save button only shows when editing */}
+              {isEditing && (
+                <Button 
+                  onClick={handleSave} 
+                  disabled={isSaving} 
+                  className="w-full sm:w-auto bg-emerald-600 hover:bg-emerald-700 text-white font-medium disabled:opacity-50"
+                >
+                  <Save className="w-4 h-4 mr-2" /> 
+                  {isSaving ? 'Saving...' : 'Save'}
+                </Button>
               )}
             </div>
           </div>
@@ -628,8 +633,9 @@ const ProfilePage = ({ currentUser, profile, onProfileUpdate, onLogout, onShowTe
         </div>
       </div>
 
-      {/* Scrollable Content */}
-      <div className="max-w-4xl mx-auto p-6 pt-8 pb-12 space-y-8">
+      {/* Scrollable Content - Fixed mobile scrolling issues */}
+      <div className="max-w-4xl mx-auto p-6 pt-8 pb-12 space-y-8 overflow-x-hidden w-full">
+        <div className="w-full max-w-full overflow-hidden">
           <ProfileSummaryCard currentUser={currentUser} />
           <ImageManagement currentUser={currentUser} />
           <BasicInfoSection 
@@ -684,6 +690,7 @@ const ProfilePage = ({ currentUser, profile, onProfileUpdate, onLogout, onShowTe
             onShowPrivacy={onShowPrivacy}
           />
         </div>
+      </div>
     </div>
   );
 };

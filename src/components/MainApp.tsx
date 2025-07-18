@@ -173,11 +173,11 @@ const MainApp = ({ user, onLogout }: MainAppProps) => {
 
   return (
     <div className="w-full h-screen bg-gray-100">
-      <div className="w-full h-screen flex flex-col bg-white relative shadow-md overflow-hidden">
+      <div className="w-full h-screen flex flex-col bg-white relative shadow-md overflow-hidden mobile-container">
         
         {/* Fixed Header - Hide when showing terms/privacy */}
         {!showTerms && !showPrivacy && (
-          <div className="fixed top-0 left-0 right-0 w-full bg-white shadow-sm border-b z-50">
+          <div className="fixed top-0 left-0 right-0 w-full bg-white shadow-sm border-b z-50 mobile-header">
             <div className="px-4 py-2 flex justify-start items-center">
               <img 
                 src="/driplove-logo.png" 
@@ -189,13 +189,13 @@ const MainApp = ({ user, onLogout }: MainAppProps) => {
         )}
 
         {/* Main Content */}
-        <div className={`flex-1 overflow-y-auto ${!showTerms && !showPrivacy ? 'pt-[60px] pb-[70px]' : ''}`}>
+        <div className={`flex-1 overflow-y-auto ${!showTerms && !showPrivacy ? 'pt-[calc(60px+env(safe-area-inset-top,44px))] pb-[calc(70px+env(safe-area-inset-bottom,0px))]' : 'pt-safe pb-safe'}`}>
           {renderContent()}
         </div>
 
         {/* Fixed Bottom Nav - Hide when showing terms/privacy */}
         {!showTerms && !showPrivacy && (
-          <div className="fixed bottom-0 left-0 right-0 w-full bg-white border-t border-gray-200 px-2 py-2 z-50">
+          <div className="fixed bottom-0 left-0 right-0 w-full bg-white border-t border-gray-200 px-2 py-2 z-50 mobile-bottom-nav">
             <div className="flex justify-around items-center">
               {[
                 { label: 'Discover', icon: Heart }, 

@@ -71,14 +71,6 @@ const ChatHeader: React.FC<ChatHeaderProps> = ({
           </Button>
         </DropdownMenuTrigger>
         <DropdownMenuContent align="end">
-          {onTestNotification && (
-            <DropdownMenuItem 
-              onClick={onTestNotification}
-              className="text-blue-600"
-            >
-              🔔 Test Notifications
-            </DropdownMenuItem>
-          )}
           <DropdownMenuItem 
             onClick={() => onBlockUser(selectedMatch)}
             className="text-red-600"

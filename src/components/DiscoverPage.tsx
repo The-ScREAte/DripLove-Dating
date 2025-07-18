@@ -768,13 +768,14 @@ const DiscoverPage = ({ currentUser, onNavigateToChat }: DiscoverPageProps) => {
   return (
     <div className="h-full w-full fixed top-0 left-0 overflow-hidden">
       {/* Main Image Area - Card stack */}
-      <div className="flex-1 relative overflow-hidden h-[calc(100vh-80px)]">
+      <div className="flex-1 relative overflow-hidden" style={{ height: 'calc(100vh - env(safe-area-inset-bottom, 0px) - 80px)' }}>
         {/* Next card (preloaded, below) */}
         {nextMatch && (
           <div
-            className={`absolute inset-0 z-0 scale-95 opacity-80 pointer-events-none transition-all duration-300 ${isDragging ? 'blur-[1.5px]' : ''}`}
+            className={`absolute inset-0 z-0 scale-95 transition-all duration-300 pointer-events-none ${
+              isDragging ? 'opacity-90 blur-0' : 'opacity-80 blur-[1.5px]'
+            }`}
             style={{
-              filter: isDragging ? 'blur(1.5px)' : 'none',
               transition: 'filter 0.2s, opacity 0.2s, transform 0.2s',
             }}
           >
@@ -782,7 +783,7 @@ const DiscoverPage = ({ currentUser, onNavigateToChat }: DiscoverPageProps) => {
               <img
                 src={nextMatchImages[0]}
                 alt={`${nextMatch.first_name}'s photo`}
-                className="w-full h-full object-cover object-center"
+                className="w-full h-full object-contain bg-black"
                 draggable={false}
                 loading="eager"
               />
@@ -797,69 +798,101 @@ const DiscoverPage = ({ currentUser, onNavigateToChat }: DiscoverPageProps) => {
           </div>
         )}
 
-        {/* Current card (top) */}
+        {/* Current card (top) - Split into swipeable and non-swipeable areas */}
         <div
-          className="h-full w-full cursor-pointer select-none relative z-10"
+          className="h-full w-full relative z-10 flex flex-col"
           style={{
             transform: cardTransform,
             transition: isDragging ? 'none' : 'transform 0.3s cubic-bezier(0.22, 1, 0.36, 1)',
             boxShadow: isDragging ? '0 8px 32px 0 rgba(0,0,0,0.25)' : '0 4px 16px 0 rgba(0,0,0,0.10)'
           }}
-          onTouchStart={handleTouchStart}
-          onTouchMove={handleTouchMove}
-          onTouchEnd={handleTouchEnd}
-          onMouseDown={handleMouseDown}
-          onMouseMove={handleMouseMove}
-          onMouseUp={handleMouseUp}
-          onClick={handleImageAreaClick}
         >
-          {/* Swipe Feedback Overlays */}
-          {isDragging && swipeDirection && (
-            <>
-              {/* Like Overlay (Right Swipe) */}
-              {swipeDirection === 'right' && (
-                <div
-                  className="absolute inset-0 bg-green-500/20 flex items-center justify-center z-20 pointer-events-none"
-                  style={{ opacity: swipeOpacity }}
-                >
-                  <div className="bg-green-500 text-white px-8 py-4 rounded-full font-bold text-2xl shadow-lg transform rotate-12">
-                    <Heart className="w-8 h-8 inline mr-2" />
-                    LIKE
+          {/* Swipeable Image Area Only */}
+          <div
+            className={`cursor-pointer select-none relative transition-all duration-300 ${
+              showMoreInfo ? 'h-[calc(100%-250px)]' : 'h-[calc(100%-120px)]'
+            }`}
+            onTouchStart={handleTouchStart}
+            onTouchMove={handleTouchMove}
+            onTouchEnd={handleTouchEnd}
+            onMouseDown={handleMouseDown}
+            onMouseMove={handleMouseMove}
+            onMouseUp={handleMouseUp}
+            onClick={handleImageAreaClick}
+          >
+            {/* Swipe Feedback Overlays */}
+            {isDragging && swipeDirection && (
+              <>
+                {/* Like Overlay (Right Swipe) */}
+                {swipeDirection === 'right' && (
+                  <div
+                    className="absolute inset-0 bg-green-500/20 flex items-center justify-center z-20 pointer-events-none"
+                    style={{ opacity: swipeOpacity }}
+                  >
+                    <div className="bg-green-500 text-white px-8 py-4 rounded-full font-bold text-2xl shadow-lg transform rotate-12">
+                      <Heart className="w-8 h-8 inline mr-2" />
+                      LIKE
+                    </div>
                   </div>
-                </div>
-              )}
+                )}
 
-              {/* Dislike Overlay (Left Swipe) */}
-              {swipeDirection === 'left' && (
-                <div
-                  className="absolute inset-0 bg-red-500/20 flex items-center justify-center z-20 pointer-events-none"
-                  style={{ opacity: swipeOpacity }}
-                >
-                  <div className="bg-red-500 text-white px-8 py-4 rounded-full font-bold text-2xl shadow-lg transform -rotate-12">
-                    <X className="w-8 h-8 inline mr-2" />
-                    NOPE
+                {/* Dislike Overlay (Left Swipe) */}
+                {swipeDirection === 'left' && (
+                  <div
+                    className="absolute inset-0 bg-red-500/20 flex items-center justify-center z-20 pointer-events-none"
+                    style={{ opacity: swipeOpacity }}
+                  >
+                    <div className="bg-red-500 text-white px-8 py-4 rounded-full font-bold text-2xl shadow-lg transform -rotate-12">
+                      <X className="w-8 h-8 inline mr-2" />
+                      NOPE
+                    </div>
                   </div>
-                </div>
-              )}
-            </>
-          )}
+                )}
+              </>
+            )}
 
-          <MatchCard
-            match={currentMatch}
-            imageIndex={imageIndex}
-            showMoreInfo={showMoreInfo}
-            isPremium={isPremium()}
-            userImages={currentMatchImages}
-            currentUserLatitude={currentUser.latitude}
-            currentUserLongitude={currentUser.longitude}
-            onImageClick={() => handleImageAreaClick({} as React.MouseEvent<HTMLDivElement>)}
-            onToggleInfo={() => setShowMoreInfo(!showMoreInfo)}
-            calculateAge={calculateAge}
-            calculateDistance={calculateDistance}
-            swipeDirection={swipeDirection}
-            swipeDistance={swipeDistance}
-            isVerified={calculateProfileVerification(currentMatch)} // Pass verification status
-          />
+            {/* Image content only */}
+            <MatchCard
+              match={currentMatch}
+              imageIndex={imageIndex}
+              showMoreInfo={showMoreInfo}
+              isPremium={isPremium()}
+              userImages={currentMatchImages}
+              currentUserLatitude={currentUser.latitude}
+              currentUserLongitude={currentUser.longitude}
+              onImageClick={() => handleImageAreaClick({} as React.MouseEvent<HTMLDivElement>)}
+              onToggleInfo={() => setShowMoreInfo(!showMoreInfo)}
+              calculateAge={calculateAge}
+              calculateDistance={calculateDistance}
+              swipeDirection={swipeDirection}
+              swipeDistance={swipeDistance}
+              isVerified={calculateProfileVerification(currentMatch)}
+              isSwipeAreaOnly={true} // New prop to render only image area
+            />
+          </div>
+
+          {/* Non-swipeable Details Area */}
+          <div className={`bg-white border-t border-gray-200 p-2 transition-all duration-300 ${
+            showMoreInfo ? 'h-[250px] overflow-y-auto pb-[env(safe-area-inset-bottom,0px)+20px]' : 'h-[120px] overflow-y-auto pb-[env(safe-area-inset-bottom,0px)+10px]'
+          }`}>
+            <MatchCard
+              match={currentMatch}
+              imageIndex={imageIndex}
+              showMoreInfo={showMoreInfo}
+              isPremium={isPremium()}
+              userImages={currentMatchImages}
+              currentUserLatitude={currentUser.latitude}
+              currentUserLongitude={currentUser.longitude}
+              onImageClick={() => handleImageAreaClick({} as React.MouseEvent<HTMLDivElement>)}
+              onToggleInfo={() => setShowMoreInfo(!showMoreInfo)}
+              calculateAge={calculateAge}
+              calculateDistance={calculateDistance}
+              swipeDirection={swipeDirection}
+              swipeDistance={swipeDistance}
+              isVerified={calculateProfileVerification(currentMatch)}
+              isDetailsAreaOnly={true} // New prop to render only details area
+            />
+          </div>
         </div>
 
         {/* Action Buttons */}
