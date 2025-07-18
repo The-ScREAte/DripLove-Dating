@@ -189,7 +189,7 @@ const MainApp = ({ user, onLogout }: MainAppProps) => {
         )}
 
         {/* Main Content */}
-        <div className={`flex-1 overflow-y-auto ${!showTerms && !showPrivacy ? 'pt-[calc(60px+env(safe-area-inset-top,44px))] pb-[calc(70px+env(safe-area-inset-bottom,0px))]' : 'pt-safe pb-safe'}`}>
+        <div className={`flex-1 overflow-y-auto ${!showTerms && !showPrivacy ? 'pt-[calc(100px+env(safe-area-inset-top,0px))] pb-[calc(70px+env(safe-area-inset-bottom,0px))]' : 'pt-safe pb-safe'}`}>
           {renderContent()}
         </div>
 

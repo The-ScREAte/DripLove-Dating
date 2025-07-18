@@ -362,7 +362,7 @@ const ChatPage = ({ currentUser, onUnreadChange }: ChatPageProps) => {
     return (
       <div className="h-full flex flex-col bg-gray-50">
         {/* Sticky Search Header */}
-        <div className="sticky top-0 z-30 bg-gradient-to-r from-pink-500 to-purple-600 text-white p-4 pt-safe">
+        <div className="sticky top-0 z-30 bg-gradient-to-r from-pink-500 to-purple-600 text-white p-4">
           <h2 className="text-xl font-bold mb-4">Messages</h2>
           <div className="relative">
             <input
@@ -379,7 +379,7 @@ const ChatPage = ({ currentUser, onUnreadChange }: ChatPageProps) => {
         </div>
 
         {/* Scrollable Chat List */}
-        <div className="flex-1 overflow-y-auto pb-safe">
+        <div className="flex-1 overflow-y-auto pb-20">
           {filteredMatches.length === 0 ? (
             <div className="p-4 text-center text-gray-500">
               {searchTerm ? 'No matches found' : 'No conversations yet'}
@@ -460,7 +460,7 @@ const ChatPage = ({ currentUser, onUnreadChange }: ChatPageProps) => {
   return (
     <div className="h-full flex flex-col bg-gray-50">
       {/* Sticky Chat Header */}
-      <div className="sticky top-0 z-30 bg-white border-b border-gray-200 shadow-sm pt-safe">
+      <div className="sticky top-0 z-30 bg-white border-b border-gray-200 shadow-sm">
         <ChatHeader
           selectedMatch={selectedMatch}
           onBack={() => setSelectedMatch(null)}
@@ -501,7 +501,7 @@ const ChatPage = ({ currentUser, onUnreadChange }: ChatPageProps) => {
       </div>
 
       {/* Sticky Message Input Footer */}
-      <div className="sticky bottom-0 z-30 bg-white border-t border-gray-200 pb-safe">
+      <div className="sticky bottom-0 z-30 bg-white border-t border-gray-200 pb-[env(safe-area-inset-bottom,0px)]">
         <MessageInput
           newMessage={newMessage}
           onMessageChange={setNewMessage}
