@@ -9,7 +9,7 @@ interface AboutUsProps {
 
 const AboutUs = ({ onBack }: AboutUsProps) => {
   return (
-    <div className="min-h-screen bg-white flex flex-col pt-safe">
+    <div className="min-h-screen bg-white flex flex-col">
       {/* Header */}
       <div className="w-full bg-white border-b p-4 sticky top-0 z-10">
         <Button 
@@ -23,7 +23,7 @@ const AboutUs = ({ onBack }: AboutUsProps) => {
       </div>
 
       {/* Main Content */}
-      <div className="flex-1 overflow-y-auto pb-safe">
+      <div className="flex-1 overflow-y-auto">
         <div className="max-w-4xl mx-auto px-6 py-8">
           {/* Logo */}
           <div className="text-center mb-8">

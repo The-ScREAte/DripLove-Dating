@@ -528,9 +528,9 @@ const ProfilePage = ({ currentUser, profile, onProfileUpdate, onLogout, onShowTe
 
   return (
     <div className="min-h-screen bg-gray-50 overflow-x-hidden w-full max-w-full"> 
-      {/* Sticky Header with Progress Bar */}
-      <div className="sticky top-0 z-50 bg-white border-b border-gray-200 shadow-sm">
-        <div className="p-6">
+      {/* Sticky Header with Progress Bar - positioned below main header */}
+      <div className="sticky top-[10px] z-40 bg-white border-b border-gray-200 shadow-sm">
+        <div className="p-7">
           <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
             <div className="flex flex-row gap-3 w-full">
               {!isPremium() && (
@@ -579,7 +579,7 @@ const ProfilePage = ({ currentUser, profile, onProfileUpdate, onLogout, onShowTe
             </div>
           </div>
           
-          {/* Profile Completion Progress Bar */}
+          {/* Profile Completion Progress Bar with Verified Badge */}
           <div className="mt-6">
             <div className="flex items-center gap-3">
               <div className="flex-1 h-2 bg-gray-200 rounded-full overflow-hidden">

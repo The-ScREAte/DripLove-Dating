@@ -30,7 +30,7 @@
 
 /* Header with safe area top - Universal for all mobile devices */
 .mobile-header {
-  padding-top: max(var(--safe-area-inset-top), 20px);
+  padding-top: max(var(--safe-area-inset-top), 8px);
   background: white;
   position: sticky;
   top: 0;
@@ -42,7 +42,7 @@
 /* Enhanced mobile header for status bar overlap prevention */
 @media screen and (max-device-width: 768px) {
   .mobile-header {
-    padding-top: max(var(--safe-area-inset-top), 44px); /* iOS status bar + some padding */
+    padding-top: max(var(--safe-area-inset-top), 16px); /* Reduced from 44px to 16px */
   }
 }
 

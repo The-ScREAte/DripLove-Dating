@@ -170,7 +170,6 @@ const PremiumUpgrade = ({ currentUser, onClose, preselectedPlan }: PremiumUpgrad
                 ))}
                 
                 <div className="pt-6 text-center">
-                  
                   <p className="text-gray-500 text-sm mt-3">
                     Limited features • Basic support
                   </p>
