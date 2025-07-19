@@ -1,7 +1,7 @@
 <?xml version='1.0' encoding='utf-8'?>
 <resources>
-    <string name="app_name">AfroVibe</string>
-    <string name="title_activity_main">AfroVibe</string>
+    <string name="app_name">DripLove</string>
+    <string name="title_activity_main">DripLove</string>
     <string name="package_name">app.lovable.fef6ab3677bc4046b6f5fc5b2ad8c182</string>
     <string name="custom_url_scheme">app.lovable.fef6ab3677bc4046b6f5fc5b2ad8c182</string>
 </resources>

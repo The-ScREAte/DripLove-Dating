@@ -8,6 +8,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Heart, Mail, Lock, Eye, EyeOff } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
+import { handleInputFocus, handleInputBlur, getInputStyles } from '@/utils/inputUtils';
 
 interface AuthFormProps {
   isLogin: boolean;
@@ -347,9 +348,12 @@ const AuthForm = ({ isLogin, onToggle, onOAuthSuccess }: AuthFormProps) => {
                 type="email"
                 value={formData.email}
                 onChange={handleInputChange}
+                onFocus={handleInputFocus}
+                onBlur={handleInputBlur}
                 className={`pl-10 border-gray-200 focus:border-pink-400 focus:ring-pink-400 ${
                   errors.email ? 'border-red-500 focus:border-red-500' : ''
                 }`}
+                style={getInputStyles()}
                 placeholder="Enter your email"
                 required
               />
@@ -369,9 +373,12 @@ const AuthForm = ({ isLogin, onToggle, onOAuthSuccess }: AuthFormProps) => {
                 type={showPassword ? "text" : "password"}
                 value={formData.password}
                 onChange={handleInputChange}
+                onFocus={handleInputFocus}
+                onBlur={handleInputBlur}
                 className={`pl-10 pr-10 border-gray-200 focus:border-pink-400 focus:ring-pink-400 ${
                   errors.password ? 'border-red-500 focus:border-red-500' : ''
                 }`}
+                style={getInputStyles()}
                 placeholder="Enter your password"
                 required
               />
@@ -399,9 +406,12 @@ const AuthForm = ({ isLogin, onToggle, onOAuthSuccess }: AuthFormProps) => {
                   type={showConfirmPassword ? "text" : "password"}
                   value={formData.confirmPassword}
                   onChange={handleInputChange}
+                  onFocus={handleInputFocus}
+                  onBlur={handleInputBlur}
                   className={`pl-10 pr-10 border-gray-200 focus:border-pink-400 focus:ring-pink-400 ${
                     errors.confirmPassword ? 'border-red-500 focus:border-red-500' : ''
                   }`}
+                  style={getInputStyles()}
                   placeholder="Confirm your password"
                   required
                 />
@@ -422,7 +432,7 @@ const AuthForm = ({ isLogin, onToggle, onOAuthSuccess }: AuthFormProps) => {
           <Button
             type="submit"
             disabled={loading}
-            className="w-full bg-gradient-to-r from-pink-500 to-purple-600 hover:from-pink-600 hover:to-purple-700 text-white font-semibold py-3 rounded-lg transition-all duration-200 transform hover:scale-[1.02]"
+            className="w-full bg-gradient-to-r from-pink-500 to-purple-600 hover:from-pink-600 hover:to-purple-700 text-white font-semibold py-3 rounded-lg transition-all duration-200"
           >
             {loading ? 'Processing...' : isLogin ? 'Sign In' : 'Create Account'}
           </Button>

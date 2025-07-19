@@ -1,6 +1,6 @@
 import React from 'react';
 import { Button } from '@/components/ui/button';
-import { ArrowLeft } from 'lucide-react';
+import { ArrowLeft, FileText, Users, Crown, Shield, AlertTriangle, Gavel, Mail } from 'lucide-react';
 
 interface TermsOfServiceProps {
   onBack: () => void;
@@ -8,173 +8,257 @@ interface TermsOfServiceProps {
 
 const TermsOfService = ({ onBack }: TermsOfServiceProps) => {
   return (
-    <div className="min-h-screen bg-gradient-to-br from-pink-400 via-purple-500 to-indigo-600 p-4">
+    <div 
+      className="min-h-screen bg-gradient-to-br from-pink-400 via-purple-500 to-indigo-600 p-4 mobile-container"
+      style={{
+        paddingTop: `max(env(safe-area-inset-top, 0px), 16px)`,
+        paddingBottom: `max(env(safe-area-inset-bottom, 0px), 16px)`,
+        paddingLeft: `max(env(safe-area-inset-left, 0px), 16px)`,
+        paddingRight: `max(env(safe-area-inset-right, 0px), 16px)`,
+        minHeight: '100dvh'
+      }}
+    >
       <div className="max-w-4xl mx-auto bg-white rounded-lg shadow-lg overflow-hidden">
         {/* Header */}
-        <div className="bg-gradient-to-r from-purple-600 to-pink-600 text-white p-6 sticky top-0 z-10 rounded-t-lg">
+        <div className="bg-gradient-to-r from-purple-600 to-pink-600 text-white p-6 sticky-header rounded-t-lg" style={{ top: 0, zIndex: 10 }}>
           <Button
             onClick={onBack}
             variant="ghost"
             size="sm"
             className="text-white hover:bg-white/20 mb-4"
+            style={{ fontSize: '16px' }}
           >
             <ArrowLeft className="w-4 h-4 mr-2" />
             Back
           </Button>
-          <h1 className="text-3xl font-bold">Terms of Service</h1>
-          <p className="text-purple-100 mt-2">Last updated: July 13, 2025</p>
+          <h1 className="text-3xl font-bold">DripLove Terms of Service</h1>
+          <p className="text-purple-100 mt-2">Last Updated: July 13, 2025</p>
         </div>
 
         {/* Content */}
         <div className="p-8 space-y-8 max-h-[80vh] overflow-y-auto">
+          <div className="text-center mb-8">
+            <div className="text-gray-400 text-2xl font-light">⸻</div>
+          </div>
+
           <section>
-            <h2 className="text-2xl font-semibold text-gray-800 mb-4">1. Acceptance of Terms</h2>
+            <h2 className="text-2xl font-semibold text-gray-800 mb-4 flex items-center">
+              <FileText className="w-6 h-6 mr-2 text-blue-600" />
+              1. Acceptance of Terms
+            </h2>
+            <p className="text-gray-600 leading-relaxed mb-4">
+              By accessing or using DripLove ("the Service"), you agree to comply with and be legally bound by these Terms of Service. If you do not accept these terms in full, do not use the Service.
+            </p>
             <p className="text-gray-600 leading-relaxed">
-              By accessing and using DripLove ("the Service"), you accept and agree to be bound by the terms and provision of this agreement. 
-              If you do not agree to abide by the above, please do not use this service.
-            </p>
-            
-            <p className="text-gray-700 mb-6">
-              DripLove is a property of The ScREAte Ltd, a technology company dedicated to creating innovative digital solutions.
-            </p>
-            
-            <h3 className="text-xl font-semibold text-gray-900 mb-4">Service Description</h3>
-            <p className="text-gray-700 mb-6">
-              DripLove is a dating platform designed to connect individuals from diverse backgrounds worldwide.
+              DripLove is owned and operated by The ScREAte Ltd, a company committed to building innovative and inclusive digital experiences.
             </p>
           </section>
 
+          <div className="text-center">
+            <div className="text-gray-400 text-2xl font-light">⸻</div>
+          </div>
+
           <section>
-            <h2 className="text-2xl font-semibold text-gray-800 mb-4">2. Description of Service</h2>
-            <p className="text-gray-600 leading-relaxed mb-4">
-              AfroVibe is a dating platform designed to connect individuals within the African diaspora community worldwide. 
-              Our service provides features including:
+            <h2 className="text-2xl font-semibold text-gray-800 mb-4 flex items-center">
+              <Users className="w-6 h-6 mr-2 text-purple-600" />
+              2. Description of Service
+            </h2>
+            <p className="text-gray-600 leading-relaxed mb-3">
+              DripLove is a global dating platform created to connect individuals from diverse backgrounds. Our features include:
             </p>
-            <ul className="list-disc list-inside text-gray-600 space-y-2">
-              <li>Profile creation and management</li>
-              <li>Matching algorithms based on preferences and compatibility</li>
-              <li>Messaging and communication tools</li>
-              <li>Premium subscription features</li>
-              <li>Community guidelines and safety features</li>
+            <ul className="list-disc pl-6 space-y-1 text-gray-600">
+              <li>Personalized profile creation and management</li>
+              <li>Match suggestions based on preferences and compatibility</li>
+              <li>Real-time messaging and communication tools</li>
+              <li>Optional premium subscription features</li>
+              <li>Safety guidelines and community moderation</li>
             </ul>
           </section>
 
+          <div className="text-center">
+            <div className="text-gray-400 text-2xl font-light">⸻</div>
+          </div>
+
           <section>
             <h2 className="text-2xl font-semibold text-gray-800 mb-4">3. User Eligibility</h2>
-            <div className="text-gray-600 leading-relaxed space-y-3">
-              <p>To use DripLove, you must:</p>
-              <ul className="list-disc list-inside space-y-2">
-                <li>Be at least 18 years of age</li>
-                <li>Provide accurate and truthful information</li>
-                <li>Not be prohibited from using the service under applicable law</li>
-                <li>Not have been previously banned from our platform</li>
-                <li>Use the service for legitimate dating and relationship purposes only</li>
-              </ul>
-            </div>
+            <p className="text-gray-600 leading-relaxed mb-3">To use DripLove, you must:</p>
+            <ul className="list-disc pl-6 space-y-1 text-gray-600">
+              <li>Be at least 18 years of age</li>
+              <li>Provide accurate and truthful personal information</li>
+              <li>Not be prohibited from using the service by any applicable law</li>
+              <li>Not have been previously suspended or banned from DripLove</li>
+              <li>Use the platform solely for legitimate dating or relationship purposes</li>
+            </ul>
           </section>
 
-          <section>
-            <h2 className="text-2xl font-semibold text-gray-800 mb-4">4. User Conduct</h2>
-            <div className="text-gray-600 leading-relaxed space-y-3">
-              <p>Users agree to conduct themselves respectfully and lawfully. The following behaviors are strictly prohibited:</p>
-              <ul className="list-disc list-inside space-y-2">
-                <li>Harassment, abuse, or threatening behavior toward other users</li>
-                <li>Sharing inappropriate, offensive, or explicit content</li>
-                <li>Impersonating another person or creating fake profiles</li>
-                <li>Soliciting money, gifts, or personal information</li>
-                <li>Promoting commercial activities or spam</li>
-                <li>Using the platform for illegal activities</li>
-                <li>Attempting to circumvent our safety measures</li>
-              </ul>
-            </div>
-          </section>
+          <div className="text-center">
+            <div className="text-gray-400 text-2xl font-light">⸻</div>
+          </div>
 
           <section>
-            <h2 className="text-2xl font-semibold text-gray-800 mb-4">5. Premium Subscription</h2>
-            <div className="text-gray-600 leading-relaxed space-y-3">
-              <p>DripLove offers premium subscription features including:</p>
-              <ul className="list-disc list-inside space-y-2">
-                <li>Unlimited likes and super likes</li>
-                <li>Advanced filtering options</li>
-                <li>Priority customer support</li>
-                <li>Ad-free experience</li>
-                <li>Enhanced profile visibility</li>
-              </ul>
-              <p className="mt-4">
-                Subscription fees are non-refundable except as required by law. Subscriptions automatically renew unless cancelled before the renewal date.
+            <h2 className="text-2xl font-semibold text-gray-800 mb-4 flex items-center">
+              <AlertTriangle className="w-6 h-6 mr-2 text-red-600" />
+              4. User Conduct
+            </h2>
+            <p className="text-gray-600 leading-relaxed mb-3">
+              All users are expected to behave respectfully and responsibly. The following actions are strictly prohibited:
+            </p>
+            <ul className="list-disc pl-6 space-y-1 text-gray-600 mb-4">
+              <li>Harassment, abuse, or threatening behavior</li>
+              <li>Uploading or sharing explicit, hateful, or illegal content</li>
+              <li>Creating fake identities or impersonating others</li>
+              <li>Soliciting money, gifts, or sensitive information</li>
+              <li>Promoting commercial services, spam, or scams</li>
+              <li>Violating any laws while using the service</li>
+              <li>Circumventing or disabling safety features</li>
+            </ul>
+            <div className="bg-red-50 border-l-4 border-red-400 p-4 rounded">
+              <p className="text-red-800">
+                <strong>⚠️ Violation of these rules may result in immediate account suspension or termination.</strong>
               </p>
             </div>
           </section>
 
-          <section>
-            <h2 className="text-2xl font-semibold text-gray-800 mb-4">6. Privacy and Data Protection</h2>
-            <p className="text-gray-600 leading-relaxed">
-              Your privacy is important to us. Please review our Privacy Policy to understand how we collect, use, and protect your personal information. 
-              By using our service, you consent to the collection and use of information as outlined in our Privacy Policy.
-            </p>
-          </section>
+          <div className="text-center">
+            <div className="text-gray-400 text-2xl font-light">⸻</div>
+          </div>
 
           <section>
-            <h2 className="text-2xl font-semibold text-gray-800 mb-4">7. Content and Intellectual Property</h2>
-            <ul className="text-gray-600 leading-relaxed space-y-3">
-              <li>
-                Users retain ownership of content they upload but grant DripLove a license to use, display, and distribute such content 
-                within the platform for its intended purpose.
-              </li>
-              <li>
-                All DripLove branding, logos, and proprietary content remain the exclusive property of The ScREAte Ltd and may not be used 
-                without explicit written permission.
-              </li>
+            <h2 className="text-2xl font-semibold text-gray-800 mb-4 flex items-center">
+              <Crown className="w-6 h-6 mr-2 text-yellow-600" />
+              5. Premium Subscription
+            </h2>
+            <p className="text-gray-600 leading-relaxed mb-3">
+              DripLove offers optional premium features, such as:
+            </p>
+            <ul className="list-disc pl-6 space-y-1 text-gray-600 mb-4">
+              <li>Unlimited likes and super likes</li>
+              <li>Advanced match filtering</li>
+              <li>Ad-free browsing</li>
+              <li>Enhanced profile visibility</li>
+              <li>Priority customer support</li>
+            </ul>
+            <p className="text-gray-600 leading-relaxed mb-2">All subscriptions:</p>
+            <ul className="list-disc pl-6 space-y-1 text-gray-600">
+              <li>Auto-renew by default unless canceled before renewal</li>
+              <li>Are non-refundable unless otherwise required by law</li>
             </ul>
           </section>
 
+          <div className="text-center">
+            <div className="text-gray-400 text-2xl font-light">⸻</div>
+          </div>
+
           <section>
-            <h2 className="text-2xl font-semibold text-gray-800 mb-4">8. Safety and Security</h2>
-            <div className="text-gray-600 leading-relaxed space-y-3">
-              <p>While we implement safety measures, users are responsible for their own safety when meeting others through our platform:</p>
-              <ul className="list-disc list-inside space-y-2">
-                <li>Always meet in public places for initial meetings</li>
-                <li>Inform friends or family about your plans</li>
-                <li>Trust your instincts and report suspicious behavior</li>
-                <li>Never share personal financial information</li>
-                <li>Use our in-app messaging until you feel comfortable</li>
+            <h2 className="text-2xl font-semibold text-gray-800 mb-4">6. Privacy and Data Protection</h2>
+            <p className="text-gray-600 leading-relaxed">
+              We respect your privacy. Our practices are explained in our Privacy Policy. By using DripLove, you consent to the collection and use of your information in accordance with that policy.
+            </p>
+          </section>
+
+          <div className="text-center">
+            <div className="text-gray-400 text-2xl font-light">⸻</div>
+          </div>
+
+          <section>
+            <h2 className="text-2xl font-semibold text-gray-800 mb-4">7. Content and Intellectual Property</h2>
+            <ul className="list-disc pl-6 space-y-2 text-gray-600">
+              <li>Users retain ownership of their uploaded content but grant DripLove a non-exclusive, worldwide license to use, display, and distribute it within the platform.</li>
+              <li>All platform branding, visuals, and code remain the exclusive property of The ScREAte Ltd and may not be used without written permission.</li>
+            </ul>
+          </section>
+
+          <div className="text-center">
+            <div className="text-gray-400 text-2xl font-light">⸻</div>
+          </div>
+
+          <section>
+            <h2 className="text-2xl font-semibold text-gray-800 mb-4 flex items-center">
+              <Shield className="w-6 h-6 mr-2 text-green-600" />
+              8. Safety and Security
+            </h2>
+            <p className="text-gray-600 leading-relaxed mb-4">
+              DripLove implements community and technical safeguards, but your personal safety is your responsibility.
+            </p>
+            
+            <div className="bg-green-50 border border-green-200 rounded-lg p-4">
+              <h3 className="text-lg font-semibold text-green-800 mb-3 flex items-center">
+                🔐 User Safety Guidelines:
+              </h3>
+              <ul className="list-disc pl-6 space-y-1 text-green-700">
+                <li>Always meet in public spaces for initial dates</li>
+                <li>Inform someone you trust of your meeting details</li>
+                <li>Never share banking or financial information</li>
+                <li>Use in-app chat before exchanging personal contact details</li>
+                <li>Report suspicious behavior using the in-app report tool</li>
               </ul>
             </div>
           </section>
 
+          <div className="text-center">
+            <div className="text-gray-400 text-2xl font-light">⸻</div>
+          </div>
+
           <section>
             <h2 className="text-2xl font-semibold text-gray-800 mb-4">9. Account Termination</h2>
+            <p className="text-gray-600 leading-relaxed mb-4">
+              We reserve the right to suspend or permanently ban users who violate these Terms or compromise user safety.
+            </p>
             <p className="text-gray-600 leading-relaxed">
-              We reserve the right to suspend or terminate accounts that violate these terms or engage in harmful behavior. 
-              Users may also delete their accounts at any time through their profile settings.
+              You may delete your account at any time via your profile settings. Account deletion is permanent and will remove your data from our active servers.
             </p>
           </section>
 
+          <div className="text-center">
+            <div className="text-gray-400 text-2xl font-light">⸻</div>
+          </div>
+
           <section>
-            <h2 className="text-2xl font-semibold text-gray-800 mb-4">10. Limitation of Liability</h2>
-            <p className="text-gray-600 leading-relaxed">
-              DripLove provides the service "as is" without warranties. We are not liable for any damages resulting from use of our platform, 
-              including but not limited to interactions between users, technical issues, or data loss.
+            <h2 className="text-2xl font-semibold text-gray-800 mb-4 flex items-center">
+              <Gavel className="w-6 h-6 mr-2 text-gray-600" />
+              10. Limitation of Liability
+            </h2>
+            <p className="text-gray-600 leading-relaxed mb-3">
+              DripLove is provided "as is" and without warranties of any kind. We are not liable for:
             </p>
+            <ul className="list-disc pl-6 space-y-1 text-gray-600">
+              <li>User interactions or relationships</li>
+              <li>Technical disruptions, bugs, or downtime</li>
+              <li>Data loss or service interruptions</li>
+              <li>Unauthorized use of your account</li>
+            </ul>
           </section>
+
+          <div className="text-center">
+            <div className="text-gray-400 text-2xl font-light">⸻</div>
+          </div>
 
           <section>
             <h2 className="text-2xl font-semibold text-gray-800 mb-4">11. Changes to Terms</h2>
             <p className="text-gray-600 leading-relaxed">
-              We may update these terms periodically. Users will be notified of significant changes, and continued use of the service 
-              constitutes acceptance of the updated terms.
+              We may update these Terms periodically. You will be notified of significant changes, and continued use of the Service constitutes acceptance of the new Terms.
             </p>
           </section>
 
+          <div className="text-center">
+            <div className="text-gray-400 text-2xl font-light">⸻</div>
+          </div>
+
           <section>
-            <h2 className="text-2xl font-semibold text-gray-800 mb-4">12. Contact Information</h2>
-            <div className="text-gray-600 leading-relaxed">
-              <p>For questions about these Terms of Service, please contact us at:</p>
-              <div className="mt-3 bg-gray-50 p-4 rounded-lg">
-                <p>Email: support@driplove.com</p>
-                <p>Address: The ScREAte Ltd Support Team</p>
-                <p>Phone: +1 (555) 123-4567</p>
-              </div>
+            <h2 className="text-2xl font-semibold text-gray-800 mb-4 flex items-center">
+              <Mail className="w-6 h-6 mr-2 text-pink-600" />
+              12. Contact Information
+            </h2>
+            <p className="text-gray-600 mb-4">
+              If you have questions or need assistance, contact us at:
+            </p>
+            <div className="bg-pink-50 border border-pink-200 rounded-lg p-4 space-y-2">
+              <p className="text-pink-800 font-semibold">
+                📧 <a href="mailto:support@driplove.com" className="hover:underline">support@driplove.com</a>
+              </p>
+              <p className="text-pink-700">
+                📍 The ScREAte Ltd – Support Team
+              </p>
             </div>
           </section>
         </div>

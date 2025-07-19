@@ -122,7 +122,21 @@
   }
 
   input, textarea {
-    font-size: 16px; /* Prevent iOS zoom */
+    font-size: 16px !important; /* Prevent iOS zoom */
+    -webkit-appearance: none;
+    appearance: none;
+    -webkit-border-radius: 0;
+    border-radius: 0;
+  }
+
+  /* Prevent zoom on all form elements */
+  input, textarea, select {
+    font-size: 16px !important;
+    -webkit-appearance: none;
+    appearance: none;
+    -webkit-border-radius: 0;
+    border-radius: 0;
+    touch-action: manipulation;
   }
 
   /* ✅ Ensure no horizontal scrolling on any screen size */
@@ -187,6 +201,48 @@
       max-width: 100vw;
       margin: 0;
       padding: 0;
+    }
+  }
+
+  /* Keyboard handling for mobile devices */
+  .keyboard-aware {
+    transition: all 0.3s ease-in-out;
+  }
+
+  /* Ensure forms don't zoom on mobile */
+  @media screen and (max-width: 768px) {
+    input, textarea, select {
+      font-size: 16px !important;
+      transform: translateZ(0); /* Force hardware acceleration */
+    }
+  }
+
+  /* Reset any zoom after input blur */
+  input:focus, textarea:focus, select:focus {
+    zoom: 1;
+  }
+
+  /* Sticky positioning fixes */
+  .sticky-header {
+    position: sticky;
+    top: 0;
+    z-index: 50;
+    background: white;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+  }
+
+  /* Prevent unwanted scaling/zooming on mobile */
+  .no-zoom {
+    transform: scale(1) !important;
+    transition: none !important;
+  }
+
+  /* Disable scale transforms on touch devices to prevent zoom issues */
+  @media (hover: none) and (pointer: coarse) {
+    .hover\:scale-105:hover,
+    .hover\:scale-110:hover,
+    .hover\:scale-\[1\.02\]:hover {
+      transform: none !important;
     }
   }
 }

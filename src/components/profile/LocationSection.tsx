@@ -113,18 +113,7 @@ const LocationSection = ({
             </div>
           </div>
 
-          {/* Location Status */}
-          {editedProfile.latitude && editedProfile.longitude && (
-            <div className="p-3 bg-green-50 rounded-lg">
-              <div className="text-sm text-green-800 font-medium">
-                ✅ Precise Location Available
-              </div>
-              <div className="text-xs text-green-600">
-                Your city coordinates are known, enabling accurate distance matching.
-              </div>
-            </div>
-          )}
-
+          {/* Location Status - Only show warnings when location is not available */}
           {editedProfile.city && !editedProfile.latitude && (
             <div className="p-3 bg-orange-50 rounded-lg">
               <div className="text-sm text-orange-800 font-medium">
@@ -132,6 +121,17 @@ const LocationSection = ({
               </div>
               <div className="text-xs text-orange-600">
                 Your city isn't in our database. You'll still get matches based on country/region.
+              </div>
+            </div>
+          )}
+
+          {!editedProfile.city && (
+            <div className="p-3 bg-red-50 rounded-lg">
+              <div className="text-sm text-red-800 font-medium">
+                ⚠️ Location Required
+              </div>
+              <div className="text-xs text-red-600">
+                Please add your city to enable location-based matching.
               </div>
             </div>
           )}

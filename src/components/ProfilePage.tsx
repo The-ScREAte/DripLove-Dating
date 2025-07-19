@@ -17,6 +17,7 @@ import ImageManagement from './profile/ImageManagement';
 import AccountActions from './profile/AccountActions';
 import ProfileSummaryCard from './ProfileSummaryCard';
 import PremiumUpgrade from './PremiumUpgrade';
+import CollapsibleSection from './ui/CollapsibleSection';
 
 interface ProfilePageProps {
   currentUser: any;
@@ -32,6 +33,17 @@ const ProfilePage = ({ currentUser, profile, onProfileUpdate, onLogout, onShowTe
   const [isSaving, setIsSaving] = useState(false);
   const [showPremiumUpgrade, setShowPremiumUpgrade] = useState(false);
   const [hideProfileCompletion, setHideProfileCompletion] = useState(false);
+  
+  // State for collapsible sections
+  const [showLocationSection, setShowLocationSection] = useState(false);
+  const [showPreferencesSection, setShowPreferencesSection] = useState(false);
+  const [showLifestyleSection, setShowLifestyleSection] = useState(false);
+  const [showWorkEducationSection, setShowWorkEducationSection] = useState(false);
+  const [showPersonalitySection, setShowPersonalitySection] = useState(false);
+  const [showFunQuestionsSection, setShowFunQuestionsSection] = useState(false);
+  const [showInterestsSection, setShowInterestsSection] = useState(false);
+  const [showAccountActionsSection, setShowAccountActionsSection] = useState(false);
+  
   const { toast } = useToast();
   const { subscription, loading: subscriptionLoading, isPremium } = useSubscription(currentUser?.id);
 
@@ -528,8 +540,15 @@ const ProfilePage = ({ currentUser, profile, onProfileUpdate, onLogout, onShowTe
 
   return (
     <div className="min-h-screen bg-gray-50 overflow-x-hidden w-full max-w-full"> 
-      {/* Sticky Header with Progress Bar - positioned below main header */}
-      <div className="sticky top-[10px] z-40 bg-white border-b border-gray-200 shadow-sm">
+      {/* Fixed Header with Progress Bar - completely fixed below main header */}
+      <div 
+        className="fixed left-0 right-0 z-40 bg-white border-b border-gray-200 shadow-sm" 
+        style={{ 
+          top: '60px',
+          paddingTop: 'max(env(safe-area-inset-top, 0px), 8px)',
+          width: '100%'
+        }}
+      >
         <div className="p-7">
           <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
             <div className="flex flex-row gap-3 w-full">
@@ -633,8 +652,8 @@ const ProfilePage = ({ currentUser, profile, onProfileUpdate, onLogout, onShowTe
         </div>
       </div>
 
-      {/* Scrollable Content - Fixed mobile scrolling issues */}
-      <div className="max-w-4xl mx-auto p-6 pt-8 pb-12 space-y-8 overflow-x-hidden w-full">
+      {/* Scrollable Content - with padding to account for fixed header */}
+      <div className="max-w-4xl mx-auto p-6 pb-12 space-y-8 overflow-x-hidden w-full" style={{ paddingTop: '180px' }}>
         <div className="w-full max-w-full overflow-hidden">
           <ProfileSummaryCard currentUser={currentUser} />
           <ImageManagement currentUser={currentUser} />
@@ -643,52 +662,109 @@ const ProfilePage = ({ currentUser, profile, onProfileUpdate, onLogout, onShowTe
             isEditing={isEditing} 
             onInputChange={handleInputChange} 
           />
-          <LocationSection 
-            editedProfile={editedProfile} 
-            isEditing={isEditing} 
-            onInputChange={handleInputChange}
-            onLocationChange={handleLocationChange}
-            onDistanceChange={handleDistanceChange}
-          />
-          <PreferencesSection 
-            editedProfile={editedProfile} 
-            isEditing={isEditing} 
-            onSliderChange={handleSliderChange} 
-            onSelectChange={handleSelectChange} 
-            onAgeRangeChange={handleAgeRangeChange} 
-          />
-          <LifestyleSection 
-            editedProfile={editedProfile} 
-            isEditing={isEditing} 
-            onSelectChange={handleSelectChange} 
-          />
-          <WorkEducationSection 
-            editedProfile={editedProfile} 
-            isEditing={isEditing} 
-            onInputChange={handleInputChange} 
-          />
-          <PersonalitySection 
-            editedProfile={editedProfile} 
-            isEditing={isEditing} 
-            onSliderChange={handleSliderChange} 
-          />
-          <FunQuestionsSection 
-            editedProfile={editedProfile} 
-            isEditing={isEditing} 
-            onInputChange={handleInputChange} 
-          />
-          <InterestsSection 
-            editedProfile={editedProfile} 
-            profile={profile} 
-            isEditing={isEditing} 
-            onInterestsChange={handleInterestsChange} 
-          />
-          <AccountActions 
-            currentUser={currentUser} 
-            onLogout={onLogout} 
-            onShowTerms={onShowTerms}
-            onShowPrivacy={onShowPrivacy}
-          />
+          
+          <CollapsibleSection
+            title="Location & Matching Preferences"
+            isOpen={showLocationSection}
+            onToggle={() => setShowLocationSection(!showLocationSection)}
+            className="mt-6"
+          >
+            <LocationSection 
+              editedProfile={editedProfile} 
+              isEditing={isEditing} 
+              onInputChange={handleInputChange}
+              onLocationChange={handleLocationChange}
+              onDistanceChange={handleDistanceChange}
+            />
+          </CollapsibleSection>
+          
+          <CollapsibleSection
+            title="Preferences"
+            isOpen={showPreferencesSection}
+            onToggle={() => setShowPreferencesSection(!showPreferencesSection)}
+          >
+            <PreferencesSection 
+              editedProfile={editedProfile} 
+              isEditing={isEditing} 
+              onSliderChange={handleSliderChange} 
+              onSelectChange={handleSelectChange} 
+              onAgeRangeChange={handleAgeRangeChange} 
+            />
+          </CollapsibleSection>
+          
+          <CollapsibleSection
+            title="Lifestyle"
+            isOpen={showLifestyleSection}
+            onToggle={() => setShowLifestyleSection(!showLifestyleSection)}
+          >
+            <LifestyleSection 
+              editedProfile={editedProfile} 
+              isEditing={isEditing} 
+              onSelectChange={handleSelectChange} 
+            />
+          </CollapsibleSection>
+          
+          <CollapsibleSection
+            title="Work & Education"
+            isOpen={showWorkEducationSection}
+            onToggle={() => setShowWorkEducationSection(!showWorkEducationSection)}
+          >
+            <WorkEducationSection 
+              editedProfile={editedProfile} 
+              isEditing={isEditing} 
+              onInputChange={handleInputChange} 
+            />
+          </CollapsibleSection>
+          
+          <CollapsibleSection
+            title="Personality"
+            isOpen={showPersonalitySection}
+            onToggle={() => setShowPersonalitySection(!showPersonalitySection)}
+          >
+            <PersonalitySection 
+              editedProfile={editedProfile} 
+              isEditing={isEditing} 
+              onSliderChange={handleSliderChange} 
+            />
+          </CollapsibleSection>
+          
+          <CollapsibleSection
+            title="Fun Questions"
+            isOpen={showFunQuestionsSection}
+            onToggle={() => setShowFunQuestionsSection(!showFunQuestionsSection)}
+          >
+            <FunQuestionsSection 
+              editedProfile={editedProfile} 
+              isEditing={isEditing} 
+              onInputChange={handleInputChange} 
+            />
+          </CollapsibleSection>
+          
+          <CollapsibleSection
+            title="Interests"
+            isOpen={showInterestsSection}
+            onToggle={() => setShowInterestsSection(!showInterestsSection)}
+          >
+            <InterestsSection 
+              editedProfile={editedProfile} 
+              profile={profile} 
+              isEditing={isEditing} 
+              onInterestsChange={handleInterestsChange} 
+            />
+          </CollapsibleSection>
+          
+          <CollapsibleSection
+            title="Account Actions"
+            isOpen={showAccountActionsSection}
+            onToggle={() => setShowAccountActionsSection(!showAccountActionsSection)}
+          >
+            <AccountActions 
+              currentUser={currentUser} 
+              onLogout={onLogout} 
+              onShowTerms={onShowTerms}
+              onShowPrivacy={onShowPrivacy}
+            />
+          </CollapsibleSection>
         </div>
       </div>
     </div>

@@ -42,7 +42,7 @@ const TermsAcceptance = ({ user, onAccept }: TermsAcceptanceProps) => {
       }
 
       toast({
-        title: "Welcome to AfroVibe!",
+        title: "Welcome to DripLove!",
         description: "Thank you for accepting our terms. You can now start connecting with amazing people!",
       });
 
@@ -68,8 +68,8 @@ const TermsAcceptance = ({ user, onAccept }: TermsAcceptanceProps) => {
               <Heart className="w-10 h-10 text-white" />
             </div>
           </div>
-          <CardTitle className="text-3xl font-bold bg-gradient-to-r from-pink-600 to-purple-600 bg-clip-text text-transparent">
-            Welcome to AfroVibe!
+                    <CardTitle className="text-3xl font-bold text-center text-purple-700 mb-2">
+            Welcome to DripLove!
           </CardTitle>
           <CardDescription className="text-gray-600 text-lg">
             Before you begin your journey, please review and accept our terms and conditions
@@ -81,7 +81,7 @@ const TermsAcceptance = ({ user, onAccept }: TermsAcceptanceProps) => {
           <div className="bg-gradient-to-r from-pink-50 to-purple-50 rounded-lg p-6 mb-6">
             <h3 className="text-lg font-semibold text-gray-800 mb-4 flex items-center">
               <Star className="w-5 h-5 mr-2 text-pink-500" />
-              What awaits you on AfroVibe
+              What awaits you on DripLove
             </h3>
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
               <div className="flex items-center space-x-3">
@@ -101,13 +101,15 @@ const TermsAcceptance = ({ user, onAccept }: TermsAcceptanceProps) => {
 
           {/* Terms and Conditions Content */}
           <div className="bg-white rounded-lg border border-gray-200 p-6 max-h-96 overflow-y-auto">
-            <h3 className="text-xl font-semibold text-gray-800 mb-4">Terms and Conditions</h3>
+                        <h3 className="text-xl font-semibold text-purple-700 mb-3">
+              What awaits you on DripLove
+            </h3>
             
             <div className="space-y-4 text-sm text-gray-600">
               <section>
                 <h4 className="font-semibold text-gray-800 mb-2">1. Acceptance of Terms</h4>
                 <p>
-                  By creating an account and using AfroVibe, you agree to comply with and be bound by these Terms and Conditions. 
+                  By creating an account and using DripLove, you agree to comply with and be bound by these Terms and Conditions. 
                   If you do not agree with any part of these terms, you may not use our service.
                 </p>
               </section>
@@ -129,14 +131,14 @@ const TermsAcceptance = ({ user, onAccept }: TermsAcceptanceProps) => {
                 <h4 className="font-semibold text-gray-800 mb-2">3. Privacy and Data Protection</h4>
                 <p>
                   Your privacy is important to us. We collect and use your personal information in accordance with our Privacy Policy. 
-                  By using AfroVibe, you consent to the collection and use of your information as described in our Privacy Policy.
+                  By using DripLove, you consent to the collection and use of your information as described in our Privacy Policy.
                 </p>
               </section>
 
               <section>
                 <h4 className="font-semibold text-gray-800 mb-2">4. Safety and Security</h4>
                 <p>
-                  AfroVibe implements various safety measures to protect our users. However, you are responsible for your own safety when 
+                  DripLove implements various safety measures to protect our users. However, you are responsible for your own safety when 
                   interacting with other users. We recommend:
                 </p>
                 <ul className="list-disc list-inside ml-4 mt-2 space-y-1">
@@ -162,7 +164,7 @@ const TermsAcceptance = ({ user, onAccept }: TermsAcceptanceProps) => {
               <section>
                 <h4 className="font-semibold text-gray-800 mb-2">6. Account Termination</h4>
                 <p>
-                  AfroVibe reserves the right to suspend or terminate accounts that violate these terms or engage in inappropriate behavior. 
+                  DripLove reserves the right to suspend or terminate accounts that violate these terms or engage in inappropriate behavior. 
                   Users may also delete their accounts at any time through their profile settings.
                 </p>
               </section>
@@ -170,8 +172,8 @@ const TermsAcceptance = ({ user, onAccept }: TermsAcceptanceProps) => {
               <section>
                 <h4 className="font-semibold text-gray-800 mb-2">7. Intellectual Property</h4>
                 <p>
-                  All content and materials on AfroVibe, including logos, designs, and software, are owned by AfroVibe and protected by 
-                  intellectual property laws. Users retain ownership of their uploaded content but grant AfroVibe a license to use it 
+                  All content and materials on DripLove, including logos, designs, and software, are owned by DripLove and protected by 
+                  intellectual property laws. Users retain ownership of their uploaded content but grant DripLove a license to use it 
                   within the platform.
                 </p>
               </section>
@@ -179,7 +181,7 @@ const TermsAcceptance = ({ user, onAccept }: TermsAcceptanceProps) => {
               <section>
                 <h4 className="font-semibold text-gray-800 mb-2">8. Limitation of Liability</h4>
                 <p>
-                  AfroVibe provides the service "as is" and cannot guarantee specific outcomes from using the platform. We are not liable 
+                  DripLove provides the service "as is" and cannot guarantee specific outcomes from using the platform. We are not liable 
                   for any direct, indirect, or consequential damages arising from your use of the service.
                 </p>
               </section>
@@ -187,7 +189,7 @@ const TermsAcceptance = ({ user, onAccept }: TermsAcceptanceProps) => {
               <section>
                 <h4 className="font-semibold text-gray-800 mb-2">9. Changes to Terms</h4>
                 <p>
-                  AfroVibe may update these terms from time to time. Users will be notified of significant changes, and continued use of 
+                  DripLove may update these terms from time to time. Users will be notified of significant changes, and continued use of 
                   the service constitutes acceptance of the updated terms.
                 </p>
               </section>
@@ -195,7 +197,7 @@ const TermsAcceptance = ({ user, onAccept }: TermsAcceptanceProps) => {
               <section>
                 <h4 className="font-semibold text-gray-800 mb-2">10. Contact Information</h4>
                 <p>
-                  For questions about these terms or to report issues, please contact us at support@afrovibe.com or through our 
+                  For questions about these terms or to report issues, please contact us at support@driplove.com or through our 
                   in-app support feature.
                 </p>
               </section>
@@ -227,9 +229,9 @@ const TermsAcceptance = ({ user, onAccept }: TermsAcceptanceProps) => {
             <Button
               onClick={handleAccept}
               disabled={loading || !termsAccepted}
-              className="w-full bg-gradient-to-r from-pink-500 to-purple-600 hover:from-pink-600 hover:to-purple-700 text-white font-semibold py-3 rounded-lg transition-all duration-200 transform hover:scale-[1.02] disabled:opacity-50 disabled:cursor-not-allowed disabled:transform-none"
+              className="w-full bg-gradient-to-r from-pink-500 to-purple-600 hover:from-pink-600 hover:to-purple-700 text-white font-semibold py-3 rounded-lg transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed"
             >
-              {loading ? 'Processing...' : 'Accept Terms & Continue to AfroVibe'}
+              {loading ? 'Processing...' : 'Accept Terms & Continue to DripLove'}
             </Button>
             
             <p className="text-xs text-gray-500 text-center">

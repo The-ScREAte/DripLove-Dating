@@ -47,7 +47,7 @@ const ProfileCompletionPage = () => {
 
   const handleTermsAccept = () => {
     toast({
-      title: "Welcome to AfroVibe!",
+      title: "Welcome to DripLove!",
       description: "Your profile has been completed and terms accepted. Welcome to the community!",
     });
     navigate('/');

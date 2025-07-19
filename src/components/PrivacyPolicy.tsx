@@ -1,6 +1,6 @@
 import React from 'react';
 import { Button } from '@/components/ui/button';
-import { ArrowLeft, Shield, Eye, Lock, Users } from 'lucide-react';
+import { ArrowLeft, Shield, Eye, Lock, Users, Globe, Database, FileText, Mail } from 'lucide-react';
 
 interface PrivacyPolicyProps {
   onBack: () => void;
@@ -8,62 +8,81 @@ interface PrivacyPolicyProps {
 
 const PrivacyPolicy = ({ onBack }: PrivacyPolicyProps) => {
   return (
-    <div className="min-h-screen bg-gradient-to-br from-pink-400 via-purple-500 to-indigo-600 p-4">
+    <div 
+      className="min-h-screen bg-gradient-to-br from-pink-400 via-purple-500 to-indigo-600 p-4 mobile-container"
+      style={{
+        paddingTop: `max(env(safe-area-inset-top, 0px), 16px)`,
+        paddingBottom: `max(env(safe-area-inset-bottom, 0px), 16px)`,
+        paddingLeft: `max(env(safe-area-inset-left, 0px), 16px)`,
+        paddingRight: `max(env(safe-area-inset-right, 0px), 16px)`,
+        minHeight: '100dvh'
+      }}
+    >
       <div className="max-w-4xl mx-auto bg-white rounded-lg shadow-lg overflow-hidden">
         {/* Header */}
-        <div className="bg-gradient-to-r from-purple-600 to-pink-600 text-white p-6 sticky top-0 z-10 rounded-t-lg">
+        <div className="bg-gradient-to-r from-purple-600 to-pink-600 text-white p-6 sticky-header rounded-t-lg" style={{ top: 0, zIndex: 10 }}>
           <Button
             onClick={onBack}
             variant="ghost"
             size="sm"
             className="text-white hover:bg-white/20 mb-4"
+            style={{ fontSize: '16px' }}
           >
             <ArrowLeft className="w-4 h-4 mr-2" />
             Back
           </Button>
-          <h1 className="text-3xl font-bold">Privacy Policy</h1>
-          <p className="text-purple-100 mt-2">Last updated: July 13, 2025</p>
+          <h1 className="text-3xl font-bold">DripLove Privacy Policy</h1>
+          <p className="text-purple-100 mt-2">Last Updated: July 13, 2025</p>
         </div>
 
         {/* Content */}
         <div className="p-8 space-y-8 max-h-[80vh] overflow-y-auto">
+          <div className="text-center mb-8">
+            <div className="text-gray-400 text-2xl font-light">⸻</div>
+          </div>
+
           <section>
             <h2 className="text-2xl font-semibold text-gray-800 mb-4 flex items-center">
               <Shield className="w-6 h-6 mr-2 text-purple-600" />
               1. Our Commitment to Privacy
             </h2>
             <p className="text-gray-600 leading-relaxed">
-              At AfroVibe, we take your privacy seriously. This Privacy Policy explains how we collect, use, protect, and share your personal 
-              information when you use our dating platform. We are committed to maintaining the trust and confidence of our users by ensuring 
-              your data is handled with the utmost care and in accordance with applicable privacy laws.
+              At DripLove, we respect and protect your privacy. This Privacy Policy explains how we collect, use, protect, and share your information when you use our platform. We are committed to maintaining the trust of our users by handling your data responsibly and in compliance with applicable privacy laws.
             </p>
           </section>
 
+          <div className="text-center">
+            <div className="text-gray-400 text-2xl font-light">⸻</div>
+          </div>
+
           <section>
             <h2 className="text-2xl font-semibold text-gray-800 mb-4 flex items-center">
-              <Eye className="w-6 h-6 mr-2 text-purple-600" />
+              <Database className="w-6 h-6 mr-2 text-blue-600" />
               2. Information We Collect
             </h2>
-            <div className="space-y-4">
+            
+            <div className="space-y-6">
               <div>
-                <h3 className="text-lg font-semibold text-gray-700 mb-2">Information You Provide</h3>
-                <ul className="list-disc list-inside text-gray-600 space-y-1">
-                  <li>Profile information (name, age, photos, bio, interests)</li>
-                  <li>Contact information (email address, phone number)</li>
+                <h3 className="text-xl font-semibold text-gray-700 mb-3">a. Information You Provide</h3>
+                <p className="text-gray-600 mb-3">When you use DripLove, you may provide:</p>
+                <ul className="list-disc pl-6 space-y-1 text-gray-600">
+                  <li>Profile details (e.g., name, age, photos, bio, interests)</li>
+                  <li>Contact information (email address, optional phone number)</li>
                   <li>Location data (city, country, zip code)</li>
-                  <li>Preferences and relationship goals</li>
-                  <li>Messages and communications with other users</li>
-                  <li>Payment information for premium subscriptions</li>
+                  <li>Dating preferences and relationship goals</li>
+                  <li>Messages and interactions with other users</li>
+                  <li>Payment details for premium features</li>
                   <li>Support inquiries and feedback</li>
                 </ul>
               </div>
-              
+
               <div>
-                <h3 className="text-lg font-semibold text-gray-700 mb-2">Information We Collect Automatically</h3>
-                <ul className="list-disc list-inside text-gray-600 space-y-1">
-                  <li>Device information (type, operating system, unique identifiers)</li>
-                  <li>Usage data (features used, time spent, interactions)</li>
-                  <li>Log data (IP address, access times, referral URLs)</li>
+                <h3 className="text-xl font-semibold text-gray-700 mb-3">b. Information We Collect Automatically</h3>
+                <p className="text-gray-600 mb-3">We also collect certain technical and usage data, including:</p>
+                <ul className="list-disc pl-6 space-y-1 text-gray-600">
+                  <li>Device information (type, OS, unique identifiers)</li>
+                  <li>Usage data (interactions, features used, time spent)</li>
+                  <li>Log data (IP address, access times, referral sources)</li>
                   <li>Location information (with your permission)</li>
                   <li>Cookies and similar tracking technologies</li>
                 </ul>
@@ -71,170 +90,188 @@ const PrivacyPolicy = ({ onBack }: PrivacyPolicyProps) => {
             </div>
           </section>
 
-          <section>
-            <h2 className="text-2xl font-semibold text-gray-800 mb-4">3. How We Use Your Information</h2>
-            <div className="text-gray-600 leading-relaxed space-y-3">
-              <p>We use your information to:</p>
-              <ul className="list-disc list-inside space-y-2">
-                <li>Create and maintain your profile</li>
-                <li>Provide matching services and recommendations</li>
-                <li>Enable communication between users</li>
-                <li>Process payments and manage subscriptions</li>
-                <li>Improve our services and develop new features</li>
-                <li>Ensure platform safety and prevent fraud</li>
-                <li>Send important updates and notifications</li>
-                <li>Provide customer support</li>
-                <li>Comply with legal obligations</li>
-              </ul>
-            </div>
-          </section>
-
-          <section>
-            <h2 className="text-2xl font-semibold text-gray-800 mb-4">4. Information Sharing and Disclosure</h2>
-            <div className="text-gray-600 leading-relaxed space-y-4">
-              <div>
-                <h3 className="text-lg font-semibold text-gray-700 mb-2">With Other Users</h3>
-                <p>Your profile information is visible to other users as part of our matching service. You control what information to include in your profile.</p>
-              </div>
-              
-              <div>
-                <h3 className="text-lg font-semibold text-gray-700 mb-2">With Service Providers</h3>
-                <p>We work with trusted third-party service providers for hosting, analytics, payment processing, and customer support. These providers are bound by confidentiality agreements.</p>
-              </div>
-              
-              <div>
-                <h3 className="text-lg font-semibold text-gray-700 mb-2">Legal Requirements</h3>
-                <p>We may disclose information when required by law, to protect our rights, or in connection with legal proceedings.</p>
-              </div>
-              
-              <div>
-                <h3 className="text-lg font-semibold text-gray-700 mb-2">Business Transfers</h3>
-                <p>In the event of a merger, acquisition, or sale of assets, user information may be transferred as part of the transaction.</p>
-              </div>
-            </div>
-          </section>
+          <div className="text-center">
+            <div className="text-gray-400 text-2xl font-light">⸻</div>
+          </div>
 
           <section>
             <h2 className="text-2xl font-semibold text-gray-800 mb-4 flex items-center">
-              <Lock className="w-6 h-6 mr-2 text-purple-600" />
-              5. Data Security
+              <Eye className="w-6 h-6 mr-2 text-green-600" />
+              3. How We Use Your Information
             </h2>
-            <div className="text-gray-600 leading-relaxed space-y-3">
-              <p>We implement robust security measures to protect your personal information:</p>
-              <ul className="list-disc list-inside space-y-2">
-                <li>Encryption of data in transit and at rest</li>
-                <li>Regular security audits and assessments</li>
-                <li>Access controls and authentication protocols</li>
-                <li>Secure payment processing systems</li>
-                <li>Employee training on data protection</li>
-                <li>Incident response procedures</li>
-              </ul>
-              <p className="mt-4 bg-yellow-50 p-4 rounded-lg border-l-4 border-yellow-400">
-                <strong>Important:</strong> While we implement strong security measures, no system is 100% secure. We encourage users to 
-                use strong passwords and be cautious about sharing personal information.
-              </p>
-            </div>
+            <p className="text-gray-600 mb-3">We use your information to:</p>
+            <ul className="list-disc pl-6 space-y-1 text-gray-600">
+              <li>Create and manage your account</li>
+              <li>Recommend matches based on your preferences</li>
+              <li>Enable communication with other users</li>
+              <li>Process payments and manage subscriptions</li>
+              <li>Improve app performance and develop new features</li>
+              <li>Maintain platform safety and prevent misuse</li>
+              <li>Send essential updates and notifications</li>
+              <li>Provide customer support</li>
+              <li>Comply with legal obligations</li>
+            </ul>
           </section>
+
+          <div className="text-center">
+            <div className="text-gray-400 text-2xl font-light">⸻</div>
+          </div>
 
           <section>
             <h2 className="text-2xl font-semibold text-gray-800 mb-4 flex items-center">
               <Users className="w-6 h-6 mr-2 text-purple-600" />
-              6. Your Privacy Rights
+              4. Information Sharing and Disclosure
             </h2>
-            <div className="text-gray-600 leading-relaxed space-y-4">
-              <p>Depending on your location, you may have the following rights:</p>
-              
-              <div className="grid md:grid-cols-2 gap-4">
-                <div className="bg-gray-50 p-4 rounded-lg">
-                  <h4 className="font-semibold mb-2">Access & Portability</h4>
-                  <p className="text-sm">Request a copy of your personal data and download your information.</p>
-                </div>
-                
-                <div className="bg-gray-50 p-4 rounded-lg">
-                  <h4 className="font-semibold mb-2">Correction</h4>
-                  <p className="text-sm">Update or correct inaccurate personal information.</p>
-                </div>
-                
-                <div className="bg-gray-50 p-4 rounded-lg">
-                  <h4 className="font-semibold mb-2">Deletion</h4>
-                  <p className="text-sm">Request deletion of your personal data and account.</p>
-                </div>
-                
-                <div className="bg-gray-50 p-4 rounded-lg">
-                  <h4 className="font-semibold mb-2">Restriction</h4>
-                  <p className="text-sm">Limit how we process your personal information.</p>
-                </div>
+            
+            <div className="space-y-4">
+              <div>
+                <h3 className="text-xl font-semibold text-gray-700 mb-2">a. With Other Users</h3>
+                <p className="text-gray-600">Your profile is visible to other users as part of the matching experience. You control the content you choose to share.</p>
               </div>
-              
-              <p className="mt-4">
-                To exercise these rights, contact us at privacy@afrovibe.com. We will respond to your request within 30 days.
+
+              <div>
+                <h3 className="text-xl font-semibold text-gray-700 mb-2">b. With Third-Party Service Providers</h3>
+                <p className="text-gray-600">We work with trusted partners for hosting, analytics, payments, and support. These providers are contractually required to protect your data.</p>
+              </div>
+
+              <div>
+                <h3 className="text-xl font-semibold text-gray-700 mb-2">c. Legal and Compliance</h3>
+                <p className="text-gray-600">We may disclose your information when required to comply with legal obligations, enforce our policies, or protect the rights and safety of others.</p>
+              </div>
+
+              <div>
+                <h3 className="text-xl font-semibold text-gray-700 mb-2">d. Business Transfers</h3>
+                <p className="text-gray-600">In the event of a merger, acquisition, or asset transfer, user information may be part of the transferred assets under appropriate safeguards.</p>
+              </div>
+            </div>
+          </section>
+
+          <div className="text-center">
+            <div className="text-gray-400 text-2xl font-light">⸻</div>
+          </div>
+
+          <section>
+            <h2 className="text-2xl font-semibold text-gray-800 mb-4 flex items-center">
+              <Lock className="w-6 h-6 mr-2 text-red-600" />
+              5. Data Security
+            </h2>
+            <p className="text-gray-600 mb-3">We implement strong technical and organizational measures to protect your data, including:</p>
+            <ul className="list-disc pl-6 space-y-1 text-gray-600 mb-4">
+              <li>Data encryption during storage and transmission</li>
+              <li>Access controls and secure authentication</li>
+              <li>Security audits and regular vulnerability assessments</li>
+              <li>Secure payment processing practices</li>
+              <li>Internal data handling policies and employee training</li>
+            </ul>
+            <div className="bg-yellow-50 border-l-4 border-yellow-400 p-4 rounded">
+              <p className="text-yellow-800">
+                <strong>⚠️ While we take every reasonable precaution, no system is completely immune to risks. Please use strong passwords and be cautious when sharing personal information.</strong>
               </p>
             </div>
           </section>
 
+          <div className="text-center">
+            <div className="text-gray-400 text-2xl font-light">⸻</div>
+          </div>
+
           <section>
-            <h2 className="text-2xl font-semibold text-gray-800 mb-4">7. Cookies and Tracking</h2>
-            <div className="text-gray-600 leading-relaxed space-y-3">
-              <p>We use cookies and similar technologies to:</p>
-              <ul className="list-disc list-inside space-y-2">
-                <li>Remember your preferences and settings</li>
-                <li>Analyze usage patterns and improve our service</li>
-                <li>Provide personalized content and recommendations</li>
-                <li>Ensure platform security and prevent fraud</li>
-              </ul>
-              <p className="mt-4">
-                You can control cookie settings through your browser preferences. However, disabling cookies may affect some functionality.
-              </p>
-            </div>
+            <h2 className="text-2xl font-semibold text-gray-800 mb-4 flex items-center">
+              <FileText className="w-6 h-6 mr-2 text-indigo-600" />
+              6. Your Privacy Rights
+            </h2>
+            <p className="text-gray-600 mb-3">Depending on your jurisdiction, you may have the right to:</p>
+            <ul className="list-disc pl-6 space-y-1 text-gray-600 mb-4">
+              <li>Access your personal information</li>
+              <li>Correct any inaccurate data</li>
+              <li>Delete your account and associated information</li>
+              <li>Restrict certain types of data processing</li>
+            </ul>
+            <p className="text-gray-600">
+              To exercise any of these rights, please contact us at <a href="mailto:privacy@driplove.com" className="text-blue-600 hover:underline">privacy@driplove.com</a>. We will respond to your request within 30 days, in accordance with applicable laws.
+            </p>
           </section>
+
+          <div className="text-center">
+            <div className="text-gray-400 text-2xl font-light">⸻</div>
+          </div>
+
+          <section>
+            <h2 className="text-2xl font-semibold text-gray-800 mb-4">7. Cookies and Tracking Technologies</h2>
+            <p className="text-gray-600 mb-3">DripLove uses cookies and similar tools to:</p>
+            <ul className="list-disc pl-6 space-y-1 text-gray-600 mb-4">
+              <li>Remember your preferences</li>
+              <li>Analyze usage trends</li>
+              <li>Personalize content</li>
+              <li>Support security and fraud prevention</li>
+            </ul>
+            <p className="text-gray-600">
+              You may control cookie settings in your browser. Please note that disabling cookies may affect certain functionality.
+            </p>
+          </section>
+
+          <div className="text-center">
+            <div className="text-gray-400 text-2xl font-light">⸻</div>
+          </div>
 
           <section>
             <h2 className="text-2xl font-semibold text-gray-800 mb-4">8. Data Retention</h2>
-            <p className="text-gray-600 leading-relaxed">
-              We retain your personal information for as long as necessary to provide our services, comply with legal obligations, 
-              and resolve disputes. When you delete your account, we will delete your personal information within 30 days, except 
-              where we are required to retain it for legal or safety purposes.
+            <p className="text-gray-600">
+              We retain your information only as long as necessary for service delivery, legal compliance, and safety. Once you delete your account, we will remove your data within 30 days unless retention is legally required.
             </p>
           </section>
 
+          <div className="text-center">
+            <div className="text-gray-400 text-2xl font-light">⸻</div>
+          </div>
+
           <section>
-            <h2 className="text-2xl font-semibold text-gray-800 mb-4">9. International Data Transfers</h2>
-            <p className="text-gray-600 leading-relaxed">
-              As AfroVibe connects users globally, your information may be transferred to and processed in countries other than your own. 
-              We ensure appropriate safeguards are in place for international transfers, including standard contractual clauses and 
-              adequacy decisions.
+            <h2 className="text-2xl font-semibold text-gray-800 mb-4 flex items-center">
+              <Globe className="w-6 h-6 mr-2 text-blue-600" />
+              9. International Data Transfers
+            </h2>
+            <p className="text-gray-600">
+              Because DripLove connects users globally, your data may be processed in countries outside your own. We use appropriate legal safeguards to protect your information during such transfers.
             </p>
           </section>
+
+          <div className="text-center">
+            <div className="text-gray-400 text-2xl font-light">⸻</div>
+          </div>
 
           <section>
             <h2 className="text-2xl font-semibold text-gray-800 mb-4">10. Children's Privacy</h2>
-            <p className="text-gray-600 leading-relaxed">
-              AfroVibe is intended for users 18 years and older. We do not knowingly collect personal information from minors. 
-              If we become aware that we have collected information from someone under 18, we will delete it immediately.
+            <p className="text-gray-600">
+              DripLove is intended for users aged 18 and older. We do not knowingly collect data from minors. If we discover that a user is under 18, their data will be promptly deleted.
             </p>
           </section>
+
+          <div className="text-center">
+            <div className="text-gray-400 text-2xl font-light">⸻</div>
+          </div>
 
           <section>
             <h2 className="text-2xl font-semibold text-gray-800 mb-4">11. Changes to This Policy</h2>
-            <p className="text-gray-600 leading-relaxed">
-              We may update this Privacy Policy periodically to reflect changes in our practices or applicable laws. We will notify users 
-              of significant changes through the app or email. Your continued use of AfroVibe after changes become effective constitutes 
-              acceptance of the updated policy.
+            <p className="text-gray-600">
+              We may update this Privacy Policy to reflect changes in our practices or legal obligations. Significant changes will be communicated via the app or email. Continued use of DripLove after updates constitutes acceptance of the revised policy.
             </p>
           </section>
 
+          <div className="text-center">
+            <div className="text-gray-400 text-2xl font-light">⸻</div>
+          </div>
+
           <section>
-            <h2 className="text-2xl font-semibold text-gray-800 mb-4">12. Contact Us</h2>
-            <div className="text-gray-600 leading-relaxed">
-              <p>If you have questions about this Privacy Policy or how we handle your personal information, please contact us:</p>
-              <div className="mt-4 bg-gray-50 p-6 rounded-lg">
-                <div className="space-y-2">
-                  <p><strong>Email:</strong> privacy@afrovibe.com</p>
-                  <p><strong>Data Protection Officer:</strong> dpo@afrovibe.com</p>
-                  <p><strong>Address:</strong> AfroVibe Privacy Team<br />123 Love Lane<br />Heart City, HC 12345</p>
-                  <p><strong>Phone:</strong> +1 (555) 123-4567</p>
-                </div>
-              </div>
+            <h2 className="text-2xl font-semibold text-gray-800 mb-4 flex items-center">
+              <Mail className="w-6 h-6 mr-2 text-pink-600" />
+              12. Contact Us
+            </h2>
+            <p className="text-gray-600 mb-4">
+              If you have any questions or concerns about this Privacy Policy, please contact us at:
+            </p>
+            <div className="bg-pink-50 border border-pink-200 rounded-lg p-4">
+              <p className="text-pink-800 font-semibold">
+                📧 <a href="mailto:privacy@driplove.com" className="hover:underline">privacy@driplove.com</a>
+              </p>
             </div>
           </section>
         </div>

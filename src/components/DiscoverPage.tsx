@@ -146,7 +146,7 @@ const DiscoverPage = ({ currentUser, onNavigateToChat }: DiscoverPageProps) => {
           .from('passes')
           .select('passed_id, passed_at')
           .match({ passer_id: currentUser.id })
-          .gte('passed_at', new Date(Date.now() - 3 * 24 * 60 * 60 * 1000).toISOString())
+          .gte('passed_at', new Date(Date.now() - 2 * 24 * 60 * 60 * 1000).toISOString())
       ]);
 
       const likedUserIds = likedUsers?.map(like => like.liked_id) || [];
@@ -163,7 +163,7 @@ const DiscoverPage = ({ currentUser, onNavigateToChat }: DiscoverPageProps) => {
         .in('gender', allowedGenders)
         .eq('account_status', 'active')
         .eq('is_admin', false)
-        .limit(50); // Increased limit to account for distance filtering
+        .limit(200); // Significantly increased limit to account for distance and age filtering
 
       if (error) throw error;
 
@@ -171,7 +171,7 @@ const DiscoverPage = ({ currentUser, onNavigateToChat }: DiscoverPageProps) => {
       let filteredProfiles = profiles || [];
       const userMaxDistance = currentUser.max_distance || currentUser.distance_preference || 50;
       if (currentUser.latitude && currentUser.longitude && userMaxDistance) {
-        filteredProfiles = (profiles || []).filter(profile => {
+        const nearbyProfiles = (profiles || []).filter(profile => {
           // If profile doesn't have coordinates, include it (fallback to country/city matching)
           if (!profile.latitude || !profile.longitude) {
             return profile.country === currentUser.country;
@@ -187,6 +187,29 @@ const DiscoverPage = ({ currentUser, onNavigateToChat }: DiscoverPageProps) => {
 
           return distance <= userMaxDistance;
         });
+
+        // If there aren't enough nearby profiles, gradually expand the search radius
+        if (nearbyProfiles.length < 10) {
+          const expandedProfiles = (profiles || []).filter(profile => {
+            if (!profile.latitude || !profile.longitude) {
+              return profile.country === currentUser.country;
+            }
+
+            const distance = calculateDistance(
+              currentUser.latitude,
+              currentUser.longitude,
+              profile.latitude,
+              profile.longitude
+            );
+
+            // Expand to 2x the preferred distance if not enough matches
+            return distance <= (userMaxDistance * 2);
+          });
+
+          filteredProfiles = expandedProfiles.length > nearbyProfiles.length ? expandedProfiles : nearbyProfiles;
+        } else {
+          filteredProfiles = nearbyProfiles;
+        }
 
         // Applied distance filter: reduced profiles based on distance preferences
       } else {

@@ -53,15 +53,34 @@ const PreferencesSection = ({ editedProfile, isEditing, onSliderChange, onSelect
           <div className="space-y-3">
             <Label>Age Range for Matches</Label>
             <div className="px-3">
-              <Slider
-                value={[editedProfile.min_age || 18, editedProfile.max_age || 99]}
-                onValueChange={onAgeRangeChange || (() => {})}
-                max={99}
-                min={18}
-                step={1}
-                className="w-full"
-                disabled={!isEditing}
-              />
+              <div className="relative">
+                <Slider
+                  value={[editedProfile.min_age || 18, editedProfile.max_age || 99]}
+                  onValueChange={onAgeRangeChange || (() => {})}
+                  max={99}
+                  min={18}
+                  step={1}
+                  className="w-full"
+                  disabled={!isEditing}
+                />
+                {/* Visual enhancement for better UX */}
+                <div className="absolute -top-8 left-0 right-0 flex justify-between">
+                  <div className="bg-gray-800 text-white text-xs px-2 py-1 rounded" style={{ 
+                    left: `${((editedProfile.min_age || 18) - 18) / (99 - 18) * 100}%`,
+                    position: 'absolute',
+                    transform: 'translateX(-50%)'
+                  }}>
+                    {editedProfile.min_age || 18}
+                  </div>
+                  <div className="bg-gray-800 text-white text-xs px-2 py-1 rounded" style={{ 
+                    left: `${((editedProfile.max_age || 99) - 18) / (99 - 18) * 100}%`,
+                    position: 'absolute',
+                    transform: 'translateX(-50%)'
+                  }}>
+                    {editedProfile.max_age || 99}
+                  </div>
+                </div>
+              </div>
               <div className="flex justify-between text-xs text-gray-500 mt-1">
                 <span>18 years</span>
                 <span className="font-medium">

@@ -404,7 +404,7 @@ const ProfileCompletionForm = ({ user, onComplete, onCancel }: ProfileCompletion
             <Button
               type="submit"
               disabled={loading}
-              className="w-full bg-gradient-to-r from-pink-500 to-purple-600 hover:from-pink-600 hover:to-purple-700 text-white font-semibold py-3 rounded-lg transition-all duration-200 transform hover:scale-[1.02]"
+              className="w-full bg-gradient-to-r from-pink-500 to-purple-600 hover:from-pink-600 hover:to-purple-700 text-white font-semibold py-3 rounded-lg transition-all duration-200"
             >
               {loading ? 'Completing Profile...' : 'Complete Profile'}
             </Button>

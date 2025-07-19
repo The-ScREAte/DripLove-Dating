@@ -177,13 +177,18 @@ const MainApp = ({ user, onLogout }: MainAppProps) => {
         
         {/* Fixed Header - Hide when showing terms/privacy */}
         {!showTerms && !showPrivacy && (
-          <div className="fixed top-0 left-0 right-0 w-full bg-white shadow-sm border-b z-50 mobile-header">
-            <div className="px-4 py-2 flex justify-start items-center">
+          <div className="fixed top-0 left-0 right-0 w-full bg-white shadow-sm border-b z-50 mobile-header sticky-header">
+            <div className="px-4 py-2 flex justify-between items-center">
               <img 
                 src="/driplove-logo.png" 
                 alt="DripLove Logo" 
                 className="h-12"
               />
+              <div className="text-right">
+                <span className="text-sm font-bold text-pink-600">
+                  I feel love 🔥❤️
+                </span>
+              </div>
             </div>
           </div>
         )}

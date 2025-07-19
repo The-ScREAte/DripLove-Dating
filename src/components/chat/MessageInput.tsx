@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Smile, Send } from 'lucide-react';
@@ -18,6 +18,8 @@ const MessageInput: React.FC<MessageInputProps> = ({
   disabled = false
 }) => {
   const [showEmojiPicker, setShowEmojiPicker] = useState(false);
+  const inputRef = useRef<HTMLInputElement>(null);
+  const containerRef = useRef<HTMLDivElement>(null);
 
   const handleEmojiSelect = (emoji: string) => {
     onMessageChange(newMessage + emoji);
@@ -31,16 +33,52 @@ const MessageInput: React.FC<MessageInputProps> = ({
     }
   };
 
+  // Handle focus and blur to manage viewport on mobile
+  const handleFocus = () => {
+    // Small delay to ensure keyboard is shown
+    setTimeout(() => {
+      if (inputRef.current) {
+        inputRef.current.scrollIntoView({ 
+          behavior: 'smooth', 
+          block: 'center' 
+        });
+      }
+    }, 300);
+  };
+
+  const handleBlur = () => {
+    // Reset viewport zoom after input loses focus (iOS fix)
+    setTimeout(() => {
+      window.scrollTo(0, 0);
+    }, 100);
+  };
+
   return (
-    <div className="p-4 border-t bg-white relative">
+    <div 
+      ref={containerRef}
+      className="p-4 border-t bg-white relative keyboard-aware"
+      style={{ 
+        paddingBottom: `max(16px, env(safe-area-inset-bottom))`,
+        position: 'sticky',
+        bottom: 0,
+        zIndex: 10
+      }}
+    >
       <div className="flex items-center space-x-2">
         <div className="flex-1 flex items-center space-x-2 bg-gray-100 rounded-full px-4 py-2">
           <Input
+            ref={inputRef}
             value={newMessage}
             onChange={(e) => onMessageChange(e.target.value)}
             onKeyPress={handleKeyPress}
+            onFocus={handleFocus}
+            onBlur={handleBlur}
             placeholder="Type a message..."
             className="flex-1 border-none bg-transparent focus:ring-0 p-0"
+            style={{ 
+              fontSize: '16px',
+              outline: 'none'
+            }}
             disabled={disabled}
           />
           <Button

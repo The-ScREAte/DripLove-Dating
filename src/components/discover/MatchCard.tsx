@@ -313,10 +313,10 @@ const MatchCard: React.FC<MatchCardProps> = ({
         <div className="flex justify-between items-start">
           <div className="flex-1">
             <div className="flex items-center gap-2 mb-1">
-              <h2 className="text-xl font-bold text-gray-900">
+              <h2 className="text-2xl font-bold text-gray-900">
                 {match.first_name} {match.last_name}
               </h2>
-              <span className="text-lg text-gray-600">
+              <span className="text-xl text-gray-600">
                 {calculateAge(match.date_of_birth)}
               </span>
               {/* Verified badge beside name and age */}

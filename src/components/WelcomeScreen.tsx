@@ -34,18 +34,18 @@ const WelcomeScreen = ({ onGetStarted, onAdminAccess, onShowAbout, onShowTerms, 
         
         {/* Tagline */}
         <h2 className="text-2xl md:text-3xl font-bold mb-4 leading-tight">
-          Where Hearts Connect Worldwide
+          Feel the Spark. Drip in Love
         </h2>
         
         <p className="text-lg md:text-xl mb-8 opacity-90 leading-relaxed">
-          Discover meaningful connections with people from all walks of life
+          Real Vibes. Real People. Real Love.
         </p>
         
         {/* CTA Button */}
         <Button 
           onClick={onGetStarted}
           size="lg"
-          className="bg-white text-purple-600 hover:bg-gray-100 font-semibold px-8 py-3 rounded-full text-lg shadow-lg transform hover:scale-105 transition-all duration-200 mb-6"
+          className="bg-white text-purple-600 hover:bg-gray-100 font-semibold px-8 py-3 rounded-full text-lg shadow-lg transition-all duration-200 mb-6"
         >
           Get Started
         </Button>

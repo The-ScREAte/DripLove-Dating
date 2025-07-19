@@ -83,7 +83,7 @@ const PremiumUpgrade = ({ currentUser, onClose, preselectedPlan }: PremiumUpgrad
           
           {/* Premium Plan - Featured */}
           <div className="order-1 lg:order-1">
-            <Card className="border-3 border-yellow-400 relative overflow-hidden shadow-2xl bg-gradient-to-br from-white to-yellow-50 transform hover:scale-105 transition-all duration-300">
+            <Card className="border-3 border-yellow-400 relative overflow-hidden shadow-2xl bg-gradient-to-br from-white to-yellow-50 transition-all duration-300">
               {/* Popular Badge */}
               <div className="absolute -top-1 -right-1 bg-gradient-to-r from-yellow-400 to-orange-400 text-black px-4 py-2 text-sm font-bold rounded-bl-lg shadow-lg">
                 ⭐ MOST POPULAR
@@ -132,7 +132,7 @@ const PremiumUpgrade = ({ currentUser, onClose, preselectedPlan }: PremiumUpgrad
                 <div className="pt-6 text-center">
                   <Button
                     onClick={handleUpgrade}
-                    className="w-full bg-gradient-to-r from-yellow-400 via-yellow-500 to-orange-400 hover:from-yellow-500 hover:via-yellow-600 hover:to-orange-500 text-black font-bold py-4 px-8 rounded-xl text-lg shadow-xl transform hover:scale-105 transition-all duration-200"
+                    className="w-full bg-gradient-to-r from-yellow-400 via-yellow-500 to-orange-400 hover:from-yellow-500 hover:via-yellow-600 hover:to-orange-500 text-black font-bold py-4 px-8 rounded-xl text-lg shadow-xl transition-all duration-200"
                   >
                     <Crown className="w-6 h-6 mr-3" />
                     Upgrade to Premium Now
@@ -146,7 +146,7 @@ const PremiumUpgrade = ({ currentUser, onClose, preselectedPlan }: PremiumUpgrad
 
           {/* Free Plan */}
           <div className="order-2 lg:order-2">
-            <Card className="border-2 border-gray-200 shadow-lg bg-white relative transform hover:scale-105 transition-all duration-300">
+            <Card className="border-2 border-gray-200 shadow-lg bg-white relative transition-all duration-300">
               <CardHeader className="text-center pb-6">
                 <CardTitle className="text-2xl font-bold text-gray-700">Free Plan</CardTitle>
                 <div className="mt-4">

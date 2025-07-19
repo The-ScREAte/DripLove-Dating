@@ -92,7 +92,12 @@ const FlwPaymentModal: React.FC<FlwPaymentModalProps> = ({ isOpen, onClose, amou
         </div>
         <div className="mb-4">
           <label className="block font-medium mb-1">Amount</label>
-          <input value={amount} readOnly className="w-full border rounded px-2 py-1" />
+          <input 
+            value={amount} 
+            readOnly 
+            className="w-full border rounded px-2 py-1" 
+            style={{ fontSize: '16px' }}
+          />
         </div>
         <button onClick={handlePay} className="w-full bg-pink-600 text-white mt-2 py-2 rounded font-bold text-lg">
           Pay with Flutterwave
