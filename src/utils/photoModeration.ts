@@ -349,23 +349,26 @@ class PhotoModerationService {
       message = 'Image file is corrupted or invalid and cannot be uploaded.';
       // Image blocked: Invalid file
     }
-    // Send inappropriate content to admin review
-    else if (hasContentFlags) {
-      isApproved = true; // Allow upload but require review
-      requiresReview = true;
-      confidence = 20;
-      message = 'Image uploaded but requires admin approval due to potentially inappropriate content.';
-      // Image flagged for admin review due to content flags
+    // ❌ REJECT explicit content immediately
+    else if (combinedDetails.explicitContent && combinedDetails.explicitContent >= 95) {
+      isApproved = false;
+      confidence = 95;
+      message = 'Image contains explicit content and cannot be uploaded.';
     }
-    // Send high-risk content scores to admin review  
-    else if (
-      (combinedDetails.adultContent && combinedDetails.adultContent >= 75) ||  // Raised from 60 to 75
-      (combinedDetails.explicitContent && combinedDetails.explicitContent >= 80) || // Raised from 70 to 80
-      (combinedDetails.suggestiveContent && combinedDetails.suggestiveContent >= 70)  // Raised from 50 to 70
-    ) {
+    // ⚠️ REVIEW borderline content (shirtless, bikini, etc.)
+    else if (hasContentFlags || 
+             (combinedDetails.adultContent && combinedDetails.adultContent >= 85) ||
+             (combinedDetails.explicitContent && combinedDetails.explicitContent >= 80)) {
       isApproved = true; // Allow upload but require review
       requiresReview = true;
       confidence = 30;
+      message = 'Image uploaded but requires admin approval before being visible to others.';
+    }
+    // ⚠️ REVIEW high suggestive content 
+    else if (combinedDetails.suggestiveContent && combinedDetails.suggestiveContent >= 70) {
+      isApproved = true; // Allow upload but require review
+      requiresReview = true;
+      confidence = 40;
       message = 'Image uploaded but requires admin approval before being visible to others.';
     }
     else {

@@ -400,24 +400,33 @@ const ProfileCompletionForm = ({ user, onComplete, onCancel }: ProfileCompletion
             {errors.educationLevel && <p className="text-sm text-red-500">{errors.educationLevel}</p>}
           </div>
 
-          <div className="flex flex-col gap-3">
-            <Button
-              type="submit"
-              disabled={loading}
-              className="w-full bg-gradient-to-r from-pink-500 to-purple-600 hover:from-pink-600 hover:to-purple-700 text-white font-semibold py-3 rounded-lg transition-all duration-200"
-            >
-              {loading ? 'Completing Profile...' : 'Complete Profile'}
-            </Button>
-            
-            <Button
-              type="button"
-              variant="outline"
-              onClick={onCancel}
-              disabled={loading}
-              className="w-full border-gray-300 text-gray-700 hover:bg-gray-50 font-medium py-3 rounded-lg transition-all duration-200"
-            >
-              Cancel
-            </Button>
+          <div className="space-y-4">
+            <div className="bg-blue-50 p-4 rounded-lg">
+              <h4 className="font-medium text-blue-900 mb-2">Next Step: Add Photos</h4>
+              <p className="text-sm text-blue-800">
+                After completing your profile, you'll be able to upload at least 2 photos with AI content moderation.
+              </p>
+            </div>
+
+            <div className="flex flex-col gap-3">
+              <Button
+                type="submit"
+                disabled={loading}
+                className="w-full bg-gradient-to-r from-pink-500 to-purple-600 hover:from-pink-600 hover:to-purple-700 text-white font-semibold py-3 rounded-lg transition-all duration-200"
+              >
+                {loading ? 'Completing Profile...' : 'Complete Profile & Add Photos'}
+              </Button>
+              
+              <Button
+                type="button"
+                variant="outline"
+                onClick={onCancel}
+                disabled={loading}
+                className="w-full border-gray-300 text-gray-700 hover:bg-gray-50 font-medium py-3 rounded-lg transition-all duration-200"
+              >
+                Cancel
+              </Button>
+            </div>
           </div>
         </form>
       </CardContent>
