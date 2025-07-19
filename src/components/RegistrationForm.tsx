@@ -7,16 +7,25 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Textarea } from '@/components/ui/textarea';
-import { Heart, MapPin, Briefcase, GraduationCap } from 'lucide-react';
+import { Heart, MapPin, Briefcase, GraduationCap, Upload, Shield, CheckCircle, AlertTriangle } from 'lucide-react';
 import BasicInfoSection from '@/components/forms/BasicInfoSection';
 import LocationInput from '@/components/forms/LocationInput';
 import { validateRegistrationForm, transformFormDataForSubmission } from '@/utils/formValidation';
 import { initialFormData } from '@/constants/formData';
 import { occupationOptions, industryOptions } from '@/constants/professionOptions';
+import { moderateImage, ModerationResult } from '@/utils/photoModeration';
+import { useToast } from '@/hooks/use-toast';
 
 interface RegistrationFormProps {
   onSubmit: (data: any) => void;
   onBackToLogin: () => void;
+}
+
+interface ImageUpload {
+  file: File;
+  preview: string;
+  moderationResult?: ModerationResult;
+  status: 'uploading' | 'moderating' | 'approved' | 'pending' | 'rejected';
 }
 
 const RegistrationForm = ({ onSubmit, onBackToLogin }: RegistrationFormProps) => {
@@ -25,6 +34,8 @@ const RegistrationForm = ({ onSubmit, onBackToLogin }: RegistrationFormProps) =>
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [currentStep, setCurrentStep] = useState(1);
+  const [images, setImages] = useState<ImageUpload[]>([]);
+  const { toast } = useToast();
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
     setFormData({
@@ -94,6 +105,144 @@ const RegistrationForm = ({ onSubmit, onBackToLogin }: RegistrationFormProps) =>
     }));
   };
 
+  const handleImageUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const files = Array.from(event.target.files || []);
+    if (files.length === 0) return;
+
+    if (images.length + files.length > 7) {
+      toast({
+        title: "Too many images",
+        description: "You can upload a maximum of 7 images.",
+        variant: "destructive"
+      });
+      return;
+    }
+
+    for (const file of files) {
+      if (!file.type.startsWith('image/')) {
+        toast({
+          title: "Invalid file type",
+          description: `${file.name} is not an image file.`,
+          variant: "destructive"
+        });
+        continue;
+      }
+
+      if (file.size > 10 * 1024 * 1024) {
+        toast({
+          title: "File too large",
+          description: `${file.name} is larger than 10MB.`,
+          variant: "destructive"
+        });
+        continue;
+      }
+
+      const preview = URL.createObjectURL(file);
+      const newImage: ImageUpload = { file, preview, status: 'moderating' };
+
+      setImages(prev => [...prev, newImage]);
+
+      // AI Moderation
+      try {
+        const moderationResult = await moderateImage(file);
+        
+        setImages(prev => prev.map(img => 
+          img.preview === preview 
+            ? { 
+                ...img, 
+                moderationResult,
+                status: !moderationResult.isApproved 
+                  ? 'rejected' 
+                  : moderationResult.details?.requiresReview 
+                    ? 'pending' 
+                    : 'approved'
+              }
+            : img
+        ));
+
+        if (!moderationResult.isApproved) {
+          toast({
+            title: "Image rejected",
+            description: moderationResult.message || "This image violates our community guidelines.",
+            variant: "destructive"
+          });
+        } else if (moderationResult.details?.requiresReview) {
+          toast({
+            title: "Image needs review",
+            description: "This image will be reviewed by our team before approval.",
+            variant: "default"
+          });
+        } else {
+          toast({
+            title: "Image approved",
+            description: "Your image looks good and has been approved!",
+            variant: "default"
+          });
+        }
+      } catch (error) {
+        console.error('Moderation error:', error);
+        setImages(prev => prev.map(img => 
+          img.preview === preview 
+            ? { ...img, status: 'pending', moderationResult: {
+                isApproved: true,
+                confidence: 0,
+                flags: ['MODERATION_FAILED'],
+                details: { requiresReview: true },
+                message: "Moderation check failed - will be reviewed manually"
+              }}
+            : img
+        ));
+      }
+    }
+
+    event.target.value = '';
+  };
+
+  const removeImage = (preview: string) => {
+    setImages(prev => {
+      const updated = prev.filter(img => img.preview !== preview);
+      URL.revokeObjectURL(preview);
+      return updated;
+    });
+  };
+
+  const renderImageStatus = (image: ImageUpload) => {
+    switch (image.status) {
+      case 'moderating':
+        return (
+          <div className="absolute inset-0 bg-black/50 flex items-center justify-center rounded-lg">
+            <div className="text-white text-center">
+              <Shield className="w-6 h-6 mx-auto mb-1 animate-pulse" />
+              <div className="text-xs">Checking...</div>
+            </div>
+          </div>
+        );
+      case 'approved':
+        return (
+          <div className="absolute top-2 left-2 bg-green-500 text-white p-1 rounded-full">
+            <CheckCircle className="w-4 h-4" />
+          </div>
+        );
+      case 'pending':
+        return (
+          <div className="absolute top-2 left-2 bg-orange-500 text-white text-xs px-2 py-1 rounded-full">
+            Review
+          </div>
+        );
+      case 'rejected':
+        return (
+          <div className="absolute inset-0 bg-red-500/80 flex items-center justify-center rounded-lg">
+            <div className="text-white text-center">
+              <AlertTriangle className="w-6 h-6 mx-auto mb-1" />
+              <div className="text-xs">Rejected</div>
+            </div>
+          </div>
+        );
+      default:
+        return null;
+    }
+  };
+
   const handleContinue = () => {
     // Validate first step fields
     const firstStepErrors: Record<string, string> = {};
@@ -154,13 +303,41 @@ const RegistrationForm = ({ onSubmit, onBackToLogin }: RegistrationFormProps) =>
       return;
     }
     
-    const validationErrors = validateRegistrationForm(formData);
-    if (Object.keys(validationErrors).length > 0) {
-      setErrors(validationErrors);
+    if (currentStep === 2) {
+      // Validate second step
+      const validationErrors = validateRegistrationForm(formData);
+      if (Object.keys(validationErrors).length > 0) {
+        setErrors(validationErrors);
+        return;
+      }
+      setCurrentStep(3);
       return;
     }
-    // Pass the raw formData so password fields are included
-    onSubmit(formData);
+
+    // Final step - validate images
+    const approvedImages = images.filter(img => img.status === 'approved' || img.status === 'pending');
+    
+    if (approvedImages.length < 2) {
+      toast({
+        title: "Not enough photos",
+        description: "Please upload at least 2 photos to complete registration.",
+        variant: "destructive"
+      });
+      return;
+    }
+
+    const rejectedImages = images.filter(img => img.status === 'rejected');
+    if (rejectedImages.length > 0) {
+      toast({
+        title: "Some images were rejected",
+        description: "Please remove rejected images before continuing.",
+        variant: "destructive"
+      });
+      return;
+    }
+
+    // Submit with images
+    onSubmit({ ...formData, images: approvedImages });
   };
 
   return (
@@ -172,12 +349,14 @@ const RegistrationForm = ({ onSubmit, onBackToLogin }: RegistrationFormProps) =>
           </div>
         </div>
         <CardTitle className="text-2xl font-bold bg-gradient-to-r from-pink-600 to-purple-600 bg-clip-text text-transparent animate-fade-in">
-          {currentStep === 1 ? 'Create Your Account' : 'Tell Us More About You'}
+          {currentStep === 1 ? 'Create Your Account' : currentStep === 2 ? 'Tell Us More About You' : 'Add Your Photos'}
         </CardTitle>
         <CardDescription className="text-gray-600 animate-fade-in">
           {currentStep === 1 
             ? 'Just a few details to get started. You can complete your profile later for better matches!'
-            : 'Help us find your perfect match with a few more details!'
+            : currentStep === 2
+            ? 'Help us find your perfect match with a few more details!'
+            : 'Upload at least 2 photos to complete your profile'
           }
         </CardDescription>
       </CardHeader>
@@ -320,12 +499,71 @@ const RegistrationForm = ({ onSubmit, onBackToLogin }: RegistrationFormProps) =>
           </div>
           )}
 
+          {currentStep === 3 && (
+            <div className="space-y-6 animate-fade-in">
+              <div className="text-center">
+                <div className="flex items-center justify-center mb-4">
+                  <Shield className="w-5 h-5 text-purple-600 mr-2" />
+                  <span className="text-sm text-purple-600 font-medium">AI Content Moderation Active</span>
+                </div>
+                <p className="text-sm text-gray-600">All photos are automatically checked for appropriateness</p>
+              </div>
+
+              <div className="space-y-4">
+                <Label htmlFor="photos" className="text-lg font-medium">Upload Photos (Minimum 2 required)</Label>
+                <Input
+                  id="photos"
+                  type="file"
+                  accept="image/*"
+                  multiple
+                  onChange={handleImageUpload}
+                  className="cursor-pointer"
+                />
+                
+                {images.length > 0 && (
+                  <div className="grid grid-cols-2 sm:grid-cols-3 gap-4">
+                    {images.map((image, index) => (
+                      <div key={image.preview} className="relative group">
+                        <img 
+                          src={image.preview} 
+                          alt={`Upload ${index + 1}`}
+                          className="w-full h-32 object-cover rounded-lg shadow-sm"
+                        />
+                        {renderImageStatus(image)}
+                        
+                        <Button
+                          type="button"
+                          variant="destructive"
+                          size="sm"
+                          className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity p-1 h-8 w-8"
+                          onClick={() => removeImage(image.preview)}
+                        >
+                          ×
+                        </Button>
+                      </div>
+                    ))}
+                  </div>
+                )}
+
+                <div className="bg-blue-50 p-4 rounded-lg">
+                  <h4 className="font-medium text-blue-900 mb-2">Photo Guidelines:</h4>
+                  <ul className="text-sm text-blue-800 space-y-1">
+                    <li>• Clear photos showing your face</li>
+                    <li>• Appropriate clothing required</li>
+                    <li>• No explicit or inappropriate content</li>
+                    <li>• Borderline content may require admin review</li>
+                  </ul>
+                </div>
+              </div>
+            </div>
+          )}
+
           <div className="flex flex-col gap-4">
-            {currentStep === 2 && (
+            {currentStep > 1 && (
               <Button 
                 type="button" 
                 variant="outline"
-                onClick={() => setCurrentStep(1)}
+                onClick={() => setCurrentStep(currentStep - 1)}
                 className="w-full border-pink-400 text-pink-600 hover:bg-pink-50 transition-all duration-200 animate-fade-in"
               >
                 Back
@@ -335,7 +573,7 @@ const RegistrationForm = ({ onSubmit, onBackToLogin }: RegistrationFormProps) =>
               type="submit" 
               className="w-full bg-gradient-to-r from-pink-500 to-purple-600 hover:from-pink-600 hover:to-purple-700 text-white font-semibold py-3 rounded-lg transition-all duration-200 animate-fade-in"
             >
-              {currentStep === 1 ? 'Continue' : 'Create Account'}
+              {currentStep === 1 ? 'Continue' : currentStep === 2 ? 'Add Photos' : 'Create Account'}
             </Button>
           </div>
           <div className="text-center animate-fade-in">
