@@ -275,30 +275,6 @@ export type Database = {
           },
         ]
       }
-      payment_config: {
-        Row: {
-          created_at: string
-          id: string
-          payment_methods: Json
-          premium_price: number
-          updated_at: string
-        }
-        Insert: {
-          created_at?: string
-          id?: string
-          payment_methods?: Json
-          premium_price?: number
-          updated_at?: string
-        }
-        Update: {
-          created_at?: string
-          id?: string
-          payment_methods?: Json
-          premium_price?: number
-          updated_at?: string
-        }
-        Relationships: []
-      }
       profiles: {
         Row: {
           account_status: string | null
@@ -555,10 +531,14 @@ export type Database = {
       }
       user_subscriptions: {
         Row: {
+          auto_renew: boolean | null
+          country: string | null
           created_at: string
           expires_at: string | null
           flutterwave_transaction_id: string | null
           id: string
+          next_billing_date: string | null
+          payment_method: string | null
           plan_name: string
           starts_at: string
           status: string
@@ -566,10 +546,14 @@ export type Database = {
           user_id: string
         }
         Insert: {
+          auto_renew?: boolean | null
+          country?: string | null
           created_at?: string
           expires_at?: string | null
           flutterwave_transaction_id?: string | null
           id?: string
+          next_billing_date?: string | null
+          payment_method?: string | null
           plan_name: string
           starts_at?: string
           status?: string
@@ -577,10 +561,14 @@ export type Database = {
           user_id: string
         }
         Update: {
+          auto_renew?: boolean | null
+          country?: string | null
           created_at?: string
           expires_at?: string | null
           flutterwave_transaction_id?: string | null
           id?: string
+          next_billing_date?: string | null
+          payment_method?: string | null
           plan_name?: string
           starts_at?: string
           status?: string
@@ -694,7 +682,23 @@ export type Database = {
       }
       get_user_subscription: {
         Args: { user_id_param: string }
-        Returns: Json
+        Returns: {
+          plan_name: string
+          status: string
+          expires_at: string
+          next_billing_date: string
+          auto_renew: boolean
+          features: Json
+        }[]
+      }
+      handle_subscription_payment: {
+        Args: {
+          p_user_id: string
+          p_transaction_id: string
+          p_amount: number
+          p_currency?: string
+        }
+        Returns: boolean
       }
       increment_unread_count: {
         Args: { match_id_input: string; field_name: string }
@@ -703,6 +707,10 @@ export type Database = {
       reject_image: {
         Args: { image_id: string; admin_notes?: string }
         Returns: boolean
+      }
+      test_subscription_info: {
+        Args: { user_id_param: string }
+        Returns: Json
       }
       update_user_usage: {
         Args: {
