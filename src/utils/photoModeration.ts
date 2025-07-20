@@ -109,7 +109,7 @@ class PhotoModerationService {
   }
 
   /**
-   * Analyze image content for inappropriate material
+   * Analyze image content for inappropriate material - INCLUSIVE across all skin tones
    */
   private async analyzeImageContent(imageData: ImageData): Promise<Partial<ModerationResult>> {
     const data = imageData.data;
@@ -118,13 +118,14 @@ class PhotoModerationService {
     let skinTonePixels = 0;
     let redDominantPixels = 0;
     let highSaturationPixels = 0;
+    let nudityIndicators = 0;
 
     for (let i = 0; i < data.length; i += 4) {
       const r = data[i];
       const g = data[i + 1];
       const b = data[i + 2];
       
-      // Enhanced skin tone detection
+      // Enhanced skin tone detection (now works for ALL skin tones)
       if (this.isSkinTone(r, g, b)) {
         skinTonePixels++;
       }
@@ -141,40 +142,48 @@ class PhotoModerationService {
       if (saturation > 0.6 && max > 100) {
         highSaturationPixels++;
       }
+      
+      // Additional nudity indicators for better detection
+      // Check for flesh-like colors across all skin tones
+      const isFleshLike = this.isFleshColor(r, g, b);
+      if (isFleshLike) {
+        nudityIndicators++;
+      }
     }
 
     const skinToneRatio = skinTonePixels / pixels;
     const redDominantRatio = redDominantPixels / pixels;
+    const nudityRatio = nudityIndicators / pixels;
     
     const flags: string[] = [];
     let adultContent = 0;
     let explicitContent = 0;
     let suggestiveContent = 0;
 
-    // BALANCED MODERATION - More reasonable thresholds for dating app
-    // Send borderline cases to admin review instead of auto-rejecting
+    // INCLUSIVE MODERATION - Works across all skin tones and ethnicities
+    // Enhanced detection for explicit content regardless of skin color
 
-    // Reasonable thresholds for dating app moderation
-    if (skinToneRatio > 0.80) { // 80%+ skin tone - very likely nude/explicit
+    // Enhanced explicit content detection
+    if (skinToneRatio > 0.75 || nudityRatio > 0.70) { // 75%+ skin tone OR 70%+ flesh-like colors
       explicitContent = 95;
       flags.push(MODERATION_FLAGS.EXPLICIT_CONTENT);
-      // FLAGGED: Very high skin exposure - 80%+ skin tone (nude/explicit content)
+      // FLAGGED: Very high skin/flesh exposure - likely nude/explicit content
     }
-    else if (skinToneRatio > 0.65) { // 65-80% skin tone - likely shirtless/bikini content
-      adultContent = 75; // Send to review instead of auto-reject
-      // REVIEW: High skin exposure - 65-80% skin tone (shirtless/bikini, requires review)
+    else if (skinToneRatio > 0.60 || nudityRatio > 0.55) { // 60%+ skin tone OR 55%+ flesh-like
+      adultContent = 85; // Send to review instead of auto-reject
+      // REVIEW: High skin/flesh exposure - likely bikini/underwear content
     }
-    else if (skinToneRatio > 0.50) { // 50-65% skin tone - tank tops, summer clothing, sports wear
-      suggestiveContent = 55; // Send to review to be safe
-      // REVIEW: Moderate skin exposure - 50-65% skin tone (summer clothing, requires review)
+    else if (skinToneRatio > 0.45 || nudityRatio > 0.40) { // 45%+ skin tone OR 40%+ flesh-like
+      suggestiveContent = 60; // Send to review to be safe
+      // REVIEW: Moderate skin/flesh exposure - summer clothing, swimwear
     }
-    else if (skinToneRatio > 0.35) { // 35-50% skin tone - casual clothing, portraits
-      suggestiveContent = 25; // Lower score to allow auto-approval
-      // PASSED: Light skin exposure - 35-50% skin tone (casual clothing, auto-approved)
+    else if (skinToneRatio > 0.30 || nudityRatio > 0.25) { // 30%+ skin tone OR 25%+ flesh-like
+      suggestiveContent = 35; // Lower score to allow auto-approval
+      // PASSED: Light skin/flesh exposure - casual clothing, portraits
     }
     else {
-      // 0-35% skin tone - normal face/portrait photos, uniforms, regular clothing
-      // PASSED: Normal clothing - 0-35% skin tone (normal photos, auto-approved)
+      // Low skin/flesh exposure - normal photos, uniforms, regular clothing
+      // PASSED: Normal clothing - low skin/flesh exposure
     }
 
     // Additional check for extremely red-dominant images (very rare)
@@ -192,6 +201,47 @@ class PhotoModerationService {
         suggestiveContent
       }
     };
+  }
+
+  /**
+   * Additional flesh color detection method for better nudity detection
+   */
+  private isFleshColor(r: number, g: number, b: number): boolean {
+    // This method focuses on detecting flesh-like colors that might indicate nudity
+    // Works across different skin tones
+    
+    // Skip extreme values
+    if ((r < 15 && g < 15 && b < 15) || (r > 245 && g > 245 && b > 245)) return false;
+    
+    // Check for typical flesh color patterns across ethnicities
+    const total = r + g + b;
+    if (total < 45 || total > 600) return false; // Basic bounds check
+    
+    // Light flesh tones
+    const isLightFlesh = (
+      r > 60 && g > 35 && b > 20 &&
+      r > g && r > b &&
+      (r / total) > 0.4 && (r / total) < 0.65
+    );
+    
+    // Medium flesh tones  
+    const isMediumFlesh = (
+      r > 40 && g > 25 && b > 15 &&
+      r >= g && r >= b &&
+      Math.abs(r - g) < 30 &&
+      (r / total) > 0.35 && (r / total) < 0.55
+    );
+    
+    // Dark flesh tones
+    const isDarkFlesh = (
+      r > 25 && g > 18 && b > 12 &&
+      Math.abs(r - g) < 20 &&
+      Math.abs(r - b) < 25 &&
+      Math.abs(g - b) < 20 &&
+      (r / total) > 0.3 && (r / total) < 0.5
+    );
+    
+    return isLightFlesh || isMediumFlesh || isDarkFlesh;
   }
 
   /**
@@ -387,36 +437,79 @@ class PhotoModerationService {
   }
 
   /**
-   * BALANCED skin tone detection - more reasonable for dating app photos
+   * INCLUSIVE skin tone detection - works across ALL skin tones and ethnicities
    */
   private isSkinTone(r: number, g: number, b: number): boolean {
-    // More conservative skin detection - focus on actual skin tones
-    // Better to under-detect than over-detect for normal photos
+    // Inclusive skin detection that works for all ethnicities
+    // Must detect skin tones from very light to very dark
     
-    // Skip obvious non-skin values
-    if (r < 50 || g < 30 || b < 20 || (r > 240 && g > 240 && b > 240)) return false;
+    // Skip only pure black, pure white, and extreme colors
+    if ((r < 10 && g < 10 && b < 10) || (r > 250 && g > 250 && b > 250)) return false;
     
-    // Method 1: Standard YCbCr with reasonable ranges
+    // Method 1: Enhanced YCbCr for ALL skin tones (light to dark)
     const y = 0.299 * r + 0.587 * g + 0.114 * b;
     const cb = -0.168736 * r - 0.331264 * g + 0.5 * b + 128;
     const cr = 0.5 * r - 0.418688 * g - 0.081312 * b + 128;
     
-    // More conservative skin tone ranges
+    // INCLUSIVE ranges covering all skin tones from very light to very dark
     const isSkinYCbCr = (
-      y >= 80 && y <= 230 &&          // More restricted luminance range
-      cb >= 85 && cb <= 135 &&        // Tighter blue chroma range  
-      cr >= 135 && cr <= 180          // More conservative red chroma range
+      y >= 20 && y <= 240 &&          // FULL luminance range (dark to light)
+      cb >= 70 && cb <= 155 &&        // Extended blue chroma range  
+      cr >= 125 && cr <= 185          // Extended red chroma range
     );
     
-    // Method 2: Conservative RGB detection for actual skin
-    const isBasicSkin = (
-      r > 80 && g > 50 && b > 30 &&          // Higher minimum thresholds
-      r > g && r > b &&                      // Red dominance
-      (r - g) > 15 && (r - b) > 25          // Stronger differences required
+    // Method 2: RGB detection for light skin tones
+    const isLightSkin = (
+      r > 70 && g > 40 && b > 25 &&          // Light skin thresholds
+      r > g && r > b &&                      // Red dominance for light skin
+      (r - g) > 8 && (r - b) > 15           // Light skin differences
     );
     
-    // Require BOTH methods to agree for more accuracy
-    return isSkinYCbCr && isBasicSkin;
+    // Method 3: RGB detection for medium skin tones
+    const isMediumSkin = (
+      r > 45 && g > 25 && b > 15 &&          // Medium skin thresholds
+      r >= g && r >= b &&                    // Red dominance or equal
+      Math.abs(r - g) <= 35 &&               // Closer RGB values for medium tones
+      Math.abs(r - b) <= 45
+    );
+    
+    // Method 4: RGB detection for dark skin tones
+    const isDarkSkin = (
+      r > 20 && g > 15 && b > 10 &&          // Dark skin minimum thresholds
+      (r >= g - 5) && (r >= b - 5) &&       // Allow brown tones
+      Math.abs(r - g) <= 25 &&               // Close RGB values for dark skin
+      Math.abs(r - b) <= 30 &&
+      Math.abs(g - b) <= 25
+    );
+    
+    // Method 5: HSV-based detection for all skin tones
+    const max = Math.max(r, g, b);
+    const min = Math.min(r, g, b);
+    const delta = max - min;
+    
+    let hue = 0;
+    if (delta !== 0) {
+      if (max === r) hue = ((g - b) / delta) % 6;
+      else if (max === g) hue = (b - r) / delta + 2;
+      else hue = (r - g) / delta + 4;
+      hue *= 60;
+      if (hue < 0) hue += 360;
+    }
+    
+    const saturation = max === 0 ? 0 : delta / max;
+    const value = max / 255;
+    
+    // Skin hue ranges covering all ethnicities
+    const isHSVSkin = (
+      value > 0.08 &&                       // Not too dark (allows dark skin)
+      saturation <= 0.85 &&                 // Not oversaturated
+      ((hue >= 0 && hue <= 60) ||           // Red-orange range
+       (hue >= 300 && hue <= 360) ||        // Red range
+       (hue >= 20 && hue <= 45))            // Orange-brown range
+    );
+    
+    // Return true if YCbCr AND at least one RGB method OR HSV detects skin
+    return isSkinYCbCr && (isLightSkin || isMediumSkin || isDarkSkin || isHSVSkin);
   }
 }
 
