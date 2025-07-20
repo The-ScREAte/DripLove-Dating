@@ -66,14 +66,31 @@ const AuthForm = ({ isLogin, onToggle, onOAuthSuccess }: AuthFormProps) => {
     setOauthLoading(provider);
     
     try {
+      // Detect if running in mobile app
+      const isMobileApp = window.location.protocol === 'capacitor:' || 
+                         window.location.protocol === 'file:' ||
+                         /Android|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
+      
+      // Configure redirect URI based on platform
+      const redirectTo = isMobileApp 
+        ? 'com.driplove.dating://auth/callback'
+        : `${window.location.origin}/auth/callback`;
+
+      console.log('OAuth config:', { isMobileApp, redirectTo, protocol: window.location.protocol });
+
       const { data, error } = await supabase.auth.signInWithOAuth({
         provider: provider,
         options: {
-          redirectTo: `${window.location.origin}/auth/callback`
+          redirectTo: redirectTo,
+          queryParams: {
+            // Ensure proper account selection for mobile
+            prompt: 'select_account',
+          }
         }
       });
 
       if (error) {
+        console.error('OAuth error:', error);
         toast({
           title: "Authentication Error",
           description: error.message,
@@ -81,6 +98,12 @@ const AuthForm = ({ isLogin, onToggle, onOAuthSuccess }: AuthFormProps) => {
         });
         setOauthLoading(null);
         return;
+      }
+
+      // For mobile apps, we need to handle the redirect differently
+      if (isMobileApp && data?.url) {
+        // In mobile app, we can open the OAuth URL directly
+        window.location.href = data.url;
       }
 
       // OAuth will redirect to the callback URL

@@ -5,9 +5,10 @@
   --safe-area-inset-bottom: env(safe-area-inset-bottom, 0px);
   --safe-area-inset-left: env(safe-area-inset-left, 0px);
   
-  /* Fallback for Android devices that don't support env() */
+  /* Android-specific fallbacks for devices without env() support */
   --android-status-bar-height: 24px;
   --android-nav-bar-height: 48px;
+  --android-gesture-nav-height: 20px; /* For Android 10+ gesture navigation */
 }
 
 /* Enhanced safe area detection for Android */
@@ -15,6 +16,13 @@
   :root {
     --safe-area-inset-top: var(--android-status-bar-height);
     --safe-area-inset-bottom: var(--android-nav-bar-height);
+  }
+  
+  /* Android gesture navigation detection */
+  @media (pointer: coarse) and (hover: none) {
+    :root {
+      --safe-area-inset-bottom: var(--android-gesture-nav-height);
+    }
   }
 }
 
@@ -26,6 +34,11 @@
   padding-right: max(var(--safe-area-inset-right), 0px);
   min-height: 100vh;
   min-height: 100dvh; /* Dynamic viewport height for mobile browsers */
+  
+  /* Android-specific smooth scrolling optimizations */
+  -webkit-overflow-scrolling: touch;
+  scroll-behavior: smooth;
+  overscroll-behavior: contain;
 }
 
 /* Header with safe area top - Universal for all mobile devices */
@@ -37,12 +50,22 @@
   z-index: 50;
   width: 100%;
   box-sizing: border-box;
+  
+  /* Android touch optimizations */
+  touch-action: manipulation;
+  -webkit-touch-callout: none;
+  -webkit-user-select: none;
+  user-select: none;
 }
 
 /* Enhanced mobile header for status bar overlap prevention */
 @media screen and (max-device-width: 768px) {
   .mobile-header {
-    padding-top: max(var(--safe-area-inset-top), 16px); /* Reduced from 44px to 16px */
+    padding-top: max(var(--safe-area-inset-top), 16px);
+    
+    /* Android-specific header optimizations */
+    will-change: transform;
+    transform: translateZ(0); /* Hardware acceleration */
   }
 }
 

@@ -9,28 +9,24 @@ const config: CapacitorConfig = {
     // Performance optimizations
     allowNavigation: [
       'https://*.supabase.co',
-      'https://*.supabase.io'
+      'https://*.supabase.io',
+      'https://accounts.google.com',
+      'https://oauth.googleusercontent.com'
     ]
   },
   ios: {
-    scheme: 'DripLove Dating',
+    scheme: 'com.driplove.dating',
     contentInset: 'automatic',
     scrollEnabled: true,
     // Performance optimizations for iOS
-    preferredContentMode: 'mobile',
-    // Handle safe areas properly
-    handleUrlScheme: true
+    preferredContentMode: 'mobile'
   },
   android: {
     allowMixedContent: true,
     captureInput: true,
-    webContentsDebuggingEnabled: false, // Disable in production for performance
-    // Performance optimizations for Android
-    loggingBehavior: 'none',
-    // Memory optimizations
-    allowBackup: false,
-    // Network optimizations
-    useCleartext: false
+    webContentsDebuggingEnabled: false,
+    // Android safe area support
+    appendUserAgent: 'DripLove/1.0'
   },
   plugins: {
     PushNotifications: {
@@ -50,9 +46,7 @@ const config: CapacitorConfig = {
     CapacitorHttp: {
       enabled: true
     }
-  },
-  // Build optimizations
-  bundledWebRuntime: false // Use system WebView for better performance
+  }
 };
 
 export default config;

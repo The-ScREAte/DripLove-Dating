@@ -1,32 +1,49 @@
 // Mobile-specific optimizations for iOS and Android
 
-// 1. iOS/Android specific styles
+// 1. iOS/Android specific styles with comprehensive safe area and touch support
 export const mobileStyles = {
-  // Prevent zoom on input focus (iOS)
+  // Prevent zoom on input focus (iOS) and optimize for Android
   preventZoom: {
     fontSize: '16px', // iOS doesn't zoom if font-size >= 16px
     transform: 'scale(1)', // Prevent zoom with transform
+    WebkitTextSizeAdjust: '100%', // Prevent text scaling on Android
+    textSizeAdjust: '100%',
   },
   
-  // Smooth scrolling for mobile
+  // Smooth scrolling for both iOS and Android
   smoothScroll: {
     WebkitOverflowScrolling: 'touch',
-    overflowScrolling: 'touch',
+    scrollBehavior: 'smooth',
+    overscrollBehavior: 'contain', // Prevent bounce scrolling on Android
   },
   
-  // Optimize touch targets
+  // Optimize touch targets for both platforms
   touchTarget: {
-    minHeight: '44px', // iOS recommended minimum
-    minWidth: '44px',
+    minHeight: '48px', // Android accessibility minimum (48dp)
+    minWidth: '48px',  // iOS minimum is 44px, Android 48px covers both
+    padding: '12px',   // Adequate touch padding
   },
   
-  // Safe area handling
+  // Universal safe area handling (iOS and Android)
   safeArea: {
-    paddingTop: 'env(safe-area-inset-top)',
-    paddingBottom: 'env(safe-area-inset-bottom)',
-    paddingLeft: 'env(safe-area-inset-left)',
-    paddingRight: 'env(safe-area-inset-right)',
-  }
+    paddingTop: 'max(env(safe-area-inset-top), 24px)', // Android status bar fallback
+    paddingBottom: 'max(env(safe-area-inset-bottom), 20px)', // Android gesture nav
+    paddingLeft: 'max(env(safe-area-inset-left), 0px)',
+    paddingRight: 'max(env(safe-area-inset-right), 0px)',
+  },
+  
+  // Android-specific safe area enhancements
+  androidSafeArea: {
+    // Support for Android notches and punch holes
+    paddingTop: 'max(env(safe-area-inset-top), var(--android-status-bar-height, 24px))',
+    paddingBottom: 'max(env(safe-area-inset-bottom), var(--android-nav-height, 48px))',
+    
+    // Android 10+ gesture navigation
+    gestureArea: {
+      height: 'max(env(safe-area-inset-bottom), 20px)',
+      background: 'transparent',
+    },
+  },
 };
 
 // 2. Image optimization for mobile
@@ -107,35 +124,92 @@ export const memoryOptimization = {
   }
 };
 
-// 7. Touch/Swipe optimizations
+// 7. Touch/Swipe optimizations for Android & iOS
 export const touchOptimization = {
   // Passive event listeners for better scroll performance
   passiveOptions: { passive: true },
   
-  // Touch delay reduction
+  // Touch delay reduction (especially important for Android)
   fastClick: {
     touchAction: 'manipulation',
   },
   
-  // Swipe thresholds
+  // Swipe thresholds optimized for both platforms
   swipeThreshold: {
     distance: 50,
     velocity: 0.3,
-  }
+  },
+  
+  // Android-specific touch improvements
+  androidTouch: {
+    // Minimum touch target size (Android accessibility guidelines)
+    minHeight: '48dp', // 48dp = 48px at 1x density
+    minWidth: '48dp',
+    
+    // Touch feedback
+    androidRipple: true,
+    touchFeedback: {
+      backgroundColor: 'rgba(0, 0, 0, 0.1)',
+      duration: '150ms',
+    },
+    
+    // Prevent text selection on touch
+    userSelect: 'none',
+    WebkitUserSelect: 'none',
+    
+    // Prevent touch highlighting
+    WebkitTapHighlightColor: 'transparent',
+    tapHighlightColor: 'transparent',
+  },
 };
 
 // 8. Android-specific optimizations
 export const androidOptimizations = {
-  // Hardware acceleration
+  // Hardware acceleration for smooth performance
   willChange: 'transform',
   transform: 'translateZ(0)',
   
-  // Reduce overdraw
+  // Reduce overdraw for better performance
   backgroundColor: 'transparent',
   
   // Optimize text rendering
   textRendering: 'optimizeSpeed',
   fontDisplay: 'swap',
+  
+  // Touch responsiveness (48dp minimum touch targets)
+  minTouchTarget: '48px',
+  touchAction: 'manipulation',
+  
+  // Smooth scrolling optimizations
+  overflowScrolling: 'touch',
+  scrollBehavior: 'smooth',
+  overscrollBehavior: 'contain',
+  
+  // Safe area handling for Android
+  safeAreaSupport: {
+    paddingTop: 'max(env(safe-area-inset-top), 24px)', // Status bar
+    paddingBottom: 'max(env(safe-area-inset-bottom), 20px)', // Gesture nav
+    paddingLeft: 'max(env(safe-area-inset-left), 0px)',
+    paddingRight: 'max(env(safe-area-inset-right), 0px)',
+  },
+  
+  // Android gesture navigation support
+  gestureNavigation: {
+    height: '20px', // Android 10+ gesture area
+    position: 'fixed',
+    bottom: '0',
+    left: '0',
+    right: '0',
+    zIndex: '9999',
+  },
+  
+  // Performance optimizations for Android WebView
+  webViewOptimizations: {
+    WebkitUserSelect: 'none',
+    WebkitTouchCallout: 'none',
+    WebkitTapHighlightColor: 'transparent',
+    touchAction: 'pan-x pan-y',
+  },
 };
 
 // 9. iOS-specific optimizations

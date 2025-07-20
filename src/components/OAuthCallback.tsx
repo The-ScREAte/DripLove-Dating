@@ -14,8 +14,42 @@ const OAuthCallback = () => {
   useEffect(() => {
     const handleAuthCallback = async () => {
       try {
-        // Get the session from the URL parameters
-        const { data: sessionData, error: sessionError } = await supabase.auth.getSession();
+        setStatus('Authenticating...');
+
+        // Handle both web and mobile auth callbacks
+        const isMobileApp = window.location.protocol === 'capacitor:' || 
+                           window.location.protocol === 'file:';
+
+        let sessionData;
+        let sessionError;
+
+        if (isMobileApp) {
+          // For mobile apps, handle the session from URL hash or query params
+          const hashParams = new URLSearchParams(window.location.hash.substring(1));
+          const queryParams = new URLSearchParams(window.location.search);
+          
+          const accessToken = hashParams.get('access_token') || queryParams.get('access_token');
+          const refreshToken = hashParams.get('refresh_token') || queryParams.get('refresh_token');
+          
+          if (accessToken && refreshToken) {
+            const { data, error } = await supabase.auth.setSession({
+              access_token: accessToken,
+              refresh_token: refreshToken
+            });
+            sessionData = data;
+            sessionError = error;
+          } else {
+            // Fallback to getting session normally
+            const result = await supabase.auth.getSession();
+            sessionData = result.data;
+            sessionError = result.error;
+          }
+        } else {
+          // Web browser flow
+          const { data, error } = await supabase.auth.getSession();
+          sessionData = data;
+          sessionError = error;
+        }
         
         if (sessionError) {
           throw sessionError;

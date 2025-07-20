@@ -45,5 +45,16 @@
 	</array>
 	<key>UIViewControllerBasedStatusBarAppearance</key>
 	<true/>
+	<key>CFBundleURLTypes</key>
+	<array>
+		<dict>
+			<key>CFBundleURLName</key>
+			<string>com.driplove.dating</string>
+			<key>CFBundleURLSchemes</key>
+			<array>
+				<string>com.driplove.dating</string>
+			</array>
+		</dict>
+	</array>
 </dict>
 </plist>
