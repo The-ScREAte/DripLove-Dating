@@ -277,11 +277,12 @@ const DiscoverPage = ({ currentUser, onNavigateToChat }: DiscoverPageProps) => {
     if (userImages[profileId]?.length > 0) return; // Already loaded
     
     try {
-      // Always use basic query for now to avoid moderation column issues
+      // Only load approved images for discover page
       const { data: images, error } = await supabase
         .from('user_images')
-        .select('image_url')
+        .select('image_url, is_approved')
         .eq('user_id', profileId)
+        .eq('is_approved', true)
         .order('image_order', { ascending: true });
 
       if (error) throw error;

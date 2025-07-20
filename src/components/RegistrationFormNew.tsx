@@ -262,7 +262,7 @@ const RegistrationFormNew = ({ onSubmit, onBackToLogin }: RegistrationFormProps)
     if (approvedImages.length < 2) {
       toast({
         title: "Not enough photos",
-        description: "Please upload at least 2 photos to complete registration.",
+        description: "Please upload at least 2 approved photos to complete registration.",
         variant: "destructive"
       });
       return;
@@ -273,6 +273,16 @@ const RegistrationFormNew = ({ onSubmit, onBackToLogin }: RegistrationFormProps)
       toast({
         title: "Some images were rejected",
         description: "Please remove rejected images before continuing.",
+        variant: "destructive"
+      });
+      return;
+    }
+
+    // Check that we have enough truly usable images
+    if (approvedImages.length < 2) {
+      toast({
+        title: "Registration incomplete",
+        description: "You need at least 2 approved photos to create your account.",
         variant: "destructive"
       });
       return;

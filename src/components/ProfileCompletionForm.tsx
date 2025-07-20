@@ -1,13 +1,16 @@
 import React, { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Heart, ArrowLeft } from 'lucide-react';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { Heart, ArrowLeft, Upload, Shield, CheckCircle, AlertTriangle } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import { initialFormData } from '@/constants/formData';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { occupationOptions, industryOptions } from '@/constants/professionOptions';
 import LocationInput from '@/components/forms/LocationInput';
+import { moderateImage, ModerationResult } from '@/utils/photoModeration';
 
 interface ProfileCompletionFormProps {
   user: any;
@@ -15,10 +18,18 @@ interface ProfileCompletionFormProps {
   onCancel: () => void;
 }
 
+interface ImageUpload {
+  file: File;
+  preview: string;
+  moderationResult?: ModerationResult;
+  status: 'uploading' | 'moderating' | 'approved' | 'pending' | 'rejected';
+}
+
 const ProfileCompletionForm = ({ user, onComplete, onCancel }: ProfileCompletionFormProps) => {
   const [formData, setFormData] = useState(initialFormData);
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [loading, setLoading] = useState(false);
+  const [images, setImages] = useState<ImageUpload[]>([]);
   const { toast } = useToast();
 
   useEffect(() => {
@@ -85,6 +96,144 @@ const ProfileCompletionForm = ({ user, onComplete, onCancel }: ProfileCompletion
     }
   };
 
+  const handleImageUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const files = Array.from(event.target.files || []);
+    if (files.length === 0) return;
+
+    if (images.length + files.length > 7) {
+      toast({
+        title: "Too many images",
+        description: "You can upload a maximum of 7 images.",
+        variant: "destructive"
+      });
+      return;
+    }
+
+    for (const file of files) {
+      if (!file.type.startsWith('image/')) {
+        toast({
+          title: "Invalid file type",
+          description: `${file.name} is not an image file.`,
+          variant: "destructive"
+        });
+        continue;
+      }
+
+      if (file.size > 10 * 1024 * 1024) {
+        toast({
+          title: "File too large",
+          description: `${file.name} is larger than 10MB.`,
+          variant: "destructive"
+        });
+        continue;
+      }
+
+      const preview = URL.createObjectURL(file);
+      const newImage: ImageUpload = { file, preview, status: 'moderating' };
+
+      setImages(prev => [...prev, newImage]);
+
+      // AI Moderation
+      try {
+        const moderationResult = await moderateImage(file);
+        
+        setImages(prev => prev.map(img => 
+          img.preview === preview 
+            ? { 
+                ...img, 
+                moderationResult,
+                status: !moderationResult.isApproved 
+                  ? 'rejected' 
+                  : moderationResult.details?.requiresReview 
+                    ? 'pending' 
+                    : 'approved'
+              }
+            : img
+        ));
+
+        if (!moderationResult.isApproved) {
+          toast({
+            title: "Image rejected",
+            description: moderationResult.message || "This image violates our community guidelines.",
+            variant: "destructive"
+          });
+        } else if (moderationResult.details?.requiresReview) {
+          toast({
+            title: "Image needs review",
+            description: "This image will be reviewed by our team before approval.",
+            variant: "default"
+          });
+        } else {
+          toast({
+            title: "Image approved",
+            description: "Your image looks good and has been approved!",
+            variant: "default"
+          });
+        }
+      } catch (error) {
+        console.error('Moderation error:', error);
+        setImages(prev => prev.map(img => 
+          img.preview === preview 
+            ? { ...img, status: 'pending', moderationResult: {
+                isApproved: true,
+                confidence: 0,
+                flags: ['MODERATION_FAILED'],
+                details: { requiresReview: true },
+                message: "Moderation check failed - will be reviewed manually"
+              }}
+            : img
+        ));
+      }
+    }
+
+    event.target.value = '';
+  };
+
+  const removeImage = (preview: string) => {
+    setImages(prev => {
+      const updated = prev.filter(img => img.preview !== preview);
+      URL.revokeObjectURL(preview);
+      return updated;
+    });
+  };
+
+  const renderImageStatus = (image: ImageUpload) => {
+    switch (image.status) {
+      case 'moderating':
+        return (
+          <div className="absolute inset-0 bg-black/50 flex items-center justify-center rounded-lg">
+            <div className="text-white text-center">
+              <Shield className="w-6 h-6 mx-auto mb-1 animate-pulse" />
+              <div className="text-xs">Checking...</div>
+            </div>
+          </div>
+        );
+      case 'approved':
+        return (
+          <div className="absolute top-2 left-2 bg-green-500 text-white p-1 rounded-full">
+            <CheckCircle className="w-4 h-4" />
+          </div>
+        );
+      case 'pending':
+        return (
+          <div className="absolute top-2 left-2 bg-orange-500 text-white text-xs px-2 py-1 rounded-full">
+            Review
+          </div>
+        );
+      case 'rejected':
+        return (
+          <div className="absolute inset-0 bg-red-500/80 flex items-center justify-center rounded-lg">
+            <div className="text-white text-center">
+              <AlertTriangle className="w-6 h-6 mx-auto mb-1" />
+              <div className="text-xs">Rejected</div>
+            </div>
+          </div>
+        );
+      default:
+        return null;
+    }
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
@@ -103,6 +252,18 @@ const ProfileCompletionForm = ({ user, onComplete, onCancel }: ProfileCompletion
     if (!formData.occupation) validationErrors.occupation = 'Occupation is required';
     if (!formData.industry) validationErrors.industry = 'Industry is required';
     if (!formData.educationLevel) validationErrors.educationLevel = 'Education level is required';
+
+    // Validate images
+    const approvedImages = images.filter(img => img.status === 'approved' || img.status === 'pending');
+    
+    if (approvedImages.length < 2) {
+      validationErrors.images = 'You need at least 2 approved photos to complete your profile';
+    }
+
+    const rejectedImages = images.filter(img => img.status === 'rejected');
+    if (rejectedImages.length > 0) {
+      validationErrors.images = 'Please remove rejected images before continuing';
+    }
 
     // Age validation (must be 18+)
     if (formData.dateOfBirth) {
@@ -170,6 +331,50 @@ const ProfileCompletionForm = ({ user, onComplete, onCancel }: ProfileCompletion
 
       if (error) {
         throw error;
+      }
+
+      // Upload approved images to database
+      const approvedImages = images.filter(img => img.status === 'approved' || img.status === 'pending');
+      for (const image of approvedImages) {
+        try {
+          // Upload to storage
+          const fileExt = image.file.name.split('.').pop();
+          const fileName = `${Date.now()}.${fileExt}`;
+          const filePath = `${user.id}/${fileName}`;
+
+          const { error: uploadError } = await supabase.storage
+            .from('user-photos')
+            .upload(filePath, image.file);
+
+          if (uploadError) throw uploadError;
+
+          // Get public URL
+          const { data: { publicUrl } } = supabase.storage
+            .from('user-photos')
+            .getPublicUrl(filePath);
+
+          // Save to database
+          const { error: dbError } = await supabase
+            .from('user_images')
+            .insert({
+              user_id: user.id,
+              image_url: publicUrl,
+              image_order: approvedImages.indexOf(image),
+              is_approved: image.status === 'approved',
+              moderation_status: image.status === 'approved' ? 'approved' : 'pending',
+              flagged_content: image.moderationResult?.flags || [],
+              confidence_score: image.moderationResult?.confidence || 0
+            });
+
+          if (dbError) throw dbError;
+        } catch (error) {
+          console.error('Error uploading image:', error);
+          toast({
+            title: "Image upload error",
+            description: "Some images failed to upload. You can add them later.",
+            variant: "destructive"
+          });
+        }
       }
 
       toast({
@@ -401,14 +606,53 @@ const ProfileCompletionForm = ({ user, onComplete, onCancel }: ProfileCompletion
           </div>
 
           <div className="space-y-4">
-            <div className="bg-blue-50 p-4 rounded-lg">
-              <h4 className="font-medium text-blue-900 mb-2">Next Step: Add Photos</h4>
-              <p className="text-sm text-blue-800">
-                After completing your profile, you'll be able to upload at least 2 photos with AI content moderation.
-              </p>
+            <h3 className="text-lg font-semibold text-gray-800">Profile Photos *</h3>
+            <p className="text-sm text-gray-600">Upload at least 2 photos. All images are checked by AI for content moderation.</p>
+            
+            <div className="border-2 border-dashed border-gray-300 rounded-lg p-6 text-center hover:border-pink-400 transition-colors">
+              <Input
+                type="file"
+                accept="image/*"
+                multiple
+                onChange={handleImageUpload}
+                className="hidden"
+                id="image-upload"
+              />
+              <Label htmlFor="image-upload" className="cursor-pointer">
+                <Upload className="mx-auto h-8 w-8 text-gray-400 mb-2" />
+                <p className="text-sm text-gray-600">Click to upload images</p>
+                <p className="text-xs text-gray-500">JPG, PNG up to 10MB each</p>
+              </Label>
             </div>
 
-            <div className="flex flex-col gap-3">
+            {images.length > 0 && (
+              <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
+                {images.map((image, index) => (
+                  <div key={index} className="relative">
+                    <img
+                      src={image.preview}
+                      alt={`Upload ${index + 1}`}
+                      className="w-full h-32 object-cover rounded-lg"
+                    />
+                    <Button
+                      type="button"
+                      size="sm"
+                      variant="destructive"
+                      className="absolute top-2 right-2 h-6 w-6 p-0"
+                      onClick={() => removeImage(image.preview)}
+                    >
+                      ×
+                    </Button>
+                    {renderImageStatus(image)}
+                  </div>
+                ))}
+              </div>
+            )}
+            
+            {errors.images && <p className="text-sm text-red-500">{errors.images}</p>}
+          </div>
+
+          <div className="flex flex-col gap-3">
               <Button
                 type="submit"
                 disabled={loading}
@@ -427,7 +671,6 @@ const ProfileCompletionForm = ({ user, onComplete, onCancel }: ProfileCompletion
                 Cancel
               </Button>
             </div>
-          </div>
         </form>
       </CardContent>
     </Card>
