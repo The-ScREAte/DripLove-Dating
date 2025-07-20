@@ -29,6 +29,8 @@ export interface ModerationFlags {
   POOR_QUALITY: string;
   MULTIPLE_FACES: string;
   INVALID_IMAGE: string;
+  BLOOD_GORE: string;
+  AI_GENERATED: string;
 }
 
 const MODERATION_FLAGS: ModerationFlags = {
@@ -39,7 +41,9 @@ const MODERATION_FLAGS: ModerationFlags = {
   NO_FACE_DETECTED: 'No face detected in image',
   POOR_QUALITY: 'Image quality is too poor',
   MULTIPLE_FACES: 'Multiple faces detected',
-  INVALID_IMAGE: 'Invalid or corrupted image'
+  INVALID_IMAGE: 'Invalid or corrupted image',
+  BLOOD_GORE: 'Blood or gore content detected',
+  AI_GENERATED: 'Potentially AI-generated content detected'
 };
 
 /**
@@ -109,16 +113,27 @@ class PhotoModerationService {
   }
 
   /**
-   * Analyze image content for inappropriate material - INCLUSIVE across all skin tones
+   * Analyze image content for inappropriate material - INCLUSIVE across all skin tones AND genders
    */
   private async analyzeImageContent(imageData: ImageData): Promise<Partial<ModerationResult>> {
     const data = imageData.data;
     const pixels = data.length / 4;
+    const width = imageData.width;
+    const height = imageData.height;
     
     let skinTonePixels = 0;
     let redDominantPixels = 0;
     let highSaturationPixels = 0;
     let nudityIndicators = 0;
+    let maleNudityIndicators = 0;
+    let blackMaleNudityIndicators = 0;
+    let bloodGoreIndicators = 0;
+    let aiGeneratedIndicators = 0;
+
+    // Advanced nudity detection patterns
+    const nudityPatterns = this.analyzeNudityPatterns(imageData);
+    const violencePatterns = this.analyzeViolencePatterns(imageData);
+    const aiPatterns = this.analyzeAIPatterns(imageData);
 
     for (let i = 0; i < data.length; i += 4) {
       const r = data[i];
@@ -149,48 +164,106 @@ class PhotoModerationService {
       if (isFleshLike) {
         nudityIndicators++;
       }
+
+      // Male-specific nudity detection (broader skin areas, torso patterns)
+      const isMaleNudityPattern = this.isMaleNudityColor(r, g, b);
+      if (isMaleNudityPattern) {
+        maleNudityIndicators++;
+      }
+
+      // Black male nudity detection (enhanced for darker skin tones)
+      const isBlackMaleNudity = this.isBlackMaleNudityColor(r, g, b);
+      if (isBlackMaleNudity) {
+        blackMaleNudityIndicators++;
+      }
+
+      // Blood and gore detection
+      const isBloodGore = this.isBloodGoreColor(r, g, b);
+      if (isBloodGore) {
+        bloodGoreIndicators++;
+      }
+
+      // AI-generated content detection
+      const isAIGenerated = this.isAIGeneratedPattern(r, g, b);
+      if (isAIGenerated) {
+        aiGeneratedIndicators++;
+      }
     }
 
     const skinToneRatio = skinTonePixels / pixels;
     const redDominantRatio = redDominantPixels / pixels;
     const nudityRatio = nudityIndicators / pixels;
+    const maleNudityRatio = maleNudityIndicators / pixels;
+    const blackMaleNudityRatio = blackMaleNudityIndicators / pixels;
+    const bloodGoreRatio = bloodGoreIndicators / pixels;
+    const aiGeneratedRatio = aiGeneratedIndicators / pixels;
     
     const flags: string[] = [];
     let adultContent = 0;
     let explicitContent = 0;
     let suggestiveContent = 0;
 
-    // INCLUSIVE MODERATION - Works across all skin tones and ethnicities
-    // Enhanced detection for explicit content regardless of skin color
+    // PRIORITY 1: Check for blood/gore/violence FIRST (immediate flagging)
+    if (bloodGoreRatio > 0.15 || violencePatterns.hasBloodSplatters || violencePatterns.hasViolentContent) {
+      flags.push(MODERATION_FLAGS.BLOOD_GORE);
+      adultContent = Math.max(adultContent, 90); // Send to admin review
+    }
 
-    // Enhanced explicit content detection
-    if (skinToneRatio > 0.75 || nudityRatio > 0.70) { // 75%+ skin tone OR 70%+ flesh-like colors
+    // PRIORITY 2: Check for AI-generated content
+    if (aiGeneratedRatio > 0.25 || aiPatterns.hasAIArtifacts || aiPatterns.hasUnrealisticSkinTexture) {
+      flags.push(MODERATION_FLAGS.AI_GENERATED);
+      suggestiveContent = Math.max(suggestiveContent, 70); // Send to admin review
+    }
+
+    // PRIORITY 3: UNIVERSAL NUDITY DETECTION - Works across ALL skin tones, genders, and ethnicities
+    // Enhanced detection for explicit content regardless of skin color or gender
+
+    // Apply advanced pattern analysis - take MAXIMUM of all detection methods
+    let nudityScore = Math.max(skinToneRatio, nudityRatio, maleNudityRatio, blackMaleNudityRatio);
+    
+    // Boost score if multiple indicators align
+    if (nudityPatterns.hasVerticalSkinStripes && nudityPatterns.hasLargeSkinAreas) {
+      nudityScore = Math.min(nudityScore * 1.3, 1.0); // 30% boost for pattern matching
+    }
+    
+    if (nudityPatterns.hasCentralSkinConcentration) {
+      nudityScore = Math.min(nudityScore * 1.2, 1.0); // 20% boost for central skin areas
+    }
+
+    // Enhanced explicit content detection for ALL genders and ethnicities
+    if (nudityScore > 0.85 || 
+        (skinToneRatio > 0.80 && (maleNudityRatio > 0.50 || blackMaleNudityRatio > 0.50)) ||
+        (nudityRatio > 0.75 && (maleNudityRatio > 0.60 || blackMaleNudityRatio > 0.60))) { 
       explicitContent = 95;
       flags.push(MODERATION_FLAGS.EXPLICIT_CONTENT);
-      // FLAGGED: Very high skin/flesh exposure - likely nude/explicit content
+      // REJECTED: Complete nudity detected - very high skin exposure (all genders/ethnicities)
     }
-    else if (skinToneRatio > 0.60 || nudityRatio > 0.55) { // 60%+ skin tone OR 55%+ flesh-like
-      adultContent = 85; // Send to review instead of auto-reject
-      // REVIEW: High skin/flesh exposure - likely bikini/underwear content
+    else if (nudityScore > 0.60 ||
+             (skinToneRatio > 0.55 && (maleNudityRatio > 0.35 || blackMaleNudityRatio > 0.35)) ||
+             (nudityRatio > 0.50 && (maleNudityRatio > 0.40 || blackMaleNudityRatio > 0.40))) { 
+      adultContent = 85; // Send to admin review
+      // REVIEW: High nudity probability - likely nude/explicit content (all genders/ethnicities)
     }
-    else if (skinToneRatio > 0.45 || nudityRatio > 0.40) { // 45%+ skin tone OR 40%+ flesh-like
-      suggestiveContent = 60; // Send to review to be safe
-      // REVIEW: Moderate skin/flesh exposure - summer clothing, swimwear
+    else if (nudityScore > 0.40 ||
+             (skinToneRatio > 0.35 && (maleNudityRatio > 0.25 || blackMaleNudityRatio > 0.25)) ||
+             (nudityRatio > 0.30 && (maleNudityRatio > 0.25 || blackMaleNudityRatio > 0.25))) { 
+      suggestiveContent = Math.max(suggestiveContent, 60); // Send to admin review
+      // REVIEW: Moderate nudity risk - summer clothing, swimwear, sports, possible AI (all genders/ethnicities)
     }
-    else if (skinToneRatio > 0.30 || nudityRatio > 0.25) { // 30%+ skin tone OR 25%+ flesh-like
-      suggestiveContent = 35; // Lower score to allow auto-approval
-      // PASSED: Light skin/flesh exposure - casual clothing, portraits
+    else if (nudityScore > 0.25 || skinToneRatio > 0.25 || nudityRatio > 0.20) { 
+      suggestiveContent = Math.max(suggestiveContent, 35); // Lower score to allow auto-approval
+      // PASSED: Light skin exposure - casual clothing, portraits (all genders/ethnicities)
     }
     else {
-      // Low skin/flesh exposure - normal photos, uniforms, regular clothing
-      // PASSED: Normal clothing - low skin/flesh exposure
+      // Low skin exposure - normal photos, uniforms, regular clothing
+      // PASSED: Normal clothing - low skin exposure (all genders/ethnicities)
     }
 
-    // Additional check for extremely red-dominant images (very rare)
-    if (redDominantRatio > 0.8) { // 80% red dominant
-      flags.push(MODERATION_FLAGS.INAPPROPRIATE);
-      adultContent = Math.max(adultContent, 75);
-      // Inappropriate content detected - 80%+ red dominant
+    // Additional check for extremely red-dominant images (crime scenes, gore)
+    if (redDominantRatio > 0.6) { // Lowered threshold for better blood detection
+      flags.push(MODERATION_FLAGS.BLOOD_GORE);
+      adultContent = Math.max(adultContent, 80);
+      // Potential blood/gore content detected - high red dominance
     }
 
     return {
@@ -242,6 +315,283 @@ class PhotoModerationService {
     );
     
     return isLightFlesh || isMediumFlesh || isDarkFlesh;
+  }
+
+  /**
+   * Male-specific nudity detection - focuses on broader skin areas and torso patterns
+   */
+  private isMaleNudityColor(r: number, g: number, b: number): boolean {
+    // Male nudity often presents as larger skin areas (chest, back, torso)
+    // Less focused on specific body parts, more on overall skin exposure
+    
+    // Skip extreme values
+    if ((r < 12 && g < 12 && b < 12) || (r > 248 && g > 248 && b > 248)) return false;
+    
+    const total = r + g + b;
+    if (total < 40 || total > 650) return false;
+    
+    // Broader flesh detection for male torso areas
+    const isMaleTorsoSkin = (
+      r > 30 && g > 20 && b > 15 &&           // Lower minimum thresholds
+      r >= g - 8 && r >= b - 8 &&            // Allow more variation in ratios
+      Math.abs(r - g) < 40 &&                // Wider RGB tolerance
+      Math.abs(r - b) < 50 &&
+      (r / total) > 0.28 && (r / total) < 0.7 // Broader red ratio range
+    );
+    
+    // Additional patterns for male skin (often less saturated)
+    const isMaleSkinTone = (
+      r > 25 && g > 18 && b > 12 &&
+      r + g + b > 60 &&                      // Not too dark overall
+      Math.abs(r - g) < 35 &&                // Close color values
+      Math.abs(g - b) < 30 &&
+      r >= g - 5 && g >= b - 5               // Gradual decrease pattern
+    );
+    
+    return isMaleTorsoSkin || isMaleSkinTone;
+  }
+
+  /**
+   * Black male nudity detection - enhanced for darker skin tones and male body patterns
+   */
+  private isBlackMaleNudityColor(r: number, g: number, b: number): boolean {
+    // Specifically targets darker skin tones that might be missed by other methods
+    // Focuses on male body patterns with darker skin
+    
+    // Skip extreme values
+    if ((r < 8 && g < 8 && b < 8) || (r > 250 && g > 250 && b > 250)) return false;
+    
+    const total = r + g + b;
+    if (total < 35 || total > 400) return false; // Adjusted for darker skin
+    
+    // Dark male skin tones (African, African-American, etc.)
+    const isDarkMaleSkin = (
+      r > 20 && g > 15 && b > 10 &&            // Minimum thresholds for dark skin
+      r <= 120 && g <= 100 && b <= 80 &&       // Maximum thresholds for dark skin
+      Math.abs(r - g) < 25 &&                  // Close RGB values for dark skin
+      Math.abs(r - b) < 30 &&
+      Math.abs(g - b) < 25 &&
+      r >= g - 3 && g >= b - 3                 // Gradual color transition
+    );
+    
+    // Brown/chocolate skin tones
+    const isBrownMaleSkin = (
+      r > 35 && g > 25 && b > 15 &&
+      r <= 140 && g <= 110 && b <= 85 &&
+      r >= g && r >= b &&                      // Red slightly dominant
+      (r - g) <= 20 && (r - b) <= 30 &&       // Close but distinct values
+      (r / total) > 0.32 && (r / total) < 0.48 // Specific ratio for brown skin
+    );
+    
+    // Medium-dark skin tones
+    const isMediumDarkSkin = (
+      r > 40 && g > 30 && b > 20 &&
+      r <= 160 && g <= 130 && b <= 100 &&
+      Math.abs(r - g) < 30 &&
+      Math.abs(r - b) < 35 &&
+      r >= g - 5 && g >= b - 5
+    );
+    
+    return isDarkMaleSkin || isBrownMaleSkin || isMediumDarkSkin;
+  }
+
+  /**
+   * Blood and gore detection
+   */
+  private isBloodGoreColor(r: number, g: number, b: number): boolean {
+    // Detect blood-like colors and gore patterns
+    
+    // Fresh blood (bright red)
+    const isFreshBlood = (
+      r > 120 && g < 60 && b < 60 &&           // High red, low green/blue
+      r > g + 60 && r > b + 60 &&             // Strong red dominance
+      (r / (r + g + b)) > 0.5                 // Red makes up >50% of color
+    );
+    
+    // Dark blood (dried blood, darker reds)
+    const isDarkBlood = (
+      r > 60 && r < 150 && g < 50 && b < 50 && // Medium red, very low green/blue
+      r > g + 30 && r > b + 30 &&
+      (r + g + b) < 250                       // Overall darker tone
+    );
+    
+    // Gore/meat tones (pinkish, raw flesh)
+    const isGoreTone = (
+      r > 100 && g > 40 && g < 80 && b > 40 && b < 80 &&
+      r > g + 20 && r > b + 20 &&
+      Math.abs(g - b) < 30                    // Green and blue similar
+    );
+    
+    return isFreshBlood || isDarkBlood || isGoreTone;
+  }
+
+  /**
+   * AI-generated content detection
+   */
+  private isAIGeneratedPattern(r: number, g: number, b: number): boolean {
+    // Detect patterns common in AI-generated images
+    
+    // Over-smoothed skin (too perfect, lacks natural texture)
+    const isOverSmoothed = (
+      r > 80 && g > 60 && b > 50 &&
+      Math.abs(r - g) < 15 &&                 // Very similar RGB values
+      Math.abs(g - b) < 15 &&
+      Math.abs(r - b) < 20 &&
+      (r + g + b) > 200 &&                    // Bright/light colors
+      (r + g + b) < 600                       // Not too bright
+    );
+    
+    // Unnatural color gradients (AI artifacts)
+    const hasAIArtifacts = (
+      (r > 200 && g > 200 && b > 200) ||       // Over-brightened
+      (Math.abs(r - 128) < 5 && Math.abs(g - 128) < 5 && Math.abs(b - 128) < 5) // Mid-gray artifacts
+    );
+    
+    return isOverSmoothed || hasAIArtifacts;
+  }
+
+  /**
+   * Violence pattern analysis
+   */
+  private analyzeViolencePatterns(imageData: ImageData): {
+    hasBloodSplatters: boolean;
+    hasViolentContent: boolean;
+  } {
+    const data = imageData.data;
+    const width = imageData.width;
+    const height = imageData.height;
+    const pixels = data.length / 4;
+    
+    let redConcentrations = 0;
+    let darkRedAreas = 0;
+    
+    for (let i = 0; i < data.length; i += 4) {
+      const r = data[i];
+      const g = data[i + 1];
+      const b = data[i + 2];
+      
+      // Look for blood-like color concentrations
+      if (this.isBloodGoreColor(r, g, b)) {
+        redConcentrations++;
+      }
+      
+      // Dark red concentrations (dried blood, violence)
+      if (r > 80 && r > g + 40 && r > b + 40 && (r + g + b) < 300) {
+        darkRedAreas++;
+      }
+    }
+    
+    const redRatio = redConcentrations / pixels;
+    const darkRedRatio = darkRedAreas / pixels;
+    
+    return {
+      hasBloodSplatters: redRatio > 0.1 || darkRedRatio > 0.15, // 10% blood-like colors or 15% dark red
+      hasViolentContent: redRatio > 0.2 // 20% blood-like colors indicates violence
+    };
+  }
+
+  /**
+   * AI pattern analysis
+   */
+  private analyzeAIPatterns(imageData: ImageData): {
+    hasAIArtifacts: boolean;
+    hasUnrealisticSkinTexture: boolean;
+  } {
+    const data = imageData.data;
+    const pixels = data.length / 4;
+    
+    let aiArtifacts = 0;
+    let unrealisticSkin = 0;
+    
+    for (let i = 0; i < data.length; i += 4) {
+      const r = data[i];
+      const g = data[i + 1];
+      const b = data[i + 2];
+      
+      if (this.isAIGeneratedPattern(r, g, b)) {
+        aiArtifacts++;
+      }
+      
+      // Check for unrealistic skin smoothness
+      if (this.isSkinTone(r, g, b) && this.isAIGeneratedPattern(r, g, b)) {
+        unrealisticSkin++;
+      }
+    }
+    
+    const aiRatio = aiArtifacts / pixels;
+    const unrealisticSkinRatio = unrealisticSkin / pixels;
+    
+    return {
+      hasAIArtifacts: aiRatio > 0.3, // 30% AI-like patterns
+      hasUnrealisticSkinTexture: unrealisticSkinRatio > 0.2 // 20% unrealistic skin
+    };
+  }
+
+  /**
+   * Advanced pattern analysis for nudity detection
+   */
+  private analyzeNudityPatterns(imageData: ImageData): {
+    hasVerticalSkinStripes: boolean;
+    hasLargeSkinAreas: boolean;
+    hasCentralSkinConcentration: boolean;
+  } {
+    const data = imageData.data;
+    const width = imageData.width;
+    const height = imageData.height;
+    
+    let verticalSkinStripes = 0;
+    let largeSkinAreas = 0;
+    let centralSkinPixels = 0;
+    let totalCentralPixels = 0;
+    
+    // Analyze vertical strips for body-like patterns
+    for (let x = 0; x < width; x += 10) { // Sample every 10 pixels
+      let skinInColumn = 0;
+      for (let y = 0; y < height; y += 5) { // Sample every 5 pixels
+        const idx = (y * width + x) * 4;
+        const r = data[idx];
+        const g = data[idx + 1];
+        const b = data[idx + 2];
+        
+        if (this.isSkinTone(r, g, b) || this.isFleshColor(r, g, b)) {
+          skinInColumn++;
+        }
+      }
+      
+      const columnSkinRatio = skinInColumn / (height / 5);
+      if (columnSkinRatio > 0.6) { // 60% of column is skin
+        verticalSkinStripes++;
+      }
+    }
+    
+    // Analyze for large continuous skin areas
+    const centerX = Math.floor(width / 2);
+    const centerY = Math.floor(height / 2);
+    const centerRadius = Math.min(width, height) / 4;
+    
+    for (let y = Math.max(0, centerY - centerRadius); y < Math.min(height, centerY + centerRadius); y += 3) {
+      for (let x = Math.max(0, centerX - centerRadius); x < Math.min(width, centerX + centerRadius); x += 3) {
+        const idx = (y * width + x) * 4;
+        const r = data[idx];
+        const g = data[idx + 1];
+        const b = data[idx + 2];
+        
+        totalCentralPixels++;
+        if (this.isSkinTone(r, g, b) || this.isFleshColor(r, g, b) || this.isMaleNudityColor(r, g, b)) {
+          centralSkinPixels++;
+        }
+      }
+    }
+    
+    const hasVerticalSkinStripes = verticalSkinStripes > (width / 10) * 0.3; // 30% of columns have skin
+    const hasLargeSkinAreas = largeSkinAreas > 20; // Arbitrary threshold for large areas
+    const hasCentralSkinConcentration = totalCentralPixels > 0 && (centralSkinPixels / totalCentralPixels) > 0.5;
+    
+    return {
+      hasVerticalSkinStripes,
+      hasLargeSkinAreas,
+      hasCentralSkinConcentration
+    };
   }
 
   /**
@@ -398,25 +748,39 @@ class PhotoModerationService {
       message = 'Image file is corrupted or invalid and cannot be uploaded.';
       // Image blocked: Invalid file
     }
-    // ❌ REJECT only truly explicit content (80%+ skin exposure)
+    // ❌ REJECT only COMPLETE nudity - must be extremely explicit (90%+ confidence)
     else if (combinedDetails.explicitContent && combinedDetails.explicitContent >= 95) {
       isApproved = false;
       confidence = 95;
-      message = 'Image contains explicit content and cannot be uploaded.';
+      message = 'Image contains explicit nudity and cannot be uploaded.';
     }
-    // ⚠️ REVIEW high skin exposure content (send to admin instead of rejecting)
+    // ⚠️ REVIEW blood/gore content (send to admin, don't auto-approve)
+    else if (allFlags.includes(MODERATION_FLAGS.BLOOD_GORE)) {
+      isApproved = true; // Allow upload but require review
+      requiresReview = true;
+      confidence = 20;
+      message = 'Image uploaded but requires admin approval due to potential violent content.';
+    }
+    // ⚠️ REVIEW AI-generated content (send to admin)
+    else if (allFlags.includes(MODERATION_FLAGS.AI_GENERATED)) {
+      isApproved = true; // Allow upload but require review
+      requiresReview = true;
+      confidence = 25;
+      message = 'Image uploaded but requires admin approval due to potential AI-generated content.';
+    }
+    // ⚠️ REVIEW high nudity probability (send to admin instead of rejecting)
     else if (combinedDetails.adultContent && combinedDetails.adultContent >= 70) {
       isApproved = true; // Allow upload but require review
       requiresReview = true;
       confidence = 30;
-      message = 'Image uploaded but requires admin approval before being visible to others.';
+      message = 'Image uploaded but requires admin approval due to high skin exposure.';
     }
-    // ⚠️ REVIEW moderately suggestive content 
+    // ⚠️ REVIEW moderate nudity risk (send to admin for AI nudes, borderline content)
     else if (combinedDetails.suggestiveContent && combinedDetails.suggestiveContent >= 50) {
       isApproved = true; // Allow upload but require review
       requiresReview = true;
       confidence = 40;
-      message = 'Image uploaded but requires admin approval before being visible to others.';
+      message = 'Image uploaded but requires admin approval for content review.';
     }
     else {
       message = 'Image approved and uploaded successfully.';
