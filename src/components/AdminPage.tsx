@@ -13,6 +13,7 @@ import UserProfileModal from '@/components/UserProfileModal';
 import StatsCard from './admin/StatsCard';
 import UserModerationPanel from './admin/UserModerationPanel';
 import AdminErrorBoundary from './admin/AdminErrorBoundary';
+import UserPoolDebugger from './admin/UserPoolDebugger';
 import { debounce, userDataCache, createPagination } from '@/utils/performanceOptimizer';
 import { useSupabaseSubscription, useMemoryMonitor } from '@/hooks/usePerformance';
 import { CurrentUser, AdminStats } from '@/types';
@@ -785,7 +786,7 @@ const AdminPageComponent = ({ currentUser, onLogout }: AdminPageProps) => {
           {/* Tabbed Interface with Error Boundaries for 1000+ users */}
           <AdminErrorBoundary>
             <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-              <TabsList className="grid w-full grid-cols-4 mb-4 h-11">
+              <TabsList className="grid w-full grid-cols-5 mb-4 h-11">
                 <TabsTrigger value="dashboard" className="text-xs flex flex-col gap-1 py-2">
                   <BarChart3 className="w-4 h-4" />
                   <span>Dashboard</span>
@@ -797,6 +798,10 @@ const AdminPageComponent = ({ currentUser, onLogout }: AdminPageProps) => {
                 <TabsTrigger value="content" className="text-xs flex flex-col gap-1 py-2">
                   <Image className="w-4 h-4" />
                   <span>Content</span>
+                </TabsTrigger>
+                <TabsTrigger value="debugger" className="text-xs flex flex-col gap-1 py-2">
+                  <Search className="w-4 h-4" />
+                  <span>Debug</span>
                 </TabsTrigger>
                 <TabsTrigger value="settings" className="text-xs flex flex-col gap-1 py-2">
                   <Settings className="w-4 h-4" />
@@ -1193,6 +1198,21 @@ const AdminPageComponent = ({ currentUser, onLogout }: AdminPageProps) => {
                   )}
                 </CardContent>
               </Card>
+            </TabsContent>
+
+            {/* Debugger Tab */}
+            <TabsContent value="debugger" className="space-y-4">
+              <UserPoolDebugger 
+                currentUserId={currentUser.id}
+                userPreferences={{
+                  min_age: currentUser.min_age,
+                  max_age: currentUser.max_age,
+                  max_distance: currentUser.max_distance,
+                  preference: currentUser.preference,
+                  latitude: currentUser.latitude,
+                  longitude: currentUser.longitude
+                }}
+              />
             </TabsContent>
 
             {/* Settings Tab */}

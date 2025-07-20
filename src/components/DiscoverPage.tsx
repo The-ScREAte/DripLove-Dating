@@ -156,7 +156,7 @@ const DiscoverPage = ({ currentUser, onNavigateToChat }: DiscoverPageProps) => {
           .from('passes')
           .select('passed_id, passed_at')
           .match({ passer_id: currentUser.id })
-          .gte('passed_at', new Date(Date.now() - 2 * 24 * 60 * 60 * 1000).toISOString())
+          .gte('passed_at', new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString()) // Reduced from 2 days to 1 day
       ]);
 
       const likedUserIds = likedUsers?.map(like => like.liked_id) || [];
@@ -164,7 +164,17 @@ const DiscoverPage = ({ currentUser, onNavigateToChat }: DiscoverPageProps) => {
       const hiddenPassedIds = recentPasses?.map(p => p.passed_id) || [];
       const excludedIds = [...likedUserIds, ...blockedUserIds, ...hiddenPassedIds, currentUser.id];
       
-      // User preference filtering applied
+      // Debug logging to understand filtering
+      console.log('🔍 Discover Page Debug:', {
+        totalLiked: likedUserIds.length,
+        totalBlocked: blockedUserIds.length,
+        totalRecentPasses: hiddenPassedIds.length,
+        totalExcluded: excludedIds.length,
+        userPreference: currentUser.preference,
+        allowedGenders,
+        maxDistance: currentUser.max_distance || currentUser.distance_preference || 50,
+        ageRange: `${currentUser.min_age || 18}-${currentUser.max_age || 99}`
+      });
   
       const { data: profiles, error } = await supabase
         .from('profiles')
@@ -173,9 +183,11 @@ const DiscoverPage = ({ currentUser, onNavigateToChat }: DiscoverPageProps) => {
         .in('gender', allowedGenders)
         .eq('account_status', 'active')
         .eq('is_admin', false)
-        .limit(50); // Reduced limit for better performance
+        .limit(200); // Increased limit to show more potential matches
 
       if (error) throw error;
+
+      console.log('📊 Initial profiles fetched:', profiles?.length || 0);
 
       // Apply distance filtering if current user has coordinates and distance preference
       let filteredProfiles = profiles || [];
@@ -199,7 +211,7 @@ const DiscoverPage = ({ currentUser, onNavigateToChat }: DiscoverPageProps) => {
         });
 
         // If there aren't enough nearby profiles, gradually expand the search radius
-        if (nearbyProfiles.length < 10) {
+        if (nearbyProfiles.length < 20) { // Reduced threshold from 10 to 20
           const expandedProfiles = (profiles || []).filter(profile => {
             if (!profile.latitude || !profile.longitude) {
               return profile.country === currentUser.country;
@@ -212,8 +224,8 @@ const DiscoverPage = ({ currentUser, onNavigateToChat }: DiscoverPageProps) => {
               profile.longitude
             );
 
-            // Expand to 2x the preferred distance if not enough matches
-            return distance <= (userMaxDistance * 2);
+            // Expand to 3x the preferred distance if not enough matches
+            return distance <= (userMaxDistance * 3); // Increased from 2x to 3x
           });
 
           filteredProfiles = expandedProfiles.length > nearbyProfiles.length ? expandedProfiles : nearbyProfiles;
@@ -221,9 +233,9 @@ const DiscoverPage = ({ currentUser, onNavigateToChat }: DiscoverPageProps) => {
           filteredProfiles = nearbyProfiles;
         }
 
-        // Applied distance filter: reduced profiles based on distance preferences
+        console.log(`📍 Distance filtering: ${(profiles || []).length} → ${filteredProfiles.length} profiles`);
       } else {
-      // No distance filtering applied - missing coordinates or preference
+        console.log('⚠️ No distance filtering applied - missing coordinates or preference');
       }
 
       // Apply age filtering based on user preferences
@@ -238,7 +250,8 @@ const DiscoverPage = ({ currentUser, onNavigateToChat }: DiscoverPageProps) => {
         return age >= userMinAge && age <= userMaxAge;
       });
 
-      // Applied age filter to match user preferences
+      console.log(`👥 Age filtering (${userMinAge}-${userMaxAge}): ${beforeAgeFilter} → ${filteredProfiles.length} profiles`);
+      console.log(`🎯 Final profiles to display: ${filteredProfiles.length}`);
 
       // Add empty images array to match interface
       const profilesWithImages = filteredProfiles.map(profile => ({
@@ -516,12 +529,34 @@ const DiscoverPage = ({ currentUser, onNavigateToChat }: DiscoverPageProps) => {
     }
 
     try {
-      const { error } = await supabase
+      // First check if like already exists to prevent duplicate key error
+      const { data: existingLike, error: checkError } = await supabase
         .from('likes')
-        .insert({ liker_id: currentUser.id, liked_id: currentMatch.id });
+        .select('id')
+        .match({ liker_id: currentUser.id, liked_id: currentMatch.id })
+        .maybeSingle();
 
-      if (error) throw error;
+      if (checkError && checkError.code !== 'PGRST116') {
+        throw checkError;
+      }
 
+      // Only insert if like doesn't already exist
+      if (!existingLike) {
+        const { error: insertError } = await supabase
+          .from('likes')
+          .insert({ liker_id: currentUser.id, liked_id: currentMatch.id });
+
+        if (insertError) {
+          // Handle specific duplicate key error gracefully
+          if (insertError.code === '23505') {
+            console.log('Like already exists, skipping insert');
+          } else {
+            throw insertError;
+          }
+        }
+      }
+
+      // Check for mutual like
       const { data: mutualLike, error: mutualError } = await supabase
         .from('likes')
         .select('*')
@@ -572,11 +607,33 @@ const DiscoverPage = ({ currentUser, onNavigateToChat }: DiscoverPageProps) => {
     }
 
     try {
-      const { error } = await supabase.from('passes').insert({
-        passer_id: currentUser.id,
-        passed_id: currentMatch.id
-      });
-      if (error) throw error;
+      // Check if pass already exists to prevent duplicate key error
+      const { data: existingPass, error: checkError } = await supabase
+        .from('passes')
+        .select('id')
+        .match({ passer_id: currentUser.id, passed_id: currentMatch.id })
+        .maybeSingle();
+
+      if (checkError && checkError.code !== 'PGRST116') {
+        throw checkError;
+      }
+
+      // Only insert if pass doesn't already exist
+      if (!existingPass) {
+        const { error: insertError } = await supabase.from('passes').insert({
+          passer_id: currentUser.id,
+          passed_id: currentMatch.id
+        });
+
+        if (insertError) {
+          // Handle specific duplicate key error gracefully
+          if (insertError.code === '23505') {
+            console.log('Pass already exists, skipping insert');
+          } else {
+            throw insertError;
+          }
+        }
+      }
     } catch (err) {
       console.error('Error saving pass:', err);
       toast({
