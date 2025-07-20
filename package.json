@@ -6,6 +6,7 @@
   "scripts": {
     "dev": "vite",
     "build": "tsc && vite build",
+    "build:dev": "tsc && vite build --mode development",
     "lint": "eslint .",
     "preview": "vite preview",
     "android:build": "npm run build && cap sync android",

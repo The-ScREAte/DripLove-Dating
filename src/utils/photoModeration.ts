@@ -151,31 +151,30 @@ class PhotoModerationService {
     let explicitContent = 0;
     let suggestiveContent = 0;
 
-    // AGGRESSIVE MODERATION - Much stricter for nude content detection
-    // Apply AGGRESSIVE moderation thresholds to catch nude content
+    // BALANCED MODERATION - More reasonable thresholds for dating app
+    // Send borderline cases to admin review instead of auto-rejecting
 
-    // Balanced thresholds for dating app moderation
-    if (skinToneRatio > 0.65) { // 65%+ skin tone - very likely nude/explicit
+    // Reasonable thresholds for dating app moderation
+    if (skinToneRatio > 0.80) { // 80%+ skin tone - very likely nude/explicit
       explicitContent = 95;
       flags.push(MODERATION_FLAGS.EXPLICIT_CONTENT);
-      // FLAGGED: Very high skin exposure - 65%+ skin tone (nude/explicit content)
+      // FLAGGED: Very high skin exposure - 80%+ skin tone (nude/explicit content)
     }
-    else if (skinToneRatio > 0.50) { // 50-65% skin tone - shirtless/bikini content
-      adultContent = 85;
-      flags.push(MODERATION_FLAGS.ADULT_CONTENT);
-      // FLAGGED: High skin exposure - 50-65% skin tone (shirtless/bikini, requires review)
+    else if (skinToneRatio > 0.65) { // 65-80% skin tone - likely shirtless/bikini content
+      adultContent = 75; // Send to review instead of auto-reject
+      // REVIEW: High skin exposure - 65-80% skin tone (shirtless/bikini, requires review)
     }
-    else if (skinToneRatio > 0.35) { // 35-50% skin tone - tank tops, summer clothing
-      suggestiveContent = 45; // Lower score to allow auto-approval
-      // PASSED: Moderate skin exposure - 35-50% skin tone (summer clothing, auto-approved)
+    else if (skinToneRatio > 0.50) { // 50-65% skin tone - tank tops, summer clothing, sports wear
+      suggestiveContent = 55; // Send to review to be safe
+      // REVIEW: Moderate skin exposure - 50-65% skin tone (summer clothing, requires review)
     }
-    else if (skinToneRatio > 0.15) { // 15-35% skin tone - casual clothing
-      suggestiveContent = 25; // Low score to allow auto-approval
-      // PASSED: Light skin exposure - 15-35% skin tone (casual clothing, auto-approved)
+    else if (skinToneRatio > 0.35) { // 35-50% skin tone - casual clothing, portraits
+      suggestiveContent = 25; // Lower score to allow auto-approval
+      // PASSED: Light skin exposure - 35-50% skin tone (casual clothing, auto-approved)
     }
     else {
-      // 0-15% skin tone - normal face/portrait photos
-      // PASSED: Minimal skin exposure - 0-15% skin tone (normal portrait, auto-approved)
+      // 0-35% skin tone - normal face/portrait photos, uniforms, regular clothing
+      // PASSED: Normal clothing - 0-35% skin tone (normal photos, auto-approved)
     }
 
     // Additional check for extremely red-dominant images (very rare)
@@ -349,23 +348,21 @@ class PhotoModerationService {
       message = 'Image file is corrupted or invalid and cannot be uploaded.';
       // Image blocked: Invalid file
     }
-    // ❌ REJECT explicit content immediately
+    // ❌ REJECT only truly explicit content (80%+ skin exposure)
     else if (combinedDetails.explicitContent && combinedDetails.explicitContent >= 95) {
       isApproved = false;
       confidence = 95;
       message = 'Image contains explicit content and cannot be uploaded.';
     }
-    // ⚠️ REVIEW borderline content (shirtless, bikini, etc.)
-    else if (hasContentFlags || 
-             (combinedDetails.adultContent && combinedDetails.adultContent >= 85) ||
-             (combinedDetails.explicitContent && combinedDetails.explicitContent >= 80)) {
+    // ⚠️ REVIEW high skin exposure content (send to admin instead of rejecting)
+    else if (combinedDetails.adultContent && combinedDetails.adultContent >= 70) {
       isApproved = true; // Allow upload but require review
       requiresReview = true;
       confidence = 30;
       message = 'Image uploaded but requires admin approval before being visible to others.';
     }
-    // ⚠️ REVIEW high suggestive content 
-    else if (combinedDetails.suggestiveContent && combinedDetails.suggestiveContent >= 70) {
+    // ⚠️ REVIEW moderately suggestive content 
+    else if (combinedDetails.suggestiveContent && combinedDetails.suggestiveContent >= 50) {
       isApproved = true; // Allow upload but require review
       requiresReview = true;
       confidence = 40;
@@ -390,69 +387,36 @@ class PhotoModerationService {
   }
 
   /**
-   * AGGRESSIVE skin tone detection - catches all possible skin tones
+   * BALANCED skin tone detection - more reasonable for dating app photos
    */
   private isSkinTone(r: number, g: number, b: number): boolean {
-    // MUCH MORE AGGRESSIVE skin detection - we want to catch ALL skin
-    // Better to over-detect than under-detect for nude content
+    // More conservative skin detection - focus on actual skin tones
+    // Better to under-detect than over-detect for normal photos
     
-    // Skip only extreme non-skin values (pure black, pure white, pure colors)
-    if (r < 30 || g < 20 || b < 15 || (r > 250 && g > 250 && b > 250)) return false;
+    // Skip obvious non-skin values
+    if (r < 50 || g < 30 || b < 20 || (r > 240 && g > 240 && b > 240)) return false;
     
-    // Method 1: Enhanced YCbCr with WIDER ranges
+    // Method 1: Standard YCbCr with reasonable ranges
     const y = 0.299 * r + 0.587 * g + 0.114 * b;
     const cb = -0.168736 * r - 0.331264 * g + 0.5 * b + 128;
     const cr = 0.5 * r - 0.418688 * g - 0.081312 * b + 128;
     
-    // MUCH WIDER skin tone ranges - catches more skin variations
+    // More conservative skin tone ranges
     const isSkinYCbCr = (
-      y >= 60 && y <= 255 &&          // Wider luminance range
-      cb >= 75 && cb <= 150 &&        // Wider blue chroma range  
-      cr >= 120 && cr <= 200          // Wider red chroma range
+      y >= 80 && y <= 230 &&          // More restricted luminance range
+      cb >= 85 && cb <= 135 &&        // Tighter blue chroma range  
+      cr >= 135 && cr <= 180          // More conservative red chroma range
     );
     
-    // Method 2: Aggressive RGB detection - multiple algorithms
+    // Method 2: Conservative RGB detection for actual skin
     const isBasicSkin = (
-      r > 60 && g > 30 && b > 15 &&          // Lower thresholds
-      r > g && r > b &&                      // Basic red dominance
-      (r - g) > 10 && (r - b) > 15          // Minimum differences
+      r > 80 && g > 50 && b > 30 &&          // Higher minimum thresholds
+      r > g && r > b &&                      // Red dominance
+      (r - g) > 15 && (r - b) > 25          // Stronger differences required
     );
     
-    // Method 3: Ratio-based detection (very aggressive)
-    const maxVal = Math.max(r, g, b);
-    const minVal = Math.min(r, g, b);
-    const isRatioSkin = (
-      maxVal > 50 && minVal > 15 &&          // Not too dark/bright
-      r > 0.35 * (r + g + b) &&             // Red component significant
-      (maxVal - minVal) > 10                 // Some color variation
-    );
-    
-    // Method 4: HSV-based detection
-    const hsvMax = Math.max(r, g, b);
-    const hsvMin = Math.min(r, g, b);
-    const hsvDelta = hsvMax - hsvMin;
-    
-    let hue = 0;
-    if (hsvDelta !== 0) {
-      if (hsvMax === r) hue = ((g - b) / hsvDelta) % 6;
-      else if (hsvMax === g) hue = (b - r) / hsvDelta + 2;
-      else hue = (r - g) / hsvDelta + 4;
-      hue *= 60;
-      if (hue < 0) hue += 360;
-    }
-    
-    const saturation = hsvMax === 0 ? 0 : hsvDelta / hsvMax;
-    const value = hsvMax / 255;
-    
-    // Skin typically has hue 0-40 degrees and low-medium saturation
-    const isHSVSkin = (
-      value > 0.2 &&                        // Not too dark
-      ((hue >= 0 && hue <= 50) || (hue >= 340 && hue <= 360)) && // Skin hue range
-      saturation >= 0.1 && saturation <= 0.8 // Reasonable saturation
-    );
-    
-    // Return true if ANY method detects skin (aggressive approach)
-    return isSkinYCbCr || isBasicSkin || isRatioSkin || isHSVSkin;
+    // Require BOTH methods to agree for more accuracy
+    return isSkinYCbCr && isBasicSkin;
   }
 }
 
