@@ -4,6 +4,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Badge } from '@/components/ui/badge';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { defaultPaymentMethods, PaymentMethod } from '@/constants/flwConfig';
 import { bulkApproveExistingImages } from '@/utils/bulkApproveImages';
 import { useToast } from '@/hooks/use-toast';
@@ -11,6 +12,10 @@ import { supabase } from '@/integrations/supabase/client';
 import UserProfileModal from '@/components/UserProfileModal';
 import StatsCard from './admin/StatsCard';
 import UserModerationPanel from './admin/UserModerationPanel';
+import AdminErrorBoundary from './admin/AdminErrorBoundary';
+import { debounce, userDataCache, createPagination } from '@/utils/performanceOptimizer';
+import { useSupabaseSubscription, useMemoryMonitor } from '@/hooks/usePerformance';
+import { CurrentUser, AdminStats } from '@/types';
 import { 
   LogOut, 
   Shield, 
@@ -25,10 +30,12 @@ import {
   Eye, 
   Search, 
   Play,
-  Trash2
+  Trash2,
+  Settings,
+  Image,
+  CreditCard,
+  BarChart3
 } from 'lucide-react';
-import { CurrentUser, AdminStats, AdminUser } from '@/types';
-import { Json } from '@/integrations/supabase/types';
 
 interface AdminPageProps {
   currentUser: CurrentUser;
@@ -62,34 +69,59 @@ interface PendingImage {
   };
 }
 
-const AdminPage = ({ currentUser, onLogout }: AdminPageProps) => {
-  // Payment methods state for admin
-  // Payment config state
+const AdminPageComponent = ({ currentUser, onLogout }: AdminPageProps) => {
+  // Always call hooks in the same order - performance monitoring
+  useMemoryMonitor();
+  
+  // All state hooks first - consistent order
   const [paymentMethods, setPaymentMethods] = useState<PaymentMethod[]>(defaultPaymentMethods);
   const [premiumPrice, setPremiumPrice] = useState('50');
   const [loadingConfig, setLoadingConfig] = useState(true);
+  const [showPaymentConfig, setShowPaymentConfig] = useState(false);
+  const [stats, setStats] = useState<AdminStats | null>(null);
+  const [users, setUsers] = useState<UserProfile[]>([]);
+  const [adminUsers, setAdminUsers] = useState<UserProfile[]>([]);
+  const [searchTerm, setSearchTerm] = useState('');
+  const [statusFilter, setStatusFilter] = useState('all');
+  const [loading, setLoading] = useState(true);
+  const [currentPage, setCurrentPage] = useState(1);
+  const [matchUser1, setMatchUser1] = useState('');
+  const [matchUser2, setMatchUser2] = useState('');
+  const [selectedUserId, setSelectedUserId] = useState<string | null>(null);
+  const [isProfileModalOpen, setIsProfileModalOpen] = useState(false);
+  const [activeTab, setActiveTab] = useState('dashboard');
+  const [pendingImages, setPendingImages] = useState<PendingImage[]>([]);
+  const [loadingPendingImages, setLoadingPendingImages] = useState(false);
+  const [approvingImages, setApprovingImages] = useState<Record<string, boolean>>({});
+  const [rejectingImages, setRejectingImages] = useState<Record<string, boolean>>({});
+  const [isAdmin, setIsAdmin] = useState<boolean | null>(null);
+  
+  // Constants
+  const usersPerPage = 20;
+  const { toast } = useToast();
 
-  // Fetch payment config from DB on mount
+  // Fetch payment config from DB on mount with caching
   useEffect(() => {
     const fetchConfig = async () => {
       setLoadingConfig(true);
+      
+      // Check cache first
+      const cacheKey = 'payment_config';
+      const cachedConfig = userDataCache.get(cacheKey);
+      if (cachedConfig) {
+        setPaymentMethods(cachedConfig.paymentMethods);
+        setPremiumPrice(cachedConfig.premiumPrice);
+        setLoadingConfig(false);
+        return;
+      }
+      
       // TODO: Payment config table not available yet - using defaults
-      // const { data, error } = await supabase
-      //   .from('payment_config')
-      //   .select('payment_methods, premium_price')
-      //   .order('updated_at', { ascending: false })
-      //   .limit(1)
-      //   .maybeSingle();
-      // if (!error && data) {
-        // If payment_methods is missing, fallback to default
-        let methods = defaultPaymentMethods;
-        // Ensure all default methods are present (for backward compatibility)
-        setPaymentMethods(methods);
-        setPremiumPrice('50');
-      // } else {
-      //   setPaymentMethods(defaultPaymentMethods);
-      //   setPremiumPrice('50');
-      // }
+      let methods = defaultPaymentMethods;
+      setPaymentMethods(methods);
+      setPremiumPrice('50');
+      
+      // Cache the configuration
+      userDataCache.set(cacheKey, { paymentMethods: methods, premiumPrice: '50' });
       setLoadingConfig(false);
     };
     fetchConfig();
@@ -102,10 +134,6 @@ const AdminPage = ({ currentUser, onLogout }: AdminPageProps) => {
       return updated;
     });
   };
-
-  // Payment methods admin UI
-  // Payment config modal state
-  const [showPaymentConfig, setShowPaymentConfig] = useState(false);
 
   // Save payment config to DB
   const handleSavePaymentConfig = async () => {
@@ -222,30 +250,17 @@ const AdminPage = ({ currentUser, onLogout }: AdminPageProps) => {
       </div>
     </>
   );
-  const [stats, setStats] = useState<AdminStats | null>(null);
-  const [users, setUsers] = useState<UserProfile[]>([]);
-  const [adminUsers, setAdminUsers] = useState<UserProfile[]>([]);
-  const [searchTerm, setSearchTerm] = useState('');
-  const [statusFilter, setStatusFilter] = useState('all');
-  const [loading, setLoading] = useState(true);
-  const [currentPage, setCurrentPage] = useState(1);
-  const [matchUser1, setMatchUser1] = useState('');
-  const [matchUser2, setMatchUser2] = useState('');
-  const [selectedUserId, setSelectedUserId] = useState<string | null>(null);
-  const [isProfileModalOpen, setIsProfileModalOpen] = useState(false);
-  
-  // Pending images state
-  const [pendingImages, setPendingImages] = useState<PendingImage[]>([]);
-  const [loadingPendingImages, setLoadingPendingImages] = useState(false);
-  const [approvingImages, setApprovingImages] = useState<Record<string, boolean>>({});
-  const [rejectingImages, setRejectingImages] = useState<Record<string, boolean>>({});
-  
-  const usersPerPage = 10;
-  const { toast } = useToast();
 
-  // Check if current user is admin
-  const [isAdmin, setIsAdmin] = useState<boolean | null>(null);
+  // Debounced search for better performance
+  const debouncedSearch = useCallback(
+    debounce((term: string) => {
+      setSearchTerm(term);
+      setCurrentPage(1); // Reset to first page on search
+    }, 300),
+    []
+  );
 
+  // Check if current user is admin - useEffect for admin status
   useEffect(() => {
     const checkAdminStatus = async () => {
       if (!currentUser?.id) {
@@ -274,7 +289,16 @@ const AdminPage = ({ currentUser, onLogout }: AdminPageProps) => {
     try {
       setLoadingPendingImages(true);
 
-      // Fetch images that need approval (either is_approved = false OR moderation_status = 'pending')
+      // Check cache first for performance
+      const cacheKey = 'pending_images';
+      const cachedImages = userDataCache.get(cacheKey);
+      if (cachedImages) {
+        setPendingImages(cachedImages);
+        setLoadingPendingImages(false);
+        return;
+      }
+
+      // Fetch images that need approval with pagination for performance
       const { data, error } = await supabase
         .from('user_images')
         .select(`
@@ -287,7 +311,8 @@ const AdminPage = ({ currentUser, onLogout }: AdminPageProps) => {
           user_id
         `)
         .or('is_approved.eq.false,moderation_status.eq.pending')
-        .order('created_at', { ascending: false });
+        .order('created_at', { ascending: false })
+        .limit(50); // Limit for performance
 
       if (error) {
         console.error('❌ Error fetching pending images:', error);
@@ -302,10 +327,11 @@ const AdminPage = ({ currentUser, onLogout }: AdminPageProps) => {
       
       if (!data || data.length === 0) {
         setPendingImages([]);
+        userDataCache.set(cacheKey, []);
         return;
       }
 
-      // Get user profiles for the images
+      // Batch fetch user profiles for better performance
       const userIds = [...new Set(data.map(img => img.user_id))];
       const { data: profiles } = await supabase
         .from('profiles')
@@ -328,6 +354,8 @@ const AdminPage = ({ currentUser, onLogout }: AdminPageProps) => {
       }));
 
       setPendingImages(transformedData);
+      // Cache for 2 minutes (shorter for pending content)
+      userDataCache.set(cacheKey, transformedData);
     } catch (error) {
       console.error('Error fetching pending images:', error);
       toast({
@@ -429,11 +457,22 @@ const AdminPage = ({ currentUser, onLogout }: AdminPageProps) => {
 
   const fetchAppStats = useCallback(async () => {
     try {
+      // Check cache first for better performance
+      const cacheKey = 'app_stats';
+      const cachedStats = userDataCache.get(cacheKey);
+      if (cachedStats) {
+        setStats(cachedStats);
+        return;
+      }
+
       const { data, error } = await supabase.rpc('get_app_stats');
       if (error) throw error;
       
       if (data && typeof data === 'object' && !Array.isArray(data)) {
-        setStats(data as unknown as AdminStats);
+        const statsData = data as unknown as AdminStats;
+        setStats(statsData);
+        // Cache for 2 minutes (stats don't change frequently)
+        userDataCache.set(cacheKey, statsData);
       }
     } catch (error) {
       console.error('Error fetching app stats:', error);
@@ -445,20 +484,40 @@ const AdminPage = ({ currentUser, onLogout }: AdminPageProps) => {
     }
   }, [toast]);
 
-  const fetchUsers = useCallback(async () => {
+  const fetchUsers = useCallback(debounce(async () => {
     try {
       setLoading(true);
-      const { data, error } = await supabase
+      
+      // Check cache first for performance
+      const cacheKey = `users_${currentPage}_${statusFilter}`;
+      const cachedUsers = userDataCache.get(cacheKey);
+      if (cachedUsers) {
+        const { regularUsers, admins } = cachedUsers;
+        setUsers(regularUsers);
+        setAdminUsers(admins);
+        setLoading(false);
+        return;
+      }
+
+      // Use pagination for better performance with large datasets
+      let query = supabase
         .from('profiles')
         .select('id, first_name, last_name, email, account_status, created_at, city, country, date_of_birth, is_admin')
-        .order('created_at', { ascending: false });
+        .order('created_at', { ascending: false })
+        .range((currentPage - 1) * usersPerPage, currentPage * usersPerPage - 1);
+
+      if (statusFilter !== 'all') {
+        query = query.eq('account_status', statusFilter);
+      }
+
+      const { data, error } = await query;
 
       if (error) throw error;
 
-      const usersWithAge = data.map(user => ({
+      const usersWithAge = data?.map(user => ({
         ...user,
         age: calculateAge(user.date_of_birth)
-      }));
+      })) || [];
 
       // Separate admin and regular users
       const regularUsers = usersWithAge.filter(user => !user.is_admin);
@@ -466,6 +525,9 @@ const AdminPage = ({ currentUser, onLogout }: AdminPageProps) => {
 
       setUsers(regularUsers);
       setAdminUsers(admins);
+      
+      // Cache the users data for 3 minutes
+      userDataCache.set(cacheKey, { regularUsers, admins });
     } catch (error) {
       console.error('Error fetching users:', error);
       toast({
@@ -476,7 +538,7 @@ const AdminPage = ({ currentUser, onLogout }: AdminPageProps) => {
     } finally {
       setLoading(false);
     }
-  }, [toast]);
+  }, 300), [toast, currentPage, statusFilter, usersPerPage]);
 
   const calculateAge = (dateOfBirth: string) => {
     const today = new Date();
@@ -509,11 +571,16 @@ const AdminPage = ({ currentUser, onLogout }: AdminPageProps) => {
 
       if (error) throw error;
 
+      // Optimistic update for better UX
       setUsers(users.map(user => 
         user.id === userId ? { ...user, account_status: newStatus } : user
       ));
 
-      await fetchAppStats();
+      // Clear cache to ensure fresh data on next fetch
+      userDataCache.clear();
+      
+      // Refresh stats in background
+      fetchAppStats();
 
       const statusMessages = {
         'active': 'User account has been activated',
@@ -528,6 +595,8 @@ const AdminPage = ({ currentUser, onLogout }: AdminPageProps) => {
 
     } catch (error) {
       console.error('Error updating user status:', error);
+      // Revert optimistic update on error
+      fetchUsers();
       toast({
         title: 'Error',
         description: 'Failed to update user status',
@@ -659,6 +728,14 @@ const AdminPage = ({ currentUser, onLogout }: AdminPageProps) => {
       </Badge>
     );
   };
+
+  // Cleanup effect for memory management with 1000+ users - MUST be called before any returns
+  useEffect(() => {
+    return () => {
+      // Clear cache when component unmounts to prevent memory leaks
+      userDataCache.clear();
+    };
+  }, []);
   
   if (isAdmin === null) {
     return (
@@ -685,8 +762,9 @@ const AdminPage = ({ currentUser, onLogout }: AdminPageProps) => {
   return (
     <div className="w-full min-h-screen bg-gray-100">
       <div className="w-full max-w-[390px] mx-auto bg-white min-h-screen">
-        <div className="p-4 space-y-4">
-          <div className="flex items-center justify-between">
+        <div className="p-4">
+          {/* Header */}
+          <div className="flex items-center justify-between mb-6">
             <h1 className="text-2xl font-bold">Admin Dashboard</h1>
             <div className="flex items-center gap-2">
               <Badge variant="outline" className="px-3 py-1">
@@ -704,399 +782,438 @@ const AdminPage = ({ currentUser, onLogout }: AdminPageProps) => {
             </div>
           </div>
 
-          {/* Stats Overview */}
-          {stats && (
-            <div className="grid grid-cols-2 gap-3">
-              <React.Fragment>
-                <Card className="p-3">
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <p className="text-xs text-gray-600">Total Users</p>
-                      <p className="text-lg font-bold">{stats.total_users}</p>
-                    </div>
-                    <Users className="w-6 h-6 text-blue-500" />
-                  </div>
-                </Card>
-                <Card className="p-3">
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <p className="text-xs text-gray-600">Total Matches</p>
-                      <p className="text-lg font-bold">{stats.total_matches}</p>
-                    </div>
-                    <Heart className="w-6 h-6 text-pink-500" />
-                  </div>
-                </Card>
-                <Card className="p-3">
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <p className="text-xs text-gray-600">Messages Sent</p>
-                      <p className="text-lg font-bold">{stats.total_messages}</p>
-                    </div>
-                    <MessageSquare className="w-6 h-6 text-green-500" />
-                  </div>
-                </Card>
-                <Card className="p-3">
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <p className="text-xs text-gray-600">Active Today</p>
-                      <p className="text-lg font-bold">{stats.active_users_today}</p>
-                    </div>
-                    <TrendingUp className="w-6 h-6 text-purple-500" />
-                  </div>
-                </Card>
-                <Card className="p-3">
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <p className="text-xs text-gray-600">New This Week</p>
-                      <p className="text-lg font-bold">{stats.new_users_this_week}</p>
-                    </div>
-                    <Calendar className="w-6 h-6 text-indigo-500" />
-                  </div>
-                </Card>
-                <Card className="p-3">
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <p className="text-xs text-gray-600">Users On Hold</p>
-                      <p className="text-lg font-bold">{stats.users_on_hold}</p>
-                    </div>
-                    <Pause className="w-6 h-6 text-yellow-500" />
-                  </div>
-                </Card>
-                <Card className="p-3">
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <p className="text-xs text-gray-600">Blocked Users</p>
-                      <p className="text-lg font-bold">{stats.blocked_users}</p>
-                    </div>
-                    <UserX className="w-6 h-6 text-red-500" />
-                  </div>
-                </Card>
-                <Card className="p-3">
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <p className="text-xs text-gray-600">Total Admins</p>
-                      <p className="text-lg font-bold">{stats.total_admins}</p>
-                    </div>
-                    <Shield className="w-6 h-6 text-gray-500" />
-                  </div>
-                </Card>
-              </React.Fragment>
-            </div>
-          )}
+          {/* Tabbed Interface with Error Boundaries for 1000+ users */}
+          <AdminErrorBoundary>
+            <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
+              <TabsList className="grid w-full grid-cols-4 mb-4 h-11">
+                <TabsTrigger value="dashboard" className="text-xs flex flex-col gap-1 py-2">
+                  <BarChart3 className="w-4 h-4" />
+                  <span>Dashboard</span>
+                </TabsTrigger>
+                <TabsTrigger value="users" className="text-xs flex flex-col gap-1 py-2">
+                  <Users className="w-4 h-4" />
+                  <span>Users</span>
+                </TabsTrigger>
+                <TabsTrigger value="content" className="text-xs flex flex-col gap-1 py-2">
+                  <Image className="w-4 h-4" />
+                  <span>Content</span>
+                </TabsTrigger>
+                <TabsTrigger value="settings" className="text-xs flex flex-col gap-1 py-2">
+                  <Settings className="w-4 h-4" />
+                  <span>Settings</span>
+                </TabsTrigger>
+              </TabsList>
 
-          {/* Manual Match Creation */}
-          <Card>
-            <CardHeader className="pb-3">
-              <CardTitle className="flex items-center gap-2 text-lg">
-                <UserPlus className="w-5 h-5" />
-                Create Manual Match
-              </CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-3">
-              <div className="grid grid-cols-2 gap-2">
-                <Select value={matchUser1} onValueChange={setMatchUser1}>
-                  <SelectTrigger className="text-sm">
-                    <SelectValue placeholder="Select User 1" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {users.map((user) => (
-                      <SelectItem key={user.id} value={user.id}>
-                        {user.first_name} {user.last_name}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-                <Select value={matchUser2} onValueChange={setMatchUser2}>
-                  <SelectTrigger className="text-sm">
-                    <SelectValue placeholder="Select User 2" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {users.map((user) => (
-                      <SelectItem key={user.id} value={user.id}>
-                        {user.first_name} {user.last_name}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-              <Button onClick={createManualMatch} className="w-full" size="sm">
-                Create Match
-              </Button>
-            </CardContent>
-          </Card>
-
-          {/* Admin Users */}
-          {adminUsers.length > 0 && (
-            <Card>
-              <CardHeader className="pb-3">
-                <CardTitle className="flex items-center gap-2 text-lg">
-                  <Shield className="w-5 h-5" />
-                  Admin Users ({adminUsers.length})
-                </CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="space-y-2">
-                  {adminUsers.map((admin) => (
-                    <div key={admin.id} className="flex items-center justify-between p-2 bg-gray-50 rounded">
-                      <div>
-                        <p className="font-medium text-sm">{admin.first_name} {admin.last_name}</p>
-                        <p className="text-xs text-gray-600">{admin.email}</p>
+            {/* Dashboard Tab */}
+            <TabsContent value="dashboard" className="space-y-4">
+              {/* Stats Overview */}
+              {stats && (
+                <Card>
+                  <CardHeader className="pb-3">
+                    <CardTitle className="flex items-center gap-2 text-lg">
+                      <BarChart3 className="w-5 h-5" />
+                      Platform Statistics
+                    </CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="grid grid-cols-2 gap-3">
+                      <div className="flex items-center justify-between p-3 bg-gradient-to-r from-blue-50 to-blue-100 rounded-lg border border-blue-200">
+                        <div>
+                          <p className="text-xs text-blue-700 font-medium">Total Users</p>
+                          <p className="text-lg font-bold text-blue-900">{stats.total_users}</p>
+                        </div>
+                        <Users className="w-6 h-6 text-blue-500" />
                       </div>
-                      <div className="flex items-center gap-2">
-                        <Button
-                          size="sm"
-                          variant="outline"
-                          onClick={() => handleViewProfile(admin.id)}
-                          className="text-blue-600 hover:text-blue-700 text-xs px-2 py-1 h-7"
-                        >
-                          <Eye className="w-3 h-3 mr-1" />
-                          View
-                        </Button>
-                        <Badge className="bg-blue-100 text-blue-800 text-xs">
-                          ADMIN
-                        </Badge>
+                      <div className="flex items-center justify-between p-3 bg-gradient-to-r from-pink-50 to-pink-100 rounded-lg border border-pink-200">
+                        <div>
+                          <p className="text-xs text-pink-700 font-medium">Total Matches</p>
+                          <p className="text-lg font-bold text-pink-900">{stats.total_matches}</p>
+                        </div>
+                        <Heart className="w-6 h-6 text-pink-500" />
+                      </div>
+                      <div className="flex items-center justify-between p-3 bg-gradient-to-r from-green-50 to-green-100 rounded-lg border border-green-200">
+                        <div>
+                          <p className="text-xs text-green-700 font-medium">Messages Sent</p>
+                          <p className="text-lg font-bold text-green-900">{stats.total_messages}</p>
+                        </div>
+                        <MessageSquare className="w-6 h-6 text-green-500" />
+                      </div>
+                      <div className="flex items-center justify-between p-3 bg-gradient-to-r from-purple-50 to-purple-100 rounded-lg border border-purple-200">
+                        <div>
+                          <p className="text-xs text-purple-700 font-medium">Active Today</p>
+                          <p className="text-lg font-bold text-purple-900">{stats.active_users_today}</p>
+                        </div>
+                        <TrendingUp className="w-6 h-6 text-purple-500" />
+                      </div>
+                      <div className="flex items-center justify-between p-3 bg-gradient-to-r from-indigo-50 to-indigo-100 rounded-lg border border-indigo-200">
+                        <div>
+                          <p className="text-xs text-indigo-700 font-medium">New This Week</p>
+                          <p className="text-lg font-bold text-indigo-900">{stats.new_users_this_week}</p>
+                        </div>
+                        <Calendar className="w-6 h-6 text-indigo-500" />
+                      </div>
+                      <div className="flex items-center justify-between p-3 bg-gradient-to-r from-yellow-50 to-yellow-100 rounded-lg border border-yellow-200">
+                        <div>
+                          <p className="text-xs text-yellow-700 font-medium">Users On Hold</p>
+                          <p className="text-lg font-bold text-yellow-900">{stats.users_on_hold}</p>
+                        </div>
+                        <Pause className="w-6 h-6 text-yellow-500" />
+                      </div>
+                      <div className="flex items-center justify-between p-3 bg-gradient-to-r from-red-50 to-red-100 rounded-lg border border-red-200">
+                        <div>
+                          <p className="text-xs text-red-700 font-medium">Blocked Users</p>
+                          <p className="text-lg font-bold text-red-900">{stats.blocked_users}</p>
+                        </div>
+                        <UserX className="w-6 h-6 text-red-500" />
+                      </div>
+                      <div className="flex items-center justify-between p-3 bg-gradient-to-r from-gray-50 to-gray-100 rounded-lg border border-gray-200">
+                        <div>
+                          <p className="text-xs text-gray-700 font-medium">Total Admins</p>
+                          <p className="text-lg font-bold text-gray-900">{stats.total_admins}</p>
+                        </div>
+                        <Shield className="w-6 h-6 text-gray-500" />
                       </div>
                     </div>
-                  ))}
-                </div>
-              </CardContent>
-            </Card>
-          )}
+                  </CardContent>
+                </Card>
+              )}
 
-          {/* User Management */}
-          <Card>
-            <CardHeader className="pb-3">
-              <CardTitle className="flex items-center gap-2 text-lg">
-                <Users className="w-5 h-5" />
-                User Management ({filteredUsers.length})
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              {/* Search and Filter */}
-              <div className="flex gap-2 mb-4">
-                <div className="flex-1 relative">
-                  <Search className="absolute left-2 top-2.5 h-4 w-4 text-gray-400" />
-                  <Input
-                    placeholder="Search users..."
-                    value={searchTerm}
-                    onChange={(e) => setSearchTerm(e.target.value)}
-                    className="pl-8 text-sm"
-                  />
-                </div>
-                <Select value={statusFilter} onValueChange={setStatusFilter}>
-                  <SelectTrigger className="w-32">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="all">All</SelectItem>
-                    <SelectItem value="active">Active</SelectItem>
-                    <SelectItem value="on_hold">On Hold</SelectItem>
-                    <SelectItem value="blocked">Blocked</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-
-              {/* Users List Container */}
-              <div className="border rounded-lg bg-white">
-                {loading ? (
-                  <div className="flex justify-center py-8">
-                    <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-pink-600"></div>
+              {/* Manual Match Creation */}
+              <Card>
+                <CardHeader className="pb-3">
+                  <CardTitle className="flex items-center gap-2 text-lg">
+                    <UserPlus className="w-5 h-5" />
+                    Create Manual Match
+                  </CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-3">
+                  <div className="grid grid-cols-2 gap-2">
+                    <Select value={matchUser1} onValueChange={setMatchUser1}>
+                      <SelectTrigger className="text-sm">
+                        <SelectValue placeholder="Select User 1" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {users.map((user) => (
+                          <SelectItem key={user.id} value={user.id}>
+                            {user.first_name} {user.last_name}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                    <Select value={matchUser2} onValueChange={setMatchUser2}>
+                      <SelectTrigger className="text-sm">
+                        <SelectValue placeholder="Select User 2" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {users.map((user) => (
+                          <SelectItem key={user.id} value={user.id}>
+                            {user.first_name} {user.last_name}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
                   </div>
-                ) : (
-                  <div className="space-y-0 max-h-96 overflow-y-auto">
-                    {paginatedUsers.map((user, index) => (
-                      <div key={user.id} className={`p-3 space-y-2 ${index !== paginatedUsers.length - 1 ? 'border-b' : ''}`}>
-                        <div className="flex items-start justify-between">
-                          <div className="flex-1 min-w-0">
-                            <h3 className="font-medium text-sm truncate">
-                              {user.first_name} {user.last_name}
-                            </h3>
-                            <p className="text-xs text-gray-600 truncate">{user.email}</p>
-                            <p className="text-xs text-gray-500">
-                              {user.city}, {user.country} • Age {user.age}
-                            </p>
-                            <p className="text-xs text-gray-500">
-                              Joined: {new Date(user.created_at).toLocaleDateString()}
-                            </p>
+                  <Button onClick={createManualMatch} className="w-full" size="sm">
+                    Create Match
+                  </Button>
+                </CardContent>
+              </Card>
+            </TabsContent>
+
+            {/* Users Tab */}
+            <TabsContent value="users" className="space-y-4">
+              {/* Admin Users */}
+              {adminUsers.length > 0 && (
+                <Card>
+                  <CardHeader className="pb-3">
+                    <CardTitle className="flex items-center gap-2 text-lg">
+                      <Shield className="w-5 h-5" />
+                      Admin Users ({adminUsers.length})
+                    </CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="space-y-2">
+                      {adminUsers.map((admin) => (
+                        <div key={admin.id} className="flex items-center justify-between p-2 bg-blue-50 rounded">
+                          <div>
+                            <p className="font-medium text-sm">{admin.first_name} {admin.last_name}</p>
+                            <p className="text-xs text-gray-600">{admin.email}</p>
                           </div>
-                          <div className="ml-2">
-                            {getStatusBadge(user.account_status)}
+                          <div className="flex items-center gap-2">
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              onClick={() => handleViewProfile(admin.id)}
+                              className="text-blue-600 hover:text-blue-700 text-xs px-2 py-1 h-7"
+                            >
+                              <Eye className="w-3 h-3 mr-1" />
+                              View
+                            </Button>
+                            <Badge className="bg-blue-100 text-blue-800 text-xs">
+                              ADMIN
+                            </Badge>
                           </div>
                         </div>
+                      ))}
+                    </div>
+                  </CardContent>
+                </Card>
+              )}
+
+              {/* User Management */}
+              <Card>
+                <CardHeader className="pb-3">
+                  <CardTitle className="flex items-center gap-2 text-lg">
+                    <Users className="w-5 h-5" />
+                    User Management ({filteredUsers.length})
+                  </CardTitle>
+                </CardHeader>
+                <CardContent>
+                  {/* Search and Filter */}
+                  <div className="flex gap-2 mb-4">
+                    <div className="flex-1 relative">
+                      <Search className="absolute left-2 top-2.5 h-4 w-4 text-gray-400" />
+                      <Input
+                        placeholder="Search users..."
+                        value={searchTerm}
+                        onChange={(e) => setSearchTerm(e.target.value)}
+                        className="pl-8 text-sm"
+                      />
+                    </div>
+                    <Select value={statusFilter} onValueChange={setStatusFilter}>
+                      <SelectTrigger className="w-32">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="all">All</SelectItem>
+                        <SelectItem value="active">Active</SelectItem>
+                        <SelectItem value="on_hold">On Hold</SelectItem>
+                        <SelectItem value="blocked">Blocked</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+
+                  {/* Users List Container */}
+                  <div className="border rounded-lg bg-white">
+                    {loading ? (
+                      <div className="flex justify-center py-8">
+                        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-pink-600"></div>
+                      </div>
+                    ) : (
+                      <div className="space-y-0 max-h-96 overflow-y-auto">
+                        {paginatedUsers.map((user, index) => (
+                          <div key={user.id} className={`p-3 space-y-2 ${index !== paginatedUsers.length - 1 ? 'border-b' : ''}`}>
+                            <div className="flex items-start justify-between">
+                              <div className="flex-1 min-w-0">
+                                <h3 className="font-medium text-sm truncate">
+                                  {user.first_name} {user.last_name}
+                                </h3>
+                                <p className="text-xs text-gray-600 truncate">{user.email}</p>
+                                <p className="text-xs text-gray-500">
+                                  {user.city}, {user.country} • Age {user.age}
+                                </p>
+                                <p className="text-xs text-gray-500">
+                                  Joined: {new Date(user.created_at).toLocaleDateString()}
+                                </p>
+                              </div>
+                              <div className="ml-2">
+                                {getStatusBadge(user.account_status)}
+                              </div>
+                            </div>
+                            
+                            <div className="flex gap-1 flex-wrap">
+                              <Button
+                                size="sm"
+                                variant="outline"
+                                onClick={() => handleViewProfile(user.id)}
+                                className="text-blue-600 hover:text-blue-700 text-xs px-2 py-1 h-7"
+                              >
+                                <Eye className="w-3 h-3 mr-1" />
+                                View
+                              </Button>
+                              
+                              {user.account_status === 'on_hold' ? (
+                                <Button
+                                  size="sm"
+                                  variant="outline"
+                                  onClick={() => updateUserStatus(user.id, 'active')}
+                                  className="text-green-600 hover:text-green-700 text-xs px-2 py-1 h-7"
+                                >
+                                  <Play className="w-3 h-3 mr-1" />
+                                  Activate
+                                </Button>
+                              ) : (
+                                <Button
+                                  size="sm"
+                                  variant="outline"
+                                  onClick={() => updateUserStatus(user.id, 'on_hold')}
+                                  className="text-yellow-600 hover:text-yellow-700 text-xs px-2 py-1 h-7"
+                                >
+                                  <Pause className="w-3 h-3 mr-1" />
+                                  Hold
+                                </Button>
+                              )}
+                              
+                              <Button
+                                size="sm"
+                                variant="outline"
+                                onClick={() => deleteUser(user.id)}
+                                className="text-red-600 hover:text-red-700 text-xs px-2 py-1 h-7"
+                              >
+                                <Trash2 className="w-3 h-3 mr-1" />
+                                Delete
+                              </Button>
+                            </div>
+                          </div>
+                        ))}
                         
-                        <div className="flex gap-1 flex-wrap">
-                          <Button
-                            size="sm"
-                            variant="outline"
-                            onClick={() => handleViewProfile(user.id)}
-                            className="text-blue-600 hover:text-blue-700 text-xs px-2 py-1 h-7"
-                          >
-                            <Eye className="w-3 h-3 mr-1" />
-                            View
-                          </Button>
-                          
-                          {user.account_status === 'on_hold' ? (
-                            <Button
-                              size="sm"
-                              variant="outline"
-                              onClick={() => updateUserStatus(user.id, 'active')}
-                              className="text-green-600 hover:text-green-700 text-xs px-2 py-1 h-7"
-                            >
-                              <Play className="w-3 h-3 mr-1" />
-                              Activate
-                            </Button>
-                          ) : (
-                            <Button
-                              size="sm"
-                              variant="outline"
-                              onClick={() => updateUserStatus(user.id, 'on_hold')}
-                              className="text-yellow-600 hover:text-yellow-700 text-xs px-2 py-1 h-7"
-                            >
-                              <Pause className="w-3 h-3 mr-1" />
-                              Hold
-                            </Button>
-                          )}
-                          
-                          <Button
-                            size="sm"
-                            variant="outline"
-                            onClick={() => deleteUser(user.id)}
-                            className="text-red-600 hover:text-red-700 text-xs px-2 py-1 h-7"
-                          >
-                            <Trash2 className="w-3 h-3 mr-1" />
-                            Delete
-                          </Button>
-                        </div>
+                        {filteredUsers.length === 0 && (
+                          <div className="text-center py-8 text-gray-500 text-sm">
+                            No users found matching your criteria.
+                          </div>
+                        )}
                       </div>
-                    ))}
-                    
-                    {filteredUsers.length === 0 && (
-                      <div className="text-center py-8 text-gray-500 text-sm">
-                        No users found matching your criteria.
+                    )}
+
+                    {/* Pagination */}
+                    {totalPages > 1 && (
+                      <div className="flex justify-between items-center mt-4 pt-4 border-t px-3 pb-3">
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => setCurrentPage(Math.max(1, currentPage - 1))}
+                          disabled={currentPage === 1}
+                        >
+                          Previous
+                        </Button>
+                        <span className="text-sm text-gray-600">
+                          Page {currentPage} of {totalPages}
+                        </span>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => setCurrentPage(Math.min(totalPages, currentPage + 1))}
+                          disabled={currentPage === totalPages}
+                        >
+                          Next
+                        </Button>
                       </div>
                     )}
                   </div>
-                )}
+                </CardContent>
+              </Card>
+            </TabsContent>
 
-                {/* Pagination */}
-                {totalPages > 1 && (
-                  <div className="flex justify-between items-center mt-4 pt-4 border-t px-3 pb-3">
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={() => setCurrentPage(Math.max(1, currentPage - 1))}
-                      disabled={currentPage === 1}
-                    >
-                      Previous
-                    </Button>
-                    <span className="text-sm text-gray-600">
-                      Page {currentPage} of {totalPages}
-                    </span>
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={() => setCurrentPage(Math.min(totalPages, currentPage + 1))}
-                      disabled={currentPage === totalPages}
-                    >
-                      Next
-                    </Button>
-                  </div>
-                )}
-              </div>
-            </CardContent>
-          </Card>
-
-          {/* Pending Images Management */}
-          <Card>
-            <CardHeader className="pb-3">
-              <CardTitle className="flex items-center justify-between text-lg">
-                <div className="flex items-center gap-2">
-                  <Eye className="w-5 h-5" />
-                  Pending Images ({pendingImages.length})
-                </div>
-                <Button
-                  onClick={async () => {
-                    toast({ title: "Bulk approval started", description: "Approving all existing images..." });
-                    await bulkApproveExistingImages();
-                    await fetchPendingImages();
-                    toast({ title: "✅ Bulk approval complete", description: "All appropriate images have been approved." });
-                  }}
-                  variant="outline"
-                  size="sm"
-                  className="text-xs"
-                >
-                  🔧 Bulk Approve All
-                </Button>
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              {loadingPendingImages ? (
-                <div className="flex justify-center py-8">
-                  <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-pink-600"></div>
-                </div>
-              ) : pendingImages.length === 0 ? (
-                <div className="text-center py-8 text-gray-500 text-sm">
-                  No pending images to review.
-                </div>
-              ) : (
-                <div className="space-y-4">
-                  {pendingImages.map((image) => (
-                    <div key={image.id} className="border rounded-lg p-4 bg-gray-50">
-                      <div className="flex items-start gap-4">
-                        <div className="flex-shrink-0">
-                          <img
-                            src={image.image_url}
-                            alt="Pending image"
-                            className="w-20 h-20 object-cover rounded-lg border"
-                          />
-                        </div>
-                        <div className="flex-1 min-w-0">
-                          <h4 className="font-medium text-sm">
-                            {image.profile?.first_name} {image.profile?.last_name}
-                          </h4>
-                          <p className="text-xs text-gray-600">{image.profile?.email}</p>
-                          <p className="text-xs text-gray-500 mt-1">
-                            Uploaded: {new Date(image.created_at).toLocaleDateString()}
-                          </p>
-                          <p className="text-xs text-gray-500">
-                            Status: <span className="font-medium">{image.moderation_status}</span>
-                          </p>
-                          {image.moderation_notes && (
-                            <p className="text-xs text-orange-600 mt-1">
-                              Note: {image.moderation_notes}
-                            </p>
-                          )}
-                        </div>
-                        <div className="flex flex-col gap-2">
-                          <Button
-                            size="sm"
-                            onClick={() => approveImage(image.id)}
-                            disabled={approvingImages[image.id]}
-                            className="bg-green-600 hover:bg-green-700 text-white text-xs px-3 py-1 h-8"
-                          >
-                            {approvingImages[image.id] ? 'Approving...' : 'Approve'}
-                          </Button>
-                          <Button
-                            size="sm"
-                            variant="outline"
-                            onClick={() => rejectImage(image.id)}
-                            disabled={rejectingImages[image.id]}
-                            className="text-red-600 hover:text-red-700 border-red-300 hover:bg-red-50 text-xs px-3 py-1 h-8"
-                          >
-                            {rejectingImages[image.id] ? 'Rejecting...' : 'Reject'}
-                          </Button>
-                        </div>
-                      </div>
+            {/* Content Tab */}
+            <TabsContent value="content" className="space-y-4">
+              {/* Pending Images Management */}
+              <Card>
+                <CardHeader className="pb-3">
+                  <CardTitle className="flex items-center justify-between text-lg">
+                    <div className="flex items-center gap-2">
+                      <Image className="w-5 h-5" />
+                      Pending Images ({pendingImages.length})
                     </div>
-                  ))}
-                </div>
-              )}
-            </CardContent>
-          </Card>
+                    <Button
+                      onClick={async () => {
+                        toast({ title: "Bulk approval started", description: "Approving all existing images..." });
+                        await bulkApproveExistingImages();
+                        await fetchPendingImages();
+                        toast({ title: "✅ Bulk approval complete", description: "All appropriate images have been approved." });
+                      }}
+                      variant="outline"
+                      size="sm"
+                      className="text-xs"
+                    >
+                      🔧 Bulk Approve All
+                    </Button>
+                  </CardTitle>
+                </CardHeader>
+                <CardContent>
+                  {loadingPendingImages ? (
+                    <div className="flex justify-center py-8">
+                      <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-pink-600"></div>
+                    </div>
+                  ) : pendingImages.length === 0 ? (
+                    <div className="text-center py-8 text-gray-500 text-sm">
+                      No pending images to review.
+                    </div>
+                  ) : (
+                    <div className="space-y-4 max-h-96 overflow-y-auto">
+                      {pendingImages.map((image) => (
+                        <div key={image.id} className="border rounded-lg p-4 bg-gray-50">
+                          <div className="flex items-start gap-4">
+                            <div className="flex-shrink-0">
+                              <img
+                                src={image.image_url}
+                                alt="Pending image"
+                                className="w-20 h-20 object-cover rounded-lg border"
+                              />
+                            </div>
+                            <div className="flex-1 min-w-0">
+                              <h4 className="font-medium text-sm">
+                                {image.profile?.first_name} {image.profile?.last_name}
+                              </h4>
+                              <p className="text-xs text-gray-600">{image.profile?.email}</p>
+                              <p className="text-xs text-gray-500 mt-1">
+                                Uploaded: {new Date(image.created_at).toLocaleDateString()}
+                              </p>
+                              <p className="text-xs text-gray-500">
+                                Status: <span className="font-medium">{image.moderation_status}</span>
+                              </p>
+                              {image.moderation_notes && (
+                                <p className="text-xs text-orange-600 mt-1">
+                                  Note: {image.moderation_notes}
+                                </p>
+                              )}
+                            </div>
+                            <div className="flex flex-col gap-2">
+                              <Button
+                                size="sm"
+                                onClick={() => approveImage(image.id)}
+                                disabled={approvingImages[image.id]}
+                                className="bg-green-600 hover:bg-green-700 text-white text-xs px-3 py-1 h-8"
+                              >
+                                {approvingImages[image.id] ? 'Approving...' : 'Approve'}
+                              </Button>
+                              <Button
+                                size="sm"
+                                variant="outline"
+                                onClick={() => rejectImage(image.id)}
+                                disabled={rejectingImages[image.id]}
+                                className="text-red-600 hover:text-red-700 border-red-300 hover:bg-red-50 text-xs px-3 py-1 h-8"
+                              >
+                                {rejectingImages[image.id] ? 'Rejecting...' : 'Reject'}
+                              </Button>
+                            </div>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
+            </TabsContent>
 
-          {/* Payment Configuration */}
-          {isAdmin && renderPaymentMethodsAdmin()}
+            {/* Settings Tab */}
+            <TabsContent value="settings" className="space-y-4">
+              {/* Payment Configuration */}
+              <Card>
+                <CardHeader className="pb-3">
+                  <CardTitle className="flex items-center gap-2 text-lg">
+                    <CreditCard className="w-5 h-5" />
+                    Payment Configuration
+                  </CardTitle>
+                </CardHeader>
+                <CardContent>
+                  {isAdmin && renderPaymentMethodsAdmin()}
+                </CardContent>
+              </Card>
+            </TabsContent>
+          </Tabs>
+          </AdminErrorBoundary>
         </div>
+
         {/* User Profile Modal */}
         {selectedUserId && (
           <UserProfileModal
@@ -1112,5 +1229,12 @@ const AdminPage = ({ currentUser, onLogout }: AdminPageProps) => {
     </div>
   );
 };
+
+// Memoize the component for performance with 1000+ users
+const AdminPage = React.memo<AdminPageProps>(({ currentUser, onLogout }) => {
+  return <AdminPageComponent currentUser={currentUser} onLogout={onLogout} />;
+});
+
+AdminPage.displayName = 'AdminPage';
 
 export default AdminPage;

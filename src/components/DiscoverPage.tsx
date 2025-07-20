@@ -6,6 +6,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import { useSubscription } from '@/hooks/useSubscription';
 import { calculateDistance } from '@/constants/locationData';
+import { debounce, optimizeImageUrl, createPagination, userDataCache } from '@/utils/performanceOptimizer';
 
 // Helper function to calculate age from date of birth
 const calculateAge = (dateOfBirth: string): number => {
@@ -128,6 +129,15 @@ const DiscoverPage = ({ currentUser, onNavigateToChat }: DiscoverPageProps) => {
     try {
       setIsLoading(true);
       
+      // Check cache first for better performance
+      const cacheKey = `potential_matches_${currentUser.id}`;
+      const cachedData = userDataCache.get(cacheKey);
+      if (cachedData) {
+        setPotentialMatches(cachedData);
+        setIsLoading(false);
+        return;
+      }
+      
       // Parallel queries for better performance
       const [
         { data: likedUsers },
@@ -163,7 +173,7 @@ const DiscoverPage = ({ currentUser, onNavigateToChat }: DiscoverPageProps) => {
         .in('gender', allowedGenders)
         .eq('account_status', 'active')
         .eq('is_admin', false)
-        .limit(200); // Significantly increased limit to account for distance and age filtering
+        .limit(50); // Reduced limit for better performance
 
       if (error) throw error;
 
