@@ -1,5 +1,22 @@
 import { supabase } from '@/integrations/supabase/client';
 
+export async function getPaymentConfig() {
+  try {
+    const { data, error } = await supabase
+      .from('payment_config')
+      .select('*')
+      .order('created_at', { ascending: false })
+      .limit(1)
+      .single();
+
+    if (error) throw error;
+    return data;
+  } catch (error) {
+    console.error('Error fetching payment config:', error);
+    return null;
+  }
+}
+
 export async function getPremiumPaymentConfig() {
   try {
     const { data, error } = await supabase

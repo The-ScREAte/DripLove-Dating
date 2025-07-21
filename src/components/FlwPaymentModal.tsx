@@ -1,8 +1,7 @@
 
 import React from 'react';
-import { FLW_PUBLIC_KEY } from '@/constants/flwConfig';
-
 import { PaymentMethod } from '@/constants/flwConfig';
+import { getPaymentConfig } from '@/utils/paymentConfig';
 
 interface FlwPaymentModalProps {
   isOpen: boolean;
@@ -31,6 +30,15 @@ const loadFlutterwaveScript = () => {
 
 const FlwPaymentModal: React.FC<FlwPaymentModalProps> = ({ isOpen, onClose, amount, currency = 'GHS', email, paymentMethods, onSuccess }) => {
   const [selectedMethod, setSelectedMethod] = React.useState<PaymentMethod | null>(paymentMethods[0] || null);
+  const [paymentConfig, setPaymentConfig] = React.useState<any>(null);
+
+  React.useEffect(() => {
+    const loadConfig = async () => {
+      const config = await getPaymentConfig();
+      setPaymentConfig(config);
+    };
+    loadConfig();
+  }, []);
   React.useEffect(() => {
     if (isOpen) {
       loadFlutterwaveScript();
@@ -39,16 +47,26 @@ const FlwPaymentModal: React.FC<FlwPaymentModalProps> = ({ isOpen, onClose, amou
 
   const handlePay = async () => {
     await loadFlutterwaveScript();
-    if ((window as any).FlutterwaveCheckout && selectedMethod) {
+    if ((window as any).FlutterwaveCheckout && selectedMethod && paymentConfig) {
       let payment_options = 'card';
-      let meta: any = { charge_type: 'recurring' };
+      let meta: any = { 
+        charge_type: 'recurring',
+        source: 'driplove_dating_app',
+        subscription_type: 'premium_monthly'
+      };
+      
       if (selectedMethod.type === 'momo') {
         payment_options = 'mobilemoneyghana';
         meta = { ...meta, payment_type: 'mobilemoneyghana' };
       }
+
+      // Get the public key from payment config or use the configured methods
+      const publicKey = paymentConfig.payment_methods?.find((m: any) => m.type === selectedMethod.type)?.extra || 
+                       paymentConfig.payment_methods?.[0]?.extra;
+
       (window as any).FlutterwaveCheckout({
-        public_key: FLW_PUBLIC_KEY,
-        tx_ref: `driplove-premium-${Date.now()}`,
+        public_key: publicKey,
+        tx_ref: `driplove_premium_${Date.now()}`,
         amount,
         currency,
         payment_options,
@@ -58,13 +76,13 @@ const FlwPaymentModal: React.FC<FlwPaymentModalProps> = ({ isOpen, onClose, amou
         meta,
         redirect_url: window.location.origin + '/payment-success',
         customizations: {
-          title: 'DripLove Premium',
-          description: 'Upgrade to premium',
-          logo: '/favicon.ico',
+          title: 'DripLove Premium Subscription',
+          description: 'Monthly subscription to DripLove dating app',
+          logo: '/driplove-logo.png',
         },
       });
     } else {
-      alert('Flutterwave payment could not be initialized.');
+      alert('Payment configuration not loaded. Please try again.');
     }
   };
 

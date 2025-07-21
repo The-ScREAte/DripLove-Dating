@@ -31,6 +31,7 @@ async function sendWebPushNotification(token: string, payload: NotificationPaylo
   try {
     // For web browsers, we'll use the browser's Notification API
     // This will be handled on the client side
+    console.log('📱 Web push notification:', {
       token: token.substring(0, 10) + '...',
       title: payload.title,
       type: payload.type
@@ -168,6 +169,7 @@ serve(async (req) => {
         // Legacy Firebase support
         sent = await sendFCMNotification(tokenData.token, { title, body, userId, type, data })
       } else {
+        console.log('📤 Unknown platform notification:', {
           to: tokenData.token,
           title,
           body,
