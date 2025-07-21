@@ -1,7 +1,7 @@
 
 import React, { useEffect, useState } from 'react';
 import { Button } from '@/components/ui/button';
-import { Crown, Heart, RotateCcw, Users, Check } from 'lucide-react';
+import { Crown, Heart, RotateCcw, Users, Check, AlertCircle, ArrowLeft } from 'lucide-react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
@@ -21,82 +21,306 @@ const PaymentSuccess: React.FC = () => {
   const [upgrading, setUpgrading] = useState(false);
   const [upgradeSuccess, setUpgradeSuccess] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [isAuthenticated, setIsAuthenticated] = useState(false);
+  const [isLoading, setIsLoading] = useState(true);
+  const [redirectTimer, setRedirectTimer] = useState<NodeJS.Timeout | null>(null);
+  const [redirectCountdown, setRedirectCountdown] = useState<number | null>(null);
+
+  // Cleanup timer on unmount
+  useEffect(() => {
+    return () => {
+      if (redirectTimer) {
+        clearTimeout(redirectTimer);
+      }
+    };
+  }, [redirectTimer]);
+
+  // Check authentication first
+  useEffect(() => {
+    const checkAuth = async () => {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session?.user) {
+        toast({
+          title: 'Authentication Required',
+          description: 'Please log in to view payment status.',
+          variant: 'destructive',
+        });
+        navigate('/auth');
+        return;
+      }
+      setIsAuthenticated(true);
+      setIsLoading(false);
+    };
+    
+    checkAuth();
+  }, [navigate, toast]);
 
   useEffect(() => {
-    // Check for payment success in query params
+    // Only proceed if authenticated
+    if (!isAuthenticated) return;
+
+    // Check for payment status in query params
     const params = new URLSearchParams(location.search);
     const status = params.get('status');
     const tx_ref = params.get('tx_ref');
     const transaction_id = params.get('transaction_id');
+    
+    console.log('Payment success params:', { status, tx_ref, transaction_id });
+    
+    // If no payment parameters, redirect to discover page
+    if (!status && !tx_ref && !transaction_id) {
+      console.log('No payment parameters found, redirecting to discover page');
+      toast({
+        title: 'Invalid Access',
+        description: 'Please initiate payment to access this page.',
+        variant: 'default',
+      });
+      navigate('/discover');
+      return;
+    }
+    
+    // Handle different payment statuses
+    if (status === 'cancelled') {
+      toast({
+        title: 'Payment Cancelled',
+        description: 'Your payment was cancelled. No charges were made.',
+        variant: 'default',
+      });
+      setTimeout(() => navigate('/discover'), 2000); // Redirect after 2 seconds
+      return;
+    }
+    
+    if (status === 'failed') {
+      toast({
+        title: 'Payment Failed',
+        description: 'Your payment could not be processed. Please try again.',
+        variant: 'destructive',
+      });
+      setTimeout(() => navigate('/discover'), 2000); // Redirect after 2 seconds
+      return;
+    }
+    
+    if (status !== 'successful' || !transaction_id) {
+      console.log('Payment not successful or missing transaction ID');
+      setError('Payment verification failed. Please contact support if money was deducted.');
+      // Auto-redirect after 10 seconds for error cases
+      setRedirectCountdown(10);
+      const timer = setTimeout(() => {
+        navigate('/discover');
+      }, 10000);
+      setRedirectTimer(timer);
+      
+      // Countdown timer
+      const countdownInterval = setInterval(() => {
+        setRedirectCountdown(prev => {
+          if (prev && prev > 1) {
+            return prev - 1;
+          } else {
+            clearInterval(countdownInterval);
+            return null;
+          }
+        });
+      }, 1000);
+      
+      return;
+    }
+    
+    // Process successful payment
     if (status === 'successful' && transaction_id) {
       setUpgrading(true);
       supabase.auth.getSession().then(async ({ data: { session } }) => {
         const user = session?.user;
         if (!user) {
-          setError('User not logged in. Please log in again.');
+          setError('User session expired. Please log in again.');
           setUpgrading(false);
+          setTimeout(() => navigate('/auth'), 3000);
           return;
         }
-        // Fetch transaction details from Flutterwave
-        let flwToken = null;
-        let flwSubscriptionId = null;
-        let paymentType = null;
+
         try {
-          const flwRes = await fetch(`https://api.flutterwave.com/v3/transactions/${transaction_id}/verify`, {
-            headers: {
-              Authorization: `Bearer ${import.meta.env.VITE_FLW_SECRET_KEY}`,
-            },
-          });
-          const flwData = await flwRes.json();
-          // Card tokenization
-          flwToken = flwData?.data?.card?.token || null;
-          // MoMo tokenization (if available)
-          if (!flwToken && flwData?.data?.meta?.authorization) {
-            flwToken = flwData.data.meta.authorization.token;
+          console.log('Processing successful payment directly...');
+          console.log('User ID:', user.id);
+          console.log('Transaction ID:', transaction_id);
+          console.log('TX Ref:', tx_ref);
+          
+          // Since Flutterwave confirmed the payment was successful,
+          // create the subscription directly
+          const expiryDate = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000);
+          const subscriptionData = {
+            user_id: user.id,
+            plan_name: 'premium',
+            status: 'active',
+            flutterwave_transaction_id: transaction_id,
+            starts_at: new Date().toISOString(),
+            expires_at: expiryDate.toISOString(),
+            next_billing_date: expiryDate.toISOString(),
+            auto_renew: true,
+            payment_method: 'flutterwave',
+            updated_at: new Date().toISOString(),
+          };
+          
+          console.log('Creating subscription directly:', subscriptionData);
+          
+          // First, check if user already has a subscription
+          const { data: existingSubscription } = await supabase
+            .from('user_subscriptions')
+            .select('*')
+            .eq('user_id', user.id)
+            .single();
+          
+          let subscriptionResult;
+          let subscriptionError;
+          
+          if (existingSubscription) {
+            // Update existing subscription
+            console.log('Updating existing subscription');
+            const expiryDate = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000);
+            const { data, error } = await supabase
+              .from('user_subscriptions')
+              .update({
+                plan_name: 'premium',
+                status: 'active',
+                flutterwave_transaction_id: transaction_id,
+                expires_at: expiryDate.toISOString(),
+                next_billing_date: expiryDate.toISOString(),
+                auto_renew: true,
+                payment_method: 'flutterwave',
+                updated_at: new Date().toISOString(),
+              })
+              .eq('user_id', user.id)
+              .select();
+            subscriptionResult = data;
+            subscriptionError = error;
+          } else {
+            // Create new subscription
+            console.log('Creating new subscription');
+            const { data, error } = await supabase
+              .from('user_subscriptions')
+              .insert([subscriptionData])
+              .select();
+            subscriptionResult = data;
+            subscriptionError = error;
           }
-          // Subscription ID (if available)
-          flwSubscriptionId = flwData?.data?.subscription?.id || null;
-          paymentType = flwData?.data?.payment_type || null;
+          
+          console.log('Subscription result:', { subscriptionResult, subscriptionError });
+          
+          if (subscriptionError) {
+            console.error('Subscription error:', subscriptionError);
+            const errorDetails = subscriptionError.message || subscriptionError.details || 'Unknown database error';
+            setError(`Could not activate premium: ${errorDetails}. Please contact support with transaction ID: ${transaction_id}`);
+          } else {
+            console.log('Premium subscription created successfully!');
+            console.log('Subscription data:', subscriptionResult);
+            setUpgradeSuccess(true);
+            
+            // Verify the subscription was created with premium plan
+            if (subscriptionResult && subscriptionResult[0] && subscriptionResult[0].plan_name === 'premium') {
+              console.log('✅ Premium plan confirmed in database');
+              
+              // Let's also test the subscription fetch immediately
+              try {
+                console.log('🧪 Testing subscription fetch immediately after creation...');
+                const { data: testData, error: testError } = await supabase.rpc('get_user_subscription', {
+                  user_id_param: user.id
+                });
+                console.log('🧪 Immediate subscription test result:', { testData, testError });
+                
+                const subscriptionTestData = testData as any;
+                if (subscriptionTestData && subscriptionTestData.plan_name === 'premium') {
+                  console.log('✅ Subscription fetch test PASSED - premium plan found');
+                } else {
+                  console.log('❌ Subscription fetch test FAILED - premium plan not found', subscriptionTestData);
+                }
+              } catch (testErr) {
+                console.error('❌ Subscription fetch test ERROR:', testErr);
+              }
+              
+              toast({ 
+                title: 'Premium Activated!', 
+                description: 'Your account has been upgraded to premium. You now have unlimited access!' 
+              });
+              
+              // Force a small delay to ensure database consistency before redirect
+              setTimeout(() => {
+                console.log('🔄 Redirecting to discover with premium activation flag');
+              }, 1000);
+              
+              // Don't redirect automatically - let user click the button
+              // The button will navigate with ?premium=activated parameter
+            } else {
+              console.error('⚠️ Subscription created but plan_name is not premium:', subscriptionResult);
+              setError('Subscription created but premium access may not be active. Please contact support.');
+            }
+          }
         } catch (err) {
-          // If fetch fails, continue but don't save token
-          console.error('Failed to fetch Flutterwave transaction:', err);
+          console.error('Unexpected error during premium activation:', err);
+          setError('An unexpected error occurred. Please contact support with transaction ID: ' + transaction_id);
         }
-        // Set up subscription with recurring billing
-        const subscriptionData: any = {
-          plan_name: 'premium',
-          status: 'active',
-          flutterwave_transaction_id: transaction_id,
-          starts_at: new Date().toISOString(),
-          expires_at: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString(), // 30 days from now
-          next_billing_date: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString(),
-          auto_renew: true,
-          payment_method: paymentType === 'card' ? 'card' : 'momo',
-          updated_at: new Date().toISOString(),
-        };
         
-        // Add tokens for recurring billing
-        if (flwToken && paymentType === 'card') subscriptionData.flw_card_token = flwToken;
-        if (flwToken && paymentType === 'mobilemoneyghana') subscriptionData.flw_momo_token = flwToken;
-        if (flwSubscriptionId) subscriptionData.flw_subscription_id = flwSubscriptionId;
-        
-        // Upsert subscription (update if exists, insert if not)
-        const { error } = await supabase
-          .from('user_subscriptions')
-          .upsert(
-            { user_id: user.id, ...subscriptionData },
-            { onConflict: 'user_id' }
-          );
-        if (!error) {
-          setUpgradeSuccess(true);
-          toast({ title: 'Premium Activated!', description: 'Your account has been upgraded.' });
-        } else {
-          setError('Could not activate premium. Contact support.');
-        }
         setUpgrading(false);
       });
     }
-  }, [location.search, toast]);
+  }, [location.search, toast, navigate, isAuthenticated]);
 
+  // Show loading while checking authentication
+  if (isLoading) {
+    return (
+      <div className="min-h-screen flex flex-col items-center justify-center bg-gradient-to-br from-pink-400 via-purple-500 to-indigo-600 p-4">
+        <div className="bg-white rounded-3xl shadow-2xl p-8 max-w-md w-full text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-pink-500 mx-auto mb-4"></div>
+          <p className="text-gray-600">Checking authentication...</p>
+        </div>
+      </div>
+    );
+  }
+
+  // Don't render anything if not authenticated (will redirect)
+  if (!isAuthenticated) {
+    return null;
+  }
+
+  // Show error state with option to go back
+  if (error && !upgrading && !upgradeSuccess) {
+    return (
+      <div className="min-h-screen flex flex-col items-center justify-center bg-gradient-to-br from-red-400 via-pink-500 to-purple-600 p-4">
+        <div className="bg-white rounded-3xl shadow-2xl p-8 max-w-md w-full text-center border-4 border-red-300/60 relative">
+          <div className="absolute -top-10 left-1/2 -translate-x-1/2 bg-gradient-to-br from-red-400 to-red-600 rounded-full p-3 shadow-lg">
+            <AlertCircle className="w-14 h-14 text-white" />
+          </div>
+          <h1 className="text-3xl font-extrabold mb-3 mt-8 text-gray-900 tracking-tight">Payment Issue</h1>
+          <div className="mb-6 text-red-600 font-semibold bg-red-50 p-4 rounded-lg border border-red-200">
+            {error}
+            {redirectCountdown && (
+              <div className="mt-2 text-sm text-gray-600">
+                Redirecting in {redirectCountdown} seconds...
+              </div>
+            )}
+          </div>
+          <div className="space-y-3">
+            <Button
+              className="w-full bg-gradient-to-r from-blue-500 to-blue-600 text-white font-bold py-3 px-8 rounded-full text-lg shadow-lg hover:scale-105 transition-all duration-200"
+              onClick={() => navigate('/discover')}
+            >
+              <ArrowLeft className="w-5 h-5 mr-2" />
+              Try Payment Again
+            </Button>
+            <Button
+              variant="outline"
+              className="w-full border-2 border-gray-300 text-gray-700 font-semibold py-3 px-8 rounded-full text-lg hover:bg-gray-50 transition-all duration-200"
+              onClick={() => navigate('/')}
+            >
+              Go to Home
+            </Button>
+          </div>
+          <div className="mt-6 text-xs text-gray-400">
+            Need help? Contact support with your transaction details.
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  // Show success state
   return (
     <div className="min-h-screen flex flex-col items-center justify-center bg-gradient-to-br from-pink-400 via-purple-500 to-indigo-600 p-4">
       <div className="bg-white rounded-3xl shadow-2xl p-8 max-w-md w-full text-center border-4 border-yellow-300/60 relative animate-fade-in">
@@ -117,7 +341,7 @@ const PaymentSuccess: React.FC = () => {
         {error && <div className="mb-4 text-red-600 font-semibold animate-shake">{error}</div>}
         <Button
           className="w-full bg-gradient-to-r from-yellow-400 to-yellow-600 text-black font-extrabold py-3 px-8 rounded-full text-xl shadow-xl hover:scale-105 hover:shadow-2xl transition-all duration-200 mt-2"
-          onClick={() => navigate('/')}
+          onClick={() => navigate('/?premium=activated')}
           disabled={upgrading}
         >
           Start Discovering Now

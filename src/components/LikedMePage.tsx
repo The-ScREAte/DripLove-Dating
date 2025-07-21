@@ -1,6 +1,3 @@
-  // Preload images for the next few profiles for smoother UX
-  // Defined after loadFullImages to avoid hoisting issues
-  let preloadNextProfileImages: (likersList: { id: string }[], alreadyLoaded: { [key: string]: string[] }) => void;
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -245,7 +242,7 @@ const LikedMePage = ({ currentUser }: LikedMePageProps) => {
   }, [userImages]);
 
   // Preload images for the next few profiles for smoother UX
-  preloadNextProfileImages = useCallback(
+  const preloadNextProfileImages = useCallback(
     async (likersList: { id: string }[], alreadyLoaded: { [key: string]: string[] }) => {
       // Preload for the next 2 profiles (can adjust as needed)
       const toPreload = likersList

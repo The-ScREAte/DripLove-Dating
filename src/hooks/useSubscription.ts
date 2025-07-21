@@ -35,7 +35,9 @@ export const useSubscription = (userId: string | undefined) => {
       });
 
       if (error) throw error;
-      setSubscription(data as unknown as SubscriptionInfo);
+      
+      const subscriptionData = data as unknown as SubscriptionInfo;
+      setSubscription(subscriptionData);
     } catch (error) {
       console.error('Error fetching subscription:', error);
       // Fallback to default free subscription if function doesn't exist

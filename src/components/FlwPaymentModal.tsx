@@ -2,6 +2,7 @@
 import React from 'react';
 import { PaymentMethod } from '@/constants/flwConfig';
 import { getPaymentConfig } from '@/utils/paymentConfig';
+import { FLW_PUBLIC_KEY } from '@/constants/flwConfig';
 
 interface FlwPaymentModalProps {
   isOpen: boolean;
@@ -15,39 +16,104 @@ interface FlwPaymentModalProps {
 
 const loadFlutterwaveScript = () => {
   return new Promise((resolve, reject) => {
-    if (document.getElementById('flw-js')) {
+    // Check if Flutterwave is already loaded
+    if ((window as any).FlutterwaveCheckout) {
+      console.log('Flutterwave already loaded');
       resolve(true);
       return;
     }
+    
+    // Check if script is already in DOM
+    if (document.getElementById('flw-js')) {
+      // Wait a bit and check again
+      setTimeout(() => {
+        if ((window as any).FlutterwaveCheckout) {
+          resolve(true);
+        } else {
+          reject('Flutterwave script loaded but FlutterwaveCheckout not available');
+        }
+      }, 1000);
+      return;
+    }
+    
+    console.log('Loading Flutterwave script...');
     const script = document.createElement('script');
     script.id = 'flw-js';
     script.src = 'https://checkout.flutterwave.com/v3.js';
-    script.onload = () => resolve(true);
-    script.onerror = () => reject('Flutterwave script failed to load');
-    document.body.appendChild(script);
+    script.onload = () => {
+      console.log('Flutterwave script loaded successfully');
+      // Give it a moment to initialize
+      setTimeout(() => {
+        if ((window as any).FlutterwaveCheckout) {
+          resolve(true);
+        } else {
+          reject('Flutterwave script loaded but FlutterwaveCheckout not available');
+        }
+      }, 500);
+    };
+    script.onerror = () => {
+      console.error('Failed to load Flutterwave script');
+      reject('Flutterwave script failed to load');
+    };
+    document.head.appendChild(script);
   });
 };
 
 const FlwPaymentModal: React.FC<FlwPaymentModalProps> = ({ isOpen, onClose, amount, currency = 'GHS', email, paymentMethods, onSuccess }) => {
-  const [selectedMethod, setSelectedMethod] = React.useState<PaymentMethod | null>(paymentMethods[0] || null);
+  const [selectedMethod, setSelectedMethod] = React.useState<PaymentMethod | null>(null);
   const [paymentConfig, setPaymentConfig] = React.useState<any>(null);
+  const [isLoading, setIsLoading] = React.useState(false);
+
+  // Set initial selected method when paymentMethods change
+  React.useEffect(() => {
+    if (paymentMethods && paymentMethods.length > 0 && !selectedMethod) {
+      console.log('Setting initial payment method:', paymentMethods[0]);
+      setSelectedMethod(paymentMethods[0]);
+    }
+  }, [paymentMethods, selectedMethod]);
 
   React.useEffect(() => {
     const loadConfig = async () => {
+      console.log('Loading payment config...');
       const config = await getPaymentConfig();
+      console.log('Payment config loaded:', config);
       setPaymentConfig(config);
     };
     loadConfig();
   }, []);
+  
   React.useEffect(() => {
     if (isOpen) {
-      loadFlutterwaveScript();
+      console.log('Modal opened, preloading Flutterwave script...');
+      loadFlutterwaveScript().catch(console.error);
     }
   }, [isOpen]);
 
   const handlePay = async () => {
-    await loadFlutterwaveScript();
-    if ((window as any).FlutterwaveCheckout && selectedMethod && paymentConfig) {
+    try {
+      setIsLoading(true);
+      console.log('Starting payment process...');
+      console.log('Selected method:', selectedMethod);
+      console.log('Payment config:', paymentConfig);
+      
+      await loadFlutterwaveScript();
+      
+      if (!(window as any).FlutterwaveCheckout) {
+        console.error('Flutterwave script not loaded');
+        alert('Payment system is not ready. Please refresh and try again.');
+        return;
+      }
+
+      if (!selectedMethod) {
+        alert('Please select a payment method.');
+        return;
+      }
+
+      if (!paymentConfig) {
+        alert('Payment configuration not loaded. Please try again.');
+        return;
+      }
+
       let payment_options = 'card';
       let meta: any = { 
         charge_type: 'recurring',
@@ -60,33 +126,113 @@ const FlwPaymentModal: React.FC<FlwPaymentModalProps> = ({ isOpen, onClose, amou
         meta = { ...meta, payment_type: 'mobilemoneyghana' };
       }
 
-      // Get the public key from payment config or use the configured methods
-      const publicKey = paymentConfig.payment_methods?.find((m: any) => m.type === selectedMethod.type)?.extra || 
-                       paymentConfig.payment_methods?.[0]?.extra;
+      // Get the public key from payment config - try multiple fallback options
+      let publicKey = '';
+      
+      // First try to get from the specific payment method
+      if (paymentConfig.payment_methods && Array.isArray(paymentConfig.payment_methods)) {
+        const methodConfig = paymentConfig.payment_methods.find((m: any) => m.type === selectedMethod.type);
+        if (methodConfig?.extra) {
+          publicKey = methodConfig.extra.trim();
+        }
+      }
+      
+      // Fallback to first payment method's extra
+      if (!publicKey && paymentConfig.payment_methods?.[0]?.extra) {
+        publicKey = paymentConfig.payment_methods[0].extra.trim();
+      }
+      
+      // Fallback to direct public_key field
+      if (!publicKey && paymentConfig.public_key) {
+        publicKey = paymentConfig.public_key.trim();
+      }
+      
+      // Fallback to environment variable from config
+      if (!publicKey && FLW_PUBLIC_KEY) {
+        publicKey = FLW_PUBLIC_KEY.trim();
+      }
+      
+      // Final fallback to import.meta.env
+      if (!publicKey) {
+        publicKey = (import.meta.env.VITE_FLW_PUBLIC_KEY || '').trim();
+      }
 
-      (window as any).FlutterwaveCheckout({
+      if (!publicKey) {
+        console.error('No public key found in config');
+        alert('Payment configuration is incomplete. Please contact support.');
+        return;
+      }
+
+      // Validate public key format
+      if (!publicKey.startsWith('FLWPUBK_')) {
+        console.error('Invalid public key format:', publicKey);
+        alert('Invalid payment configuration. Please contact support.');
+        return;
+      }
+
+      console.log('Debug payment config structure:', {
+        hasPaymentMethods: !!paymentConfig.payment_methods,
+        paymentMethodsLength: paymentConfig.payment_methods?.length || 0,
+        paymentMethodsArray: paymentConfig.payment_methods,
+        hasPublicKey: !!paymentConfig.public_key,
+        envPublicKey: !!FLW_PUBLIC_KEY,
+        envViteKey: !!import.meta.env.VITE_FLW_PUBLIC_KEY
+      });
+
+      console.log('Using public key:', publicKey ? (publicKey.substring(0, 15) + '...') : 'NONE FOUND');
+      
+      const paymentData = {
         public_key: publicKey,
-        tx_ref: `driplove_premium_${Date.now()}`,
-        amount,
-        currency,
-        payment_options,
+        tx_ref: `driplove_premium_${Date.now()}_${Math.random().toString(36).substring(7)}`,
+        amount: amount,
+        currency: currency,
+        payment_options: payment_options,
         customer: {
-          email,
+          email: email,
+          name: 'DripLove User',
+          phone_number: '',
         },
-        meta,
+        meta: meta,
         redirect_url: window.location.origin + '/payment-success',
+        callback: function(data: any) {
+          console.log('Payment callback:', data);
+          if (data.status === 'successful') {
+            onSuccess();
+            onClose();
+          }
+          setIsLoading(false);
+        },
+        onclose: function() {
+          console.log('Payment modal closed');
+          setIsLoading(false);
+        },
         customizations: {
           title: 'DripLove Premium Subscription',
           description: 'Monthly subscription to DripLove dating app',
-          logo: '/driplove-logo.png',
+          logo: window.location.origin + '/driplove-logo.png',
         },
-      });
-    } else {
-      alert('Payment configuration not loaded. Please try again.');
+      };
+
+      console.log('Initiating Flutterwave payment with data:', paymentData);
+      
+      (window as any).FlutterwaveCheckout(paymentData);
+    } catch (error) {
+      console.error('Payment error:', error);
+      alert('An error occurred while processing payment. Please try again.');
+      setIsLoading(false);
     }
   };
 
   if (!isOpen) return null;
+
+  console.log('Rendering modal with:', { 
+    paymentMethods, 
+    selectedMethod, 
+    paymentConfig: !!paymentConfig,
+    amount,
+    currency,
+    email 
+  });
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
@@ -96,15 +242,19 @@ const FlwPaymentModal: React.FC<FlwPaymentModalProps> = ({ isOpen, onClose, amou
         <div className="mb-4">
           <label className="block font-medium mb-1">Select payment method:</label>
           <div className="flex gap-2 mb-2">
-            {paymentMethods.map((method, idx) => (
-              <button
-                key={method.type + idx}
-                onClick={() => setSelectedMethod(method)}
-                className={`px-3 py-2 rounded border ${selectedMethod?.type === method.type ? 'bg-pink-600 text-white' : 'bg-gray-100'}`}
-              >
-                {method.label}
-              </button>
-            ))}
+            {paymentMethods && paymentMethods.length > 0 ? (
+              paymentMethods.map((method, idx) => (
+                <button
+                  key={method.type + idx}
+                  onClick={() => setSelectedMethod(method)}
+                  className={`px-3 py-2 rounded border ${selectedMethod?.type === method.type ? 'bg-pink-600 text-white' : 'bg-gray-100'}`}
+                >
+                  {method.label}
+                </button>
+              ))
+            ) : (
+              <div className="text-gray-500">Loading payment methods...</div>
+            )}
           </div>
           {/* Do not show receiving account details to user */}
         </div>
@@ -117,8 +267,16 @@ const FlwPaymentModal: React.FC<FlwPaymentModalProps> = ({ isOpen, onClose, amou
             style={{ fontSize: '16px' }}
           />
         </div>
-        <button onClick={handlePay} className="w-full bg-pink-600 text-white mt-2 py-2 rounded font-bold text-lg">
-          Pay with Flutterwave
+        <button 
+          onClick={handlePay} 
+          disabled={isLoading || !selectedMethod || !paymentConfig}
+          className={`w-full text-white mt-2 py-2 rounded font-bold text-lg ${
+            isLoading || !selectedMethod || !paymentConfig 
+              ? 'bg-gray-400 cursor-not-allowed' 
+              : 'bg-pink-600 hover:bg-pink-700'
+          }`}
+        >
+          {isLoading ? 'Processing...' : 'Pay with Flutterwave'}
         </button>
       </div>
     </div>

@@ -54,7 +54,63 @@ const DiscoverPage = ({ currentUser, onNavigateToChat }: DiscoverPageProps) => {
   const [reverseUsageToday, setReverseUsageToday] = useState(0);
   const { toast } = useToast();
   
-  const { subscription, checkUsageLimit, isPremium } = useSubscription(currentUser?.id);
+  const { subscription, checkUsageLimit, isPremium, refetchSubscription } = useSubscription(currentUser?.id);
+
+  // Check for premium activation from payment success
+  useEffect(() => {
+    const urlParams = new URLSearchParams(window.location.search);
+    if (urlParams.get('premium') === 'activated') {
+      console.log('Premium activation detected, refetching subscription...');
+      refetchSubscription();
+      toast({
+        title: 'Welcome to Premium!',
+        description: 'Your premium features are now active. Enjoy unlimited access!',
+        duration: 5000,
+      });
+      // Clean up URL
+      const newUrl = window.location.pathname;
+      window.history.replaceState({}, '', newUrl);
+    }
+  }, [refetchSubscription, toast]);
+
+  // Debug function to check subscription status
+  const debugSubscription = async () => {
+    console.log('🐛 DEBUG - Current subscription state:', {
+      subscription,
+      isPremium: isPremium(),
+      currentUser: currentUser?.id
+    });
+    
+    // Test direct database call
+    if (currentUser?.id) {
+      try {
+        const { data, error } = await supabase.rpc('get_user_subscription', {
+          user_id_param: currentUser.id
+        });
+        console.log('🐛 DEBUG - Direct DB call result:', { data, error });
+        
+        // Also try direct table query
+        const { data: directData, error: directError } = await supabase
+          .from('user_subscriptions')
+          .select('*')
+          .eq('user_id', currentUser.id)
+          .single();
+        console.log('🐛 DEBUG - Direct table query result:', { directData, directError });
+      } catch (err) {
+        console.error('🐛 DEBUG - Error in direct calls:', err);
+      }
+    }
+  };
+
+  // Add debug functions to window for console access
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      (window as any).debugSubscription = debugSubscription;
+      (window as any).refetchSubscription = refetchSubscription;
+      (window as any).isPremium = isPremium;
+      console.log('🔧 Debug functions: window.debugSubscription(), window.refetchSubscription(), window.isPremium()');
+    }
+  }, [debugSubscription, refetchSubscription, isPremium]);
 
   // Fetch current reverse usage for today
   const fetchReverseUsage = useCallback(async () => {
@@ -498,16 +554,20 @@ const DiscoverPage = ({ currentUser, onNavigateToChat }: DiscoverPageProps) => {
 
     moveToNext(); // Move UI instantly
 
-    // Check swipe limit before proceeding (but UI is already updated)
-    const usageResult = await checkUsageLimit('swipe');
-    if (!usageResult.success) {
-      setIsOutOfSwipes(true);
-      toast({
-        title: 'Daily Limit Reached',
-        description: usageResult.message,
-        variant: 'destructive'
-      });
-      return;
+    // Check swipe limit only for free users
+    if (!isPremium()) {
+      const usageResult = await checkUsageLimit('swipe');
+      if (!usageResult.success) {
+        setIsOutOfSwipes(true);
+        toast({
+          title: 'Daily Limit Reached',
+          description: usageResult.message + ' Upgrade to Premium for unlimited swipes.',
+          variant: 'destructive'
+        });
+        return;
+      }
+    } else {
+      console.log('🏆 Premium user - unlimited swipes enabled');
     }
 
     try {
@@ -576,16 +636,20 @@ const DiscoverPage = ({ currentUser, onNavigateToChat }: DiscoverPageProps) => {
 
     moveToNext(); // Move UI instantly
 
-    // Check swipe limit before proceeding (but UI is already updated)
-    const usageResult = await checkUsageLimit('swipe');
-    if (!usageResult.success) {
-      setIsOutOfSwipes(true);
-      toast({
-        title: 'Daily Limit Reached',
-        description: usageResult.message,
-        variant: 'destructive'
-      });
-      return;
+    // Check swipe limit only for free users
+    if (!isPremium()) {
+      const usageResult = await checkUsageLimit('swipe');
+      if (!usageResult.success) {
+        setIsOutOfSwipes(true);
+        toast({
+          title: 'Daily Limit Reached',
+          description: usageResult.message + ' Upgrade to Premium for unlimited swipes.',
+          variant: 'destructive'
+        });
+        return;
+      }
+    } else {
+      console.log('🏆 Premium user - unlimited swipes enabled');
     }
 
     try {
@@ -779,16 +843,21 @@ const DiscoverPage = ({ currentUser, onNavigateToChat }: DiscoverPageProps) => {
             <Heart className="w-16 h-16 mx-auto mb-4 text-gray-300" />
             <h2 className="text-xl font-semibold mb-2">You're out of swipes for today!</h2>
             <p className="text-gray-600 mb-4">
-              Free users get 12 swipes per day. Come back tomorrow or upgrade to Premium for unlimited swipes!
+              {isPremium() 
+                ? "Refreshing your matches..." 
+                : "Free users get 12 swipes per day. Come back tomorrow or upgrade to Premium for unlimited swipes!"
+              }
             </p>
             <div className="space-y-3">
-            <Button 
-              onClick={() => setShowPremiumUpgrade(true)} 
-              className="w-full bg-gradient-to-r from-yellow-400 to-yellow-600 hover:from-yellow-500 hover:to-yellow-700 text-black font-bold"
-            >
-              <Crown className="w-4 h-4 mr-2" />
-              Upgrade to Premium
-            </Button>
+            {!isPremium() && (
+              <Button 
+                onClick={() => setShowPremiumUpgrade(true)} 
+                className="w-full bg-gradient-to-r from-yellow-400 to-yellow-600 hover:from-yellow-500 hover:to-yellow-700 text-black font-bold"
+              >
+                <Crown className="w-4 h-4 mr-2" />
+                Upgrade to Premium
+              </Button>
+            )}
               <Button 
                 onClick={() => {
                   setIsOutOfSwipes(false);
