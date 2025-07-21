@@ -544,8 +544,8 @@ const ProfilePage = ({ currentUser, profile, onProfileUpdate, onLogout, onShowTe
       <div 
         className="fixed left-0 right-0 z-40 bg-white border-b border-gray-200 shadow-sm" 
         style={{ 
-          top: '60px',
-          paddingTop: 'max(env(safe-area-inset-top, 0px), 8px)',
+          top: '80px',
+          paddingTop: 'max(env(safe-area-inset-top, 0px), 4px)',
           width: '100%'
         }}
       >
@@ -580,7 +580,7 @@ const ProfilePage = ({ currentUser, profile, onProfileUpdate, onLogout, onShowTe
                 ) : (
                   <>
                     <Edit className="w-4 h-4 mr-2" /> 
-                    Edit Profile
+                    Edit
                   </>
                 )}
               </Button>

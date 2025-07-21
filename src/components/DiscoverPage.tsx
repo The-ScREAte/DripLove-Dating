@@ -53,8 +53,24 @@ const DiscoverPage = ({ currentUser, onNavigateToChat }: DiscoverPageProps) => {
   const [userImages, setUserImages] = useState<{ [key: string]: string[] }>({});
   const [reverseUsageToday, setReverseUsageToday] = useState(0);
   const { toast } = useToast();
-  
   const { subscription, checkUsageLimit, isPremium, refetchSubscription } = useSubscription(currentUser?.id);
+
+  // --- BEGIN: Swipe Guide Popup State ---
+  const [showSwipeGuide, setShowSwipeGuide] = useState(false);
+  useEffect(() => {
+    // Only show for new users (e.g., if localStorage flag not set)
+    if (!currentUser?.id) return;
+    const guideFlag = localStorage.getItem('driplove_swipe_guide_shown');
+    if (!guideFlag) {
+      setShowSwipeGuide(true);
+      const timer = setTimeout(() => {
+        setShowSwipeGuide(false);
+        localStorage.setItem('driplove_swipe_guide_shown', 'true');
+      }, 20000); // 20 seconds
+      return () => clearTimeout(timer);
+    }
+  }, [currentUser?.id]);
+  // --- END: Swipe Guide Popup State ---
 
   // Check for premium activation from payment success
   useEffect(() => {
@@ -909,9 +925,65 @@ const DiscoverPage = ({ currentUser, onNavigateToChat }: DiscoverPageProps) => {
 
   return (
     <div className="h-full w-full fixed top-0 left-0 overflow-hidden">
+      {/* --- Swipe Guide Popup for New Users --- */}
+      {showSwipeGuide && (
+        <div
+          className="fixed inset-0 z-[9999] flex items-center justify-center"
+          style={{ background: 'rgba(0,0,0,0.12)', cursor: 'pointer' }}
+          onClick={() => {
+            setShowSwipeGuide(false);
+            localStorage.setItem('driplove_swipe_guide_shown', 'true');
+          }}
+        >
+          <style>{`
+            @keyframes fingerMoveLeft {
+              0% { transform: translateX(0); }
+              20% { transform: translateX(-30px); }
+              40% { transform: translateX(0); }
+              100% { transform: translateX(0); }
+            }
+            @keyframes fingerMoveRight {
+              0% { transform: translateX(0); }
+              20% { transform: translateX(30px); }
+              40% { transform: translateX(0); }
+              100% { transform: translateX(0); }
+            }
+            .finger-left {
+              animation: fingerMoveLeft 1.5s infinite;
+              font-size: 3rem;
+              display: block;
+            }
+            .finger-right {
+              animation: fingerMoveRight 1.5s infinite;
+              font-size: 3rem;
+              display: block;
+            }
+          `}</style>
+          <div className="bg-white rounded-2xl px-7 py-7 flex flex-col items-center shadow-xl" style={{ maxWidth: 340, opacity: 0.98 }}>
+            <div className="text-2xl font-bold text-gray-900 mb-4">How to Swipe</div>
+            <div className="flex flex-row gap-8 mb-2">
+              {/* Swipe Left */}
+              <div className="flex flex-col items-center">
+                <span className="text-base font-semibold text-gray-700 mb-1">Swipe Left</span>
+                <span className="finger-left" role="img" aria-label="finger left">👆</span>
+                <span className="text-2xl" style={{ color: '#888', marginTop: '-10px', marginBottom: '-10px' }}>←←←</span>
+                <span className="text-sm text-red-600 mt-1">Dislike</span>
+              </div>
+              {/* Swipe Right */}
+              <div className="flex flex-col items-center">
+                <span className="text-base font-semibold text-gray-700 mb-1">Swipe Right</span>
+                <span className="finger-right" role="img" aria-label="finger right">👆</span>
+                <span className="text-2xl" style={{ color: '#888', marginTop: '-10px', marginBottom: '-10px' }}>→→→</span>
+                <span className="text-sm text-green-600 mt-1">Like</span>
+              </div>
+            </div>
+            <div className="mt-3 text-center text-gray-700 text-base font-medium">Tap anywhere to dismiss</div>
+          </div>
+        </div>
+      )}
       {/* Main Image Area - Card stack */}
       <div className="flex-1 relative overflow-hidden" style={{ height: 'calc(100vh - 80px)' }}>
-        {/* Next card (preloaded, below) */}
+        {/* ...existing code... */}
         {nextMatch && (
           <div
             className={`absolute inset-0 z-0 scale-95 transition-all duration-300 pointer-events-none ${
@@ -940,7 +1012,7 @@ const DiscoverPage = ({ currentUser, onNavigateToChat }: DiscoverPageProps) => {
           </div>
         )}
 
-        {/* Current card (top) - Split into swipeable and non-swipeable areas */}
+        {/* ...existing code... */}
         <div
           className="h-full w-full relative z-10 flex flex-col"
           style={{
@@ -949,7 +1021,7 @@ const DiscoverPage = ({ currentUser, onNavigateToChat }: DiscoverPageProps) => {
             boxShadow: isDragging ? '0 8px 32px 0 rgba(0,0,0,0.25)' : '0 4px 16px 0 rgba(0,0,0,0.10)'
           }}
         >
-          {/* Swipeable Image Area Only */}
+          {/* ...existing code... */}
           <div
             className={`cursor-pointer select-none relative transition-all duration-300 ${
               showMoreInfo ? 'h-[calc(100%-250px)]' : 'h-[calc(100%-120px)]'
@@ -962,38 +1034,13 @@ const DiscoverPage = ({ currentUser, onNavigateToChat }: DiscoverPageProps) => {
             onMouseUp={handleMouseUp}
             onClick={handleImageAreaClick}
           >
-            {/* Swipe Feedback Overlays */}
+            {/* ...existing code... */}
             {isDragging && swipeDirection && (
               <>
-                {/* Like Overlay (Right Swipe) */}
-                {swipeDirection === 'right' && (
-                  <div
-                    className="absolute inset-0 bg-green-500/20 flex items-center justify-center z-20 pointer-events-none"
-                    style={{ opacity: swipeOpacity }}
-                  >
-                    <div className="bg-green-500 text-white px-8 py-4 rounded-full font-bold text-2xl shadow-lg transform rotate-12">
-                      <Heart className="w-8 h-8 inline mr-2" />
-                      LIKE
-                    </div>
-                  </div>
-                )}
-
-                {/* Dislike Overlay (Left Swipe) */}
-                {swipeDirection === 'left' && (
-                  <div
-                    className="absolute inset-0 bg-red-500/20 flex items-center justify-center z-20 pointer-events-none"
-                    style={{ opacity: swipeOpacity }}
-                  >
-                    <div className="bg-red-500 text-white px-8 py-4 rounded-full font-bold text-2xl shadow-lg transform -rotate-12">
-                      <X className="w-8 h-8 inline mr-2" />
-                      NOPE
-                    </div>
-                  </div>
-                )}
+                {/* ...existing code... */}
               </>
             )}
-
-            {/* Image content only */}
+            {/* ...existing code... */}
             <MatchCard
               match={currentMatch}
               imageIndex={imageIndex}
@@ -1009,11 +1056,10 @@ const DiscoverPage = ({ currentUser, onNavigateToChat }: DiscoverPageProps) => {
               swipeDirection={swipeDirection}
               swipeDistance={swipeDistance}
               isVerified={calculateProfileVerification(currentMatch)}
-              isSwipeAreaOnly={true} // New prop to render only image area
+              isSwipeAreaOnly={true}
             />
           </div>
-
-          {/* Non-swipeable Details Area */}
+          {/* ...existing code... */}
           <div className={`bg-white border-t border-gray-200 p-2 transition-all duration-300 ${
             showMoreInfo ? 'h-[250px] overflow-y-auto pb-5' : 'h-[120px] overflow-y-auto pb-3'
           }`}>
@@ -1032,12 +1078,11 @@ const DiscoverPage = ({ currentUser, onNavigateToChat }: DiscoverPageProps) => {
               swipeDirection={swipeDirection}
               swipeDistance={swipeDistance}
               isVerified={calculateProfileVerification(currentMatch)}
-              isDetailsAreaOnly={true} // New prop to render only details area
+              isDetailsAreaOnly={true}
             />
           </div>
         </div>
-
-        {/* Action Buttons */}
+        {/* ...existing code... */}
         <SwipeButtons
           onPass={handlePass}
           onReverse={handleReverse}
