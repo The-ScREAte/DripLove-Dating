@@ -101,28 +101,30 @@ const AdminPageComponent = ({ currentUser, onLogout }: AdminPageProps) => {
   const usersPerPage = 20;
   const { toast } = useToast();
 
-  // Fetch payment config from DB on mount with caching
+  // Fetch payment config from DB on mount
   useEffect(() => {
     const fetchConfig = async () => {
       setLoadingConfig(true);
       
-      // Check cache first
-      const cacheKey = 'payment_config';
-      const cachedConfig = userDataCache.get(cacheKey);
-      if (cachedConfig) {
-        setPaymentMethods(cachedConfig.paymentMethods);
-        setPremiumPrice(cachedConfig.premiumPrice);
-        setLoadingConfig(false);
-        return;
+      try {
+        const { data, error } = await supabase
+          .from('payment_config')
+          .select('premium_price, payment_methods')
+          .order('created_at', { ascending: false })
+          .limit(1)
+          .single();
+
+        if (error) throw error;
+
+        setPaymentMethods(data.payment_methods as unknown as PaymentMethod[]);
+        setPremiumPrice(data.premium_price.toString());
+      } catch (error) {
+        console.error('Error fetching payment config:', error);
+        // Fallback to defaults
+        setPaymentMethods(defaultPaymentMethods);
+        setPremiumPrice('50');
       }
       
-      // TODO: Payment config table not available yet - using defaults
-      let methods = defaultPaymentMethods;
-      setPaymentMethods(methods);
-      setPremiumPrice('50');
-      
-      // Cache the configuration
-      userDataCache.set(cacheKey, { paymentMethods: methods, premiumPrice: '50' });
       setLoadingConfig(false);
     };
     fetchConfig();
@@ -139,23 +141,46 @@ const AdminPageComponent = ({ currentUser, onLogout }: AdminPageProps) => {
   // Save payment config to DB
   const handleSavePaymentConfig = async () => {
     setLoadingConfig(true);
-    // TODO: Payment config table not available
-    // Upsert singleton config row
-    // const { error } = await supabase
-    //   .from('payment_config')
-    //   .upsert({
-    //     id: '00000000-0000-0000-0000-000000000000', // always use same id for singleton
-    //     payment_methods: paymentMethods as unknown as Json,
-    //     premium_price: Number(premiumPrice),
-    //     updated_at: new Date().toISOString(),
-    //   }, { onConflict: 'id' });
-    setShowPaymentConfig(false);
-    setLoadingConfig(false);
-    const error = false; // TODO: Remove when payment_config table is available
-    if (!error) {
+    
+    try {
+      // Get the first (and should be only) payment config record
+      const { data: existing } = await supabase
+        .from('payment_config')
+        .select('id')
+        .limit(1)
+        .single();
+
+      if (existing) {
+        // Update existing record
+        const { error } = await supabase
+          .from('payment_config')
+          .update({
+            payment_methods: paymentMethods as unknown as any,
+            premium_price: Number(premiumPrice),
+            updated_at: new Date().toISOString(),
+          })
+          .eq('id', existing.id);
+
+        if (error) throw error;
+      } else {
+        // Create new record
+        const { error } = await supabase
+          .from('payment_config')
+          .insert({
+            payment_methods: paymentMethods as unknown as any,
+            premium_price: Number(premiumPrice),
+          });
+
+        if (error) throw error;
+      }
+
+      setShowPaymentConfig(false);
       toast({ title: 'Saved', description: 'Payment methods and price updated.' });
-    } else {
+    } catch (error) {
+      console.error('Error saving payment config:', error);
       toast({ title: 'Error', description: 'Failed to save payment config', variant: 'destructive' });
+    } finally {
+      setLoadingConfig(false);
     }
   };
 

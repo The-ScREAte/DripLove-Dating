@@ -18,7 +18,19 @@ const PremiumUpgrade = ({ currentUser, onClose, preselectedPlan }: PremiumUpgrad
   const [loading, setLoading] = useState(false);
   const { toast } = useToast();
   const [showPaymentModal, setShowPaymentModal] = useState(false);
-  const { price, paymentMethods } = getPremiumPaymentConfig();
+  const [price, setPrice] = useState('50');
+  const [paymentMethods, setPaymentMethods] = useState<any[]>([]);
+  const [currency, setCurrency] = useState('GHS');
+
+  React.useEffect(() => {
+    const loadPaymentConfig = async () => {
+      const config = await getPremiumPaymentConfig();
+      setPrice(config.price);
+      setPaymentMethods(config.paymentMethods);
+      setCurrency(config.currency);
+    };
+    loadPaymentConfig();
+  }, []);
 
   const handleUpgrade = () => {
     if (!paymentMethods.length) {

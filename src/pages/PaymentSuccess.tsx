@@ -61,20 +61,31 @@ const PaymentSuccess: React.FC = () => {
           // If fetch fails, continue but don't save token
           console.error('Failed to fetch Flutterwave transaction:', err);
         }
-        // Only update, do not insert
-        const updateObj: any = {
+        // Set up subscription with recurring billing
+        const subscriptionData: any = {
           plan_name: 'premium',
           status: 'active',
           flutterwave_transaction_id: transaction_id,
+          starts_at: new Date().toISOString(),
+          expires_at: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString(), // 30 days from now
+          next_billing_date: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString(),
+          auto_renew: true,
+          payment_method: paymentType === 'card' ? 'card' : 'momo',
           updated_at: new Date().toISOString(),
         };
-        if (flwToken && paymentType === 'card') updateObj.flw_card_token = flwToken;
-        if (flwToken && paymentType === 'mobilemoneyghana') updateObj.flw_momo_token = flwToken;
-        if (flwSubscriptionId) updateObj.flw_subscription_id = flwSubscriptionId;
+        
+        // Add tokens for recurring billing
+        if (flwToken && paymentType === 'card') subscriptionData.flw_card_token = flwToken;
+        if (flwToken && paymentType === 'mobilemoneyghana') subscriptionData.flw_momo_token = flwToken;
+        if (flwSubscriptionId) subscriptionData.flw_subscription_id = flwSubscriptionId;
+        
+        // Upsert subscription (update if exists, insert if not)
         const { error } = await supabase
           .from('user_subscriptions')
-          .update(updateObj)
-          .eq('user_id', user.id);
+          .upsert(
+            { user_id: user.id, ...subscriptionData },
+            { onConflict: 'user_id' }
+          );
         if (!error) {
           setUpgradeSuccess(true);
           toast({ title: 'Premium Activated!', description: 'Your account has been upgraded.' });
