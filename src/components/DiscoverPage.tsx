@@ -164,18 +164,6 @@ const DiscoverPage = ({ currentUser, onNavigateToChat }: DiscoverPageProps) => {
       const hiddenPassedIds = recentPasses?.map(p => p.passed_id) || [];
       const excludedIds = [...likedUserIds, ...blockedUserIds, ...hiddenPassedIds, currentUser.id];
       
-      // Debug logging to understand filtering
-      console.log('🔍 Discover Page Debug:', {
-        totalLiked: likedUserIds.length,
-        totalBlocked: blockedUserIds.length,
-        totalRecentPasses: hiddenPassedIds.length,
-        totalExcluded: excludedIds.length,
-        userPreference: currentUser.preference,
-        allowedGenders,
-        maxDistance: currentUser.max_distance || currentUser.distance_preference || 50,
-        ageRange: `${currentUser.min_age || 18}-${currentUser.max_age || 99}`
-      });
-  
       const { data: profiles, error } = await supabase
         .from('profiles')
         .select('id, first_name, last_name, bio, city, country, country_code, occupation, education_level, date_of_birth, interests, gender, latitude, longitude, fun_fact, perfect_first_date, last_googled, relationship_intent, smoking, drinking, exercise_level, sleeping_schedule, introvert_extrovert, spontaneous_planner, messy_organized')
@@ -186,8 +174,6 @@ const DiscoverPage = ({ currentUser, onNavigateToChat }: DiscoverPageProps) => {
         .limit(200); // Increased limit to show more potential matches
 
       if (error) throw error;
-
-      console.log('📊 Initial profiles fetched:', profiles?.length || 0);
 
       // Apply distance filtering if current user has coordinates and distance preference
       let filteredProfiles = profiles || [];
@@ -233,9 +219,8 @@ const DiscoverPage = ({ currentUser, onNavigateToChat }: DiscoverPageProps) => {
           filteredProfiles = nearbyProfiles;
         }
 
-        console.log(`📍 Distance filtering: ${(profiles || []).length} → ${filteredProfiles.length} profiles`);
       } else {
-        console.log('⚠️ No distance filtering applied - missing coordinates or preference');
+        // No distance filtering applied - missing coordinates or preference
       }
 
       // Apply age filtering based on user preferences
@@ -249,9 +234,6 @@ const DiscoverPage = ({ currentUser, onNavigateToChat }: DiscoverPageProps) => {
         const age = calculateAge(profile.date_of_birth);
         return age >= userMinAge && age <= userMaxAge;
       });
-
-      console.log(`👥 Age filtering (${userMinAge}-${userMaxAge}): ${beforeAgeFilter} → ${filteredProfiles.length} profiles`);
-      console.log(`🎯 Final profiles to display: ${filteredProfiles.length}`);
 
       // Add empty images array to match interface
       const profilesWithImages = filteredProfiles.map(profile => ({
@@ -549,7 +531,7 @@ const DiscoverPage = ({ currentUser, onNavigateToChat }: DiscoverPageProps) => {
         if (insertError) {
           // Handle specific duplicate key error gracefully
           if (insertError.code === '23505') {
-            console.log('Like already exists, skipping insert');
+            // Like already exists, skipping insert
           } else {
             throw insertError;
           }
@@ -628,7 +610,7 @@ const DiscoverPage = ({ currentUser, onNavigateToChat }: DiscoverPageProps) => {
         if (insertError) {
           // Handle specific duplicate key error gracefully
           if (insertError.code === '23505') {
-            console.log('Pass already exists, skipping insert');
+            // Pass already exists, skipping insert
           } else {
             throw insertError;
           }
