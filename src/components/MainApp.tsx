@@ -10,6 +10,7 @@ import PrivacyPolicy from '@/components/PrivacyPolicy';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import { usePushNotifications } from '@/hooks/usePushNotifications';
+import { SafeAreaView, useSafeAreaInsets } from '@/hooks/useSafeArea';
 
 interface MainAppProps {
   user: any;
@@ -23,6 +24,7 @@ const MainApp = ({ user, onLogout }: MainAppProps) => {
   const [profile, setProfile] = useState<any>(null);
   const [unreadCount, setUnreadCount] = useState(0);
   const { toast } = useToast();
+  const insets = useSafeAreaInsets();
 
   // Initialize push notifications silently in background
   const {
@@ -173,11 +175,11 @@ const MainApp = ({ user, onLogout }: MainAppProps) => {
 
   return (
     <div className="w-full h-screen bg-gray-100">
-      <div className="w-full h-screen flex flex-col bg-white relative shadow-md overflow-hidden mobile-container">
+      <div className="w-full h-screen flex flex-col bg-white relative shadow-md overflow-hidden">
         
-        {/* Fixed Header - Hide when showing terms/privacy */}
+        {/* Fixed Header with Professional Safe Area */}
         {!showTerms && !showPrivacy && (
-          <div className="fixed top-0 left-0 right-0 w-full bg-white shadow-sm border-b z-50 mobile-header sticky-header">
+          <SafeAreaView edges={['top']} className="fixed top-0 left-0 right-0 w-full bg-white shadow-sm border-b z-50">
             <div className="px-4 py-2 flex justify-between items-center">
               <img 
                 src="/driplove-logo.png" 
@@ -190,17 +192,22 @@ const MainApp = ({ user, onLogout }: MainAppProps) => {
                 </span>
               </div>
             </div>
-          </div>
+          </SafeAreaView>
         )}
 
         {/* Main Content */}
-        <div className={`flex-1 overflow-y-auto ${!showTerms && !showPrivacy ? 'pt-[calc(60px+env(safe-area-inset-top,0px))] pb-[calc(70px+env(safe-area-inset-bottom,0px))]' : ''}`}>
+        <div 
+          className={`flex-1 overflow-y-auto ${!showTerms && !showPrivacy ? 'pb-[70px]' : ''}`}
+          style={{ 
+            paddingTop: !showTerms && !showPrivacy ? (60 + insets.top) : 0 
+          }}
+        >
           {renderContent()}
         </div>
 
-        {/* Fixed Bottom Nav - Hide when showing terms/privacy */}
+        {/* Fixed Bottom Nav with Professional Safe Area */}
         {!showTerms && !showPrivacy && (
-          <div className="fixed bottom-0 left-0 right-0 w-full bg-white border-t border-gray-200 px-2 py-2 z-50 mobile-bottom-nav">
+          <SafeAreaView edges={['bottom']} className="fixed bottom-0 left-0 right-0 w-full bg-white border-t border-gray-200 px-2 py-2 z-50">
             <div className="flex justify-around items-center">
               {[
                 { label: 'Discover', icon: Heart }, 
@@ -223,7 +230,7 @@ const MainApp = ({ user, onLogout }: MainAppProps) => {
                 </button>
               ))}
             </div>
-          </div>
+          </SafeAreaView>
         )}
       </div>
     </div>

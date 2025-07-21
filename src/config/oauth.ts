@@ -5,17 +5,17 @@
 
 export const OAUTH_CONFIG = {
   // Custom URL scheme for your app
-  customScheme: 'com.driplove.dating',
+  customScheme: 'driplove',
   
   // OAuth redirect URIs for mobile
   redirectUris: {
-    google: 'com.driplove.dating://auth/callback/google',
-    apple: 'com.driplove.dating://auth/callback/apple',
+    google: 'driplove://auth/callback/google',
+    apple: 'driplove://auth/callback/apple',
     // Add other providers as needed
   },
   
   // Supabase redirect configuration
-  supabaseRedirectUri: 'com.driplove.dating://auth/callback',
+  supabaseRedirectUri: 'driplove://auth/callback',
   
   // Web fallback for development/testing
   webRedirectUri: process.env.NODE_ENV === 'development' 

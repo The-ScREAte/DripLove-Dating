@@ -910,7 +910,7 @@ const DiscoverPage = ({ currentUser, onNavigateToChat }: DiscoverPageProps) => {
   return (
     <div className="h-full w-full fixed top-0 left-0 overflow-hidden">
       {/* Main Image Area - Card stack */}
-      <div className="flex-1 relative overflow-hidden" style={{ height: 'calc(100vh - env(safe-area-inset-bottom, 0px) - 80px)' }}>
+      <div className="flex-1 relative overflow-hidden" style={{ height: 'calc(100vh - 80px)' }}>
         {/* Next card (preloaded, below) */}
         {nextMatch && (
           <div
@@ -1015,7 +1015,7 @@ const DiscoverPage = ({ currentUser, onNavigateToChat }: DiscoverPageProps) => {
 
           {/* Non-swipeable Details Area */}
           <div className={`bg-white border-t border-gray-200 p-2 transition-all duration-300 ${
-            showMoreInfo ? 'h-[250px] overflow-y-auto pb-[env(safe-area-inset-bottom,0px)+20px]' : 'h-[120px] overflow-y-auto pb-[env(safe-area-inset-bottom,0px)+10px]'
+            showMoreInfo ? 'h-[250px] overflow-y-auto pb-5' : 'h-[120px] overflow-y-auto pb-3'
           }`}>
             <MatchCard
               match={currentMatch}

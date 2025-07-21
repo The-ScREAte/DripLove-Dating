@@ -24,30 +24,27 @@ export const getAndroidVersion = (): number | null => {
 };
 
 /**
- * Applies Android-specific optimizations to DOM elements
+ * Applies Android-specific optimizations to DOM elements - NO SAFE AREAS
  */
 export const applyAndroidOptimizations = (element: HTMLElement): void => {
   if (!isAndroid()) return;
   
-  // Apply safe area styles
+  // NO SAFE AREA STYLES - just apply basic optimizations
   Object.assign(element.style, {
-    paddingTop: androidOptimizations.safeAreaSupport.paddingTop,
-    paddingBottom: androidOptimizations.safeAreaSupport.paddingBottom,
-    paddingLeft: androidOptimizations.safeAreaSupport.paddingLeft,
-    paddingRight: androidOptimizations.safeAreaSupport.paddingRight,
+    padding: '0', // Force no padding
   });
   
-  // Apply touch optimizations
+  // Apply touch optimizations only
   Object.assign(element.style, {
-    touchAction: androidOptimizations.touchAction,
-    WebkitUserSelect: androidOptimizations.webViewOptimizations.WebkitUserSelect,
-    WebkitTouchCallout: androidOptimizations.webViewOptimizations.WebkitTouchCallout,
-    WebkitTapHighlightColor: androidOptimizations.webViewOptimizations.WebkitTapHighlightColor,
+    touchAction: 'manipulation',
+    WebkitUserSelect: 'none',
+    WebkitTouchCallout: 'none',
+    WebkitTapHighlightColor: 'transparent',
   });
   
   // Apply performance optimizations
   Object.assign(element.style, {
-    transform: androidOptimizations.transform,
+    transform: 'translateZ(0px)',
     willChange: androidOptimizations.willChange,
   });
 };
@@ -100,16 +97,34 @@ export const enableAndroidSmoothScrolling = (element: HTMLElement): void => {
 export const setupAndroidGestureNavigation = (): void => {
   if (!isAndroid()) return;
   
-  const androidVersion = getAndroidVersion();
-  if (!androidVersion || androidVersion < 10) return; // Gesture nav introduced in Android 10
-  
-  // Add CSS custom properties for gesture navigation
-  document.documentElement.style.setProperty('--android-gesture-height', '20px');
-  
-  // Ensure content doesn't overlap with gesture area
+  // Force full width on Android WebView
   const body = document.body;
+  const html = document.documentElement;
+  
   if (body) {
-    body.style.paddingBottom = 'max(env(safe-area-inset-bottom), 20px)';
+    body.style.padding = '0';
+    body.style.margin = '0';
+    body.style.width = '100vw';
+    body.style.maxWidth = '100vw';
+    body.style.overflowX = 'hidden';
+  }
+  
+  if (html) {
+    html.style.width = '100vw';
+    html.style.maxWidth = '100vw';
+    html.style.overflowX = 'hidden';
+    html.style.margin = '0';
+    html.style.padding = '0';
+  }
+  
+  // Force full width on root container
+  const root = document.getElementById('root');
+  if (root) {
+    root.style.width = '100vw';
+    root.style.maxWidth = '100vw';
+    root.style.margin = '0';
+    root.style.padding = '0';
+    root.style.overflowX = 'hidden';
   }
 };
 

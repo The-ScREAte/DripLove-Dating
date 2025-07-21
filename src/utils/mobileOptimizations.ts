@@ -24,25 +24,12 @@ export const mobileStyles = {
     padding: '12px',   // Adequate touch padding
   },
   
-  // Universal safe area handling (iOS and Android)
+  // No safe area handling - let browser handle it naturally
   safeArea: {
-    paddingTop: 'max(env(safe-area-inset-top), 24px)', // Android status bar fallback
-    paddingBottom: 'max(env(safe-area-inset-bottom), 20px)', // Android gesture nav
-    paddingLeft: 'max(env(safe-area-inset-left), 0px)',
-    paddingRight: 'max(env(safe-area-inset-right), 0px)',
-  },
-  
-  // Android-specific safe area enhancements
-  androidSafeArea: {
-    // Support for Android notches and punch holes
-    paddingTop: 'max(env(safe-area-inset-top), var(--android-status-bar-height, 24px))',
-    paddingBottom: 'max(env(safe-area-inset-bottom), var(--android-nav-height, 48px))',
-    
-    // Android 10+ gesture navigation
-    gestureArea: {
-      height: 'max(env(safe-area-inset-bottom), 20px)',
-      background: 'transparent',
-    },
+    paddingTop: '0px',
+    paddingBottom: '0px', 
+    paddingLeft: '0px',
+    paddingRight: '0px',
   },
 };
 
@@ -163,34 +150,22 @@ export const touchOptimization = {
   },
 };
 
-// 8. Android-specific optimizations
-export const androidOptimizations = {
-  // Hardware acceleration for smooth performance
+// 8. Minimal optimizations - no Android-specific code
+export const optimizations = {
+  // Basic performance optimizations
   willChange: 'transform',
   transform: 'translateZ(0)',
   
-  // Reduce overdraw for better performance
-  backgroundColor: 'transparent',
-  
-  // Optimize text rendering
-  textRendering: 'optimizeSpeed',
-  fontDisplay: 'swap',
-  
-  // Touch responsiveness (48dp minimum touch targets)
-  minTouchTarget: '48px',
+  // Touch responsiveness
+  minTouchTarget: '44px',
   touchAction: 'manipulation',
   
-  // Smooth scrolling optimizations
-  overflowScrolling: 'touch',
-  scrollBehavior: 'smooth',
-  overscrollBehavior: 'contain',
-  
-  // Safe area handling for Android
+  // No safe area handling
   safeAreaSupport: {
-    paddingTop: 'max(env(safe-area-inset-top), 24px)', // Status bar
-    paddingBottom: 'max(env(safe-area-inset-bottom), 20px)', // Gesture nav
-    paddingLeft: 'max(env(safe-area-inset-left), 0px)',
-    paddingRight: 'max(env(safe-area-inset-right), 0px)',
+    paddingTop: '0px',
+    paddingBottom: '0px', 
+    paddingLeft: '0px',
+    paddingRight: '0px',
   },
   
   // Android gesture navigation support

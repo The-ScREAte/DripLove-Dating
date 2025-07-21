@@ -73,7 +73,7 @@ const AuthForm = ({ isLogin, onToggle, onOAuthSuccess }: AuthFormProps) => {
       
       // Configure redirect URI based on platform
       const redirectTo = isMobileApp 
-        ? 'com.driplove.dating://auth/callback'
+        ? 'driplove://auth/callback'
         : `${window.location.origin}/auth/callback`;
 
       console.log('OAuth config:', { isMobileApp, redirectTo, protocol: window.location.protocol });

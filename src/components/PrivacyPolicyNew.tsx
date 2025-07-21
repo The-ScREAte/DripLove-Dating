@@ -11,10 +11,10 @@ const PrivacyPolicyNew = ({ onBack }: PrivacyPolicyNewProps) => {
     <div 
       className="min-h-screen bg-gradient-to-br from-pink-400 via-purple-500 to-indigo-600 p-4 mobile-container"
       style={{
-        paddingTop: `max(env(safe-area-inset-top, 0px), 16px)`,
-        paddingBottom: `max(env(safe-area-inset-bottom, 0px), 16px)`,
-        paddingLeft: `max(env(safe-area-inset-left, 0px), 16px)`,
-        paddingRight: `max(env(safe-area-inset-right, 0px), 16px)`,
+        paddingTop: '16px',
+        paddingBottom: '16px',
+        paddingLeft: '16px',
+        paddingRight: '16px',
         minHeight: '100dvh'
       }}
     >

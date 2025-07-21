@@ -15,7 +15,7 @@ const config: CapacitorConfig = {
     ]
   },
   ios: {
-    scheme: 'com.driplove.dating',
+    scheme: 'driplove',
     contentInset: 'automatic',
     scrollEnabled: true,
     // Performance optimizations for iOS
@@ -24,9 +24,7 @@ const config: CapacitorConfig = {
   android: {
     allowMixedContent: true,
     captureInput: true,
-    webContentsDebuggingEnabled: false,
-    // Android safe area support
-    appendUserAgent: 'DripLove/1.0'
+    webContentsDebuggingEnabled: false
   },
   plugins: {
     PushNotifications: {

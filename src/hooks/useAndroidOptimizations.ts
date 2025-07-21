@@ -70,19 +70,19 @@ export const useAndroidSmoothScrolling = () => {
 };
 
 /**
- * Hook for safe area management
+ * Hook for Android layout management - NO SAFE AREAS
  */
 export const useAndroidSafeArea = () => {
   useEffect(() => {
     if (!isAndroid()) return;
     
-    // Apply safe area CSS custom properties
+    // Apply fixed padding for Android - NO safe area detection
     const root = document.documentElement;
     if (root) {
-      root.style.setProperty('--android-safe-top', 'max(env(safe-area-inset-top), 24px)');
-      root.style.setProperty('--android-safe-bottom', 'max(env(safe-area-inset-bottom), 20px)');
-      root.style.setProperty('--android-safe-left', 'max(env(safe-area-inset-left), 0px)');
-      root.style.setProperty('--android-safe-right', 'max(env(safe-area-inset-right), 0px)');
+      root.style.setProperty('--android-safe-top', '24px');
+      root.style.setProperty('--android-safe-bottom', '0px');
+      root.style.setProperty('--android-safe-left', '0px');
+      root.style.setProperty('--android-safe-right', '0px');
     }
   }, []);
   

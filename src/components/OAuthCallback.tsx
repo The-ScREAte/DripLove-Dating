@@ -18,7 +18,8 @@ const OAuthCallback = () => {
 
         // Handle both web and mobile auth callbacks
         const isMobileApp = window.location.protocol === 'capacitor:' || 
-                           window.location.protocol === 'file:';
+                           window.location.protocol === 'file:' ||
+                           window.location.href.startsWith('driplove://');
 
         let sessionData;
         let sessionError;
@@ -28,8 +29,18 @@ const OAuthCallback = () => {
           const hashParams = new URLSearchParams(window.location.hash.substring(1));
           const queryParams = new URLSearchParams(window.location.search);
           
-          const accessToken = hashParams.get('access_token') || queryParams.get('access_token');
-          const refreshToken = hashParams.get('refresh_token') || queryParams.get('refresh_token');
+          // Also check for custom scheme URLs
+          const urlString = window.location.href;
+          let accessToken = hashParams.get('access_token') || queryParams.get('access_token');
+          let refreshToken = hashParams.get('refresh_token') || queryParams.get('refresh_token');
+          
+          // Parse custom scheme URLs (driplove://auth/callback#access_token=...)
+          if (urlString.includes('driplove://')) {
+            const match = urlString.match(/[#&]access_token=([^&]+)/);
+            const refreshMatch = urlString.match(/[#&]refresh_token=([^&]+)/);
+            if (match) accessToken = decodeURIComponent(match[1]);
+            if (refreshMatch) refreshToken = decodeURIComponent(refreshMatch[1]);
+          }
           
           if (accessToken && refreshToken) {
             const { data, error } = await supabase.auth.setSession({

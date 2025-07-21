@@ -3,6 +3,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import { usePushNotifications } from '@/hooks/usePushNotifications';
 import { requestNotificationPermission } from '@/services/pushNotifications';
+import { SafeAreaView } from '@/hooks/useSafeArea';
 import UserProfileModal from './UserProfileModal';
 import BlockDialog from './BlockDialog';
 import ChatUserList from './chat/ChatUserList';
@@ -361,22 +362,24 @@ const ChatPage = ({ currentUser, onUnreadChange }: ChatPageProps) => {
   if (!selectedMatch) {
     return (
       <div className="h-full flex flex-col bg-gray-50">
-        {/* Sticky Search Header */}
-        <div className="sticky top-0 z-30 bg-gradient-to-r from-pink-500 to-purple-600 text-white p-4">
-          <h2 className="text-xl font-bold mb-4">Messages</h2>
-          <div className="relative">
-            <input
-              type="text"
-              placeholder="Search conversations..."
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-              className="w-full pr-10 bg-white text-gray-900 rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-pink-300"
-            />
-            <svg className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="m21 21-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
-            </svg>
+        {/* Professional Safe Area Header */}
+        <SafeAreaView edges={['top']} className="sticky top-0 z-30 bg-gradient-to-r from-pink-500 to-purple-600 text-white">
+          <div className="p-4">
+            <h2 className="text-xl font-bold mb-4">Messages</h2>
+            <div className="relative">
+              <input
+                type="text"
+                placeholder="Search conversations..."
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+                className="w-full pr-10 bg-white text-gray-900 rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-pink-300"
+              />
+              <svg className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="m21 21-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+              </svg>
+            </div>
           </div>
-        </div>
+        </SafeAreaView>
 
         {/* Scrollable Chat List */}
         <div className="flex-1 overflow-y-auto pb-20">
@@ -459,8 +462,8 @@ const ChatPage = ({ currentUser, onUnreadChange }: ChatPageProps) => {
 
   return (
     <div className="h-full flex flex-col bg-gray-50">
-      {/* Sticky Chat Header */}
-      <div className="sticky top-0 z-30 bg-white border-b border-gray-200 shadow-sm">
+      {/* Professional Safe Area Chat Header */}
+      <SafeAreaView edges={['top']} className="sticky top-0 z-30 bg-white border-b border-gray-200 shadow-sm">
         <ChatHeader
           selectedMatch={selectedMatch}
           onBack={() => setSelectedMatch(null)}
@@ -470,7 +473,7 @@ const ChatPage = ({ currentUser, onUnreadChange }: ChatPageProps) => {
           isMobile={true}
           currentUserId={currentUser.id}
         />
-      </div>
+      </SafeAreaView>
 
       {/* Scrollable Messages Area */}
       <div 
@@ -500,14 +503,16 @@ const ChatPage = ({ currentUser, onUnreadChange }: ChatPageProps) => {
         <div ref={messagesEndRef} />
       </div>
 
-      {/* Sticky Message Input Footer */}
-      <div className="sticky bottom-0 z-30 bg-white border-t border-gray-200 pb-[env(safe-area-inset-bottom,0px)]">
-        <MessageInput
-          newMessage={newMessage}
-          onMessageChange={setNewMessage}
-          onSendMessage={sendMessage}
-        />
-      </div>
+      {/* Professional Safe Area Message Input */}
+      <SafeAreaView edges={['bottom']} className="sticky bottom-0 z-30 bg-white border-t border-gray-200">
+        <div className="pb-2">
+          <MessageInput
+            newMessage={newMessage}
+            onMessageChange={setNewMessage}
+            onSendMessage={sendMessage}
+          />
+        </div>
+      </SafeAreaView>
 
       <UserProfileModal
         isOpen={isUserProfileOpen}

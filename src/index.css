@@ -1,10 +1,17 @@
 
-/* Import safe area styles */
-@import './styles/safeArea.css';
-
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
+
+/* Simple, clean CSS - no Android optimizations */
+@layer base {
+  html, body, #root {
+    margin: 0;
+    padding: 0;
+    width: 100%;
+    height: 100%;
+  }
+}
 
 /* Definition of the design system. All colors, gradients, fonts, etc should be defined here. */
 

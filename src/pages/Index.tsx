@@ -247,7 +247,7 @@ const Index = () => {
 
   if (loading) {
     return (
-      <div className="mobile-container min-h-screen bg-gradient-to-br from-pink-400 via-purple-500 to-indigo-600 flex items-center justify-center">
+      <div className="min-h-screen bg-gradient-to-br from-pink-400 via-purple-500 to-indigo-600 flex items-center justify-center">
         <div className="animate-spin rounded-full h-32 w-32 border-b-2 border-white"></div>
       </div>
     );
@@ -260,7 +260,7 @@ const Index = () => {
   
   return (
     <div className="w-full min-h-screen flex justify-center bg-background">
-      <div className="mobile-container w-full h-full">
+      <div className="w-full h-full">
         {currentView === 'welcome' && (
           <WelcomeScreen 
             onGetStarted={handleGetStarted} 

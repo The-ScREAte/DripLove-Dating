@@ -1,161 +1,188 @@
-/* Universal Safe Area Support for iOS and Android */
-:root {
-  --safe-area-inset-top: env(safe-area-inset-top, 0px);
-  --safe-area-inset-right: env(safe-area-inset-right, 0px);
-  --safe-area-inset-bottom: env(safe-area-inset-bottom, 0px);
-  --safe-area-inset-left: env(safe-area-inset-left, 0px);
-  
-  /* Android-specific fallbacks for devices without env() support */
-  --android-status-bar-height: 24px;
-  --android-nav-bar-height: 48px;
-  --android-gesture-nav-height: 20px; /* For Android 10+ gesture navigation */
-}
+/* Mobile Safe Area Support for iOS and Android - Responsive */
 
-/* Enhanced safe area detection for Android */
-@supports not (padding: env(safe-area-inset-top)) {
-  :root {
-    --safe-area-inset-top: var(--android-status-bar-height);
-    --safe-area-inset-bottom: var(--android-nav-bar-height);
-  }
-  
-  /* Android gesture navigation detection */
-  @media (pointer: coarse) and (hover: none) {
-    :root {
-      --safe-area-inset-bottom: var(--android-gesture-nav-height);
-    }
-  }
-}
-
-/* Mobile container with safe area - Works on both iOS and Android */
+/* Base mobile container with safe area support */
 .mobile-container {
-  padding-top: max(var(--safe-area-inset-top), 0px);
-  padding-bottom: max(var(--safe-area-inset-bottom), 0px);
-  padding-left: max(var(--safe-area-inset-left), 0px);
-  padding-right: max(var(--safe-area-inset-right), 0px);
+  padding-top: env(safe-area-inset-top);
+  padding-bottom: env(safe-area-inset-bottom);
+  padding-left: env(safe-area-inset-left);
+  padding-right: env(safe-area-inset-right);
   min-height: 100vh;
-  min-height: 100dvh; /* Dynamic viewport height for mobile browsers */
-  
-  /* Android-specific smooth scrolling optimizations */
-  -webkit-overflow-scrolling: touch;
-  scroll-behavior: smooth;
-  overscroll-behavior: contain;
-}
-
-/* Header with safe area top - Universal for all mobile devices */
-.mobile-header {
-  padding-top: max(var(--safe-area-inset-top), 8px);
-  background: white;
-  position: sticky;
-  top: 0;
-  z-index: 50;
   width: 100%;
-  box-sizing: border-box;
-  
-  /* Android touch optimizations */
-  touch-action: manipulation;
-  -webkit-touch-callout: none;
-  -webkit-user-select: none;
-  user-select: none;
-}
-
-/* Enhanced mobile header for status bar overlap prevention */
-@media screen and (max-device-width: 768px) {
-  .mobile-header {
-    padding-top: max(var(--safe-area-inset-top), 16px);
-    
-    /* Android-specific header optimizations */
-    will-change: transform;
-    transform: translateZ(0); /* Hardware acceleration */
-  }
-}
-
-/* Bottom navigation with safe area - For Android gesture navigation */
-.mobile-bottom-nav {
-  padding-bottom: max(var(--safe-area-inset-bottom), 0px);
-  width: 100%;
+  overflow-x: hidden;
   box-sizing: border-box;
 }
 
-/* Safe area utility classes */
-.pt-safe {
-  padding-top: max(var(--safe-area-inset-top), 20px);
+/* Stable container to prevent page shaking and overflow */
+.stable-container {
+  width: 100%;
+  max-width: 100vw;
+  overflow-x: hidden;
+  position: relative;
+  box-sizing: border-box;
 }
 
-.pb-safe {
-  padding-bottom: max(var(--safe-area-inset-bottom), 0px);
+/* Premium modal stability with proper containment */
+.premium-modal {
+  width: 100%;
+  max-width: 100vw;
+  overflow: hidden;
+  padding-left: max(env(safe-area-inset-left), 16px);
+  padding-right: max(env(safe-area-inset-right), 16px);
+  padding-top: max(env(safe-area-inset-top), 20px);
+  padding-bottom: max(env(safe-area-inset-bottom), 20px);
+  box-sizing: border-box;
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
 }
 
-.pl-safe {
-  padding-left: max(var(--safe-area-inset-left), 0px);
+/* Premium content container for proper scrolling */
+.premium-content {
+  flex: 1;
+  overflow-y: auto;
+  overflow-x: hidden;
+  width: 100%;
+  box-sizing: border-box;
+  padding: 0;
+  margin: 0;
 }
 
-.pr-safe {
-  padding-right: max(var(--safe-area-inset-right), 0px);
+/* Responsive premium inner container */
+.premium-inner {
+  max-width: 100%;
+  width: 100%;
+  margin: 0 auto;
+  padding: 16px;
+  box-sizing: border-box;
 }
 
-/* Universal text scaling fixes - Both iOS and Android */
-* {
-  -webkit-text-size-adjust: 100%;
-  -moz-text-size-adjust: 100%;
-  -ms-text-size-adjust: 100%;
-  text-size-adjust: 100%;
+/* Safe area aware padding for critical components */
+.safe-area-padding {
+  padding-left: max(env(safe-area-inset-left), 16px);
+  padding-right: max(env(safe-area-inset-right), 16px);
 }
 
-/* Responsive font sizes for both platforms */
+/* Safe area aware top padding */
+.safe-area-top {
+  padding-top: max(env(safe-area-inset-top), 20px);
+}
+
+/* Safe area aware bottom padding */
+.safe-area-bottom {
+  padding-bottom: max(env(safe-area-inset-bottom), 20px);
+}
+
+/* Prevent horizontal overflow on all elements */
+.no-overflow {
+  overflow-x: hidden;
+  width: 100%;
+  max-width: 100vw;
+  box-sizing: border-box;
+}
+
+/* Responsive text and spacing */
+.responsive-text {
+  word-wrap: break-word;
+  overflow-wrap: break-word;
+  hyphens: auto;
+}
+
+/* Mobile viewport fix with proper responsive behavior */
 @media screen and (max-width: 768px) {
-  html {
-    font-size: 14px; /* Smaller base font for mobile */
+  * {
+    box-sizing: border-box;
   }
   
-  .text-xs { font-size: 0.75rem; }
-  .text-sm { font-size: 0.875rem; }
-  .text-base { font-size: 1rem; }
-  .text-lg { font-size: 1.125rem; }
-  .text-xl { font-size: 1.25rem; }
-  .text-2xl { font-size: 1.5rem; }
-  .text-3xl { font-size: 1.875rem; }
-}
-
-/* Mobile specific fixes for both platforms */
-@media screen and (max-width: 768px) {
   body {
-    font-size: 16px; /* Prevent zoom on form inputs */
-    overflow-x: hidden; /* Prevent horizontal scrolling */
-    width: 100vw;
-    max-width: 100vw;
-  }
-  
-  /* Prevent scroll bouncing and jitter */
-  html, body {
-    -webkit-overflow-scrolling: touch;
-    overscroll-behavior-x: none; /* Prevent horizontal overscroll */
-    width: 100vw;
+    overflow-x: hidden;
+    width: 100%;
     max-width: 100vw;
     margin: 0;
     padding: 0;
   }
   
-  /* Ensure all containers stay within viewport */
-  * {
-    max-width: 100vw;
-    box-sizing: border-box;
-  }
-  
-  /* Ensure proper touch targets */
-  button, 
-  [role="button"],
-  input,
-  select,
-  textarea {
-    min-height: 44px;
-  }
-  
-  /* Prevent content from expanding horizontally */
-  .mobile-container,
-  [class*="container"],
-  [class*="wrapper"] {
+  #root {
+    overflow-x: hidden;
     width: 100%;
     max-width: 100vw;
-    overflow-x: hidden;
+    margin: 0;
+    padding: 0;
   }
+  
+  .mobile-container {
+    box-sizing: border-box;
+    width: 100%;
+    max-width: 100vw;
+  }
+  
+  .premium-modal {
+    padding: max(env(safe-area-inset-top), 16px) max(env(safe-area-inset-right), 12px) max(env(safe-area-inset-bottom), 16px) max(env(safe-area-inset-left), 12px);
+  }
+  
+  .premium-inner {
+    padding: 12px;
+    max-width: 100%;
+  }
+  
+  /* Responsive typography for mobile */
+  .premium-title {
+    font-size: clamp(2rem, 8vw, 3.5rem);
+    line-height: 1.2;
+    word-wrap: break-word;
+  }
+  
+  .premium-subtitle {
+    font-size: clamp(1rem, 4vw, 1.25rem);
+    line-height: 1.4;
+  }
+  
+  .premium-feature-text {
+    font-size: clamp(0.875rem, 3.5vw, 1rem);
+    line-height: 1.5;
+  }
+}
+
+/* Extra small screens */
+@media screen and (max-width: 480px) {
+  .premium-modal {
+    padding: max(env(safe-area-inset-top), 12px) max(env(safe-area-inset-right), 8px) max(env(safe-area-inset-bottom), 12px) max(env(safe-area-inset-left), 8px);
+  }
+  
+  .premium-inner {
+    padding: 8px;
+  }
+  
+  .premium-title {
+    font-size: clamp(1.75rem, 7vw, 2.5rem);
+  }
+}
+
+/* Android specific optimizations */
+@media screen and (max-width: 768px) {
+  .android-safe {
+    padding-top: max(env(safe-area-inset-top), 24px);
+    padding-bottom: max(env(safe-area-inset-bottom), 24px);
+    padding-left: max(env(safe-area-inset-left), 16px);
+    padding-right: max(env(safe-area-inset-right), 16px);
+  }
+}
+
+/* iOS specific optimizations */
+@supports (padding: max(0px)) {
+  .ios-safe {
+    padding-top: max(env(safe-area-inset-top), 0px);
+    padding-bottom: max(env(safe-area-inset-bottom), 0px);
+    padding-left: max(env(safe-area-inset-left), 0px);
+    padding-right: max(env(safe-area-inset-right), 0px);
+  }
+}
+
+/* Ensure no elements can cause horizontal scroll */
+* {
+  max-width: 100%;
+}
+
+img, video, iframe, canvas, svg {
+  max-width: 100%;
+  height: auto;
 }

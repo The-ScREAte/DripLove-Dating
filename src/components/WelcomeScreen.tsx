@@ -12,7 +12,7 @@ interface WelcomeScreenProps {
 
 const WelcomeScreen = ({ onGetStarted, onAdminAccess, onShowAbout, onShowTerms, onShowPrivacy }: WelcomeScreenProps) => {
   return (
-    <div className="min-h-screen bg-gradient-to-br from-pink-400 via-purple-500 to-indigo-600 flex flex-col items-center justify-center text-white relative overflow-hidden">
+    <div className="min-h-screen w-full bg-gradient-to-br from-pink-400 via-purple-500 to-indigo-600 flex flex-col items-center justify-center text-white relative overflow-hidden">
       {/* Background Pattern */}
       <div className="absolute inset-0 opacity-10">
         <div className="absolute top-10 left-10 w-20 h-20 bg-white rounded-full"></div>
@@ -22,7 +22,7 @@ const WelcomeScreen = ({ onGetStarted, onAdminAccess, onShowAbout, onShowTerms, 
       </div>
       
       {/* Main Content */}
-      <div className="text-center z-10 px-4 max-w-md mx-auto">
+      <div className="text-center z-10 px-4 w-full max-w-md mx-auto">
         {/* Logo */}
         <div className="mb-8 flex justify-center">
           <img 

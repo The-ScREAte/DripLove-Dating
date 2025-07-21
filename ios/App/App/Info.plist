@@ -49,10 +49,10 @@
 	<array>
 		<dict>
 			<key>CFBundleURLName</key>
-			<string>com.driplove.dating</string>
+			<string>driplove</string>
 			<key>CFBundleURLSchemes</key>
 			<array>
-				<string>com.driplove.dating</string>
+				<string>driplove</string>
 			</array>
 		</dict>
 	</array>
