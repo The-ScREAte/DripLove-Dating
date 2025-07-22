@@ -97,8 +97,13 @@ export const useSubscription = (userId: string | undefined) => {
   };
 
   const getLikedMeVisibleCount = () => {
-    if (!subscription || !subscription.features) return 1;
-    return subscription.features.liked_me_visible === -1 ? -1 : subscription.features.liked_me_visible;
+    if (!subscription || !subscription.features) return 0; // Free users see nothing
+    
+    // Premium users see all (-1 means unlimited)
+    if (isPremium()) return -1;
+    
+    // Free users see nothing in liked me page
+    return 0;
   };
 
   useEffect(() => {

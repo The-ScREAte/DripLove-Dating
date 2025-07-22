@@ -400,9 +400,8 @@ const LikedMePage = ({ currentUser }: LikedMePageProps) => {
   };
 
   const handleProfileClick = (liker: any, index: number) => {
-    // Premium users can view all profiles, free users only see limited
-    const visibleCount = getLikedMeVisibleCount();
-    if (!isPremium() && visibleCount !== -1 && index >= visibleCount) {
+    // Only premium users can click on profiles
+    if (!isPremium()) {
       setShowPremiumUpgrade(true);
       return;
     }
@@ -636,7 +635,25 @@ const LikedMePage = ({ currentUser }: LikedMePageProps) => {
       </div>
       
       <div className="flex-1 overflow-y-auto p-4 pb-24 bg-white">
-        {likers.length === 0 ? (
+        {/* For free users, show upgrade prompt instead of profiles */}
+        {!isPremium() ? (
+          <div className="flex items-center justify-center h-full">
+            <div className="text-center p-6">
+              <Crown className="w-20 h-20 text-yellow-500 mx-auto mb-6" />
+              <h3 className="text-2xl font-bold text-gray-800 mb-4">Premium Feature</h3>
+              <p className="text-gray-600 mb-6 text-lg">
+                Upgrade to Premium to see who liked you and interact with them
+              </p>
+              <Button 
+                onClick={() => setShowPremiumUpgrade(true)}
+                className="bg-gradient-to-r from-pink-500 to-purple-600 hover:from-pink-600 hover:to-purple-700 text-white font-bold py-3 px-8 rounded-lg text-lg shadow-lg"
+              >
+                <Crown className="w-5 h-5 mr-2" />
+                Upgrade to Premium
+              </Button>
+            </div>
+          </div>
+        ) : likers.length === 0 ? (
           <div className="flex items-center justify-center h-full">
             <div className="text-center">
               <Users className="w-16 h-16 text-gray-400 mx-auto mb-4" />
@@ -648,13 +665,11 @@ const LikedMePage = ({ currentUser }: LikedMePageProps) => {
           <div className="grid grid-cols-2 gap-3">
             {likers.map((liker, index) => {
               const profileImages = userImages[liker.id] || [];
-              const visibleCount = getLikedMeVisibleCount();
-              const isLocked = !isPremium() && visibleCount !== -1 && index >= visibleCount;
               
               return (
                 <Card
                   key={liker.id}
-                  className={`cursor-pointer hover:shadow-lg transition-shadow flex flex-col relative ${isLocked ? 'opacity-75' : ''}`}
+                  className="cursor-pointer hover:shadow-lg transition-shadow flex flex-col relative"
                   onClick={() => handleProfileClick(liker, index)}
                 >
                   <div className="relative aspect-[3/4] w-full overflow-hidden rounded-t-lg">
@@ -662,33 +677,31 @@ const LikedMePage = ({ currentUser }: LikedMePageProps) => {
                       <img
                         src={profileImages[0]}
                         alt={`${liker.first_name}'s photo`}
-                        className={`w-full h-full object-cover ${isLocked ? 'blur-md' : ''}`}
+                        className="w-full h-full object-cover"
                         loading="lazy"
                       />
                     ) : (
-                      <div className={`w-full h-full bg-gradient-to-br from-pink-200 to-purple-200 flex items-center justify-center ${isLocked ? 'blur-md' : ''}`}>
+                      <div className="w-full h-full bg-gradient-to-br from-pink-200 to-purple-200 flex items-center justify-center">
                         <span className="text-2xl font-bold text-gray-700">
                           {liker.first_name?.[0]}{liker.last_name?.[0]}
                         </span>
                       </div>
                     )}
-                    {isLocked && (
-                      <div className="absolute inset-0 flex items-center justify-center bg-black/20">
-                        <div className="bg-white/90 backdrop-blur-sm rounded-full p-3">
-                          <Lock className="w-6 h-6 text-gray-700" />
-                        </div>
+                    
+                    <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-transparent" />
+                    
+                    <div className="absolute bottom-0 left-0 right-0 p-3 text-white">
+                      <div className="space-y-1">
+                        <h3 className="font-semibold text-white">
+                          {liker.first_name}, {calculateAge(liker.date_of_birth)}
+                        </h3>
+                        <p className="text-white/80 text-sm flex items-center">
+                          <MapPin className="w-3 h-3 mr-1" />
+                          {liker.city}
+                        </p>
                       </div>
-                    )}
+                    </div>
                   </div>
-
-                  <CardContent className="p-3 flex-1">
-                    <h3 className={`font-semibold text-gray-800 truncate text-sm ${isLocked ? 'blur-sm' : ''}`}>
-                      {liker.first_name}, {calculateAge(liker.date_of_birth)}
-                    </h3>
-                    <p className={`text-xs text-gray-600 truncate ${isLocked ? 'blur-sm' : ''}`}>
-                      {liker.city}
-                    </p>
-                  </CardContent>
                 </Card>
               );
             })}

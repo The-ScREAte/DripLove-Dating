@@ -1091,7 +1091,7 @@ const DiscoverPage = ({ currentUser, onNavigateToChat }: DiscoverPageProps) => {
           onReverse={handleReverse}
           onLike={handleLike}
           canReverse={passedUsers.length > 0}
-          reversesLeft={isPremium() ? undefined : Math.max(0, 2 - reverseUsageToday)}
+          reversesLeft={isPremium() ? undefined : Math.max(0, 1 - reverseUsageToday)}
           isPremium={isPremium()}
         />
       </div>
