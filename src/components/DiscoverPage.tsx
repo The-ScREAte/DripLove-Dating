@@ -718,8 +718,11 @@ const DiscoverPage = ({ currentUser, onNavigateToChat }: DiscoverPageProps) => {
           description: usageResult.message + ' Upgrade to Premium for unlimited reverse dislikes.',
           variant: 'destructive'
         });
+        setShowPremiumUpgrade(true);
         return;
       }
+    } else {
+      console.log('🏆 Premium user - unlimited reverse dislikes enabled');
     }
 
     const lastPassedUser = passedUsers[0];

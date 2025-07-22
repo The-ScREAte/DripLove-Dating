@@ -400,8 +400,9 @@ const LikedMePage = ({ currentUser }: LikedMePageProps) => {
   };
 
   const handleProfileClick = (liker: any, index: number) => {
-    // For free users, only allow clicking if they're premium
-    if (!isPremium()) {
+    // Premium users can view all profiles, free users only see limited
+    const visibleCount = getLikedMeVisibleCount();
+    if (!isPremium() && visibleCount !== -1 && index >= visibleCount) {
       setShowPremiumUpgrade(true);
       return;
     }
@@ -647,7 +648,8 @@ const LikedMePage = ({ currentUser }: LikedMePageProps) => {
           <div className="grid grid-cols-2 gap-3">
             {likers.map((liker, index) => {
               const profileImages = userImages[liker.id] || [];
-              const isLocked = !isPremium();
+              const visibleCount = getLikedMeVisibleCount();
+              const isLocked = !isPremium() && visibleCount !== -1 && index >= visibleCount;
               
               return (
                 <Card
