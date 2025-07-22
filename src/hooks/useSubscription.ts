@@ -97,7 +97,7 @@ export const useSubscription = (userId: string | undefined) => {
   };
 
   const getLikedMeVisibleCount = () => {
-    if (!subscription) return 1;
+    if (!subscription || !subscription.features) return 1;
     return subscription.features.liked_me_visible === -1 ? -1 : subscription.features.liked_me_visible;
   };
 
