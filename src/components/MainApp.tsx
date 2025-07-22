@@ -22,6 +22,7 @@ const MainApp = ({ user, onLogout }: MainAppProps) => {
   const [showTerms, setShowTerms] = useState(false);
   const [showPrivacy, setShowPrivacy] = useState(false);
   const [profile, setProfile] = useState<any>(null);
+  const [isPremium, setIsPremium] = useState(false);
   const [unreadCount, setUnreadCount] = useState(0);
   const { toast } = useToast();
   const insets = useSafeAreaInsets();
@@ -87,7 +88,22 @@ const MainApp = ({ user, onLogout }: MainAppProps) => {
         return;
       }
 
+      console.log('[MainApp] Profile fetched:', data);
       setProfile(data);
+      // Check premium status from user_subscriptions
+      if (data?.id) {
+        const { data: subData, error: subError } = await supabase
+          .from('user_subscriptions')
+          .select('plan_name, status')
+          .eq('user_id', data.id)
+          .eq('plan_name', 'premium')
+          .eq('status', 'active')
+          .maybeSingle();
+        setIsPremium(!!subData);
+        console.log('[MainApp] Subscription fetched:', subData, 'isPremium:', !!subData);
+      } else {
+        setIsPremium(false);
+      }
     } catch (error) {
       console.error('Error fetching profile:', error);
       toast({
@@ -150,13 +166,14 @@ const MainApp = ({ user, onLogout }: MainAppProps) => {
       return <PrivacyPolicy onBack={handleBackFromPrivacy} />;
     }
 
+    // Use isPremium from subscription table, not profile
     switch (activeTab) {
       case 'discover':
-        return <DiscoverPage currentUser={profile} onNavigateToChat={handleNavigateToChat} />;
+        return <DiscoverPage currentUser={profile} onNavigateToChat={handleNavigateToChat} isPremium={isPremium} />;
       case 'chat':
         return <ChatPage currentUser={profile} onUnreadChange={fetchUnreadCount} />;
       case 'liked':
-        return <LikedMePage currentUser={profile} />;
+        return <LikedMePage currentUser={profile} isPremium={isPremium} />;
       case 'profile':
         return (
           <ProfilePage 
@@ -166,10 +183,11 @@ const MainApp = ({ user, onLogout }: MainAppProps) => {
             onLogout={onLogout}
             onShowTerms={handleShowTerms}
             onShowPrivacy={handleShowPrivacy}
+            isPremium={isPremium}
           />
         );
       default:
-        return <DiscoverPage currentUser={profile} onNavigateToChat={handleNavigateToChat} />;
+        return <DiscoverPage currentUser={profile} onNavigateToChat={handleNavigateToChat} isPremium={isPremium} />;
     }
   };
 

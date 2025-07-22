@@ -26,9 +26,10 @@ interface ProfilePageProps {
   onLogout: () => void;
   onShowTerms?: () => void;
   onShowPrivacy?: () => void;
+  isPremium?: boolean;
 }
 
-const ProfilePage = ({ currentUser, profile, onProfileUpdate, onLogout, onShowTerms, onShowPrivacy }: ProfilePageProps) => {
+const ProfilePage = ({ currentUser, profile, onProfileUpdate, onLogout, onShowTerms, onShowPrivacy, isPremium }: ProfilePageProps) => {
   const [isEditing, setIsEditing] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const [showPremiumUpgrade, setShowPremiumUpgrade] = useState(false);
@@ -45,7 +46,7 @@ const ProfilePage = ({ currentUser, profile, onProfileUpdate, onLogout, onShowTe
   const [showAccountActionsSection, setShowAccountActionsSection] = useState(false);
   
   const { toast } = useToast();
-  const { subscription, loading: subscriptionLoading, isPremium } = useSubscription(currentUser?.id);
+  const { subscription, loading: subscriptionLoading } = useSubscription(currentUser?.id);
 
   const [editedProfile, setEditedProfile] = useState({
     first_name: '',
@@ -552,7 +553,7 @@ const ProfilePage = ({ currentUser, profile, onProfileUpdate, onLogout, onShowTe
         <div className="p-7">
           <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
             <div className="flex flex-row gap-3 w-full">
-              {!isPremium() && (
+              {!isPremium && (
                 <Button
                   onClick={() => setShowPremiumUpgrade(true)}
                   className="bg-gradient-to-r from-yellow-400 to-yellow-500 hover:from-yellow-500 hover:to-yellow-600 text-white font-semibold w-full sm:w-auto shadow-md hover:shadow-lg transition-all duration-200"

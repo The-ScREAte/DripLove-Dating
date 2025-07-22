@@ -25,7 +25,7 @@ const LikedMePage = ({ currentUser }: LikedMePageProps) => {
   const [hasInteractedToday, setHasInteractedToday] = useState(false);
   const { toast } = useToast();
 
-  const { subscription, isPremium, getLikedMeVisibleCount } = useSubscription(currentUser?.id);
+  // const { subscription, isPremium, getLikedMeVisibleCount } = useSubscription(currentUser?.id);
 
   const calculateAge = useCallback((dateOfBirth: string) => {
     const today = new Date();
@@ -41,7 +41,7 @@ const LikedMePage = ({ currentUser }: LikedMePageProps) => {
   }, []);
 
   const checkLockoutStatus = useCallback(async () => {
-    if (!currentUser?.id || isPremium()) return;
+    if (!currentUser?.id || isPremium) return;
 
     try {
       const { data, error } = await supabase
@@ -333,7 +333,7 @@ const LikedMePage = ({ currentUser }: LikedMePageProps) => {
       if (likeError) throw likeError;
 
       // Set lockout period for free users
-      if (!isPremium() && !hasInteractedToday) {
+      if (!isPremium && !hasInteractedToday) {
         await setLockoutPeriod();
         setHasInteractedToday(true);
       }
@@ -366,7 +366,7 @@ const LikedMePage = ({ currentUser }: LikedMePageProps) => {
       if (error) throw error;
 
       // Set lockout period for free users
-      if (!isPremium() && !hasInteractedToday) {
+      if (!isPremium && !hasInteractedToday) {
         await setLockoutPeriod();
         setHasInteractedToday(true);
       }
@@ -401,7 +401,7 @@ const LikedMePage = ({ currentUser }: LikedMePageProps) => {
 
   const handleProfileClick = (liker: any, index: number) => {
     // For free users, only allow clicking if they're premium
-    if (!isPremium()) {
+    if (!isPremium) {
       setShowPremiumUpgrade(true);
       return;
     }
@@ -419,7 +419,7 @@ const LikedMePage = ({ currentUser }: LikedMePageProps) => {
   };
 
   const isInLockout = useMemo(() => 
-    !isPremium() && lockoutEndDate && new Date() < lockoutEndDate,
+    !isPremium && lockoutEndDate && new Date() < lockoutEndDate,
     [isPremium, lockoutEndDate]
   );
 
@@ -610,7 +610,7 @@ const LikedMePage = ({ currentUser }: LikedMePageProps) => {
             <Users className="w-6 h-6 text-pink-600" />
             <h1 className="text-xl font-bold text-gray-800">People who liked you</h1>
           </div>
-          {!isPremium() && (
+          {!isPremium && (
             <Button
               onClick={() => setShowPremiumUpgrade(true)}
               className="bg-gradient-to-r from-yellow-400 to-yellow-600 hover:from-yellow-500 hover:to-yellow-700 text-black font-bold text-xs px-2 py-1"
@@ -622,7 +622,7 @@ const LikedMePage = ({ currentUser }: LikedMePageProps) => {
         </div>
         <p className="text-gray-600 text-sm">({likers.length} people)</p>
         
-        {!isPremium() && (
+        {!isPremium && (
           <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-3 mt-3">
             <div className="flex items-center space-x-2 text-yellow-800">
               <Lock className="w-4 h-4" />
@@ -647,7 +647,7 @@ const LikedMePage = ({ currentUser }: LikedMePageProps) => {
           <div className="grid grid-cols-2 gap-3">
             {likers.map((liker, index) => {
               const profileImages = userImages[liker.id] || [];
-              const isLocked = !isPremium();
+              const isLocked = !isPremium;
               
               return (
                 <Card

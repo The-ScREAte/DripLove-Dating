@@ -31,6 +31,7 @@ import { CurrentUser, PotentialMatch } from '@/types';
 interface DiscoverPageProps {
   currentUser: CurrentUser;
   onNavigateToChat?: (userId: string) => void;
+  isPremium?: boolean;
 }
 
 interface PassedUser {
@@ -38,7 +39,7 @@ interface PassedUser {
   passed_at: Date;
 }
 
-const DiscoverPage = ({ currentUser, onNavigateToChat }: DiscoverPageProps) => {
+const DiscoverPage = ({ currentUser, onNavigateToChat, isPremium }: DiscoverPageProps) => {
   const [potentialMatches, setPotentialMatches] = useState<PotentialMatch[]>([]);
   const [currentIndex, setCurrentIndex] = useState(0);
   const [imageIndex, setImageIndex] = useState(0);
@@ -53,7 +54,7 @@ const DiscoverPage = ({ currentUser, onNavigateToChat }: DiscoverPageProps) => {
   const [userImages, setUserImages] = useState<{ [key: string]: string[] }>({});
   const [reverseUsageToday, setReverseUsageToday] = useState(0);
   const { toast } = useToast();
-  const { subscription, checkUsageLimit, isPremium, refetchSubscription } = useSubscription(currentUser?.id);
+  const { subscription, checkUsageLimit, refetchSubscription } = useSubscription(currentUser?.id);
 
   // --- BEGIN: Swipe Guide Popup State ---
   const [showSwipeGuide, setShowSwipeGuide] = useState(false);
@@ -93,7 +94,7 @@ const DiscoverPage = ({ currentUser, onNavigateToChat }: DiscoverPageProps) => {
   const debugSubscription = async () => {
     console.log('🐛 DEBUG - Current subscription state:', {
       subscription,
-      isPremium: isPremium(),
+      isPremium: isPremium,
       currentUser: currentUser?.id
     });
     
@@ -571,7 +572,7 @@ const DiscoverPage = ({ currentUser, onNavigateToChat }: DiscoverPageProps) => {
     moveToNext(); // Move UI instantly
 
     // Check swipe limit only for free users
-    if (!isPremium()) {
+    if (!isPremium) {
       const usageResult = await checkUsageLimit('swipe');
       if (!usageResult.success) {
         setIsOutOfSwipes(true);
@@ -653,7 +654,7 @@ const DiscoverPage = ({ currentUser, onNavigateToChat }: DiscoverPageProps) => {
     moveToNext(); // Move UI instantly
 
     // Check swipe limit only for free users
-    if (!isPremium()) {
+    if (!isPremium) {
       const usageResult = await checkUsageLimit('swipe');
       if (!usageResult.success) {
         setIsOutOfSwipes(true);
@@ -710,7 +711,7 @@ const DiscoverPage = ({ currentUser, onNavigateToChat }: DiscoverPageProps) => {
     if (passedUsers.length === 0) return;
 
     // Check reverse dislike limit for free users
-    if (!isPremium()) {
+    if (!isPremium) {
       const usageResult = await checkUsageLimit('reverse_dislike');
       if (!usageResult.success) {
         toast({
@@ -774,7 +775,7 @@ const DiscoverPage = ({ currentUser, onNavigateToChat }: DiscoverPageProps) => {
       setPassedUsers(prev => prev.slice(1));
 
       // Update reverse usage count if not premium
-      if (!isPremium()) {
+      if (!isPremium) {
         setReverseUsageToday(prev => prev + 1);
       }
 
@@ -859,13 +860,13 @@ const DiscoverPage = ({ currentUser, onNavigateToChat }: DiscoverPageProps) => {
             <Heart className="w-16 h-16 mx-auto mb-4 text-gray-300" />
             <h2 className="text-xl font-semibold mb-2">You're out of swipes for today!</h2>
             <p className="text-gray-600 mb-4">
-              {isPremium() 
+              {isPremium 
                 ? "Refreshing your matches..." 
                 : "Free users get 12 swipes per day. Come back tomorrow or upgrade to Premium for unlimited swipes!"
               }
             </p>
             <div className="space-y-3">
-            {!isPremium() && (
+            {!isPremium && (
               <Button 
                 onClick={() => setShowPremiumUpgrade(true)} 
                 className="w-full bg-gradient-to-r from-yellow-400 to-yellow-600 hover:from-yellow-500 hover:to-yellow-700 text-black font-bold"
@@ -1045,7 +1046,7 @@ const DiscoverPage = ({ currentUser, onNavigateToChat }: DiscoverPageProps) => {
               match={currentMatch}
               imageIndex={imageIndex}
               showMoreInfo={showMoreInfo}
-              isPremium={isPremium()}
+              isPremium={isPremium}
               userImages={currentMatchImages}
               currentUserLatitude={currentUser.latitude}
               currentUserLongitude={currentUser.longitude}
@@ -1067,7 +1068,7 @@ const DiscoverPage = ({ currentUser, onNavigateToChat }: DiscoverPageProps) => {
               match={currentMatch}
               imageIndex={imageIndex}
               showMoreInfo={showMoreInfo}
-              isPremium={isPremium()}
+              isPremium={isPremium}
               userImages={currentMatchImages}
               currentUserLatitude={currentUser.latitude}
               currentUserLongitude={currentUser.longitude}
@@ -1087,9 +1088,9 @@ const DiscoverPage = ({ currentUser, onNavigateToChat }: DiscoverPageProps) => {
           onPass={handlePass}
           onReverse={handleReverse}
           onLike={handleLike}
-          canReverse={passedUsers.length > 0}
-          reversesLeft={isPremium() ? undefined : Math.max(0, 2 - reverseUsageToday)}
-          isPremium={isPremium()}
+          canReverse={isPremium ? true : passedUsers.length > 0}
+          reversesLeft={isPremium ? undefined : Math.max(0, 2 - reverseUsageToday)}
+          isPremium={isPremium}
         />
       </div>
     </div>
