@@ -1,5 +1,6 @@
 
 import React, { useState } from 'react';
+import { supabase } from '@/integrations/supabase/client';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -36,6 +37,34 @@ const RegistrationForm = ({ onSubmit, onBackToLogin }: RegistrationFormProps) =>
   const [currentStep, setCurrentStep] = useState(1);
   const [images, setImages] = useState<ImageUpload[]>([]);
   const { toast } = useToast();
+
+  // Restore images from sessionStorage on mount
+  React.useEffect(() => {
+    const saved = sessionStorage.getItem('registration_images');
+    if (saved) {
+      try {
+        const parsed = JSON.parse(saved);
+        // Only restore preview/status/moderationResult, not File
+        setImages(parsed.map((img: any) => ({
+          file: null, // File cannot be restored
+          preview: img.preview,
+          moderationResult: img.moderationResult,
+          status: img.status
+        })));
+      } catch {}
+    }
+  }, []);
+
+  // Save images to sessionStorage whenever they change
+  React.useEffect(() => {
+    // Only save serializable data
+    const serializable = images.map(img => ({
+      preview: img.preview,
+      moderationResult: img.moderationResult,
+      status: img.status
+    }));
+    sessionStorage.setItem('registration_images', JSON.stringify(serializable));
+  }, [images]);
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
     setFormData({
@@ -145,7 +174,6 @@ const RegistrationForm = ({ onSubmit, onBackToLogin }: RegistrationFormProps) =>
       // AI Moderation
       try {
         const moderationResult = await moderateImage(file);
-        
         setImages(prev => prev.map(img => 
           img.preview === preview 
             ? { 
@@ -159,6 +187,16 @@ const RegistrationForm = ({ onSubmit, onBackToLogin }: RegistrationFormProps) =>
               }
             : img
         ));
+
+        // Save updated images to sessionStorage
+        setTimeout(() => {
+          const serializable = images.map(img => ({
+            preview: img.preview,
+            moderationResult: img.moderationResult,
+            status: img.status
+          }));
+          sessionStorage.setItem('registration_images', JSON.stringify(serializable));
+        }, 0);
 
         if (!moderationResult.isApproved) {
           toast({
@@ -192,6 +230,14 @@ const RegistrationForm = ({ onSubmit, onBackToLogin }: RegistrationFormProps) =>
               }}
             : img
         ));
+        setTimeout(() => {
+          const serializable = images.map(img => ({
+            preview: img.preview,
+            moderationResult: img.moderationResult,
+            status: img.status
+          }));
+          sessionStorage.setItem('registration_images', JSON.stringify(serializable));
+        }, 0);
       }
     }
 
@@ -296,7 +342,7 @@ const RegistrationForm = ({ onSubmit, onBackToLogin }: RegistrationFormProps) =>
     setCurrentStep(2);
   };
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (currentStep === 1) {
       handleContinue();
@@ -336,7 +382,122 @@ const RegistrationForm = ({ onSubmit, onBackToLogin }: RegistrationFormProps) =>
       return;
     }
 
+    // Clear sessionStorage after successful registration
+    sessionStorage.removeItem('registration_images');
     // Submit with images
+    // 1. Create user account
+    let userId = null;
+    let userEmail = formData.email;
+    let userCreated = false;
+    try {
+      // Create user in Supabase Auth
+      const { data: signUpData, error: signUpError } = await supabase.auth.signUp({
+        email: formData.email,
+        password: formData.password,
+        options: {
+          data: {
+            first_name: formData.firstName,
+            last_name: formData.lastName,
+          }
+        }
+      });
+      if (signUpError) throw signUpError;
+      userId = signUpData?.user?.id;
+      userCreated = !!userId;
+    } catch (err) {
+      toast({
+        title: 'Account Creation Error',
+        description: err.message || 'Failed to create account.',
+        variant: 'destructive',
+      });
+      return;
+    }
+
+    // 2. Save profile data
+    try {
+      const profileData = {
+        id: userId,
+        email: userEmail,
+        first_name: formData.firstName,
+        last_name: formData.lastName,
+        date_of_birth: formData.dateOfBirth,
+        country: formData.country,
+        city: formData.city,
+        zip_code: formData.zipCode,
+        gender: formData.gender,
+        preference: formData.preference,
+        relationship_intent: formData.relationshipIntent,
+        occupation: formData.occupation,
+        industry: formData.industry,
+        education_level: formData.educationLevel,
+        bio: formData.bio || '',
+        interests: formData.interests || [],
+        latitude: formData.latitude,
+        longitude: formData.longitude,
+        is_custom_city: formData.isCustomCity || false,
+        max_distance: formData.maxDistance || 50,
+        country_code: formData.countryCode || ''
+      };
+      const { error: profileError } = await supabase
+        .from('profiles')
+        .upsert(profileData);
+      if (profileError) throw profileError;
+    } catch (err) {
+      toast({
+        title: 'Profile Save Error',
+        description: err.message || 'Failed to save profile.',
+        variant: 'destructive',
+      });
+      return;
+    }
+
+    // 3. Upload approved images to storage and save to DB
+    for (const image of approvedImages) {
+      try {
+        // Upload to storage
+        const fileExt = image.file.name.split('.').pop();
+        const fileName = `${Date.now()}.${fileExt}`;
+        const filePath = `${userId}/${fileName}`;
+
+        const { error: uploadError } = await supabase.storage
+          .from('user-photos')
+          .upload(filePath, image.file);
+
+        if (uploadError) throw uploadError;
+
+        // Get public URL
+        const { data: { publicUrl } } = supabase.storage
+          .from('user-photos')
+          .getPublicUrl(filePath);
+
+        // Save to database
+        const { error: dbError } = await supabase
+          .from('user_images')
+          .insert({
+            user_id: userId,
+            image_url: publicUrl,
+            image_order: approvedImages.indexOf(image),
+            is_approved: image.status === 'approved',
+            moderation_status: image.status === 'approved' ? 'approved' : 'pending',
+            flagged_content: image.moderationResult?.flags || [],
+            confidence_score: image.moderationResult?.confidence || 0
+          });
+
+        if (dbError) throw dbError;
+      } catch (error) {
+        console.error('Error uploading image:', error);
+        toast({
+          title: 'Image Upload Error',
+          description: 'Some images failed to upload. You can add them later.',
+          variant: 'destructive',
+        });
+      }
+    }
+
+    toast({
+      title: 'Account Created!',
+      description: 'Your account and profile have been created. Welcome!',
+    });
     onSubmit({ ...formData, images: approvedImages });
   };
 

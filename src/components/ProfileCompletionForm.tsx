@@ -32,6 +32,32 @@ const ProfileCompletionForm = ({ user, onComplete, onCancel }: ProfileCompletion
   const [images, setImages] = useState<ImageUpload[]>([]);
   const { toast } = useToast();
 
+  // Restore images from sessionStorage on mount
+  useEffect(() => {
+    const saved = sessionStorage.getItem('profilecompletion_images');
+    if (saved) {
+      try {
+        const parsed = JSON.parse(saved);
+        setImages(parsed.map((img: any) => ({
+          file: null,
+          preview: img.preview,
+          moderationResult: img.moderationResult,
+          status: img.status
+        })));
+      } catch {}
+    }
+  }, []);
+
+  // Save images to sessionStorage whenever they change
+  useEffect(() => {
+    const serializable = images.map(img => ({
+      preview: img.preview,
+      moderationResult: img.moderationResult,
+      status: img.status
+    }));
+    sessionStorage.setItem('profilecompletion_images', JSON.stringify(serializable));
+  }, [images]);
+
   useEffect(() => {
     // Pre-fill form with user data from OAuth if available
     if (user) {
@@ -288,7 +314,9 @@ const ProfileCompletionForm = ({ user, onComplete, onCancel }: ProfileCompletion
     }
 
     try {
-      // Create profile for OAuth user
+      // Clear sessionStorage after successful completion
+      sessionStorage.removeItem('profilecompletion_images');
+      // ...existing code...
       const profileData = {
         first_name: formData.firstName,
         last_name: formData.lastName,

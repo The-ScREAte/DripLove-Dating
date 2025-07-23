@@ -88,7 +88,7 @@ const MainApp = ({ user, onLogout }: MainAppProps) => {
         return;
       }
 
-      console.log('[MainApp] Profile fetched:', data);
+      // [MainApp] Profile fetched
       setProfile(data);
       // Check premium status from user_subscriptions
       if (data?.id) {
@@ -100,7 +100,7 @@ const MainApp = ({ user, onLogout }: MainAppProps) => {
           .eq('status', 'active')
           .maybeSingle();
         setIsPremium(!!subData);
-        console.log('[MainApp] Subscription fetched:', subData, 'isPremium:', !!subData);
+        // [MainApp] Subscription fetched
       } else {
         setIsPremium(false);
       }
