@@ -100,11 +100,13 @@ const ChatPage = ({ currentUser, onUnreadChange }: ChatPageProps) => {
       const matchesWithPartner = matches?.map(match => {
         const partner = match.user1_id === currentUser.id ? match.user2 : match.user1;
         const lastMessage = match.chats?.[match.chats.length - 1];
-        
-        // Safely get unread count - handle cases where fields don't exist
+        // Get unread count for current user
         let unreadCount = 0;
-        // Note: unread tracking fields may not exist in all database schemas
-
+        if ('user1_unread_count' in match && 'user2_unread_count' in match) {
+          unreadCount = match.user1_id === currentUser.id ? Number(match.user1_unread_count) : Number(match.user2_unread_count);
+        }
+        // Ensure unreadCount is always a non-negative integer
+        if (!Number.isFinite(unreadCount) || unreadCount < 0) unreadCount = 0;
         return {
           ...match,
           partner,
@@ -173,9 +175,8 @@ const ChatPage = ({ currentUser, onUnreadChange }: ChatPageProps) => {
         // Try updating unread count with proper error handling
         try {
           const isUser1 = selectedMatch.user1_id === currentUser.id;
-          const unreadField = isUser1 ? 'user1_unread' : 'user2_unread';
+          const unreadField = isUser1 ? 'user1_unread_count' : 'user2_unread_count';
           const updateData = { [unreadField]: 0 };
-          
           await supabase
             .from('matches')
             .update(updateData)
@@ -248,9 +249,18 @@ const ChatPage = ({ currentUser, onUnreadChange }: ChatPageProps) => {
       // Try to update unread count (only if field exists)
       try {
         const isUser1 = selectedMatch.user1_id === currentUser.id;
-        const unreadField = isUser1 ? 'user2_unread' : 'user1_unread';
-        const updateData = { [unreadField]: 1 };
-        
+        const unreadField = isUser1 ? 'user2_unread_count' : 'user1_unread_count';
+        // Get current unread count for the other user
+        const { data: matchData, error: matchError } = await supabase
+          .from('matches')
+          .select(unreadField)
+          .eq('id', selectedMatch.id)
+          .single();
+        let newCount = 1;
+        if (!matchError && matchData && typeof matchData[unreadField] === 'number') {
+          newCount = matchData[unreadField] + 1;
+        }
+        const updateData = { [unreadField]: newCount };
         await supabase
           .from('matches')
           .update(updateData)
@@ -398,7 +408,7 @@ const ChatPage = ({ currentUser, onUnreadChange }: ChatPageProps) => {
                   key={match.id}
                   className={`p-4 border-b border-gray-200 cursor-pointer hover:bg-gray-100 transition-colors ${
                     selectedMatch?.id === match.id ? 'bg-pink-50 border-pink-200' : 'bg-white'
-                  }`}
+                  } ${match.unread_messages > 0 ? 'font-bold bg-purple-50' : ''}`}
                   onClick={() => setSelectedMatch(match)}
                 >
                   <div className="flex items-center space-x-3">
@@ -418,7 +428,8 @@ const ChatPage = ({ currentUser, onUnreadChange }: ChatPageProps) => {
                     </div>
                   <div className="flex-1 min-w-0">
                     <div className="flex justify-between items-start">
-                      <h3 className="font-semibold text-gray-900 truncate">
+                      <h3 className={`font-semibold truncate ${match.unread_messages > 0 ? 'text-purple-700' : 'text-gray-900'}`}
+                        >
                         {match.first_name} {match.last_name}
                       </h3>
                       {match.last_message_time && (

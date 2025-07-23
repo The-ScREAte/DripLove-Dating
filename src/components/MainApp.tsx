@@ -126,39 +126,23 @@ const MainApp = ({ user, onLogout }: MainAppProps) => {
     if (!user?.id) return;
 
     try {
-      // Get unread count from notifications table for more accurate count
-      const { data: notificationData, error: notificationError } = await supabase
-        .from('notifications')
-        .select('id')
-        .eq('user_id', user.id)
-        .eq('type', 'message')
-        .eq('is_read', false);
+      // Always use matches table for unread count
+      const { data, error } = await supabase
+        .from('matches')
+        .select('user1_unread_count, user2_unread_count, user1_id, user2_id')
+        .or(`user1_id.eq.${user.id},user2_id.eq.${user.id}`);
 
-      if (notificationError) throw notificationError;
+      if (error) throw error;
 
-      setUnreadCount(notificationData?.length || 0);
+      const total = data?.reduce((sum, match) => {
+        const isUser1 = match.user1_id === user.id;
+        const unread = isUser1 ? Number(match.user1_unread_count) : Number(match.user2_unread_count);
+        return sum + (Number.isFinite(unread) && unread > 0 ? unread : 0);
+      }, 0) || 0;
+
+      setUnreadCount(total);
     } catch (error) {
       console.error('Error fetching unread count:', error);
-      
-      // Fallback to matches table method
-      try {
-        const { data, error } = await supabase
-          .from('matches')
-          .select('user1_unread_count, user2_unread_count, user1_id, user2_id')
-          .or(`user1_id.eq.${user.id},user2_id.eq.${user.id}`);
-
-        if (error) throw error;
-
-        const total = data?.reduce((sum, match) => {
-          const isUser1 = match.user1_id === user.id;
-          const unread = isUser1 ? match.user1_unread_count : match.user2_unread_count;
-          return sum + (unread || 0);
-        }, 0) || 0;
-
-        setUnreadCount(total);
-      } catch (fallbackError) {
-        console.error('Error in fallback unread count:', fallbackError);
-      }
     }
   };
 
