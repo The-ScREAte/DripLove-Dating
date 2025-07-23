@@ -546,7 +546,7 @@ const ProfilePage = ({ currentUser, profile, onProfileUpdate, onLogout, onShowTe
         className="fixed left-0 right-0 z-40 bg-white border-b border-gray-200 shadow-sm" 
         style={{ 
           top: '60px',
-          paddingTop: 'max(env(safe-area-inset-top, 0px), 4px)',
+          paddingTop: 'max(env(safe-area-inset-top, 0px), 15px)',
           width: '100%'
         }}
       >
@@ -654,21 +654,29 @@ const ProfilePage = ({ currentUser, profile, onProfileUpdate, onLogout, onShowTe
       </div>
 
       {/* Scrollable Content - with padding to account for fixed header */}
-      <div className="max-w-4xl mx-auto p-6 pb-12 space-y-8 overflow-x-hidden w-full" style={{ paddingTop: '180px' }}>
+      <div className="max-w-4xl mx-auto p-6 pb-12 space-y-8 overflow-x-hidden w-full" style={{ paddingTop: '180px', paddingBottom: '0px' }}>
         <div className="w-full max-w-full overflow-hidden">
           <ProfileSummaryCard currentUser={currentUser} />
-          <ImageManagement currentUser={currentUser} />
+          <div className="mb-2" />
           <BasicInfoSection 
             editedProfile={editedProfile} 
             isEditing={isEditing} 
             onInputChange={handleInputChange} 
           />
-          
+          <div className="mb-2" />
+          <CollapsibleSection
+            title="Your Photos"
+            isOpen={showAccountActionsSection} // reuse or create a new state if needed
+            onToggle={() => setShowAccountActionsSection(!showAccountActionsSection)}
+          >
+            <ImageManagement currentUser={currentUser} />
+          </CollapsibleSection>
+          <div className="mb-2" />
           <CollapsibleSection
             title="Location & Matching Preferences"
             isOpen={showLocationSection}
             onToggle={() => setShowLocationSection(!showLocationSection)}
-            className="mt-6"
+            className="mt-2"
           >
             <LocationSection 
               editedProfile={editedProfile} 
@@ -678,7 +686,7 @@ const ProfilePage = ({ currentUser, profile, onProfileUpdate, onLogout, onShowTe
               onDistanceChange={handleDistanceChange}
             />
           </CollapsibleSection>
-          
+          <div className="mb-2" />
           <CollapsibleSection
             title="Preferences"
             isOpen={showPreferencesSection}
@@ -692,7 +700,7 @@ const ProfilePage = ({ currentUser, profile, onProfileUpdate, onLogout, onShowTe
               onAgeRangeChange={handleAgeRangeChange} 
             />
           </CollapsibleSection>
-          
+          <div className="mb-2" />
           <CollapsibleSection
             title="Lifestyle"
             isOpen={showLifestyleSection}
@@ -704,7 +712,7 @@ const ProfilePage = ({ currentUser, profile, onProfileUpdate, onLogout, onShowTe
               onSelectChange={handleSelectChange} 
             />
           </CollapsibleSection>
-          
+          <div className="mb-2" />
           <CollapsibleSection
             title="Work & Education"
             isOpen={showWorkEducationSection}
@@ -716,7 +724,7 @@ const ProfilePage = ({ currentUser, profile, onProfileUpdate, onLogout, onShowTe
               onInputChange={handleInputChange} 
             />
           </CollapsibleSection>
-          
+          <div className="mb-2" />
           <CollapsibleSection
             title="Personality"
             isOpen={showPersonalitySection}
@@ -728,7 +736,7 @@ const ProfilePage = ({ currentUser, profile, onProfileUpdate, onLogout, onShowTe
               onSliderChange={handleSliderChange} 
             />
           </CollapsibleSection>
-          
+          <div className="mb-2" />
           <CollapsibleSection
             title="Fun Questions"
             isOpen={showFunQuestionsSection}
@@ -740,7 +748,7 @@ const ProfilePage = ({ currentUser, profile, onProfileUpdate, onLogout, onShowTe
               onInputChange={handleInputChange} 
             />
           </CollapsibleSection>
-          
+          <div className="mb-2" />
           <CollapsibleSection
             title="Interests"
             isOpen={showInterestsSection}
@@ -753,19 +761,46 @@ const ProfilePage = ({ currentUser, profile, onProfileUpdate, onLogout, onShowTe
               onInterestsChange={handleInterestsChange} 
             />
           </CollapsibleSection>
-          
+          <div className="mb-2" />
           <CollapsibleSection
             title="Account Actions"
             isOpen={showAccountActionsSection}
             onToggle={() => setShowAccountActionsSection(!showAccountActionsSection)}
           >
+            {/* Only show the rest of the account actions here, not logout/terms/privacy */}
             <AccountActions 
               currentUser={currentUser} 
-              onLogout={onLogout} 
-              onShowTerms={onShowTerms}
-              onShowPrivacy={onShowPrivacy}
+              hideLogoutTermsPrivacy={true} // Pass a prop to hide these actions
             />
           </CollapsibleSection>
+        </div>
+        {/* Move Logout, Terms of Service, and Privacy Policy to the bottom of the page */}
+        <div className="mt-2 flex flex-col items-center gap-4">
+          <Button
+            onClick={() => {
+              if (window.confirm('Are you sure you want to log out?')) {
+                onLogout();
+              }
+            }}
+            className="w-full max-w-xs bg-gray-900 hover:bg-gray-800 text-white font-medium"
+          >
+            Log Out
+          </Button>
+          <div className="flex gap-4 text-sm text-gray-600">
+            <button
+              onClick={onShowTerms}
+              className="hover:underline focus:outline-none"
+            >
+              Terms of Service
+            </button>
+            <span>|</span>
+            <button
+              onClick={onShowPrivacy}
+              className="hover:underline focus:outline-none"
+            >
+              Privacy Policy
+            </button>
+          </div>
         </div>
       </div>
     </div>

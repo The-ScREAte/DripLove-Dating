@@ -19,6 +19,28 @@ interface MainAppProps {
 
 const MainApp = ({ user, onLogout }: MainAppProps) => {
   const [activeTab, setActiveTab] = useState('discover');
+  // Register device token for push notifications (mobile only)
+  useEffect(() => {
+    const registerDeviceToken = async () => {
+      if (window.Capacitor && window.Capacitor.isNativePlatform && user?.id) {
+        try {
+          const { PushNotifications } = await import('@capacitor/push-notifications');
+          PushNotifications.register();
+          PushNotifications.addListener('registration', async (token) => {
+            // Save token to Supabase
+            await supabase.from('push_tokens').upsert({
+              user_id: user.id,
+              token: token.value,
+              platform: window.Capacitor.getPlatform()
+            });
+          });
+        } catch (err) {
+          // Ignore if not mobile or plugin not available
+        }
+      }
+    };
+    registerDeviceToken();
+  }, [user?.id]);
   const [showTerms, setShowTerms] = useState(false);
   const [showPrivacy, setShowPrivacy] = useState(false);
   const [profile, setProfile] = useState<any>(null);
@@ -52,15 +74,7 @@ const MainApp = ({ user, onLogout }: MainAppProps) => {
 
   useEffect(() => {
     const channel = supabase
-      .channel('unread-messages')
-      .on('postgres_changes', {
-        event: '*',
-        schema: 'public',
-        table: 'notifications',
-        filter: `user_id=eq.${user?.id}`
-      }, () => {
-        fetchUnreadCount();
-      })
+      .channel('nav-matches')
       .on('postgres_changes', {
         event: '*',
         schema: 'public',

@@ -56,7 +56,7 @@ const MessageInput: React.FC<MessageInputProps> = ({
   return (
     <div 
       ref={containerRef}
-      className="p-4 border-t bg-white relative keyboard-aware"
+      className="p-2 border-t bg-white relative keyboard-aware"
       style={{ 
         paddingBottom: `max(16px, env(safe-area-inset-bottom))`,
         position: 'sticky',

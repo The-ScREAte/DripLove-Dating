@@ -14,9 +14,10 @@ interface AccountActionsProps {
   onLogout: () => void;
   onShowTerms?: () => void;
   onShowPrivacy?: () => void;
+  hideLogoutTermsPrivacy?: boolean;
 }
 
-const AccountActions = ({ currentUser, onLogout, onShowTerms, onShowPrivacy }: AccountActionsProps) => {
+const AccountActions = ({ currentUser, onLogout, onShowTerms, onShowPrivacy, hideLogoutTermsPrivacy }: AccountActionsProps) => {
   const [deletingAccount, setDeletingAccount] = useState(false);
   const [showPasswordDialog, setShowPasswordDialog] = useState(false);
   const [password, setPassword] = useState('');
@@ -114,43 +115,48 @@ const AccountActions = ({ currentUser, onLogout, onShowTerms, onShowPrivacy }: A
           </a>
         </div>
 
-        {/* Legal Links */}
-        {(onShowTerms || onShowPrivacy) && (
-          <div className="bg-gray-50 p-4 rounded-lg border">
-            <div className="flex flex-wrap justify-center gap-4 text-sm">
-              {onShowTerms && (
-                <button 
-                  onClick={onShowTerms}
-                  className="text-purple-600 hover:text-purple-700 hover:underline transition-colors"
-                >
-                  Terms of Service
-                </button>
-              )}
-              {onShowTerms && onShowPrivacy && (
-                <span className="text-gray-400">•</span>
-              )}
-              {onShowPrivacy && (
-                <button 
-                  onClick={onShowPrivacy}
-                  className="text-purple-600 hover:text-purple-700 hover:underline transition-colors"
-                >
-                  Privacy Policy
-                </button>
-              )}
+        {/* Legal Links and Logout only if not hidden by prop */}
+        {!hideLogoutTermsPrivacy && (
+          <>
+            {(onShowTerms || onShowPrivacy) && (
+              <div className="bg-gray-50 p-4 rounded-lg border">
+                <div className="flex flex-wrap justify-center gap-4 text-sm">
+                  {onShowTerms && (
+                    <button 
+                      onClick={onShowTerms}
+                      className="text-purple-600 hover:text-purple-700 hover:underline transition-colors"
+                    >
+                      Terms of Service
+                    </button>
+                  )}
+                  {onShowTerms && onShowPrivacy && (
+                    <span className="text-gray-400">•</span>
+                  )}
+                  {onShowPrivacy && (
+                    <button 
+                      onClick={onShowPrivacy}
+                      className="text-purple-600 hover:text-purple-700 hover:underline transition-colors"
+                    >
+                      Privacy Policy
+                    </button>
+                  )}
+                </div>
+              </div>
+            )}
+            <div className="flex flex-col sm:flex-row gap-4">
+              <Button 
+                onClick={handleLogout}
+                variant="outline"
+                className="flex items-center justify-center space-x-2 border-gray-300 text-gray-700 hover:bg-gray-50 w-full sm:w-auto"
+              >
+                <LogOut className="w-4 h-4" />
+                <span>Logout</span>
+              </Button>
             </div>
-          </div>
+          </>
         )}
-
-        <div className="flex flex-col sm:flex-row gap-4">
-          <Button 
-            onClick={handleLogout}
-            variant="outline"
-            className="flex items-center justify-center space-x-2 border-gray-300 text-gray-700 hover:bg-gray-50 w-full sm:w-auto"
-          >
-            <LogOut className="w-4 h-4" />
-            <span>Logout</span>
-          </Button>
-
+        {/* Delete Account always visible */}
+        <div className="flex flex-col sm:flex-row gap-4 mt-4">
           <AlertDialog>
             <AlertDialogTrigger asChild>
               <Button 

@@ -20,6 +20,7 @@ interface ChatPageProps {
 
 const ChatPage = ({ currentUser, onUnreadChange }: ChatPageProps) => {
   const [matches, setMatches] = useState<ChatMatch[]>([]);
+  const matchesRef = useRef<ChatMatch[]>([]);
   const [selectedMatch, setSelectedMatch] = useState<ChatMatch | null>(null);
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [newMessage, setNewMessage] = useState('');
@@ -37,6 +38,34 @@ const ChatPage = ({ currentUser, onUnreadChange }: ChatPageProps) => {
     fetchMatches();
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [currentUser]);
+
+  // Keep matchesRef in sync
+  useEffect(() => {
+    matchesRef.current = matches;
+  }, [matches]);
+
+  // Real-time subscription for matches table
+  useEffect(() => {
+    const channel = supabase
+      .channel('chat-matches')
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'matches',
+        },
+        (payload) => {
+          // On any insert/update/delete, refetch matches
+          fetchMatches();
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [currentUser.id]);
 
   useEffect(() => {
     if (selectedMatch) {
@@ -97,15 +126,13 @@ const ChatPage = ({ currentUser, onUnreadChange }: ChatPageProps) => {
 
       if (error) throw error;
 
-      const matchesWithPartner = matches?.map(match => {
+      const matchesWithPartner = (matches?.map(match => {
         const partner = match.user1_id === currentUser.id ? match.user2 : match.user1;
         const lastMessage = match.chats?.[match.chats.length - 1];
-        // Get unread count for current user
         let unreadCount = 0;
         if ('user1_unread_count' in match && 'user2_unread_count' in match) {
           unreadCount = match.user1_id === currentUser.id ? Number(match.user1_unread_count) : Number(match.user2_unread_count);
         }
-        // Ensure unreadCount is always a non-negative integer
         if (!Number.isFinite(unreadCount) || unreadCount < 0) unreadCount = 0;
         return {
           ...match,
@@ -116,9 +143,15 @@ const ChatPage = ({ currentUser, onUnreadChange }: ChatPageProps) => {
           first_name: partner?.first_name || '',
           last_name: partner?.last_name || '',
           last_message: lastMessage?.message || '',
-          last_message_time: lastMessage?.created_at
+          last_message_time: lastMessage?.created_at || match.created_at
         };
-      }) || [];
+      }) || [])
+        // Sort by most recent message time (desc)
+        .sort((a, b) => {
+          const aTime = new Date(a.last_message_time || a.created_at).getTime();
+          const bTime = new Date(b.last_message_time || b.created_at).getTime();
+          return bTime - aTime;
+        });
 
       setMatches(matchesWithPartner as unknown as ChatMatch[]);
     } catch (error) {
@@ -227,22 +260,29 @@ const ChatPage = ({ currentUser, onUnreadChange }: ChatPageProps) => {
 
       if (error) throw error;
 
-      // Send push notification to the recipient
+      // Send push notification to the recipient using Supabase Edge Function
       const recipientId = selectedMatch.user1_id === currentUser.id 
         ? selectedMatch.user2_id 
         : selectedMatch.user1_id;
-      
       const senderName = `${currentUser.first_name || ''} ${currentUser.last_name || ''}`.trim() || 'Someone';
-      
-      // Send notification (don't await to avoid blocking UI)
-      if (isSupported && isInitialized) {
-        sendMessageNotification(
-          senderName,
-          newMessage.trim(),
-          recipientId,
-          selectedMatch.id
-        ).catch(() => {
-          // Silently handle notification errors
+
+      // Fetch the recipient's push token from Supabase
+      const { data: pushTokenData } = await supabase
+        .from('push_tokens')
+        .select('token')
+        .eq('user_id', recipientId)
+        .maybeSingle();
+
+      if (pushTokenData?.token) {
+        // Call your Edge Function to send the push notification
+        fetch('https://tgjsyyihabsovironesw.supabase.co/functions/v1/send-push-notification', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            token: pushTokenData.token,
+            title: `${senderName} sent you a message`,
+            message: newMessage.trim()
+          })
         });
       }
 

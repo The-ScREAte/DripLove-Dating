@@ -377,11 +377,44 @@ const MatchCard: React.FC<MatchCardProps> = ({
         {/* Expandable details - appears below basic info */}
         {showMoreInfo && (
           <div className="mt-4 space-y-3 text-sm">
-            {/* Bio */}
+            {/* About (Bio) */}
             {match.bio && (
               <div className="bg-gray-50 rounded-lg p-3">
                 <h4 className="font-semibold text-pink-600 mb-1">About</h4>
                 <p className="text-gray-700 text-xs leading-relaxed">{match.bio}</p>
+              </div>
+            )}
+
+            {/* Lifestyle */}
+            {(match.smoking || match.drinking || match.exercise_level || match.sleeping_schedule) && (
+              <div className="bg-gray-50 rounded-lg p-3">
+                <h4 className="font-semibold text-pink-600 mb-2">Lifestyle</h4>
+                <div className="space-y-2">
+                  {match.smoking && (
+                    <div className="flex items-center text-xs">
+                      <span className="font-semibold mr-2">Smoking:</span>
+                      <span className="text-gray-700">{match.smoking}</span>
+                    </div>
+                  )}
+                  {match.drinking && (
+                    <div className="flex items-center text-xs">
+                      <span className="font-semibold mr-2">Drinking:</span>
+                      <span className="text-gray-700">{match.drinking}</span>
+                    </div>
+                  )}
+                  {match.exercise_level && (
+                    <div className="flex items-center text-xs">
+                      <span className="font-semibold mr-2">Exercise:</span>
+                      <span className="text-gray-700">{match.exercise_level}</span>
+                    </div>
+                  )}
+                  {match.sleeping_schedule && (
+                    <div className="flex items-center text-xs">
+                      <span className="font-semibold mr-2">Sleep:</span>
+                      <span className="text-gray-700">{match.sleeping_schedule}</span>
+                    </div>
+                  )}
+                </div>
               </div>
             )}
 
@@ -400,6 +433,33 @@ const MatchCard: React.FC<MatchCardProps> = ({
                     <div className="flex items-center text-xs">
                       <GraduationCap className="w-3 h-3 mr-2 flex-shrink-0 text-pink-500" />
                       <span className="text-gray-700">{match.education_level}</span>
+                    </div>
+                  )}
+                </div>
+              </div>
+            )}
+
+            {/* Personality */}
+            {(typeof match.introvert_extrovert === 'number' || typeof match.spontaneous_planner === 'number' || typeof match.messy_organized === 'number') && (
+              <div className="bg-gray-50 rounded-lg p-3">
+                <h4 className="font-semibold text-pink-600 mb-2">Personality</h4>
+                <div className="space-y-2">
+                  {typeof match.introvert_extrovert === 'number' && (
+                    <div className="flex items-center text-xs">
+                      <span className="font-semibold mr-2">Introvert/Extrovert:</span>
+                      <span className="text-gray-700">{match.introvert_extrovert}</span>
+                    </div>
+                  )}
+                  {typeof match.spontaneous_planner === 'number' && (
+                    <div className="flex items-center text-xs">
+                      <span className="font-semibold mr-2">Spontaneous/Planner:</span>
+                      <span className="text-gray-700">{match.spontaneous_planner}</span>
+                    </div>
+                  )}
+                  {typeof match.messy_organized === 'number' && (
+                    <div className="flex items-center text-xs">
+                      <span className="font-semibold mr-2">Messy/Organized:</span>
+                      <span className="text-gray-700">{match.messy_organized}</span>
                     </div>
                   )}
                 </div>

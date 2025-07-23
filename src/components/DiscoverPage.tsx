@@ -1061,7 +1061,7 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, isPremium }: DiscoverPage
             />
           </div>
           {/* ...existing code... */}
-          <div className={`bg-white border-t border-gray-200 p-2 transition-all duration-300 ${
+          <div className={`bg-white border-t border-gray-400 p-1 transition-all duration-300 ${
             showMoreInfo ? 'h-[250px] overflow-y-auto pb-5' : 'h-[120px] overflow-y-auto pb-3'
           }`}>
             <MatchCard
