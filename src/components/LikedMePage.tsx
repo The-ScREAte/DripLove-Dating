@@ -10,9 +10,10 @@ import PremiumUpgrade from './PremiumUpgrade';
 
 interface LikedMePageProps {
   currentUser: any;
+  isPremium?: boolean;
 }
 
-const LikedMePage = ({ currentUser }: LikedMePageProps) => {
+const LikedMePage = ({ currentUser, isPremium = false }: LikedMePageProps) => {
   const [likers, setLikers] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [selectedProfile, setSelectedProfile] = useState<any>(null);
@@ -25,7 +26,7 @@ const LikedMePage = ({ currentUser }: LikedMePageProps) => {
   const [hasInteractedToday, setHasInteractedToday] = useState(false);
   const { toast } = useToast();
 
-  // const { subscription, isPremium, getLikedMeVisibleCount } = useSubscription(currentUser?.id);
+  const { subscription, getLikedMeVisibleCount } = useSubscription(currentUser?.id);
 
   const calculateAge = useCallback((dateOfBirth: string) => {
     const today = new Date();
@@ -275,7 +276,7 @@ const LikedMePage = ({ currentUser }: LikedMePageProps) => {
   }, [selectedProfile]);
 
   const setLockoutPeriod = async () => {
-    if (isPremium()) return;
+    if (isPremium) return;
 
     try {
       const lockoutDate = new Date();

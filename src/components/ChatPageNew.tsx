@@ -82,7 +82,7 @@ const ChatPage = ({ currentUser, onUnreadChange }: ChatPageProps) => {
           *,
           user1:profiles!matches_user1_id_fkey(id, first_name, last_name, is_admin),
           user2:profiles!matches_user2_id_fkey(id, first_name, last_name, is_admin),
-          chats(id, message, created_at, sender_id, is_read)
+          chats!chats_match_id_fkey(id, message, created_at, sender_id, is_read)
         `)
         .or(`user1_id.eq.${currentUser.id},user2_id.eq.${currentUser.id}`)
         .order('created_at', { ascending: false });
@@ -91,10 +91,13 @@ const ChatPage = ({ currentUser, onUnreadChange }: ChatPageProps) => {
 
       const matchesWithPartner = matches?.map(match => {
         const partner = match.user1_id === currentUser.id ? match.user2 : match.user1;
-        const lastMessage = match.chats?.[match.chats.length - 1];
+        const sortedChats = match.chats?.sort((a, b) => 
+          new Date(a.created_at).getTime() - new Date(b.created_at).getTime()
+        ) || [];
+        const lastMessage = sortedChats[sortedChats.length - 1];
         
-        // Count unread messages
-        const unreadCount = match.chats?.filter(msg => 
+        // Count unread messages for current user
+        const unreadCount = sortedChats.filter(msg => 
           msg.sender_id !== currentUser.id && !msg.is_read
         ).length || 0;
 
@@ -103,7 +106,7 @@ const ChatPage = ({ currentUser, onUnreadChange }: ChatPageProps) => {
           partner,
           last_message: lastMessage?.message || '',
           last_message_obj: lastMessage,
-          unreadCount,
+          unread_messages: unreadCount, // Use unread_messages for consistency
           // For compatibility with ChatMatch interface
           id: match.id,
           first_name: partner?.first_name || '',
@@ -157,6 +160,27 @@ const ChatPage = ({ currentUser, onUnreadChange }: ChatPageProps) => {
     if (!selectedMatch) return;
 
     try {
+      // Mark chat messages as read
+      await supabase
+        .from('chats')
+        .update({ is_read: true })
+        .eq('match_id', selectedMatch.id)
+        .neq('sender_id', currentUser.id);
+
+      // Mark notifications as read for messages from this match
+      const partnerId = selectedMatch.user1_id === currentUser.id 
+        ? selectedMatch.user2_id 
+        : selectedMatch.user1_id;
+
+      await supabase
+        .from('notifications')
+        .update({ is_read: true })
+        .eq('user_id', currentUser.id)
+        .eq('related_user_id', partnerId)
+        .eq('type', 'message')
+        .eq('is_read', false);
+
+      // Update unread count in matches table
       const isUser1 = selectedMatch.user1_id === currentUser.id;
       const unreadField = isUser1 ? 'user1_unread_count' : 'user2_unread_count';
 
@@ -165,13 +189,10 @@ const ChatPage = ({ currentUser, onUnreadChange }: ChatPageProps) => {
         .update({ [unreadField]: 0 })
         .eq('id', selectedMatch.id);
 
-      await supabase
-        .from('chats')
-        .update({ is_read: true })
-        .eq('match_id', selectedMatch.id)
-        .neq('sender_id', currentUser.id);
-
       onUnreadChange?.();
+      
+      // Refresh matches to update unread indicators
+      fetchMatches();
     } catch (error) {
       console.error('Error marking messages as read:', error);
     }
@@ -191,27 +212,70 @@ const ChatPage = ({ currentUser, onUnreadChange }: ChatPageProps) => {
     }
 
     try {
-      const isUser1 = selectedMatch.user1_id === currentUser.id;
-      const unreadField = isUser1 ? 'user2_unread_count' : 'user1_unread_count';
+      const recipientId = selectedMatch.user1_id === currentUser.id 
+        ? selectedMatch.user2_id 
+        : selectedMatch.user1_id;
 
-      const { error } = await supabase
+      // Send the message
+      const { data: messageData, error: messageError } = await supabase
         .from('chats')
         .insert({
           match_id: selectedMatch.id,
           sender_id: currentUser.id,
-          message: newMessage.trim()
-        });
+          message: newMessage.trim(),
+          is_read: false
+        })
+        .select()
+        .single();
 
-      if (error) throw error;
+      if (messageError) throw messageError;
 
-      // Update unread count for the receiver  
+      // Update unread count in matches table
+      const isUser1 = selectedMatch.user1_id === currentUser.id;
+      const unreadField = isUser1 ? 'user2_unread_count' : 'user1_unread_count';
+
       await supabase.rpc('increment_unread_count', { 
         match_id_input: selectedMatch.id, 
         field_name: unreadField 
       });
 
+      // Create notification for recipient (handled by database trigger)
+      // But we can also manually ensure notification is created
+      const senderName = `${currentUser.first_name} ${currentUser.last_name}`.trim();
+      
+      await supabase
+        .from('notifications')
+        .insert({
+          user_id: recipientId,
+          title: 'New Message',
+          message: `${senderName} sent you a message`,
+          type: 'message',
+          related_user_id: currentUser.id,
+          is_read: false
+        });
+
+      // Send push notification via edge function
+      try {
+        await supabase.functions.invoke('send-push-notification', {
+          body: {
+            title: `💬 ${senderName}`,
+            body: newMessage.trim(),
+            userId: recipientId,
+            type: 'message',
+            data: { 
+              chatId: selectedMatch.id,
+              senderId: currentUser.id
+            }
+          }
+        });
+      } catch (pushError) {
+        console.warn('Push notification failed:', pushError);
+        // Don't block message sending if push notification fails
+      }
+
       setNewMessage('');
       onUnreadChange?.();
+      fetchMatches(); // Refresh to update unread counts
     } catch (error) {
       console.error('Error sending message:', error);
       toast({

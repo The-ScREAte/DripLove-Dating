@@ -1,7 +1,7 @@
 // Android-specific utilities for DripLove Dating App
 // Ensures consistent safe areas, touch targets, and smooth scrolling
 
-import { androidOptimizations, touchOptimization, mobileStyles } from './mobileOptimizations';
+import { iosOptimizations, touchOptimization, mobileStyles } from './mobileOptimizations';
 
 /**
  * Detects if the app is running on Android
@@ -45,7 +45,7 @@ export const applyAndroidOptimizations = (element: HTMLElement): void => {
   // Apply performance optimizations
   Object.assign(element.style, {
     transform: 'translateZ(0px)',
-    willChange: androidOptimizations.willChange,
+    willChange: 'transform',
   });
 };
 

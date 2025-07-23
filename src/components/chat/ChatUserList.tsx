@@ -79,17 +79,17 @@ const ChatUserList: React.FC<ChatUserListProps> = ({
                       lastName={match.last_name}
                       onClick={() => onUserProfileOpen(partnerId)}
                     />
-                    {match.unread_messages > 0 && (
-                      <div className="absolute -top-1 -right-1 bg-red-500 text-white text-xs rounded-full w-5 h-5 flex items-center justify-center">
-                        {match.unread_messages > 9 ? '9+' : match.unread_messages}
-                      </div>
-                    )}
+                     {match.unread_messages > 0 && (
+                       <div className="absolute -top-1 -right-1 bg-red-500 text-white text-xs rounded-full w-5 h-5 flex items-center justify-center">
+                         {match.unread_messages > 9 ? '9+' : match.unread_messages}
+                       </div>
+                     )}
                   </div>
-                <div className="flex-1 min-w-0">
-                  <div className="flex justify-between items-start">
-                    <h3 className="font-semibold text-gray-900 truncate">
-                      {match.first_name} {match.last_name}
-                    </h3>
+                 <div className="flex-1 min-w-0">
+                   <div className="flex justify-between items-start">
+                     <h3 className={`truncate ${match.unread_messages > 0 ? 'font-bold text-gray-900' : 'font-semibold text-gray-900'}`}>
+                       {match.first_name} {match.last_name}
+                     </h3>
                     {match.last_message_time && (
                       <span className="text-xs text-gray-500 ml-2">
                         {new Date(match.last_message_time).toLocaleTimeString([], {
@@ -99,11 +99,11 @@ const ChatUserList: React.FC<ChatUserListProps> = ({
                       </span>
                     )}
                   </div>
-                  {match.last_message && (
-                    <p className="text-sm text-gray-600 truncate mt-1">
-                      {match.last_message}
-                    </p>
-                  )}
+                     {match.last_message && (
+                       <p className={`text-sm truncate mt-1 ${match.unread_messages > 0 ? 'font-bold text-gray-800' : 'text-gray-600'}`}>
+                         {match.last_message}
+                       </p>
+                     )}
                 </div>
               </div>
             </div>

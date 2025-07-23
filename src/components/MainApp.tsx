@@ -56,6 +56,14 @@ const MainApp = ({ user, onLogout }: MainAppProps) => {
       .on('postgres_changes', {
         event: '*',
         schema: 'public',
+        table: 'notifications',
+        filter: `user_id=eq.${user?.id}`
+      }, () => {
+        fetchUnreadCount();
+      })
+      .on('postgres_changes', {
+        event: '*',
+        schema: 'public',
         table: 'matches',
       }, () => {
         fetchUnreadCount();
@@ -118,22 +126,39 @@ const MainApp = ({ user, onLogout }: MainAppProps) => {
     if (!user?.id) return;
 
     try {
-      const { data, error } = await supabase
-        .from('matches')
-        .select('user1_unread_count, user2_unread_count, user1_id, user2_id')
-        .or(`user1_id.eq.${user.id},user2_id.eq.${user.id}`);
+      // Get unread count from notifications table for more accurate count
+      const { data: notificationData, error: notificationError } = await supabase
+        .from('notifications')
+        .select('id')
+        .eq('user_id', user.id)
+        .eq('type', 'message')
+        .eq('is_read', false);
 
-      if (error) throw error;
+      if (notificationError) throw notificationError;
 
-      const total = data?.reduce((sum, match) => {
-        const isUser1 = match.user1_id === user.id;
-        const unread = isUser1 ? match.user1_unread_count : match.user2_unread_count;
-        return sum + (unread || 0);
-      }, 0) || 0;
-
-      setUnreadCount(total);
+      setUnreadCount(notificationData?.length || 0);
     } catch (error) {
       console.error('Error fetching unread count:', error);
+      
+      // Fallback to matches table method
+      try {
+        const { data, error } = await supabase
+          .from('matches')
+          .select('user1_unread_count, user2_unread_count, user1_id, user2_id')
+          .or(`user1_id.eq.${user.id},user2_id.eq.${user.id}`);
+
+        if (error) throw error;
+
+        const total = data?.reduce((sum, match) => {
+          const isUser1 = match.user1_id === user.id;
+          const unread = isUser1 ? match.user1_unread_count : match.user2_unread_count;
+          return sum + (unread || 0);
+        }, 0) || 0;
+
+        setUnreadCount(total);
+      } catch (fallbackError) {
+        console.error('Error in fallback unread count:', fallbackError);
+      }
     }
   };
 
@@ -242,9 +267,13 @@ const MainApp = ({ user, onLogout }: MainAppProps) => {
                 >
                   <Icon className={`w-5 h-5 ${activeTab === label.toLowerCase() ? 'fill-current' : ''}`} />
                   <span className="text-xs font-medium">{label}</span>
-                  {label === 'Chat' && unreadCount > 0 && (
-                  <span className="absolute -top-1 -right-1 h-2 w-2 rounded-full bg-pink-600 border border-white z-10" />
-                )}
+                   {label === 'Chat' && unreadCount > 0 && (
+                     <div className="absolute -top-1 -right-1 h-5 w-5 rounded-full bg-red-500 border-2 border-white z-10 flex items-center justify-center">
+                       <span className="text-xs text-white font-bold">
+                         {unreadCount > 9 ? '9+' : unreadCount}
+                       </span>
+                     </div>
+                   )}
                 </button>
               ))}
             </div>
