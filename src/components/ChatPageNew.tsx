@@ -44,6 +44,26 @@ const ChatPage = ({ currentUser, onUnreadChange }: ChatPageProps) => {
   }, [messages]);
 
   useEffect(() => {
+    // Listen for changes to any chats to update unread indicators in real-time
+    const chatChannel = supabase
+      .channel('chat-updates')
+      .on('postgres_changes', {
+        event: '*',
+        schema: 'public',
+        table: 'chats',
+      }, () => {
+        console.log('🔄 Chat update detected, refreshing matches...');
+        fetchMatches();
+        onUnreadChange?.();
+      })
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(chatChannel);
+    };
+  }, [currentUser.id, onUnreadChange]);
+
+  useEffect(() => {
     if (selectedMatch) {
       const channel = supabase
         .channel(`chats:${selectedMatch.id}`)
@@ -89,6 +109,8 @@ const ChatPage = ({ currentUser, onUnreadChange }: ChatPageProps) => {
 
       if (error) throw error;
 
+      console.log('📨 Raw matches data:', matches);
+
       const matchesWithPartner = matches?.map(match => {
         const partner = match.user1_id === currentUser.id ? match.user2 : match.user1;
         const sortedChats = match.chats?.sort((a, b) => 
@@ -96,10 +118,14 @@ const ChatPage = ({ currentUser, onUnreadChange }: ChatPageProps) => {
         ) || [];
         const lastMessage = sortedChats[sortedChats.length - 1];
         
-        // Count unread messages for current user
-        const unreadCount = sortedChats.filter(msg => 
-          msg.sender_id !== currentUser.id && !msg.is_read
-        ).length || 0;
+        // Count unread messages for current user (messages sent by others that are unread)
+        const unreadCount = sortedChats.filter(msg => {
+          const isFromOther = msg.sender_id !== currentUser.id;
+          const isUnread = !msg.is_read;
+          return isFromOther && isUnread;
+        }).length || 0;
+
+        console.log(`💬 Match ${match.id}: ${partner?.first_name} has ${unreadCount} unread messages`);
 
         return {
           ...match,
@@ -114,6 +140,11 @@ const ChatPage = ({ currentUser, onUnreadChange }: ChatPageProps) => {
           last_message_time: lastMessage?.created_at
         };
       }) || [];
+
+      console.log('📋 Final matches with unread counts:', matchesWithPartner.map(m => ({ 
+        name: `${m.first_name} ${m.last_name}`, 
+        unread: m.unread_messages 
+      })));
 
       setMatches(matchesWithPartner as ChatMatch[]);
     } catch (error) {
@@ -328,6 +359,8 @@ const ChatPage = ({ currentUser, onUnreadChange }: ChatPageProps) => {
           searchTerm={searchTerm}
           onMatchSelect={setSelectedMatch}
           onUserProfileOpen={handleUserProfileClick}
+          onSearchChange={setSearchTerm}
+          currentUserId={currentUser.id}
         />
 
         {/* User Profile Modal */}

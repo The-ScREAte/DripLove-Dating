@@ -64,13 +64,13 @@ const ChatUserList: React.FC<ChatUserListProps> = ({
                              (currentUserId && match.user1_id === currentUserId ? match.user2_id : match.user1_id);
             
             return (
-              <div
-                key={match.id}
-                className={`p-4 border-b cursor-pointer hover:bg-gray-50 transition-colors ${
-                  selectedMatch?.id === match.id ? 'bg-pink-50 border-pink-200' : ''
-                }`}
-                onClick={() => onMatchSelect(match)}
-              >
+                <div
+                  key={match.id}
+                  className={`p-4 border-b cursor-pointer hover:bg-gray-50 transition-colors ${
+                    selectedMatch?.id === match.id ? 'bg-pink-50 border-pink-200' : ''
+                  } ${match.unread_messages > 0 ? 'bg-blue-50/30' : ''}`}
+                  onClick={() => onMatchSelect(match)}
+                >
                 <div className="flex items-center space-x-3">
                   <div className="relative">
                     <ChatUserAvatar
