@@ -545,8 +545,8 @@ const ProfilePage = ({ currentUser, profile, onProfileUpdate, onLogout, onShowTe
       <div 
         className="fixed left-0 right-0 z-40 bg-white border-b border-gray-200 shadow-sm" 
         style={{ 
-          top: '60px',
-          paddingTop: 'max(env(safe-area-inset-top, 0px), 15px)',
+          top: '60px', // Increased from 60px to 80px for better iOS safe area visibility
+          paddingTop: 'max(env(safe-area-inset-top, 0px), 25px)', // Increased padding for extra space
           width: '100%'
         }}
       >
@@ -654,7 +654,7 @@ const ProfilePage = ({ currentUser, profile, onProfileUpdate, onLogout, onShowTe
       </div>
 
       {/* Scrollable Content - with padding to account for fixed header */}
-      <div className="max-w-4xl mx-auto p-6 pb-12 space-y-8 overflow-x-hidden w-full" style={{ paddingTop: '180px', paddingBottom: '0px' }}>
+      <div className="max-w-4xl mx-auto p-6 pb-12 space-y-8 overflow-x-hidden w-full" style={{ paddingTop: '180px', paddingBottom: '40px' }}>
         <div className="w-full max-w-full overflow-hidden">
           <ProfileSummaryCard currentUser={currentUser} />
           <div className="mb-2" />
