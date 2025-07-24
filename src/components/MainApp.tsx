@@ -22,8 +22,9 @@ const MainApp = ({ user, onLogout }: MainAppProps) => {
   // Register device token for push notifications (mobile only)
   useEffect(() => {
     const registerDeviceToken = async () => {
-      if (window.Capacitor && window.Capacitor.isNativePlatform && user?.id) {
-        try {
+      try {
+        const { Capacitor } = await import('@capacitor/core');
+        if (Capacitor.isNativePlatform() && user?.id) {
           const { PushNotifications } = await import('@capacitor/push-notifications');
           PushNotifications.register();
           PushNotifications.addListener('registration', async (token) => {
@@ -31,12 +32,12 @@ const MainApp = ({ user, onLogout }: MainAppProps) => {
             await supabase.from('push_tokens').upsert({
               user_id: user.id,
               token: token.value,
-              platform: window.Capacitor.getPlatform()
+              platform: Capacitor.getPlatform()
             });
           });
-        } catch (err) {
-          // Ignore if not mobile or plugin not available
         }
+      } catch (err) {
+        // Ignore if not mobile or plugin not available
       }
     };
     registerDeviceToken();
