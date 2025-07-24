@@ -366,9 +366,11 @@ const ProfileCompletionForm = ({ user, onComplete, onCancel }: ProfileCompletion
       for (const image of approvedImages) {
         try {
           // Upload to storage
-          const fileExt = image.file.name.split('.').pop();
+          const fileExt = image.file?.name.split('.').pop() || 'jpg';
           const fileName = `${Date.now()}.${fileExt}`;
           const filePath = `${user.id}/${fileName}`;
+
+          if (!image.file) continue; // Skip if no file (shouldn't happen but safety check)
 
           const { error: uploadError } = await supabase.storage
             .from('user-photos')
