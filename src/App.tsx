@@ -14,29 +14,59 @@ import ProfileCompletionPage from './components/ProfileCompletionPage';
 const queryClient = new QueryClient();
 
 const App = () => {
-  return (
-    <QueryClientProvider client={queryClient}>
-      <TooltipProvider>
-        <Toaster />
-        <Sonner />
-        
-        {/* Standard web container */}
-        <div className="w-full h-full">
-          <BrowserRouter>
-            <Routes>
-              <Route path="/" element={<Index />} />
-              <Route path="/discover" element={<DiscoverPage currentUser={null} />} />
-              <Route path="/payment-success" element={<PaymentSuccess />} />
-              <Route path="/auth/callback" element={<OAuthCallback />} />
-              <Route path="/complete-profile" element={<ProfileCompletionPage />} />
-              {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
-              <Route path="*" element={<NotFound />} />
-            </Routes>
-          </BrowserRouter>
+  // Add error boundary to prevent crashes
+  const [hasError, setHasError] = React.useState(false);
+  
+  const handleError = (error: Error) => {
+    console.error('App error:', error);
+    setHasError(true);
+  };
+
+  if (hasError) {
+    return (
+      <div className="w-full h-screen flex items-center justify-center bg-gray-100">
+        <div className="text-center p-8">
+          <h2 className="text-xl font-bold text-gray-800 mb-4">Something went wrong</h2>
+          <p className="text-gray-600 mb-4">Please refresh the app to continue.</p>
+          <button 
+            onClick={() => window.location.reload()} 
+            className="px-4 py-2 bg-pink-600 text-white rounded-lg hover:bg-pink-700"
+          >
+            Refresh App
+          </button>
         </div>
-      </TooltipProvider>
-    </QueryClientProvider>
-  );
+      </div>
+    );
+  }
+
+  try {
+    return (
+      <QueryClientProvider client={queryClient}>
+        <TooltipProvider>
+          <Toaster />
+          <Sonner />
+          
+          {/* Standard web container */}
+          <div className="w-full h-full">
+            <BrowserRouter>
+              <Routes>
+                <Route path="/" element={<Index />} />
+                <Route path="/discover" element={<DiscoverPage currentUser={null} />} />
+                <Route path="/payment-success" element={<PaymentSuccess />} />
+                <Route path="/auth/callback" element={<OAuthCallback />} />
+                <Route path="/complete-profile" element={<ProfileCompletionPage />} />
+                {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
+                <Route path="*" element={<NotFound />} />
+              </Routes>
+            </BrowserRouter>
+          </div>
+        </TooltipProvider>
+      </QueryClientProvider>
+    );
+  } catch (error) {
+    handleError(error as Error);
+    return null;
+  }
 };
 
 export default App;

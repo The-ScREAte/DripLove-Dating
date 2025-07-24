@@ -8,10 +8,18 @@ import { supabase } from './integrations/supabase/client';
 // 👉 Capacitor keyboard handling
 import { Capacitor } from '@capacitor/core';
 import { Keyboard, KeyboardResize } from '@capacitor/keyboard';
+import { initializeSafeAndroidOptimizations } from './utils/safeAndroidOptimizations';
 
 if (Capacitor.isNativePlatform()) {
-  Keyboard.setScroll({ isDisabled: true });
-  Keyboard.setResizeMode({ mode: KeyboardResize.Native });
+  try {
+    Keyboard.setScroll({ isDisabled: true });
+    Keyboard.setResizeMode({ mode: KeyboardResize.Native });
+    
+    // Initialize safe Android optimizations
+    initializeSafeAndroidOptimizations();
+  } catch (error) {
+    console.error('Error initializing Capacitor:', error);
+  }
 }
 
 const container = document.getElementById("root");

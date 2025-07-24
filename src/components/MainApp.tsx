@@ -26,18 +26,34 @@ const MainApp = ({ user, onLogout }: MainAppProps) => {
         const { Capacitor } = await import('@capacitor/core');
         if (Capacitor.isNativePlatform() && user?.id) {
           const { PushNotifications } = await import('@capacitor/push-notifications');
-          PushNotifications.register();
-          PushNotifications.addListener('registration', async (token) => {
-            // Save token to Supabase
-            await supabase.from('push_tokens').upsert({
-              user_id: user.id,
-              token: token.value,
-              platform: Capacitor.getPlatform()
+          
+          // Request permission first to prevent crashes
+          const permissionResult = await PushNotifications.requestPermissions();
+          if (permissionResult.receive === 'granted') {
+            await PushNotifications.register();
+            
+            PushNotifications.addListener('registration', async (token) => {
+              try {
+                // Save token to Supabase
+                await supabase.from('push_tokens').upsert({
+                  user_id: user.id,
+                  token: token.value,
+                  platform: Capacitor.getPlatform()
+                });
+                console.log('Push token registered successfully');
+              } catch (error) {
+                console.error('Failed to save push token:', error);
+              }
             });
-          });
+
+            PushNotifications.addListener('registrationError', (error) => {
+              console.error('Push registration error:', error);
+            });
+          }
         }
       } catch (err) {
-        // Ignore if not mobile or plugin not available
+        console.error('Push notification setup error:', err);
+        // Don't throw error to prevent app crash
       }
     };
     registerDeviceToken();

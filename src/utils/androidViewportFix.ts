@@ -101,11 +101,5 @@ export const fixAndroidViewport = () => {
   setInterval(applyViewportFix, 1000);
 };
 
-// Initialize on load
-if (typeof window !== 'undefined') {
-  if (document.readyState === 'loading') {
-    document.addEventListener('DOMContentLoaded', fixAndroidViewport);
-  } else {
-    fixAndroidViewport();
-  }
-}
+// Don't auto-initialize to prevent crashes
+// Let components manually call fixAndroidViewport when needed
