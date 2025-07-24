@@ -1,4 +1,6 @@
 import React, { useState, useEffect } from 'react';
+import { Capacitor } from '@capacitor/core';
+// import { PushNotifications } from '@capacitor/push-notifications'; // Uncomment if you use PushNotifications
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { User, Edit, Save, X, Crown } from 'lucide-react';
@@ -494,6 +496,13 @@ const ProfilePage = ({ currentUser, profile, onProfileUpdate, onLogout, onShowTe
       }
 
       try {
+        // Only run PushNotifications code on native platforms
+        if (Capacitor.getPlatform() !== 'web') {
+          // Uncomment and use if you need to register for push notifications
+          // await PushNotifications.register();
+        }
+
+        // This code always runs on all platforms
         const { data: images, error } = await supabase
           .from('user_images')
           .select('image_url, is_approved, moderation_status')
@@ -545,7 +554,7 @@ const ProfilePage = ({ currentUser, profile, onProfileUpdate, onLogout, onShowTe
       <div 
         className="fixed left-0 right-0 z-40 bg-white border-b border-gray-200 shadow-sm" 
         style={{ 
-          top: '60px', // Increased from 60px to 80px for better iOS safe area visibility
+          top: '80px', // Increased for better iOS safe area visibility
           paddingTop: 'max(env(safe-area-inset-top, 0px), 25px)', // Increased padding for extra space
           width: '100%'
         }}
@@ -771,6 +780,7 @@ const ProfilePage = ({ currentUser, profile, onProfileUpdate, onLogout, onShowTe
             <AccountActions 
               currentUser={currentUser} 
               hideLogoutTermsPrivacy={true} // Pass a prop to hide these actions
+              onLogout={onLogout}
             />
           </CollapsibleSection>
         </div>
