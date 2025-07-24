@@ -34,6 +34,15 @@ class SupabasePushNotificationService {
     try {
       this.currentUserId = userId;
 
+      // Prevent Firebase messaging initialization in Capacitor WebView
+      if (typeof window !== 'undefined') {
+        // Block Firebase messaging APIs in WebView environments
+        if ((window as any).firebase && !Capacitor.isNativePlatform()) {
+          console.warn('⚠️ Blocking Firebase messaging in WebView environment');
+          return true;
+        }
+      }
+
       // Initialize native push notifications if on mobile
       if (Capacitor.isNativePlatform()) {
         await this.initializeNativePushNotifications(userId);
@@ -52,31 +61,40 @@ class SupabasePushNotificationService {
   }
 
   private async initializeNativePushNotifications(userId: string): Promise<void> {
-    // Request permission for push notifications
-    const permissionStatus = await PushNotifications.requestPermissions();
-    
-    if (permissionStatus.receive === 'granted') {
-      // Register for push notifications
-      await PushNotifications.register();
+    try {
+      // Ensure we're on a native platform and push notifications are available
+      if (!Capacitor.isNativePlatform() || typeof PushNotifications === 'undefined') {
+        console.warn('⚠️ Push notifications not available on this platform');
+        return;
+      }
+
+      // Request permission for push notifications
+      const permissionStatus = await PushNotifications.requestPermissions();
       
-      // Set up event listeners
-      PushNotifications.addListener('registration', async (token: Token) => {
-        this.deviceToken = token.value;
-        await this.saveTokenToDatabase(userId, token.value, Capacitor.getPlatform());
-      });
+      if (permissionStatus.receive === 'granted') {
+        // Register for push notifications
+        await PushNotifications.register();
+        
+        // Set up event listeners
+        PushNotifications.addListener('registration', async (token: Token) => {
+          this.deviceToken = token.value;
+          await this.saveTokenToDatabase(userId, token.value, Capacitor.getPlatform());
+        });
 
-      PushNotifications.addListener('registrationError', (error: unknown) => {
-        console.error('❌ Error registering for push notifications:', error);
-      });
+        PushNotifications.addListener('registrationError', (error: unknown) => {
+          console.error('❌ Error registering for push notifications:', error);
+        });
 
-      PushNotifications.addListener('pushNotificationReceived', (notification: PushNotificationSchema) => {
-        this.handleForegroundNotification(notification);
-      });
+        PushNotifications.addListener('pushNotificationReceived', (notification: PushNotificationSchema) => {
+          this.handleForegroundNotification(notification);
+        });
 
-      PushNotifications.addListener('pushNotificationActionPerformed', (notification: ActionPerformed) => {
-        this.handleNotificationAction(notification);
-      });
-
+        PushNotifications.addListener('pushNotificationActionPerformed', (notification: ActionPerformed) => {
+          this.handleNotificationAction(notification);
+        });
+      }
+    } catch (error) {
+      console.error('❌ Error initializing native push notifications:', error);
     }
   }
 

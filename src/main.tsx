@@ -9,6 +9,10 @@ import { supabase } from './integrations/supabase/client';
 import { Capacitor } from '@capacitor/core';
 import { Keyboard, KeyboardResize } from '@capacitor/keyboard';
 import { initializeSafeAndroidOptimizations } from './utils/safeAndroidOptimizations';
+import { preventFirebaseMessaging } from './utils/firebaseBlocker';
+
+// Prevent Firebase messaging in Capacitor WebView before any other code runs
+preventFirebaseMessaging();
 
 if (Capacitor.isNativePlatform()) {
   try {
