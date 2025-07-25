@@ -8,6 +8,7 @@ import {
   cleanupPushNotifications,
   NotificationPayload
 } from '@/services/pushNotifications';
+import { handlePushNotificationError, logPushNotificationError, shouldRetryPushNotificationSetup } from '@/utils/pushNotificationErrorHandler';
 
 export const usePushNotifications = (userId?: string) => {
   const [isInitialized, setIsInitialized] = useState(false);
@@ -32,20 +33,45 @@ export const usePushNotifications = (userId?: string) => {
         // Only check permission, don't request it automatically
         const hasPermission = 'Notification' in window && Notification.permission === 'granted';
         
-        // Initialize the service
-        const initialized = await initializePushNotifications(userId);
-        setIsInitialized(initialized);
+        // Initialize the service with retry logic
+        let initialized = false;
+        let retryCount = 0;
+        const maxRetries = 3;
         
-        if (initialized) {
-          setError(null);
-          // Load unread notifications count
-          const unreadNotifications = await getUnreadNotifications(userId);
-          setUnreadCount(unreadNotifications.length);
-        } else {
-          setError('Failed to initialize push notifications');
+        while (!initialized && retryCount < maxRetries) {
+          try {
+            initialized = await initializePushNotifications(userId);
+            if (initialized) {
+              setIsInitialized(true);
+              setError(null);
+              // Load unread notifications count
+              const unreadNotifications = await getUnreadNotifications(userId);
+              setUnreadCount(unreadNotifications.length);
+              break;
+            }
+          } catch (initError) {
+            const errorInfo = handlePushNotificationError(initError);
+            logPushNotificationError(errorInfo);
+            
+            if (shouldRetryPushNotificationSetup(errorInfo) && retryCount < maxRetries - 1) {
+              retryCount++;
+              console.log(`🔄 Retrying push notification setup (${retryCount}/${maxRetries})...`);
+              await new Promise(resolve => setTimeout(resolve, 2000 * retryCount)); // Progressive delay
+            } else {
+              setError(errorInfo.message);
+              setIsInitialized(false);
+              break;
+            }
+          }
+        }
+        
+        if (!initialized) {
+          console.log('📱 App will continue without push notifications');
         }
       } catch (err) {
-        setError(err instanceof Error ? err.message : 'Unknown error');
+        const errorInfo = handlePushNotificationError(err);
+        logPushNotificationError(errorInfo);
+        setError(errorInfo.message);
         setIsInitialized(false);
       }
     };

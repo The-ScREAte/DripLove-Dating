@@ -62,30 +62,48 @@ class SupabasePushNotificationService {
 
   private async initializeNativePushNotifications(userId: string): Promise<void> {
     try {
+      console.log('🔄 Attempting to initialize native push notifications...');
+      
       // Ensure we're on a native platform and push notifications are available
       if (!Capacitor.isNativePlatform() || typeof PushNotifications === 'undefined') {
         console.warn('⚠️ Push notifications not available on this platform');
         return;
       }
 
+      // Add a small delay to ensure Firebase is initialized
+      await new Promise(resolve => setTimeout(resolve, 1000));
+
       // Request permission for push notifications
       const permissionStatus = await PushNotifications.requestPermissions();
+      console.log('📱 Push permissions result:', permissionStatus);
       
       if (permissionStatus.receive === 'granted') {
-        // Register for push notifications
-        await PushNotifications.register();
+        console.log('📱 Push permissions granted, attempting registration...');
+        
+        // Register for push notifications with error handling
+        try {
+          await PushNotifications.register();
+          console.log('📱 Push registration initiated successfully');
+        } catch (registerError) {
+          console.error('❌ Failed to register for push notifications:', registerError);
+          // Continue without push notifications rather than failing completely
+          return;
+        }
         
         // Set up event listeners
         PushNotifications.addListener('registration', async (token: Token) => {
+          console.log('✅ Push registration success, token received:', token.value);
           this.deviceToken = token.value;
           await this.saveTokenToDatabase(userId, token.value, Capacitor.getPlatform());
         });
 
         PushNotifications.addListener('registrationError', (error: unknown) => {
           console.error('❌ Error registering for push notifications:', error);
+          // Don't throw - let the app continue without push notifications
         });
 
         PushNotifications.addListener('pushNotificationReceived', (notification: PushNotificationSchema) => {
+          console.log('📬 Push notification received:', notification);
           this.handleForegroundNotification(notification);
         });
 

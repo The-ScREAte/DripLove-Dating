@@ -8,6 +8,15 @@ public class MainActivity extends BridgeActivity {
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
-        FirebaseApp.initializeApp(this);
+        
+        try {
+            // Ensure Firebase is initialized before any plugins try to use it
+            if (FirebaseApp.getApps(this).isEmpty()) {
+                FirebaseApp.initializeApp(this);
+                android.util.Log.d("DripLove", "Firebase initialized in MainActivity");
+            }
+        } catch (Exception e) {
+            android.util.Log.e("DripLove", "Failed to initialize Firebase in MainActivity: " + e.getMessage());
+        }
     }
 }
