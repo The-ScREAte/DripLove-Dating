@@ -1,10 +1,10 @@
 apply plugin: 'com.android.application'
 
 android {
-    namespace "app.lovable.fef6ab3677bc4046b6f5fc5b2ad8c182"
+    namespace "com.driplove.dating"
     compileSdk rootProject.ext.compileSdkVersion
     defaultConfig {
-        applicationId "app.lovable.fef6ab3677bc4046b6f5fc5b2ad8c182"
+        applicationId "com.driplove.dating"
         minSdkVersion rootProject.ext.minSdkVersion
         targetSdkVersion rootProject.ext.targetSdkVersion
         versionCode 1
@@ -22,6 +22,14 @@ android {
             proguardFiles getDefaultProguardFile('proguard-android.txt'), 'proguard-rules.pro'
         }
     }
+    compileOptions {
+        sourceCompatibility JavaVersion.VERSION_17
+        targetCompatibility JavaVersion.VERSION_17
+    }
+    // If you use Kotlin, uncomment below:
+    // kotlinOptions {
+    //     jvmTarget = "17"
+    // }
 }
 
 repositories {
@@ -40,6 +48,11 @@ dependencies {
     androidTestImplementation "androidx.test.ext:junit:$androidxJunitVersion"
     androidTestImplementation "androidx.test.espresso:espresso-core:$androidxEspressoCoreVersion"
     implementation project(':capacitor-cordova-android-plugins')
+
+    // Firebase dependencies
+    implementation 'com.google.firebase:firebase-messaging:23.4.1'
+    implementation 'com.google.firebase:firebase-common:20.4.3'
+    implementation 'com.google.firebase:firebase-core:21.1.1' // Optional, but safe
 }
 
 apply from: 'capacitor.build.gradle'

@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "361835962012",
+    "project_id": "time-tracking-b70af",
+    "storage_bucket": "time-tracking-b70af.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:361835962012:android:6a81e6ca2b14f4a7f9d759",
+        "android_client_info": {
+          "package_name": "com.driplove.dating"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyAD-W1piPbJOFE5bEFa53kQTLycG_sRbaQ"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
