@@ -385,6 +385,19 @@ const RegistrationForm = ({ onSubmit, onBackToLogin }: RegistrationFormProps) =>
       return;
     }
 
+    // Check if we have valid files for approved images
+    const imagesWithFiles = approvedImages.filter(img => img.file !== null);
+    if (imagesWithFiles.length < 2) {
+      toast({
+        title: "Photos need to be re-uploaded",
+        description: "Please re-upload your photos to complete registration.",
+        variant: "destructive"
+      });
+      // Clear images that don't have files and ask user to re-upload
+      setImages(prev => prev.filter(img => img.file !== null));
+      return;
+    }
+
     // Clear sessionStorage after successful registration
     sessionStorage.removeItem('registration_images');
     // Submit with images
@@ -455,18 +468,27 @@ const RegistrationForm = ({ onSubmit, onBackToLogin }: RegistrationFormProps) =>
     }
 
     // 3. Upload approved images to storage and save to DB
-    for (const image of approvedImages) {
+    for (const image of imagesWithFiles) {
       try {
+        // Skip if file is null (restored from sessionStorage)
+        if (!image.file) {
+          console.warn('Skipping image upload - file is null');
+          continue;
+        }
+
         // Upload to storage
-        const fileExt = image.file.name.split('.').pop();
-        const fileName = `${Date.now()}.${fileExt}`;
+        const fileExt = image.file.name?.split('.').pop() || 'jpg';
+        const fileName = `${Date.now()}-${Math.random().toString(36).substr(2, 9)}.${fileExt}`;
         const filePath = `${userId}/${fileName}`;
 
         const { error: uploadError } = await supabase.storage
           .from('user-photos')
           .upload(filePath, image.file);
 
-        if (uploadError) throw uploadError;
+        if (uploadError) {
+          console.error('Upload error:', uploadError);
+          throw uploadError;
+        }
 
         // Get public URL
         const { data: { publicUrl } } = supabase.storage
@@ -486,7 +508,10 @@ const RegistrationForm = ({ onSubmit, onBackToLogin }: RegistrationFormProps) =>
             confidence_score: image.moderationResult?.confidence || 0
           });
 
-        if (dbError) throw dbError;
+        if (dbError) {
+          console.error('Database error:', dbError);
+          throw dbError;
+        }
       } catch (error) {
         console.error('Error uploading image:', error);
         toast({
