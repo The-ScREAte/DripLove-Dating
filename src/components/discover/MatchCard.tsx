@@ -321,7 +321,7 @@ const MatchCard: React.FC<MatchCardProps> = ({
               </span>
               {/* Verified badge beside name and age */}
               {isVerified && (
-                <div className="bg-green-500 text-white px-2 py-1 rounded-full flex items-center text-xs font-semibold">
+                <div className="bg-green-5 text-white px-2 py-1 rounded-full flex items-center text-xs font-semibold">
                   <Shield className="w-3 h-3 mr-1" />
                   Verified
                 </div>
@@ -386,29 +386,34 @@ const MatchCard: React.FC<MatchCardProps> = ({
             )}
 
             {/* Lifestyle */}
-            {(match.smoking || match.drinking || match.exercise_level || match.sleeping_schedule) && (
+            {([
+              match.smoking,
+              match.drinking,
+              match.exercise_level,
+              match.sleeping_schedule
+            ].some(val => val && val !== 'not_specified')) && (
               <div className="bg-gray-50 rounded-lg p-3">
                 <h4 className="font-semibold text-pink-600 mb-2">Lifestyle</h4>
                 <div className="space-y-2">
-                  {match.smoking && (
+                  {match.smoking && match.smoking !== 'not_specified' && (
                     <div className="flex items-center text-xs">
                       <span className="font-semibold mr-2">Smoking:</span>
                       <span className="text-gray-700">{match.smoking}</span>
                     </div>
                   )}
-                  {match.drinking && (
+                  {match.drinking && match.drinking !== 'not_specified' && (
                     <div className="flex items-center text-xs">
                       <span className="font-semibold mr-2">Drinking:</span>
                       <span className="text-gray-700">{match.drinking}</span>
                     </div>
                   )}
-                  {match.exercise_level && (
+                  {match.exercise_level && match.exercise_level !== 'not_specified' && (
                     <div className="flex items-center text-xs">
                       <span className="font-semibold mr-2">Exercise:</span>
                       <span className="text-gray-700">{match.exercise_level}</span>
                     </div>
                   )}
-                  {match.sleeping_schedule && (
+                  {match.sleeping_schedule && match.sleeping_schedule !== 'not_specified' && (
                     <div className="flex items-center text-xs">
                       <span className="font-semibold mr-2">Sleep:</span>
                       <span className="text-gray-700">{match.sleeping_schedule}</span>
