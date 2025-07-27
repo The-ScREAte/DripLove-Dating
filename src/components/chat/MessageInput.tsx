@@ -3,6 +3,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Smile, Send } from 'lucide-react';
 import EmojiPicker from '../EmojiPicker';
+import { sanitizeMessage } from '@/utils/inputSanitization';
 
 interface MessageInputProps {
   newMessage: string;
@@ -22,7 +23,8 @@ const MessageInput: React.FC<MessageInputProps> = ({
   const containerRef = useRef<HTMLDivElement>(null);
 
   const handleEmojiSelect = (emoji: string) => {
-    onMessageChange(newMessage + emoji);
+    const sanitizedMessage = sanitizeMessage(newMessage + emoji);
+    onMessageChange(sanitizedMessage);
     setShowEmojiPicker(false);
   };
 
@@ -69,7 +71,7 @@ const MessageInput: React.FC<MessageInputProps> = ({
           <Input
             ref={inputRef}
             value={newMessage}
-            onChange={(e) => onMessageChange(e.target.value)}
+            onChange={(e) => onMessageChange(sanitizeMessage(e.target.value))}
             onKeyPress={handleKeyPress}
             onFocus={handleFocus}
             onBlur={handleBlur}

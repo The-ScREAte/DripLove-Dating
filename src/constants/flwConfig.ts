@@ -1,6 +1,7 @@
-// Flatterwave public key and config
+// Flutterwave public configuration - SECURE: Only public keys exposed to frontend
 export const FLW_PUBLIC_KEY = import.meta.env.VITE_FLW_PUBLIC_KEY || process.env.FLW_PUBLIC_KEY || '';
-export const FLW_SECRET_KEY = import.meta.env.VITE_FLW_SECRET_KEY || process.env.FLW_SECRET_KEY || '';
+// SECURITY: Secret keys moved to edge functions - never expose in frontend
+// export const FLW_SECRET_KEY - REMOVED FOR SECURITY
 export const FLW_ENCRYPTION_KEY = import.meta.env.VITE_FLW_ENCRYPTION_KEY || process.env.FLW_ENCRYPTION_KEY || '';
 
 export interface PaymentMethod {

@@ -4,12 +4,39 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Label } from '@/components/ui/label';
+import { sanitizeName, sanitizeBio } from '@/utils/inputSanitization';
 
 interface BasicInfoSectionProps {
   editedProfile: any;
   isEditing: boolean;
   onInputChange: (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => void;
 }
+
+const handleSecureInputChange = (
+  e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>,
+  onInputChange: (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => void
+) => {
+  const { name, value } = e.target;
+  let sanitizedValue = value;
+  
+  // Apply appropriate sanitization based on field type
+  if (name === 'first_name' || name === 'last_name') {
+    sanitizedValue = sanitizeName(value);
+  } else if (name === 'bio') {
+    sanitizedValue = sanitizeBio(value);
+  }
+  
+  // Create new event with sanitized value
+  const sanitizedEvent = {
+    ...e,
+    target: {
+      ...e.target,
+      value: sanitizedValue
+    }
+  } as React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>;
+  
+  onInputChange(sanitizedEvent);
+};
 
 const BasicInfoSection = ({ editedProfile, isEditing, onInputChange }: BasicInfoSectionProps) => {
   return (
@@ -27,7 +54,7 @@ const BasicInfoSection = ({ editedProfile, isEditing, onInputChange }: BasicInfo
                 id="first_name"
                 name="first_name"
                 value={editedProfile.first_name}
-                onChange={onInputChange}
+                onChange={(e) => handleSecureInputChange(e, onInputChange)}
                 disabled={!isEditing}
                 className="w-full"
               />
@@ -39,7 +66,7 @@ const BasicInfoSection = ({ editedProfile, isEditing, onInputChange }: BasicInfo
                 id="last_name"
                 name="last_name"
                 value={editedProfile.last_name}
-                onChange={onInputChange}
+                onChange={(e) => handleSecureInputChange(e, onInputChange)}
                 disabled={!isEditing}
                 className="w-full"
               />
@@ -51,7 +78,7 @@ const BasicInfoSection = ({ editedProfile, isEditing, onInputChange }: BasicInfo
               id="bio"
               name="bio"
               value={editedProfile.bio}
-              onChange={onInputChange}
+              onChange={(e) => handleSecureInputChange(e, onInputChange)}
               disabled={!isEditing}
               className="w-full min-h-[100px] resize-none"
               placeholder="Tell us about yourself..."

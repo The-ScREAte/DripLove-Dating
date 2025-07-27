@@ -161,14 +161,31 @@ class SupabasePushNotificationService {
   }
 
   private showInAppNotification(payload: NotificationPayload): void {
-    // Create and show in-app notification toast
+    // Create and show in-app notification toast - SECURE: Using textContent instead of innerHTML
     const toast = document.createElement('div');
     toast.className = 'fixed top-4 right-4 bg-purple-600 text-white px-4 py-2 rounded-lg shadow-lg z-50 max-w-sm cursor-pointer transition-all hover:bg-purple-700';
-    toast.innerHTML = `
-      <div class="font-semibold">${payload.title}</div>
-      <div class="text-sm opacity-90">${payload.body}</div>
-      <div class="text-xs opacity-70 mt-1">${payload.type ? `• ${payload.type}` : ''}</div>
-    `;
+    
+    // Create title element with safe text content
+    const titleDiv = document.createElement('div');
+    titleDiv.className = 'font-semibold';
+    titleDiv.textContent = payload.title;
+    
+    // Create body element with safe text content
+    const bodyDiv = document.createElement('div');
+    bodyDiv.className = 'text-sm opacity-90';
+    bodyDiv.textContent = payload.body;
+    
+    // Create type element with safe text content
+    const typeDiv = document.createElement('div');
+    typeDiv.className = 'text-xs opacity-70 mt-1';
+    typeDiv.textContent = payload.type ? `• ${payload.type}` : '';
+    
+    // Append all elements safely
+    toast.appendChild(titleDiv);
+    toast.appendChild(bodyDiv);
+    if (payload.type) {
+      toast.appendChild(typeDiv);
+    }
     
     document.body.appendChild(toast);
     
