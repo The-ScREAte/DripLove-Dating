@@ -406,7 +406,7 @@ const RegistrationForm = ({ onSubmit, onBackToLogin }: RegistrationFormProps) =>
     let userEmail = formData.email;
     let userCreated = false;
     try {
-      // Create user in Supabase Auth
+      // Create user in Supabase Auth with complete metadata
       const { data: signUpData, error: signUpError } = await supabase.auth.signUp({
         email: formData.email,
         password: formData.password,
@@ -414,6 +414,20 @@ const RegistrationForm = ({ onSubmit, onBackToLogin }: RegistrationFormProps) =>
           data: {
             first_name: formData.firstName,
             last_name: formData.lastName,
+            date_of_birth: formData.dateOfBirth,
+            country: formData.country,
+            city: formData.city,
+            zip_code: formData.zipCode,
+            gender: formData.gender,
+            preference: formData.preference,
+            relationship_intent: formData.relationshipIntent,
+            occupation: formData.occupation || '',
+            industry: formData.industry || '',
+            education_level: formData.educationLevel || '',
+            bio: formData.bio || '',
+            email: formData.email,
+            email_verified: true,
+            phone_verified: false
           }
         }
       });
@@ -421,6 +435,7 @@ const RegistrationForm = ({ onSubmit, onBackToLogin }: RegistrationFormProps) =>
       userId = signUpData?.user?.id;
       userCreated = !!userId;
     } catch (err) {
+      console.error('Auth signup error:', err);
       toast({
         title: 'Account Creation Error',
         description: err.message || 'Failed to create account.',
