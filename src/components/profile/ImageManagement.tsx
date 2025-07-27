@@ -12,6 +12,7 @@ import { Upload, Trash2, Shield, AlertTriangle, CheckCircle } from 'lucide-react
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import { moderateImage, saveModerationResult, ModerationResult } from '@/utils/photoModeration';
+import { compressImage } from '@/utils/imageCompression';
 import { bulkApproveExistingImages } from '@/utils/bulkApproveImages';
 
 interface ImageManagementProps {
@@ -117,14 +118,17 @@ const ImageManagement = ({ currentUser }: ImageManagementProps) => {
       return;
     }
 
-    // Step 1: AI Moderation Check
+    // Step 1: Compress and convert to WebP before moderation
     setModerating(true);
     setModerationResult(null);
+
+    // Compress image
+    const compressedFile = await compressImage(file);
 
     let moderationResult: ModerationResult | null = null;
 
     try {
-      moderationResult = await moderateImage(file);
+      moderationResult = await moderateImage(compressedFile);
       setModerationResult(moderationResult);
       
       // Only block if image is completely rejected (not approved)
@@ -170,7 +174,7 @@ const ImageManagement = ({ currentUser }: ImageManagementProps) => {
       // Upload to storage
       const { data: uploadData, error: uploadError } = await supabase.storage
         .from('user-photos')
-        .upload(fileName, file, { cacheControl: '3600', upsert: false });
+        .upload(fileName, compressedFile, { cacheControl: '3600', upsert: false });
 
       if (uploadError) throw uploadError;
 

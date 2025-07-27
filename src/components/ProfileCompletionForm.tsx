@@ -11,6 +11,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { occupationOptions, industryOptions } from '@/constants/professionOptions';
 import LocationInput from '@/components/forms/LocationInput';
 import { moderateImage, ModerationResult } from '@/utils/photoModeration';
+import { compressImage } from '@/utils/imageCompression';
 
 interface ProfileCompletionFormProps {
   user: any;
@@ -154,14 +155,16 @@ const ProfileCompletionForm = ({ user, onComplete, onCancel }: ProfileCompletion
         continue;
       }
 
-      const preview = URL.createObjectURL(file);
-      const newImage: ImageUpload = { file, preview, status: 'moderating' };
+      // Compress and convert to WebP before preview and moderation
+      const compressedFile = await compressImage(file);
+      const preview = URL.createObjectURL(compressedFile);
+      const newImage: ImageUpload = { file: compressedFile, preview, status: 'moderating' };
 
       setImages(prev => [...prev, newImage]);
 
       // AI Moderation
       try {
-        const moderationResult = await moderateImage(file);
+        const moderationResult = await moderateImage(compressedFile);
         
         setImages(prev => prev.map(img => 
           img.preview === preview 
