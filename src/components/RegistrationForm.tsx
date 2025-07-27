@@ -483,6 +483,7 @@ const RegistrationForm = ({ onSubmit, onBackToLogin }: RegistrationFormProps) =>
     }
 
     // 3. Upload approved images to storage and save to DB
+    let imageOrder = 1;
     for (const image of imagesWithFiles) {
       try {
         // Skip if file is null (restored from sessionStorage)
@@ -510,13 +511,13 @@ const RegistrationForm = ({ onSubmit, onBackToLogin }: RegistrationFormProps) =>
           .from('user-photos')
           .getPublicUrl(filePath);
 
-        // Save to database
+        // Save to database with proper image order (1-based index, max 7)
         const { error: dbError } = await supabase
           .from('user_images')
           .insert({
             user_id: userId,
             image_url: publicUrl,
-            image_order: approvedImages.indexOf(image),
+            image_order: imageOrder,
             is_approved: image.status === 'approved',
             moderation_status: image.status === 'approved' ? 'approved' : 'pending',
             flagged_content: image.moderationResult?.flags || [],
@@ -527,6 +528,9 @@ const RegistrationForm = ({ onSubmit, onBackToLogin }: RegistrationFormProps) =>
           console.error('Database error:', dbError);
           throw dbError;
         }
+        
+        // Increment order for next image
+        imageOrder++;
       } catch (error) {
         console.error('Error uploading image:', error);
         toast({
