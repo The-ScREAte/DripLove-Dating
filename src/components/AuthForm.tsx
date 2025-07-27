@@ -66,27 +66,15 @@ const AuthForm = ({ isLogin, onToggle, onOAuthSuccess }: AuthFormProps) => {
     setOauthLoading(provider);
     
     try {
-      // Detect if running in mobile app
-      const isMobileApp = window.location.protocol === 'capacitor:' || 
-                         window.location.protocol === 'file:' ||
-                         /Android|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
+      // Import OAuth config
+      const { getSupabaseAuthConfig } = await import('@/config/oauth');
+      const authConfig = getSupabaseAuthConfig();
       
-      // Configure redirect URI based on platform
-      const redirectTo = isMobileApp 
-        ? 'driplove://auth/callback'
-        : `${window.location.origin}/auth/callback`;
-
-      console.log('OAuth config:', { isMobileApp, redirectTo, protocol: window.location.protocol });
+      console.log('OAuth config:', authConfig);
 
       const { data, error } = await supabase.auth.signInWithOAuth({
         provider: provider,
-        options: {
-          redirectTo: redirectTo,
-          queryParams: {
-            // Ensure proper account selection for mobile
-            prompt: 'select_account',
-          }
-        }
+        options: authConfig
       });
 
       if (error) {
@@ -100,14 +88,9 @@ const AuthForm = ({ isLogin, onToggle, onOAuthSuccess }: AuthFormProps) => {
         return;
       }
 
-      // For mobile apps, we need to handle the redirect differently
-      if (isMobileApp && data?.url) {
-        // In mobile app, we can open the OAuth URL directly
-        window.location.href = data.url;
-      }
+      // For mobile and web, the OAuth flow will redirect automatically
+      console.log('OAuth initiated successfully, redirecting...');
 
-      // OAuth will redirect to the callback URL
-      // The callback handler will check if user exists and handle accordingly
     } catch (error: any) {
       console.error('OAuth error:', error);
       toast({

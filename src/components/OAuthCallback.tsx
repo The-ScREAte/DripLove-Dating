@@ -26,31 +26,53 @@ const OAuthCallback = () => {
 
         if (isMobileApp) {
           // For mobile apps, handle the session from URL hash or query params
-          const hashParams = new URLSearchParams(window.location.hash.substring(1));
-          const queryParams = new URLSearchParams(window.location.search);
-          
-          // Also check for custom scheme URLs
           const urlString = window.location.href;
-          let accessToken = hashParams.get('access_token') || queryParams.get('access_token');
-          let refreshToken = hashParams.get('refresh_token') || queryParams.get('refresh_token');
+          console.log('Mobile callback URL:', urlString);
           
-          // Parse custom scheme URLs (driplove://auth/callback#access_token=...)
-          if (urlString.includes('driplove://')) {
-            const match = urlString.match(/[#&]access_token=([^&]+)/);
-            const refreshMatch = urlString.match(/[#&]refresh_token=([^&]+)/);
-            if (match) accessToken = decodeURIComponent(match[1]);
-            if (refreshMatch) refreshToken = decodeURIComponent(refreshMatch[1]);
+          // Extract tokens from various possible URL formats
+          let accessToken, refreshToken, expiresAt, tokenType;
+          
+          // Handle hash-based tokens (#access_token=...)
+          if (urlString.includes('#')) {
+            const hashParams = new URLSearchParams(urlString.split('#')[1]);
+            accessToken = hashParams.get('access_token');
+            refreshToken = hashParams.get('refresh_token');
+            expiresAt = hashParams.get('expires_at');
+            tokenType = hashParams.get('token_type');
           }
           
+          // Handle query-based tokens (?access_token=...)
+          if (!accessToken && urlString.includes('?')) {
+            const queryParams = new URLSearchParams(urlString.split('?')[1]);
+            accessToken = queryParams.get('access_token');
+            refreshToken = queryParams.get('refresh_token');
+            expiresAt = queryParams.get('expires_at');
+            tokenType = queryParams.get('token_type');
+          }
+          
+          console.log('Extracted tokens:', { 
+            hasAccess: !!accessToken, 
+            hasRefresh: !!refreshToken,
+            expiresAt,
+            tokenType 
+          });
+          
           if (accessToken && refreshToken) {
-            const { data, error } = await supabase.auth.setSession({
-              access_token: accessToken,
-              refresh_token: refreshToken
-            });
-            sessionData = data;
-            sessionError = error;
+            try {
+              const { data, error } = await supabase.auth.setSession({
+                access_token: accessToken,
+                refresh_token: refreshToken
+              });
+              sessionData = data;
+              sessionError = error;
+              console.log('Session set result:', { success: !!data.session, error });
+            } catch (err) {
+              console.error('Error setting session:', err);
+              sessionError = err as any;
+            }
           } else {
             // Fallback to getting session normally
+            console.log('No tokens found in URL, trying getSession fallback');
             const result = await supabase.auth.getSession();
             sessionData = result.data;
             sessionError = result.error;

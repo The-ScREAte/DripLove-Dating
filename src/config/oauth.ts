@@ -9,8 +9,8 @@ export const OAUTH_CONFIG = {
   
   // OAuth redirect URIs for mobile
   redirectUris: {
-    google: 'driplove://auth/callback/google',
-    apple: 'driplove://auth/callback/apple',
+    google: 'driplove://auth/callback',
+    apple: 'driplove://auth/callback',
     // Add other providers as needed
   },
   
@@ -18,9 +18,9 @@ export const OAUTH_CONFIG = {
   supabaseRedirectUri: 'driplove://auth/callback',
   
   // Web fallback for development/testing
-  webRedirectUri: process.env.NODE_ENV === 'development' 
-    ? 'http://localhost:8081/auth/callback'
-    : 'https://yourapp.com/auth/callback'
+  webRedirectUri: typeof window !== 'undefined' && window.location.origin 
+    ? `${window.location.origin}/auth/callback`
+    : 'https://fef6ab36-77bc-4046-b6f5-fc5b2ad8c182.lovableproject.com/auth/callback'
 };
 
 /**
