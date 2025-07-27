@@ -37,6 +37,7 @@ const RegistrationForm = ({ onSubmit, onBackToLogin }: RegistrationFormProps) =>
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [currentStep, setCurrentStep] = useState(1);
   const [images, setImages] = useState<ImageUpload[]>([]);
+  const [isSubmitting, setIsSubmitting] = useState(false);
   const { toast } = useToast();
 
   // Restore images from sessionStorage on mount
@@ -347,6 +348,10 @@ const RegistrationForm = ({ onSubmit, onBackToLogin }: RegistrationFormProps) =>
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    
+    // Prevent double submission
+    if (isSubmitting) return;
+    
     if (currentStep === 1) {
       handleContinue();
       return;
@@ -398,6 +403,9 @@ const RegistrationForm = ({ onSubmit, onBackToLogin }: RegistrationFormProps) =>
       return;
     }
 
+    // Set loading state
+    setIsSubmitting(true);
+    
     // Clear sessionStorage after successful registration
     sessionStorage.removeItem('registration_images');
     // Submit with images
@@ -436,6 +444,7 @@ const RegistrationForm = ({ onSubmit, onBackToLogin }: RegistrationFormProps) =>
       userCreated = !!userId;
     } catch (err) {
       console.error('Auth signup error:', err);
+      setIsSubmitting(false); // Reset loading state
       toast({
         title: 'Account Creation Error',
         description: err.message || 'Failed to create account.',
@@ -474,6 +483,7 @@ const RegistrationForm = ({ onSubmit, onBackToLogin }: RegistrationFormProps) =>
         .upsert(profileData);
       if (profileError) throw profileError;
     } catch (err) {
+      setIsSubmitting(false); // Reset loading state
       toast({
         title: 'Profile Save Error',
         description: err.message || 'Failed to save profile.',
@@ -541,6 +551,7 @@ const RegistrationForm = ({ onSubmit, onBackToLogin }: RegistrationFormProps) =>
       }
     }
 
+    setIsSubmitting(false); // Reset loading state
     toast({
       title: 'Account Created!',
       description: 'Your account and profile have been created. Welcome!',
@@ -779,9 +790,17 @@ const RegistrationForm = ({ onSubmit, onBackToLogin }: RegistrationFormProps) =>
             )}
             <Button 
               type="submit" 
-              className="w-full bg-gradient-to-r from-pink-500 to-purple-600 hover:from-pink-600 hover:to-purple-700 text-white font-semibold py-3 rounded-lg transition-all duration-200 animate-fade-in"
+              disabled={isSubmitting}
+              className="w-full bg-gradient-to-r from-pink-500 to-purple-600 hover:from-pink-600 hover:to-purple-700 text-white font-semibold py-3 rounded-lg transition-all duration-200 animate-fade-in disabled:opacity-50 disabled:cursor-not-allowed"
             >
-              {currentStep === 1 ? 'Continue' : currentStep === 2 ? 'Add Photos' : 'Create Account'}
+              {isSubmitting 
+                ? 'Creating Account...' 
+                : currentStep === 1 
+                  ? 'Continue' 
+                  : currentStep === 2 
+                    ? 'Add Photos' 
+                    : 'Create Account'
+              }
             </Button>
           </div>
           <div className="text-center animate-fade-in">
