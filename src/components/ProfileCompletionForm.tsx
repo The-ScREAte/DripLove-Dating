@@ -31,6 +31,7 @@ const ProfileCompletionForm = ({ user, onComplete, onCancel }: ProfileCompletion
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [loading, setLoading] = useState(false);
   const [images, setImages] = useState<ImageUpload[]>([]);
+  const [isSubmitting, setIsSubmitting] = useState(false);
   const { toast } = useToast();
 
   // Restore images from sessionStorage on mount
@@ -265,7 +266,12 @@ const ProfileCompletionForm = ({ user, onComplete, onCancel }: ProfileCompletion
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    
+    // Prevent double submission
+    if (isSubmitting) return;
+    
     setLoading(true);
+    setIsSubmitting(true);
 
     // Validate required fields (excluding password fields since it's OAuth)
     const validationErrors: Record<string, string> = {};
@@ -386,13 +392,14 @@ const ProfileCompletionForm = ({ user, onComplete, onCancel }: ProfileCompletion
             .from('user-photos')
             .getPublicUrl(filePath);
 
-          // Save to database
+          // Save to database with 1-based sequential order
+          const imageOrder = approvedImages.indexOf(image) + 1;
           const { error: dbError } = await supabase
             .from('user_images')
             .insert({
               user_id: user.id,
               image_url: publicUrl,
-              image_order: approvedImages.indexOf(image),
+              image_order: imageOrder,
               is_approved: image.status === 'approved',
               moderation_status: image.status === 'approved' ? 'approved' : 'pending',
               flagged_content: image.moderationResult?.flags || [],
@@ -425,6 +432,7 @@ const ProfileCompletionForm = ({ user, onComplete, onCancel }: ProfileCompletion
       });
     } finally {
       setLoading(false);
+      setIsSubmitting(false);
     }
   };
 
@@ -688,17 +696,17 @@ const ProfileCompletionForm = ({ user, onComplete, onCancel }: ProfileCompletion
           <div className="flex flex-col gap-3">
               <Button
                 type="submit"
-                disabled={loading}
-                className="w-full bg-gradient-to-r from-pink-500 to-purple-600 hover:from-pink-600 hover:to-purple-700 text-white font-semibold py-3 rounded-lg transition-all duration-200"
+                disabled={isSubmitting}
+                className="w-full bg-gradient-to-r from-pink-500 to-purple-600 hover:from-pink-600 hover:to-purple-700 text-white font-semibold py-3 rounded-lg transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed"
               >
-                {loading ? 'Completing Profile...' : 'Complete Profile & Add Photos'}
+                {isSubmitting ? 'Completing Profile...' : 'Complete Profile'}
               </Button>
               
               <Button
                 type="button"
                 variant="outline"
                 onClick={onCancel}
-                disabled={loading}
+                disabled={isSubmitting}
                 className="w-full border-gray-300 text-gray-700 hover:bg-gray-50 font-medium py-3 rounded-lg transition-all duration-200"
               >
                 Cancel

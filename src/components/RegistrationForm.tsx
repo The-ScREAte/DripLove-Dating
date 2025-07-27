@@ -439,9 +439,25 @@ const RegistrationForm = ({ onSubmit, onBackToLogin }: RegistrationFormProps) =>
           }
         }
       });
-      if (signUpError) throw signUpError;
-      userId = signUpData?.user?.id;
-      userCreated = !!userId;
+      
+      if (signUpError) {
+        // Handle the specific "User already registered" error
+        if (signUpError.message.includes('User already registered') || signUpError.message.includes('already been registered')) {
+          // Check if user is already signed in
+          const { data: { session } } = await supabase.auth.getSession();
+          if (session?.user) {
+            userId = session.user.id;
+            userCreated = true;
+          } else {
+            throw new Error('User already exists. Please sign in instead.');
+          }
+        } else {
+          throw signUpError;
+        }
+      } else {
+        userId = signUpData?.user?.id;
+        userCreated = !!userId;
+      }
     } catch (err) {
       console.error('Auth signup error:', err);
       setIsSubmitting(false); // Reset loading state
