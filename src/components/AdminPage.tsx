@@ -19,6 +19,7 @@ import { debounce, userDataCache, createPagination } from '@/utils/performanceOp
 import { useSupabaseSubscription, useMemoryMonitor } from '@/hooks/usePerformance';
 
 import { CurrentUser, AdminStats } from '@/types';
+import { Shield, LogOut, BarChart3, Users, Image, Search, Settings, UserPlus, Eye, Play, Pause, Trash2, CreditCard } from 'lucide-react';
 
 interface AdminPageProps {
   currentUser: CurrentUser;
@@ -32,6 +33,11 @@ interface UserProfile {
   email: string;
   account_status: string;
   created_at: string;
+  city?: string;
+  country?: string;
+  date_of_birth?: string;
+  age?: number;
+  is_admin?: boolean;
 }
 
 // Main admin page component
@@ -42,6 +48,8 @@ const AdminPageComponent: React.FC<AdminPageProps> = ({ currentUser, onLogout })
   const [adminUsers, setAdminUsers] = useState<UserProfile[]>([]);
   const [currentPage, setCurrentPage] = useState(1);
   const [statusFilter, setStatusFilter] = useState<'all' | 'active' | 'blocked' | 'pending'>('all');
+  const [searchTerm, setSearchTerm] = useState('');
+  
   // Payment config state
   const [loadingConfig, setLoadingConfig] = useState(false);
   const [showPaymentConfig, setShowPaymentConfig] = useState(false);
@@ -49,15 +57,26 @@ const AdminPageComponent: React.FC<AdminPageProps> = ({ currentUser, onLogout })
   const [paymentMethods, setPaymentMethods] = useState<PaymentMethod[]>(defaultPaymentMethods);
   const [enabledCountries, setEnabledCountries] = useState<string[]>([]);
   const [countryPrices, setCountryPrices] = useState<{ country: string; currency: string; price: string }[]>([]);
+  const [editCountries, setEditCountries] = useState(false);
+
+  // App stats
+  const [stats, setStats] = useState<AdminStats | null>(null);
 
   // Type for pending images
   type PendingImage = {
     id: string;
     user_id: string;
-    url: string;
-    status: string;
+    image_url: string;
+    moderation_status: string;
     created_at: string;
+    moderation_notes?: string;
+    profile?: {
+      first_name: string;
+      last_name: string;
+      email: string;
+    };
   };
+  
   const [matchUser1, setMatchUser1] = useState('');
   const [matchUser2, setMatchUser2] = useState('');
   const [selectedUserId, setSelectedUserId] = useState<string | null>(null);
@@ -68,9 +87,36 @@ const AdminPageComponent: React.FC<AdminPageProps> = ({ currentUser, onLogout })
   const [approvingImages, setApprovingImages] = useState<Record<string, boolean>>({});
   const [rejectingImages, setRejectingImages] = useState<Record<string, boolean>>({});
   const [isAdmin, setIsAdmin] = useState<boolean | null>(null);
+  
   // Constants
   const usersPerPage = 20;
   const { toast } = useToast();
+
+  // Check admin status on mount
+  useEffect(() => {
+    const checkAdminStatus = async () => {
+      if (!currentUser?.id) {
+        setIsAdmin(false);
+        return;
+      }
+
+      try {
+        const { data, error } = await supabase
+          .from('profiles')
+          .select('is_admin')
+          .eq('id', currentUser.id)
+          .single();
+
+        if (error) throw error;
+        setIsAdmin(data?.is_admin || false);
+      } catch (error) {
+        console.error('Error checking admin status:', error);
+        setIsAdmin(false);
+      }
+    };
+
+    checkAdminStatus();
+  }, [currentUser?.id]);
 
   // Fetch payment config from DB on mount
   useEffect(() => {
@@ -89,7 +135,19 @@ const AdminPageComponent: React.FC<AdminPageProps> = ({ currentUser, onLogout })
         setPaymentMethods(data.payment_methods as unknown as PaymentMethod[]);
         setPremiumPrice(data.premium_price.toString());
         setEnabledCountries(Array.isArray(data.enabled_countries) ? data.enabled_countries : []);
-        // ...existing code for countryPrices...
+        
+        // Convert JSONB country_prices back to array format for UI
+        if (data.country_prices && typeof data.country_prices === 'object') {
+          const pricesArray = Object.entries(data.country_prices).map(([currency, price]) => {
+            const countryCode = getCountriesList().find(c => getCountryByCode(c.code)?.currency === currency)?.code || '';
+            return {
+              country: countryCode,
+              currency,
+              price: price.toString()
+            };
+          });
+          setCountryPrices(pricesArray);
+        }
       } catch (error) {
         console.error('Error fetching payment config:', error);
         setPaymentMethods(defaultPaymentMethods);
@@ -189,8 +247,7 @@ const AdminPageComponent: React.FC<AdminPageProps> = ({ currentUser, onLogout })
                   const selectedCountry = countryOptions.find(c => c.code === entry.country);
                   const currency = selectedCountry ? getCountryByCode(selectedCountry.code)?.currency || '' : '';
                   return (
-                    <div key={idx} className="flex gap-2 items-center mb-1">
-                      {/* Country dropdown */}
+                    <div key={idx} className="flex gap-2 items-center">
                       <select
                         value={entry.country}
                         onChange={e => {
@@ -202,19 +259,65 @@ const AdminPageComponent: React.FC<AdminPageProps> = ({ currentUser, onLogout })
                       >
                         <option value="">Select Country</option>
                         {countryOptions.map(c => (
-                      <option key={c.code} value={c.code}>{c.name}</option>
-                    ))}
-                  </select>
-                  {/* End country dropdown */}
-                </div>
-              );
-            })}
+                          <option key={c.code} value={c.code}>{c.name}</option>
+                        ))}
+                      </select>
+                      <Input
+                        type="text"
+                        value={currency}
+                        disabled
+                        className="w-20 text-center"
+                        placeholder="Currency"
+                      />
+                      <Input
+                        type="number"
+                        value={entry.price}
+                        onChange={e => setCountryPrices(prices => prices.map((p, i) => i === idx ? { ...p, price: e.target.value } : p))}
+                        className="w-24"
+                        placeholder="Price"
+                      />
+                      <Button
+                        variant="destructive"
+                        size="sm"
+                        onClick={() => setCountryPrices(prices => prices.filter((_, i) => i !== idx))}
+                      >
+                        Remove
+                      </Button>
+                    </div>
+                  );
+                })}
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setCountryPrices([...countryPrices, { country: '', currency: '', price: '' }])}
+                >
+                  Add Country Price
+                </Button>
+              </div>
+            </div>
+            <div className="flex gap-2">
+              <Button onClick={handleSavePaymentConfig} disabled={loadingConfig}>
+                Save Configuration
+              </Button>
+              <Button variant="outline" onClick={() => setShowPaymentConfig(false)}>
+                Cancel
+              </Button>
+            </div>
           </div>
         </div>
-        {/* ...rest of settings UI... */}
-    </div>
-    );
-  };
+      )}
+    </>
+  );
+
+  const fetchAppStats = useCallback(async () => {
+    try {
+      const { data, error } = await supabase.rpc('get_admin_stats');
+      if (error) throw error;
+      setStats(data[0]);
+    } catch (error) {
+      console.error('Error fetching app stats:', error);
+    }
+  }, []);
 
   const fetchUsers = useCallback(debounce(async () => {
     try {
@@ -272,7 +375,49 @@ const AdminPageComponent: React.FC<AdminPageProps> = ({ currentUser, onLogout })
     }
   }, 300), [toast, currentPage, statusFilter, usersPerPage]);
 
+  const fetchPendingImages = useCallback(async () => {
+    try {
+      setLoadingPendingImages(true);
+      const { data, error } = await supabase
+        .from('user_images')
+        .select(`
+          id,
+          user_id,
+          image_url,
+          moderation_status,
+          created_at,
+          moderation_notes,
+          profiles:user_id (
+            first_name,
+            last_name,
+            email
+          )
+        `)
+        .eq('moderation_status', 'pending')
+        .order('created_at', { ascending: false });
+
+      if (error) throw error;
+
+      const pendingImagesWithProfile = data?.map(image => ({
+        ...image,
+        profile: Array.isArray(image.profiles) ? image.profiles[0] : image.profiles
+      })) || [];
+
+      setPendingImages(pendingImagesWithProfile);
+    } catch (error) {
+      console.error('Error fetching pending images:', error);
+      toast({
+        title: 'Error',
+        description: 'Failed to load pending images',
+        variant: 'destructive'
+      });
+    } finally {
+      setLoadingPendingImages(false);
+    }
+  }, [toast]);
+
   const calculateAge = (dateOfBirth: string) => {
+    if (!dateOfBirth) return 0;
     const today = new Date();
     const birthDate = new Date(dateOfBirth);
     let age = today.getFullYear() - birthDate.getFullYear();
@@ -413,6 +558,56 @@ const AdminPageComponent: React.FC<AdminPageProps> = ({ currentUser, onLogout })
     }
   };
 
+  const approveImage = async (imageId: string) => {
+    setApprovingImages(prev => ({ ...prev, [imageId]: true }));
+    try {
+      const { error } = await supabase
+        .from('user_images')
+        .update({ 
+          is_approved: true, 
+          moderation_status: 'approved',
+          moderated_by: currentUser.id,
+          moderated_at: new Date().toISOString()
+        })
+        .eq('id', imageId);
+
+      if (error) throw error;
+
+      setPendingImages(prev => prev.filter(img => img.id !== imageId));
+      toast({ title: 'Success', description: 'Image approved successfully' });
+    } catch (error) {
+      console.error('Error approving image:', error);
+      toast({ title: 'Error', description: 'Failed to approve image', variant: 'destructive' });
+    } finally {
+      setApprovingImages(prev => ({ ...prev, [imageId]: false }));
+    }
+  };
+
+  const rejectImage = async (imageId: string) => {
+    setRejectingImages(prev => ({ ...prev, [imageId]: true }));
+    try {
+      const { error } = await supabase
+        .from('user_images')
+        .update({ 
+          is_approved: false, 
+          moderation_status: 'rejected',
+          moderated_by: currentUser.id,
+          moderated_at: new Date().toISOString()
+        })
+        .eq('id', imageId);
+
+      if (error) throw error;
+
+      setPendingImages(prev => prev.filter(img => img.id !== imageId));
+      toast({ title: 'Success', description: 'Image rejected successfully' });
+    } catch (error) {
+      console.error('Error rejecting image:', error);
+      toast({ title: 'Error', description: 'Failed to reject image', variant: 'destructive' });
+    } finally {
+      setRejectingImages(prev => ({ ...prev, [imageId]: false }));
+    }
+  };
+
   const handleLogout = async () => {
     try {
       await supabase.auth.signOut();
@@ -539,6 +734,7 @@ const AdminPageComponent: React.FC<AdminPageProps> = ({ currentUser, onLogout })
                   <span>Settings</span>
                 </TabsTrigger>
               </TabsList>
+
               {/* Dashboard Tab */}
               <TabsContent value="dashboard" className="space-y-4">
                 {/* Stats Overview */}
@@ -552,11 +748,15 @@ const AdminPageComponent: React.FC<AdminPageProps> = ({ currentUser, onLogout })
                     </CardHeader>
                     <CardContent>
                       <div className="grid grid-cols-2 gap-3">
-                        {/* ...stats cards... */}
+                        <StatsCard title="Total Users" value={stats.total_users} />
+                        <StatsCard title="Active Users" value={stats.active_users} />
+                        <StatsCard title="Total Matches" value={stats.total_matches} />
+                        <StatsCard title="Pending Images" value={stats.pending_images} />
                       </div>
                     </CardContent>
                   </Card>
                 )}
+
                 {/* Manual Match Creation */}
                 <Card>
                   <CardHeader className="pb-3">
@@ -598,523 +798,221 @@ const AdminPageComponent: React.FC<AdminPageProps> = ({ currentUser, onLogout })
                   </CardContent>
                 </Card>
               </TabsContent>
+
               {/* Users Tab */}
               <TabsContent value="users" className="space-y-4">
-                {/* Admin Users */}
-                {adminUsers.length > 0 && (
-                  <Card>
-                    <CardHeader className="pb-3">
-                      <CardTitle className="flex items-center gap-2 text-lg">
-                        <Shield className="w-5 h-5" />
-                        Admin Users ({adminUsers.length})
-                      </CardTitle>
-                    </CardHeader>
-                    <CardContent>
-                      <div className="space-y-2">
-                        {adminUsers.map((admin) => (
-                          <div key={admin.id} className="flex items-center justify-between p-2 bg-blue-50 rounded">
-                            <div>
-                              <p className="font-medium text-sm">{admin.first_name} {admin.last_name}</p>
-                              <p className="text-xs text-gray-600">{admin.email}</p>
-                            </div>
-                            <div className="flex items-center gap-2">
-                              <Button
-                                size="sm"
-                                variant="outline"
-                                onClick={() => handleViewProfile(admin.id)}
-                                className="text-blue-600 hover:text-blue-700 text-xs px-2 py-1 h-7"
-                              >
-                                <Eye className="w-3 h-3 mr-1" />
-                                View
-                              </Button>
-                              <Badge className="bg-blue-100 text-blue-800 text-xs">
-                                ADMIN
-                              </Badge>
-                            </div>
-                          </div>
-                        ))}
-                      </div>
-                    </CardContent>
-                  </Card>
-                )}
-                {/* User Management */}
-                <Card>
-                  <CardHeader className="pb-3">
-                    <CardTitle className="flex items-center gap-2 text-lg">
-                      <Users className="w-5 h-5" />
-                      User Management ({filteredUsers.length})
-                    </CardTitle>
-                  </CardHeader>
-                  <CardContent>
-                    {/* Search and Filter */}
-                    <div className="flex gap-2 mb-4">
-                      <div className="flex-1 relative">
-                        <Search className="absolute left-2 top-2.5 h-4 w-4 text-gray-400" />
-                        <Input
-                          placeholder="Search users..."
-                          value={searchTerm}
-                          onChange={(e) => setSearchTerm(e.target.value)}
-                          className="pl-8 text-sm"
-                        />
-                      </div>
-                      <Select value={statusFilter} onValueChange={setStatusFilter}>
-                        <SelectTrigger className="w-32">
-                          <SelectValue />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="all">All</SelectItem>
-                          <SelectItem value="active">Active</SelectItem>
-                          <SelectItem value="on_hold">On Hold</SelectItem>
-                          <SelectItem value="blocked">Blocked</SelectItem>
-                        </SelectContent>
-                      </Select>
-                    </div>
-                    {/* ...rest of user management table... */}
-                  </CardContent>
-                </Card>
+                <UserModerationPanel 
+                  users={users}
+                  adminUsers={adminUsers}
+                  loading={loading}
+                  searchTerm={searchTerm}
+                  setSearchTerm={setSearchTerm}
+                  statusFilter={statusFilter}
+                  setStatusFilter={setStatusFilter}
+                  currentPage={currentPage}
+                  setCurrentPage={setCurrentPage}
+                  updateUserStatus={updateUserStatus}
+                  deleteUser={deleteUser}
+                  handleViewProfile={handleViewProfile}
+                  getStatusBadge={getStatusBadge}
+                  usersPerPage={usersPerPage}
+                />
               </TabsContent>
-              {/* ...other tabs (content, debugger, settings)... */}
-            </Tabs>
-          </AdminErrorBoundary>
-        </div>
 
-        {/* User Profile Modal */}
-        {selectedUserId && (
-          <UserProfileModal
-            isOpen={isProfileModalOpen}
-            onClose={() => {
-              setIsProfileModalOpen(false);
-              setSelectedUserId(null);
-            }}
-            userId={selectedUserId}
-          />
-        )}
-      </div>
-    </div>
-  );
-                </Card>
-              )}
-
-              {/* Manual Match Creation */}
-              <Card>
-                <CardHeader className="pb-3">
-                  <CardTitle className="flex items-center gap-2 text-lg">
-                    <UserPlus className="w-5 h-5" />
-                    Create Manual Match
-                  </CardTitle>
-                </CardHeader>
-                <CardContent className="space-y-3">
-                  <div className="grid grid-cols-2 gap-2">
-                    <Select value={matchUser1} onValueChange={setMatchUser1}>
-                      <SelectTrigger className="text-sm">
-                        <SelectValue placeholder="Select User 1" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {users.map((user) => (
-                          <SelectItem key={user.id} value={user.id}>
-                            {user.first_name} {user.last_name}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                    <Select value={matchUser2} onValueChange={setMatchUser2}>
-                      <SelectTrigger className="text-sm">
-                        <SelectValue placeholder="Select User 2" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {users.map((user) => (
-                          <SelectItem key={user.id} value={user.id}>
-                            {user.first_name} {user.last_name}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  </div>
-                  <Button onClick={createManualMatch} className="w-full" size="sm">
-                    Create Match
-                  </Button>
-                </CardContent>
-              </Card>
-            </TabsContent>
-
-            {/* Users Tab */}
-            <TabsContent value="users" className="space-y-4">
-              {/* Admin Users */}
-              {adminUsers.length > 0 && (
+              {/* Content Tab */}
+              <TabsContent value="content" className="space-y-4">
+                {/* Pending Images Management */}
                 <Card>
                   <CardHeader className="pb-3">
-                    <CardTitle className="flex items-center gap-2 text-lg">
-                      <Shield className="w-5 h-5" />
-                      Admin Users ({adminUsers.length})
+                    <CardTitle className="flex items-center justify-between text-lg">
+                      <div className="flex items-center gap-2">
+                        <Image className="w-5 h-5" />
+                        Pending Images ({pendingImages.length})
+                      </div>
+                      <Button
+                        onClick={async () => {
+                          toast({ title: "Bulk approval started", description: "Approving all existing images..." });
+                          await bulkApproveExistingImages();
+                          await fetchPendingImages();
+                          toast({ title: "✅ Bulk approval complete", description: "All appropriate images have been approved." });
+                        }}
+                        variant="outline"
+                        size="sm"
+                        className="text-xs"
+                      >
+                        🔧 Bulk Approve All
+                      </Button>
                     </CardTitle>
                   </CardHeader>
                   <CardContent>
-                    <div className="space-y-2">
-                      {adminUsers.map((admin) => (
-                        <div key={admin.id} className="flex items-center justify-between p-2 bg-blue-50 rounded">
-                          <div>
-                            <p className="font-medium text-sm">{admin.first_name} {admin.last_name}</p>
-                            <p className="text-xs text-gray-600">{admin.email}</p>
-                          </div>
-                          <div className="flex items-center gap-2">
-                            <Button
-                              size="sm"
-                              variant="outline"
-                              onClick={() => handleViewProfile(admin.id)}
-                              className="text-blue-600 hover:text-blue-700 text-xs px-2 py-1 h-7"
-                            >
-                              <Eye className="w-3 h-3 mr-1" />
-                              View
-                            </Button>
-                            <Badge className="bg-blue-100 text-blue-800 text-xs">
-                              ADMIN
-                            </Badge>
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-                  </CardContent>
-                </Card>
-              )}
-
-              {/* User Management */}
-              <Card>
-                <CardHeader className="pb-3">
-                  <CardTitle className="flex items-center gap-2 text-lg">
-                    <Users className="w-5 h-5" />
-                    User Management ({filteredUsers.length})
-                  </CardTitle>
-                </CardHeader>
-                <CardContent>
-                  {/* Search and Filter */}
-                  <div className="flex gap-2 mb-4">
-                    <div className="flex-1 relative">
-                      <Search className="absolute left-2 top-2.5 h-4 w-4 text-gray-400" />
-                      <Input
-                        placeholder="Search users..."
-                        value={searchTerm}
-                        onChange={(e) => setSearchTerm(e.target.value)}
-                        className="pl-8 text-sm"
-                      />
-                    </div>
-                    <Select value={statusFilter} onValueChange={setStatusFilter}>
-                      <SelectTrigger className="w-32">
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="all">All</SelectItem>
-                        <SelectItem value="active">Active</SelectItem>
-                        <SelectItem value="on_hold">On Hold</SelectItem>
-                        <SelectItem value="blocked">Blocked</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </div>
-
-                  {/* Users List Container */}
-                  <div className="border rounded-lg bg-white">
-                    {loading ? (
+                    {loadingPendingImages ? (
                       <div className="flex justify-center py-8">
                         <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-pink-600"></div>
                       </div>
+                    ) : pendingImages.length === 0 ? (
+                      <div className="text-center py-8 text-gray-500 text-sm">
+                        No pending images to review.
+                      </div>
                     ) : (
-                      <div className="space-y-0 max-h-96 overflow-y-auto">
-                        {paginatedUsers.map((user, index) => (
-                          <div key={user.id} className={`p-3 space-y-2 ${index !== paginatedUsers.length - 1 ? 'border-b' : ''}`}>
-                            <div className="flex items-start justify-between">
+                      <div className="space-y-4 max-h-96 overflow-y-auto">
+                        {pendingImages.map((image) => (
+                          <div key={image.id} className="border rounded-lg p-4 bg-gray-50">
+                            <div className="flex items-start gap-4">
+                              <div className="flex-shrink-0">
+                                <img
+                                  src={image.image_url}
+                                  alt="Pending image"
+                                  className="w-20 h-20 object-cover rounded-lg border"
+                                />
+                              </div>
                               <div className="flex-1 min-w-0">
-                                <h3 className="font-medium text-sm truncate">
-                                  {user.first_name} {user.last_name}
-                                </h3>
-                                <p className="text-xs text-gray-600 truncate">{user.email}</p>
-                                <p className="text-xs text-gray-500">
-                                  {user.city}, {user.country} • Age {user.age}
+                                <h4 className="font-medium text-sm">
+                                  {image.profile?.first_name} {image.profile?.last_name}
+                                </h4>
+                                <p className="text-xs text-gray-600">{image.profile?.email}</p>
+                                <p className="text-xs text-gray-500 mt-1">
+                                  Uploaded: {new Date(image.created_at).toLocaleDateString()}
                                 </p>
                                 <p className="text-xs text-gray-500">
-                                  Joined: {new Date(user.created_at).toLocaleDateString()}
+                                  Status: <span className="font-medium">{image.moderation_status}</span>
                                 </p>
+                                {image.moderation_notes && (
+                                  <p className="text-xs text-orange-600 mt-1">
+                                    Note: {image.moderation_notes}
+                                  </p>
+                                )}
                               </div>
-                              <div className="ml-2">
-                                {getStatusBadge(user.account_status)}
-                              </div>
-                            </div>
-                            
-                            <div className="flex gap-1 flex-wrap">
-                              <Button
-                                size="sm"
-                                variant="outline"
-                                onClick={() => handleViewProfile(user.id)}
-                                className="text-blue-600 hover:text-blue-700 text-xs px-2 py-1 h-7"
-                              >
-                                <Eye className="w-3 h-3 mr-1" />
-                                View
-                              </Button>
-                              
-                              {user.account_status === 'on_hold' ? (
+                              <div className="flex flex-col gap-2">
+                                <Button
+                                  size="sm"
+                                  onClick={() => approveImage(image.id)}
+                                  disabled={approvingImages[image.id]}
+                                  className="bg-green-600 hover:bg-green-700 text-white text-xs px-3 py-1 h-8"
+                                >
+                                  {approvingImages[image.id] ? 'Approving...' : 'Approve'}
+                                </Button>
                                 <Button
                                   size="sm"
                                   variant="outline"
-                                  onClick={() => updateUserStatus(user.id, 'active')}
-                                  className="text-green-600 hover:text-green-700 text-xs px-2 py-1 h-7"
+                                  onClick={() => rejectImage(image.id)}
+                                  disabled={rejectingImages[image.id]}
+                                  className="text-red-600 hover:text-red-700 border-red-300 hover:bg-red-50 text-xs px-3 py-1 h-8"
                                 >
-                                  <Play className="w-3 h-3 mr-1" />
-                                  Activate
+                                  {rejectingImages[image.id] ? 'Rejecting...' : 'Reject'}
                                 </Button>
-                              ) : (
-                                <Button
-                                  size="sm"
-                                  variant="outline"
-                                  onClick={() => updateUserStatus(user.id, 'on_hold')}
-                                  className="text-yellow-600 hover:text-yellow-700 text-xs px-2 py-1 h-7"
-                                >
-                                  <Pause className="w-3 h-3 mr-1" />
-                                  Hold
-                                </Button>
-                              )}
-                              
-                              <Button
-                                size="sm"
-                                variant="outline"
-                                onClick={() => deleteUser(user.id)}
-                                className="text-red-600 hover:text-red-700 text-xs px-2 py-1 h-7"
-                              >
-                                <Trash2 className="w-3 h-3 mr-1" />
-                                Delete
-                              </Button>
+                              </div>
                             </div>
                           </div>
                         ))}
-                        
-                        {filteredUsers.length === 0 && (
-                          <div className="text-center py-8 text-gray-500 text-sm">
-                            No users found matching your criteria.
-                          </div>
+                      </div>
+                    )}
+                  </CardContent>
+                </Card>
+              </TabsContent>
+
+              {/* Debugger Tab */}
+              <TabsContent value="debugger" className="space-y-4">
+                <UserPoolDebugger 
+                  currentUserId={currentUser.id}
+                  userPreferences={{
+                    min_age: currentUser.min_age,
+                    max_age: currentUser.max_age,
+                    max_distance: currentUser.max_distance,
+                    preference: currentUser.preference,
+                    latitude: currentUser.latitude,
+                    longitude: currentUser.longitude
+                  }}
+                />
+              </TabsContent>
+
+              {/* Settings Tab */}
+              <TabsContent value="settings" className="space-y-4">
+                {/* Enabled Countries Management */}
+                <Card>
+                  <CardHeader className="pb-3 flex flex-row items-center justify-between">
+                    <CardTitle className="flex items-center gap-2 text-lg">
+                      <span className="inline-block w-5 h-5 bg-gradient-to-br from-green-400 to-blue-400 rounded-full mr-2" />
+                      Enabled Countries
+                    </CardTitle>
+                    <Button size="sm" variant={editCountries ? 'default' : 'outline'} onClick={async () => {
+                      if (editCountries) {
+                        await handleSavePaymentConfig();
+                      }
+                      setEditCountries(!editCountries);
+                    }}>
+                      {editCountries ? 'Save' : 'Edit'}
+                    </Button>
+                  </CardHeader>
+                  <CardContent>
+                    {editCountries ? (
+                      <>
+                        <div className="flex items-center justify-between mb-2">
+                          <span className="text-sm font-medium text-gray-700">Select countries to enable</span>
+                          <span className="text-xs text-gray-500">{enabledCountries.length} selected</span>
+                        </div>
+                        <div className="grid grid-cols-2 gap-2 max-h-56 overflow-y-auto border rounded p-2 bg-gray-50 mb-4">
+                          {getCountriesList().map(c => {
+                            const checked = enabledCountries.includes(c.code);
+                            return (
+                              <label
+                                key={c.code}
+                                className={`flex items-center gap-2 text-sm cursor-pointer select-none px-2 py-1 rounded transition border-2 ${checked ? 'bg-blue-50 border-blue-500 font-semibold text-blue-900 shadow' : 'bg-white border-gray-200 hover:bg-blue-50'}`}
+                                style={{ userSelect: 'none' }}
+                              >
+                                <input
+                                  type="checkbox"
+                                  className="accent-blue-600 w-4 h-4 border-2 border-blue-400 rounded focus:ring-2 focus:ring-blue-400"
+                                  checked={checked}
+                                  onChange={e => {
+                                    setEnabledCountries(list => e.target.checked
+                                      ? [...list, c.code]
+                                      : list.filter(code => code !== c.code)
+                                    );
+                                  }}
+                                />
+                                <span>{c.name}</span>
+                              </label>
+                            );
+                          })}
+                        </div>
+                        <div className="flex gap-2 justify-end">
+                          <Button size="sm" variant="outline" onClick={() => { setEditCountries(false); }}>
+                            Cancel
+                          </Button>
+                          <Button size="sm" variant="default" onClick={async () => { await handleSavePaymentConfig(); setEditCountries(false); }}>
+                            Save
+                          </Button>
+                        </div>
+                      </>
+                    ) : (
+                      <div className="flex flex-wrap gap-2">
+                        {enabledCountries.length === 0 ? (
+                          <span className="text-gray-500 text-sm">No countries enabled.</span>
+                        ) : (
+                          enabledCountries.map(code => {
+                            const c = getCountryByCode(code);
+                            return c ? <span key={code} className="px-2 py-1 bg-blue-100 text-blue-800 rounded text-xs border border-blue-300 font-medium">{c.name}</span> : null;
+                          })
                         )}
                       </div>
                     )}
+                  </CardContent>
+                </Card>
 
-                    {/* Pagination */}
-                    {totalPages > 1 && (
-                      <div className="flex justify-between items-center mt-4 pt-4 border-t px-3 pb-3">
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          onClick={() => setCurrentPage(Math.max(1, currentPage - 1))}
-                          disabled={currentPage === 1}
-                        >
-                          Previous
-                        </Button>
-                        <span className="text-sm text-gray-600">
-                          Page {currentPage} of {totalPages}
-                        </span>
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          onClick={() => setCurrentPage(Math.min(totalPages, currentPage + 1))}
-                          disabled={currentPage === totalPages}
-                        >
-                          Next
-                        </Button>
-                      </div>
-                    )}
-                  </div>
-                </CardContent>
-              </Card>
-            </TabsContent>
-
-            {/* Content Tab */}
-            <TabsContent value="content" className="space-y-4">
-              {/* Pending Images Management */}
-              <Card>
-                <CardHeader className="pb-3">
-                  <CardTitle className="flex items-center justify-between text-lg">
-                    <div className="flex items-center gap-2">
-                      <Image className="w-5 h-5" />
-                      Pending Images ({pendingImages.length})
-                    </div>
-                    <Button
-                      onClick={async () => {
-                        toast({ title: "Bulk approval started", description: "Approving all existing images..." });
-                        await bulkApproveExistingImages();
-                        await fetchPendingImages();
-                        toast({ title: "✅ Bulk approval complete", description: "All appropriate images have been approved." });
-                      }}
-                      variant="outline"
-                      size="sm"
-                      className="text-xs"
-                    >
-                      🔧 Bulk Approve All
-                    </Button>
-                  </CardTitle>
-                </CardHeader>
-                <CardContent>
-                  {loadingPendingImages ? (
-                    <div className="flex justify-center py-8">
-                      <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-pink-600"></div>
-                    </div>
-                  ) : pendingImages.length === 0 ? (
-                    <div className="text-center py-8 text-gray-500 text-sm">
-                      No pending images to review.
-                    </div>
-                  ) : (
-                    <div className="space-y-4 max-h-96 overflow-y-auto">
-                      {pendingImages.map((image) => (
-                        <div key={image.id} className="border rounded-lg p-4 bg-gray-50">
-                          <div className="flex items-start gap-4">
-                            <div className="flex-shrink-0">
-                              <img
-                                src={image.image_url}
-                                alt="Pending image"
-                                className="w-20 h-20 object-cover rounded-lg border"
-                              />
-                            </div>
-                            <div className="flex-1 min-w-0">
-                              <h4 className="font-medium text-sm">
-                                {image.profile?.first_name} {image.profile?.last_name}
-                              </h4>
-                              <p className="text-xs text-gray-600">{image.profile?.email}</p>
-                              <p className="text-xs text-gray-500 mt-1">
-                                Uploaded: {new Date(image.created_at).toLocaleDateString()}
-                              </p>
-                              <p className="text-xs text-gray-500">
-                                Status: <span className="font-medium">{image.moderation_status}</span>
-                              </p>
-                              {image.moderation_notes && (
-                                <p className="text-xs text-orange-600 mt-1">
-                                  Note: {image.moderation_notes}
-                                </p>
-                              )}
-                            </div>
-                            <div className="flex flex-col gap-2">
-                              <Button
-                                size="sm"
-                                onClick={() => approveImage(image.id)}
-                                disabled={approvingImages[image.id]}
-                                className="bg-green-600 hover:bg-green-700 text-white text-xs px-3 py-1 h-8"
-                              >
-                                {approvingImages[image.id] ? 'Approving...' : 'Approve'}
-                              </Button>
-                              <Button
-                                size="sm"
-                                variant="outline"
-                                onClick={() => rejectImage(image.id)}
-                                disabled={rejectingImages[image.id]}
-                                className="text-red-600 hover:text-red-700 border-red-300 hover:bg-red-50 text-xs px-3 py-1 h-8"
-                              >
-                                {rejectingImages[image.id] ? 'Rejecting...' : 'Reject'}
-                              </Button>
-                            </div>
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-                  )}
-                </CardContent>
-              </Card>
-            </TabsContent>
-
-            {/* Debugger Tab */}
-            <TabsContent value="debugger" className="space-y-4">
-              <UserPoolDebugger 
-                currentUserId={currentUser.id}
-                userPreferences={{
-                  min_age: currentUser.min_age,
-                  max_age: currentUser.max_age,
-                  max_distance: currentUser.max_distance,
-                  preference: currentUser.preference,
-                  latitude: currentUser.latitude,
-                  longitude: currentUser.longitude
-                }}
-              />
-            </TabsContent>
-
-            {/* Settings Tab */}
-            <TabsContent value="settings" className="space-y-4">
-              {/* Enabled Countries Management */}
-              <Card>
-                <CardHeader className="pb-3 flex flex-row items-center justify-between">
-                  <CardTitle className="flex items-center gap-2 text-lg">
-                    <span className="inline-block w-5 h-5 bg-gradient-to-br from-green-400 to-blue-400 rounded-full mr-2" />
-                    Enabled Countries
-                  </CardTitle>
-                  <Button size="sm" variant={editCountries ? 'default' : 'outline'} onClick={async () => {
-                    if (editCountries) {
-                      await handleSavePaymentConfig();
-                    }
-                    setEditCountries(!editCountries);
-                  }}>
-                    {editCountries ? 'Save' : 'Edit'}
-                  </Button>
-                </CardHeader>
-                <CardContent>
-                  {editCountries ? (
-                    <>
-                      <div className="flex items-center justify-between mb-2">
-                        <span className="text-sm font-medium text-gray-700">Select countries to enable</span>
-                        <span className="text-xs text-gray-500">{enabledCountries.length} selected</span>
-                      </div>
-                      <div className="grid grid-cols-2 gap-2 max-h-56 overflow-y-auto border rounded p-2 bg-gray-50 mb-4">
-                        {getCountriesList().map(c => {
-                          const checked = enabledCountries.includes(c.code);
-                          return (
-                            <label
-                              key={c.code}
-                              className={`flex items-center gap-2 text-sm cursor-pointer select-none px-2 py-1 rounded transition border-2 ${checked ? 'bg-blue-50 border-blue-500 font-semibold text-blue-900 shadow' : 'bg-white border-gray-200 hover:bg-blue-50'}`}
-                              style={{ userSelect: 'none' }}
-                            >
-                              <input
-                                type="checkbox"
-                                className="accent-blue-600 w-4 h-4 border-2 border-blue-400 rounded focus:ring-2 focus:ring-blue-400"
-                                checked={checked}
-                                onChange={e => {
-                                  setEnabledCountries(list => e.target.checked
-                                    ? [...list, c.code]
-                                    : list.filter(code => code !== c.code)
-                                  );
-                                }}
-                              />
-                              <span>{c.name}</span>
-                            </label>
-                          );
-                        })}
-                      </div>
-                      <div className="flex gap-2 justify-end">
-                        <Button size="sm" variant="outline" onClick={() => { setEditCountries(false); }}>
-                          Cancel
-                        </Button>
-                        <Button size="sm" variant="default" onClick={async () => { await handleSavePaymentConfig(); setEditCountries(false); }}>
-                          Save
-                        </Button>
-                      </div>
-                    </>
-                  ) : (
-                    <div className="flex flex-wrap gap-2">
-                      {enabledCountries.length === 0 ? (
-                        <span className="text-gray-500 text-sm">No countries enabled.</span>
-                      ) : (
-                        enabledCountries.map(code => {
-                          const c = getCountryByCode(code);
-                          return c ? <span key={code} className="px-2 py-1 bg-blue-100 text-blue-800 rounded text-xs border border-blue-300 font-medium">{c.name}</span> : null;
-                        })
-                      )}
-                    </div>
-                  )}
-                </CardContent>
-              </Card>
-
-              {/* Payment Configuration */}
-              <Card>
-                <CardHeader className="pb-3">
-                  <CardTitle className="flex items-center gap-2 text-lg">
-                    <CreditCard className="w-5 h-5" />
-                    Payment Configuration
-                  </CardTitle>
-                </CardHeader>
-                <CardContent>
-                  {isAdmin && renderPaymentMethodsAdmin()}
-                </CardContent>
-              </Card>
-            </TabsContent>
-          </Tabs>
+                {/* Payment Configuration */}
+                <Card>
+                  <CardHeader className="pb-3">
+                    <CardTitle className="flex items-center gap-2 text-lg">
+                      <CreditCard className="w-5 h-5" />
+                      Payment Configuration
+                    </CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    {isAdmin && renderPaymentMethodsAdmin()}
+                  </CardContent>
+                </Card>
+              </TabsContent>
+            </Tabs>
           </AdminErrorBoundary>
         </div>
 
