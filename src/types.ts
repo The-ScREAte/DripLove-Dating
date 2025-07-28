@@ -79,7 +79,9 @@ export interface ChatMessage {
 
 export interface AdminStats {
   total_users: number;
+  active_users: number;
   total_matches: number;
+  pending_images: number;
   total_likes: number;
   total_blocks: number;
   total_messages: number;

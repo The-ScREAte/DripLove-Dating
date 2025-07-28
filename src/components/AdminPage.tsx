@@ -19,7 +19,7 @@ import { debounce, userDataCache, createPagination } from '@/utils/performanceOp
 import { useSupabaseSubscription, useMemoryMonitor } from '@/hooks/usePerformance';
 
 import { CurrentUser, AdminStats } from '@/types';
-import { Shield, LogOut, BarChart3, Users, Image, Search, Settings, UserPlus, Eye, Play, Pause, Trash2, CreditCard } from 'lucide-react';
+import { Shield, LogOut, BarChart3, Users, Image, Search, Settings, UserPlus, Eye, Play, Pause, Trash2, CreditCard, Ban } from 'lucide-react';
 
 interface AdminPageProps {
   currentUser: CurrentUser;
@@ -134,7 +134,7 @@ const AdminPageComponent: React.FC<AdminPageProps> = ({ currentUser, onLogout })
 
         setPaymentMethods(data.payment_methods as unknown as PaymentMethod[]);
         setPremiumPrice(data.premium_price.toString());
-        setEnabledCountries(Array.isArray(data.enabled_countries) ? data.enabled_countries : []);
+        setEnabledCountries(Array.isArray(data.enabled_countries) ? data.enabled_countries.map(item => String(item)) : []);
         
         // Convert JSONB country_prices back to array format for UI
         if (data.country_prices && typeof data.country_prices === 'object') {
@@ -313,7 +313,7 @@ const AdminPageComponent: React.FC<AdminPageProps> = ({ currentUser, onLogout })
     try {
       const { data, error } = await supabase.rpc('get_admin_stats');
       if (error) throw error;
-      setStats(data[0]);
+      setStats(data as unknown as AdminStats);
     } catch (error) {
       console.error('Error fetching app stats:', error);
     }
@@ -739,22 +739,7 @@ const AdminPageComponent: React.FC<AdminPageProps> = ({ currentUser, onLogout })
               <TabsContent value="dashboard" className="space-y-4">
                 {/* Stats Overview */}
                 {stats && (
-                  <Card>
-                    <CardHeader className="pb-3">
-                      <CardTitle className="flex items-center gap-2 text-lg">
-                        <BarChart3 className="w-5 h-5" />
-                        Platform Statistics
-                      </CardTitle>
-                    </CardHeader>
-                    <CardContent>
-                      <div className="grid grid-cols-2 gap-3">
-                        <StatsCard title="Total Users" value={stats.total_users} />
-                        <StatsCard title="Active Users" value={stats.active_users} />
-                        <StatsCard title="Total Matches" value={stats.total_matches} />
-                        <StatsCard title="Pending Images" value={stats.pending_images} />
-                      </div>
-                    </CardContent>
-                  </Card>
+                  <StatsCard stats={stats} />
                 )}
 
                 {/* Manual Match Creation */}
@@ -801,22 +786,112 @@ const AdminPageComponent: React.FC<AdminPageProps> = ({ currentUser, onLogout })
 
               {/* Users Tab */}
               <TabsContent value="users" className="space-y-4">
-                <UserModerationPanel 
-                  users={users}
-                  adminUsers={adminUsers}
-                  loading={loading}
-                  searchTerm={searchTerm}
-                  setSearchTerm={setSearchTerm}
-                  statusFilter={statusFilter}
-                  setStatusFilter={setStatusFilter}
-                  currentPage={currentPage}
-                  setCurrentPage={setCurrentPage}
-                  updateUserStatus={updateUserStatus}
-                  deleteUser={deleteUser}
-                  handleViewProfile={handleViewProfile}
-                  getStatusBadge={getStatusBadge}
-                  usersPerPage={usersPerPage}
-                />
+                <Card>
+                  <CardHeader className="pb-3">
+                    <CardTitle className="flex items-center gap-2 text-lg">
+                      <Users className="w-5 h-5" />
+                      User Management
+                    </CardTitle>
+                  </CardHeader>
+                  <CardContent className="space-y-4">
+                    {/* Search and filters */}
+                    <div className="flex flex-col sm:flex-row gap-4">
+                      <div className="relative flex-1">
+                        <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4" />
+                        <Input
+                          placeholder="Search users..."
+                          value={searchTerm}
+                          onChange={(e) => setSearchTerm(e.target.value)}
+                          className="pl-10"
+                        />
+                      </div>
+                      <Select value={statusFilter} onValueChange={(value: any) => setStatusFilter(value)}>
+                        <SelectTrigger className="w-full sm:w-48">
+                          <SelectValue placeholder="Filter by status" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="all">All Users</SelectItem>
+                          <SelectItem value="active">Active</SelectItem>
+                          <SelectItem value="blocked">Blocked</SelectItem>
+                          <SelectItem value="pending">Pending</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+
+                    {/* Users list */}
+                    {loading ? (
+                      <div className="flex justify-center py-8">
+                        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-pink-600"></div>
+                      </div>
+                    ) : (
+                      <div className="space-y-2 max-h-96 overflow-y-auto">
+                        {filteredUsers.map((user) => (
+                          <div key={user.id} className="flex items-center justify-between p-3 border rounded-lg">
+                            <div className="flex-1">
+                              <div className="flex items-center gap-3">
+                                <div>
+                                  <h4 className="font-medium text-sm">
+                                    {user.first_name} {user.last_name}
+                                  </h4>
+                                  <p className="text-xs text-gray-600">{user.email}</p>
+                                  <p className="text-xs text-gray-500">
+                                    {user.city}, {user.country} • Age: {user.age || 'N/A'}
+                                  </p>
+                                </div>
+                                <div className="ml-auto flex items-center gap-2">
+                                  {getStatusBadge(user.account_status)}
+                                  <div className="flex gap-1">
+                                    <Button
+                                      size="sm"
+                                      variant="outline"
+                                      onClick={() => handleViewProfile(user.id)}
+                                      className="h-8 w-8 p-0"
+                                    >
+                                      <Eye className="w-4 h-4" />
+                                    </Button>
+                                    {user.account_status === 'active' && (
+                                      <Button
+                                        size="sm"
+                                        variant="outline"
+                                        onClick={() => updateUserStatus(user.id, 'blocked')}
+                                        className="h-8 w-8 p-0 text-red-600 hover:text-red-700"
+                                      >
+                                        <Ban className="w-4 h-4" />
+                                      </Button>
+                                    )}
+                                    {user.account_status === 'blocked' && (
+                                      <Button
+                                        size="sm"
+                                        variant="outline"
+                                        onClick={() => updateUserStatus(user.id, 'active')}
+                                        className="h-8 w-8 p-0 text-green-600 hover:text-green-700"
+                                      >
+                                        <Play className="w-4 h-4" />
+                                      </Button>
+                                    )}
+                                    <Button
+                                      size="sm"
+                                      variant="outline"
+                                      onClick={() => deleteUser(user.id)}
+                                      className="h-8 w-8 p-0 text-red-600 hover:text-red-700"
+                                    >
+                                      <Trash2 className="w-4 h-4" />
+                                    </Button>
+                                  </div>
+                                </div>
+                              </div>
+                            </div>
+                          </div>
+                        ))}
+                        {filteredUsers.length === 0 && (
+                          <div className="text-center py-8 text-gray-500 text-sm">
+                            No users found.
+                          </div>
+                        )}
+                      </div>
+                    )}
+                  </CardContent>
+                </Card>
               </TabsContent>
 
               {/* Content Tab */}

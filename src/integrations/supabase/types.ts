@@ -280,6 +280,7 @@ export type Database = {
           country_prices: Json | null
           created_at: string
           currency: string
+          enabled_countries: Json | null
           id: string
           payment_methods: Json
           premium_price: number
@@ -289,6 +290,7 @@ export type Database = {
           country_prices?: Json | null
           created_at?: string
           currency?: string
+          enabled_countries?: Json | null
           id?: string
           payment_methods?: Json
           premium_price?: number
@@ -298,6 +300,7 @@ export type Database = {
           country_prices?: Json | null
           created_at?: string
           currency?: string
+          enabled_countries?: Json | null
           id?: string
           payment_methods?: Json
           premium_price?: number
@@ -705,6 +708,10 @@ export type Database = {
           city: string
           country_code: string
         }[]
+      }
+      get_admin_stats: {
+        Args: Record<PropertyKey, never>
+        Returns: Json
       }
       get_app_stats: {
         Args: Record<PropertyKey, never>
