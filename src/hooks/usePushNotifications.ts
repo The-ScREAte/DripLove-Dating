@@ -55,7 +55,7 @@ export const usePushNotifications = (userId?: string) => {
             
             if (shouldRetryPushNotificationSetup(errorInfo) && retryCount < maxRetries - 1) {
               retryCount++;
-              console.log(`🔄 Retrying push notification setup (${retryCount}/${maxRetries})...`);
+              // ...removed console.log...
               await new Promise(resolve => setTimeout(resolve, 2000 * retryCount)); // Progressive delay
             } else {
               setError(errorInfo.message);
@@ -66,7 +66,7 @@ export const usePushNotifications = (userId?: string) => {
         }
         
         if (!initialized) {
-          console.log('📱 App will continue without push notifications');
+          // ...removed console.log...
         }
       } catch (err) {
         const errorInfo = handlePushNotificationError(err);

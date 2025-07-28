@@ -77,7 +77,7 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, isPremium }: DiscoverPage
   useEffect(() => {
     const urlParams = new URLSearchParams(window.location.search);
     if (urlParams.get('premium') === 'activated') {
-      console.log('Premium activation detected, refetching subscription...');
+      // ...removed console.log...
       refetchSubscription();
       toast({
         title: 'Welcome to Premium!',
@@ -92,11 +92,7 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, isPremium }: DiscoverPage
 
   // Debug function to check subscription status
   const debugSubscription = async () => {
-    console.log('🐛 DEBUG - Current subscription state:', {
-      subscription,
-      isPremium: isPremium,
-      currentUser: currentUser?.id
-    });
+    // Debug info available via window.debugSubscription
     
     // Test direct database call
     if (currentUser?.id) {
@@ -104,7 +100,7 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, isPremium }: DiscoverPage
         const { data, error } = await supabase.rpc('get_user_subscription', {
           user_id_param: currentUser.id
         });
-        console.log('🐛 DEBUG - Direct DB call result:', { data, error });
+        // ...removed console.log...
         
         // Also try direct table query
         const { data: directData, error: directError } = await supabase
@@ -112,7 +108,7 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, isPremium }: DiscoverPage
           .select('*')
           .eq('user_id', currentUser.id)
           .single();
-        console.log('🐛 DEBUG - Direct table query result:', { directData, directError });
+        // ...removed console.log...
       } catch (err) {
         console.error('🐛 DEBUG - Error in direct calls:', err);
       }
@@ -125,7 +121,7 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, isPremium }: DiscoverPage
       (window as any).debugSubscription = debugSubscription;
       (window as any).refetchSubscription = refetchSubscription;
       (window as any).isPremium = isPremium;
-      console.log('🔧 Debug functions: window.debugSubscription(), window.refetchSubscription(), window.isPremium()');
+      // ...removed console.log...
     }
   }, [debugSubscription, refetchSubscription, isPremium]);
 
@@ -584,7 +580,7 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, isPremium }: DiscoverPage
         return;
       }
     } else {
-      console.log('🏆 Premium user - unlimited swipes enabled');
+      // ...removed console.log...
     }
 
     try {
@@ -666,7 +662,7 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, isPremium }: DiscoverPage
         return;
       }
     } else {
-      console.log('🏆 Premium user - unlimited swipes enabled');
+      // ...removed console.log...
     }
 
     try {

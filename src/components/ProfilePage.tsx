@@ -46,6 +46,7 @@ const ProfilePage = ({ currentUser, profile, onProfileUpdate, onLogout, onShowTe
   const [showFunQuestionsSection, setShowFunQuestionsSection] = useState(false);
   const [showInterestsSection, setShowInterestsSection] = useState(false);
   const [showAccountActionsSection, setShowAccountActionsSection] = useState(false);
+  const [showPhotoSection, setShowPhotoSection] = useState(false);
   
   const { toast } = useToast();
   const { subscription, loading: subscriptionLoading } = useSubscription(currentUser?.id);
@@ -675,8 +676,8 @@ const ProfilePage = ({ currentUser, profile, onProfileUpdate, onLogout, onShowTe
           <div className="mb-2" />
           <CollapsibleSection
             title="Your Photos"
-            isOpen={showAccountActionsSection} // reuse or create a new state if needed
-            onToggle={() => setShowAccountActionsSection(!showAccountActionsSection)}
+            isOpen={showPhotoSection}
+            onToggle={() => setShowPhotoSection(!showPhotoSection)}
           >
             <ImageManagement currentUser={currentUser} />
           </CollapsibleSection>

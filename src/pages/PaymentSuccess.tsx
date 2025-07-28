@@ -65,11 +65,11 @@ const PaymentSuccess: React.FC = () => {
     const tx_ref = params.get('tx_ref');
     const transaction_id = params.get('transaction_id');
     
-    console.log('Payment success params:', { status, tx_ref, transaction_id });
+    // ...removed console.log...
     
     // If no payment parameters, redirect to discover page
     if (!status && !tx_ref && !transaction_id) {
-      console.log('No payment parameters found, redirecting to discover page');
+      // ...removed console.log...
       toast({
         title: 'Invalid Access',
         description: 'Please initiate payment to access this page.',
@@ -101,7 +101,7 @@ const PaymentSuccess: React.FC = () => {
     }
     
     if (status !== 'successful' || !transaction_id) {
-      console.log('Payment not successful or missing transaction ID');
+      // ...removed console.log...
       setError('Payment verification failed. Please contact support if money was deducted.');
       // Auto-redirect after 10 seconds for error cases
       setRedirectCountdown(10);
@@ -138,10 +138,10 @@ const PaymentSuccess: React.FC = () => {
         }
 
         try {
-          console.log('Processing successful payment directly...');
-          console.log('User ID:', user.id);
-          console.log('Transaction ID:', transaction_id);
-          console.log('TX Ref:', tx_ref);
+          // ...removed console.log...
+          // ...removed console.log...
+          // ...removed console.log...
+          // ...removed console.log...
           
           // Since Flutterwave confirmed the payment was successful,
           // create the subscription directly
@@ -159,7 +159,7 @@ const PaymentSuccess: React.FC = () => {
             updated_at: new Date().toISOString(),
           };
           
-          console.log('Creating subscription directly:', subscriptionData);
+          // ...removed console.log...
           
           // First, check if user already has a subscription
           const { data: existingSubscription } = await supabase
@@ -173,7 +173,7 @@ const PaymentSuccess: React.FC = () => {
           
           if (existingSubscription) {
             // Update existing subscription
-            console.log('Updating existing subscription');
+            // ...removed console.log...
             const expiryDate = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000);
             const { data, error } = await supabase
               .from('user_subscriptions')
@@ -193,7 +193,7 @@ const PaymentSuccess: React.FC = () => {
             subscriptionError = error;
           } else {
             // Create new subscription
-            console.log('Creating new subscription');
+            // ...removed console.log...
             const { data, error } = await supabase
               .from('user_subscriptions')
               .insert([subscriptionData])
@@ -202,34 +202,34 @@ const PaymentSuccess: React.FC = () => {
             subscriptionError = error;
           }
           
-          console.log('Subscription result:', { subscriptionResult, subscriptionError });
+          // ...removed console.log...
           
           if (subscriptionError) {
             console.error('Subscription error:', subscriptionError);
             const errorDetails = subscriptionError.message || subscriptionError.details || 'Unknown database error';
             setError(`Could not activate premium: ${errorDetails}. Please contact support with transaction ID: ${transaction_id}`);
           } else {
-            console.log('Premium subscription created successfully!');
-            console.log('Subscription data:', subscriptionResult);
+            // ...removed console.log...
+            // ...removed console.log...
             setUpgradeSuccess(true);
             
             // Verify the subscription was created with premium plan
             if (subscriptionResult && subscriptionResult[0] && subscriptionResult[0].plan_name === 'premium') {
-              console.log('✅ Premium plan confirmed in database');
+              // ...removed console.log...
               
               // Let's also test the subscription fetch immediately
               try {
-                console.log('🧪 Testing subscription fetch immediately after creation...');
+                // ...removed console.log...
                 const { data: testData, error: testError } = await supabase.rpc('get_user_subscription', {
                   user_id_param: user.id
                 });
-                console.log('🧪 Immediate subscription test result:', { testData, testError });
+                // ...removed console.log...
                 
                 const subscriptionTestData = testData as any;
                 if (subscriptionTestData && subscriptionTestData.plan_name === 'premium') {
-                  console.log('✅ Subscription fetch test PASSED - premium plan found');
+                  // ...removed console.log...
                 } else {
-                  console.log('❌ Subscription fetch test FAILED - premium plan not found', subscriptionTestData);
+                  // ...removed console.log...
                 }
               } catch (testErr) {
                 console.error('❌ Subscription fetch test ERROR:', testErr);
@@ -242,7 +242,7 @@ const PaymentSuccess: React.FC = () => {
               
               // Force a small delay to ensure database consistency before redirect
               setTimeout(() => {
-                console.log('🔄 Redirecting to discover with premium activation flag');
+                // ...removed console.log...
               }, 1000);
               
               // Don't redirect automatically - let user click the button
