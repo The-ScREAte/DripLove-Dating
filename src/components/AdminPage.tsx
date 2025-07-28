@@ -17,27 +17,8 @@ import AdminErrorBoundary from './admin/AdminErrorBoundary';
 import UserPoolDebugger from './admin/UserPoolDebugger';
 import { debounce, userDataCache, createPagination } from '@/utils/performanceOptimizer';
 import { useSupabaseSubscription, useMemoryMonitor } from '@/hooks/usePerformance';
+
 import { CurrentUser, AdminStats } from '@/types';
-import { 
-  LogOut, 
-  Shield, 
-  Users, 
-  Heart, 
-  MessageSquare, 
-  TrendingUp, 
-  Calendar, 
-  Pause, 
-  UserX, 
-  UserPlus, 
-  Eye, 
-  Search, 
-  Play,
-  Trash2,
-  Settings,
-  Image,
-  CreditCard,
-  BarChart3
-} from 'lucide-react';
 
 interface AdminPageProps {
   currentUser: CurrentUser;
@@ -51,44 +32,32 @@ interface UserProfile {
   email: string;
   account_status: string;
   created_at: string;
-  city: string;
-  country: string;
-  age: number;
-  is_admin: boolean;
 }
 
-interface PendingImage {
-  id: string;
-  image_url: string;
-  is_approved: boolean;
-  moderation_status: string;
-  moderation_notes?: string;
-  created_at: string;
-  profile?: {
-    first_name: string;
-    last_name: string;
-    email: string;
-  };
-}
-
-const AdminPageComponent = ({ currentUser, onLogout }: AdminPageProps) => {
-  // Always call hooks in the same order - performance monitoring
-  useMemoryMonitor();
-  
-  // All state hooks first - consistent order
-  const [paymentMethods, setPaymentMethods] = useState<PaymentMethod[]>(defaultPaymentMethods);
-  const [premiumPrice, setPremiumPrice] = useState('50');
-  // Now an array of { country, currency, price }
-  const [countryPrices, setCountryPrices] = useState<{ country: string; currency: string; price: string }[]>([]);
-  const [loadingConfig, setLoadingConfig] = useState(true);
-  const [showPaymentConfig, setShowPaymentConfig] = useState(false);
-  const [stats, setStats] = useState<AdminStats | null>(null);
+// Main admin page component
+const AdminPageComponent: React.FC<AdminPageProps> = ({ currentUser, onLogout }) => {
+  // User management state
+  const [loading, setLoading] = useState(false);
   const [users, setUsers] = useState<UserProfile[]>([]);
   const [adminUsers, setAdminUsers] = useState<UserProfile[]>([]);
-  const [searchTerm, setSearchTerm] = useState('');
-  const [statusFilter, setStatusFilter] = useState('all');
-  const [loading, setLoading] = useState(true);
   const [currentPage, setCurrentPage] = useState(1);
+  const [statusFilter, setStatusFilter] = useState<'all' | 'active' | 'blocked' | 'pending'>('all');
+  // Payment config state
+  const [loadingConfig, setLoadingConfig] = useState(false);
+  const [showPaymentConfig, setShowPaymentConfig] = useState(false);
+  const [premiumPrice, setPremiumPrice] = useState('50');
+  const [paymentMethods, setPaymentMethods] = useState<PaymentMethod[]>(defaultPaymentMethods);
+  const [enabledCountries, setEnabledCountries] = useState<string[]>([]);
+  const [countryPrices, setCountryPrices] = useState<{ country: string; currency: string; price: string }[]>([]);
+
+  // Type for pending images
+  type PendingImage = {
+    id: string;
+    user_id: string;
+    url: string;
+    status: string;
+    created_at: string;
+  };
   const [matchUser1, setMatchUser1] = useState('');
   const [matchUser2, setMatchUser2] = useState('');
   const [selectedUserId, setSelectedUserId] = useState<string | null>(null);
@@ -99,7 +68,6 @@ const AdminPageComponent = ({ currentUser, onLogout }: AdminPageProps) => {
   const [approvingImages, setApprovingImages] = useState<Record<string, boolean>>({});
   const [rejectingImages, setRejectingImages] = useState<Record<string, boolean>>({});
   const [isAdmin, setIsAdmin] = useState<boolean | null>(null);
-  
   // Constants
   const usersPerPage = 20;
   const { toast } = useToast();
@@ -111,7 +79,7 @@ const AdminPageComponent = ({ currentUser, onLogout }: AdminPageProps) => {
       try {
         const { data, error } = await supabase
           .from('payment_config')
-          .select('premium_price, payment_methods, country_prices')
+          .select('premium_price, payment_methods, country_prices, enabled_countries')
           .order('created_at', { ascending: false })
           .limit(1)
           .single();
@@ -120,19 +88,8 @@ const AdminPageComponent = ({ currentUser, onLogout }: AdminPageProps) => {
 
         setPaymentMethods(data.payment_methods as unknown as PaymentMethod[]);
         setPremiumPrice(data.premium_price.toString());
-        
-        // Convert JSONB country_prices to array format for admin UI
-        const countryPricesObj = data.country_prices || {};
-        if (typeof countryPricesObj === 'object' && !Array.isArray(countryPricesObj)) {
-          const countryPricesArray = Object.entries(countryPricesObj).map(([currency, price]) => ({
-            country: '', // We'll need to map currency to country
-            currency,
-            price: price.toString()
-          }));
-          setCountryPrices(countryPricesArray);
-        } else {
-          setCountryPrices([]);
-        }
+        setEnabledCountries(Array.isArray(data.enabled_countries) ? data.enabled_countries : []);
+        // ...existing code for countryPrices...
       } catch (error) {
         console.error('Error fetching payment config:', error);
         setPaymentMethods(defaultPaymentMethods);
@@ -180,6 +137,7 @@ const AdminPageComponent = ({ currentUser, onLogout }: AdminPageProps) => {
             premium_price: Number(premiumPrice),
             country_prices: countryPricesObj,
             updated_at: new Date().toISOString(),
+            enabled_countries: enabledCountries,
           })
           .eq('id', existing.id);
 
@@ -192,6 +150,7 @@ const AdminPageComponent = ({ currentUser, onLogout }: AdminPageProps) => {
             payment_methods: paymentMethods as unknown as any,
             premium_price: Number(premiumPrice),
             country_prices: countryPricesObj,
+            enabled_countries: enabledCountries,
           });
 
         if (error) throw error;
@@ -243,353 +202,19 @@ const AdminPageComponent = ({ currentUser, onLogout }: AdminPageProps) => {
                       >
                         <option value="">Select Country</option>
                         {countryOptions.map(c => (
-                          <option key={c.code} value={c.code}>{c.name}</option>
-                        ))}
-                      </select>
-                      {/* Currency input */}
-                      <Input
-                        value={entry.currency}
-                        onChange={e => {
-                          const v = e.target.value.toUpperCase();
-                          setCountryPrices(prices => prices.map((p, i) => i === idx ? { ...p, currency: v } : p));
-                        }}
-                        placeholder="Currency (e.g. GHS, NGN)"
-                        className="w-1/4"
-                      />
-                      {/* Price input */}
-                      <Input
-                        value={entry.price}
-                        onChange={e => {
-                          const v = e.target.value;
-                          setCountryPrices(prices => prices.map((p, i) => i === idx ? { ...p, price: v } : p));
-                        }}
-                        type="number"
-                        min="1"
-                        placeholder="Price"
-                        className="w-1/4"
-                      />
-                      {/* Delete button */}
-                      <Button size="icon" variant="ghost" onClick={() => setCountryPrices(prices => prices.filter((_, i) => i !== idx))}>
-                        ✕
-                      </Button>
-                    </div>
-                  );
-                })}
-                <Button size="sm" variant="outline" className="mt-2" onClick={() => setCountryPrices(prices => [...prices, { country: '', currency: '', price: '' }])}>
-                  + Add Country
-                </Button>
-              </div>
-            </div>
-            <div className="mb-4">
-              <h3 className="font-semibold mb-2">Payment Methods</h3>
-              <div className="space-y-4">
-                {paymentMethods.map((method, idx) => (
-                  <div key={method.type} className="flex flex-col gap-2 border-b pb-2">
-                    <span className="font-medium capitalize">{method.label}</span>
-                    {method.type === 'momo' ? (
-                      <>
-                        <Input
-                          value={method.details}
-                          onChange={e => handlePaymentMethodChange(idx, 'details', e.target.value)}
-                          placeholder="MoMo Number"
-                          className="w-full"
-                        />
-                        <Input
-                          value={method.name || ''}
-                          onChange={e => handlePaymentMethodChange(idx, 'name', e.target.value)}
-                          placeholder="MoMo Name"
-                          className="w-full"
-                        />
-                        <Input
-                          value={method.extra || ''}
-                          onChange={e => handlePaymentMethodChange(idx, 'extra', e.target.value)}
-                          placeholder="MoMo Provider/Network (optional)"
-                          className="w-full"
-                        />
-                      </>
-                    ) : (
-                      <>
-                        <Input
-                          value={method.details}
-                          onChange={e => handlePaymentMethodChange(idx, 'details', e.target.value)}
-                          placeholder="Card/Account Details"
-                          className="w-full"
-                        />
-                        <Input
-                          value={method.extra || ''}
-                          onChange={e => handlePaymentMethodChange(idx, 'extra', e.target.value)}
-                          placeholder="Bank Name/Info (optional)"
-                          className="w-full"
-                        />
-                      </>
-                    )}
-                  </div>
-                ))}
-              </div>
-            </div>
-            <Button onClick={handleSavePaymentConfig} className="w-full bg-pink-600 text-white mt-2">Save</Button>
+                      <option key={c.code} value={c.code}>{c.name}</option>
+                    ))}
+                  </select>
+                  {/* End country dropdown */}
+                </div>
+              );
+            })}
           </div>
         </div>
-      )}
-
-      {/* Show saved payment methods below the form */}
-      <div className="mt-8">
-        <h3 className="font-semibold mb-2">Saved Payment Accounts (Receiving)</h3>
-        <div className="space-y-2">
-          {paymentMethods.map((method, idx) => (
-            <div key={method.type + idx} className="border rounded p-3 bg-gray-50">
-              <span className="font-bold capitalize">{method.label} Account</span>
-              {method.type === 'momo' ? (
-                <div className="text-sm mt-1">
-                  <div>MoMo Name: <span className="font-mono">{method.name}</span></div>
-                  <div>MoMo Number: <span className="font-mono">{method.details}</span></div>
-                  {method.extra && <div>Provider: <span className="font-mono">{method.extra}</span></div>}
-                </div>
-              ) : (
-                <div className="text-sm mt-1">
-                  <div>Card/Account: <span className="font-mono">{method.details}</span></div>
-                  {method.extra && <div>Bank: <span className="font-mono">{method.extra}</span></div>}
-                </div>
-              )}
-            </div>
-          ))}
-        </div>
-      </div>
-    </>
-  );
-
-  // Debounced search for better performance
-  const debouncedSearch = useCallback(
-    debounce((term: string) => {
-      setSearchTerm(term);
-      setCurrentPage(1); // Reset to first page on search
-    }, 300),
-    []
-  );
-
-  // Check if current user is admin - useEffect for admin status
-  useEffect(() => {
-    const checkAdminStatus = async () => {
-      if (!currentUser?.id) {
-        setIsAdmin(false);
-        return;
-      }
-  
-      const { data, error } = await supabase
-        .from('profiles')
-        .select('is_admin')
-        .eq('id', currentUser.id)
-        .single();
-  
-      if (error || !data) {
-        console.error('Failed to fetch admin status:', error);
-        setIsAdmin(false);
-      } else {
-        setIsAdmin(data.is_admin);
-      }
-    };
-  
-    checkAdminStatus();
-  }, [currentUser]);
-
-  const fetchPendingImages = useCallback(async () => {
-    try {
-      setLoadingPendingImages(true);
-
-      // Check cache first for performance
-      const cacheKey = 'pending_images';
-      const cachedImages = userDataCache.get(cacheKey);
-      if (cachedImages) {
-        setPendingImages(cachedImages);
-        setLoadingPendingImages(false);
-        return;
-      }
-
-      // Fetch images that need approval with pagination for performance
-      const { data, error } = await supabase
-        .from('user_images')
-        .select(`
-          id,
-          image_url,
-          is_approved,
-          moderation_status,
-          moderation_notes,
-          created_at,
-          user_id
-        `)
-        .or('is_approved.eq.false,moderation_status.eq.pending')
-        .order('created_at', { ascending: false })
-        .limit(50); // Limit for performance
-
-      if (error) {
-        console.error('❌ Error fetching pending images:', error);
-        setPendingImages([]);
-        toast({
-          title: 'Error',
-          description: 'Failed to load pending images',
-          variant: 'destructive'
-        });
-        return;
-      }
-      
-      if (!data || data.length === 0) {
-        setPendingImages([]);
-        userDataCache.set(cacheKey, []);
-        return;
-      }
-
-      // Batch fetch user profiles for better performance
-      const userIds = [...new Set(data.map(img => img.user_id))];
-      const { data: profiles } = await supabase
-        .from('profiles')
-        .select('id, first_name, last_name, email')
-        .in('id', userIds);
-
-      // Transform the data to match expected format
-      const transformedData = data.map(img => ({
-        id: img.id,
-        image_url: img.image_url,
-        is_approved: img.is_approved ?? false,
-        moderation_status: img.moderation_status ?? 'pending',
-        moderation_notes: img.moderation_notes,
-        created_at: img.created_at,
-        profile: profiles?.find(p => p.id === img.user_id) || {
-          first_name: 'Unknown',
-          last_name: 'User',
-          email: 'unknown@example.com'
-        }
-      }));
-
-      setPendingImages(transformedData);
-      // Cache for 2 minutes (shorter for pending content)
-      userDataCache.set(cacheKey, transformedData);
-    } catch (error) {
-      console.error('Error fetching pending images:', error);
-      toast({
-        title: 'Error',
-        description: 'Failed to load pending images',
-        variant: 'destructive'
-      });
-      setPendingImages([]);
-    } finally {
-      setLoadingPendingImages(false);
-    }
-  }, [toast]);
-
-  const approveImage = async (imageId: string) => {
-    try {
-      setApprovingImages(prev => ({ ...prev, [imageId]: true }));
-
-      // Use the approve_image function if available, otherwise direct update
-      const { data, error } = await supabase.rpc('approve_image', {
-        image_id: imageId,
-        admin_notes: 'Approved by admin'
-      });
-
-      if (error) {
-        if (error.message.includes('function') && error.message.includes('does not exist')) {
-          // Fallback to direct update if function doesn't exist
-          const { error: updateError } = await supabase
-            .from('user_images')
-            .update({
-              is_approved: true,
-              moderation_status: 'approved',
-              moderated_at: new Date().toISOString(),
-              moderated_by: currentUser.id
-            })
-            .eq('id', imageId);
-
-          if (updateError) throw updateError;
-        } else {
-          throw error;
-        }
-      }
-
-      // Remove from pending list
-      setPendingImages(prev => prev.filter(img => img.id !== imageId));
-      
-      toast({
-        title: 'Success',
-        description: 'Image approved successfully'
-      });
-
-      // Refresh stats and pending images
-      await Promise.all([fetchAppStats(), fetchPendingImages()]);
-
-    } catch (error) {
-      console.error('Error approving image:', error);
-      toast({
-        title: 'Error',
-        description: 'Failed to approve image',
-        variant: 'destructive'
-      });
-    } finally {
-      setApprovingImages(prev => ({ ...prev, [imageId]: false }));
-    }
+        {/* ...rest of settings UI... */}
+    </div>
+    );
   };
-
-  const rejectImage = async (imageId: string) => {
-    try {
-      setRejectingImages(prev => ({ ...prev, [imageId]: true }));
-
-      // Use the reject_image function which has admin privileges and deletes the image
-      const { error } = await supabase.rpc('reject_image', {
-        image_id: imageId,
-        admin_notes: 'Rejected by admin'
-      });
-
-      if (error) {
-        throw error;
-      }
-
-      // Remove from pending list immediately
-      setPendingImages(prev => prev.filter(img => img.id !== imageId));
-      
-      toast({
-        title: 'Image rejected',
-        description: 'Image permanently deleted from database'
-      });
-
-    } catch (error) {
-      console.error('❌ Error rejecting image:', error);
-      toast({
-        title: 'Error',
-        description: 'Failed to reject image. Please try again.',
-        variant: 'destructive'
-      });
-    } finally {
-      setRejectingImages(prev => ({ ...prev, [imageId]: false }));
-    }
-  };
-
-  const fetchAppStats = useCallback(async () => {
-    try {
-      // Check cache first for better performance
-      const cacheKey = 'app_stats';
-      const cachedStats = userDataCache.get(cacheKey);
-      if (cachedStats) {
-        setStats(cachedStats);
-        return;
-      }
-
-      const { data, error } = await supabase.rpc('get_app_stats');
-      if (error) throw error;
-      
-      if (data && typeof data === 'object' && !Array.isArray(data)) {
-        const statsData = data as unknown as AdminStats;
-        setStats(statsData);
-        // Cache for 2 minutes (stats don't change frequently)
-        userDataCache.set(cacheKey, statsData);
-      }
-    } catch (error) {
-      console.error('Error fetching app stats:', error);
-      toast({
-        title: 'Error',
-        description: 'Failed to load app statistics',
-        variant: 'destructive'
-      });
-    }
-  }, [toast]);
 
   const fetchUsers = useCallback(debounce(async () => {
     try {
@@ -914,78 +539,159 @@ const AdminPageComponent = ({ currentUser, onLogout }: AdminPageProps) => {
                   <span>Settings</span>
                 </TabsTrigger>
               </TabsList>
-
-            {/* Dashboard Tab */}
-            <TabsContent value="dashboard" className="space-y-4">
-              {/* Stats Overview */}
-              {stats && (
+              {/* Dashboard Tab */}
+              <TabsContent value="dashboard" className="space-y-4">
+                {/* Stats Overview */}
+                {stats && (
+                  <Card>
+                    <CardHeader className="pb-3">
+                      <CardTitle className="flex items-center gap-2 text-lg">
+                        <BarChart3 className="w-5 h-5" />
+                        Platform Statistics
+                      </CardTitle>
+                    </CardHeader>
+                    <CardContent>
+                      <div className="grid grid-cols-2 gap-3">
+                        {/* ...stats cards... */}
+                      </div>
+                    </CardContent>
+                  </Card>
+                )}
+                {/* Manual Match Creation */}
                 <Card>
                   <CardHeader className="pb-3">
                     <CardTitle className="flex items-center gap-2 text-lg">
-                      <BarChart3 className="w-5 h-5" />
-                      Platform Statistics
+                      <UserPlus className="w-5 h-5" />
+                      Create Manual Match
+                    </CardTitle>
+                  </CardHeader>
+                  <CardContent className="space-y-3">
+                    <div className="grid grid-cols-2 gap-2">
+                      <Select value={matchUser1} onValueChange={setMatchUser1}>
+                        <SelectTrigger className="text-sm">
+                          <SelectValue placeholder="Select User 1" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {users.map((user) => (
+                            <SelectItem key={user.id} value={user.id}>
+                              {user.first_name} {user.last_name}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                      <Select value={matchUser2} onValueChange={setMatchUser2}>
+                        <SelectTrigger className="text-sm">
+                          <SelectValue placeholder="Select User 2" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {users.map((user) => (
+                            <SelectItem key={user.id} value={user.id}>
+                              {user.first_name} {user.last_name}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <Button onClick={createManualMatch} className="w-full" size="sm">
+                      Create Match
+                    </Button>
+                  </CardContent>
+                </Card>
+              </TabsContent>
+              {/* Users Tab */}
+              <TabsContent value="users" className="space-y-4">
+                {/* Admin Users */}
+                {adminUsers.length > 0 && (
+                  <Card>
+                    <CardHeader className="pb-3">
+                      <CardTitle className="flex items-center gap-2 text-lg">
+                        <Shield className="w-5 h-5" />
+                        Admin Users ({adminUsers.length})
+                      </CardTitle>
+                    </CardHeader>
+                    <CardContent>
+                      <div className="space-y-2">
+                        {adminUsers.map((admin) => (
+                          <div key={admin.id} className="flex items-center justify-between p-2 bg-blue-50 rounded">
+                            <div>
+                              <p className="font-medium text-sm">{admin.first_name} {admin.last_name}</p>
+                              <p className="text-xs text-gray-600">{admin.email}</p>
+                            </div>
+                            <div className="flex items-center gap-2">
+                              <Button
+                                size="sm"
+                                variant="outline"
+                                onClick={() => handleViewProfile(admin.id)}
+                                className="text-blue-600 hover:text-blue-700 text-xs px-2 py-1 h-7"
+                              >
+                                <Eye className="w-3 h-3 mr-1" />
+                                View
+                              </Button>
+                              <Badge className="bg-blue-100 text-blue-800 text-xs">
+                                ADMIN
+                              </Badge>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    </CardContent>
+                  </Card>
+                )}
+                {/* User Management */}
+                <Card>
+                  <CardHeader className="pb-3">
+                    <CardTitle className="flex items-center gap-2 text-lg">
+                      <Users className="w-5 h-5" />
+                      User Management ({filteredUsers.length})
                     </CardTitle>
                   </CardHeader>
                   <CardContent>
-                    <div className="grid grid-cols-2 gap-3">
-                      <div className="flex items-center justify-between p-3 bg-gradient-to-r from-blue-50 to-blue-100 rounded-lg border border-blue-200">
-                        <div>
-                          <p className="text-xs text-blue-700 font-medium">Total Users</p>
-                          <p className="text-lg font-bold text-blue-900">{stats.total_users}</p>
-                        </div>
-                        <Users className="w-6 h-6 text-blue-500" />
+                    {/* Search and Filter */}
+                    <div className="flex gap-2 mb-4">
+                      <div className="flex-1 relative">
+                        <Search className="absolute left-2 top-2.5 h-4 w-4 text-gray-400" />
+                        <Input
+                          placeholder="Search users..."
+                          value={searchTerm}
+                          onChange={(e) => setSearchTerm(e.target.value)}
+                          className="pl-8 text-sm"
+                        />
                       </div>
-                      <div className="flex items-center justify-between p-3 bg-gradient-to-r from-pink-50 to-pink-100 rounded-lg border border-pink-200">
-                        <div>
-                          <p className="text-xs text-pink-700 font-medium">Total Matches</p>
-                          <p className="text-lg font-bold text-pink-900">{stats.total_matches}</p>
-                        </div>
-                        <Heart className="w-6 h-6 text-pink-500" />
-                      </div>
-                      <div className="flex items-center justify-between p-3 bg-gradient-to-r from-green-50 to-green-100 rounded-lg border border-green-200">
-                        <div>
-                          <p className="text-xs text-green-700 font-medium">Messages Sent</p>
-                          <p className="text-lg font-bold text-green-900">{stats.total_messages}</p>
-                        </div>
-                        <MessageSquare className="w-6 h-6 text-green-500" />
-                      </div>
-                      <div className="flex items-center justify-between p-3 bg-gradient-to-r from-purple-50 to-purple-100 rounded-lg border border-purple-200">
-                        <div>
-                          <p className="text-xs text-purple-700 font-medium">Active Today</p>
-                          <p className="text-lg font-bold text-purple-900">{stats.active_users_today}</p>
-                        </div>
-                        <TrendingUp className="w-6 h-6 text-purple-500" />
-                      </div>
-                      <div className="flex items-center justify-between p-3 bg-gradient-to-r from-indigo-50 to-indigo-100 rounded-lg border border-indigo-200">
-                        <div>
-                          <p className="text-xs text-indigo-700 font-medium">New This Week</p>
-                          <p className="text-lg font-bold text-indigo-900">{stats.new_users_this_week}</p>
-                        </div>
-                        <Calendar className="w-6 h-6 text-indigo-500" />
-                      </div>
-                      <div className="flex items-center justify-between p-3 bg-gradient-to-r from-yellow-50 to-yellow-100 rounded-lg border border-yellow-200">
-                        <div>
-                          <p className="text-xs text-yellow-700 font-medium">Users On Hold</p>
-                          <p className="text-lg font-bold text-yellow-900">{stats.users_on_hold}</p>
-                        </div>
-                        <Pause className="w-6 h-6 text-yellow-500" />
-                      </div>
-                      <div className="flex items-center justify-between p-3 bg-gradient-to-r from-red-50 to-red-100 rounded-lg border border-red-200">
-                        <div>
-                          <p className="text-xs text-red-700 font-medium">Blocked Users</p>
-                          <p className="text-lg font-bold text-red-900">{stats.blocked_users}</p>
-                        </div>
-                        <UserX className="w-6 h-6 text-red-500" />
-                      </div>
-                      <div className="flex items-center justify-between p-3 bg-gradient-to-r from-gray-50 to-gray-100 rounded-lg border border-gray-200">
-                        <div>
-                          <p className="text-xs text-gray-700 font-medium">Total Admins</p>
-                          <p className="text-lg font-bold text-gray-900">{stats.total_admins}</p>
-                        </div>
-                        <Shield className="w-6 h-6 text-gray-500" />
-                      </div>
+                      <Select value={statusFilter} onValueChange={setStatusFilter}>
+                        <SelectTrigger className="w-32">
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="all">All</SelectItem>
+                          <SelectItem value="active">Active</SelectItem>
+                          <SelectItem value="on_hold">On Hold</SelectItem>
+                          <SelectItem value="blocked">Blocked</SelectItem>
+                        </SelectContent>
+                      </Select>
                     </div>
+                    {/* ...rest of user management table... */}
                   </CardContent>
+                </Card>
+              </TabsContent>
+              {/* ...other tabs (content, debugger, settings)... */}
+            </Tabs>
+          </AdminErrorBoundary>
+        </div>
+
+        {/* User Profile Modal */}
+        {selectedUserId && (
+          <UserProfileModal
+            isOpen={isProfileModalOpen}
+            onClose={() => {
+              setIsProfileModalOpen(false);
+              setSelectedUserId(null);
+            }}
+            userId={selectedUserId}
+          />
+        )}
+      </div>
+    </div>
+  );
                 </Card>
               )}
 
@@ -1323,6 +1029,78 @@ const AdminPageComponent = ({ currentUser, onLogout }: AdminPageProps) => {
 
             {/* Settings Tab */}
             <TabsContent value="settings" className="space-y-4">
+              {/* Enabled Countries Management */}
+              <Card>
+                <CardHeader className="pb-3 flex flex-row items-center justify-between">
+                  <CardTitle className="flex items-center gap-2 text-lg">
+                    <span className="inline-block w-5 h-5 bg-gradient-to-br from-green-400 to-blue-400 rounded-full mr-2" />
+                    Enabled Countries
+                  </CardTitle>
+                  <Button size="sm" variant={editCountries ? 'default' : 'outline'} onClick={async () => {
+                    if (editCountries) {
+                      await handleSavePaymentConfig();
+                    }
+                    setEditCountries(!editCountries);
+                  }}>
+                    {editCountries ? 'Save' : 'Edit'}
+                  </Button>
+                </CardHeader>
+                <CardContent>
+                  {editCountries ? (
+                    <>
+                      <div className="flex items-center justify-between mb-2">
+                        <span className="text-sm font-medium text-gray-700">Select countries to enable</span>
+                        <span className="text-xs text-gray-500">{enabledCountries.length} selected</span>
+                      </div>
+                      <div className="grid grid-cols-2 gap-2 max-h-56 overflow-y-auto border rounded p-2 bg-gray-50 mb-4">
+                        {getCountriesList().map(c => {
+                          const checked = enabledCountries.includes(c.code);
+                          return (
+                            <label
+                              key={c.code}
+                              className={`flex items-center gap-2 text-sm cursor-pointer select-none px-2 py-1 rounded transition border-2 ${checked ? 'bg-blue-50 border-blue-500 font-semibold text-blue-900 shadow' : 'bg-white border-gray-200 hover:bg-blue-50'}`}
+                              style={{ userSelect: 'none' }}
+                            >
+                              <input
+                                type="checkbox"
+                                className="accent-blue-600 w-4 h-4 border-2 border-blue-400 rounded focus:ring-2 focus:ring-blue-400"
+                                checked={checked}
+                                onChange={e => {
+                                  setEnabledCountries(list => e.target.checked
+                                    ? [...list, c.code]
+                                    : list.filter(code => code !== c.code)
+                                  );
+                                }}
+                              />
+                              <span>{c.name}</span>
+                            </label>
+                          );
+                        })}
+                      </div>
+                      <div className="flex gap-2 justify-end">
+                        <Button size="sm" variant="outline" onClick={() => { setEditCountries(false); }}>
+                          Cancel
+                        </Button>
+                        <Button size="sm" variant="default" onClick={async () => { await handleSavePaymentConfig(); setEditCountries(false); }}>
+                          Save
+                        </Button>
+                      </div>
+                    </>
+                  ) : (
+                    <div className="flex flex-wrap gap-2">
+                      {enabledCountries.length === 0 ? (
+                        <span className="text-gray-500 text-sm">No countries enabled.</span>
+                      ) : (
+                        enabledCountries.map(code => {
+                          const c = getCountryByCode(code);
+                          return c ? <span key={code} className="px-2 py-1 bg-blue-100 text-blue-800 rounded text-xs border border-blue-300 font-medium">{c.name}</span> : null;
+                        })
+                      )}
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
+
               {/* Payment Configuration */}
               <Card>
                 <CardHeader className="pb-3">

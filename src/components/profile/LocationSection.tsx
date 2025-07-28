@@ -20,6 +20,7 @@ interface LocationSectionProps {
     isCustomCity?: boolean;
   }) => void;
   onDistanceChange?: (distance: number[]) => void;
+  allowedCountries?: string[];
 }
 
 const LocationSection = ({ 
@@ -27,7 +28,8 @@ const LocationSection = ({
   isEditing, 
   onInputChange, 
   onLocationChange,
-  onDistanceChange 
+  onDistanceChange,
+  allowedCountries
 }: LocationSectionProps) => {
   return (
     <Card>
@@ -43,6 +45,7 @@ const LocationSection = ({
               zipCode={editedProfile.zip_code || ''}
               onLocationChange={onLocationChange}
               required={false}
+              allowedCountries={allowedCountries}
             />
           ) : (
             // Display mode

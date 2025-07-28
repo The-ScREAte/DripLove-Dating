@@ -1,10 +1,11 @@
 import { supabase } from '@/integrations/supabase/client';
 
+
 export async function getPaymentConfig() {
   try {
     const { data, error } = await supabase
       .from('payment_config')
-      .select('*')
+      .select('*, enabled_countries')
       .order('created_at', { ascending: false })
       .limit(1)
       .single();
@@ -15,6 +16,15 @@ export async function getPaymentConfig() {
     console.error('Error fetching payment config:', error);
     return null;
   }
+}
+
+// Helper to get enabled countries as array of codes
+export async function getEnabledCountries(): Promise<string[]> {
+  const config = await getPaymentConfig();
+  if (config && Array.isArray(config.enabled_countries)) {
+    return config.enabled_countries;
+  }
+  return [];
 }
 
 export async function getPremiumPaymentConfig() {

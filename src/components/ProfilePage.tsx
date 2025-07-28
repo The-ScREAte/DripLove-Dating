@@ -9,6 +9,7 @@ import { useToast } from '@/hooks/use-toast';
 import { useSubscription } from '@/hooks/useSubscription';
 import BasicInfoSection from './profile/BasicInfoSection';
 import LocationSection from './profile/LocationSection';
+import { getEnabledCountries } from '@/utils/paymentConfig';
 import PreferencesSection from './profile/PreferencesSection';
 import LifestyleSection from './profile/LifestyleSection';
 import WorkEducationSection from './profile/WorkEducationSection';
@@ -50,6 +51,11 @@ const ProfilePage = ({ currentUser, profile, onProfileUpdate, onLogout, onShowTe
   
   const { toast } = useToast();
   const { subscription, loading: subscriptionLoading } = useSubscription(currentUser?.id);
+
+  const [allowedCountries, setAllowedCountries] = useState<string[]>([]);
+  useEffect(() => {
+    getEnabledCountries().then(setAllowedCountries);
+  }, []);
 
   const [editedProfile, setEditedProfile] = useState({
     first_name: '',
@@ -694,6 +700,7 @@ const ProfilePage = ({ currentUser, profile, onProfileUpdate, onLogout, onShowTe
               onInputChange={handleInputChange}
               onLocationChange={handleLocationChange}
               onDistanceChange={handleDistanceChange}
+              allowedCountries={allowedCountries}
             />
           </CollapsibleSection>
           <div className="mb-2" />
