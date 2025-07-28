@@ -39,6 +39,20 @@
                 <data android:scheme="com.driplove.dating" />
             </intent-filter>
 
+            <!-- Add intent filters for all Supabase deep link schemes -->
+            <intent-filter>
+                <action android:name="android.intent.action.VIEW" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <category android:name="android.intent.category.BROWSABLE" />
+                <data android:scheme="com.driplove.app" />
+            </intent-filter>
+            <intent-filter>
+                <action android:name="android.intent.action.VIEW" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <category android:name="android.intent.category.BROWSABLE" />
+                <data android:scheme="com.driplove.ios" />
+            </intent-filter>
+
         </activity>
 
         <provider
