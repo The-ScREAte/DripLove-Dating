@@ -29,6 +29,8 @@ export const useMobileOAuth = () => {
 
     const handleAppUrlOpen = async (event: { url: string }) => {
       console.log('[Mobile OAuth] App opened with URL:', event.url);
+      console.log('[Mobile OAuth] URL includes driplove:', event.url.includes('driplove://'));
+      console.log('[Mobile OAuth] URL includes callback:', event.url.includes('/callback'));
       
       if (event.url.startsWith('driplove://auth/callback')) {
         console.log('[Mobile OAuth] Processing OAuth callback');
