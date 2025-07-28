@@ -15,6 +15,7 @@ interface PremiumUpgradeProps {
 }
 
 const PremiumUpgrade = ({ currentUser, onClose, preselectedPlan }: PremiumUpgradeProps) => {
+
   const [loading, setLoading] = useState(false);
   const { toast } = useToast();
   const [showPaymentModal, setShowPaymentModal] = useState(false);
@@ -25,12 +26,27 @@ const PremiumUpgrade = ({ currentUser, onClose, preselectedPlan }: PremiumUpgrad
   React.useEffect(() => {
     const loadPaymentConfig = async () => {
       const config = await getPremiumPaymentConfig();
-      setPrice(config.price);
+      // Example: config.prices = { GHS: 50, NGN: 8000, KES: 2000 }
+      //          config.currencies = ['GHS', 'NGN', 'KES']
+      let userCountry = currentUser?.country?.toLowerCase() || '';
+      let selectedCurrency = 'GHS';
+      let selectedPrice = config.price;
+      if (userCountry === 'nigeria' || userCountry === 'ng') {
+        selectedCurrency = 'NGN';
+        selectedPrice = config.nigeria_price || '8000';
+      } else if (userCountry === 'kenya' || userCountry === 'ke') {
+        selectedCurrency = 'KES';
+        selectedPrice = config.kenya_price || '2000';
+      } else {
+        selectedCurrency = config.currency || 'GHS';
+        selectedPrice = config.price || '50';
+      }
+      setPrice(selectedPrice);
       setPaymentMethods(config.paymentMethods);
-      setCurrency(config.currency);
+      setCurrency(selectedCurrency);
     };
     loadPaymentConfig();
-  }, []);
+  }, [currentUser]);
 
   const handleUpgrade = () => {
     if (!paymentMethods.length) {
