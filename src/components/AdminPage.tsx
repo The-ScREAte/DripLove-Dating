@@ -120,7 +120,19 @@ const AdminPageComponent = ({ currentUser, onLogout }: AdminPageProps) => {
 
         setPaymentMethods(data.payment_methods as unknown as PaymentMethod[]);
         setPremiumPrice(data.premium_price.toString());
-        setCountryPrices(Array.isArray(data.country_prices) ? (data.country_prices as { country: string; currency: string; price: string }[]) : []);
+        
+        // Convert JSONB country_prices to array format for admin UI
+        const countryPricesObj = data.country_prices || {};
+        if (typeof countryPricesObj === 'object' && !Array.isArray(countryPricesObj)) {
+          const countryPricesArray = Object.entries(countryPricesObj).map(([currency, price]) => ({
+            country: '', // We'll need to map currency to country
+            currency,
+            price: price.toString()
+          }));
+          setCountryPrices(countryPricesArray);
+        } else {
+          setCountryPrices([]);
+        }
       } catch (error) {
         console.error('Error fetching payment config:', error);
         setPaymentMethods(defaultPaymentMethods);
@@ -144,6 +156,14 @@ const AdminPageComponent = ({ currentUser, onLogout }: AdminPageProps) => {
   const handleSavePaymentConfig = async () => {
     setLoadingConfig(true);
     try {
+      // Convert array format back to JSONB format for database
+      const countryPricesObj = countryPrices.reduce((acc, item) => {
+        if (item.currency && item.price) {
+          acc[item.currency] = Number(item.price);
+        }
+        return acc;
+      }, {} as Record<string, number>);
+
       // Get the first (and should be only) payment config record
       const { data: existing } = await supabase
         .from('payment_config')
@@ -158,7 +178,7 @@ const AdminPageComponent = ({ currentUser, onLogout }: AdminPageProps) => {
           .update({
             payment_methods: paymentMethods as unknown as any,
             premium_price: Number(premiumPrice),
-            country_prices: countryPrices,
+            country_prices: countryPricesObj,
             updated_at: new Date().toISOString(),
           })
           .eq('id', existing.id);
@@ -171,7 +191,7 @@ const AdminPageComponent = ({ currentUser, onLogout }: AdminPageProps) => {
           .insert({
             payment_methods: paymentMethods as unknown as any,
             premium_price: Number(premiumPrice),
-            country_prices: countryPrices,
+            country_prices: countryPricesObj,
           });
 
         if (error) throw error;
@@ -226,12 +246,15 @@ const AdminPageComponent = ({ currentUser, onLogout }: AdminPageProps) => {
                           <option key={c.code} value={c.code}>{c.name}</option>
                         ))}
                       </select>
-                      {/* Currency display (readonly) */}
+                      {/* Currency input */}
                       <Input
                         value={entry.currency}
-                        readOnly
-                        className="w-1/4 bg-gray-100 cursor-not-allowed"
-                        placeholder="Currency"
+                        onChange={e => {
+                          const v = e.target.value.toUpperCase();
+                          setCountryPrices(prices => prices.map((p, i) => i === idx ? { ...p, currency: v } : p));
+                        }}
+                        placeholder="Currency (e.g. GHS, NGN)"
+                        className="w-1/4"
                       />
                       {/* Price input */}
                       <Input
