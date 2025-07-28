@@ -2,6 +2,7 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { getCountriesList, getCountryByCode } from '@/constants/locationData';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Badge } from '@/components/ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
@@ -77,6 +78,8 @@ const AdminPageComponent = ({ currentUser, onLogout }: AdminPageProps) => {
   // All state hooks first - consistent order
   const [paymentMethods, setPaymentMethods] = useState<PaymentMethod[]>(defaultPaymentMethods);
   const [premiumPrice, setPremiumPrice] = useState('50');
+  // Now an array of { country, currency, price }
+  const [countryPrices, setCountryPrices] = useState<{ country: string; currency: string; price: string }[]>([]);
   const [loadingConfig, setLoadingConfig] = useState(true);
   const [showPaymentConfig, setShowPaymentConfig] = useState(false);
   const [stats, setStats] = useState<AdminStats | null>(null);
@@ -105,11 +108,10 @@ const AdminPageComponent = ({ currentUser, onLogout }: AdminPageProps) => {
   useEffect(() => {
     const fetchConfig = async () => {
       setLoadingConfig(true);
-      
       try {
         const { data, error } = await supabase
           .from('payment_config')
-          .select('premium_price, payment_methods')
+          .select('premium_price, payment_methods, country_prices')
           .order('created_at', { ascending: false })
           .limit(1)
           .single();
@@ -118,13 +120,13 @@ const AdminPageComponent = ({ currentUser, onLogout }: AdminPageProps) => {
 
         setPaymentMethods(data.payment_methods as unknown as PaymentMethod[]);
         setPremiumPrice(data.premium_price.toString());
+        setCountryPrices(Array.isArray(data.country_prices) ? (data.country_prices as { country: string; currency: string; price: string }[]) : []);
       } catch (error) {
         console.error('Error fetching payment config:', error);
-        // Fallback to defaults
         setPaymentMethods(defaultPaymentMethods);
         setPremiumPrice('50');
+        setCountryPrices([]);
       }
-      
       setLoadingConfig(false);
     };
     fetchConfig();
@@ -141,7 +143,6 @@ const AdminPageComponent = ({ currentUser, onLogout }: AdminPageProps) => {
   // Save payment config to DB
   const handleSavePaymentConfig = async () => {
     setLoadingConfig(true);
-    
     try {
       // Get the first (and should be only) payment config record
       const { data: existing } = await supabase
@@ -157,6 +158,7 @@ const AdminPageComponent = ({ currentUser, onLogout }: AdminPageProps) => {
           .update({
             payment_methods: paymentMethods as unknown as any,
             premium_price: Number(premiumPrice),
+            country_prices: countryPrices,
             updated_at: new Date().toISOString(),
           })
           .eq('id', existing.id);
@@ -169,6 +171,7 @@ const AdminPageComponent = ({ currentUser, onLogout }: AdminPageProps) => {
           .insert({
             payment_methods: paymentMethods as unknown as any,
             premium_price: Number(premiumPrice),
+            country_prices: countryPrices,
           });
 
         if (error) throw error;
@@ -192,12 +195,67 @@ const AdminPageComponent = ({ currentUser, onLogout }: AdminPageProps) => {
       {loadingConfig && <div className="text-center text-sm text-gray-500 mb-2">Loading payment config...</div>}
       {showPaymentConfig && !loadingConfig && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
-          <div className="bg-white rounded-lg shadow-lg p-6 w-full max-w-lg relative">
+          <div className="bg-white rounded-lg shadow-lg p-6 w-full max-w-lg relative max-h-[90vh] overflow-y-auto">
             <button onClick={() => setShowPaymentConfig(false)} className="absolute top-2 right-2 text-gray-400 hover:text-gray-600">✕</button>
             <h2 className="text-xl font-bold mb-4">Configure Premium Payment</h2>
             <div className="mb-4">
-              <label className="block font-medium mb-1">Premium Price (GHS)</label>
+              <label className="block font-medium mb-1">Default Premium Price (GHS)</label>
               <Input value={premiumPrice} onChange={e => setPremiumPrice(e.target.value)} type="number" min="1" className="w-full" />
+            </div>
+            <div className="mb-4">
+              <h3 className="font-semibold mb-2">Country-Specific Prices</h3>
+              <div className="space-y-2">
+                {countryPrices.map((entry, idx) => {
+                  const countryOptions = getCountriesList();
+                  const selectedCountry = countryOptions.find(c => c.code === entry.country);
+                  const currency = selectedCountry ? getCountryByCode(selectedCountry.code)?.currency || '' : '';
+                  return (
+                    <div key={idx} className="flex gap-2 items-center mb-1">
+                      {/* Country dropdown */}
+                      <select
+                        value={entry.country}
+                        onChange={e => {
+                          const v = e.target.value;
+                          const countryObj = getCountryByCode(v);
+                          setCountryPrices(prices => prices.map((p, i) => i === idx ? { ...p, country: v, currency: countryObj?.currency || '', price: p.price } : p));
+                        }}
+                        className="w-1/3 border rounded px-2 py-1"
+                      >
+                        <option value="">Select Country</option>
+                        {countryOptions.map(c => (
+                          <option key={c.code} value={c.code}>{c.name}</option>
+                        ))}
+                      </select>
+                      {/* Currency display (readonly) */}
+                      <Input
+                        value={entry.currency}
+                        readOnly
+                        className="w-1/4 bg-gray-100 cursor-not-allowed"
+                        placeholder="Currency"
+                      />
+                      {/* Price input */}
+                      <Input
+                        value={entry.price}
+                        onChange={e => {
+                          const v = e.target.value;
+                          setCountryPrices(prices => prices.map((p, i) => i === idx ? { ...p, price: v } : p));
+                        }}
+                        type="number"
+                        min="1"
+                        placeholder="Price"
+                        className="w-1/4"
+                      />
+                      {/* Delete button */}
+                      <Button size="icon" variant="ghost" onClick={() => setCountryPrices(prices => prices.filter((_, i) => i !== idx))}>
+                        ✕
+                      </Button>
+                    </div>
+                  );
+                })}
+                <Button size="sm" variant="outline" className="mt-2" onClick={() => setCountryPrices(prices => [...prices, { country: '', currency: '', price: '' }])}>
+                  + Add Country
+                </Button>
+              </div>
             </div>
             <div className="mb-4">
               <h3 className="font-semibold mb-2">Payment Methods</h3>

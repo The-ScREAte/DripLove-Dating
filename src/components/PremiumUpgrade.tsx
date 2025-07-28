@@ -27,26 +27,35 @@ const PremiumUpgrade = ({ currentUser, onClose, preselectedPlan }: PremiumUpgrad
     const loadPaymentConfig = async () => {
       const config = await getPremiumPaymentConfig();
       
-      // Get user's country and determine currency
+      // Get user's country and currency
       let userCountry = currentUser?.country?.toLowerCase() || '';
+      let userCurrency = currentUser?.currency?.toUpperCase?.() || '';
       let selectedCurrency = 'GHS';
-      
-      // Map country names to currency codes
-      if (userCountry === 'nigeria' || userCountry === 'ng') {
-        selectedCurrency = 'NGN';
-      } else if (userCountry === 'kenya' || userCountry === 'ke') {
-        selectedCurrency = 'KES';
-      } else if (userCountry === 'tanzania' || userCountry === 'tz') {
-        selectedCurrency = 'TZS';
-      } else if (userCountry === 'egypt' || userCountry === 'eg') {
-        selectedCurrency = 'EGP';
+      let selectedPrice = config.price || '50';
+
+      // Try to find a match in countryPrices by country or currency
+      if (Array.isArray(config.countryPrices)) {
+        // Try match by country (case-insensitive)
+        const countryEntry = config.countryPrices.find((entry: any) => entry.country?.toLowerCase() === userCountry);
+        if (countryEntry) {
+          selectedCurrency = countryEntry.currency || 'GHS';
+          selectedPrice = countryEntry.price || selectedPrice;
+        } else if (userCurrency) {
+          // Try match by currency
+          const currencyEntry = config.countryPrices.find((entry: any) => entry.currency?.toUpperCase() === userCurrency);
+          if (currencyEntry) {
+            selectedCurrency = currencyEntry.currency;
+            selectedPrice = currencyEntry.price || selectedPrice;
+          } else {
+            selectedCurrency = config.currency || 'GHS';
+          }
+        } else {
+          selectedCurrency = config.currency || 'GHS';
+        }
       } else {
         selectedCurrency = config.currency || 'GHS';
       }
-      
-      // Get price from country_prices or fallback to default
-      const selectedPrice = config.countryPrices?.[selectedCurrency]?.toString() || config.price || '50';
-      
+
       setPrice(selectedPrice);
       setPaymentMethods(config.paymentMethods);
       setCurrency(selectedCurrency);
