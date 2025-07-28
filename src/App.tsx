@@ -10,10 +10,14 @@ import DiscoverPage from './components/DiscoverPage';
 import PaymentSuccess from './pages/PaymentSuccess';
 import OAuthCallback from './components/OAuthCallback';
 import ProfileCompletionPage from './components/ProfileCompletionPage';
+import { useMobileOAuth } from '@/hooks/useMobileOAuth';
 
 const queryClient = new QueryClient();
 
 const App = () => {
+  // Initialize mobile OAuth handler
+  useMobileOAuth();
+  
   // Add error boundary to prevent crashes
   const [hasError, setHasError] = React.useState(false);
   
