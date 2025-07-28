@@ -13,6 +13,16 @@ const OAuthCallback = () => {
 
   useEffect(() => {
     const handleAuthCallback = async () => {
+      const timeout = setTimeout(() => {
+        console.error('OAuth callback timeout');
+        toast({
+          title: "Authentication Timeout",
+          description: "The login process took too long. Please try again.",
+          variant: "destructive",
+        });
+        navigate('/');
+      }, 10000); // 10 second timeout
+
       try {
         setStatus('Authenticating...');
 
@@ -25,95 +35,26 @@ const OAuthCallback = () => {
         let sessionError;
 
         if (isMobileApp) {
-          // For mobile apps, handle the session from URL hash or query params
-          const urlString = window.location.href;
-          console.log('Mobile callback URL:', urlString);
+          console.log('Mobile OAuth callback detected');
+          console.log('Current URL:', window.location.href);
           
-          // Try multiple approaches for mobile session handling
-          const approaches = [
-            // Approach 1: Direct session check
-            async () => {
-              console.log('Trying direct session check...');
-              const { data, error } = await supabase.auth.getSession();
-              return { data, error };
-            },
-            // Approach 2: Parse tokens from URL
-            async () => {
-              console.log('Trying token extraction from URL...');
-              const cleanUrl = urlString.replace('driplove://', 'https://driplove.app/');
-              const url = new URL(cleanUrl);
-              
-              let accessToken, refreshToken, expiresAt, expiresIn;
-              
-              // Try hash first
-              if (url.hash) {
-                const hashParams = new URLSearchParams(url.hash.substring(1));
-                accessToken = hashParams.get('access_token');
-                refreshToken = hashParams.get('refresh_token');
-                expiresAt = hashParams.get('expires_at');
-                expiresIn = hashParams.get('expires_in');
-              }
-              
-              // Fallback to query params
-              if (!accessToken && url.search) {
-                const queryParams = new URLSearchParams(url.search);
-                accessToken = queryParams.get('access_token');
-                refreshToken = queryParams.get('refresh_token');
-                expiresAt = queryParams.get('expires_at');
-                expiresIn = queryParams.get('expires_in');
-              }
-              
-              if (accessToken && refreshToken) {
-                return await supabase.auth.setSession({
-                  access_token: accessToken,
-                  refresh_token: refreshToken
-                });
-              }
-              
-              return { data: null, error: new Error('No tokens found') };
-            },
-            // Approach 3: Code exchange
-            async () => {
-              console.log('Trying code exchange...');
-              const cleanUrl = urlString.replace('driplove://', 'https://driplove.app/');
-              const url = new URL(cleanUrl);
-              const code = url.searchParams.get('code') || 
-                          (url.hash ? new URLSearchParams(url.hash.substring(1)).get('code') : null);
-              
-              if (code) {
-                return await supabase.auth.exchangeCodeForSession(code);
-              }
-              
-              return { data: null, error: new Error('No code found') };
-            }
-          ];
+          // For mobile, wait a moment for the session to be established
+          await new Promise(resolve => setTimeout(resolve, 1000));
           
-          // Try each approach until one succeeds
-          for (const approach of approaches) {
-            try {
-              const result = await approach();
-              if (result.data?.session) {
-                sessionData = result.data;
-                sessionError = null;
-                console.log('Session established successfully');
-                break;
-              }
-            } catch (error) {
-              console.log('Approach failed:', error);
-              continue;
-            }
-          }
+          // Simple session check
+          const { data, error } = await supabase.auth.getSession();
+          sessionData = data;
+          sessionError = error;
           
-          // If no approach worked, set error
-          if (!sessionData?.session) {
-            sessionError = new Error('Failed to establish session with all approaches');
-          }
+          console.log('Session check result:', { hasSession: !!data?.session, error });
         } else {
           // Web browser flow
           const { data, error } = await supabase.auth.getSession();
           sessionData = data;
           sessionError = error;
         }
+        
+        clearTimeout(timeout);
         
         if (sessionError) {
           throw sessionError;
