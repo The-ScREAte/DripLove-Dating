@@ -13,46 +13,40 @@ const OAuthCallback = () => {
 
   useEffect(() => {
     const handleAuthCallback = async () => {
+      console.log('OAuth callback started');
+      console.log('Current URL:', window.location.href);
+      console.log('Protocol:', window.location.protocol);
+      
       const timeout = setTimeout(() => {
-        console.error('OAuth callback timeout');
+        console.error('OAuth callback timeout after 10 seconds');
         toast({
           title: "Authentication Timeout",
           description: "The login process took too long. Please try again.",
           variant: "destructive",
         });
         navigate('/');
-      }, 10000); // 10 second timeout
+      }, 10000);
 
       try {
-        setStatus('Authenticating...');
+        setStatus('Checking authentication...');
 
-        // Handle both web and mobile auth callbacks
         const isMobileApp = window.location.protocol === 'capacitor:' || 
                            window.location.protocol === 'file:' ||
                            window.location.href.startsWith('driplove://');
 
-        let sessionData;
-        let sessionError;
+        console.log('Is mobile app:', isMobileApp);
 
-        if (isMobileApp) {
-          console.log('Mobile OAuth callback detected');
-          console.log('Current URL:', window.location.href);
-          
-          // For mobile, wait a moment for the session to be established
-          await new Promise(resolve => setTimeout(resolve, 1000));
-          
-          // Simple session check
-          const { data, error } = await supabase.auth.getSession();
-          sessionData = data;
-          sessionError = error;
-          
-          console.log('Session check result:', { hasSession: !!data?.session, error });
-        } else {
-          // Web browser flow
-          const { data, error } = await supabase.auth.getSession();
-          sessionData = data;
-          sessionError = error;
-        }
+        // Wait for any potential session updates
+        await new Promise(resolve => setTimeout(resolve, 1500));
+        
+        setStatus('Getting session...');
+        const { data: sessionData, error: sessionError } = await supabase.auth.getSession();
+        
+        console.log('Session data:', {
+          hasSession: !!sessionData?.session,
+          hasUser: !!sessionData?.session?.user,
+          error: sessionError?.message || 'No error'
+        });
         
         clearTimeout(timeout);
         
