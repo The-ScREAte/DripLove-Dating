@@ -15,6 +15,7 @@ import StatsCard from './admin/StatsCard';
 import UserModerationPanel from './admin/UserModerationPanel';
 import AdminErrorBoundary from './admin/AdminErrorBoundary';
 import UserPoolDebugger from './admin/UserPoolDebugger';
+import CountryManagement from './admin/CountryManagement';
 import { debounce, userDataCache, createPagination } from '@/utils/performanceOptimizer';
 import { useSupabaseSubscription, useMemoryMonitor } from '@/hooks/usePerformance';
 import { CurrentUser, AdminStats } from '@/types';
@@ -331,6 +332,11 @@ const AdminPageComponent = ({ currentUser, onLogout }: AdminPageProps) => {
             </div>
           ))}
         </div>
+      </div>
+
+      {/* Country Management Section */}
+      <div className="mt-8">
+        <CountryManagement />
       </div>
     </>
   );

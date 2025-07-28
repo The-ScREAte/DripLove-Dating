@@ -12,6 +12,7 @@ import {
   getCountryByCode,
   type CityData 
 } from '@/constants/locationData';
+import { getEnabledCountries } from '@/utils/enabledCountries';
 
 interface LocationInputProps {
   country: string;
@@ -48,8 +49,27 @@ const LocationInput = ({
   const [isCustomCity, setIsCustomCity] = useState(false);
   const [suggestedCities, setSuggestedCities] = useState<CityData[]>([]);
   const [coordinates, setCoordinates] = useState<{lat?: number, lng?: number}>({});
+  const [countries, setCountries] = useState<any[]>([]);
+  const [loadingCountries, setLoadingCountries] = useState(true);
 
-  const countries = getCountriesList();
+  // Load enabled countries on mount
+  useEffect(() => {
+    const loadCountries = async () => {
+      try {
+        setLoadingCountries(true);
+        const enabledCountries = await getEnabledCountries();
+        setCountries(enabledCountries);
+      } catch (error) {
+        console.error('Error loading countries:', error);
+        // Fallback to all countries
+        setCountries(getCountriesList());
+      } finally {
+        setLoadingCountries(false);
+      }
+    };
+    
+    loadCountries();
+  }, []);
 
   // Initialize selected country
   useEffect(() => {
@@ -171,9 +191,9 @@ const LocationInput = ({
           <MapPin className="w-4 h-4" />
           Country {required && <span className="text-red-500">*</span>}
         </Label>
-        <Select value={selectedCountryCode} onValueChange={handleCountryChange}>
+        <Select value={selectedCountryCode} onValueChange={handleCountryChange} disabled={loadingCountries}>
           <SelectTrigger className={errors.country ? 'border-red-500' : ''}>
-            <SelectValue placeholder="Select your country" />
+            <SelectValue placeholder={loadingCountries ? "Loading countries..." : "Select your country"} />
           </SelectTrigger>
           <SelectContent>
             {countries.map((country) => (

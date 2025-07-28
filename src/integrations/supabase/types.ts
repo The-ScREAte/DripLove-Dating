@@ -110,6 +110,33 @@ export type Database = {
           },
         ]
       }
+      enabled_countries: {
+        Row: {
+          country_code: string
+          country_name: string
+          created_at: string
+          id: string
+          is_enabled: boolean
+          updated_at: string
+        }
+        Insert: {
+          country_code: string
+          country_name: string
+          created_at?: string
+          id?: string
+          is_enabled?: boolean
+          updated_at?: string
+        }
+        Update: {
+          country_code?: string
+          country_name?: string
+          created_at?: string
+          id?: string
+          is_enabled?: boolean
+          updated_at?: string
+        }
+        Relationships: []
+      }
       likes: {
         Row: {
           created_at: string
@@ -280,6 +307,7 @@ export type Database = {
           country_prices: Json | null
           created_at: string
           currency: string
+          enabled_countries: Json | null
           id: string
           payment_methods: Json
           premium_price: number
@@ -289,6 +317,7 @@ export type Database = {
           country_prices?: Json | null
           created_at?: string
           currency?: string
+          enabled_countries?: Json | null
           id?: string
           payment_methods?: Json
           premium_price?: number
@@ -298,6 +327,7 @@ export type Database = {
           country_prices?: Json | null
           created_at?: string
           currency?: string
+          enabled_countries?: Json | null
           id?: string
           payment_methods?: Json
           premium_price?: number
@@ -706,9 +736,20 @@ export type Database = {
           country_code: string
         }[]
       }
+      get_admin_stats: {
+        Args: Record<PropertyKey, never>
+        Returns: Json
+      }
       get_app_stats: {
         Args: Record<PropertyKey, never>
         Returns: Json
+      }
+      get_enabled_countries: {
+        Args: Record<PropertyKey, never>
+        Returns: {
+          country_code: string
+          country_name: string
+        }[]
       }
       get_user_subscription: {
         Args: { user_id_param: string }
