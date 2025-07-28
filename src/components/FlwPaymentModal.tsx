@@ -176,9 +176,11 @@ const FlwPaymentModal: React.FC<FlwPaymentModalProps> = ({ isOpen, onClose, amou
 
       console.log('Using public key:', publicKey ? (publicKey.substring(0, 15) + '...') : 'NONE FOUND');
       
+      // Add a unique prefix to tx_ref for easy filtering in Flutterwave dashboard
+      const txRefPrefix = 'DRIPLOVE-';
       const paymentData = {
         public_key: publicKey,
-        tx_ref: `driplove_premium_${Date.now()}_${Math.random().toString(36).substring(7)}`,
+        tx_ref: `${txRefPrefix}${Date.now()}-${Math.random().toString(36).substring(7)}`,
         amount: amount,
         currency: currency,
         payment_options: payment_options,
