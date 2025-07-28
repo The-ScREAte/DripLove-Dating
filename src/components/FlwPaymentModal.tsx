@@ -126,35 +126,30 @@ const FlwPaymentModal: React.FC<FlwPaymentModalProps> = ({ isOpen, onClose, amou
         meta = { ...meta, payment_type: 'mobilemoneyghana' };
       }
 
-      // Get the public key from payment config - try multiple fallback options
+      // Get the public key from environment variables (most reliable source)
       let publicKey = '';
       
-      // First try to get from the specific payment method
-      if (paymentConfig.payment_methods && Array.isArray(paymentConfig.payment_methods)) {
-        const methodConfig = paymentConfig.payment_methods.find((m: any) => m.type === selectedMethod.type);
-        if (methodConfig?.extra) {
-          publicKey = methodConfig.extra.trim();
-        }
+      // First try environment variable from config
+      if (FLW_PUBLIC_KEY) {
+        publicKey = FLW_PUBLIC_KEY.trim();
       }
       
-      // Fallback to first payment method's extra
-      if (!publicKey && paymentConfig.payment_methods?.[0]?.extra) {
-        publicKey = paymentConfig.payment_methods[0].extra.trim();
+      // Fallback to import.meta.env
+      if (!publicKey) {
+        publicKey = (import.meta.env.VITE_FLW_PUBLIC_KEY || '').trim();
       }
       
-      // Fallback to direct public_key field
+      // Fallback to direct public_key field from database
       if (!publicKey && paymentConfig.public_key) {
         publicKey = paymentConfig.public_key.trim();
       }
       
-      // Fallback to environment variable from config
-      if (!publicKey && FLW_PUBLIC_KEY) {
-        publicKey = FLW_PUBLIC_KEY.trim();
-      }
-      
-      // Final fallback to import.meta.env
-      if (!publicKey) {
-        publicKey = (import.meta.env.VITE_FLW_PUBLIC_KEY || '').trim();
+      // Only use payment method extra field if it looks like a valid key
+      if (!publicKey && paymentConfig.payment_methods && Array.isArray(paymentConfig.payment_methods)) {
+        const methodConfig = paymentConfig.payment_methods.find((m: any) => m.type === selectedMethod.type);
+        if (methodConfig?.extra && methodConfig.extra.startsWith('FLWPUBK_')) {
+          publicKey = methodConfig.extra.trim();
+        }
       }
 
       if (!publicKey) {
