@@ -775,8 +775,8 @@ class PhotoModerationService {
       confidence = 30;
       message = 'Image uploaded but requires admin approval due to high skin exposure.';
     }
-    // ⚠️ REVIEW moderate nudity risk (send to admin for AI nudes, borderline content)
-    else if (combinedDetails.suggestiveContent && combinedDetails.suggestiveContent >= 50) {
+    // ⚠️ REVIEW moderate nudity risk (send to admin for AI nudes, borderline content) - LESS SENSITIVE
+    else if (combinedDetails.suggestiveContent && combinedDetails.suggestiveContent >= 60) {
       isApproved = true; // Allow upload but require review
       requiresReview = true;
       confidence = 40;

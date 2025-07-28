@@ -252,7 +252,7 @@ const ProfileCompletionForm = ({ user, onComplete, onCancel }: ProfileCompletion
         );
       case 'rejected':
         return (
-          <div className="absolute inset-0 bg-red-500/80 flex items-center justify-center rounded-lg">
+          <div className="absolute inset-0 bg-red-500/80 flex items-center justify-center rounded-lg pointer-events-none">
             <div className="text-white text-center">
               <AlertTriangle className="w-6 h-6 mx-auto mb-1" />
               <div className="text-xs">Rejected</div>
