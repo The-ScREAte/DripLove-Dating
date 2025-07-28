@@ -230,24 +230,24 @@ class PhotoModerationService {
       nudityScore = Math.min(nudityScore * 1.2, 1.0); // 20% boost for central skin areas
     }
 
-    // Enhanced explicit content detection for ALL genders and ethnicities - LESS SENSITIVE
-    if (nudityScore > 0.95 || 
-        (skinToneRatio > 0.90 && (maleNudityRatio > 0.65 || blackMaleNudityRatio > 0.65)) ||
-        (nudityRatio > 0.85 && (maleNudityRatio > 0.75 || blackMaleNudityRatio > 0.75))) { 
+    // Enhanced explicit content detection for ALL genders and ethnicities - MUCH LESS SENSITIVE
+    if (nudityScore > 0.98 || 
+        (skinToneRatio > 0.95 && (maleNudityRatio > 0.85 || blackMaleNudityRatio > 0.85)) ||
+        (nudityRatio > 0.95 && (maleNudityRatio > 0.90 || blackMaleNudityRatio > 0.90))) { 
       explicitContent = 95;
       flags.push(MODERATION_FLAGS.EXPLICIT_CONTENT);
       // REJECTED: Complete nudity detected - very high skin exposure (all genders/ethnicities)
     }
-    else if (nudityScore > 0.80 ||
-             (skinToneRatio > 0.75 && (maleNudityRatio > 0.55 || blackMaleNudityRatio > 0.55)) ||
-             (nudityRatio > 0.70 && (maleNudityRatio > 0.60 || blackMaleNudityRatio > 0.60))) { 
-      adultContent = 75; // Send to admin review
+    else if (nudityScore > 0.90 ||
+             (skinToneRatio > 0.85 && (maleNudityRatio > 0.75 || blackMaleNudityRatio > 0.75)) ||
+             (nudityRatio > 0.85 && (maleNudityRatio > 0.80 || blackMaleNudityRatio > 0.80))) { 
+      adultContent = 65; // Send to admin review - reduced threshold
       // REVIEW: High nudity probability - likely nude/explicit content (all genders/ethnicities)
     }
-    else if (nudityScore > 0.65 ||
-             (skinToneRatio > 0.60 && (maleNudityRatio > 0.45 || blackMaleNudityRatio > 0.45)) ||
-             (nudityRatio > 0.55 && (maleNudityRatio > 0.45 || blackMaleNudityRatio > 0.45))) { 
-      suggestiveContent = Math.max(suggestiveContent, 45); // Lower threshold for auto-approval
+    else if (nudityScore > 0.80 ||
+             (skinToneRatio > 0.75 && (maleNudityRatio > 0.65 || blackMaleNudityRatio > 0.65)) ||
+             (nudityRatio > 0.75 && (maleNudityRatio > 0.65 || blackMaleNudityRatio > 0.65))) { 
+      suggestiveContent = Math.max(suggestiveContent, 35); // Much lower threshold for auto-approval
       // REVIEW: Moderate nudity risk - summer clothing, swimwear, sports, possible AI (all genders/ethnicities)
     }
     else if (nudityScore > 0.45 || skinToneRatio > 0.45 || nudityRatio > 0.40) { 
