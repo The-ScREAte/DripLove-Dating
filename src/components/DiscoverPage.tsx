@@ -1038,7 +1038,79 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, isPremium }: DiscoverPage
             {/* ...existing code... */}
             {isDragging && swipeDirection && (
               <>
-                {/* ...existing code... */}
+                {/* Like Overlay - Right Swipe */}
+                {swipeDirection === 'right' && (
+                  <div 
+                    className="absolute inset-0 z-20 flex items-center justify-center pointer-events-none"
+                    style={{ 
+                      background: `linear-gradient(135deg, rgba(34, 197, 94, ${swipeOpacity * 0.7}), rgba(74, 222, 128, ${swipeOpacity * 0.5}))`,
+                      transition: 'none'
+                    }}
+                  >
+                    <div 
+                      className="bg-green-500/90 backdrop-blur-sm rounded-full p-6 shadow-2xl transform"
+                      style={{ 
+                        scale: Math.min(0.8 + (swipeOpacity * 0.4), 1.2),
+                        transition: 'none'
+                      }}
+                    >
+                      <Heart 
+                        className="w-12 h-12 text-white fill-current" 
+                        style={{ 
+                          filter: `drop-shadow(0 4px 8px rgba(0,0,0,0.3))`,
+                          transform: `rotate(${swipeDistance * 0.1}deg)`
+                        }}
+                      />
+                    </div>
+                    <div 
+                      className="absolute bottom-32 bg-green-500/95 backdrop-blur-sm px-8 py-3 rounded-full shadow-xl"
+                      style={{ 
+                        opacity: Math.min(swipeOpacity + 0.2, 1),
+                        transform: `translateY(${-swipeDistance * 0.1}px)`,
+                        transition: 'none'
+                      }}
+                    >
+                      <span className="text-white font-bold text-2xl tracking-wider">LIKE</span>
+                    </div>
+                  </div>
+                )}
+
+                {/* Pass Overlay - Left Swipe */}
+                {swipeDirection === 'left' && (
+                  <div 
+                    className="absolute inset-0 z-20 flex items-center justify-center pointer-events-none"
+                    style={{ 
+                      background: `linear-gradient(135deg, rgba(239, 68, 68, ${swipeOpacity * 0.7}), rgba(248, 113, 113, ${swipeOpacity * 0.5}))`,
+                      transition: 'none'
+                    }}
+                  >
+                    <div 
+                      className="bg-red-500/90 backdrop-blur-sm rounded-full p-6 shadow-2xl transform"
+                      style={{ 
+                        scale: Math.min(0.8 + (swipeOpacity * 0.4), 1.2),
+                        transition: 'none'
+                      }}
+                    >
+                      <X 
+                        className="w-12 h-12 text-white" 
+                        style={{ 
+                          filter: `drop-shadow(0 4px 8px rgba(0,0,0,0.3))`,
+                          transform: `rotate(${-swipeDistance * 0.1}deg)`
+                        }}
+                      />
+                    </div>
+                    <div 
+                      className="absolute bottom-32 bg-red-500/95 backdrop-blur-sm px-8 py-3 rounded-full shadow-xl"
+                      style={{ 
+                        opacity: Math.min(swipeOpacity + 0.2, 1),
+                        transform: `translateY(${-swipeDistance * 0.1}px)`,
+                        transition: 'none'
+                      }}
+                    >
+                      <span className="text-white font-bold text-2xl tracking-wider">NOPE</span>
+                    </div>
+                  </div>
+                )}
               </>
             )}
             {/* ...existing code... */}
