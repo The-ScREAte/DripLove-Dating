@@ -26,21 +26,27 @@ const PremiumUpgrade = ({ currentUser, onClose, preselectedPlan }: PremiumUpgrad
   React.useEffect(() => {
     const loadPaymentConfig = async () => {
       const config = await getPremiumPaymentConfig();
-      // Example: config.prices = { GHS: 50, NGN: 8000, KES: 2000 }
-      //          config.currencies = ['GHS', 'NGN', 'KES']
+      
+      // Get user's country and determine currency
       let userCountry = currentUser?.country?.toLowerCase() || '';
       let selectedCurrency = 'GHS';
-      let selectedPrice = config.price;
+      
+      // Map country names to currency codes
       if (userCountry === 'nigeria' || userCountry === 'ng') {
         selectedCurrency = 'NGN';
-        selectedPrice = config.nigeria_price || '8000';
       } else if (userCountry === 'kenya' || userCountry === 'ke') {
         selectedCurrency = 'KES';
-        selectedPrice = config.kenya_price || '2000';
+      } else if (userCountry === 'tanzania' || userCountry === 'tz') {
+        selectedCurrency = 'TZS';
+      } else if (userCountry === 'egypt' || userCountry === 'eg') {
+        selectedCurrency = 'EGP';
       } else {
         selectedCurrency = config.currency || 'GHS';
-        selectedPrice = config.price || '50';
       }
+      
+      // Get price from country_prices or fallback to default
+      const selectedPrice = config.countryPrices?.[selectedCurrency]?.toString() || config.price || '50';
+      
       setPrice(selectedPrice);
       setPaymentMethods(config.paymentMethods);
       setCurrency(selectedCurrency);
@@ -123,7 +129,7 @@ const PremiumUpgrade = ({ currentUser, onClose, preselectedPlan }: PremiumUpgrad
                 </CardTitle>
                 <div className="mt-3 sm:mt-4">
                   <div className="text-3xl sm:text-4xl lg:text-5xl font-bold text-gray-800 responsive-text">
-                    GHS {price}
+                    {currency} {price}
                   </div>
                   <div className="text-xs sm:text-sm text-green-600 font-medium mt-1">✨ Lifetime access</div>
                 </div>

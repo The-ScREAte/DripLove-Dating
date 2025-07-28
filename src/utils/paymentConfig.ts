@@ -21,7 +21,7 @@ export async function getPremiumPaymentConfig() {
   try {
     const { data, error } = await supabase
       .from('payment_config')
-      .select('premium_price, currency, payment_methods')
+      .select('premium_price, currency, payment_methods, country_prices')
       .order('created_at', { ascending: false })
       .limit(1)
       .single();
@@ -36,14 +36,16 @@ export async function getPremiumPaymentConfig() {
     return { 
       price: data.premium_price.toString(), 
       paymentMethods: validMethods,
-      currency: data.currency 
+      currency: data.currency,
+      countryPrices: data.country_prices || {}
     };
   } catch (error) {
     console.error('Error fetching payment config:', error);
     return { 
       price: '50', 
       paymentMethods: [],
-      currency: 'GHS'
+      currency: 'GHS',
+      countryPrices: {}
     };
   }
 }

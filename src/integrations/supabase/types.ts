@@ -277,6 +277,7 @@ export type Database = {
       }
       payment_config: {
         Row: {
+          country_prices: Json | null
           created_at: string
           currency: string
           id: string
@@ -285,6 +286,7 @@ export type Database = {
           updated_at: string
         }
         Insert: {
+          country_prices?: Json | null
           created_at?: string
           currency?: string
           id?: string
@@ -293,6 +295,7 @@ export type Database = {
           updated_at?: string
         }
         Update: {
+          country_prices?: Json | null
           created_at?: string
           currency?: string
           id?: string
