@@ -22,7 +22,7 @@ export async function getPaymentConfig() {
 export async function getEnabledCountries(): Promise<string[]> {
   const config = await getPaymentConfig();
   if (config && Array.isArray(config.enabled_countries)) {
-    return config.enabled_countries;
+    return config.enabled_countries.map(String);
   }
   return [];
 }
