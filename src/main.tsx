@@ -3,10 +3,29 @@ import React from 'react';
 import { createRoot } from 'react-dom/client';
 import App from './App.tsx';
 import './index.css';
+import { App as CapacitorApp } from '@capacitor/app';
+import { Capacitor } from '@capacitor/core';
 import { supabase } from './integrations/supabase/client';
 
+// Handle OAuth deep link for mobile (Capacitor)
+if (Capacitor.isNativePlatform()) {
+  CapacitorApp.addListener('appUrlOpen', async ({ url }) => {
+    console.log('[OAuth Debug] Returned URL:', url);
+    if (url?.includes('#access_token=')) {
+      const params = new URLSearchParams(url.split('#')[1]);
+      const access_token = params.get('access_token');
+      const refresh_token = params.get('refresh_token');
+      if (access_token && refresh_token) {
+        await supabase.auth.setSession({ access_token, refresh_token });
+        console.log('[OAuth Debug] Session set successfully!');
+      } else {
+        console.warn('[OAuth Debug] Tokens missing in URL.');
+      }
+    }
+  });
+}
+
 // 👉 Capacitor keyboard handling
-import { Capacitor } from '@capacitor/core';
 import { Keyboard, KeyboardResize } from '@capacitor/keyboard';
 import { initializeSafeAndroidOptimizations } from './utils/safeAndroidOptimizations';
 import { preventFirebaseMessaging } from './utils/firebaseBlocker';
