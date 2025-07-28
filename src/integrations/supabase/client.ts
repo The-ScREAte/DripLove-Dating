@@ -7,20 +7,24 @@ const SUPABASE_PUBLISHABLE_KEY = import.meta.env.VITE_SUPABASE_ANON_KEY;
 
 // Mobile app detection
 const isMobileApp = window.location.protocol === 'capacitor:' || 
-                   window.location.protocol === 'file:';
+                   window.location.protocol === 'file:' ||
+                   window.location.href.startsWith('driplove://');
 
 // Configure auth options for mobile deep linking
 const authOptions = {
   auth: {
     // Set the redirect URL based on platform
     redirectTo: isMobileApp 
-      ? 'com.driplove.dating://auth/callback'
+      ? 'driplove://auth/callback'
       : `${window.location.origin}/auth/callback`,
-    // Auto detect redirect
-    detectSessionInUrl: true,
-    // For mobile apps, we need to handle deep links
+    // Auto detect redirect for web only
+    detectSessionInUrl: !isMobileApp,
+    // For mobile apps, we need to handle deep links manually
     persistSession: true,
-    autoRefreshToken: true
+    autoRefreshToken: true,
+    // Storage options
+    storage: typeof window !== 'undefined' ? window.localStorage : undefined,
+    storageKey: 'supabase.auth.token'
   }
 };
 

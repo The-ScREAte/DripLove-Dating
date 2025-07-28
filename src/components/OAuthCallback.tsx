@@ -29,53 +29,112 @@ const OAuthCallback = () => {
           const urlString = window.location.href;
           console.log('Mobile callback URL:', urlString);
           
+          // Clean up the URL for mobile deep links
+          const cleanUrl = urlString.replace('driplove://', 'https://driplove.app/');
+          const url = new URL(cleanUrl);
+          
           // Extract tokens from various possible URL formats
-          let accessToken, refreshToken, expiresAt, tokenType;
+          let accessToken, refreshToken, expiresAt, tokenType, expiresIn;
           
           // Handle hash-based tokens (#access_token=...)
-          if (urlString.includes('#')) {
-            const hashParams = new URLSearchParams(urlString.split('#')[1]);
+          if (url.hash) {
+            const hashParams = new URLSearchParams(url.hash.substring(1));
             accessToken = hashParams.get('access_token');
             refreshToken = hashParams.get('refresh_token');
             expiresAt = hashParams.get('expires_at');
-            tokenType = hashParams.get('token_type');
+            expiresIn = hashParams.get('expires_in');
+            tokenType = hashParams.get('token_type') || 'bearer';
           }
           
           // Handle query-based tokens (?access_token=...)
-          if (!accessToken && urlString.includes('?')) {
-            const queryParams = new URLSearchParams(urlString.split('?')[1]);
+          if (!accessToken && url.search) {
+            const queryParams = new URLSearchParams(url.search);
             accessToken = queryParams.get('access_token');
             refreshToken = queryParams.get('refresh_token');
             expiresAt = queryParams.get('expires_at');
-            tokenType = queryParams.get('token_type');
+            expiresIn = queryParams.get('expires_in');
+            tokenType = queryParams.get('token_type') || 'bearer';
+          }
+          
+          // Check for auth errors
+          const errorCode = url.searchParams.get('error') || 
+                           (url.hash ? new URLSearchParams(url.hash.substring(1)).get('error') : null);
+          
+          if (errorCode) {
+            throw new Error(`OAuth error: ${errorCode}`);
           }
           
           console.log('Extracted tokens:', { 
             hasAccess: !!accessToken, 
             hasRefresh: !!refreshToken,
             expiresAt,
+            expiresIn,
             tokenType 
           });
           
           if (accessToken && refreshToken) {
             try {
+              setStatus('Setting up your session...');
+              
+              // Calculate proper expiry
+              const expiresAtTimestamp = expiresAt ? 
+                parseInt(expiresAt) : 
+                (expiresIn ? Math.floor(Date.now() / 1000) + parseInt(expiresIn) : 
+                Math.floor(Date.now() / 1000) + 3600);
+              
               const { data, error } = await supabase.auth.setSession({
                 access_token: accessToken,
                 refresh_token: refreshToken
               });
+              
               sessionData = data;
               sessionError = error;
-              console.log('Session set result:', { success: !!data.session, error });
+              
+              console.log('Session set result:', { 
+                success: !!data?.session, 
+                error: error?.message,
+                userId: data?.session?.user?.id 
+              });
+              
+              // Verify session was actually set
+              if (data?.session) {
+                // Double-check by getting the session again
+                const { data: verifyData } = await supabase.auth.getSession();
+                if (!verifyData.session) {
+                  console.warn('Session verification failed, retrying...');
+                  // Try one more time with different approach
+                  await new Promise(resolve => setTimeout(resolve, 500));
+                  const retryResult = await supabase.auth.getSession();
+                  sessionData = retryResult.data;
+                  sessionError = retryResult.error;
+                }
+              }
             } catch (err) {
               console.error('Error setting session:', err);
               sessionError = err as any;
             }
           } else {
-            // Fallback to getting session normally
-            console.log('No tokens found in URL, trying getSession fallback');
-            const result = await supabase.auth.getSession();
-            sessionData = result.data;
-            sessionError = result.error;
+            // Try to handle authorization code flow
+            const code = url.searchParams.get('code') || 
+                        (url.hash ? new URLSearchParams(url.hash.substring(1)).get('code') : null);
+            
+            if (code) {
+              console.log('Found authorization code, exchanging...');
+              try {
+                const { data, error } = await supabase.auth.exchangeCodeForSession(code);
+                sessionData = data;
+                sessionError = error;
+              } catch (err) {
+                console.error('Code exchange failed:', err);
+                sessionError = err as any;
+              }
+            } else {
+              // Fallback to getting session normally
+              console.log('No tokens or code found, trying getSession fallback');
+              const result = await supabase.auth.getSession();
+              sessionData = result.data;
+              sessionError = result.error;
+            }
           }
         } else {
           // Web browser flow
