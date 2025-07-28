@@ -23,28 +23,18 @@ const PremiumUpgrade = ({ currentUser, onClose, preselectedPlan }: PremiumUpgrad
   const [paymentMethods, setPaymentMethods] = useState<any[]>([]);
   const [currency, setCurrency] = useState('GHS');
 
-
   React.useEffect(() => {
     const loadPaymentConfig = async () => {
       const config = await getPremiumPaymentConfig();
-      // Get enabled countries from config (if present)
-      // Fallback: if enabled_countries is not present, allow all countries
-      let enabledCountries: string[] = [];
-      if ('enabled_countries' in config && Array.isArray((config as any).enabled_countries)) {
-        enabledCountries = (config as any).enabled_countries.map((c: string) => c.toLowerCase());
-      }
+      
+      // Get user's country and currency
       let userCountry = currentUser?.country?.toLowerCase() || '';
       let userCurrency = currentUser?.currency?.toUpperCase?.() || '';
       let selectedCurrency = 'GHS';
       let selectedPrice = config.price || '50';
 
-      // Only allow premium if user's country is enabled, else fallback to default
-      let countryAllowed = true;
-      if (enabledCountries.length > 0 && userCountry) {
-        countryAllowed = enabledCountries.includes(userCountry);
-      }
-
-      if (countryAllowed && Array.isArray(config.countryPrices)) {
+      // Try to find a match in countryPrices by country or currency
+      if (Array.isArray(config.countryPrices)) {
         // Try match by country (case-insensitive)
         const countryEntry = config.countryPrices.find((entry: any) => entry.country?.toLowerCase() === userCountry);
         if (countryEntry) {
@@ -67,7 +57,7 @@ const PremiumUpgrade = ({ currentUser, onClose, preselectedPlan }: PremiumUpgrad
       }
 
       setPrice(selectedPrice);
-      setPaymentMethods(countryAllowed ? config.paymentMethods : []);
+      setPaymentMethods(config.paymentMethods);
       setCurrency(selectedCurrency);
     };
     loadPaymentConfig();

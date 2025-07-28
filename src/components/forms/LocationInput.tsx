@@ -32,7 +32,6 @@ interface LocationInputProps {
     zipCode?: string;
   };
   required?: boolean;
-  allowedCountries?: string[]; // country codes
 }
 
 const LocationInput = ({
@@ -41,8 +40,7 @@ const LocationInput = ({
   zipCode,
   onLocationChange,
   errors = {},
-  required = false,
-  allowedCountries
+  required = false
 }: LocationInputProps) => {
   const [selectedCountryCode, setSelectedCountryCode] = useState<string>('');
   const [cityInput, setCityInput] = useState<string>(city);
@@ -51,10 +49,7 @@ const LocationInput = ({
   const [suggestedCities, setSuggestedCities] = useState<CityData[]>([]);
   const [coordinates, setCoordinates] = useState<{lat?: number, lng?: number}>({});
 
-  let countries = getCountriesList();
-  if (allowedCountries && allowedCountries.length > 0) {
-    countries = countries.filter(c => allowedCountries.includes(c.code));
-  }
+  const countries = getCountriesList();
 
   // Initialize selected country
   useEffect(() => {

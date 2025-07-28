@@ -10,7 +10,6 @@ import BasicInfoSection from '@/components/forms/BasicInfoSection';
 import LocationInput from '@/components/forms/LocationInput';
 import { validateRegistrationForm } from '@/utils/formValidation';
 import { initialFormData } from '@/constants/formData';
-import { getEnabledCountries } from '@/utils/paymentConfig';
 import { occupationOptions, industryOptions } from '@/constants/professionOptions';
 import { moderateImage, ModerationResult } from '@/utils/photoModeration';
 import { compressImage } from '@/utils/imageCompression';
@@ -36,11 +35,6 @@ const RegistrationFormNew = ({ onSubmit, onBackToLogin }: RegistrationFormProps)
   const [currentStep, setCurrentStep] = useState(1);
   const [images, setImages] = useState<ImageUpload[]>([]);
   const { toast } = useToast();
-  const [allowedCountries, setAllowedCountries] = useState<string[]>([]);
-
-  React.useEffect(() => {
-    getEnabledCountries().then(setAllowedCountries);
-  }, []);
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
     setFormData({
@@ -385,7 +379,6 @@ const RegistrationFormNew = ({ onSubmit, onBackToLogin }: RegistrationFormProps)
                     zipCode: errors.zipCode
                   }}
                   required={true}
-                  allowedCountries={allowedCountries}
                 />
               </div>
             </div>

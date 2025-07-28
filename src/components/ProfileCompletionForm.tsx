@@ -7,7 +7,6 @@ import { Heart, ArrowLeft, Upload, Shield, CheckCircle, AlertTriangle } from 'lu
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import { initialFormData } from '@/constants/formData';
-import { getEnabledCountries } from '@/utils/paymentConfig';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { occupationOptions, industryOptions } from '@/constants/professionOptions';
 import LocationInput from '@/components/forms/LocationInput';
@@ -33,12 +32,7 @@ const ProfileCompletionForm = ({ user, onComplete, onCancel }: ProfileCompletion
   const [loading, setLoading] = useState(false);
   const [images, setImages] = useState<ImageUpload[]>([]);
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [allowedCountries, setAllowedCountries] = useState<string[]>([]);
   const { toast } = useToast();
-
-  React.useEffect(() => {
-    getEnabledCountries().then(setAllowedCountries);
-  }, []);
 
   // Restore images from sessionStorage on mount
   useEffect(() => {
@@ -585,7 +579,6 @@ const ProfileCompletionForm = ({ user, onComplete, onCancel }: ProfileCompletion
               onLocationChange={handleLocationChange}
               errors={errors}
               required={true}
-              allowedCountries={allowedCountries}
             />
           </div>
 
