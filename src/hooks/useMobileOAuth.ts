@@ -1,16 +1,29 @@
 import { useEffect } from 'react';
-import { App } from '@capacitor/app';
-import { Capacitor } from '@capacitor/core';
-import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import { useNavigate } from 'react-router-dom';
+import { supabase } from '@/integrations/supabase/client';
+
+// Conditionally import Capacitor modules for mobile
+let App: any = null;
+let Capacitor: any = null;
+
+try {
+  // Try to import Capacitor modules - they will only be available on mobile
+  const capacitorApp = require('@capacitor/app');
+  const capacitorCore = require('@capacitor/core');
+  App = capacitorApp.App;
+  Capacitor = capacitorCore.Capacitor;
+} catch (error) {
+  console.log('Capacitor modules not available (running on web)');
+}
 
 export const useMobileOAuth = () => {
   const { toast } = useToast();
   const navigate = useNavigate();
 
   useEffect(() => {
-    if (!Capacitor.isNativePlatform()) {
+    // Early return if Capacitor is not available (web environment)
+    if (!Capacitor || !App || !Capacitor.isNativePlatform()) {
       return; // Only run on mobile
     }
 
