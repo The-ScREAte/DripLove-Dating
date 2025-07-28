@@ -21,8 +21,8 @@ export async function getPaymentConfig() {
 // Helper to get enabled countries as array of codes
 export async function getEnabledCountries(): Promise<string[]> {
   const config = await getPaymentConfig();
-  if (config && config.enabled_countries && Array.isArray(config.enabled_countries)) {
-    return config.enabled_countries.map(item => String(item));
+  if (config && Array.isArray(config.enabled_countries)) {
+    return config.enabled_countries;
   }
   return [];
 }
