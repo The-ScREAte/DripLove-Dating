@@ -190,28 +190,40 @@ const AdminPageComponent = ({ currentUser, onLogout }: AdminPageProps) => {
 
   const renderPaymentMethodsAdmin = () => (
     <>
-      <Button className="mb-4" onClick={() => setShowPaymentConfig(true)} disabled={loadingConfig}>
+      <Button
+        className="mb-4 bg-gradient-to-r from-yellow-400 via-yellow-500 to-orange-400 hover:from-yellow-500 hover:via-yellow-600 hover:to-orange-500 text-black font-bold py-2 px-6 rounded-xl shadow-md transition-all duration-200"
+        onClick={() => setShowPaymentConfig(true)}
+        disabled={loadingConfig}
+      >
         Configure Premium Payment Options
       </Button>
-      {loadingConfig && <div className="text-center text-sm text-gray-500 mb-2">Loading payment config...</div>}
+      {loadingConfig && (
+        <div className="text-center text-sm text-gray-500 mb-2">Loading payment config...</div>
+      )}
       {showPaymentConfig && !loadingConfig && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
-          <div className="bg-white rounded-lg shadow-lg p-6 w-full max-w-lg relative max-h-[90vh] overflow-y-auto">
-            <button onClick={() => setShowPaymentConfig(false)} className="absolute top-2 right-2 text-gray-400 hover:text-gray-600">✕</button>
-            <h2 className="text-xl font-bold mb-4">Configure Premium Payment</h2>
-            <div className="mb-4">
-              <label className="block font-medium mb-1">Default Premium Price (GHS)</label>
-              <Input value={premiumPrice} onChange={e => setPremiumPrice(e.target.value)} type="number" min="1" className="w-full" />
+          <div className="bg-white rounded-2xl shadow-2xl p-6 w-full max-w-2xl relative max-h-[90vh] overflow-y-auto border-2 border-yellow-300">
+            <button
+              onClick={() => setShowPaymentConfig(false)}
+              className="absolute top-3 right-3 text-gray-400 hover:text-gray-700 text-2xl font-bold transition-colors"
+              aria-label="Close"
+            >✕</button>
+            <h2 className="text-2xl font-bold mb-6 text-center text-yellow-600 flex items-center justify-center gap-2">
+              <span>⚙️</span> Configure Premium Payment
+            </h2>
+            <div className="mb-6">
+              <label className="block font-semibold mb-2 text-gray-700">Default Premium Price (GHS)</label>
+              <Input value={premiumPrice} onChange={e => setPremiumPrice(e.target.value)} type="number" min="1" className="w-full border-2 border-yellow-200 focus:border-yellow-400 rounded-lg" />
             </div>
-            <div className="mb-4">
-              <h3 className="font-semibold mb-2">Country-Specific Prices</h3>
-              <div className="space-y-2">
+            <div className="mb-6">
+              <h3 className="font-semibold mb-3 text-gray-800">Country-Specific Prices</h3>
+              <div className="space-y-3">
                 {countryPrices.map((entry, idx) => {
                   const countryOptions = getCountriesList();
                   const selectedCountry = countryOptions.find(c => c.code === entry.country);
                   const currency = selectedCountry ? getCountryByCode(selectedCountry.code)?.currency || '' : '';
                   return (
-                    <div key={idx} className="flex gap-2 items-center mb-1">
+                    <div key={idx} className="flex gap-2 items-center bg-yellow-50 rounded-lg p-2 border border-yellow-100 mb-1">
                       {/* Country dropdown */}
                       <select
                         value={entry.country}
@@ -220,7 +232,7 @@ const AdminPageComponent = ({ currentUser, onLogout }: AdminPageProps) => {
                           const countryObj = getCountryByCode(v);
                           setCountryPrices(prices => prices.map((p, i) => i === idx ? { ...p, country: v, currency: countryObj?.currency || '', price: p.price } : p));
                         }}
-                        className="w-1/3 border rounded px-2 py-1"
+                        className="w-1/3 border-2 border-yellow-200 rounded-lg px-2 py-1 focus:border-yellow-400 bg-white"
                       >
                         <option value="">Select Country</option>
                         {countryOptions.map(c => (
@@ -231,7 +243,7 @@ const AdminPageComponent = ({ currentUser, onLogout }: AdminPageProps) => {
                       <Input
                         value={entry.currency}
                         readOnly
-                        className="w-1/4 bg-gray-100 cursor-not-allowed"
+                        className="w-1/4 bg-gray-100 cursor-not-allowed border-2 border-yellow-100 rounded-lg"
                         placeholder="Currency"
                       />
                       {/* Price input */}
@@ -244,45 +256,47 @@ const AdminPageComponent = ({ currentUser, onLogout }: AdminPageProps) => {
                         type="number"
                         min="1"
                         placeholder="Price"
-                        className="w-1/4"
+                        className="w-1/4 border-2 border-yellow-200 rounded-lg focus:border-yellow-400"
                       />
                       {/* Delete button */}
-                      <Button size="icon" variant="ghost" onClick={() => setCountryPrices(prices => prices.filter((_, i) => i !== idx))}>
+                      <Button size="icon" variant="ghost" className="text-red-500 hover:bg-red-100" onClick={() => setCountryPrices(prices => prices.filter((_, i) => i !== idx))}>
                         ✕
                       </Button>
                     </div>
                   );
                 })}
-                <Button size="sm" variant="outline" className="mt-2" onClick={() => setCountryPrices(prices => [...prices, { country: '', currency: '', price: '' }])}>
+                <Button size="sm" variant="outline" className="mt-2 border-yellow-300 text-yellow-700 hover:bg-yellow-100" onClick={() => setCountryPrices(prices => [...prices, { country: '', currency: '', price: '' }])}>
                   + Add Country
                 </Button>
               </div>
             </div>
-            <div className="mb-4">
-              <h3 className="font-semibold mb-2">Payment Methods</h3>
+            <div className="mb-6">
+              <h3 className="font-semibold mb-3 text-gray-800">Payment Methods</h3>
               <div className="space-y-4">
                 {paymentMethods.map((method, idx) => (
-                  <div key={method.type} className="flex flex-col gap-2 border-b pb-2">
-                    <span className="font-medium capitalize">{method.label}</span>
+                  <div key={method.type} className="flex flex-col gap-2 border-b border-yellow-100 pb-3 bg-white rounded-lg p-3">
+                    <span className="font-medium capitalize text-yellow-700 text-base flex items-center gap-2">
+                      {method.type === 'momo' ? '📱' : '💳'} {method.label}
+                    </span>
                     {method.type === 'momo' ? (
                       <>
                         <Input
                           value={method.details}
                           onChange={e => handlePaymentMethodChange(idx, 'details', e.target.value)}
                           placeholder="MoMo Number"
-                          className="w-full"
+                          className="w-full border-2 border-yellow-200 rounded-lg focus:border-yellow-400"
                         />
                         <Input
                           value={method.name || ''}
                           onChange={e => handlePaymentMethodChange(idx, 'name', e.target.value)}
                           placeholder="MoMo Name"
-                          className="w-full"
+                          className="w-full border-2 border-yellow-200 rounded-lg focus:border-yellow-400"
                         />
                         <Input
                           value={method.extra || ''}
                           onChange={e => handlePaymentMethodChange(idx, 'extra', e.target.value)}
                           placeholder="MoMo Provider/Network (optional)"
-                          className="w-full"
+                          className="w-full border-2 border-yellow-200 rounded-lg focus:border-yellow-400"
                         />
                       </>
                     ) : (
@@ -291,13 +305,13 @@ const AdminPageComponent = ({ currentUser, onLogout }: AdminPageProps) => {
                           value={method.details}
                           onChange={e => handlePaymentMethodChange(idx, 'details', e.target.value)}
                           placeholder="Card/Account Details"
-                          className="w-full"
+                          className="w-full border-2 border-yellow-200 rounded-lg focus:border-yellow-400"
                         />
                         <Input
                           value={method.extra || ''}
                           onChange={e => handlePaymentMethodChange(idx, 'extra', e.target.value)}
                           placeholder="Bank Name/Info (optional)"
-                          className="w-full"
+                          className="w-full border-2 border-yellow-200 rounded-lg focus:border-yellow-400"
                         />
                       </>
                     )}
@@ -305,18 +319,25 @@ const AdminPageComponent = ({ currentUser, onLogout }: AdminPageProps) => {
                 ))}
               </div>
             </div>
-            <Button onClick={handleSavePaymentConfig} className="w-full bg-pink-600 text-white mt-2">Save</Button>
+            <Button
+              onClick={handleSavePaymentConfig}
+              className="w-full bg-gradient-to-r from-yellow-400 via-yellow-500 to-orange-400 hover:from-yellow-500 hover:via-yellow-600 hover:to-orange-500 text-black font-bold py-3 rounded-xl text-lg shadow-xl transition-all duration-200"
+            >
+              Save Changes
+            </Button>
           </div>
         </div>
       )}
 
       {/* Show saved payment methods below the form */}
-      <div className="mt-8">
-        <h3 className="font-semibold mb-2">Saved Payment Accounts (Receiving)</h3>
-        <div className="space-y-2">
+      <div className="mt-10">
+        <h3 className="font-semibold mb-3 text-gray-800">Saved Payment Accounts (Receiving)</h3>
+        <div className="space-y-3">
           {paymentMethods.map((method, idx) => (
-            <div key={method.type + idx} className="border rounded p-3 bg-gray-50">
-              <span className="font-bold capitalize">{method.label} Account</span>
+            <div key={method.type + idx} className="border border-yellow-200 rounded-xl p-4 bg-yellow-50 flex flex-col gap-1 shadow-sm">
+              <span className="font-bold capitalize text-yellow-700 text-base flex items-center gap-2">
+                {method.type === 'momo' ? '📱' : '💳'} {method.label} Account
+              </span>
               {method.type === 'momo' ? (
                 <div className="text-sm mt-1">
                   <div>MoMo Name: <span className="font-mono">{method.name}</span></div>
