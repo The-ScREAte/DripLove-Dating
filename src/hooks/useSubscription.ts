@@ -84,7 +84,9 @@ export const useSubscription = (userId: string | undefined) => {
   };
 
   const isPremium = () => {
-    return subscription?.plan_name === 'premium';
+    // Handle both array and object formats from the RPC function
+    const sub = Array.isArray(subscription) ? subscription[0] : subscription;
+    return sub?.plan_name === 'premium';
   };
 
   const canUseFeature = (feature: 'swipe' | 'reverse_dislike' | 'liked_me_full') => {
