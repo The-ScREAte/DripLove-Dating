@@ -15,16 +15,26 @@ serve(async (req) => {
   }
 
   try {
-    // Use service role key to call the cancel function
+    // Create supabase client with service role for authentication
     const supabaseClient = createClient(
       Deno.env.get('SUPABASE_URL') ?? '',
-      Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? '',
-      { global: { headers: { Authorization: req.headers.get('Authorization')! } } }
+      Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
     );
 
-    // Get the current user
-    const { data: { user } } = await supabaseClient.auth.getUser();
-    if (!user) {
+    // Get user from the authorization header
+    const authHeader = req.headers.get('Authorization');
+    if (!authHeader) {
+      return new Response(JSON.stringify({ error: 'No authorization header' }), { status: 401, headers: corsHeaders });
+    }
+
+    // Create client for user authentication
+    const userClient = createClient(
+      Deno.env.get('SUPABASE_URL') ?? '',
+      Deno.env.get('SUPABASE_ANON_KEY') ?? ''
+    );
+
+    const { data: { user }, error: userError } = await userClient.auth.getUser(authHeader.replace('Bearer ', ''));
+    if (userError || !user) {
       return new Response(JSON.stringify({ error: 'Not authenticated' }), { status: 401, headers: corsHeaders });
     }
 

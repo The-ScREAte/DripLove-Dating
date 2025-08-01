@@ -26,7 +26,7 @@ const AccountActions = ({ currentUser, onLogout, onShowTerms, onShowPrivacy, hid
   const [password, setPassword] = useState('');
   const [passwordError, setPasswordError] = useState('');
   const { toast } = useToast();
-  const { isPremium } = useSubscription(currentUser?.id);
+  const { isPremium, subscription } = useSubscription(currentUser?.id);
   const navigate = useNavigate();
 
   const handleLogout = async () => {
@@ -160,8 +160,8 @@ const AccountActions = ({ currentUser, onLogout, onShowTerms, onShowPrivacy, hid
             </div>
           </>
         )}
-        {/* Cancel Subscription (only if premium) */}
-        {isPremium() && (
+        {/* Cancel Subscription (only if premium and active) */}
+        {isPremium() && subscription && Array.isArray(subscription) && subscription[0]?.status === 'active' && (
           <div className="flex flex-col sm:flex-row gap-4 mt-4">
             <Button
               variant="outline"
