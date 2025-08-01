@@ -9,6 +9,9 @@ import { LogOut, AlertTriangle, Mail } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 
+import { useSubscription } from '@/hooks/useSubscription';
+import { useNavigate } from 'react-router-dom';
+
 interface AccountActionsProps {
   currentUser: any;
   onLogout: () => void;
@@ -23,6 +26,8 @@ const AccountActions = ({ currentUser, onLogout, onShowTerms, onShowPrivacy, hid
   const [password, setPassword] = useState('');
   const [passwordError, setPasswordError] = useState('');
   const { toast } = useToast();
+  const { isPremium } = useSubscription(currentUser?.id);
+  const navigate = useNavigate();
 
   const handleLogout = async () => {
     try {
@@ -154,6 +159,18 @@ const AccountActions = ({ currentUser, onLogout, onShowTerms, onShowPrivacy, hid
               </Button>
             </div>
           </>
+        )}
+        {/* Cancel Subscription (only if premium) */}
+        {isPremium() && (
+          <div className="flex flex-col sm:flex-row gap-4 mt-4">
+            <Button
+              variant="outline"
+              className="flex items-center justify-center space-x-2 w-full sm:w-auto border-red-400 text-red-600 hover:bg-red-50"
+              onClick={() => navigate('/unsubscribe')}
+            >
+              Cancel Subscription
+            </Button>
+          </div>
         )}
         {/* Delete Account always visible */}
         <div className="flex flex-col sm:flex-row gap-4 mt-4">
