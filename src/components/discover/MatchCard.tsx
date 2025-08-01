@@ -195,6 +195,42 @@ const MatchCard: React.FC<MatchCardProps> = ({
     return 'rgba(239, 68, 68, 0.8)';
   };
 
+  // Report image modal state
+  const [showReportModal, setShowReportModal] = useState(false);
+  const [reporting, setReporting] = useState(false);
+  const [reportSuccess, setReportSuccess] = useState(false);
+  const [reportError, setReportError] = useState("");
+
+  // Handle report submit
+  const handleReportImage = async () => {
+    setReporting(true);
+    setReportError("");
+    try {
+      // Call a global function if available, or fallback to window.supabase
+      const supabaseClient = (window as any).supabase || undefined;
+      const supabase = supabaseClient || (await import("@/integrations/supabase/client")).supabase;
+      const imageUrl = slides[currentSlide]?.content;
+      if (!imageUrl || !match.id) throw new Error("Missing image or user");
+      // Insert into reported_images table
+      const { error } = await supabase.from("reported_images").insert({
+        reported_user_id: match.id,
+        image_url: imageUrl,
+        status: "pending",
+        reported_at: new Date().toISOString(),
+      });
+      if (error) throw error;
+      setReportSuccess(true);
+      setTimeout(() => {
+        setShowReportModal(false);
+        setReportSuccess(false);
+      }, 1500);
+    } catch (err: any) {
+      setReportError(err.message || "Failed to report image");
+    } finally {
+      setReporting(false);
+    }
+  };
+
   // Handle split rendering modes
   if (isSwipeAreaOnly) {
     // Render only the swipeable image area
@@ -205,6 +241,19 @@ const MatchCard: React.FC<MatchCardProps> = ({
           {/* Current slide content */}
           {slides.length > 0 && (
             <div className="w-full h-full transition-all duration-300 ease-in-out">
+              {/* Report button for image slides - always visible, lower and more visible */}
+              {slides[currentSlide]?.type === 'image' && (
+                <div className="absolute right-3 top-20 z-5 flex flex-col items-end">
+                  <button
+                    className="bg-white/95 hover:bg-red-80 text-red-600 rounded-full p-1.5 shadow-lg transition-colors border border-red-200 focus:outline-none focus:ring-2 focus:ring-red-300"
+                    style={{backdropFilter: 'blur(2px)', width: 36, height: 36, minWidth: 36, minHeight: 36, display: 'flex', alignItems: 'center', justifyContent: 'center'}}
+                    onClick={e => { e.stopPropagation(); setShowReportModal(true); }}
+                    aria-label="Report image"
+                  >
+                    <svg xmlns="http://www.w3.org/2000/svg" className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01M21 12c0 4.97-4.03 9-9 9s-9-4.03-9-9 4.03-9 9-9 9 4.03 9 9z" /></svg>
+                  </button>
+                </div>
+              )}
               {slides[currentSlide]?.type === 'image' ? (
                 <img
                   src={slides[currentSlide].content}
@@ -298,6 +347,40 @@ const MatchCard: React.FC<MatchCardProps> = ({
                   }`}
                 />
               ))}
+            </div>
+          )}
+
+          {/* Report Modal */}
+          {showReportModal && (
+            <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/30" onClick={() => setShowReportModal(false)}>
+              <div className="bg-white rounded-xl shadow-2xl p-6 max-w-xs w-full relative" onClick={e => e.stopPropagation()}>
+                <h3 className="text-lg font-bold mb-2 text-red-600">Report Image</h3>
+                <p className="text-gray-700 mb-4 text-sm">Are you sure you want to report this image as inappropriate?</p>
+                {reportSuccess ? (
+                  <div className="text-green-600 font-semibold text-center py-2">Reported! Thank you.</div>
+                ) : (
+                  <>
+                    <button
+                      className="w-full bg-red-500 hover:bg-red-600 text-white font-bold py-2 rounded mb-2 disabled:opacity-60 transition-none"
+                      style={{ minHeight: 44, height: 44, minWidth: 120, width: '100%', fontVariantNumeric: 'tabular-nums', letterSpacing: 0, fontFamily: 'inherit' }}
+                      onClick={handleReportImage}
+                      disabled={reporting}
+                    >
+                      <span style={{ display: 'inline-block', width: 100, textAlign: 'center' }}>
+                        {reporting ? 'Reporting...' : 'Yes, Report'}
+                      </span>
+                    </button>
+                    <button
+                      className="w-full bg-gray-200 hover:bg-gray-300 text-gray-800 font-semibold py-2 rounded"
+                      onClick={() => setShowReportModal(false)}
+                      disabled={reporting}
+                    >
+                      Cancel
+                    </button>
+                    {reportError && <div className="text-red-500 text-xs mt-2 text-center">{reportError}</div>}
+                  </>
+                )}
+              </div>
             </div>
           )}
         </div>

@@ -957,7 +957,6 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, isPremium }: DiscoverPage
             }
           `}</style>
           <div className="bg-white rounded-2xl px-7 py-7 flex flex-col items-center shadow-xl" style={{ maxWidth: 340, opacity: 0.98 }}>
-            <div className="text-2xl font-bold text-gray-900 mb-4">How to Swipe</div>
             <div className="flex flex-row gap-8 mb-2">
               {/* Swipe Left */}
               <div className="flex flex-col items-center">
@@ -974,7 +973,6 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, isPremium }: DiscoverPage
                 <span className="text-sm text-green-600 mt-1">Like</span>
               </div>
             </div>
-            <div className="mt-3 text-center text-gray-700 text-base font-medium">Tap anywhere to dismiss</div>
           </div>
         </div>
       )}
