@@ -1,6 +1,6 @@
 
 import React, { useState } from 'react';
-import FlwPaymentModal from './FlwPaymentModal';
+import PaystackPaymentModal from './PaystackPaymentModal';
 import { getPremiumPaymentConfig } from '@/utils/paymentConfig';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -72,6 +72,7 @@ const PremiumUpgrade = ({ currentUser, onClose, preselectedPlan }: PremiumUpgrad
       });
       return;
     }
+    // Optionally, you can let user pick method if >1, or just use the first
     setShowPaymentModal(true);
   };
 
@@ -235,13 +236,13 @@ const PremiumUpgrade = ({ currentUser, onClose, preselectedPlan }: PremiumUpgrad
       </div>
 
       {/* Payment Modal */}
-      <FlwPaymentModal
+      <PaystackPaymentModal
         isOpen={showPaymentModal}
         onClose={() => setShowPaymentModal(false)}
         amount={parseFloat(price)}
         email={currentUser?.email || ''}
-        paymentMethods={paymentMethods}
         onSuccess={handlePaymentSuccess}
+        paymentMethod={paymentMethods[0]?.type || 'card'}
       />
     </div>
   );
