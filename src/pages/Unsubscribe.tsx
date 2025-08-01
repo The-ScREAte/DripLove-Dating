@@ -25,7 +25,7 @@ const Unsubscribe: React.FC = () => {
         title: 'Subscription Cancelled',
         description: 'Your premium subscription has been cancelled. You will retain access until the end of your billing period.',
       });
-      navigate('/profile');
+      navigate('/');
     } catch (err: any) {
       setError(err.message || 'Failed to cancel subscription.');
     } finally {
@@ -54,7 +54,7 @@ const Unsubscribe: React.FC = () => {
         </Button>
         <Button
           variant="outline"
-          onClick={() => navigate('/profile')}
+          onClick={() => navigate('/')}
           className="w-full mt-2"
         >
           Cancel
