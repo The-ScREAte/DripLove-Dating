@@ -200,9 +200,24 @@ const MatchCard: React.FC<MatchCardProps> = ({
   const [reporting, setReporting] = useState(false);
   const [reportSuccess, setReportSuccess] = useState(false);
   const [reportError, setReportError] = useState("");
+  const [selectedReason, setSelectedReason] = useState("");
+
+  const reportReasons = [
+    "Inappropriate content",
+    "Nudity or sexual content", 
+    "Spam or fake profile",
+    "Harassment or bullying",
+    "Violence or threats",
+    "Other"
+  ];
 
   // Handle report submit
   const handleReportImage = async () => {
+    if (!selectedReason) {
+      setReportError("Please select a reason for reporting");
+      return;
+    }
+    
     setReporting(true);
     setReportError("");
     try {
@@ -220,19 +235,27 @@ const MatchCard: React.FC<MatchCardProps> = ({
         reported_user_id: match.id,
         image_url: imageUrl,
         status: "pending",
-        reason: "Inappropriate content"
+        reason: selectedReason
       });
       if (error) throw error;
       setReportSuccess(true);
       setTimeout(() => {
         setShowReportModal(false);
         setReportSuccess(false);
+        setSelectedReason("");
       }, 1500);
     } catch (err: any) {
       setReportError(err.message || "Failed to report image");
     } finally {
       setReporting(false);
     }
+  };
+
+  // Reset modal state when closing
+  const closeReportModal = () => {
+    setShowReportModal(false);
+    setSelectedReason("");
+    setReportError("");
   };
 
   // Handle split rendering modes
@@ -358,32 +381,78 @@ const MatchCard: React.FC<MatchCardProps> = ({
 
           {/* Report Modal */}
           {showReportModal && (
-            <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/30" onClick={() => setShowReportModal(false)}>
-              <div className="bg-white rounded-xl shadow-2xl p-6 max-w-xs w-full relative" onClick={e => e.stopPropagation()}>
-                <h3 className="text-lg font-bold mb-2 text-red-600">Report Image</h3>
-                <p className="text-gray-700 mb-4 text-sm">Are you sure you want to report this image as inappropriate?</p>
+            <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/50 backdrop-blur-sm" onClick={closeReportModal}>
+              <div className="bg-white rounded-2xl shadow-2xl p-6 max-w-sm w-full mx-4 relative" onClick={e => e.stopPropagation()}>
+                {/* Close X button */}
+                <button
+                  onClick={closeReportModal}
+                  className="absolute top-4 right-4 text-gray-400 hover:text-gray-600 transition-colors"
+                  disabled={reporting}
+                >
+                  <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                  </svg>
+                </button>
+
+                <h3 className="text-xl font-bold mb-4 text-red-600 pr-8">Report Image</h3>
+                
                 {reportSuccess ? (
-                  <div className="text-green-600 font-semibold text-center py-2">Reported! Thank you.</div>
+                  <div className="text-green-600 font-semibold text-center py-8">
+                    <div className="mb-2">✓</div>
+                    <div>Reported! Thank you.</div>
+                  </div>
                 ) : (
                   <>
-                    <button
-                      className="w-full bg-red-500 hover:bg-red-600 text-white font-bold py-2 rounded mb-2 disabled:opacity-60 transition-none"
-                      style={{ minHeight: 44, height: 44, minWidth: 120, width: '100%', fontVariantNumeric: 'tabular-nums', letterSpacing: 0, fontFamily: 'inherit' }}
-                      onClick={handleReportImage}
-                      disabled={reporting}
-                    >
-                      <span style={{ display: 'inline-block', width: 100, textAlign: 'center' }}>
-                        {reporting ? 'Reporting...' : 'Yes, Report'}
-                      </span>
-                    </button>
-                    <button
-                      className="w-full bg-gray-200 hover:bg-gray-300 text-gray-800 font-semibold py-2 rounded"
-                      onClick={() => setShowReportModal(false)}
-                      disabled={reporting}
-                    >
-                      Cancel
-                    </button>
-                    {reportError && <div className="text-red-500 text-xs mt-2 text-center">{reportError}</div>}
+                    <p className="text-gray-700 mb-4 text-sm">Please select a reason for reporting this image:</p>
+                    
+                    {/* Reason selection */}
+                    <div className="space-y-2 mb-6">
+                      {reportReasons.map((reason) => (
+                        <button
+                          key={reason}
+                          onClick={() => setSelectedReason(reason)}
+                          disabled={reporting}
+                          className={`w-full text-left p-3 rounded-lg border-2 transition-all ${
+                            selectedReason === reason
+                              ? 'border-red-500 bg-red-50 text-red-700'
+                              : 'border-gray-200 bg-gray-50 text-gray-700 hover:border-gray-300'
+                          } ${reporting ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer'}`}
+                        >
+                          <div className="flex items-center justify-between">
+                            <span className="text-sm font-medium">{reason}</span>
+                            {selectedReason === reason && (
+                              <svg className="w-5 h-5 text-red-500" fill="currentColor" viewBox="0 0 20 20">
+                                <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
+                              </svg>
+                            )}
+                          </div>
+                        </button>
+                      ))}
+                    </div>
+
+                    {/* Action buttons */}
+                    <div className="space-y-3">
+                      <button
+                        className="w-full bg-red-500 hover:bg-red-600 text-white font-bold py-3 rounded-lg disabled:opacity-60 disabled:cursor-not-allowed transition-colors"
+                        onClick={handleReportImage}
+                        disabled={reporting || !selectedReason}
+                      >
+                        {reporting ? 'Reporting...' : 'Report Image'}
+                      </button>
+                      <button
+                        className="w-full bg-gray-200 hover:bg-gray-300 text-gray-800 font-semibold py-3 rounded-lg disabled:opacity-60 disabled:cursor-not-allowed transition-colors"
+                        onClick={closeReportModal}
+                        disabled={reporting}
+                      >
+                        Cancel
+                      </button>
+                    </div>
+                    
+                    {reportError && (
+                      <div className="text-red-500 text-sm mt-3 text-center bg-red-50 p-2 rounded-lg">
+                        {reportError}
+                      </div>
+                    )}
                   </>
                 )}
               </div>
