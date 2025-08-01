@@ -16,6 +16,7 @@ import UserModerationPanel from './admin/UserModerationPanel';
 import AdminErrorBoundary from './admin/AdminErrorBoundary';
 import UserPoolDebugger from './admin/UserPoolDebugger';
 import CountryManagement from './admin/CountryManagement';
+import ImageModerationPanel from './admin/ImageModerationPanel';
 import { debounce, userDataCache, createPagination } from '@/utils/performanceOptimizer';
 import { useSupabaseSubscription, useMemoryMonitor } from '@/hooks/usePerformance';
 import { CurrentUser, AdminStats } from '@/types';
@@ -1219,95 +1220,9 @@ const AdminPageComponent = ({ currentUser, onLogout }: AdminPageProps) => {
               </Card>
             </TabsContent>
 
-            {/* Content Tab */}
+            {/* Content Tab - Image Moderation */}
             <TabsContent value="content" className="space-y-4">
-              {/* Pending Images Management */}
-              <Card>
-                <CardHeader className="pb-3">
-                  <CardTitle className="flex items-center justify-between text-lg">
-                    <div className="flex items-center gap-2">
-                      <Image className="w-5 h-5" />
-                      Pending Images ({pendingImages.length})
-                    </div>
-                    <Button
-                      onClick={async () => {
-                        toast({ title: "Bulk approval started", description: "Approving all existing images..." });
-                        await bulkApproveExistingImages();
-                        await fetchPendingImages();
-                        toast({ title: "✅ Bulk approval complete", description: "All appropriate images have been approved." });
-                      }}
-                      variant="outline"
-                      size="sm"
-                      className="text-xs"
-                    >
-                      🔧 Bulk Approve All
-                    </Button>
-                  </CardTitle>
-                </CardHeader>
-                <CardContent>
-                  {loadingPendingImages ? (
-                    <div className="flex justify-center py-8">
-                      <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-pink-600"></div>
-                    </div>
-                  ) : pendingImages.length === 0 ? (
-                    <div className="text-center py-8 text-gray-500 text-sm">
-                      No pending images to review.
-                    </div>
-                  ) : (
-                    <div className="space-y-4 max-h-96 overflow-y-auto">
-                      {pendingImages.map((image) => (
-                        <div key={image.id} className="border rounded-lg p-4 bg-gray-50">
-                          <div className="flex items-start gap-4">
-                            <div className="flex-shrink-0">
-                              <img
-                                src={image.image_url}
-                                alt="Pending image"
-                                className="w-20 h-20 object-cover rounded-lg border"
-                              />
-                            </div>
-                            <div className="flex-1 min-w-0">
-                              <h4 className="font-medium text-sm">
-                                {image.profile?.first_name} {image.profile?.last_name}
-                              </h4>
-                              <p className="text-xs text-gray-600">{image.profile?.email}</p>
-                              <p className="text-xs text-gray-500 mt-1">
-                                Uploaded: {new Date(image.created_at).toLocaleDateString()}
-                              </p>
-                              <p className="text-xs text-gray-500">
-                                Status: <span className="font-medium">{image.moderation_status}</span>
-                              </p>
-                              {image.moderation_notes && (
-                                <p className="text-xs text-orange-600 mt-1">
-                                  Note: {image.moderation_notes}
-                                </p>
-                              )}
-                            </div>
-                            <div className="flex flex-col gap-2">
-                              <Button
-                                size="sm"
-                                onClick={() => approveImage(image.id)}
-                                disabled={approvingImages[image.id]}
-                                className="bg-green-600 hover:bg-green-700 text-white text-xs px-3 py-1 h-8"
-                              >
-                                {approvingImages[image.id] ? 'Approving...' : 'Approve'}
-                              </Button>
-                              <Button
-                                size="sm"
-                                variant="outline"
-                                onClick={() => rejectImage(image.id)}
-                                disabled={rejectingImages[image.id]}
-                                className="text-red-600 hover:text-red-700 border-red-300 hover:bg-red-50 text-xs px-3 py-1 h-8"
-                              >
-                                {rejectingImages[image.id] ? 'Rejecting...' : 'Reject'}
-                              </Button>
-                            </div>
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-                  )}
-                </CardContent>
-              </Card>
+              <ImageModerationPanel />
             </TabsContent>
 
             {/* Debugger Tab */}

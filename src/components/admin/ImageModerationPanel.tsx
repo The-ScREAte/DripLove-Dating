@@ -1,0 +1,504 @@
+import React, { useState, useEffect, useCallback } from 'react';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Button } from '@/components/ui/button';
+import { Badge } from '@/components/ui/badge';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { useToast } from '@/hooks/use-toast';
+import { supabase } from '@/integrations/supabase/client';
+import { Eye, Trash2, CheckCircle, XCircle, Clock, AlertTriangle, User } from 'lucide-react';
+
+interface PendingImage {
+  id: string;
+  image_url: string;
+  is_approved: boolean;
+  moderation_status: string;
+  moderation_notes?: string;
+  created_at: string;
+  user_id: string;
+  profile?: {
+    first_name: string;
+    last_name: string;
+    email: string;
+  };
+}
+
+interface ReportedImage {
+  id: string;
+  reporter_id: string;
+  reported_user_id: string;
+  image_url: string;
+  reason: string;
+  status: string;
+  reported_at: string;
+  reviewed_by?: string;
+  reviewed_at?: string;
+  admin_notes?: string;
+  reporter_profile?: {
+    first_name: string;
+    last_name: string;
+    email: string;
+  };
+  reported_user_profile?: {
+    first_name: string;
+    last_name: string;
+    email: string;
+  };
+}
+
+const ImageModerationPanel = () => {
+  const [pendingImages, setPendingImages] = useState<PendingImage[]>([]);
+  const [reportedImages, setReportedImages] = useState<ReportedImage[]>([]);
+  const [loadingPending, setLoadingPending] = useState(false);
+  const [loadingReported, setLoadingReported] = useState(false);
+  const [approvingImages, setApprovingImages] = useState<Record<string, boolean>>({});
+  const [rejectingImages, setRejectingImages] = useState<Record<string, boolean>>({});
+  const [processingReports, setProcessingReports] = useState<Record<string, boolean>>({});
+  const { toast } = useToast();
+
+  const fetchPendingImages = useCallback(async () => {
+    try {
+      setLoadingPending(true);
+      const { data, error } = await supabase
+        .from('user_images')
+        .select(`
+          id,
+          image_url,
+          is_approved,
+          moderation_status,
+          moderation_notes,
+          created_at,
+          user_id
+        `)
+        .or('is_approved.eq.false,moderation_status.eq.pending')
+        .order('created_at', { ascending: false })
+        .limit(50);
+
+      if (error) throw error;
+
+      // Fetch user profiles for these images
+      if (data && data.length > 0) {
+        const userIds = [...new Set(data.map(img => img.user_id))];
+        const { data: profiles, error: profilesError } = await supabase
+          .from('profiles')
+          .select('id, first_name, last_name, email')
+          .in('id', userIds);
+
+        if (profilesError) throw profilesError;
+
+        const imagesWithProfiles = data.map(img => ({
+          ...img,
+          profile: profiles?.find(p => p.id === img.user_id)
+        }));
+
+        setPendingImages(imagesWithProfiles);
+      } else {
+        setPendingImages([]);
+      }
+    } catch (error) {
+      console.error('Error fetching pending images:', error);
+      toast({
+        title: 'Error',
+        description: 'Failed to load pending images',
+        variant: 'destructive'
+      });
+    } finally {
+      setLoadingPending(false);
+    }
+  }, [toast]);
+
+  const fetchReportedImages = useCallback(async () => {
+    try {
+      setLoadingReported(true);
+      const { data, error } = await supabase
+        .from('reported_images')
+        .select('*')
+        .order('reported_at', { ascending: false })
+        .limit(50);
+
+      if (error) throw error;
+
+      // Fetch profiles for reporters and reported users
+      if (data && data.length > 0) {
+        const reporterIds = [...new Set(data.map(img => img.reporter_id))];
+        const reportedUserIds = [...new Set(data.map(img => img.reported_user_id))];
+        const allUserIds = [...new Set([...reporterIds, ...reportedUserIds])];
+
+        const { data: profiles, error: profilesError } = await supabase
+          .from('profiles')
+          .select('id, first_name, last_name, email')
+          .in('id', allUserIds);
+
+        if (profilesError) throw profilesError;
+
+        const reportsWithProfiles = data.map(report => ({
+          ...report,
+          reporter_profile: profiles?.find(p => p.id === report.reporter_id),
+          reported_user_profile: profiles?.find(p => p.id === report.reported_user_id)
+        }));
+
+        setReportedImages(reportsWithProfiles);
+      } else {
+        setReportedImages([]);
+      }
+    } catch (error) {
+      console.error('Error fetching reported images:', error);
+      toast({
+        title: 'Error',
+        description: 'Failed to load reported images',
+        variant: 'destructive'
+      });
+    } finally {
+      setLoadingReported(false);
+    }
+  }, [toast]);
+
+  useEffect(() => {
+    fetchPendingImages();
+    fetchReportedImages();
+  }, [fetchPendingImages, fetchReportedImages]);
+
+  const handleApproveImage = async (imageId: string) => {
+    try {
+      setApprovingImages(prev => ({ ...prev, [imageId]: true }));
+
+      const { error } = await supabase.rpc('approve_image', {
+        image_id: imageId,
+        admin_notes: 'Approved by admin'
+      });
+
+      if (error) throw error;
+
+      toast({
+        title: 'Success',
+        description: 'Image approved successfully'
+      });
+
+      fetchPendingImages();
+    } catch (error) {
+      console.error('Error approving image:', error);
+      toast({
+        title: 'Error',
+        description: 'Failed to approve image',
+        variant: 'destructive'
+      });
+    } finally {
+      setApprovingImages(prev => ({ ...prev, [imageId]: false }));
+    }
+  };
+
+  const handleRejectImage = async (imageId: string) => {
+    try {
+      setRejectingImages(prev => ({ ...prev, [imageId]: true }));
+
+      const { error } = await supabase.rpc('reject_image', {
+        image_id: imageId,
+        admin_notes: 'Rejected by admin - inappropriate content'
+      });
+
+      if (error) throw error;
+
+      toast({
+        title: 'Success',
+        description: 'Image rejected and removed'
+      });
+
+      fetchPendingImages();
+    } catch (error) {
+      console.error('Error rejecting image:', error);
+      toast({
+        title: 'Error',
+        description: 'Failed to reject image',
+        variant: 'destructive'
+      });
+    } finally {
+      setRejectingImages(prev => ({ ...prev, [imageId]: false }));
+    }
+  };
+
+  const handleIgnoreReport = async (reportId: string) => {
+    try {
+      setProcessingReports(prev => ({ ...prev, [reportId]: true }));
+
+      const { error } = await supabase
+        .from('reported_images')
+        .update({
+          status: 'ignored',
+          reviewed_by: (await supabase.auth.getUser()).data.user?.id,
+          reviewed_at: new Date().toISOString(),
+          admin_notes: 'Report reviewed and ignored by admin'
+        })
+        .eq('id', reportId);
+
+      if (error) throw error;
+
+      toast({
+        title: 'Success',
+        description: 'Report ignored successfully'
+      });
+
+      fetchReportedImages();
+    } catch (error) {
+      console.error('Error ignoring report:', error);
+      toast({
+        title: 'Error',
+        description: 'Failed to ignore report',
+        variant: 'destructive'
+      });
+    } finally {
+      setProcessingReports(prev => ({ ...prev, [reportId]: false }));
+    }
+  };
+
+  const handleDeleteReportedImage = async (reportId: string, imageUrl: string, reportedUserId: string) => {
+    try {
+      setProcessingReports(prev => ({ ...prev, [reportId]: true }));
+
+      // First delete the image from user_images table
+      const { error: deleteImageError } = await supabase
+        .from('user_images')
+        .delete()
+        .eq('image_url', imageUrl)
+        .eq('user_id', reportedUserId);
+
+      if (deleteImageError) throw deleteImageError;
+
+      // Then update the report status
+      const { error: updateReportError } = await supabase
+        .from('reported_images')
+        .update({
+          status: 'resolved',
+          reviewed_by: (await supabase.auth.getUser()).data.user?.id,
+          reviewed_at: new Date().toISOString(),
+          admin_notes: 'Image deleted by admin due to report'
+        })
+        .eq('id', reportId);
+
+      if (updateReportError) throw updateReportError;
+
+      toast({
+        title: 'Success',
+        description: 'Reported image deleted successfully'
+      });
+
+      fetchReportedImages();
+      fetchPendingImages(); // Refresh pending images too
+    } catch (error) {
+      console.error('Error deleting reported image:', error);
+      toast({
+        title: 'Error',
+        description: 'Failed to delete reported image',
+        variant: 'destructive'
+      });
+    } finally {
+      setProcessingReports(prev => ({ ...prev, [reportId]: false }));
+    }
+  };
+
+  const getStatusBadge = (status: string) => {
+    switch (status) {
+      case 'pending':
+        return <Badge variant="secondary" className="bg-yellow-100 text-yellow-800"><Clock className="w-3 h-3 mr-1" />Pending</Badge>;
+      case 'resolved':
+        return <Badge variant="secondary" className="bg-green-100 text-green-800"><CheckCircle className="w-3 h-3 mr-1" />Resolved</Badge>;
+      case 'ignored':
+        return <Badge variant="secondary" className="bg-gray-100 text-gray-800"><XCircle className="w-3 h-3 mr-1" />Ignored</Badge>;
+      default:
+        return <Badge variant="secondary">{status}</Badge>;
+    }
+  };
+
+  return (
+    <div className="space-y-6">
+      <div className="flex items-center gap-2">
+        <Eye className="w-5 h-5 text-blue-600" />
+        <h2 className="text-xl font-semibold">Image Moderation</h2>
+      </div>
+
+      <Tabs defaultValue="pending" className="w-full">
+        <TabsList className="grid w-full grid-cols-2">
+          <TabsTrigger value="pending" className="flex items-center gap-2">
+            <Clock className="w-4 h-4" />
+            Pending Approval ({pendingImages.length})
+          </TabsTrigger>
+          <TabsTrigger value="reported" className="flex items-center gap-2">
+            <AlertTriangle className="w-4 h-4" />
+            Reported Images ({reportedImages.filter(r => r.status === 'pending').length})
+          </TabsTrigger>
+        </TabsList>
+
+        <TabsContent value="pending" className="mt-6">
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <Clock className="w-5 h-5" />
+                Images Pending Approval
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              {loadingPending ? (
+                <div className="text-center py-8">Loading pending images...</div>
+              ) : pendingImages.length === 0 ? (
+                <div className="text-center py-8 text-gray-500">No images pending approval</div>
+              ) : (
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                  {pendingImages.map((image) => (
+                    <Card key={image.id} className="border-yellow-200">
+                      <CardContent className="p-4">
+                        <div className="relative mb-3">
+                          <img
+                            src={image.image_url}
+                            alt="Pending approval"
+                            className="w-full h-40 object-cover rounded-lg"
+                          />
+                          <Badge className="absolute top-2 right-2 bg-yellow-500">
+                            Pending
+                          </Badge>
+                        </div>
+                        
+                        <div className="space-y-2 mb-3">
+                          <div className="flex items-center gap-2 text-sm">
+                            <User className="w-4 h-4" />
+                            <span className="font-medium">
+                              {image.profile ? 
+                                `${image.profile.first_name} ${image.profile.last_name}` : 
+                                'Unknown User'
+                              }
+                            </span>
+                          </div>
+                          <div className="text-xs text-gray-500">
+                            Uploaded: {new Date(image.created_at).toLocaleDateString()}
+                          </div>
+                        </div>
+
+                        <div className="flex gap-2">
+                          <Button
+                            size="sm"
+                            className="flex-1 bg-green-600 hover:bg-green-700"
+                            onClick={() => handleApproveImage(image.id)}
+                            disabled={approvingImages[image.id]}
+                          >
+                            <CheckCircle className="w-4 h-4 mr-1" />
+                            {approvingImages[image.id] ? 'Approving...' : 'Approve'}
+                          </Button>
+                          <Button
+                            size="sm"
+                            variant="destructive"
+                            className="flex-1"
+                            onClick={() => handleRejectImage(image.id)}
+                            disabled={rejectingImages[image.id]}
+                          >
+                            <Trash2 className="w-4 h-4 mr-1" />
+                            {rejectingImages[image.id] ? 'Rejecting...' : 'Reject'}
+                          </Button>
+                        </div>
+                      </CardContent>
+                    </Card>
+                  ))}
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        <TabsContent value="reported" className="mt-6">
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <AlertTriangle className="w-5 h-5" />
+                Reported Images
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              {loadingReported ? (
+                <div className="text-center py-8">Loading reported images...</div>
+              ) : reportedImages.length === 0 ? (
+                <div className="text-center py-8 text-gray-500">No reported images</div>
+              ) : (
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                  {reportedImages.map((report) => (
+                    <Card key={report.id} className="border-red-200">
+                      <CardContent className="p-4">
+                        <div className="relative mb-3">
+                          <img
+                            src={report.image_url}
+                            alt="Reported content"
+                            className="w-full h-40 object-cover rounded-lg"
+                          />
+                          {getStatusBadge(report.status)}
+                        </div>
+                        
+                        <div className="space-y-2 mb-3">
+                          <div className="text-sm">
+                            <div className="font-medium text-red-600">Reported by:</div>
+                            <div className="text-xs">
+                              {report.reporter_profile ? 
+                                `${report.reporter_profile.first_name} ${report.reporter_profile.last_name}` : 
+                                'Unknown User'
+                              }
+                            </div>
+                          </div>
+                          
+                          <div className="text-sm">
+                            <div className="font-medium text-gray-700">Image owner:</div>
+                            <div className="text-xs">
+                              {report.reported_user_profile ? 
+                                `${report.reported_user_profile.first_name} ${report.reported_user_profile.last_name}` : 
+                                'Unknown User'
+                              }
+                            </div>
+                          </div>
+                          
+                          <div className="text-sm">
+                            <div className="font-medium">Reason:</div>
+                            <div className="text-xs">{report.reason || 'No reason provided'}</div>
+                          </div>
+                          
+                          <div className="text-xs text-gray-500">
+                            Reported: {new Date(report.reported_at).toLocaleDateString()}
+                          </div>
+
+                          {report.reviewed_at && (
+                            <div className="text-xs text-gray-500">
+                              Reviewed: {new Date(report.reviewed_at).toLocaleDateString()}
+                            </div>
+                          )}
+                        </div>
+
+                        {report.status === 'pending' && (
+                          <div className="flex gap-2">
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              className="flex-1"
+                              onClick={() => handleIgnoreReport(report.id)}
+                              disabled={processingReports[report.id]}
+                            >
+                              <XCircle className="w-4 h-4 mr-1" />
+                              {processingReports[report.id] ? 'Ignoring...' : 'Ignore'}
+                            </Button>
+                            <Button
+                              size="sm"
+                              variant="destructive"
+                              className="flex-1"
+                              onClick={() => handleDeleteReportedImage(report.id, report.image_url, report.reported_user_id)}
+                              disabled={processingReports[report.id]}
+                            >
+                              <Trash2 className="w-4 h-4 mr-1" />
+                              {processingReports[report.id] ? 'Deleting...' : 'Delete'}
+                            </Button>
+                          </div>
+                        )}
+                      </CardContent>
+                    </Card>
+                  ))}
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        </TabsContent>
+      </Tabs>
+    </div>
+  );
+};
+
+export default ImageModerationPanel;
