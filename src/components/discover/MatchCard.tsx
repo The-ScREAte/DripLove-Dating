@@ -390,25 +390,25 @@ const MatchCard: React.FC<MatchCardProps> = ({
           {/* Report Modal */}
           {showReportModal && (
             <div 
-              className="fixed inset-0 z-[9999] bg-black/50 backdrop-blur-sm" 
-              style={{position: 'fixed', top: 0, left: 0, right: 0, bottom: 0}}
+              className="fixed inset-0 z-[9999] bg-black/50 backdrop-blur-sm flex items-center justify-center" 
               onClick={closeReportModal}
             >
               <div 
-                className="absolute bg-white rounded-2xl shadow-2xl w-80 mx-auto" 
+                className="bg-white rounded-2xl shadow-2xl w-80 max-w-[90vw] max-h-[80vh] flex flex-col relative" 
                 onClick={e => e.stopPropagation()} 
                 style={{
-                  position: 'fixed',
-                  top: '50%', 
-                  left: '50%', 
-                  transform: 'translate(-50%, -50%)',
-                  maxWidth: '90vw',
+                  position: 'relative',
+                  overflow: 'hidden',
+                  boxSizing: 'border-box',
+                  display: 'flex',
+                  flexDirection: 'column',
+                  height: 'auto',
+                  minHeight: '0',
                   maxHeight: '80vh',
-                  overflow: 'hidden'
                 }}
               >
-                {/* Modal content container with fixed dimensions */}
-                <div className="p-6" style={{width: '100%', boxSizing: 'border-box'}}>
+                {/* Modal content container with scrollable area */}
+                <div className="p-6 flex-1 overflow-y-auto" style={{width: '100%', boxSizing: 'border-box', minHeight: '0', maxHeight: 'calc(80vh - 0px)'}}>
                   {/* Close X button */}
                   <button
                     onClick={closeReportModal}
@@ -438,9 +438,8 @@ const MatchCard: React.FC<MatchCardProps> = ({
                   ) : (
                     <>
                       <p className="text-gray-700 mb-4 text-sm font-semibold">Please select a reason for reporting this image:</p>
-                      
                       {/* Reason selection with fixed heights and no movement */}
-                      <div className="space-y-2 mb-6" style={{minHeight: '300px'}}>
+                      <div className="space-y-2 mb-6">
                         {reportReasons.map((reason) => (
                           <button
                             key={reason}
@@ -493,7 +492,6 @@ const MatchCard: React.FC<MatchCardProps> = ({
                           Cancel
                         </button>
                       </div>
-                      
                       {reportError && (
                         <div className="text-red-500 text-sm mt-3 text-center bg-red-50 p-2 rounded-lg">
                           {reportError}
