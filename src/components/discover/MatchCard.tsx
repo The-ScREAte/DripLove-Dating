@@ -270,14 +270,22 @@ const MatchCard: React.FC<MatchCardProps> = ({
             <div className="w-full h-full transition-all duration-300 ease-in-out">
               {/* Report button for image slides - positioned sticky in top right */}
               {slides[currentSlide]?.type === 'image' && (
-                <div className="absolute right-3 top-16 z-50 flex flex-col items-end">
+                <div className="absolute right-3 top-20 z-50">
                   <button
-                    className="bg-white/95 hover:bg-red-100 text-red-600 rounded-full p-1 shadow-lg transition-all duration-200 border border-red-200 focus:outline-none focus:ring-2 focus:ring-red-300 hover:scale-105"
-                    style={{backdropFilter: 'blur(8px)', width: 28, height: 28, minWidth: 28, minHeight: 28, display: 'flex', alignItems: 'center', justifyContent: 'center'}} 
+                    className="bg-white/95 hover:bg-red-100 text-red-600 rounded-full shadow-lg transition-colors duration-200 border border-red-200 focus:outline-none focus:ring-2 focus:ring-red-300"
+                    style={{
+                      backdropFilter: 'blur(8px)', 
+                      width: '24px', 
+                      height: '24px', 
+                      display: 'flex', 
+                      alignItems: 'center', 
+                      justifyContent: 'center',
+                      flexShrink: 0
+                    }} 
                     onClick={e => { e.stopPropagation(); setShowReportModal(true); }}
                     aria-label="Report image"
                   >
-                    <svg xmlns="http://www.w3.org/2000/svg" className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                    <svg xmlns="http://www.w3.org/2000/svg" className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
                       <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v2m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
                     </svg>
                   </button>
@@ -381,86 +389,119 @@ const MatchCard: React.FC<MatchCardProps> = ({
 
           {/* Report Modal */}
           {showReportModal && (
-            <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/50 backdrop-blur-sm" onClick={closeReportModal}>
-              <div className="bg-white rounded-2xl shadow-2xl p-6 w-80 mx-4 relative transform-none" onClick={e => e.stopPropagation()} style={{position: 'fixed', top: '50%', left: '50%', transform: 'translate(-50%, -50%)'}}>
-                {/* Close X button */}
-                <button
-                  onClick={closeReportModal}
-                  className="absolute top-4 right-4 w-6 h-6 text-gray-400 hover:text-gray-600 transition-colors flex items-center justify-center"
-                  disabled={reporting}
-                  style={{minWidth: '24px', minHeight: '24px'}} 
-                >
-                  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                  </svg>
-                </button>
+            <div 
+              className="fixed inset-0 z-[9999] bg-black/50 backdrop-blur-sm" 
+              style={{position: 'fixed', top: 0, left: 0, right: 0, bottom: 0}}
+              onClick={closeReportModal}
+            >
+              <div 
+                className="absolute bg-white rounded-2xl shadow-2xl w-80 mx-auto" 
+                onClick={e => e.stopPropagation()} 
+                style={{
+                  position: 'fixed',
+                  top: '50%', 
+                  left: '50%', 
+                  transform: 'translate(-50%, -50%)',
+                  maxWidth: '90vw',
+                  maxHeight: '80vh',
+                  overflow: 'hidden'
+                }}
+              >
+                {/* Modal content container with fixed dimensions */}
+                <div className="p-6" style={{width: '100%', boxSizing: 'border-box'}}>
+                  {/* Close X button */}
+                  <button
+                    onClick={closeReportModal}
+                    className="absolute top-4 right-4 text-gray-400 hover:text-gray-600 transition-colors"
+                    disabled={reporting}
+                    style={{
+                      width: '24px', 
+                      height: '24px',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      flexShrink: 0
+                    }} 
+                  >
+                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                    </svg>
+                  </button>
 
-                <h3 className="text-xl font-bold mb-4 text-red-600 pr-8">Report Image</h3>
-                
-                {reportSuccess ? (
-                  <div className="text-green-600 font-semibold text-center py-8">
-                    <div className="mb-2">✓</div>
-                    <div>Reported! Thank you.</div>
-                  </div>
-                ) : (
-                  <>
-                    {/* Sticky reason select header */}
-                    <div className="sticky top-0 z-10 bg-white pb-2" style={{marginLeft: '-24px', marginRight: '-24px', paddingLeft: '24px', paddingRight: '24px'}}>
-                      <p className="text-gray-700 mb-2 text-sm font-semibold">Please select a reason for reporting this image:</p>
+                  <h3 className="text-xl font-bold mb-4 text-red-600 pr-8">Report Image</h3>
+                  
+                  {reportSuccess ? (
+                    <div className="text-green-600 font-semibold text-center py-8">
+                      <div className="mb-2">✓</div>
+                      <div>Reported! Thank you.</div>
                     </div>
-                    {/* Reason selection - visually stable, no shake */}
-                    <div className="space-y-2 mb-6">
-                      {reportReasons.map((reason) => (
-                        <button
-                          key={reason}
-                          onClick={() => setSelectedReason(reason)}
-                          disabled={reporting}
-                          className={`w-full text-left p-3 rounded-lg border-2 transition-colors duration-150 ${
-                            selectedReason === reason
-                              ? 'border-red-500 bg-red-50 text-red-700'
-                              : 'border-gray-200 bg-gray-50 text-gray-700 hover:border-gray-300'
-                          } ${reporting ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer'}`}
-                          style={{minHeight: '48px', height: '48px', display: 'flex', alignItems: 'center', fontWeight: 500, fontSize: '15px', boxSizing: 'border-box'}}
-                        >
-                          <div className="flex items-center justify-between w-full" style={{width: '100%'}}>
-                            <span className="text-sm font-medium" style={{width: '80%', whiteSpace: 'normal'}}>{reason}</span>
-                            {selectedReason === reason && (
-                              <svg className="w-5 h-5 text-red-500 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20" style={{minWidth: '20px', minHeight: '20px'}}>
-                                <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
-                              </svg>
-                            )}
-                          </div>
-                        </button>
-                      ))}
-                    </div>
-
-                    {/* Action buttons */}
-                    <div className="space-y-3">
-                      <button
-                        className="w-full bg-red-500 hover:bg-red-600 text-white font-bold rounded-lg disabled:opacity-60 disabled:cursor-not-allowed transition-colors duration-150"
-                        onClick={handleReportImage}
-                        disabled={reporting || !selectedReason}
-                        style={{minHeight: '48px', height: '48px'}} 
-                      >
-                        {reporting ? 'Reporting...' : 'Report Image'}
-                      </button>
-                      <button
-                        className="w-full bg-gray-200 hover:bg-gray-300 text-gray-800 font-semibold rounded-lg disabled:opacity-60 disabled:cursor-not-allowed transition-colors duration-150"
-                        onClick={closeReportModal}
-                        disabled={reporting}
-                        style={{minHeight: '48px', height: '48px'}} 
-                      >
-                        Cancel
-                      </button>
-                    </div>
-                    
-                    {reportError && (
-                      <div className="text-red-500 text-sm mt-3 text-center bg-red-50 p-2 rounded-lg">
-                        {reportError}
+                  ) : (
+                    <>
+                      <p className="text-gray-700 mb-4 text-sm font-semibold">Please select a reason for reporting this image:</p>
+                      
+                      {/* Reason selection with fixed heights and no movement */}
+                      <div className="space-y-2 mb-6" style={{minHeight: '300px'}}>
+                        {reportReasons.map((reason) => (
+                          <button
+                            key={reason}
+                            onClick={() => setSelectedReason(reason)}
+                            disabled={reporting}
+                            className={`w-full text-left rounded-lg border-2 transition-colors duration-150 ${
+                              selectedReason === reason
+                                ? 'border-red-500 bg-red-50 text-red-700'
+                                : 'border-gray-200 bg-gray-50 text-gray-700 hover:border-gray-300'
+                            } ${reporting ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer'}`}
+                            style={{
+                              height: '48px',
+                              display: 'flex', 
+                              alignItems: 'center',
+                              padding: '0 16px',
+                              fontWeight: 500, 
+                              fontSize: '15px',
+                              boxSizing: 'border-box',
+                              flexShrink: 0
+                            }}
+                          >
+                            <div className="flex items-center justify-between w-full" style={{width: '100%'}}>
+                              <span className="text-sm font-medium" style={{width: '80%', whiteSpace: 'normal'}}>{reason}</span>
+                              {selectedReason === reason && (
+                                <svg className="w-5 h-5 text-red-500 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20" style={{minWidth: '20px', minHeight: '20px'}}>
+                                  <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
+                                </svg>
+                              )}
+                            </div>
+                          </button>
+                        ))}
                       </div>
-                    )}
-                  </>
-                )}
+
+                      {/* Action buttons */}
+                      <div className="space-y-3">
+                        <button
+                          className="w-full bg-red-500 hover:bg-red-600 text-white font-bold rounded-lg disabled:opacity-60 disabled:cursor-not-allowed transition-colors duration-150"
+                          onClick={handleReportImage}
+                          disabled={reporting || !selectedReason}
+                          style={{minHeight: '48px', height: '48px'}} 
+                        >
+                          {reporting ? 'Reporting...' : 'Report Image'}
+                        </button>
+                        <button
+                          className="w-full bg-gray-200 hover:bg-gray-300 text-gray-800 font-semibold rounded-lg disabled:opacity-60 disabled:cursor-not-allowed transition-colors duration-150"
+                          onClick={closeReportModal}
+                          disabled={reporting}
+                          style={{minHeight: '48px', height: '48px'}} 
+                        >
+                          Cancel
+                        </button>
+                      </div>
+                      
+                      {reportError && (
+                        <div className="text-red-500 text-sm mt-3 text-center bg-red-50 p-2 rounded-lg">
+                          {reportError}
+                        </div>
+                      )}
+                    </>
+                  )}
+                </div>
               </div>
             </div>
           )}
@@ -656,6 +697,16 @@ const MatchCard: React.FC<MatchCardProps> = ({
       </div>
     );
   }
+
+  // Full card rendering (default)
+  return (
+    <div className="relative w-full h-full">
+      {/* Main card content would go here for full rendering */}
+      <div className="text-center p-8">
+        <p>Full card rendering not implemented in this mode</p>
+      </div>
+    </div>
+  );
 };
 
 export default MatchCard;
