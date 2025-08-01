@@ -382,14 +382,15 @@ const MatchCard: React.FC<MatchCardProps> = ({
           {/* Report Modal */}
           {showReportModal && (
             <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/50 backdrop-blur-sm" onClick={closeReportModal}>
-              <div className="bg-white rounded-2xl shadow-2xl p-6 max-w-sm w-full mx-4 relative" onClick={e => e.stopPropagation()}>
+              <div className="bg-white rounded-2xl shadow-2xl p-6 w-80 mx-4 relative transform-none" onClick={e => e.stopPropagation()} style={{position: 'fixed', top: '50%', left: '50%', transform: 'translate(-50%, -50%)'}}>
                 {/* Close X button */}
                 <button
                   onClick={closeReportModal}
-                  className="absolute top-4 right-4 text-gray-400 hover:text-gray-600 transition-colors"
+                  className="absolute top-4 right-4 w-6 h-6 text-gray-400 hover:text-gray-600 transition-colors flex items-center justify-center"
                   disabled={reporting}
+                  style={{minWidth: '24px', minHeight: '24px'}}
                 >
-                  <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
                   </svg>
                 </button>
@@ -412,16 +413,17 @@ const MatchCard: React.FC<MatchCardProps> = ({
                           key={reason}
                           onClick={() => setSelectedReason(reason)}
                           disabled={reporting}
-                          className={`w-full text-left p-3 rounded-lg border-2 transition-all ${
+                          className={`w-full text-left p-3 rounded-lg border-2 transition-colors duration-150 ${
                             selectedReason === reason
                               ? 'border-red-500 bg-red-50 text-red-700'
                               : 'border-gray-200 bg-gray-50 text-gray-700 hover:border-gray-300'
                           } ${reporting ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer'}`}
+                          style={{minHeight: '48px', height: '48px', display: 'flex', alignItems: 'center'}}
                         >
-                          <div className="flex items-center justify-between">
+                          <div className="flex items-center justify-between w-full">
                             <span className="text-sm font-medium">{reason}</span>
                             {selectedReason === reason && (
-                              <svg className="w-5 h-5 text-red-500" fill="currentColor" viewBox="0 0 20 20">
+                              <svg className="w-5 h-5 text-red-500 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20" style={{minWidth: '20px', minHeight: '20px'}}>
                                 <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
                               </svg>
                             )}
@@ -433,16 +435,18 @@ const MatchCard: React.FC<MatchCardProps> = ({
                     {/* Action buttons */}
                     <div className="space-y-3">
                       <button
-                        className="w-full bg-red-500 hover:bg-red-600 text-white font-bold py-3 rounded-lg disabled:opacity-60 disabled:cursor-not-allowed transition-colors"
+                        className="w-full bg-red-500 hover:bg-red-600 text-white font-bold rounded-lg disabled:opacity-60 disabled:cursor-not-allowed transition-colors duration-150"
                         onClick={handleReportImage}
                         disabled={reporting || !selectedReason}
+                        style={{minHeight: '48px', height: '48px'}}
                       >
                         {reporting ? 'Reporting...' : 'Report Image'}
                       </button>
                       <button
-                        className="w-full bg-gray-200 hover:bg-gray-300 text-gray-800 font-semibold py-3 rounded-lg disabled:opacity-60 disabled:cursor-not-allowed transition-colors"
+                        className="w-full bg-gray-200 hover:bg-gray-300 text-gray-800 font-semibold rounded-lg disabled:opacity-60 disabled:cursor-not-allowed transition-colors duration-150"
                         onClick={closeReportModal}
                         disabled={reporting}
+                        style={{minHeight: '48px', height: '48px'}}
                       >
                         Cancel
                       </button>
