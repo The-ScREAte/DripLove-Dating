@@ -209,10 +209,10 @@ class PhotoModerationService {
       adultContent = Math.max(adultContent, 90); // Send to admin review
     }
 
-    // PRIORITY 2: Check for AI-generated content
-    if (aiGeneratedRatio > 0.25 || aiPatterns.hasAIArtifacts || aiPatterns.hasUnrealisticSkinTexture) {
+    // PRIORITY 2: Check for AI-generated content - MUCH MORE RELAXED
+    if (aiGeneratedRatio > 0.45 && aiPatterns.hasAIArtifacts && aiPatterns.hasUnrealisticSkinTexture) {
       flags.push(MODERATION_FLAGS.AI_GENERATED);
-      suggestiveContent = Math.max(suggestiveContent, 70); // Send to admin review
+      suggestiveContent = Math.max(suggestiveContent, 30); // Much more relaxed
     }
 
     // PRIORITY 3: UNIVERSAL NUDITY DETECTION - Works across ALL skin tones, genders, and ethnicities
@@ -232,22 +232,22 @@ class PhotoModerationService {
 
     // Enhanced explicit content detection for ALL genders and ethnicities - MUCH LESS SENSITIVE
     if (nudityScore > 0.98 || 
-        (skinToneRatio > 0.95 && (maleNudityRatio > 0.85 || blackMaleNudityRatio > 0.85)) ||
-        (nudityRatio > 0.95 && (maleNudityRatio > 0.90 || blackMaleNudityRatio > 0.90))) { 
+        (skinToneRatio > 0.95 && (maleNudityRatio > 0.90 || blackMaleNudityRatio > 0.90)) ||
+        (nudityRatio > 0.95 && (maleNudityRatio > 0.95 || blackMaleNudityRatio > 0.95))) { 
       explicitContent = 95;
       flags.push(MODERATION_FLAGS.EXPLICIT_CONTENT);
       // REJECTED: Complete nudity detected - very high skin exposure (all genders/ethnicities)
     }
-    else if (nudityScore > 0.90 ||
-             (skinToneRatio > 0.85 && (maleNudityRatio > 0.75 || blackMaleNudityRatio > 0.75)) ||
-             (nudityRatio > 0.85 && (maleNudityRatio > 0.80 || blackMaleNudityRatio > 0.80))) { 
-      adultContent = 65; // Send to admin review - reduced threshold
+    else if (nudityScore > 0.95 ||
+             (skinToneRatio > 0.90 && (maleNudityRatio > 0.85 || blackMaleNudityRatio > 0.85)) ||
+             (nudityRatio > 0.90 && (maleNudityRatio > 0.90 || blackMaleNudityRatio > 0.90))) { 
+      adultContent = 40; // Send to admin review - much more relaxed
       // REVIEW: High nudity probability - likely nude/explicit content (all genders/ethnicities)
     }
-    else if (nudityScore > 0.80 ||
-             (skinToneRatio > 0.75 && (maleNudityRatio > 0.65 || blackMaleNudityRatio > 0.65)) ||
-             (nudityRatio > 0.75 && (maleNudityRatio > 0.65 || blackMaleNudityRatio > 0.65))) { 
-      suggestiveContent = Math.max(suggestiveContent, 35); // Much lower threshold for auto-approval
+    else if (nudityScore > 0.85 ||
+             (skinToneRatio > 0.80 && (maleNudityRatio > 0.75 || blackMaleNudityRatio > 0.75)) ||
+             (nudityRatio > 0.80 && (maleNudityRatio > 0.75 || blackMaleNudityRatio > 0.75))) { 
+      suggestiveContent = Math.max(suggestiveContent, 20); // Much lower threshold for auto-approval
       // REVIEW: Moderate nudity risk - summer clothing, swimwear, sports, possible AI (all genders/ethnicities)
     }
     else if (nudityScore > 0.45 || skinToneRatio > 0.45 || nudityRatio > 0.40) { 
@@ -748,7 +748,7 @@ class PhotoModerationService {
       message = 'Image file is corrupted or invalid and cannot be uploaded.';
       // Image blocked: Invalid file
     }
-    // ❌ REJECT only COMPLETE nudity - must be extremely explicit (90%+ confidence)
+    // ❌ REJECT only COMPLETE nudity - must be extremely explicit (95%+ confidence)
     else if (combinedDetails.explicitContent && combinedDetails.explicitContent >= 95) {
       isApproved = false;
       confidence = 95;
@@ -761,22 +761,22 @@ class PhotoModerationService {
       confidence = 20;
       message = 'Image uploaded but requires admin approval due to potential violent content.';
     }
-    // ⚠️ REVIEW AI-generated content (send to admin)
-    else if (allFlags.includes(MODERATION_FLAGS.AI_GENERATED)) {
+    // ⚠️ REVIEW AI-generated content (send to admin) - RELAXED
+    else if (allFlags.includes(MODERATION_FLAGS.AI_GENERATED) && combinedDetails.explicitContent && combinedDetails.explicitContent >= 80) {
       isApproved = true; // Allow upload but require review
       requiresReview = true;
       confidence = 25;
       message = 'Image uploaded but requires admin approval due to potential AI-generated content.';
     }
-    // ⚠️ REVIEW high nudity probability (send to admin instead of rejecting)
-    else if (combinedDetails.adultContent && combinedDetails.adultContent >= 70) {
+    // ⚠️ REVIEW only VERY high nudity probability - MUCH MORE RELAXED
+    else if (combinedDetails.adultContent && combinedDetails.adultContent >= 85) {
       isApproved = true; // Allow upload but require review
       requiresReview = true;
       confidence = 30;
       message = 'Image uploaded but requires admin approval due to high skin exposure.';
     }
-    // ⚠️ REVIEW moderate nudity risk (send to admin for AI nudes, borderline content) - LESS SENSITIVE
-    else if (combinedDetails.suggestiveContent && combinedDetails.suggestiveContent >= 60) {
+    // ⚠️ REVIEW only extreme suggestive content - MUCH MORE RELAXED
+    else if (combinedDetails.suggestiveContent && combinedDetails.suggestiveContent >= 80) {
       isApproved = true; // Allow upload but require review
       requiresReview = true;
       confidence = 40;
