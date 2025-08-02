@@ -253,14 +253,16 @@ const ImageModerationPanel = () => {
     try {
       setProcessingReports(prev => ({ ...prev, [reportId]: true }));
 
-      // First delete the image from user_images table
+      // First delete the image from user_images table using just the image_url
       const { error: deleteImageError } = await supabase
         .from('user_images')
         .delete()
-        .eq('image_url', imageUrl)
-        .eq('user_id', reportedUserId);
+        .eq('image_url', imageUrl);
 
-      if (deleteImageError) throw deleteImageError;
+      if (deleteImageError) {
+        console.error('Delete image error:', deleteImageError);
+        throw deleteImageError;
+      }
 
       // Then update the report status
       const { error: updateReportError } = await supabase
@@ -273,11 +275,14 @@ const ImageModerationPanel = () => {
         })
         .eq('id', reportId);
 
-      if (updateReportError) throw updateReportError;
+      if (updateReportError) {
+        console.error('Update report error:', updateReportError);
+        throw updateReportError;
+      }
 
       toast({
         title: 'Success',
-        description: 'Reported image deleted successfully'
+        description: 'Reported image deleted completely from database'
       });
 
       fetchReportedImages();
