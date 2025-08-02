@@ -256,61 +256,29 @@ const ImageModerationPanel = () => {
 
       console.log('Attempting to delete image:', { imageUrl, reportedUserId });
 
-      // First, find the image in the database with more specific search
-      const { data: imagesToDelete, error: findError } = await supabase
+      // Delete directly with admin privileges (after running the SQL fix)
+      const { error: deleteError } = await supabase
         .from('user_images')
-        .select('*')
+        .delete()
         .eq('image_url', imageUrl)
         .eq('user_id', reportedUserId);
 
-      console.log('Images found for deletion:', imagesToDelete);
-
-      if (findError) {
-        console.error('Find image error:', findError);
-        throw findError;
-      }
-
-      if (!imagesToDelete || imagesToDelete.length === 0) {
-        // If not found with both criteria, try just the URL
-        const { data: imagesByUrl, error: urlError } = await supabase
-          .from('user_images')
-          .select('*')
-          .eq('image_url', imageUrl);
-
-        console.log('Images found by URL only:', imagesByUrl);
-
-        if (urlError) {
-          console.error('URL search error:', urlError);
-          throw urlError;
-        }
-
-        if (imagesByUrl && imagesByUrl.length > 0) {
-          // Delete all images with this URL
-          const { error: deleteError } = await supabase
-            .from('user_images')
-            .delete()
-            .eq('image_url', imageUrl);
-
-          if (deleteError) {
-            console.error('Delete by URL error:', deleteError);
-            throw deleteError;
-          }
-          console.log('Deleted images by URL');
-        } else {
-          console.log('No images found to delete');
-        }
-      } else {
-        // Delete the specific images found
-        const { error: deleteImageError } = await supabase
+      if (deleteError) {
+        console.error('Delete specific image error:', deleteError);
+        
+        // Try deleting by URL only as fallback
+        const { error: deleteByUrlError } = await supabase
           .from('user_images')
           .delete()
-          .in('id', imagesToDelete.map(img => img.id));
+          .eq('image_url', imageUrl);
 
-        if (deleteImageError) {
-          console.error('Delete image error:', deleteImageError);
-          throw deleteImageError;
+        if (deleteByUrlError) {
+          console.error('Delete by URL error:', deleteByUrlError);
+          throw deleteByUrlError;
         }
-        console.log('Deleted specific images:', imagesToDelete.length);
+        console.log('Deleted images by URL only');
+      } else {
+        console.log('Successfully deleted specific image');
       }
 
       // Try to delete from storage as well
