@@ -254,19 +254,53 @@ const ImageModerationPanel = () => {
     try {
       setProcessingReports(prev => ({ ...prev, [reportId]: true }));
 
-      // First, find and delete the image from user_images table
+      console.log('Attempting to delete image:', { imageUrl, reportedUserId });
+
+      // First, find the image in the database with more specific search
       const { data: imagesToDelete, error: findError } = await supabase
         .from('user_images')
-        .select('id, image_url')
-        .eq('image_url', imageUrl);
+        .select('*')
+        .eq('image_url', imageUrl)
+        .eq('user_id', reportedUserId);
+
+      console.log('Images found for deletion:', imagesToDelete);
 
       if (findError) {
         console.error('Find image error:', findError);
         throw findError;
       }
 
-      if (imagesToDelete && imagesToDelete.length > 0) {
-        // Delete all matching images
+      if (!imagesToDelete || imagesToDelete.length === 0) {
+        // If not found with both criteria, try just the URL
+        const { data: imagesByUrl, error: urlError } = await supabase
+          .from('user_images')
+          .select('*')
+          .eq('image_url', imageUrl);
+
+        console.log('Images found by URL only:', imagesByUrl);
+
+        if (urlError) {
+          console.error('URL search error:', urlError);
+          throw urlError;
+        }
+
+        if (imagesByUrl && imagesByUrl.length > 0) {
+          // Delete all images with this URL
+          const { error: deleteError } = await supabase
+            .from('user_images')
+            .delete()
+            .eq('image_url', imageUrl);
+
+          if (deleteError) {
+            console.error('Delete by URL error:', deleteError);
+            throw deleteError;
+          }
+          console.log('Deleted images by URL');
+        } else {
+          console.log('No images found to delete');
+        }
+      } else {
+        // Delete the specific images found
         const { error: deleteImageError } = await supabase
           .from('user_images')
           .delete()
@@ -276,29 +310,35 @@ const ImageModerationPanel = () => {
           console.error('Delete image error:', deleteImageError);
           throw deleteImageError;
         }
-
-        // Try to delete from storage as well
-        try {
-          const fileName = imageUrl.split('/').pop();
-          if (fileName) {
-            await supabase.storage
-              .from('user-photos')
-              .remove([fileName]);
-          }
-        } catch (storageError) {
-          console.log('Storage deletion failed (image may not exist in storage):', storageError);
-          // Don't throw here as the main goal is database deletion
-        }
+        console.log('Deleted specific images:', imagesToDelete.length);
       }
 
-      // Then update the report status
+      // Try to delete from storage as well
+      try {
+        const fileName = imageUrl.split('/').pop();
+        if (fileName) {
+          const { error: storageError } = await supabase.storage
+            .from('user-photos')
+            .remove([fileName]);
+          
+          if (storageError) {
+            console.log('Storage deletion error:', storageError);
+          } else {
+            console.log('Storage file deleted:', fileName);
+          }
+        }
+      } catch (storageError) {
+        console.log('Storage deletion failed:', storageError);
+      }
+
+      // Update the report status
       const { error: updateReportError } = await supabase
         .from('reported_images')
         .update({
           status: 'resolved',
           reviewed_by: (await supabase.auth.getUser()).data.user?.id,
           reviewed_at: new Date().toISOString(),
-          admin_notes: 'Image permanently deleted by admin due to report'
+          admin_notes: 'Image permanently deleted by admin due to inappropriate content'
         })
         .eq('id', reportId);
 
@@ -312,8 +352,9 @@ const ImageModerationPanel = () => {
         description: 'Inappropriate image permanently deleted from database and storage'
       });
 
+      // Refresh both lists
       fetchReportedImages();
-      fetchPendingImages(); // Refresh pending images too
+      fetchPendingImages();
     } catch (error) {
       console.error('Error deleting reported image:', error);
       toast({
