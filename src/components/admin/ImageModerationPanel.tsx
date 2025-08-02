@@ -112,6 +112,7 @@ const ImageModerationPanel = () => {
       const { data, error } = await supabase
         .from('reported_images')
         .select('*')
+        .eq('status', 'pending') // Only show pending reports, not resolved ones
         .order('reported_at', { ascending: false })
         .limit(50);
 
