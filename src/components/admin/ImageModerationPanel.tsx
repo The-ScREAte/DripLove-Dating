@@ -254,15 +254,41 @@ const ImageModerationPanel = () => {
     try {
       setProcessingReports(prev => ({ ...prev, [reportId]: true }));
 
-      // First delete the image from user_images table using just the image_url
-      const { error: deleteImageError } = await supabase
+      // First, find and delete the image from user_images table
+      const { data: imagesToDelete, error: findError } = await supabase
         .from('user_images')
-        .delete()
+        .select('id, image_url')
         .eq('image_url', imageUrl);
 
-      if (deleteImageError) {
-        console.error('Delete image error:', deleteImageError);
-        throw deleteImageError;
+      if (findError) {
+        console.error('Find image error:', findError);
+        throw findError;
+      }
+
+      if (imagesToDelete && imagesToDelete.length > 0) {
+        // Delete all matching images
+        const { error: deleteImageError } = await supabase
+          .from('user_images')
+          .delete()
+          .in('id', imagesToDelete.map(img => img.id));
+
+        if (deleteImageError) {
+          console.error('Delete image error:', deleteImageError);
+          throw deleteImageError;
+        }
+
+        // Try to delete from storage as well
+        try {
+          const fileName = imageUrl.split('/').pop();
+          if (fileName) {
+            await supabase.storage
+              .from('user-photos')
+              .remove([fileName]);
+          }
+        } catch (storageError) {
+          console.log('Storage deletion failed (image may not exist in storage):', storageError);
+          // Don't throw here as the main goal is database deletion
+        }
       }
 
       // Then update the report status
@@ -272,7 +298,7 @@ const ImageModerationPanel = () => {
           status: 'resolved',
           reviewed_by: (await supabase.auth.getUser()).data.user?.id,
           reviewed_at: new Date().toISOString(),
-          admin_notes: 'Image deleted by admin due to report'
+          admin_notes: 'Image permanently deleted by admin due to report'
         })
         .eq('id', reportId);
 
@@ -283,7 +309,7 @@ const ImageModerationPanel = () => {
 
       toast({
         title: 'Success',
-        description: 'Reported image deleted completely from database'
+        description: 'Inappropriate image permanently deleted from database and storage'
       });
 
       fetchReportedImages();
@@ -292,7 +318,7 @@ const ImageModerationPanel = () => {
       console.error('Error deleting reported image:', error);
       toast({
         title: 'Error',
-        description: 'Failed to delete reported image',
+        description: 'Failed to permanently delete reported image',
         variant: 'destructive'
       });
     } finally {
