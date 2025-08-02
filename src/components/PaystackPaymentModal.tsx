@@ -10,7 +10,7 @@ interface PaystackPaymentModalProps {
   paymentMethod?: 'card' | 'momo';
 }
 
-const PAYSTACK_PUBLIC_KEY = 'pk_test_0bd90a6eb17e79c6d91152923d1de09cef91ab88';
+const PAYSTACK_PUBLIC_KEY = import.meta.env.VITE_PAYSTACK_PUBLIC_KEY || 'pk_test_0bd90a6eb17e79c6d91152923d1de09cef91ab88';
 
 const loadPaystackScript = () => {
   return new Promise((resolve, reject) => {
@@ -52,6 +52,7 @@ const PaystackPaymentModal: React.FC<PaystackPaymentModalProps> = ({ isOpen, onC
 
   React.useEffect(() => {
     if (isOpen) {
+      console.log('Paystack Public Key:', PAYSTACK_PUBLIC_KEY); // Debug log
       loadPaystackScript().catch(console.error);
     }
   }, [isOpen]);
