@@ -156,13 +156,55 @@ const AuthForm = ({ isLogin, onToggle, onOAuthSuccess }: AuthFormProps) => {
           .single();
 
         if (profileError || !profile) {
-          // Sign out the user since they don't have a profile
-          await supabase.auth.signOut();
+          // Try to create a basic profile for existing auth users
+          const { error: createProfileError } = await supabase
+            .from('profiles')
+            .insert({
+              id: authData.user.id,
+              email: authData.user.email || '',
+              first_name: 'User',
+              last_name: 'Profile',
+              date_of_birth: '1990-01-01',
+              country: 'US',
+              city: 'Unknown',
+              gender: 'prefer-not-to-say',
+              preference: 'both',
+              relationship_intent: 'not-sure',
+              occupation: 'Not specified',
+              industry: 'Not specified',
+              education_level: 'not-specified',
+              account_status: 'active',
+              is_admin: false
+            });
+          
+          if (createProfileError) {
+            console.error('Failed to create profile:', createProfileError);
+            await supabase.auth.signOut();
+            toast({
+              title: "Account Setup Failed",
+              description: "Unable to set up your account. Please try registering again.",
+              variant: "destructive",
+            });
+            setLoading(false);
+            return;
+          }
+          
+          // Use the newly created profile
+          const newProfile = {
+            id: authData.user.id,
+            is_admin: false,
+            account_status: 'active'
+          };
+          
+          // Save profile ID to session
+          sessionStorage.setItem('profile_id', newProfile.id);
+          
           toast({
-            title: "Account Not Found",
-            description: "This account doesn't exist in our system. Please register first.",
-            variant: "destructive",
+            title: "Welcome!",
+            description: "Account setup completed successfully.",
           });
+          
+          navigate('/');
           setLoading(false);
           return;
         }
