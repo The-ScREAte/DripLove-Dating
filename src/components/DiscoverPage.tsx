@@ -938,13 +938,13 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, isPremium }: DiscoverPage
   const swipeOpacity = Math.min(swipeDistance / 100, 0.8);
   
   // Enhanced card transform with exit animation
-  const getCardTransform = () => {
+  const getCardTransform = useCallback(() => {
     if (exitingCard && exitDirection) {
       const exitDistance = exitDirection === 'right' ? window.innerWidth : -window.innerWidth;
       return `translateX(${exitDistance}px) translateY(100px) rotate(${exitDirection === 'right' ? 30 : -30}deg) scale(0.8)`;
     }
     return isDragging ? `translateX(${currentX - startX}px) rotate(${(currentX - startX) * 0.1}deg)` : '';
-  };
+  }, [exitingCard, exitDirection, isDragging, currentX, startX]);
   
   const cardTransform = getCardTransform();
 
