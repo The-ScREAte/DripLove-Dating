@@ -202,17 +202,32 @@ const AuthForm = ({ isLogin, onToggle, onOAuthSuccess }: AuthFormProps) => {
 
       } else {
         // Registration flow
+        const redirectUrl = `${window.location.origin}/`;
         const { data: authData, error: authError } = await supabase.auth.signUp({
           email,
-          password
+          password,
+          options: {
+            emailRedirectTo: redirectUrl
+          }
         });
 
         if (authError) {
-          toast({
-            title: "Registration Failed",
-            description: authError.message,
-            variant: "destructive",
-          });
+          // Handle specific case of user already registered
+          if (authError.message.includes('User already registered')) {
+            toast({
+              title: "Account Already Exists",
+              description: "An account with this email already exists. Please try logging in instead.",
+              variant: "destructive",
+            });
+            // Switch to login mode
+            onToggle();
+          } else {
+            toast({
+              title: "Registration Failed",
+              description: authError.message,
+              variant: "destructive",
+            });
+          }
           setLoading(false);
           return;
         }
