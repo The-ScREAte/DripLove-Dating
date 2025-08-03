@@ -20,14 +20,6 @@
     user-select: none;
   }
 
-  /* Safe area support for mobile devices */
-  .safe-area-mobile {
-    padding-top: env(safe-area-inset-top);
-    padding-bottom: env(safe-area-inset-bottom);
-    padding-left: env(safe-area-inset-left);
-    padding-right: env(safe-area-inset-right);
-  }
-
   /* Safe area top only */
   .safe-area-top {
     padding-top: env(safe-area-inset-top);
@@ -52,6 +44,20 @@
   /* Allow pinch zoom but return to natural position */
   .zoomable {
     touch-action: pinch-zoom;
+  }
+
+  /* Keyboard-aware styles for chat */
+  .keyboard-open {
+    transition: height 0.3s ease;
+  }
+  
+  /* Ensure text inputs work properly on mobile */
+  input[type="text"], 
+  textarea {
+    touch-action: manipulation !important;
+    user-select: text !important;
+    -webkit-user-select: text !important;
+    -webkit-touch-callout: default !important;
   }
 }
 

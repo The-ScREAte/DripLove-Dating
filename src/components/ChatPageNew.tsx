@@ -383,7 +383,7 @@ const ChatPage = ({ currentUser, onUnreadChange }: ChatPageProps) => {
   }
 
   return (
-    <div className="flex h-screen max-h-screen overflow-hidden safe-area-mobile"
+    <div className="flex h-screen max-h-screen overflow-hidden"
          style={{ 
            touchAction: 'pan-x pan-y',
            userSelect: 'none',

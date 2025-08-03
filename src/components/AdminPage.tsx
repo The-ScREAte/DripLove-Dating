@@ -872,7 +872,7 @@ const AdminPageComponent = ({ currentUser, onLogout }: AdminPageProps) => {
   }
   
   return (
-    <div className="w-full min-h-screen bg-gray-100 safe-area-mobile"
+    <div className="w-full min-h-screen bg-gray-100"
          style={{ 
            touchAction: 'pan-x pan-y',
            userSelect: 'none',
@@ -880,7 +880,7 @@ const AdminPageComponent = ({ currentUser, onLogout }: AdminPageProps) => {
            WebkitTouchCallout: 'none'
          }}>
       <div className="w-full max-w-[390px] mx-auto bg-white min-h-screen">
-        <div className="p-4 safe-area-top">
+        <div className="p-4">
           {/* Header */}
           <div className="flex items-center justify-between mb-6">
             <h1 className="text-2xl font-bold">Admin Dashboard</h1>

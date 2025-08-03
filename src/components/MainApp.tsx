@@ -19,6 +19,25 @@ interface MainAppProps {
 
 const MainApp = ({ user, onLogout }: MainAppProps) => {
   const [activeTab, setActiveTab] = useState('discover');
+  const [isKeyboardOpen, setIsKeyboardOpen] = useState(false);
+
+  // Simple keyboard detection for mobile
+  useEffect(() => {
+    const handleViewportChange = () => {
+      const visualViewport = window.visualViewport;
+      if (visualViewport) {
+        const heightDifference = window.innerHeight - visualViewport.height;
+        setIsKeyboardOpen(heightDifference > 150);
+      }
+    };
+
+    if (window.visualViewport) {
+      window.visualViewport.addEventListener('resize', handleViewportChange);
+      return () => {
+        window.visualViewport?.removeEventListener('resize', handleViewportChange);
+      };
+    }
+  }, []);
   // Register device token for push notifications (mobile only)
   useEffect(() => {
     const registerDeviceToken = async () => {
@@ -265,7 +284,7 @@ const MainApp = ({ user, onLogout }: MainAppProps) => {
         </div>
 
         {/* Fixed Bottom Nav with Professional Safe Area */}
-        {!showTerms && !showPrivacy && (
+        {!showTerms && !showPrivacy && !isKeyboardOpen && (
           <SafeAreaView edges={['bottom']} className="fixed bottom-0 left-0 right-0 w-full bg-white border-t border-gray-200 px-2 py-2 z-50">
             <div className="flex justify-around items-center">
               {[

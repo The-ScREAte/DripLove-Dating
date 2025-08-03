@@ -550,7 +550,7 @@ const ProfilePage = ({ currentUser, profile, onProfileUpdate, onLogout, onShowTe
   }
 
   return (
-    <div className="min-h-screen bg-gray-50 overflow-x-hidden w-full max-w-full safe-area-mobile"
+    <div className="min-h-screen bg-gray-50 overflow-x-hidden w-full max-w-full"
          style={{ 
            touchAction: 'pan-x pan-y',
            userSelect: 'none',

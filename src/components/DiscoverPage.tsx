@@ -1107,7 +1107,7 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, isPremium }: DiscoverPage
 
 
   return (
-    <div className="h-full w-full fixed top-0 left-0 overflow-hidden safe-area-mobile"
+    <div className="h-full w-full fixed top-0 left-0 overflow-hidden"
          style={{ 
            touchAction: 'pan-x pan-y',
            userSelect: 'none',

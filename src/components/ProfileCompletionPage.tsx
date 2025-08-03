@@ -85,7 +85,7 @@ const ProfileCompletionPage = () => {
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-pink-50 to-purple-50 flex items-center justify-center p-4 safe-area-mobile"
+    <div className="min-h-screen bg-gradient-to-br from-pink-50 to-purple-50 flex items-center justify-center p-4"
          style={{ 
            touchAction: 'pan-x pan-y',
            userSelect: 'none',

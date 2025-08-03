@@ -41,8 +41,8 @@ const App = () => {
           <Toaster />
           <Sonner />
           
-          {/* Mobile-optimized container with safe areas */}
-          <div className="w-full h-full safe-area-mobile"
+          {/* Mobile-optimized container */}
+          <div className="w-full h-full"
                style={{ 
                  touchAction: 'manipulation',
                  userSelect: 'none',
