@@ -146,6 +146,18 @@ const AuthForm = ({ isLogin, onToggle, onOAuthSuccess }: AuthFormProps) => {
           return;
         }
 
+        // Check if email is confirmed for login
+        if (!authData.user.email_confirmed_at) {
+          await supabase.auth.signOut();
+          toast({
+            title: "Email not confirmed",
+            description: "Please confirm your email address before logging in. Check your inbox for the confirmation link.",
+            variant: "destructive",
+          });
+          setLoading(false);
+          return;
+        }
+
         // Check if user profile exists and get account status
         const { data: profile, error: profileError } = await supabase
           .from('profiles')
