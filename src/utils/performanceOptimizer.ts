@@ -31,9 +31,41 @@ export const throttle = <T extends (...args: any[]) => any>(
 export const optimizeImageUrl = (url: string, maxWidth: number = 400): string => {
   // Add image optimization parameters for better mobile performance
   if (url.includes('supabase')) {
-    return `${url}?width=${maxWidth}&quality=80&format=webp`;
+    return `${url}?width=${maxWidth}&quality=85&format=webp`;
   }
   return url;
+};
+
+// 3.1. Batch image preloader for discover page
+export const preloadImagesBatch = async (imageUrls: string[], maxConcurrent: number = 3): Promise<HTMLImageElement[]> => {
+  const results: HTMLImageElement[] = [];
+  
+  for (let i = 0; i < imageUrls.length; i += maxConcurrent) {
+    const batch = imageUrls.slice(i, i + maxConcurrent);
+    const batchPromises = batch.map((url) => {
+      return new Promise<HTMLImageElement>((resolve, reject) => {
+        const img = new Image();
+        img.onload = () => resolve(img);
+        img.onerror = () => {
+          // Create a placeholder image for failed loads
+          const placeholder = new Image();
+          placeholder.src = 'data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iNDAwIiBoZWlnaHQ9IjQwMCIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48cmVjdCB3aWR0aD0iMTAwJSIgaGVpZ2h0PSIxMDAlIiBmaWxsPSIjZjNmNGY2Ii8+PHRleHQgeD0iNTAlIiB5PSI1MCUiIGZvbnQtZmFtaWx5PSJBcmlhbCIgZm9udC1zaXplPSIxOCIgZmlsbD0iIzlmYTZiNyIgdGV4dC1hbmNob3I9Im1pZGRsZSIgZHk9Ii4zZW0iPk5vIEltYWdlPC90ZXh0Pjwvc3ZnPg==';
+          resolve(placeholder);
+        };
+        img.src = optimizeImageUrl(url, 800);
+      });
+    });
+    
+    const batchResults = await Promise.all(batchPromises);
+    results.push(...batchResults);
+    
+    // Small delay between batches to prevent overwhelming the browser
+    if (i + maxConcurrent < imageUrls.length) {
+      await new Promise(resolve => setTimeout(resolve, 50));
+    }
+  }
+  
+  return results;
 };
 
 // 4. Memory cleanup utilities
@@ -96,3 +128,64 @@ export const batchProcess = async <T>(
     await new Promise(resolve => setTimeout(resolve, 100));
   }
 };
+
+// 8. Smart image cache with LRU eviction
+class ImageCache {
+  private cache = new Map<string, HTMLImageElement>();
+  private accessOrder = new Map<string, number>();
+  private maxSize: number;
+  private accessCounter = 0;
+
+  constructor(maxSize: number = 50) {
+    this.maxSize = maxSize;
+  }
+
+  set(url: string, image: HTMLImageElement): void {
+    // Remove oldest entries if cache is full
+    if (this.cache.size >= this.maxSize) {
+      const oldestUrl = this.findOldestUrl();
+      if (oldestUrl) {
+        this.cache.delete(oldestUrl);
+        this.accessOrder.delete(oldestUrl);
+      }
+    }
+
+    this.cache.set(url, image);
+    this.accessOrder.set(url, ++this.accessCounter);
+  }
+
+  get(url: string): HTMLImageElement | null {
+    const image = this.cache.get(url);
+    if (image) {
+      this.accessOrder.set(url, ++this.accessCounter);
+      return image;
+    }
+    return null;
+  }
+
+  private findOldestUrl(): string | null {
+    let oldestUrl: string | null = null;
+    let oldestAccess = Infinity;
+
+    for (const [url, accessTime] of this.accessOrder) {
+      if (accessTime < oldestAccess) {
+        oldestAccess = accessTime;
+        oldestUrl = url;
+      }
+    }
+
+    return oldestUrl;
+  }
+
+  clear(): void {
+    this.cache.clear();
+    this.accessOrder.clear();
+    this.accessCounter = 0;
+  }
+
+  size(): number {
+    return this.cache.size;
+  }
+}
+
+export const imageCache = new ImageCache(50);

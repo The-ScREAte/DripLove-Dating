@@ -85,7 +85,13 @@ const ProfileCompletionPage = () => {
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-pink-50 to-purple-50 flex items-center justify-center p-4">
+    <div className="min-h-screen bg-gradient-to-br from-pink-50 to-purple-50 flex items-center justify-center p-4 safe-area-mobile"
+         style={{ 
+           touchAction: 'pan-x pan-y',
+           userSelect: 'none',
+           WebkitUserSelect: 'none',
+           WebkitTouchCallout: 'none'
+         }}>
       <ProfileCompletionForm
         user={user}
         onComplete={handleProfileComplete}

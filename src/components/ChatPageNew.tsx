@@ -383,7 +383,13 @@ const ChatPage = ({ currentUser, onUnreadChange }: ChatPageProps) => {
   }
 
   return (
-    <div className="flex h-screen max-h-screen overflow-hidden">
+    <div className="flex h-screen max-h-screen overflow-hidden safe-area-mobile"
+         style={{ 
+           touchAction: 'pan-x pan-y',
+           userSelect: 'none',
+           WebkitUserSelect: 'none',
+           WebkitTouchCallout: 'none'
+         }}>
       <div className="flex-1 flex flex-col">
         <ChatHeader
           selectedMatch={selectedMatch}

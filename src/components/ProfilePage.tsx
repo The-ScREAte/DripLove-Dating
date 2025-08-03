@@ -550,7 +550,13 @@ const ProfilePage = ({ currentUser, profile, onProfileUpdate, onLogout, onShowTe
   }
 
   return (
-    <div className="min-h-screen bg-gray-50 overflow-x-hidden w-full max-w-full"> 
+    <div className="min-h-screen bg-gray-50 overflow-x-hidden w-full max-w-full safe-area-mobile"
+         style={{ 
+           touchAction: 'pan-x pan-y',
+           userSelect: 'none',
+           WebkitUserSelect: 'none',
+           WebkitTouchCallout: 'none'
+         }}> 
       {/* Fixed Header with Progress Bar - completely fixed below main header */}
       <div 
         className="fixed left-0 right-0 z-40 bg-white border-b border-gray-200 shadow-sm" 

@@ -41,8 +41,14 @@ const App = () => {
           <Toaster />
           <Sonner />
           
-          {/* Standard web container */}
-          <div className="w-full h-full">
+          {/* Mobile-optimized container with safe areas */}
+          <div className="w-full h-full safe-area-mobile"
+               style={{ 
+                 touchAction: 'manipulation',
+                 userSelect: 'none',
+                 WebkitUserSelect: 'none',
+                 WebkitTouchCallout: 'none'
+               }}>
             <BrowserRouter>
               <AppRoutes />
             </BrowserRouter>

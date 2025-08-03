@@ -5,6 +5,7 @@ import { Heart, X, Crown, Calendar, MapPin, ChevronDown, ChevronUp, Briefcase, G
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import { useSubscription } from '@/hooks/useSubscription';
+import { useImagePreloader } from '@/hooks/useImagePreloader';
 import { calculateDistance } from '@/constants/locationData';
 import { debounce, optimizeImageUrl, createPagination, userDataCache } from '@/utils/performanceOptimizer';
 
@@ -44,6 +45,7 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, isPremium }: DiscoverPage
   const [currentIndex, setCurrentIndex] = useState(0);
   const [imageIndex, setImageIndex] = useState(0);
   const [isLoading, setIsLoading] = useState(true);
+  const [isLoadingMore, setIsLoadingMore] = useState(false);
   const [passedUsers, setPassedUsers] = useState<PassedUser[]>([]);
   const [showMoreInfo, setShowMoreInfo] = useState(false);
   const [showPremiumUpgrade, setShowPremiumUpgrade] = useState(false);
@@ -52,9 +54,15 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, isPremium }: DiscoverPage
   const [matchedUser, setMatchedUser] = useState<PotentialMatch | null>(null);
   // New: Store images by userId for instant access
   const [userImages, setUserImages] = useState<{ [key: string]: string[] }>({});
+  const [preloadedImages, setPreloadedImages] = useState<{ [key: string]: HTMLImageElement[] }>({});
   const [reverseUsageToday, setReverseUsageToday] = useState(0);
   const { toast } = useToast();
   const { subscription, checkUsageLimit, refetchSubscription } = useSubscription(currentUser?.id);
+  const { preloadImages, getOptimizedUrl, isImageLoaded } = useImagePreloader({
+    maxConcurrent: 3,
+    quality: 85,
+    width: 800
+  });
 
   // --- BEGIN: Swipe Guide Popup State ---
   const [showSwipeGuide, setShowSwipeGuide] = useState(false);
@@ -332,8 +340,10 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, isPremium }: DiscoverPage
       setCurrentIndex(indexToShow);
       setLastShuffleTime(Date.now());
 
-      // Preload images for the first 3 profiles
-      preloadNextProfileImages(shuffled, {}, 0);
+      // Preload images for the first 5 profiles immediately
+      if (shuffled.length > 0) {
+        await preloadNextProfileImages(shuffled, {}, 0);
+      }
     } catch (error) {
       console.error('Error fetching potential matches:', error);
       toast({
@@ -348,7 +358,32 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, isPremium }: DiscoverPage
   }, [currentUser, allowedGenders, toast]);
 
 
-  // Preload images for the next N profiles (like LikedMePage)
+  // Enhanced image preloading with actual image objects
+  const preloadUserImages = useCallback(async (imageUrls: string[], userId: string) => {
+    if (preloadedImages[userId]?.length > 0) return; // Already preloaded
+    
+    const imagePromises = imageUrls.map((url) => {
+      return new Promise<HTMLImageElement>((resolve, reject) => {
+        const img = new Image();
+        img.onload = () => resolve(img);
+        img.onerror = () => reject(new Error(`Failed to load image: ${url}`));
+        // Add optimized image URL with compression
+        img.src = url.includes('supabase') ? `${url}?width=800&quality=85&format=webp` : url;
+      });
+    });
+
+    try {
+      const loadedImages = await Promise.all(imagePromises);
+      setPreloadedImages(prev => ({
+        ...prev,
+        [userId]: loadedImages
+      }));
+    } catch (error) {
+      console.error('Error preloading images for user:', userId, error);
+    }
+  }, [preloadedImages]);
+
+  // Preload images for the next N profiles for smoother UX
   const loadFullImages = useCallback(async (profileId: string) => {
     if (userImages[profileId]?.length > 0) return; // Already loaded
     
@@ -364,24 +399,41 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, isPremium }: DiscoverPage
       if (error) throw error;
 
       if (images?.length) {
+        const imageUrls = images.map(img => img.image_url);
         setUserImages(prev => ({
           ...prev,
-          [profileId]: images.map(img => img.image_url)
+          [profileId]: imageUrls
         }));
+        
+        // Immediately start preloading the actual images using both methods
+        await preloadUserImages(imageUrls, profileId);
+        preloadImages(imageUrls); // Also use the hook for optimization
       }
     } catch (error) {
       console.error('Error loading user images:', error);
     }
-  }, [userImages]);
+  }, [userImages, preloadImages]);
 
-  // Preload images for the next N profiles for smoother UX
-  const preloadNextProfileImages = useCallback((matches: PotentialMatch[], alreadyLoaded: { [key: string]: string[] }, startIdx: number) => {
-    // Preload for the next 2 profiles (can adjust as needed)
-    const toPreload = matches.slice(startIdx, startIdx + 2).filter(match => !alreadyLoaded[match.id] || alreadyLoaded[match.id]?.length === 0);
-    for (const match of toPreload) {
-      void loadFullImages(match.id);
+  // Enhanced preloading strategy - load more profiles ahead
+  const preloadNextProfileImages = useCallback(async (matches: PotentialMatch[], alreadyLoaded: { [key: string]: string[] }, startIdx: number) => {
+    // Increased from 2 to 5 profiles for better preloading
+    const PRELOAD_COUNT = 5;
+    const toPreload = matches.slice(startIdx, startIdx + PRELOAD_COUNT)
+      .filter(match => !alreadyLoaded[match.id] || alreadyLoaded[match.id]?.length === 0);
+    
+    // Process profiles in batches to avoid overwhelming the system
+    const BATCH_SIZE = 2;
+    for (let i = 0; i < toPreload.length; i += BATCH_SIZE) {
+      const batch = toPreload.slice(i, i + BATCH_SIZE);
+      const promises = batch.map(match => loadFullImages(match.id));
+      await Promise.all(promises);
+      
+      // Small delay between batches to maintain smooth UI
+      if (i + BATCH_SIZE < toPreload.length) {
+        await new Promise(resolve => setTimeout(resolve, 100));
+      }
     }
-  }, [loadFullImages]);
+  }, [loadFullImages, preloadUserImages]);
 
   useEffect(() => {
     if (currentUser?.id) {
@@ -406,8 +458,11 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, isPremium }: DiscoverPage
     if (currentMatch && !userImages[currentMatch.id]) {
       loadFullImages(currentMatch.id);
     }
-    // Preload images for the next 2 profiles
-    preloadNextProfileImages(potentialMatches, userImages, currentIndex + 1);
+    // Enhanced preloading: preload images for the next 5 profiles and refresh every 3 swipes
+    const shouldPreloadMore = currentIndex % 3 === 0; // Every 3 swipes
+    if (shouldPreloadMore) {
+      preloadNextProfileImages(potentialMatches, userImages, currentIndex + 1);
+    }
   }, [currentIndex, potentialMatches, userImages, preloadNextProfileImages, loadFullImages]);
 
   const handleTouchStart = (e: React.TouchEvent) => {
@@ -543,6 +598,102 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, isPremium }: DiscoverPage
     // The actual image/slide navigation is handled within MatchCard
   };
 
+  // Function to load more matches when running low
+  const loadMoreMatches = useCallback(async () => {
+    if (!currentUser?.id || isLoading || isLoadingMore) return;
+    
+    try {
+      setIsLoadingMore(true);
+      
+      // Get additional profiles (exclude current ones)
+      const currentIds = potentialMatches.map(match => match.id);
+      const excludedIds = [...currentIds, currentUser.id];
+      
+      // Get recently interacted users to exclude
+      const [
+        { data: likedUsers },
+        { data: blockedUsers },
+        { data: recentPasses }
+      ] = await Promise.all([
+        supabase
+          .from('likes')
+          .select('liked_id')
+          .eq('liker_id', currentUser.id),
+        supabase
+          .from('blocks')
+          .select('blocked_id, blocker_id')
+          .or(`blocker_id.eq.${currentUser.id},blocked_id.eq.${currentUser.id}`),
+        supabase
+          .from('passes')
+          .select('passed_id, passed_at')
+          .match({ passer_id: currentUser.id })
+          .gte('passed_at', new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString())
+      ]);
+
+      const likedUserIds = likedUsers?.map(like => like.liked_id) || [];
+      const blockedUserIds = blockedUsers?.flatMap(block => [block.blocked_id, block.blocker_id]) || [];
+      const hiddenPassedIds = recentPasses?.map(p => p.passed_id) || [];
+      excludedIds.push(...likedUserIds, ...blockedUserIds, ...hiddenPassedIds);
+      
+      const { data: newProfiles, error } = await supabase
+        .from('profiles')
+        .select('id, first_name, last_name, bio, city, country, country_code, occupation, education_level, date_of_birth, interests, gender, latitude, longitude, fun_fact, perfect_first_date, last_googled, relationship_intent, smoking, drinking, exercise_level, sleeping_schedule, introvert_extrovert, spontaneous_planner, messy_organized')
+        .not('id', 'in', `(${excludedIds.join(',')})`)
+        .in('gender', allowedGenders)
+        .eq('account_status', 'active')
+        .eq('is_admin', false)
+        .limit(50); // Load 50 new profiles
+
+      if (error) throw error;
+
+      // Apply same filtering logic as original fetch
+      let filteredProfiles = newProfiles || [];
+      const userMaxDistance = currentUser.max_distance || currentUser.distance_preference || 50;
+      
+      if (currentUser.latitude && currentUser.longitude) {
+        filteredProfiles = filteredProfiles.filter(profile => {
+          if (!profile.latitude || !profile.longitude) {
+            return profile.country === currentUser.country;
+          }
+          const distance = calculateDistance(
+            currentUser.latitude,
+            currentUser.longitude,
+            profile.latitude,
+            profile.longitude
+          );
+          return distance <= (userMaxDistance * 3);
+        });
+      }
+
+      // Apply age filtering
+      const userMinAge = currentUser.min_age || 18;
+      const userMaxAge = currentUser.max_age || 99;
+      filteredProfiles = filteredProfiles.filter(profile => {
+        if (!profile.date_of_birth) return false;
+        const age = calculateAge(profile.date_of_birth);
+        return age >= userMinAge && age <= userMaxAge;
+      });
+
+      const profilesWithImages = filteredProfiles.map(profile => ({
+        ...profile,
+        images: []
+      }));
+
+      const shuffled = profilesWithImages.sort(() => 0.5 - Math.random());
+      
+      // Add new profiles to the end of existing ones
+      setPotentialMatches(prev => [...prev, ...shuffled]);
+      
+      // Preload images for the new profiles
+      if (shuffled.length > 0) {
+        await preloadNextProfileImages(shuffled, userImages, 0);
+      }
+    } catch (error) {
+      console.error('Error loading more matches:', error);
+    } finally {
+      setIsLoadingMore(false);
+    }
+  }, [currentUser, allowedGenders, potentialMatches, calculateAge, calculateDistance, isLoading, isLoadingMore, userImages, preloadNextProfileImages]);
   // Function to check if a profile is verified (90%+ completion with photos and basic info)
   const calculateProfileVerification = useCallback((profile: PotentialMatch) => {
     if (!profile) return false;
@@ -814,6 +965,11 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, isPremium }: DiscoverPage
   const moveToNext = () => {
     if (currentIndex < potentialMatches.length - 1) {
       setCurrentIndex(currentIndex + 1);
+      
+      // Load more matches when we're getting close to the end (within 5 profiles)
+      if (currentIndex >= potentialMatches.length - 5) {
+        loadMoreMatches();
+      }
     } else {
       fetchPotentialMatches();
       setCurrentIndex(0);
@@ -951,7 +1107,13 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, isPremium }: DiscoverPage
 
 
   return (
-    <div className="h-full w-full fixed top-0 left-0 overflow-hidden">
+    <div className="h-full w-full fixed top-0 left-0 overflow-hidden safe-area-mobile"
+         style={{ 
+           touchAction: 'pan-x pan-y',
+           userSelect: 'none',
+           WebkitUserSelect: 'none',
+           WebkitTouchCallout: 'none'
+         }}>
       {/* --- Swipe Guide Popup for New Users --- */}
       {showSwipeGuide && (
         <div
@@ -1038,7 +1200,7 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, isPremium }: DiscoverPage
           >
             {nextMatchImages.length > 0 ? (
               <img
-                src={nextMatchImages[0]}
+                src={getOptimizedUrl(nextMatchImages[0])}
                 alt={`${nextMatch.first_name}'s photo`}
                 className="w-full h-full object-contain bg-black"
                 draggable={false}
@@ -1174,6 +1336,7 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, isPremium }: DiscoverPage
               swipeDistance={swipeDistance}
               isVerified={calculateProfileVerification(currentMatch)}
               isSwipeAreaOnly={true}
+              getOptimizedUrl={getOptimizedUrl}
             />
           </div>
           {/* ...existing code... */}
@@ -1196,9 +1359,19 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, isPremium }: DiscoverPage
               swipeDistance={swipeDistance}
               isVerified={calculateProfileVerification(currentMatch)}
               isDetailsAreaOnly={true}
+              getOptimizedUrl={getOptimizedUrl}
             />
           </div>
         </div>
+        {/* Loading more indicator */}
+        {isLoadingMore && (
+          <div className="absolute top-4 right-4 z-50 bg-white/90 backdrop-blur-sm rounded-full px-3 py-2 shadow-lg border border-pink-200">
+            <div className="flex items-center gap-2">
+              <div className="animate-spin rounded-full h-4 w-4 border-2 border-pink-500 border-t-transparent"></div>
+              <span className="text-sm font-medium text-pink-600">Loading...</span>
+            </div>
+          </div>
+        )}
         {/* ...existing code... */}
         <SwipeButtons
           onPass={handlePass}

@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { MapPin, Briefcase, GraduationCap, Calendar, Crown, Shield, ChevronDown, ChevronUp, User, Quote, Heart, Coffee, Search } from 'lucide-react';
+import { MapPin, Briefcase, GraduationCap, Calendar, Crown, Shield, ChevronDown, ChevronUp, User, Quote, Heart, Coffee, Search, Loader2 } from 'lucide-react';
 import { PotentialMatch } from '@/types';
 
 interface MatchCardProps {
@@ -19,6 +19,7 @@ interface MatchCardProps {
   swipeDistance: number;
   isSwipeAreaOnly?: boolean; // New prop to render only swipeable image area
   isDetailsAreaOnly?: boolean; // New prop to render only details area
+  getOptimizedUrl?: (url: string) => string; // New prop for image optimization
 }
 
 const MatchCard: React.FC<MatchCardProps> = ({
@@ -37,9 +38,11 @@ const MatchCard: React.FC<MatchCardProps> = ({
   swipeDirection,
   swipeDistance,
   isSwipeAreaOnly = false,
-  isDetailsAreaOnly = false
+  isDetailsAreaOnly = false,
+  getOptimizedUrl = (url: string) => url.includes('supabase') ? `${url}?width=800&quality=85&format=webp` : url
 }) => {
   const [currentSlide, setCurrentSlide] = useState(0);
+  const [imageLoading, setImageLoading] = useState(false);
   
   // Random background colors for fun questions and about - ensuring good contrast
   const backgroundColors = [
@@ -292,12 +295,28 @@ const MatchCard: React.FC<MatchCardProps> = ({
                 </div>
               )}
               {slides[currentSlide]?.type === 'image' ? (
-                <img
-                  src={slides[currentSlide].content}
-                  alt={`${match.first_name} ${match.last_name}`}
-                  className="w-full h-full object-contain bg-black transition-opacity duration-300"
-                  draggable={false}
-                />
+                <div className="relative w-full h-full">
+                  {imageLoading && (
+                    <div className="absolute inset-0 bg-gray-100 flex items-center justify-center z-10">
+                      <Loader2 className="h-8 w-8 animate-spin text-pink-500" />
+                    </div>
+                  )}
+                  <img
+                    src={getOptimizedUrl(slides[currentSlide].content)}
+                    alt={`${match.first_name} ${match.last_name}`}
+                    className="w-full h-full object-contain bg-black transition-opacity duration-300"
+                    draggable={false}
+                    onLoadStart={() => setImageLoading(true)}
+                    onLoad={() => setImageLoading(false)}
+                    onError={() => setImageLoading(false)}
+                    style={{
+                      touchAction: 'manipulation',
+                      userSelect: 'none',
+                      WebkitUserSelect: 'none',
+                      WebkitTouchCallout: 'none'
+                    }}
+                  />
+                </div>
               ) : slides[currentSlide]?.type === 'bio' ? (
                 <div className={`w-full h-full ${userBackgroundColor} flex items-center justify-center p-8`}>
                   <div className="max-w-sm mx-auto text-center">

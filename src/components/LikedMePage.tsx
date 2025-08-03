@@ -604,8 +604,14 @@ const LikedMePage = ({ currentUser, isPremium = false }: LikedMePageProps) => {
   }
 
   return (
-    <div className="h-full flex flex-col bg-white">
-      <div className="flex-shrink-0 bg-white border-b p-4">
+    <div className="h-full flex flex-col bg-white safe-area-mobile"
+         style={{ 
+           touchAction: 'pan-x pan-y',
+           userSelect: 'none',
+           WebkitUserSelect: 'none',
+           WebkitTouchCallout: 'none'
+         }}>
+      <div className="flex-shrink-0 bg-white border-b p-4 safe-area-top">
         <div className="flex items-center justify-between mb-2">
           <div className="flex items-center space-x-2">
             <Users className="w-6 h-6 text-pink-600" />
