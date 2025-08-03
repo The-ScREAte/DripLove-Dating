@@ -245,9 +245,10 @@ const MainApp = ({ user, onLogout }: MainAppProps) => {
                 className="h-12"
               />
               <div className="text-right">
-                <span className="text-sm font-bold text-pink-600">
-                  I feel love 🔥❤️
-                </span>
+                <div className="text-sm font-bold text-black leading-tight">
+                  <div>Find Your</div>
+                  <div>Perfect Match 💖</div>
+                </div>
               </div>
             </div>
           </SafeAreaView>

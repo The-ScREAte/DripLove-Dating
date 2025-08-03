@@ -155,6 +155,8 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, isPremium }: DiscoverPage
   const [isDragging, setIsDragging] = useState(false);
   const [swipeDirection, setSwipeDirection] = useState<'left' | 'right' | null>(null);
   const [swipeDistance, setSwipeDistance] = useState(0);
+  const [exitingCard, setExitingCard] = useState(false);
+  const [exitDirection, setExitDirection] = useState<'left' | 'right' | null>(null);
 
   // Memoize expensive calculations
   const getGenderFilter = useCallback((userPreference: string) => {
@@ -445,20 +447,29 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, isPremium }: DiscoverPage
     const minSwipeDistance = screenWidth * 0.4;
   
     if (Math.abs(deltaX) > minSwipeDistance && Math.abs(deltaX) > deltaY) {
-      if (deltaX > 0) {
-        handleLike();
-      } else {
-        handlePass();
-      }
+      // Trigger exit animation before handling like/pass
+      setExitingCard(true);
+      setExitDirection(deltaX > 0 ? 'right' : 'left');
+      
+      // Wait for animation to complete before proceeding
+      setTimeout(() => {
+        if (deltaX > 0) {
+          handleLike();
+        } else {
+          handlePass();
+        }
+        setExitingCard(false);
+        setExitDirection(null);
+      }, 300);
+    } else {
+      // Reset values if swipe wasn't far enough
+      setStartX(0);
+      setStartY(0);
+      setCurrentX(0);
+      setCurrentY(0);
+      setSwipeDirection(null);
+      setSwipeDistance(0);
     }
-  
-    // Reset values
-    setStartX(0);
-    setStartY(0);
-    setCurrentX(0);
-    setCurrentY(0);
-    setSwipeDirection(null);
-    setSwipeDistance(0);
   };
 
   // Mouse event handlers for swipe on desktop
@@ -497,22 +508,31 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, isPremium }: DiscoverPage
 
     // Only trigger swipe if horizontal movement is greater than vertical
     if (Math.abs(deltaX) > minSwipeDistance && Math.abs(deltaX) > deltaY) {
-      if (deltaX > 0) {
-        // Swipe right - like
-        handleLike();
-      } else {
-        // Swipe left - dislike
-        handlePass();
-      }
+      // Trigger exit animation before handling like/pass
+      setExitingCard(true);
+      setExitDirection(deltaX > 0 ? 'right' : 'left');
+      
+      // Wait for animation to complete before proceeding
+      setTimeout(() => {
+        if (deltaX > 0) {
+          // Swipe right - like
+          handleLike();
+        } else {
+          // Swipe left - dislike
+          handlePass();
+        }
+        setExitingCard(false);
+        setExitDirection(null);
+      }, 300);
+    } else {
+      // Reset values if swipe wasn't far enough
+      setStartX(0);
+      setStartY(0);
+      setCurrentX(0);
+      setCurrentY(0);
+      setSwipeDirection(null);
+      setSwipeDistance(0);
     }
-
-    // Reset values
-    setStartX(0);
-    setStartY(0);
-    setCurrentX(0);
-    setCurrentY(0);
-    setSwipeDirection(null);
-    setSwipeDistance(0);
   };
 
   const handleImageAreaClick = (e: React.MouseEvent<HTMLDivElement>) => {
@@ -916,7 +936,17 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, isPremium }: DiscoverPage
 
   // Calculate swipe overlay opacity and transform
   const swipeOpacity = Math.min(swipeDistance / 100, 0.8);
-  const cardTransform = isDragging ? `translateX(${currentX - startX}px) rotate(${(currentX - startX) * 0.1}deg)` : '';
+  
+  // Enhanced card transform with exit animation
+  const getCardTransform = () => {
+    if (exitingCard && exitDirection) {
+      const exitDistance = exitDirection === 'right' ? window.innerWidth : -window.innerWidth;
+      return `translateX(${exitDistance}px) translateY(100px) rotate(${exitDirection === 'right' ? 30 : -30}deg) scale(0.8)`;
+    }
+    return isDragging ? `translateX(${currentX - startX}px) rotate(${(currentX - startX) * 0.1}deg)` : '';
+  };
+  
+  const cardTransform = getCardTransform();
 
 
 
@@ -933,46 +963,64 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, isPremium }: DiscoverPage
           }}
         >
           <style>{`
-            @keyframes fingerMoveLeft {
-              0% { transform: translateX(0); }
-              20% { transform: translateX(-30px); }
-              40% { transform: translateX(0); }
-              100% { transform: translateX(0); }
+            @keyframes fingerSwipeLeft {
+              0% { transform: translateX(0) scale(1); opacity: 1; }
+              25% { transform: translateX(-40px) scale(1.1); opacity: 0.9; }
+              50% { transform: translateX(-20px) scale(1); opacity: 1; }
+              75% { transform: translateX(0) scale(0.95); opacity: 0.8; }
+              100% { transform: translateX(0) scale(1); opacity: 1; }
             }
-            @keyframes fingerMoveRight {
-              0% { transform: translateX(0); }
-              20% { transform: translateX(30px); }
-              40% { transform: translateX(0); }
-              100% { transform: translateX(0); }
+            @keyframes fingerSwipeRight {
+              0% { transform: translateX(0) scale(1); opacity: 1; }
+              25% { transform: translateX(40px) scale(1.1); opacity: 0.9; }
+              50% { transform: translateX(20px) scale(1); opacity: 1; }
+              75% { transform: translateX(0) scale(0.95); opacity: 0.8; }
+              100% { transform: translateX(0) scale(1); opacity: 1; }
+            }
+            @keyframes pulseGlow {
+              0% { box-shadow: 0 0 0 0 rgba(236, 72, 153, 0.4); }
+              70% { box-shadow: 0 0 0 10px rgba(236, 72, 153, 0); }
+              100% { box-shadow: 0 0 0 0 rgba(236, 72, 153, 0); }
             }
             .finger-left {
-              animation: fingerMoveLeft 1.5s infinite;
-              font-size: 3rem;
+              animation: fingerSwipeLeft 2s ease-in-out infinite;
+              font-size: 2.5rem;
               display: block;
+              filter: drop-shadow(0 2px 4px rgba(0,0,0,0.2));
             }
             .finger-right {
-              animation: fingerMoveRight 1.5s infinite;
-              font-size: 3rem;
+              animation: fingerSwipeRight 2s ease-in-out infinite;
+              font-size: 2.5rem;
               display: block;
+              filter: drop-shadow(0 2px 4px rgba(0,0,0,0.2));
+            }
+            .swipe-card {
+              animation: pulseGlow 2s infinite;
             }
           `}</style>
-          <div className="bg-white rounded-2xl px-7 py-7 flex flex-col items-center shadow-xl" style={{ maxWidth: 340, opacity: 0.98 }}>
-            <div className="flex flex-row gap-8 mb-2">
+          <div className="swipe-card bg-gradient-to-br from-white to-pink-50 rounded-3xl px-8 py-8 flex flex-col items-center shadow-2xl border border-pink-100" style={{ maxWidth: 360, opacity: 0.97 }}>
+            <h3 className="text-lg font-bold text-gray-800 mb-4 text-center">💕 Start Swiping! 💕</h3>
+            <div className="flex flex-row gap-12 mb-4">
               {/* Swipe Left */}
               <div className="flex flex-col items-center">
-                <span className="text-base font-semibold text-gray-700 mb-1">Swipe Left</span>
-                <span className="finger-left" role="img" aria-label="finger left">👆</span>
-                <span className="text-2xl" style={{ color: '#888', marginTop: '-10px', marginBottom: '-10px' }}>←←←</span>
-                <span className="text-sm text-red-600 mt-1">Dislike</span>
+                <div className="bg-red-50 rounded-full p-3 mb-2 border-2 border-red-200">
+                  <span className="finger-left" role="img" aria-label="finger left">👆</span>
+                </div>
+                <div className="text-xl mb-1" style={{ color: '#ef4444' }}>← ← ←</div>
+                <span className="text-sm font-semibold text-red-600">Nope</span>
+                <span className="text-xs text-gray-500 mt-1">Swipe Left</span>
               </div>
               {/* Swipe Right */}
               <div className="flex flex-col items-center">
-                <span className="text-base font-semibold text-gray-700 mb-1">Swipe Right</span>
-                <span className="finger-right" role="img" aria-label="finger right">👆</span>
-                <span className="text-2xl" style={{ color: '#888', marginTop: '-10px', marginBottom: '-10px' }}>→→→</span>
-                <span className="text-sm text-green-600 mt-1">Like</span>
+                <div className="bg-green-50 rounded-full p-3 mb-2 border-2 border-green-200">
+                  <span className="finger-right" role="img" aria-label="finger right">👆</span>
+                </div>
+                <div className="text-xl mb-1" style={{ color: '#10b981' }}>→ → →</div>
+                <span className="text-sm font-semibold text-green-600">Like</span>
+                <span className="text-xs text-gray-500 mt-1">Swipe Right</span>
               </div>
             </div>
+            <p className="text-xs text-gray-600 text-center mt-2">Tap anywhere to close</p>
           </div>
         </div>
       )}
@@ -1012,8 +1060,10 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, isPremium }: DiscoverPage
           className="h-full w-full relative z-10 flex flex-col"
           style={{
             transform: cardTransform,
-            transition: isDragging ? 'none' : 'transform 0.3s cubic-bezier(0.22, 1, 0.36, 1)',
-            boxShadow: isDragging ? '0 8px 32px 0 rgba(0,0,0,0.25)' : '0 4px 16px 0 rgba(0,0,0,0.10)'
+            transition: exitingCard ? 'transform 0.3s cubic-bezier(0.25, 0.46, 0.45, 0.94)' : 
+                       isDragging ? 'none' : 'transform 0.3s cubic-bezier(0.22, 1, 0.36, 1)',
+            boxShadow: isDragging ? '0 8px 32px 0 rgba(0,0,0,0.25)' : '0 4px 16px 0 rgba(0,0,0,0.10)',
+            opacity: exitingCard ? 0 : 1
           }}
         >
           {/* ...existing code... */}
