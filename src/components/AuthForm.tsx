@@ -288,6 +288,32 @@ const AuthForm = ({ isLogin, onToggle, onOAuthSuccess }: AuthFormProps) => {
 
         // Check if email confirmation is required
         if (!authData.session) {
+          // Even without a session, create the profile so user can login after email confirmation
+          const { error: profileError } = await supabase
+            .from('profiles')
+            .insert({
+              id: authData.user.id,
+              email: authData.user.email || email,
+              first_name: 'User',
+              last_name: 'Profile',
+              date_of_birth: '1990-01-01',
+              country: 'US',
+              city: 'Unknown',
+              gender: 'prefer-not-to-say',
+              preference: 'both',
+              relationship_intent: 'not-sure',
+              occupation: 'Not specified',
+              industry: 'Not specified',
+              education_level: 'not-specified',
+              account_status: 'active',
+              is_admin: false
+            });
+
+          if (profileError) {
+            console.error('Profile creation error:', profileError);
+            // Don't fail the registration - user can still confirm email and login
+          }
+
           toast({
             title: "Registration Successful",
             description: "Please check your email to confirm your account before signing in.",
