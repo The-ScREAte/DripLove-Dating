@@ -8,6 +8,7 @@ import MessageBubble from './chat/MessageBubble';
 import MessageInput from './chat/MessageInput';
 import ChatHeader from './chat/ChatHeader';
 import { CurrentUser, ChatMatch, ChatMessage } from '@/types';
+import { sanitizeMessage } from '@/utils/inputSanitization';
 
 interface ChatPageProps {
   currentUser: CurrentUser;
@@ -24,6 +25,7 @@ const ChatPage = ({ currentUser, onUnreadChange }: ChatPageProps) => {
   const [selectedUserId, setSelectedUserId] = useState<string>('');
   const [isBlockDialogOpen, setIsBlockDialogOpen] = useState(false);
   const [userToBlock, setUserToBlock] = useState<ChatMatch | null>(null);
+  const [isKeyboardVisible, setIsKeyboardVisible] = useState(false);
   const { toast } = useToast();
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const messagesContainerRef = useRef<HTMLDivElement>(null);
@@ -42,6 +44,22 @@ const ChatPage = ({ currentUser, onUnreadChange }: ChatPageProps) => {
   useEffect(() => {
     scrollToBottom();
   }, [messages]);
+
+  // Handle keyboard visibility for mobile
+  useEffect(() => {
+    const handleResize = () => {
+      // Check if keyboard is visible on mobile by comparing viewport height
+      if (window.visualViewport) {
+        const heightDiff = window.innerHeight - window.visualViewport.height;
+        setIsKeyboardVisible(heightDiff > 150); // Threshold for keyboard
+      }
+    };
+
+    if (window.visualViewport) {
+      window.visualViewport.addEventListener('resize', handleResize);
+      return () => window.visualViewport.removeEventListener('resize', handleResize);
+    }
+  }, []);
 
   useEffect(() => {
     // Listen for changes to any chats to update unread indicators in real-time
@@ -290,7 +308,7 @@ const ChatPage = ({ currentUser, onUnreadChange }: ChatPageProps) => {
         await supabase.functions.invoke('send-push-notification', {
           body: {
             title: `💬 ${senderName}`,
-            body: newMessage.trim(),
+            body: sanitizeMessage(newMessage.trim()),
             userId: recipientId,
             type: 'message',
             data: { 
@@ -388,7 +406,8 @@ const ChatPage = ({ currentUser, onUnreadChange }: ChatPageProps) => {
            touchAction: 'pan-x pan-y',
            userSelect: 'none',
            WebkitUserSelect: 'none',
-           WebkitTouchCallout: 'none'
+           WebkitTouchCallout: 'none',
+           paddingBottom: isKeyboardVisible ? '0' : 'env(safe-area-inset-bottom)'
          }}>
       <div className="flex-1 flex flex-col">
         <ChatHeader
@@ -425,7 +444,7 @@ const ChatPage = ({ currentUser, onUnreadChange }: ChatPageProps) => {
 
         <MessageInput
           newMessage={newMessage}
-          onMessageChange={setNewMessage}
+          onMessageChange={(message) => setNewMessage(sanitizeMessage(message))}
           onSendMessage={sendMessage}
         />
       </div>

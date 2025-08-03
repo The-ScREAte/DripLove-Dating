@@ -31,8 +31,7 @@ export const sanitizeMessage = (message: string): string => {
     .replace(/on\w+\s*=/gi, '')
     .replace(/data:/gi, '')
     .replace(/vbscript:/gi, '')
-    .trim()
-    .slice(0, 1000); // Limit message length
+    .slice(0, 1000); // Limit message length, don't trim to preserve spaces
 };
 
 /**

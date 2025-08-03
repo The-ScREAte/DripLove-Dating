@@ -23,8 +23,7 @@ const MessageInput: React.FC<MessageInputProps> = ({
   const containerRef = useRef<HTMLDivElement>(null);
 
   const handleEmojiSelect = (emoji: string) => {
-    const sanitizedMessage = sanitizeMessage(newMessage + emoji);
-    onMessageChange(sanitizedMessage);
+    onMessageChange(newMessage + emoji);
     setShowEmojiPicker(false);
   };
 
@@ -45,11 +44,12 @@ const MessageInput: React.FC<MessageInputProps> = ({
           <Input
             ref={inputRef}
             value={newMessage}
-            onChange={(e) => onMessageChange(sanitizeMessage(e.target.value))}
+            onChange={(e) => onMessageChange(e.target.value)}
             onKeyPress={handleKeyPress}
             placeholder="Type a message..."
             className="flex-1 border-none bg-transparent focus:ring-0 p-0"
             disabled={disabled}
+            style={{ fontSize: '16px' }}
           />
           <Button
             type="button"
