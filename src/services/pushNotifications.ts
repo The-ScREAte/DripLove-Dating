@@ -80,6 +80,12 @@ class SupabasePushNotificationService {
       if (permissionStatus.receive === 'granted') {
         console.log('📱 Push permissions granted, attempting registration...');
         
+        // Add delay to ensure Firebase is fully initialized on Android
+        if (Capacitor.getPlatform() === 'android') {
+          console.log('🤖 Waiting for Firebase to be ready on Android...');
+          await new Promise(resolve => setTimeout(resolve, 2000));
+        }
+        
         // Register for push notifications with error handling
         try {
           await PushNotifications.register();

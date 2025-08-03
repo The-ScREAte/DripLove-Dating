@@ -7,16 +7,27 @@ import com.google.firebase.FirebaseApp;
 public class MainActivity extends BridgeActivity {
     @Override
     protected void onCreate(Bundle savedInstanceState) {
-        super.onCreate(savedInstanceState);
+        // Initialize Firebase FIRST, before anything else
+        initializeFirebase();
         
+        super.onCreate(savedInstanceState);
+    }
+    
+    private void initializeFirebase() {
         try {
-            // Ensure Firebase is initialized before any plugins try to use it
-            if (FirebaseApp.getApps(this).isEmpty()) {
-                FirebaseApp.initializeApp(this);
-                android.util.Log.d("DripLove", "Firebase initialized in MainActivity");
-            }
+            // Always try to initialize Firebase explicitly
+            FirebaseApp.initializeApp(this);
+            android.util.Log.d("DripLove", "Firebase initialized successfully in MainActivity");
         } catch (Exception e) {
-            android.util.Log.e("DripLove", "Failed to initialize Firebase in MainActivity: " + e.getMessage());
+            android.util.Log.d("DripLove", "Firebase initialization in MainActivity: " + e.getMessage());
+            
+            // Try to get existing instance to verify it's working
+            try {
+                FirebaseApp defaultApp = FirebaseApp.getInstance();
+                android.util.Log.d("DripLove", "Firebase instance available: " + defaultApp.getName());
+            } catch (Exception e2) {
+                android.util.Log.e("DripLove", "Firebase is completely unavailable: " + e2.getMessage());
+            }
         }
     }
 }
