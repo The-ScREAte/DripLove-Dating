@@ -121,8 +121,6 @@ const AuthForm = ({ isLogin, onToggle, onOAuthSuccess }: AuthFormProps) => {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
-    if (loading) return; // Prevent duplicate submissions
-    
     if (!validateForm()) {
       return;
     }
@@ -156,55 +154,13 @@ const AuthForm = ({ isLogin, onToggle, onOAuthSuccess }: AuthFormProps) => {
           .single();
 
         if (profileError || !profile) {
-          // Try to create a basic profile for existing auth users
-          const { error: createProfileError } = await supabase
-            .from('profiles')
-            .insert({
-              id: authData.user.id,
-              email: authData.user.email || '',
-              first_name: 'User',
-              last_name: 'Profile',
-              date_of_birth: '1990-01-01',
-              country: 'US',
-              city: 'Unknown',
-              gender: 'prefer-not-to-say',
-              preference: 'both',
-              relationship_intent: 'not-sure',
-              occupation: 'Not specified',
-              industry: 'Not specified',
-              education_level: 'not-specified',
-              account_status: 'active',
-              is_admin: false
-            });
-          
-          if (createProfileError) {
-            console.error('Failed to create profile:', createProfileError);
-            await supabase.auth.signOut();
-            toast({
-              title: "Account Setup Failed",
-              description: "Unable to set up your account. Please try registering again.",
-              variant: "destructive",
-            });
-            setLoading(false);
-            return;
-          }
-          
-          // Use the newly created profile
-          const newProfile = {
-            id: authData.user.id,
-            is_admin: false,
-            account_status: 'active'
-          };
-          
-          // Save profile ID to session
-          sessionStorage.setItem('profile_id', newProfile.id);
-          
+          // Sign out the user since they don't have a profile
+          await supabase.auth.signOut();
           toast({
-            title: "Welcome!",
-            description: "Account setup completed successfully.",
+            title: "Account Not Found",
+            description: "This account doesn't exist in our system. Please register first.",
+            variant: "destructive",
           });
-          
-          navigate('/');
           setLoading(false);
           return;
         }
@@ -246,32 +202,17 @@ const AuthForm = ({ isLogin, onToggle, onOAuthSuccess }: AuthFormProps) => {
 
       } else {
         // Registration flow
-        const redirectUrl = `${window.location.origin}/`;
         const { data: authData, error: authError } = await supabase.auth.signUp({
           email,
-          password,
-          options: {
-            emailRedirectTo: redirectUrl
-          }
+          password
         });
 
         if (authError) {
-          // Handle specific case of user already registered
-          if (authError.message.includes('User already registered')) {
-            toast({
-              title: "Account Already Exists",
-              description: "An account with this email already exists. Please try logging in instead.",
-              variant: "destructive",
-            });
-            // Switch to login mode
-            onToggle();
-          } else {
-            toast({
-              title: "Registration Failed",
-              description: authError.message,
-              variant: "destructive",
-            });
-          }
+          toast({
+            title: "Registration Failed",
+            description: authError.message,
+            variant: "destructive",
+          });
           setLoading(false);
           return;
         }
@@ -288,32 +229,6 @@ const AuthForm = ({ isLogin, onToggle, onOAuthSuccess }: AuthFormProps) => {
 
         // Check if email confirmation is required
         if (!authData.session) {
-          // Even without a session, create the profile so user can login after email confirmation
-          const { error: profileError } = await supabase
-            .from('profiles')
-            .insert({
-              id: authData.user.id,
-              email: authData.user.email || email,
-              first_name: 'User',
-              last_name: 'Profile',
-              date_of_birth: '1990-01-01',
-              country: 'US',
-              city: 'Unknown',
-              gender: 'prefer-not-to-say',
-              preference: 'both',
-              relationship_intent: 'not-sure',
-              occupation: 'Not specified',
-              industry: 'Not specified',
-              education_level: 'not-specified',
-              account_status: 'active',
-              is_admin: false
-            });
-
-          if (profileError) {
-            console.error('Profile creation error:', profileError);
-            // Don't fail the registration - user can still confirm email and login
-          }
-
           toast({
             title: "Registration Successful",
             description: "Please check your email to confirm your account before signing in.",
