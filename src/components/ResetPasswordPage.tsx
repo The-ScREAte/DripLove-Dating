@@ -24,37 +24,28 @@ const ResetPasswordPage = () => {
   const [errors, setErrors] = useState<{[key: string]: string}>({});
 
   useEffect(() => {
-    // Check for recovery tokens in URL (Supabase sends these)
+    // Set up auth state listener to handle the recovery flow
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(
+      async (event, session) => {
+        console.log('Auth event:', event, session);
+        // Just log the events, don't redirect immediately
+      }
+    );
+
+    // Check for recovery tokens in URL and set session if present
     const urlParams = new URLSearchParams(window.location.search);
     const accessToken = urlParams.get('access_token');
     const refreshToken = urlParams.get('refresh_token');
     const type = urlParams.get('type');
     
     if (type === 'recovery' && accessToken && refreshToken) {
-      // Set the session with recovery tokens
       supabase.auth.setSession({
         access_token: accessToken,
         refresh_token: refreshToken
-      }).then(({ error }) => {
-        if (error) {
-          console.error('Session error:', error);
-          toast({
-            title: "Invalid Reset Link",
-            description: "This password reset link is invalid or has expired. Please request a new one.",
-            variant: "destructive",
-          });
-          navigate('/');
-        }
       });
-    } else {
-      // No valid recovery tokens found
-      toast({
-        title: "Invalid Reset Link",
-        description: "This password reset link is invalid or has expired. Please request a new one.",
-        variant: "destructive",
-      });
-      navigate('/');
     }
+
+    return () => subscription.unsubscribe();
   }, [navigate, toast]);
 
   const validateForm = () => {
@@ -104,6 +95,19 @@ const ResetPasswordPage = () => {
     setLoading(true);
 
     try {
+      // Check if user has a valid session first
+      const { data: sessionData, error: sessionError } = await supabase.auth.getSession();
+      
+      if (sessionError || !sessionData.session) {
+        toast({
+          title: "Invalid Reset Link",
+          description: "Your password reset session has expired. Please request a new reset link.",
+          variant: "destructive",
+        });
+        setLoading(false);
+        navigate('/');
+        return;
+      }
       const { error } = await supabase.auth.updateUser({
         password: formData.password
       });
