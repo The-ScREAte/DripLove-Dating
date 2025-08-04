@@ -24,38 +24,37 @@ const ResetPasswordPage = () => {
   const [errors, setErrors] = useState<{[key: string]: string}>({});
 
   useEffect(() => {
-    // Set up auth state listener for recovery flow
-    const { data: { subscription } } = supabase.auth.onAuthStateChange(
-      async (event, session) => {
-        console.log('Auth event:', event, session);
-        
-        if (event === 'PASSWORD_RECOVERY') {
-          // User clicked the recovery link and is now in recovery mode
-          return;
-        }
-        
-        if (event === 'SIGNED_IN' && session) {
-          // User is signed in, allow password reset
-          return;
-        }
-        
-        // If no session after a delay, show error
-        setTimeout(() => {
-          supabase.auth.getSession().then(({ data, error }) => {
-            if (error || !data.session) {
-              toast({
-                title: "Invalid Reset Link",
-                description: "This password reset link is invalid or has expired. Please request a new one.",
-                variant: "destructive",
-              });
-              navigate('/');
-            }
+    // Check for recovery tokens in URL (Supabase sends these)
+    const urlParams = new URLSearchParams(window.location.search);
+    const accessToken = urlParams.get('access_token');
+    const refreshToken = urlParams.get('refresh_token');
+    const type = urlParams.get('type');
+    
+    if (type === 'recovery' && accessToken && refreshToken) {
+      // Set the session with recovery tokens
+      supabase.auth.setSession({
+        access_token: accessToken,
+        refresh_token: refreshToken
+      }).then(({ error }) => {
+        if (error) {
+          console.error('Session error:', error);
+          toast({
+            title: "Invalid Reset Link",
+            description: "This password reset link is invalid or has expired. Please request a new one.",
+            variant: "destructive",
           });
-        }, 2000);
-      }
-    );
-
-    return () => subscription.unsubscribe();
+          navigate('/');
+        }
+      });
+    } else {
+      // No valid recovery tokens found
+      toast({
+        title: "Invalid Reset Link",
+        description: "This password reset link is invalid or has expired. Please request a new one.",
+        variant: "destructive",
+      });
+      navigate('/');
+    }
   }, [navigate, toast]);
 
   const validateForm = () => {
