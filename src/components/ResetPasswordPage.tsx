@@ -24,26 +24,39 @@ const ResetPasswordPage = () => {
   const [errors, setErrors] = useState<{[key: string]: string}>({});
 
   useEffect(() => {
-    // Check if we have the required tokens from the URL
-    const accessToken = searchParams.get('access_token');
-    const refreshToken = searchParams.get('refresh_token');
-    
-    if (!accessToken || !refreshToken) {
-      toast({
-        title: "Invalid Reset Link",
-        description: "This password reset link is invalid or has expired. Please request a new one.",
-        variant: "destructive",
-      });
-      navigate('/');
-      return;
-    }
+    // Set up auth state listener for recovery flow
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(
+      async (event, session) => {
+        console.log('Auth event:', event, session);
+        
+        if (event === 'PASSWORD_RECOVERY') {
+          // User clicked the recovery link and is now in recovery mode
+          return;
+        }
+        
+        if (event === 'SIGNED_IN' && session) {
+          // User is signed in, allow password reset
+          return;
+        }
+        
+        // If no session after a delay, show error
+        setTimeout(() => {
+          supabase.auth.getSession().then(({ data, error }) => {
+            if (error || !data.session) {
+              toast({
+                title: "Invalid Reset Link",
+                description: "This password reset link is invalid or has expired. Please request a new one.",
+                variant: "destructive",
+              });
+              navigate('/');
+            }
+          });
+        }, 2000);
+      }
+    );
 
-    // Set the session with the tokens from the URL
-    supabase.auth.setSession({
-      access_token: accessToken,
-      refresh_token: refreshToken
-    });
-  }, [searchParams, navigate, toast]);
+    return () => subscription.unsubscribe();
+  }, [navigate, toast]);
 
   const validateForm = () => {
     const newErrors: {[key: string]: string} = {};
