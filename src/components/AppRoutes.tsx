@@ -7,6 +7,7 @@ import PaymentSuccess from '@/pages/PaymentSuccess';
 import Unsubscribe from '@/pages/Unsubscribe';
 import OAuthCallback from '@/components/OAuthCallback';
 import ProfileCompletionPage from '@/components/ProfileCompletionPage';
+import ResetPasswordPage from '@/components/ResetPasswordPage';
 import { useMobileOAuth } from '@/hooks/useMobileOAuth';
 
 const AppRoutes = () => {
@@ -21,6 +22,7 @@ const AppRoutes = () => {
       <Route path="/unsubscribe" element={<Unsubscribe />} />
       <Route path="/auth/callback" element={<OAuthCallback />} />
       <Route path="/complete-profile" element={<ProfileCompletionPage />} />
+      <Route path="/reset-password" element={<ResetPasswordPage />} />
       {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
       <Route path="*" element={<NotFound />} />
     </Routes>
