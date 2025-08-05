@@ -7,19 +7,15 @@ const SUPABASE_PUBLISHABLE_KEY = import.meta.env.VITE_SUPABASE_ANON_KEY;
 
 // Import OAuth configuration for consistent redirect URLs
 import { getRedirectUri } from '@/config/oauth';
-
-// Mobile app detection
-const isMobileApp = window.location.protocol === 'capacitor:' || 
-                   window.location.protocol === 'file:' ||
-                   window.location.href.startsWith('driplove://');
+import { isMobileApp } from '@/utils/platformUtils';
 
 // Configure auth options for mobile deep linking
 const authOptions = {
   auth: {
-    // Use the same redirect logic as OAuth config for consistency
-    redirectTo: getRedirectUri(),
+    // Don't set a global redirectTo - let each operation specify its own
+    // redirectTo: getRedirectUri(), // Removed - this was causing the issue!
     // Auto detect redirect for web only
-    detectSessionInUrl: !isMobileApp,
+    detectSessionInUrl: !isMobileApp(),
     // For mobile apps, we need to handle deep links manually
     persistSession: true,
     autoRefreshToken: true,

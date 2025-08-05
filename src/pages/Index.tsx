@@ -23,6 +23,13 @@ const Index = () => {
     // Check for existing session
     supabase.auth.getSession().then(({ data: { session } }) => {
       if (session?.user) {
+        // Check if email is confirmed before proceeding
+        if (!session.user.email_confirmed_at) {
+          console.log('Existing session found but email not confirmed - staying on welcome screen');
+          setLoading(false);
+          return;
+        }
+        
         setUser(session.user);
         checkUserTypeAndRedirect(session.user.id);
       } else {
@@ -35,6 +42,15 @@ const Index = () => {
       data: { subscription },
     } = supabase.auth.onAuthStateChange((_event, session) => {
       if (session?.user) {
+        // Check if email is confirmed before proceeding
+        if (!session.user.email_confirmed_at) {
+          console.log('User session exists but email not confirmed - staying on welcome screen');
+          setUser(null);
+          setCurrentView('welcome');
+          setLoading(false);
+          return;
+        }
+        
         // Auth state changed for user ID: session.user.id
         setUser(session.user);
         checkUserTypeAndRedirect(session.user.id);
@@ -165,57 +181,15 @@ const Index = () => {
 
   // Shortest possible registration: essentials only
   const handleRegister = async (formData: any) => {
-    try {
-      if (formData.password !== formData.confirmPassword) {
-        throw new Error("Passwords don't match");
-      }
-
-      // Include the new registration fields
-      const essentials = {
-        first_name: formData.firstName,
-        last_name: formData.lastName,
-        email: formData.email,
-        date_of_birth: formData.dateOfBirth,
-        country: formData.country,
-        city: formData.city,
-        zip_code: formData.zipCode,
-        gender: formData.gender,
-        preference: formData.preference,
-        relationship_intent: formData.relationshipIntent,
-        occupation: formData.occupation,
-        industry: formData.industry,
-        education_level: formData.educationLevel,
-      };
-
-      // Registration essentials processed
-
-      // Register user with Supabase Auth - the trigger will create the profile automatically
-      const { data, error } = await supabase.auth.signUp({
-        email: essentials.email,
-        password: formData.password,
-        options: {
-          data: essentials,
-        },
-      });
-      if (error) throw error;
-
-      if (data.user) {
-        setUser(data.user);
-        // After registration, show terms acceptance
+    // Registration is now fully handled in RegistrationForm, just update user and view if needed
+    // If RegistrationForm returns a user, set it and show terms
+    if (formData && formData.email) {
+      // Try to fetch the user from Supabase after registration
+      const { data: { user } } = await supabase.auth.getUser();
+      if (user) {
+        setUser(user);
         setCurrentView('terms-acceptance');
       }
-
-      toast({
-        title: "Registration Successful!",
-        description: "Please review and accept our terms to continue.",
-      });
-    } catch (error: any) {
-      console.error('Registration error:', error);
-      toast({
-        title: "Registration Error",
-        description: error.message || "Failed to create account. Please try again.",
-        variant: "destructive",
-      });
     }
   };
 

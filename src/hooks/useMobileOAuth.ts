@@ -2,6 +2,7 @@ import { useEffect } from 'react';
 import { useToast } from '@/hooks/use-toast';
 import { useNavigate } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
+import { logPlatformInfo } from '@/utils/platformUtils';
 
 // Conditionally import Capacitor modules for mobile
 let App: any = null;
@@ -24,14 +25,20 @@ export const useMobileOAuth = () => {
   useEffect(() => {
     // Early return if Capacitor is not available (web environment)
     if (!Capacitor || !App || !Capacitor.isNativePlatform()) {
+      console.log('[Mobile OAuth] Not running on native platform, skipping mobile OAuth setup');
       return; // Only run on mobile
     }
+
+    console.log('[Mobile OAuth] Setting up mobile OAuth listeners');
+    logPlatformInfo();
 
     const handleAppUrlOpen = async (event: { url: string }) => {
       console.log('[Mobile OAuth] App opened with URL:', event.url);
       console.log('[Mobile OAuth] URL includes driplove:', event.url.includes('driplove://'));
       console.log('[Mobile OAuth] URL includes callback:', event.url.includes('/callback'));
+      console.log('[Mobile OAuth] URL includes reset-password:', event.url.includes('/reset-password'));
       
+      // Handle OAuth callback
       if (event.url.startsWith('driplove://auth/callback')) {
         console.log('[Mobile OAuth] Processing OAuth callback');
         
@@ -161,6 +168,95 @@ export const useMobileOAuth = () => {
           toast({
             title: "Authentication Error",
             description: "Failed to process authentication callback.",
+            variant: "destructive",
+          });
+          navigate('/');
+        }
+      }
+      
+      // Handle password reset deep link
+      else if (event.url.startsWith('driplove://reset-password')) {
+        console.log('[Mobile OAuth] Processing password reset deep link');
+        
+        try {
+          // Extract the URL parameters for password reset
+          const url = new URL(event.url);
+          const fragment = url.hash || url.search;
+          
+          console.log('[Mobile OAuth] Reset password URL fragment:', fragment);
+          
+          if (fragment.includes('access_token=') && fragment.includes('type=recovery')) {
+            // Parse the recovery tokens from the fragment
+            const params = new URLSearchParams(fragment.replace('#', '').replace('?', ''));
+            const access_token = params.get('access_token');
+            const refresh_token = params.get('refresh_token');
+            const type = params.get('type');
+            
+            console.log('[Mobile OAuth] Extracted recovery tokens:', {
+              hasAccessToken: !!access_token,
+              hasRefreshToken: !!refresh_token,
+              type: type
+            });
+            
+            if (type === 'recovery' && access_token && refresh_token) {
+              // Set the session for password recovery
+              const { data, error } = await supabase.auth.setSession({
+                access_token,
+                refresh_token
+              });
+              
+              if (error) {
+                console.error('[Mobile OAuth] Recovery session error:', error);
+                toast({
+                  title: "Password Reset Error",
+                  description: "Invalid or expired reset link. Please request a new one.",
+                  variant: "destructive",
+                });
+                navigate('/');
+                return;
+              }
+              
+              console.log('[Mobile OAuth] Recovery session set successfully:', !!data.session);
+              
+              // Navigate to reset password page
+              navigate('/reset-password');
+              
+              toast({
+                title: "Reset Link Verified",
+                description: "You can now set your new password.",
+              });
+            } else {
+              console.error('[Mobile OAuth] Missing recovery tokens in reset link');
+              toast({
+                title: "Password Reset Error",
+                description: "Invalid reset link format. Please request a new one.",
+                variant: "destructive",
+              });
+              navigate('/');
+            }
+          } else if (fragment.includes('error=')) {
+            // Handle password reset error
+            const params = new URLSearchParams(fragment.replace('#', '').replace('?', ''));
+            const error = params.get('error');
+            const error_description = params.get('error_description');
+            
+            console.error('[Mobile OAuth] Password reset error:', error, error_description);
+            toast({
+              title: "Password Reset Error",
+              description: error_description || error || "Password reset failed",
+              variant: "destructive",
+            });
+            navigate('/');
+          } else {
+            // Handle simple reset password deep link without tokens (shouldn't happen with Supabase)
+            console.log('[Mobile OAuth] Simple reset password deep link');
+            navigate('/reset-password');
+          }
+        } catch (error) {
+          console.error('[Mobile OAuth] Error processing password reset deep link:', error);
+          toast({
+            title: "Password Reset Error",
+            description: "Failed to process password reset link.",
             variant: "destructive",
           });
           navigate('/');

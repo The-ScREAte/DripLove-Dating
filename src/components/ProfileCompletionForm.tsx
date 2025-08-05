@@ -300,6 +300,14 @@ const ProfileCompletionForm = ({ user, onComplete, onCancel }: ProfileCompletion
       validationErrors.images = 'Please remove rejected images before continuing';
     }
 
+    // Check if we have valid files for approved images
+    const imagesWithFiles = approvedImages.filter(img => img.file !== null);
+    if (imagesWithFiles.length < 2) {
+      validationErrors.images = 'Please re-upload your 2 photos to complete your profile';
+      // Clear images that don't have files and ask user to re-upload
+      setImages(prev => prev.filter(img => img.file !== null));
+    }
+
     // Age validation (must be 18+)
     if (formData.dateOfBirth) {
       const today = new Date();
@@ -325,7 +333,7 @@ const ProfileCompletionForm = ({ user, onComplete, onCancel }: ProfileCompletion
     try {
       // Clear sessionStorage after successful completion
       sessionStorage.removeItem('profilecompletion_images');
-      // ...existing code...
+      // Save profile data for the already existing user
       const profileData = {
         first_name: formData.firstName,
         last_name: formData.lastName,
@@ -370,30 +378,22 @@ const ProfileCompletionForm = ({ user, onComplete, onCancel }: ProfileCompletion
         throw error;
       }
 
-      // Upload approved images to database
+      // Upload approved images to storage and DB for the existing user
       const approvedImages = images.filter(img => img.status === 'approved' || img.status === 'pending');
+      let imageOrder = 1;
       for (const image of approvedImages) {
         try {
-          // Upload to storage
+          if (!image.file) continue;
           const fileExt = image.file?.name.split('.').pop() || 'jpg';
-          const fileName = `${Date.now()}.${fileExt}`;
+          const fileName = `${Date.now()}-${Math.random().toString(36).substr(2, 9)}.${fileExt}`;
           const filePath = `${user.id}/${fileName}`;
-
-          if (!image.file) continue; // Skip if no file (shouldn't happen but safety check)
-
           const { error: uploadError } = await supabase.storage
             .from('user-photos')
             .upload(filePath, image.file);
-
           if (uploadError) throw uploadError;
-
-          // Get public URL
           const { data: { publicUrl } } = supabase.storage
             .from('user-photos')
             .getPublicUrl(filePath);
-
-          // Save to database with 1-based sequential order
-          const imageOrder = approvedImages.indexOf(image) + 1;
           const { error: dbError } = await supabase
             .from('user_images')
             .insert({
@@ -405,8 +405,8 @@ const ProfileCompletionForm = ({ user, onComplete, onCancel }: ProfileCompletion
               flagged_content: image.moderationResult?.flags || [],
               confidence_score: image.moderationResult?.confidence || 0
             });
-
           if (dbError) throw dbError;
+          imageOrder++;
         } catch (error) {
           console.error('Error uploading image:', error);
           toast({

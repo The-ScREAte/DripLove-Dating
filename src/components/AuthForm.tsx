@@ -9,6 +9,7 @@ import { Heart, Mail, Lock, Eye, EyeOff } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import { handleInputFocus, handleInputBlur, getInputStyles } from '@/utils/inputUtils';
+import { getPasswordResetRedirectUri, getEmailConfirmRedirectUri } from '@/config/oauth';
 
 interface AuthFormProps {
   isLogin: boolean;
@@ -31,6 +32,7 @@ const AuthForm = ({ isLogin, onToggle, onOAuthSuccess }: AuthFormProps) => {
   const [oauthLoading, setOauthLoading] = useState<'google' | null>(null);
   const [errors, setErrors] = useState<{[key: string]: string}>({});
   const [showForgotPassword, setShowForgotPassword] = useState(false);
+  const [resendingConfirmation, setResendingConfirmation] = useState(false);
 
   const validateForm = () => {
     const newErrors: {[key: string]: string} = {};
@@ -75,7 +77,10 @@ const AuthForm = ({ isLogin, onToggle, onOAuthSuccess }: AuthFormProps) => {
 
       const { data, error } = await supabase.auth.signInWithOAuth({
         provider: provider,
-        options: authConfig
+        options: {
+          redirectTo: authConfig.redirectTo,
+          queryParams: authConfig.queryParams
+        }
       });
 
       if (error) {
@@ -118,20 +123,53 @@ const AuthForm = ({ isLogin, onToggle, onOAuthSuccess }: AuthFormProps) => {
     setLoading(true);
     
     try {
-      const { error } = await supabase.auth.resetPasswordForEmail(formData.email, {
-        redirectTo: `${window.location.origin}/reset-password`,
-      });
-
-      if (error) {
-        toast({
-          title: "Password Reset Failed",
-          description: error.message,
-          variant: "destructive",
+      // Clear any cached session data that might affect URL generation
+      console.log('[Password Reset] Clearing any cached data...');
+      
+      const redirectUri = getPasswordResetRedirectUri();
+      console.log('[Password Reset] Using redirect URI:', redirectUri);
+      console.log('[Password Reset] Current location:', window.location.href);
+      console.log('[Password Reset] Is localhost:', window.location.hostname === 'localhost');
+      console.log('[Password Reset] Hostname:', window.location.hostname);
+      
+      // Double-check the URI before sending
+      if (window.location.hostname === 'localhost' && !redirectUri.includes('localhost')) {
+        console.error('[Password Reset] ERROR: Expected localhost URI but got:', redirectUri);
+        const correctedUri = `${window.location.origin}/reset-password`;
+        console.log('[Password Reset] Using corrected URI:', correctedUri);
+        
+        const { error } = await supabase.auth.resetPasswordForEmail(formData.email, {
+          redirectTo: correctedUri,
         });
-        setLoading(false);
-        return;
+        
+        if (error) {
+          console.error('[Password Reset] Supabase error:', error);
+          toast({
+            title: "Password Reset Failed",
+            description: error.message,
+            variant: "destructive",
+          });
+          setLoading(false);
+          return;
+        }
+      } else {
+        const { error } = await supabase.auth.resetPasswordForEmail(formData.email, {
+          redirectTo: redirectUri,
+        });
+
+        if (error) {
+          console.error('[Password Reset] Supabase error:', error);
+          toast({
+            title: "Password Reset Failed",
+            description: error.message,
+            variant: "destructive",
+          });
+          setLoading(false);
+          return;
+        }
       }
 
+      console.log('[Password Reset] Email sent successfully');
       toast({
         title: "Password Reset Email Sent",
         description: "Please check your email for password reset instructions.",
@@ -147,6 +185,40 @@ const AuthForm = ({ isLogin, onToggle, onOAuthSuccess }: AuthFormProps) => {
         variant: "destructive",
       });
       setLoading(false);
+    }
+  };
+
+  const resendConfirmationEmail = async (email: string) => {
+    setResendingConfirmation(true);
+    try {
+      const emailConfirmRedirectUri = getEmailConfirmRedirectUri();
+      console.log('[Resend Confirmation] Using redirect URI:', emailConfirmRedirectUri);
+
+      const { error } = await supabase.auth.resend({
+        type: 'signup',
+        email: email,
+        options: {
+          emailRedirectTo: emailConfirmRedirectUri
+        }
+      });
+
+      if (error) {
+        throw error;
+      }
+
+      toast({
+        title: "Confirmation Email Sent",
+        description: "We've sent a new confirmation email to your address. Please check your inbox and spam folder.",
+      });
+    } catch (error: any) {
+      console.error('[Resend Confirmation] Error:', error);
+      toast({
+        title: "Failed to Send Email",
+        description: error.message || "Could not resend confirmation email. Please try again later.",
+        variant: "destructive",
+      });
+    } finally {
+      setResendingConfirmation(false);
     }
   };
 
@@ -184,10 +256,39 @@ const AuthForm = ({ isLogin, onToggle, onOAuthSuccess }: AuthFormProps) => {
           password
         });
 
-        if (authError || !authData.user) {
+        if (authError) {
+          // Check for specific email confirmation error
+          if (authError.message.includes('Email not confirmed') || 
+              authError.message.includes('email must be confirmed') ||
+              authError.message.includes('email address not confirmed')) {
+            toast({
+              title: "Email Not Confirmed",
+              description: "Please check your email and click the confirmation link before signing in. If you haven't received the email, we can send you a new one.",
+              variant: "destructive",
+            });
+            
+            // Store email for potential resend
+            console.log('[Login] Email not confirmed for:', email);
+            
+            // Show option to resend confirmation email
+            if (window.confirm("Would you like us to send a new confirmation email?")) {
+              await resendConfirmationEmail(email);
+            }
+          } else {
+            toast({
+              title: "Login Failed",
+              description: authError.message || 'Invalid credentials',
+              variant: "destructive",
+            });
+          }
+          setLoading(false);
+          return;
+        }
+
+        if (!authData.user) {
           toast({
             title: "Login Failed",
-            description: authError?.message || 'Invalid credentials',
+            description: 'No user data received',
             variant: "destructive",
           });
           setLoading(false);
@@ -250,82 +351,113 @@ const AuthForm = ({ isLogin, onToggle, onOAuthSuccess }: AuthFormProps) => {
 
       } else {
         // Registration flow
-        const { data: authData, error: authError } = await supabase.auth.signUp({
-          email,
-          password
-        });
-
-        if (authError) {
-          toast({
-            title: "Registration Failed",
-            description: authError.message,
-            variant: "destructive",
-          });
-          setLoading(false);
-          return;
-        }
-
-        if (!authData.user) {
-          toast({
-            title: "Registration Failed",
-            description: "Failed to create account. Please try again.",
-            variant: "destructive",
-          });
-          setLoading(false);
-          return;
-        }
-
-        // Check if email confirmation is required
-        if (!authData.session) {
-          toast({
-            title: "Registration Successful",
-            description: "Please check your email to confirm your account before signing in.",
-          });
-          setLoading(false);
-          return;
-        }
-
-        // Create a basic profile for manual registration users
-        // This allows them to skip the profile completion flow (which is only for Google OAuth)
-        const { error: profileError } = await supabase
-          .from('profiles')
-          .insert({
-            id: authData.user.id,
-            email: authData.user.email || email,
-            first_name: 'User', // Basic placeholder
-            last_name: 'Profile', // Basic placeholder
-            date_of_birth: '1990-01-01',
-            country: 'US',
-            city: 'Unknown',
-            gender: 'prefer-not-to-say',
-            preference: 'both',
-            relationship_intent: 'not-sure',
-            occupation: 'Not specified',
-            industry: 'Not specified',
-            education_level: 'not-specified',
-            account_status: 'active',
-            is_admin: false
+        try {
+          // Get the appropriate email confirmation redirect URI
+          const emailConfirmRedirectUri = getEmailConfirmRedirectUri();
+          console.log('[Registration] Using email confirmation redirect URI:', emailConfirmRedirectUri);
+          
+          const { data: authData, error: authError } = await supabase.auth.signUp({
+            email,
+            password,
+            options: {
+              emailRedirectTo: emailConfirmRedirectUri
+            }
           });
 
-        if (profileError) {
-          console.error('Profile creation error:', profileError);
+          if (authError) {
+            console.error('[Registration] Auth error:', authError);
+            toast({
+              title: "Registration Failed",
+              description: authError.message,
+              variant: "destructive",
+            });
+            setLoading(false);
+            return;
+          }
+
+          if (!authData.user) {
+            toast({
+              title: "Registration Failed",
+              description: "Failed to create account. Please try again.",
+              variant: "destructive",
+            });
+            setLoading(false);
+            return;
+          }
+
+          console.log('[Registration] User created:', authData.user.id);
+          console.log('[Registration] Session created:', !!authData.session);
+          console.log('[Registration] Email confirmation required:', !authData.session);
+
+          // With email confirmation enabled, there should be no session initially
+          if (!authData.session) {
+            // This is the expected flow - email confirmation required
+            toast({
+              title: "Registration Successful!",
+              description: "Please check your email and click the confirmation link to activate your account. After confirming, you can sign in.",
+            });
+            
+            // Clear the form and switch to login mode
+            setFormData({
+              email: '',
+              password: '',
+              confirmPassword: ''
+            });
+            
+            // Switch to login form so user can sign in after confirmation
+            onToggle();
+            setLoading(false);
+            return;
+          } else {
+            // If a session was created immediately, email confirmation might be disabled
+            // We should still create a profile and warn the user
+            console.warn('[Registration] Session created immediately - email confirmation may be disabled');
+            
+            // Create a basic profile for manual registration users
+            const { error: profileError } = await supabase
+              .from('profiles')
+              .insert({
+                id: authData.user.id,
+                email: authData.user.email || email,
+                first_name: 'User', // Basic placeholder
+                last_name: 'Profile', // Basic placeholder
+                date_of_birth: '1990-01-01',
+                country: 'US',
+                city: 'Unknown',
+                gender: 'prefer-not-to-say',
+                preference: 'both',
+                relationship_intent: 'not-sure',
+                occupation: 'Not specified',
+                industry: 'Not specified',
+                education_level: 'not-specified',
+                account_status: 'active',
+                is_admin: false
+              });
+
+            if (profileError) {
+              console.error('[Registration] Profile creation error:', profileError);
+              // Don't fail the registration, just log the error
+              console.log('[Registration] User can complete profile later');
+            }
+
+            toast({
+              title: "Registration Successful",
+              description: "Account created successfully. Welcome to LoveConnect!",
+            });
+
+            // Navigate to home - user can update their profile later from the main app
+            navigate('/');
+          }
+        } catch (error: any) {
+          console.error('[Registration] Unexpected error:', error);
           toast({
             title: "Registration Error",
-            description: "Failed to create profile. Please try again.",
+            description: "An unexpected error occurred during registration. Please try again.",
             variant: "destructive",
           });
           setLoading(false);
           return;
         }
-
-        toast({
-          title: "Registration Successful",
-          description: "Account created successfully. Welcome to LoveConnect!",
-        });
-
-        // Navigate to home - user can update their profile later from the main app
-        navigate('/');
-
       }
 
       setLoading(false);

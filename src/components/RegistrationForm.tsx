@@ -373,7 +373,7 @@ const RegistrationForm = ({ onSubmit, onBackToLogin }: RegistrationFormProps) =>
     
     if (approvedImages.length < 2) {
       toast({
-        title: "Not enough photos",
+        title: "Photos required",
         description: "Please upload at least 2 photos to complete registration.",
         variant: "destructive"
       });
@@ -395,7 +395,7 @@ const RegistrationForm = ({ onSubmit, onBackToLogin }: RegistrationFormProps) =>
     if (imagesWithFiles.length < 2) {
       toast({
         title: "Photos need to be re-uploaded",
-        description: "Please re-upload your photos to complete registration.",
+        description: "Please re-upload your 2 photos to complete registration.",
         variant: "destructive"
       });
       // Clear images that don't have files and ask user to re-upload
@@ -413,64 +413,165 @@ const RegistrationForm = ({ onSubmit, onBackToLogin }: RegistrationFormProps) =>
     let userId = null;
     let userEmail = formData.email;
     let userCreated = false;
+    
     try {
-      // Create user in Supabase Auth with complete metadata
-      const { data: signUpData, error: signUpError } = await supabase.auth.signUp({
+      // Try to sign in first to see if user already exists
+      const { data: signInAttempt, error: signInAttemptError } = await supabase.auth.signInWithPassword({
         email: formData.email,
         password: formData.password,
-        options: {
-          data: {
-            first_name: formData.firstName,
-            last_name: formData.lastName,
-            date_of_birth: formData.dateOfBirth,
-            country: formData.country,
-            city: formData.city,
-            zip_code: formData.zipCode,
-            gender: formData.gender,
-            preference: formData.preference,
-            relationship_intent: formData.relationshipIntent,
-            occupation: formData.occupation || '',
-            industry: formData.industry || '',
-            education_level: formData.educationLevel || '',
-            bio: formData.bio || '',
-            email: formData.email,
-            email_verified: true,
-            phone_verified: false
-          }
-        }
       });
       
-      if (signUpError) {
-        // Handle the specific "User already registered" error
-        if (signUpError.message.includes('User already registered') || signUpError.message.includes('already been registered')) {
-          // Check if user is already signed in
-          const { data: { session } } = await supabase.auth.getSession();
-          if (session?.user) {
-            userId = session.user.id;
-            userCreated = true;
+      if (signInAttempt?.user) {
+        // User exists and can sign in - but check if email is confirmed
+        if (!signInAttempt.user.email_confirmed_at) {
+          console.log('User exists but email not confirmed');
+          setIsSubmitting(false);
+          toast({
+            title: 'Email Not Confirmed',
+            description: 'Please check your email and click the confirmation link before signing in.',
+            variant: 'destructive',
+          });
+          return;
+        }
+        
+        userId = signInAttempt.user.id;
+        userCreated = true;
+        console.log('User already exists, signed in successfully:', userId);
+      } else {
+        // User doesn't exist or password is wrong, try to create account
+        console.log('Creating new user account...');
+        const { data: signUpData, error: signUpError } = await supabase.auth.signUp({
+          email: formData.email,
+          password: formData.password,
+          options: {
+            emailRedirectTo: `${window.location.origin}/auth/confirm`,
+            data: {
+              first_name: formData.firstName,
+              last_name: formData.lastName,
+              date_of_birth: formData.dateOfBirth,
+              country: formData.country,
+              city: formData.city,
+              zip_code: formData.zipCode,
+              gender: formData.gender,
+              preference: formData.preference,
+              relationship_intent: formData.relationshipIntent,
+              occupation: formData.occupation || '',
+              industry: formData.industry || '',
+              education_level: formData.educationLevel || '',
+              bio: formData.bio || '',
+              email: formData.email,
+              email_verified: false, // Changed to false to require verification
+              phone_verified: false
+            }
+          }
+        });
+        
+        console.log('SignUp response:', {
+          user: signUpData?.user,
+          session: signUpData?.session,
+          emailConfirmedAt: signUpData?.user?.email_confirmed_at,
+          error: signUpError
+        });
+        
+        if (signUpError) {
+          console.error('SignUp error details:', signUpError);
+          
+          // If signup fails with "already registered", try to sign in again
+          if (signUpError.message.includes('User already registered') || 
+              signUpError.message.includes('already been registered') ||
+              signUpError.message.includes('already exists') ||
+              signUpError.code === 'user_already_exists') {
+            
+            const { data: retrySignIn, error: retrySignInError } = await supabase.auth.signInWithPassword({
+              email: formData.email,
+              password: formData.password,
+            });
+            
+            if (retrySignIn?.user) {
+              // Check if this existing user's email is confirmed
+              if (!retrySignIn.user.email_confirmed_at) {
+                console.log('Existing user but email not confirmed');
+                setIsSubmitting(false);
+                toast({
+                  title: 'Email Not Confirmed',
+                  description: 'Please check your email and click the confirmation link to verify your account.',
+                  variant: 'destructive',
+                });
+                return;
+              }
+              userId = retrySignIn.user.id;
+              userCreated = true;
+              console.log('Retry sign in successful after signup error:', userId);
+            } else {
+              throw new Error('User already exists but password is incorrect. Please sign in instead.');
+            }
           } else {
-            throw new Error('User already exists. Please sign in instead.');
+            throw signUpError;
           }
         } else {
-          throw signUpError;
+          // User was created successfully
+          userId = signUpData?.user?.id;
+          userCreated = !!userId;
+          console.log('Successfully created new user:', userId);
+          
+          // IMPORTANT: Check if user needs email confirmation
+          if (signUpData?.user && !signUpData.user.email_confirmed_at) {
+            console.log('User needs email confirmation - stopping registration process');
+            
+            // Save form data and images to complete registration after email confirmation
+            sessionStorage.setItem('pending_registration_data', JSON.stringify({
+              formData,
+              images: approvedImages.map(img => ({
+                preview: img.preview,
+                moderationResult: img.moderationResult,
+                status: img.status
+              })),
+              userId: signUpData.user.id
+            }));
+            
+            setIsSubmitting(false);
+            toast({
+              title: 'Check Your Email!',
+              description: 'We sent you a confirmation link. Please check your email and click the link to verify your account. Your registration will be completed after verification.',
+              variant: 'default',
+            });
+            
+            // Clear the registration images since we're stopping here
+            sessionStorage.removeItem('registration_images');
+            
+            // Redirect to login page after showing message
+            setTimeout(() => {
+              onBackToLogin();
+            }, 4000);
+            return; // STOP HERE - don't continue with profile creation
+          }
         }
-      } else {
-        userId = signUpData?.user?.id;
-        userCreated = !!userId;
       }
     } catch (err) {
-      console.error('Auth signup error:', err);
-      setIsSubmitting(false); // Reset loading state
+      console.error('Auth error:', err);
+      setIsSubmitting(false);
       toast({
         title: 'Account Creation Error',
-        description: err.message || 'Failed to create account.',
+        description: err.message || 'Failed to create account. Please try a different email or sign in if you already have an account.',
         variant: 'destructive',
       });
       return;
     }
 
-    // 2. Save profile data
+    // 2. Save profile data (handle case where profile might already exist from DB trigger)
+    // Add a small delay to allow any database triggers to complete
+    await new Promise(resolve => setTimeout(resolve, 1000));
+    
     try {
+      // First check if profile already exists
+      const { data: existingProfile, error: fetchError } = await supabase
+        .from('profiles')
+        .select('id, email')
+        .eq('id', userId)
+        .single();
+
+      console.log('Existing profile check:', existingProfile ? 'Found' : 'Not found');
+
       const profileData = {
         id: userId,
         email: userEmail,
@@ -494,11 +595,46 @@ const RegistrationForm = ({ onSubmit, onBackToLogin }: RegistrationFormProps) =>
         max_distance: formData.maxDistance || 50,
         country_code: formData.countryCode || ''
       };
-      const { error: profileError } = await supabase
-        .from('profiles')
-        .upsert(profileData);
-      if (profileError) throw profileError;
+
+      if (existingProfile) {
+        // Profile exists, update it
+        console.log('Updating existing profile for user:', userId);
+        const { error: profileError } = await supabase
+          .from('profiles')
+          .update(profileData)
+          .eq('id', userId);
+        if (profileError) {
+          console.error('Profile update error:', profileError);
+          throw profileError;
+        }
+      } else {
+        // Profile doesn't exist, create it
+        console.log('Creating new profile for user:', userId);
+        const { error: profileError } = await supabase
+          .from('profiles')
+          .insert(profileData);
+        if (profileError) {
+          console.error('Profile insert error:', profileError);
+          // If insert fails due to conflict, try update instead
+          if (profileError.code === '23505' || profileError.message.includes('duplicate') || profileError.message.includes('already exists')) {
+            console.log('Insert failed due to conflict, trying update instead...');
+            const { error: updateError } = await supabase
+              .from('profiles')
+              .update(profileData)
+              .eq('id', userId);
+            if (updateError) {
+              console.error('Profile update after conflict error:', updateError);
+              throw updateError;
+            }
+          } else {
+            throw profileError;
+          }
+        }
+      }
+      
+      console.log('Profile saved successfully for user:', userId);
     } catch (err) {
+      console.error('Profile save error:', err);
       setIsSubmitting(false); // Reset loading state
       toast({
         title: 'Profile Save Error',
@@ -508,35 +644,41 @@ const RegistrationForm = ({ onSubmit, onBackToLogin }: RegistrationFormProps) =>
       return;
     }
 
-    // 3. Upload approved images to storage and save to DB
+    // 3. Upload approved images to storage and save to DB (after user is created)
+    console.log('Starting image upload for user:', userId);
+    console.log('Images to upload:', imagesWithFiles.length);
+    
     let imageOrder = 1;
     for (const image of imagesWithFiles) {
       try {
-        // Skip if file is null (restored from sessionStorage)
         if (!image.file) {
           console.warn('Skipping image upload - file is null');
           continue;
         }
-
+        
+        console.log(`Uploading image ${imageOrder} for user ${userId}`);
+        
         // Upload to storage
         const fileExt = image.file.name?.split('.').pop() || 'jpg';
         const fileName = `${Date.now()}-${Math.random().toString(36).substr(2, 9)}.${fileExt}`;
         const filePath = `${userId}/${fileName}`;
-
+        
         const { error: uploadError } = await supabase.storage
           .from('user-photos')
           .upload(filePath, image.file);
-
+          
         if (uploadError) {
           console.error('Upload error:', uploadError);
           throw uploadError;
         }
-
+        
         // Get public URL
         const { data: { publicUrl } } = supabase.storage
           .from('user-photos')
           .getPublicUrl(filePath);
-
+        
+        console.log(`Image uploaded successfully, saving to DB: ${publicUrl}`);
+        
         // Save to database with proper image order (1-based index, max 7)
         const { error: dbError } = await supabase
           .from('user_images')
@@ -549,30 +691,64 @@ const RegistrationForm = ({ onSubmit, onBackToLogin }: RegistrationFormProps) =>
             flagged_content: image.moderationResult?.flags || [],
             confidence_score: image.moderationResult?.confidence || 0
           });
-
+          
         if (dbError) {
           console.error('Database error:', dbError);
           throw dbError;
         }
         
-        // Increment order for next image
+        console.log(`Image ${imageOrder} saved to database successfully`);
         imageOrder++;
       } catch (error) {
-        console.error('Error uploading image:', error);
+        console.error(`Error uploading image ${imageOrder}:`, error);
         toast({
           title: 'Image Upload Error',
-          description: 'Some images failed to upload. You can add them later.',
+          description: `Image ${imageOrder} failed to upload. You can add it later from your profile.`,
           variant: 'destructive',
         });
+        // Continue with other images instead of failing completely
       }
     }
 
     setIsSubmitting(false); // Reset loading state
+    
+    console.log('Registration completed successfully for user:', userId);
+    
     toast({
       title: 'Account Created!',
       description: 'Your account and profile have been created. Welcome!',
     });
-    onSubmit({ ...formData, images: approvedImages });
+    
+    // Clear sessionStorage after successful registration
+    sessionStorage.removeItem('registration_images');
+    
+    // Fetch the new user from supabase and pass to onSubmit so app state updates
+    try {
+      const { data: { user }, error: userError } = await supabase.auth.getUser();
+      if (userError) {
+        console.error('Error fetching user after registration:', userError);
+      }
+      
+      if (user) {
+        console.log('Passing user data to parent component:', user.id);
+        // Try to force a reload/redirect if onSubmit does not update the app state
+        onSubmit({ ...formData, images: approvedImages, user });
+        
+        // If the parent does not update view, do it here as a fallback
+        if (typeof window !== 'undefined') {
+          setTimeout(() => {
+            console.log('Fallback: reloading page to update app state');
+            window.location.reload();
+          }, 1000); // Increased timeout to give parent more time to handle
+        }
+      } else {
+        console.log('No user found after registration, passing form data only');
+        onSubmit({ ...formData, images: approvedImages });
+      }
+    } catch (error) {
+      console.error('Error in final user fetch:', error);
+      onSubmit({ ...formData, images: approvedImages });
+    }
   };
 
   return (
@@ -584,7 +760,7 @@ const RegistrationForm = ({ onSubmit, onBackToLogin }: RegistrationFormProps) =>
           </div>
         </div>
         <CardTitle className="text-2xl font-bold bg-gradient-to-r from-pink-600 to-purple-600 bg-clip-text text-transparent animate-fade-in">
-          {currentStep === 1 ? 'Create Your Account' : currentStep === 2 ? 'Tell Us More About You' : 'Add Your Photos'}
+          {currentStep === 1 ? 'Create Your Account' : currentStep === 2 ? 'Tell Us More About You' : 'Add Your Photo'}
         </CardTitle>
         <CardDescription className="text-gray-600 animate-fade-in">
           {currentStep === 1 
@@ -783,7 +959,7 @@ const RegistrationForm = ({ onSubmit, onBackToLogin }: RegistrationFormProps) =>
                 <div className="bg-blue-50 p-4 rounded-lg">
                   <h4 className="font-medium text-blue-900 mb-2">Photo Guidelines:</h4>
                   <ul className="text-sm text-blue-800 space-y-1">
-                    <li>• Clear photos showing your face</li>
+                    <li>• Clear photo showing your face</li>
                     <li>• Appropriate clothing required</li>
                     <li>• No explicit or inappropriate content</li>
                     <li>• Borderline content may require admin review</li>
@@ -814,7 +990,7 @@ const RegistrationForm = ({ onSubmit, onBackToLogin }: RegistrationFormProps) =>
                 : currentStep === 1 
                   ? 'Continue' 
                   : currentStep === 2 
-                    ? 'Add Photos' 
+                    ? 'Add Photo' 
                     : 'Create Account'
               }
             </Button>
