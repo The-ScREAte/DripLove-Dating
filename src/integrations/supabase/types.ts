@@ -760,6 +760,10 @@ export type Database = {
         Args: Record<PropertyKey, never>
         Returns: undefined
       }
+      cleanup_incomplete_users: {
+        Args: Record<PropertyKey, never>
+        Returns: undefined
+      }
       create_admin_user: {
         Args: {
           admin_email: string
