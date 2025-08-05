@@ -350,7 +350,23 @@ const AuthForm = ({ isLogin, onToggle, onOAuthSuccess }: AuthFormProps) => {
         navigate('/');
 
       } else {
-        // Registration flow
+        // Registration flow - first check if profile already exists
+        const { data: existingProfile, error: profileCheckError } = await supabase
+          .from('profiles')
+          .select('id')
+          .eq('email', email)
+          .single();
+        
+        if (existingProfile) {
+          toast({
+            title: "Account Already Exists",
+            description: "An account with this email already exists. Please sign in instead.",
+            variant: "destructive",
+          });
+          setLoading(false);
+          return;
+        }
+        
         try {
           // Get the appropriate email confirmation redirect URI
           const emailConfirmRedirectUri = getEmailConfirmRedirectUri();

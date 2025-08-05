@@ -415,49 +415,61 @@ const RegistrationForm = ({ onSubmit, onBackToLogin }: RegistrationFormProps) =>
     let userCreated = false;
     
     try {
-      // Try to sign in first to see if user already exists
-      const { data: signInAttempt, error: signInAttemptError } = await supabase.auth.signInWithPassword({
+      // Check if user profile already exists (this is the only check that matters)
+      const { data: existingProfile, error: profileCheckError } = await supabase
+        .from('profiles')
+        .select('id')
+        .eq('email', formData.email)
+        .single();
+      
+      if (existingProfile) {
+        toast({
+          title: "Account exists",
+          description: "An account with this email already exists. Please sign in instead.",
+          variant: "destructive"
+        });
+        setIsSubmitting(false);
+        return;
+      }
+      
+      // Create new user account directly (no existing user checks in auth.users)
+      console.log('Creating new user account...');
+      const { data: signUpData, error: signUpError } = await supabase.auth.signUp({
         email: formData.email,
         password: formData.password,
+        options: {
+          data: {
+            first_name: formData.firstName,
+            last_name: formData.lastName,
+            date_of_birth: formData.dateOfBirth,
+            country: formData.country,
+            city: formData.city,
+            zip_code: formData.zipCode,
+            gender: formData.gender,
+            preference: formData.preference,
+            relationship_intent: formData.relationshipIntent,
+            occupation: formData.occupation || '',
+            industry: formData.industry || '',
+            education_level: formData.educationLevel || '',
+            bio: formData.bio || ''
+          }
+        }
       });
       
-      if (signInAttempt?.user) {
-        userId = signInAttempt.user.id;
-        userCreated = true;
-        console.log('User already exists, signed in successfully:', userId);
-      } else {
-        // User doesn't exist, create account
-        console.log('Creating new user account...');
-        const { data: signUpData, error: signUpError } = await supabase.auth.signUp({
-          email: formData.email,
-          password: formData.password,
-          options: {
-            data: {
-              first_name: formData.firstName,
-              last_name: formData.lastName,
-              date_of_birth: formData.dateOfBirth,
-              country: formData.country,
-              city: formData.city,
-              zip_code: formData.zipCode,
-              gender: formData.gender,
-              preference: formData.preference,
-              relationship_intent: formData.relationshipIntent,
-              occupation: formData.occupation || '',
-              industry: formData.industry || '',
-              education_level: formData.educationLevel || '',
-              bio: formData.bio || ''
-            }
-          }
+      if (signUpError) {
+        console.error('SignUp error:', signUpError);
+        toast({
+          title: "Registration failed",
+          description: signUpError.message,
+          variant: "destructive"
         });
-        
-        if (signUpError) {
-          throw signUpError;
-        }
-        
-        userId = signUpData?.user?.id;
-        userCreated = !!userId;
-        console.log('Successfully created new user:', userId);
+        setIsSubmitting(false);
+        return;
       }
+      
+      userId = signUpData?.user?.id;
+      userCreated = !!userId;
+      console.log('Successfully created new user:', userId);
     } catch (err) {
       console.error('Auth error:', err);
       setIsSubmitting(false);
