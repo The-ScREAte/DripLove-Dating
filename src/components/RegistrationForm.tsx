@@ -38,6 +38,8 @@ const RegistrationForm = ({ onSubmit, onBackToLogin }: RegistrationFormProps) =>
   const [currentStep, setCurrentStep] = useState(1);
   const [images, setImages] = useState<ImageUpload[]>([]);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [emailVerificationSent, setEmailVerificationSent] = useState(false);
+  const [emailVerified, setEmailVerified] = useState(false);
   const { toast } = useToast();
 
   // Restore images from sessionStorage on mount
@@ -293,7 +295,7 @@ const RegistrationForm = ({ onSubmit, onBackToLogin }: RegistrationFormProps) =>
     }
   };
 
-  const handleContinue = () => {
+  const handleContinue = async () => {
     // Validate first step fields
     const firstStepErrors: Record<string, string> = {};
     if (!formData.firstName.trim()) firstStepErrors.firstName = 'First name is required';
@@ -343,8 +345,100 @@ const RegistrationForm = ({ onSubmit, onBackToLogin }: RegistrationFormProps) =>
     }
     
     setErrors({});
+    
+    // If email verification hasn't been sent, send it now
+    if (!emailVerificationSent) {
+      setIsSubmitting(true);
+      try {
+        const { error } = await supabase.auth.signUp({
+          email: formData.email,
+          password: formData.password,
+          options: {
+            emailRedirectTo: `${window.location.origin}/auth/confirm`,
+            data: {
+              first_name: formData.firstName,
+              last_name: formData.lastName,
+            }
+          }
+        });
+
+        if (error) {
+          if (error.message.includes('already registered') || error.message.includes('already exists')) {
+            toast({
+              title: "Account exists",
+              description: "An account with this email already exists. Please sign in instead.",
+              variant: "destructive"
+            });
+          } else {
+            toast({
+              title: "Error",
+              description: error.message,
+              variant: "destructive"
+            });
+          }
+          setIsSubmitting(false);
+          return;
+        }
+
+        setEmailVerificationSent(true);
+        toast({
+          title: "Verification email sent",
+          description: "Please check your email and click the verification link to continue.",
+          variant: "default"
+        });
+      } catch (error) {
+        console.error('Error sending verification email:', error);
+        toast({
+          title: "Error",
+          description: "Failed to send verification email. Please try again.",
+          variant: "destructive"
+        });
+      }
+      setIsSubmitting(false);
+      return;
+    }
+    
+    // Check if email is verified before proceeding
+    if (!emailVerified) {
+      toast({
+        title: "Email not verified",
+        description: "Please verify your email before continuing to the next step.",
+        variant: "destructive"
+      });
+      return;
+    }
+    
     setCurrentStep(2);
   };
+
+  // Check email verification status
+  React.useEffect(() => {
+    if (emailVerificationSent) {
+      const checkVerification = async () => {
+        const { data: { session } } = await supabase.auth.getSession();
+        if (session?.user?.email_confirmed_at) {
+          setEmailVerified(true);
+          toast({
+            title: "Email verified!",
+            description: "You can now continue with registration.",
+            variant: "default"
+          });
+        }
+      };
+
+      // Check verification status every 3 seconds
+      const interval = setInterval(checkVerification, 3000);
+      
+      // Also check when the component regains focus (user comes back from email)
+      const handleFocus = () => checkVerification();
+      window.addEventListener('focus', handleFocus);
+      
+      return () => {
+        clearInterval(interval);
+        window.removeEventListener('focus', handleFocus);
+      };
+    }
+  }, [emailVerificationSent, toast]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -415,138 +509,16 @@ const RegistrationForm = ({ onSubmit, onBackToLogin }: RegistrationFormProps) =>
     let userCreated = false;
     
     try {
-      // Try to sign in first to see if user already exists
-      const { data: signInAttempt, error: signInAttemptError } = await supabase.auth.signInWithPassword({
-        email: formData.email,
-        password: formData.password,
-      });
+      // Get the current session (user should already be authenticated from step 1)
+      const { data: { session }, error: sessionError } = await supabase.auth.getSession();
       
-      if (signInAttempt?.user) {
-        // User exists and can sign in - but check if email is confirmed
-        if (!signInAttempt.user.email_confirmed_at) {
-          console.log('User exists but email not confirmed');
-          setIsSubmitting(false);
-          toast({
-            title: 'Email Not Confirmed',
-            description: 'Please check your email and click the confirmation link before signing in.',
-            variant: 'destructive',
-          });
-          return;
-        }
-        
-        userId = signInAttempt.user.id;
-        userCreated = true;
-        console.log('User already exists, signed in successfully:', userId);
-      } else {
-        // User doesn't exist or password is wrong, try to create account
-        console.log('Creating new user account...');
-        const { data: signUpData, error: signUpError } = await supabase.auth.signUp({
-          email: formData.email,
-          password: formData.password,
-          options: {
-            emailRedirectTo: `${window.location.origin}/auth/confirm`,
-            data: {
-              first_name: formData.firstName,
-              last_name: formData.lastName,
-              date_of_birth: formData.dateOfBirth,
-              country: formData.country,
-              city: formData.city,
-              zip_code: formData.zipCode,
-              gender: formData.gender,
-              preference: formData.preference,
-              relationship_intent: formData.relationshipIntent,
-              occupation: formData.occupation || '',
-              industry: formData.industry || '',
-              education_level: formData.educationLevel || '',
-              bio: formData.bio || '',
-              email: formData.email,
-              email_verified: false, // Changed to false to require verification
-              phone_verified: false
-            }
-          }
-        });
-        
-        console.log('SignUp response:', {
-          user: signUpData?.user,
-          session: signUpData?.session,
-          emailConfirmedAt: signUpData?.user?.email_confirmed_at,
-          error: signUpError
-        });
-        
-        if (signUpError) {
-          console.error('SignUp error details:', signUpError);
-          
-          // If signup fails with "already registered", try to sign in again
-          if (signUpError.message.includes('User already registered') || 
-              signUpError.message.includes('already been registered') ||
-              signUpError.message.includes('already exists') ||
-              signUpError.code === 'user_already_exists') {
-            
-            const { data: retrySignIn, error: retrySignInError } = await supabase.auth.signInWithPassword({
-              email: formData.email,
-              password: formData.password,
-            });
-            
-            if (retrySignIn?.user) {
-              // Check if this existing user's email is confirmed
-              if (!retrySignIn.user.email_confirmed_at) {
-                console.log('Existing user but email not confirmed');
-                setIsSubmitting(false);
-                toast({
-                  title: 'Email Not Confirmed',
-                  description: 'Please check your email and click the confirmation link to verify your account.',
-                  variant: 'destructive',
-                });
-                return;
-              }
-              userId = retrySignIn.user.id;
-              userCreated = true;
-              console.log('Retry sign in successful after signup error:', userId);
-            } else {
-              throw new Error('User already exists but password is incorrect. Please sign in instead.');
-            }
-          } else {
-            throw signUpError;
-          }
-        } else {
-          // User was created successfully
-          userId = signUpData?.user?.id;
-          userCreated = !!userId;
-          console.log('Successfully created new user:', userId);
-          
-          // IMPORTANT: Check if user needs email confirmation
-          if (signUpData?.user && !signUpData.user.email_confirmed_at) {
-            console.log('User needs email confirmation - stopping registration process');
-            
-            // Save form data and images to complete registration after email confirmation
-            sessionStorage.setItem('pending_registration_data', JSON.stringify({
-              formData,
-              images: approvedImages.map(img => ({
-                preview: img.preview,
-                moderationResult: img.moderationResult,
-                status: img.status
-              })),
-              userId: signUpData.user.id
-            }));
-            
-            setIsSubmitting(false);
-            toast({
-              title: 'Check Your Email!',
-              description: 'We sent you a confirmation link. Please check your email and click the link to verify your account. Your registration will be completed after verification.',
-              variant: 'default',
-            });
-            
-            // Clear the registration images since we're stopping here
-            sessionStorage.removeItem('registration_images');
-            
-            // Redirect to login page after showing message
-            setTimeout(() => {
-              onBackToLogin();
-            }, 4000);
-            return; // STOP HERE - don't continue with profile creation
-          }
-        }
+      if (!session?.user) {
+        throw new Error('User session not found. Please sign in again.');
       }
+      
+      userId = session.user.id;
+      userCreated = true;
+      console.log('Using existing authenticated user:', userId);
     } catch (err) {
       console.error('Auth error:', err);
       setIsSubmitting(false);
@@ -801,6 +773,26 @@ const RegistrationForm = ({ onSubmit, onBackToLogin }: RegistrationFormProps) =>
               required={true}
             />
           </div>
+
+          {/* Email Verification Status */}
+          {emailVerificationSent && (
+            <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 animate-fade-in">
+              <div className="flex items-center">
+                <CheckCircle className={`w-5 h-5 mr-2 ${emailVerified ? 'text-green-600' : 'text-blue-600'}`} />
+                <div>
+                  <p className={`font-medium ${emailVerified ? 'text-green-800' : 'text-blue-800'}`}>
+                    {emailVerified ? 'Email Verified!' : 'Verification Email Sent'}
+                  </p>
+                  <p className={`text-sm ${emailVerified ? 'text-green-600' : 'text-blue-600'}`}>
+                    {emailVerified 
+                      ? 'You can now continue to the next step.'
+                      : 'Please check your email and click the verification link. This page will update automatically.'
+                    }
+                  </p>
+                </div>
+              </div>
+            </div>
+          )}
           </div>
           )}
 
@@ -986,9 +978,9 @@ const RegistrationForm = ({ onSubmit, onBackToLogin }: RegistrationFormProps) =>
               className="w-full bg-gradient-to-r from-pink-500 to-purple-600 hover:from-pink-600 hover:to-purple-700 text-white font-semibold py-3 rounded-lg transition-all duration-200 animate-fade-in disabled:opacity-50 disabled:cursor-not-allowed"
             >
               {isSubmitting 
-                ? 'Creating Account...' 
+                ? (emailVerificationSent ? 'Checking verification...' : 'Sending verification email...') 
                 : currentStep === 1 
-                  ? 'Continue' 
+                  ? (emailVerificationSent ? (emailVerified ? 'Continue' : 'Verify Email to Continue') : 'Send Verification Email')
                   : currentStep === 2 
                     ? 'Add Photo' 
                     : 'Create Account'
