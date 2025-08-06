@@ -8,6 +8,7 @@ import { useSubscription } from '@/hooks/useSubscription';
 import { useImagePreloader } from '@/hooks/useImagePreloader';
 import { calculateDistance } from '@/constants/locationData';
 import { debounce, optimizeImageUrl, createPagination, userDataCache } from '@/utils/performanceOptimizer';
+import { calculateProfileCompletion, getTodaySwipeCount, checkSwipeRestrictions } from '@/utils/profileCompletion';
 
 // Helper function to calculate age from date of birth
 const calculateAge = (dateOfBirth: string): number => {

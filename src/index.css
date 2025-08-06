@@ -3,6 +3,9 @@
 @tailwind components;
 @tailwind utilities;
 
+/* Import safe area styles */
+@import './styles/safeArea.css';
+
 /* Mobile optimizations and safe areas */
 @layer base {
   html, body, #root {

@@ -872,7 +872,7 @@ const AdminPageComponent = ({ currentUser, onLogout }: AdminPageProps) => {
   }
   
   return (
-    <div className="w-full min-h-screen bg-gray-100"
+    <div className="admin-page-container w-full min-h-screen bg-gray-100"
          style={{ 
            touchAction: 'pan-x pan-y',
            userSelect: 'none',
@@ -880,25 +880,32 @@ const AdminPageComponent = ({ currentUser, onLogout }: AdminPageProps) => {
            WebkitTouchCallout: 'none'
          }}>
       <div className="w-full max-w-[390px] mx-auto bg-white min-h-screen">
-        <div className="p-4">
-          {/* Header */}
-          <div className="flex items-center justify-between mb-6">
-            <h1 className="text-2xl font-bold">Admin Dashboard</h1>
-            <div className="flex items-center gap-2">
-              <Badge variant="outline" className="px-3 py-1">
-                <Shield className="w-4 h-4 mr-1" />
-                Admin
-              </Badge>
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={handleLogout}
-                className="text-red-600 hover:text-red-700"
-              >
-                <LogOut className="w-4 h-4" />
-              </Button>
+        {/* Fixed Header with Safe Area */}
+        <div className="sticky top-0 z-50 bg-white border-b border-gray-200">
+          <div className="p-4">
+            {/* Header */}
+            <div className="flex items-center justify-between mb-6">
+              <h1 className="text-2xl font-bold">Admin Dashboard</h1>
+              <div className="flex items-center gap-2">
+                <Badge variant="outline" className="px-3 py-1">
+                  <Shield className="w-4 h-4 mr-1" />
+                  Admin
+                </Badge>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={handleLogout}
+                  className="text-red-600 hover:text-red-700"
+                >
+                  <LogOut className="w-4 h-4" />
+                </Button>
+              </div>
             </div>
           </div>
+        </div>
+        
+        {/* Scrollable Content */}
+        <div className="p-4">
 
           {/* Tabbed Interface with Error Boundaries for 1000+ users */}
           <AdminErrorBoundary>

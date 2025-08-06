@@ -9,7 +9,7 @@ interface TermsOfServiceNewProps {
 const TermsOfServiceNew = ({ onBack }: TermsOfServiceNewProps) => {
   return (
     <div 
-      className="min-h-screen bg-gradient-to-br from-pink-400 via-purple-500 to-indigo-600 p-4 mobile-container"
+      className="terms-container min-h-screen bg-gradient-to-br from-pink-400 via-purple-500 to-indigo-600 p-4 mobile-container"
       style={{
         paddingTop: `max(env(safe-area-inset-top, 0px), 16px)`,
         paddingBottom: `max(env(safe-area-inset-bottom, 0px), 16px)`,
