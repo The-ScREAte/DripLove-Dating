@@ -260,30 +260,18 @@ const ChatPage = ({ currentUser, onUnreadChange }: ChatPageProps) => {
 
       if (error) throw error;
 
-      // Send push notification to the recipient using Supabase Edge Function
+      // Send push notification to the recipient
       const recipientId = selectedMatch.user1_id === currentUser.id 
         ? selectedMatch.user2_id 
         : selectedMatch.user1_id;
       const senderName = `${currentUser.first_name || ''} ${currentUser.last_name || ''}`.trim() || 'Someone';
 
-      // Fetch the recipient's push token from Supabase
-      const { data: pushTokenData } = await supabase
-        .from('push_tokens')
-        .select('token')
-        .eq('user_id', recipientId)
-        .maybeSingle();
-
-      if (pushTokenData?.token) {
-        // Call your Edge Function to send the push notification
-        fetch('https://tgjsyyihabsovironesw.supabase.co/functions/v1/send-push-notification', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            token: pushTokenData.token,
-            title: `${senderName} sent you a message`,
-            message: newMessage.trim()
-          })
-        });
+      // Use the proper notification service
+      try {
+        await sendMessageNotification(senderName, newMessage.trim(), recipientId, selectedMatch.id);
+      } catch (notificationError) {
+        console.warn('Failed to send push notification:', notificationError);
+        // Don't fail the message send if notification fails
       }
 
       // Try to update unread count (only if field exists)

@@ -66,7 +66,7 @@ class SupabasePushNotificationService {
       
       // Ensure we're on a native platform and push notifications are available
       if (!Capacitor.isNativePlatform() || typeof PushNotifications === 'undefined') {
-        console.warn('⚠️ Push notifications not available on this platform');
+        console.warn('⚠️ Push notifications not available on this platform - using real-time only');
         return;
       }
 
@@ -91,7 +91,7 @@ class SupabasePushNotificationService {
           await PushNotifications.register();
           console.log('📱 Push registration initiated successfully');
         } catch (registerError) {
-          console.error('❌ Failed to register for push notifications:', registerError);
+          console.warn('⚠️ Failed to register for push notifications - real-time notifications will still work:', registerError);
           // Continue without push notifications rather than failing completely
           return;
         }
@@ -104,7 +104,7 @@ class SupabasePushNotificationService {
         });
 
         PushNotifications.addListener('registrationError', (error: unknown) => {
-          console.error('❌ Error registering for push notifications:', error);
+          console.warn('⚠️ Error registering for push notifications - real-time notifications will still work:', error);
           // Don't throw - let the app continue without push notifications
         });
 
@@ -116,9 +116,11 @@ class SupabasePushNotificationService {
         PushNotifications.addListener('pushNotificationActionPerformed', (notification: ActionPerformed) => {
           this.handleNotificationAction(notification);
         });
+      } else {
+        console.warn('⚠️ Push notification permissions not granted - real-time notifications will still work');
       }
     } catch (error) {
-      console.error('❌ Error initializing native push notifications:', error);
+      console.warn('⚠️ Error initializing native push notifications - real-time notifications will still work:', error);
     }
   }
 
@@ -255,12 +257,24 @@ class SupabasePushNotificationService {
       });
 
       if (error) {
+        console.warn('Push notification service error:', error);
+        // Don't return false immediately - the notification might still be stored for real-time
+      }
+
+      // Check if notification was processed successfully (either via push or real-time)
+      const success = data?.success || data?.realTimeStored;
+      
+      if (success) {
+        console.log('✅ Notification sent successfully:', data?.message);
+        return true;
+      } else {
+        console.warn('⚠️ Notification failed:', data?.message || 'Unknown error');
         return false;
       }
 
-      return true;
-
     } catch (error) {
+      console.error('❌ Notification service error:', error);
+      // Even if push fails, real-time notifications should still work
       return false;
     }
   }

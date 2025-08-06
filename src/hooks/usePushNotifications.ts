@@ -27,6 +27,7 @@ export const usePushNotifications = (userId?: string) => {
         setIsSupported(webSupported);
         
         if (!webSupported) {
+          console.log('📱 Web notifications not supported - real-time notifications will still work');
           return;
         }
 
@@ -66,7 +67,7 @@ export const usePushNotifications = (userId?: string) => {
         }
         
         if (!initialized) {
-          // ...removed console.log...
+          console.log('📱 Push notifications not fully initialized - real-time notifications will still work');
         }
       } catch (err) {
         const errorInfo = handlePushNotificationError(err);
