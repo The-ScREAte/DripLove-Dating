@@ -27,7 +27,10 @@ import PremiumUpgrade from './PremiumUpgrade';
 import MatchAnimation from './MatchAnimation';
 import MatchCard from './discover/MatchCard';
 import SwipeButtons from './discover/SwipeButtons';
+import ProfileCompletionModal from './ProfileCompletionModal';
+import SwipeCounter from './SwipeCounter';
 import { CurrentUser, PotentialMatch } from '@/types';
+import { checkSwipeRestrictions, calculateProfileCompletion, getTodaySwipeCount } from '@/utils/profileCompletion';
 
 interface DiscoverPageProps {
   currentUser: CurrentUser;
@@ -56,6 +59,11 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, isPremium }: DiscoverPage
   const [userImages, setUserImages] = useState<{ [key: string]: string[] }>({});
   const [preloadedImages, setPreloadedImages] = useState<{ [key: string]: HTMLImageElement[] }>({});
   const [reverseUsageToday, setReverseUsageToday] = useState(0);
+  const [profileCompletion, setProfileCompletion] = useState(0);
+  const [profileMissingFields, setProfileMissingFields] = useState<string[]>([]);
+  const [userProfileImages, setUserProfileImages] = useState<any[]>([]);
+  const [showProfileCompletionModal, setShowProfileCompletionModal] = useState(false);
+  const [todaySwipeCount, setTodaySwipeCount] = useState(0);
   const { toast } = useToast();
   const { subscription, checkUsageLimit, refetchSubscription } = useSubscription(currentUser?.id);
   const { preloadImages, getOptimizedUrl, isImageLoaded } = useImagePreloader({
@@ -85,7 +93,6 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, isPremium }: DiscoverPage
   useEffect(() => {
     const urlParams = new URLSearchParams(window.location.search);
     if (urlParams.get('premium') === 'activated') {
-      // ...removed console.log...
       refetchSubscription();
       toast({
         title: 'Welcome to Premium!',
@@ -98,37 +105,54 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, isPremium }: DiscoverPage
     }
   }, [refetchSubscription, toast]);
 
-  const debugSubscription = async () => {
-    // Test direct database call
-    if (currentUser?.id) {
-      try {
-        const { data, error } = await supabase.rpc('get_user_subscription', {
-          user_id_param: currentUser.id
-        });
-        
-        // Also try direct table query
-        const { data: directData, error: directError } = await supabase
-          .from('user_subscriptions')
-          .select('*')
-          .eq('user_id', currentUser.id)
-          .single();
-      } catch (err) {
-        console.error('🐛 DEBUG - Error in direct calls:', err);
-      }
-    }
-  };
-
-  // Add debug functions to window for console access
-  useEffect(() => {
-    if (typeof window !== 'undefined') {
-      (window as any).debugSubscription = debugSubscription;
-      (window as any).refetchSubscription = refetchSubscription;
-      (window as any).isPremium = isPremium;
-      // ...removed console.log...
-    }
-  }, [debugSubscription, refetchSubscription, isPremium]);
-
   // Fetch current reverse usage for today
+  // Fetch user profile and calculate completion on mount
+  useEffect(() => {
+    const fetchUserProfileCompletion = async () => {
+      if (!currentUser?.id) return;
+
+      try {
+        // Fetch user profile
+        const { data: profile, error: profileError } = await supabase
+          .from('profiles')
+          .select('*')
+          .eq('id', currentUser.id)
+          .single();
+
+        if (profileError) {
+          console.error('Error fetching user profile:', profileError);
+          return;
+        }
+
+        // Fetch user images
+        const { data: images, error: imagesError } = await supabase
+          .from('user_images')
+          .select('image_url, is_approved, moderation_status')
+          .eq('user_id', currentUser.id);
+
+        if (imagesError) {
+          console.error('Error fetching user images:', imagesError);
+        }
+
+        const userImages = images || [];
+        setUserProfileImages(userImages);
+
+        // Calculate profile completion
+        const completionResult = calculateProfileCompletion(profile, userImages);
+        setProfileCompletion(completionResult.completion);
+        setProfileMissingFields(completionResult.missingFields);
+
+        // Get today's swipe count
+        const swipeCount = await getTodaySwipeCount(currentUser.id);
+        setTodaySwipeCount(swipeCount);
+      } catch (error) {
+        console.error('Error calculating profile completion:', error);
+      }
+    };
+
+    fetchUserProfileCompletion();
+  }, [currentUser?.id]);
+
   const fetchReverseUsage = useCallback(async () => {
     if (!currentUser?.id) return;
     
@@ -731,11 +755,10 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, isPremium }: DiscoverPage
     const currentMatch = potentialMatches[currentIndex];
     if (!currentMatch) return;
 
-    moveToNext(); // Move UI instantly
-
-    // Check swipe limit only for free users
+    // FIRST: Update database swipe count (for both free and premium users)
+    let usageResult;
     if (!isPremium) {
-      const usageResult = await checkUsageLimit('swipe');
+      usageResult = await checkUsageLimit('swipe');
       if (!usageResult.success) {
         setIsOutOfSwipes(true);
         toast({
@@ -746,8 +769,49 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, isPremium }: DiscoverPage
         return;
       }
     } else {
-      // ...removed console.log...
+      // For premium users, we still need to track swipes for profile completion restrictions
+      try {
+        await supabase.rpc('update_user_usage', {
+          user_id_param: currentUser.id,
+          usage_type: 'swipe',
+          increment_by: 1
+        });
+      } catch (error) {
+        console.error('Error updating premium user swipe count:', error);
+      }
     }
+
+    // Update today's swipe count for UI
+    setTodaySwipeCount(prev => prev + 1);
+
+    // SECOND: Check profile completion restrictions AFTER updating database
+    const restrictionCheck = await checkSwipeRestrictions(
+      currentUser.id,
+      profileCompletion,
+      isPremium
+    );
+
+    if (!restrictionCheck.canSwipe) {
+      if (restrictionCheck.reason === 'Profile completion required') {
+        setShowProfileCompletionModal(true);
+        toast({
+          title: '✨ Complete Your Profile!',
+          description: 'Help others see the real you so you can connect with genuine people who share your interests! Go to your profile and update your profile to more than 75% to continue swiping.',
+          variant: 'default',
+        });
+        return;
+      } else if (restrictionCheck.reason === 'Daily limit reached') {
+        setIsOutOfSwipes(true);
+        toast({
+          title: 'Daily Limit Reached',
+          description: 'You\'ve reached your daily swipe limit. Come back tomorrow or upgrade to Premium!',
+          variant: 'destructive'
+        });
+        return;
+      }
+    }
+
+    moveToNext(); // Move UI only after all checks pass
 
     try {
       // First check if like already exists to prevent duplicate key error
@@ -807,15 +871,7 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, isPremium }: DiscoverPage
     const currentMatch = potentialMatches[currentIndex];
     if (!currentMatch) return;
 
-    // Add to passed users list for potential reverse
-    setPassedUsers(prev => [{
-      user_id: currentMatch.id,
-      passed_at: new Date()
-    }, ...prev.slice(0, 9)]); // Keep only last 10 passed users
-
-    moveToNext(); // Move UI instantly
-
-    // Check swipe limit only for free users
+    // FIRST: Update database swipe count (for both free and premium users)
     if (!isPremium) {
       const usageResult = await checkUsageLimit('swipe');
       if (!usageResult.success) {
@@ -828,8 +884,55 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, isPremium }: DiscoverPage
         return;
       }
     } else {
-      // ...removed console.log...
+      // For premium users, we still need to track swipes for profile completion restrictions
+      try {
+        await supabase.rpc('update_user_usage', {
+          user_id_param: currentUser.id,
+          usage_type: 'swipe',
+          increment_by: 1
+        });
+      } catch (error) {
+        console.error('Error updating premium user swipe count:', error);
+      }
     }
+
+    // Update today's swipe count for UI
+    setTodaySwipeCount(prev => prev + 1);
+
+    // SECOND: Check profile completion restrictions AFTER updating database
+    const restrictionCheck = await checkSwipeRestrictions(
+      currentUser.id,
+      profileCompletion,
+      isPremium
+    );
+
+    if (!restrictionCheck.canSwipe) {
+      if (restrictionCheck.reason === 'Profile completion required') {
+        setShowProfileCompletionModal(true);
+        toast({
+          title: '✨ Complete Your Profile!',
+          description: 'Help others see the real you so you can connect with genuine people who share your interests!',
+          variant: 'default',
+        });
+        return;
+      } else if (restrictionCheck.reason === 'Daily limit reached') {
+        setIsOutOfSwipes(true);
+        toast({
+          title: 'Daily Limit Reached',
+          description: 'You\'ve reached your daily swipe limit. Come back tomorrow or upgrade to Premium!',
+          variant: 'destructive'
+        });
+        return;
+      }
+    }
+
+    // Add to passed users list for potential reverse
+    setPassedUsers(prev => [{
+      user_id: currentMatch.id,
+      passed_at: new Date()
+    }, ...prev.slice(0, 9)]); // Keep only last 10 passed users
+
+    moveToNext(); // Move UI only after all checks pass
 
     try {
       // Check if pass already exists to prevent duplicate key error

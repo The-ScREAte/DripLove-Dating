@@ -18,6 +18,7 @@ import InterestsSection from './profile/InterestsSection';
 import ImageManagement from './profile/ImageManagement';
 import AccountActions from './profile/AccountActions';
 import ProfileSummaryCard from './ProfileSummaryCard';
+import { calculateProfileCompletion } from '@/utils/profileCompletion';
 import PremiumUpgrade from './PremiumUpgrade';
 import CollapsibleSection from './ui/CollapsibleSection';
 
@@ -341,152 +342,11 @@ const ProfilePage = ({ currentUser, profile, onProfileUpdate, onLogout, onShowTe
 
   // --- BEGIN: Comprehensive Profile Progress Bar ---
   // Calculate profile completion based on specific criteria
-  const calculateProfileCompletion = () => {
-    if (!profile) return { completion: 0, missingFields: [], showVerifiedBadge: false };
-
-    const completionCriteria = {
-      // Your Photos (3 approved images)
-      photos: {
-        weight: 15,
-        completed: false,
-        description: "Upload 3 approved photos"
-      },
-      // Basic Information 
-      basicInfo: {
-        weight: 15,
-        completed: false,
-        description: "Complete basic information"
-      },
-      // Location & Matching Preferences
-      location: {
-        weight: 10,
-        completed: false,
-        description: "Set location and distance preferences"
-      },
-      // Preferences
-      preferences: {
-        weight: 10,
-        completed: false,
-        description: "Set gender preferences"
-      },
-      // Lifestyle
-      lifestyle: {
-        weight: 10,
-        completed: false,
-        description: "Complete lifestyle preferences"
-      },
-      // Work & Education
-      workEducation: {
-        weight: 10,
-        completed: false,
-        description: "Add work and education details"
-      },
-      // Personality
-      personality: {
-        weight: 10,
-        completed: false,
-        description: "Complete personality sliders"
-      },
-      // Fun Questions
-      funQuestions: {
-        weight: 10,
-        completed: false,
-        description: "Answer fun questions"
-      },
-      // Interests (at least 3)
-      interests: {
-        weight: 10,
-        completed: false,
-        description: "Select at least 3 interests"
-      }
-    };
-
-    try {
-      // Check Photos (3 approved images) - now safely check userImages
-      const approvedImages = userImages?.filter(img => img?.is_approved !== false) || [];
-      completionCriteria.photos.completed = approvedImages.length >= 3;
-
-      // Check Basic Information (first_name, last_name, bio, date_of_birth)
-      completionCriteria.basicInfo.completed = !!(
-        profile?.first_name?.trim() &&
-        profile?.last_name?.trim() &&
-        profile?.bio?.trim() &&
-        profile?.date_of_birth
-      );
-
-      // Check Location & Matching Preferences (city, country, max_distance)
-      completionCriteria.location.completed = !!(
-        profile?.city?.trim() &&
-        profile?.country?.trim() &&
-        (profile?.max_distance || profile?.distance_preference)
-      );
-
-      // Check Preferences (gender, preference)
-      completionCriteria.preferences.completed = !!(
-        profile?.gender &&
-        profile?.preference
-      );
-
-      // Check Lifestyle (smoking, drinking, exercise_level, sleeping_schedule)
-      completionCriteria.lifestyle.completed = !!(
-        profile?.smoking &&
-        profile?.drinking &&
-        profile?.exercise_level &&
-        profile?.sleeping_schedule
-      );
-
-      // Check Work & Education (occupation, education_level)
-      completionCriteria.workEducation.completed = !!(
-        profile?.occupation?.trim() &&
-        profile?.education_level
-      );
-
-      // Check Personality (personality sliders completed)
-      completionCriteria.personality.completed = !!(
-        typeof profile?.introvert_extrovert === 'number' &&
-        typeof profile?.spontaneous_planner === 'number' &&
-        typeof profile?.messy_organized === 'number'
-      );
-
-      // Check Fun Questions (at least one question answered)
-      completionCriteria.funQuestions.completed = !!(
-        profile?.fun_fact?.trim() ||
-        profile?.perfect_first_date?.trim() ||
-        profile?.last_googled?.trim()
-      );
-
-      // Check Interests (at least 3 selected)
-      const userInterests = profile?.interests || [];
-      completionCriteria.interests.completed = Array.isArray(userInterests) && userInterests.length >= 3;
-    } catch (error) {
-      console.error('Error calculating profile completion:', error);
-    }
-
-    // Calculate total completion percentage
-    let totalWeight = 0;
-    let completedWeight = 0;
-    const missingFields = [];
-
-    Object.entries(completionCriteria).forEach(([key, criteria]) => {
-      totalWeight += criteria.weight;
-      if (criteria.completed) {
-        completedWeight += criteria.weight;
-      } else {
-        missingFields.push(criteria.description);
-      }
-    });
-
-    const completion = Math.round((completedWeight / totalWeight) * 100);
-
-    // Show verified badge at 90% if photos and basic info are complete
-    const showVerifiedBadge = completion >= 90 && 
-                             completionCriteria.photos.completed && 
-                             completionCriteria.basicInfo.completed;
-
-    return { completion, missingFields, showVerifiedBadge };
+  const getProfileCompletion = () => {
+    return calculateProfileCompletion(profile, userImages);
   };
 
-  const { completion, missingFields, showVerifiedBadge } = calculateProfileCompletion();
+  const { completion, missingFields, showVerifiedBadge } = getProfileCompletion();
 
   // Fetch user images for photo completion calculation
   useEffect(() => {
