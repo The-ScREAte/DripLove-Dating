@@ -415,138 +415,61 @@ const RegistrationForm = ({ onSubmit, onBackToLogin }: RegistrationFormProps) =>
     let userCreated = false;
     
     try {
-      // Try to sign in first to see if user already exists
-      const { data: signInAttempt, error: signInAttemptError } = await supabase.auth.signInWithPassword({
+      // Check if user profile already exists (this is the only check that matters)
+      const { data: existingProfile, error: profileCheckError } = await supabase
+        .from('profiles')
+        .select('id')
+        .eq('email', formData.email)
+        .single();
+      
+      if (existingProfile) {
+        toast({
+          title: "Account exists",
+          description: "An account with this email already exists. Please sign in instead.",
+          variant: "destructive"
+        });
+        setIsSubmitting(false);
+        return;
+      }
+      
+      // Create new user account directly (no existing user checks in auth.users)
+      console.log('Creating new user account...');
+      const { data: signUpData, error: signUpError } = await supabase.auth.signUp({
         email: formData.email,
         password: formData.password,
+        options: {
+          data: {
+            first_name: formData.firstName,
+            last_name: formData.lastName,
+            date_of_birth: formData.dateOfBirth,
+            country: formData.country,
+            city: formData.city,
+            zip_code: formData.zipCode,
+            gender: formData.gender,
+            preference: formData.preference,
+            relationship_intent: formData.relationshipIntent,
+            occupation: formData.occupation || '',
+            industry: formData.industry || '',
+            education_level: formData.educationLevel || '',
+            bio: formData.bio || ''
+          }
+        }
       });
       
-      if (signInAttempt?.user) {
-        // User exists and can sign in - but check if email is confirmed
-        if (!signInAttempt.user.email_confirmed_at) {
-          console.log('User exists but email not confirmed');
-          setIsSubmitting(false);
-          toast({
-            title: 'Email Not Confirmed',
-            description: 'Please check your email and click the confirmation link before signing in.',
-            variant: 'destructive',
-          });
-          return;
-        }
-        
-        userId = signInAttempt.user.id;
-        userCreated = true;
-        console.log('User already exists, signed in successfully:', userId);
-      } else {
-        // User doesn't exist or password is wrong, try to create account
-        console.log('Creating new user account...');
-        const { data: signUpData, error: signUpError } = await supabase.auth.signUp({
-          email: formData.email,
-          password: formData.password,
-          options: {
-            emailRedirectTo: `${window.location.origin}/auth/confirm`,
-            data: {
-              first_name: formData.firstName,
-              last_name: formData.lastName,
-              date_of_birth: formData.dateOfBirth,
-              country: formData.country,
-              city: formData.city,
-              zip_code: formData.zipCode,
-              gender: formData.gender,
-              preference: formData.preference,
-              relationship_intent: formData.relationshipIntent,
-              occupation: formData.occupation || '',
-              industry: formData.industry || '',
-              education_level: formData.educationLevel || '',
-              bio: formData.bio || '',
-              email: formData.email,
-              email_verified: false, // Changed to false to require verification
-              phone_verified: false
-            }
-          }
+      if (signUpError) {
+        console.error('SignUp error:', signUpError);
+        toast({
+          title: "Registration failed",
+          description: signUpError.message,
+          variant: "destructive"
         });
-        
-        console.log('SignUp response:', {
-          user: signUpData?.user,
-          session: signUpData?.session,
-          emailConfirmedAt: signUpData?.user?.email_confirmed_at,
-          error: signUpError
-        });
-        
-        if (signUpError) {
-          console.error('SignUp error details:', signUpError);
-          
-          // If signup fails with "already registered", try to sign in again
-          if (signUpError.message.includes('User already registered') || 
-              signUpError.message.includes('already been registered') ||
-              signUpError.message.includes('already exists') ||
-              signUpError.code === 'user_already_exists') {
-            
-            const { data: retrySignIn, error: retrySignInError } = await supabase.auth.signInWithPassword({
-              email: formData.email,
-              password: formData.password,
-            });
-            
-            if (retrySignIn?.user) {
-              // Check if this existing user's email is confirmed
-              if (!retrySignIn.user.email_confirmed_at) {
-                console.log('Existing user but email not confirmed');
-                setIsSubmitting(false);
-                toast({
-                  title: 'Email Not Confirmed',
-                  description: 'Please check your email and click the confirmation link to verify your account.',
-                  variant: 'destructive',
-                });
-                return;
-              }
-              userId = retrySignIn.user.id;
-              userCreated = true;
-              console.log('Retry sign in successful after signup error:', userId);
-            } else {
-              throw new Error('User already exists but password is incorrect. Please sign in instead.');
-            }
-          } else {
-            throw signUpError;
-          }
-        } else {
-          // User was created successfully
-          userId = signUpData?.user?.id;
-          userCreated = !!userId;
-          console.log('Successfully created new user:', userId);
-          
-          // IMPORTANT: Check if user needs email confirmation
-          if (signUpData?.user && !signUpData.user.email_confirmed_at) {
-            console.log('User needs email confirmation - stopping registration process');
-            
-            // Save form data and images to complete registration after email confirmation
-            sessionStorage.setItem('pending_registration_data', JSON.stringify({
-              formData,
-              images: approvedImages.map(img => ({
-                preview: img.preview,
-                moderationResult: img.moderationResult,
-                status: img.status
-              })),
-              userId: signUpData.user.id
-            }));
-            
-            setIsSubmitting(false);
-            toast({
-              title: 'Check Your Email!',
-              description: 'We sent you a confirmation link. Please check your email and click the link to verify your account. Your registration will be completed after verification.',
-              variant: 'default',
-            });
-            
-            // Clear the registration images since we're stopping here
-            sessionStorage.removeItem('registration_images');
-            
-            // Redirect to login page after showing message
-            setTimeout(() => {
-              onBackToLogin();
-            }, 4000);
-            return; // STOP HERE - don't continue with profile creation
-          }
-        }
+        setIsSubmitting(false);
+        return;
       }
+      
+      userId = signUpData?.user?.id;
+      userCreated = !!userId;
+      console.log('Successfully created new user:', userId);
     } catch (err) {
       console.error('Auth error:', err);
       setIsSubmitting(false);
