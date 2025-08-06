@@ -17,6 +17,8 @@ import AdminErrorBoundary from './admin/AdminErrorBoundary';
 import UserPoolDebugger from './admin/UserPoolDebugger';
 import CountryManagement from './admin/CountryManagement';
 import ImageModerationPanel from './admin/ImageModerationPanel';
+import SafeAreaDebug from './SafeAreaDebug';
+import NotificationTester from './NotificationTester';
 import { debounce, userDataCache, createPagination } from '@/utils/performanceOptimizer';
 import { useSupabaseSubscription, useMemoryMonitor } from '@/hooks/usePerformance';
 import { CurrentUser, AdminStats } from '@/types';
@@ -879,6 +881,12 @@ const AdminPageComponent = ({ currentUser, onLogout }: AdminPageProps) => {
            WebkitUserSelect: 'none',
            WebkitTouchCallout: 'none'
          }}>
+      {/* Safe Area Debug Component - Remove in production */}
+      <SafeAreaDebug />
+      
+      {/* Notification Tester - Remove in production */}
+      <NotificationTester currentUser={currentUser} />
+      
       <div className="w-full max-w-[390px] mx-auto bg-white min-h-screen">
         {/* Fixed Header with Safe Area */}
         <div className="sticky top-0 z-50 bg-white border-b border-gray-200">

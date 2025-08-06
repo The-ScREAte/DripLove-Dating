@@ -26,9 +26,13 @@ if (Capacitor.isNativePlatform()) {
 import { Keyboard, KeyboardResize } from '@capacitor/keyboard';
 import { initializeSafeAndroidOptimizations } from './utils/safeAndroidOptimizations';
 import { preventFirebaseMessaging } from './utils/firebaseBlocker';
+import { initializeSafeAreas } from './utils/safeAreaUtils';
 
 // Prevent Firebase messaging in Capacitor WebView before any other code runs
 preventFirebaseMessaging();
+
+// Initialize safe area support for all platforms
+initializeSafeAreas();
 
 if (Capacitor.isNativePlatform()) {
   try {

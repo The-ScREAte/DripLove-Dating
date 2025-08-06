@@ -20,6 +20,23 @@ const NotificationTester = ({ currentUser }: NotificationTesterProps) => {
     sendLikeNotification 
   } = usePushNotifications(currentUser.id);
 
+  // Simple toast position test
+  const testToastPosition = () => {
+    toast({
+      title: '📱 Toast Position Test',
+      description: 'This toast should appear below the status bar/notch area and be fully visible on mobile devices.',
+      variant: 'default',
+    });
+  };
+
+  const testErrorToast = () => {
+    toast({
+      title: '❌ Error Test',
+      description: 'This is an error message test. It should not be hidden behind the status bar.',
+      variant: 'destructive',
+    });
+  };
+
   const testBasicNotification = async () => {
     const success = await sendNotification({
       title: '🔔 Test Notification',
@@ -110,6 +127,27 @@ const NotificationTester = ({ currentUser }: NotificationTesterProps) => {
 
         {/* Test Buttons */}
         <div className="space-y-3">
+          {/* Toast Position Tests */}
+          <div className="border-t pt-3">
+            <p className="text-sm font-medium mb-2">Toast Position Tests:</p>
+            <div className="grid grid-cols-2 gap-2">
+              <Button 
+                onClick={testToastPosition}
+                size="sm"
+                variant="outline"
+              >
+                📱 Toast Test
+              </Button>
+              <Button 
+                onClick={testErrorToast}
+                size="sm"
+                variant="destructive"
+              >
+                ❌ Error Test
+              </Button>
+            </div>
+          </div>
+          
           <Button 
             onClick={testBasicNotification}
             className="w-full bg-blue-600 hover:bg-blue-700"
