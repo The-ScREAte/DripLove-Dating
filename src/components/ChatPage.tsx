@@ -270,7 +270,6 @@ const ChatPage = ({ currentUser, onUnreadChange }: ChatPageProps) => {
       try {
         await sendMessageNotification(senderName, newMessage.trim(), recipientId, selectedMatch.id);
       } catch (notificationError) {
-        console.warn('Failed to send push notification:', notificationError);
         // Don't fail the message send if notification fails
       }
 

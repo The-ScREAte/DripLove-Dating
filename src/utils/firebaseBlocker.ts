@@ -10,7 +10,6 @@ export function preventFirebaseMessaging() {
   try {
     // Block only web Firebase messaging, not native Firebase
     if (typeof window !== 'undefined') {
-      console.log('🔧 Setting up Firebase web blocker (native Firebase will still work)');
       
       // Block service worker registration for Firebase web messaging only
       if ('serviceWorker' in navigator) {
@@ -18,7 +17,6 @@ export function preventFirebaseMessaging() {
         navigator.serviceWorker.register = function(scriptURL: string | URL, options?: RegistrationOptions) {
           const url = scriptURL.toString();
           if (url.includes('firebase-messaging') || url.includes('firebase-sw')) {
-            console.warn('⚠️ Blocked Firebase web messaging service worker registration in Capacitor');
             return Promise.reject(new Error('Firebase web messaging service workers not supported in Capacitor WebView'));
           }
           return originalRegister.call(this, scriptURL, options);
@@ -29,13 +27,11 @@ export function preventFirebaseMessaging() {
       const originalImport = window.eval;
       window.eval = function(code: string) {
         if (typeof code === 'string' && code.includes('firebase/messaging')) {
-          console.warn('⚠️ Blocked Firebase web messaging import in Capacitor');
           throw new Error('Firebase web messaging not supported in Capacitor WebView');
         }
         return originalImport.call(this, code);
       };
     }
   } catch (error) {
-    console.warn('⚠️ Error setting up Firebase web blocker:', error);
   }
 }

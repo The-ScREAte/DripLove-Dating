@@ -70,7 +70,6 @@ const ChatPage = ({ currentUser, onUnreadChange }: ChatPageProps) => {
         schema: 'public',
         table: 'chats',
       }, () => {
-        console.log('🔄 Chat update detected, refreshing matches...');
         fetchMatches();
         onUnreadChange?.();
       })
@@ -127,7 +126,6 @@ const ChatPage = ({ currentUser, onUnreadChange }: ChatPageProps) => {
 
       if (error) throw error;
 
-      console.log('📨 Raw matches data:', matches);
 
       const matchesWithPartner = matches?.map(match => {
         const partner = match.user1_id === currentUser.id ? match.user2 : match.user1;
@@ -143,7 +141,6 @@ const ChatPage = ({ currentUser, onUnreadChange }: ChatPageProps) => {
           return isFromOther && isUnread;
         }).length || 0;
 
-        console.log(`💬 Match ${match.id}: ${partner?.first_name} has ${unreadCount} unread messages`);
 
         return {
           ...match,
@@ -159,7 +156,6 @@ const ChatPage = ({ currentUser, onUnreadChange }: ChatPageProps) => {
         };
       }) || [];
 
-      console.log('📋 Final matches with unread counts:', matchesWithPartner.map(m => ({ 
         name: `${m.first_name} ${m.last_name}`, 
         unread: m.unread_messages 
       })));
@@ -318,7 +314,6 @@ const ChatPage = ({ currentUser, onUnreadChange }: ChatPageProps) => {
           }
         });
       } catch (pushError) {
-        console.warn('Push notification failed:', pushError);
         // Don't block message sending if push notification fails
       }
 

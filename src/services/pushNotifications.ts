@@ -38,7 +38,6 @@ class SupabasePushNotificationService {
       if (typeof window !== 'undefined') {
         // Block Firebase messaging APIs in WebView environments
         if ((window as any).firebase && !Capacitor.isNativePlatform()) {
-          console.warn('⚠️ Blocking Firebase messaging in WebView environment');
           return true;
         }
       }
@@ -62,11 +61,8 @@ class SupabasePushNotificationService {
 
   private async initializeNativePushNotifications(userId: string): Promise<void> {
     try {
-      console.log('🔄 Attempting to initialize native push notifications...');
-      
       // Ensure we're on a native platform and push notifications are available
       if (!Capacitor.isNativePlatform() || typeof PushNotifications === 'undefined') {
-        console.warn('⚠️ Push notifications not available on this platform - using real-time only');
         return;
       }
 
@@ -75,52 +71,41 @@ class SupabasePushNotificationService {
 
       // Request permission for push notifications
       const permissionStatus = await PushNotifications.requestPermissions();
-      console.log('📱 Push permissions result:', permissionStatus);
       
       if (permissionStatus.receive === 'granted') {
-        console.log('📱 Push permissions granted, attempting registration...');
-        
         // Add delay to ensure Firebase is fully initialized on Android
         if (Capacitor.getPlatform() === 'android') {
-          console.log('🤖 Waiting for Firebase to be ready on Android...');
           await new Promise(resolve => setTimeout(resolve, 2000));
         }
         
         // Register for push notifications with error handling
         try {
           await PushNotifications.register();
-          console.log('📱 Push registration initiated successfully');
         } catch (registerError) {
-          console.warn('⚠️ Failed to register for push notifications - real-time notifications will still work:', registerError);
           // Continue without push notifications rather than failing completely
           return;
         }
         
         // Set up event listeners
         PushNotifications.addListener('registration', async (token: Token) => {
-          console.log('✅ Push registration success, token received:', token.value);
           this.deviceToken = token.value;
           await this.saveTokenToDatabase(userId, token.value, Capacitor.getPlatform());
         });
 
         PushNotifications.addListener('registrationError', (error: unknown) => {
-          console.warn('⚠️ Error registering for push notifications - real-time notifications will still work:', error);
           // Don't throw - let the app continue without push notifications
         });
 
         PushNotifications.addListener('pushNotificationReceived', (notification: PushNotificationSchema) => {
-          console.log('📬 Push notification received:', notification);
           this.handleForegroundNotification(notification);
         });
 
         PushNotifications.addListener('pushNotificationActionPerformed', (notification: ActionPerformed) => {
           this.handleNotificationAction(notification);
         });
-      } else {
-        console.warn('⚠️ Push notification permissions not granted - real-time notifications will still work');
       }
     } catch (error) {
-      console.warn('⚠️ Error initializing native push notifications - real-time notifications will still work:', error);
+      // Continue silently if push notifications fail
     }
   }
 
@@ -257,7 +242,6 @@ class SupabasePushNotificationService {
       });
 
       if (error) {
-        console.warn('Push notification service error:', error);
         // Don't return false immediately - the notification might still be stored for real-time
       }
 
@@ -265,10 +249,8 @@ class SupabasePushNotificationService {
       const success = data?.success || data?.realTimeStored;
       
       if (success) {
-        console.log('✅ Notification sent successfully:', data?.message);
         return true;
       } else {
-        console.warn('⚠️ Notification failed:', data?.message || 'Unknown error');
         return false;
       }
 
@@ -281,7 +263,6 @@ class SupabasePushNotificationService {
 
   async requestWebNotificationPermission(): Promise<boolean> {
     if (!('Notification' in window)) {
-      console.warn('⚠️ Browser does not support notifications');
       return false;
     }
 

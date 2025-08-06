@@ -52,7 +52,6 @@ const PaystackPaymentModal: React.FC<PaystackPaymentModalProps> = ({ isOpen, onC
 
   React.useEffect(() => {
     if (isOpen) {
-      console.log('Paystack Public Key:', PAYSTACK_PUBLIC_KEY); // Debug log
       loadPaystackScript().catch(console.error);
     }
   }, [isOpen]);

@@ -55,11 +55,7 @@ export const useMemoryMonitor = () => {
       const checkMemory = () => {
         if ('memory' in performance) {
           const memInfo = (performance as any).memory;
-          console.log('Memory usage:', {
-            used: Math.round(memInfo.usedJSHeapSize / 1048576) + ' MB',
-            total: Math.round(memInfo.totalJSHeapSize / 1048576) + ' MB',
-            limit: Math.round(memInfo.jsHeapSizeLimit / 1048576) + ' MB'
-          });
+          // Memory info available but not logged in production
         }
       };
 

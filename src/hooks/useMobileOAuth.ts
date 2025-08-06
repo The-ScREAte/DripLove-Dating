@@ -15,7 +15,7 @@ try {
   App = capacitorApp.App;
   Capacitor = capacitorCore.Capacitor;
 } catch (error) {
-  console.log('Capacitor modules not available (running on web)');
+  // Capacitor modules not available (running on web)
 }
 
 export const useMobileOAuth = () => {
@@ -25,29 +25,19 @@ export const useMobileOAuth = () => {
   useEffect(() => {
     // Early return if Capacitor is not available (web environment)
     if (!Capacitor || !App || !Capacitor.isNativePlatform()) {
-      console.log('[Mobile OAuth] Not running on native platform, skipping mobile OAuth setup');
       return; // Only run on mobile
     }
 
-    console.log('[Mobile OAuth] Setting up mobile OAuth listeners');
     logPlatformInfo();
 
     const handleAppUrlOpen = async (event: { url: string }) => {
-      console.log('[Mobile OAuth] App opened with URL:', event.url);
-      console.log('[Mobile OAuth] URL includes driplove:', event.url.includes('driplove://'));
-      console.log('[Mobile OAuth] URL includes callback:', event.url.includes('/callback'));
-      console.log('[Mobile OAuth] URL includes reset-password:', event.url.includes('/reset-password'));
-      
       // Handle OAuth callback
       if (event.url.startsWith('driplove://auth/callback')) {
-        console.log('[Mobile OAuth] Processing OAuth callback');
         
         try {
           // Extract the fragment from the URL
           const url = new URL(event.url);
           const fragment = url.hash || url.search;
-          
-          console.log('[Mobile OAuth] URL fragment:', fragment);
           
           if (fragment.includes('access_token=')) {
             // Parse the OAuth tokens from the fragment
@@ -56,13 +46,6 @@ export const useMobileOAuth = () => {
             const refresh_token = params.get('refresh_token');
             const expires_in = params.get('expires_in');
             const token_type = params.get('token_type');
-            
-            console.log('[Mobile OAuth] Extracted tokens:', {
-              hasAccessToken: !!access_token,
-              hasRefreshToken: !!refresh_token,
-              expiresIn: expires_in,
-              tokenType: token_type
-            });
             
             if (access_token && refresh_token) {
               // Set the session manually
@@ -81,8 +64,6 @@ export const useMobileOAuth = () => {
                 navigate('/');
                 return;
               }
-              
-              console.log('[Mobile OAuth] Session set successfully:', !!data.session);
               
               if (data.session?.user) {
                 // Check if user profile exists
@@ -176,14 +157,12 @@ export const useMobileOAuth = () => {
       
       // Handle password reset deep link
       else if (event.url.startsWith('driplove://reset-password')) {
-        console.log('[Mobile OAuth] Processing password reset deep link');
         
         try {
           // Extract the URL parameters for password reset
           const url = new URL(event.url);
           const fragment = url.hash || url.search;
           
-          console.log('[Mobile OAuth] Reset password URL fragment:', fragment);
           
           if (fragment.includes('access_token=') && fragment.includes('type=recovery')) {
             // Parse the recovery tokens from the fragment
@@ -191,12 +170,6 @@ export const useMobileOAuth = () => {
             const access_token = params.get('access_token');
             const refresh_token = params.get('refresh_token');
             const type = params.get('type');
-            
-            console.log('[Mobile OAuth] Extracted recovery tokens:', {
-              hasAccessToken: !!access_token,
-              hasRefreshToken: !!refresh_token,
-              type: type
-            });
             
             if (type === 'recovery' && access_token && refresh_token) {
               // Set the session for password recovery
@@ -216,7 +189,6 @@ export const useMobileOAuth = () => {
                 return;
               }
               
-              console.log('[Mobile OAuth] Recovery session set successfully:', !!data.session);
               
               // Navigate to reset password page
               navigate('/reset-password');
@@ -249,7 +221,6 @@ export const useMobileOAuth = () => {
             navigate('/');
           } else {
             // Handle simple reset password deep link without tokens (shouldn't happen with Supabase)
-            console.log('[Mobile OAuth] Simple reset password deep link');
             navigate('/reset-password');
           }
         } catch (error) {

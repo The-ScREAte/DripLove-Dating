@@ -13,9 +13,6 @@ const OAuthCallback = () => {
 
   useEffect(() => {
     const handleAuthCallback = async () => {
-      console.log('OAuth callback started');
-      console.log('Current URL:', window.location.href);
-      console.log('Protocol:', window.location.protocol);
       
       const timeout = setTimeout(() => {
         console.error('OAuth callback timeout after 10 seconds');
@@ -34,19 +31,12 @@ const OAuthCallback = () => {
                            window.location.protocol === 'file:' ||
                            window.location.href.startsWith('driplove://');
 
-        console.log('Is mobile app:', isMobileApp);
 
         // Wait for any potential session updates
         await new Promise(resolve => setTimeout(resolve, 1500));
         
         setStatus('Getting session...');
         const { data: sessionData, error: sessionError } = await supabase.auth.getSession();
-        
-        console.log('Session data:', {
-          hasSession: !!sessionData?.session,
-          hasUser: !!sessionData?.session?.user,
-          error: sessionError?.message || 'No error'
-        });
         
         clearTimeout(timeout);
         

@@ -17,7 +17,6 @@ export const isAndroid = (): boolean => {
 export const initializeSafeAndroidOptimizations = (): void => {
   if (!isAndroid()) return;
   
-  console.log('🤖 Initializing safe Android optimizations...');
   
   try {
     // Set viewport meta tag safely
@@ -43,7 +42,6 @@ export const initializeSafeAndroidOptimizations = (): void => {
       (body.style as any).webkitTapHighlightColor = 'transparent';
     }
     
-    console.log('✅ Safe Android optimizations applied successfully!');
   } catch (error) {
     console.error('❌ Error applying Android optimizations:', error);
   }

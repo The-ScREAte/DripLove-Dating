@@ -222,7 +222,6 @@ const RegistrationForm = ({ onSubmit, onBackToLogin }: RegistrationFormProps) =>
           });
         }
       } catch (error) {
-        console.error('Moderation error:', error);
         setImages(prev => prev.map(img => 
           img.preview === preview 
             ? { ...img, status: 'pending', moderationResult: {
@@ -433,7 +432,6 @@ const RegistrationForm = ({ onSubmit, onBackToLogin }: RegistrationFormProps) =>
       }
       
       // Create new user account directly (no existing user checks in auth.users)
-      console.log('Creating new user account...');
       const { data: signUpData, error: signUpError } = await supabase.auth.signUp({
         email: formData.email,
         password: formData.password,
@@ -457,7 +455,6 @@ const RegistrationForm = ({ onSubmit, onBackToLogin }: RegistrationFormProps) =>
       });
       
       if (signUpError) {
-        console.error('SignUp error:', signUpError);
         toast({
           title: "Registration failed",
           description: signUpError.message,
@@ -469,9 +466,7 @@ const RegistrationForm = ({ onSubmit, onBackToLogin }: RegistrationFormProps) =>
       
       userId = signUpData?.user?.id;
       userCreated = !!userId;
-      console.log('Successfully created new user:', userId);
     } catch (err) {
-      console.error('Auth error:', err);
       setIsSubmitting(false);
       toast({
         title: 'Account Creation Error',
@@ -492,8 +487,6 @@ const RegistrationForm = ({ onSubmit, onBackToLogin }: RegistrationFormProps) =>
         .select('id, email')
         .eq('id', userId)
         .single();
-
-      console.log('Existing profile check:', existingProfile ? 'Found' : 'Not found');
 
       const profileData = {
         id: userId,
@@ -521,32 +514,26 @@ const RegistrationForm = ({ onSubmit, onBackToLogin }: RegistrationFormProps) =>
 
       if (existingProfile) {
         // Profile exists, update it
-        console.log('Updating existing profile for user:', userId);
         const { error: profileError } = await supabase
           .from('profiles')
           .update(profileData)
           .eq('id', userId);
         if (profileError) {
-          console.error('Profile update error:', profileError);
           throw profileError;
         }
       } else {
         // Profile doesn't exist, create it
-        console.log('Creating new profile for user:', userId);
         const { error: profileError } = await supabase
           .from('profiles')
           .insert(profileData);
         if (profileError) {
-          console.error('Profile insert error:', profileError);
           // If insert fails due to conflict, try update instead
           if (profileError.code === '23505' || profileError.message.includes('duplicate') || profileError.message.includes('already exists')) {
-            console.log('Insert failed due to conflict, trying update instead...');
             const { error: updateError } = await supabase
               .from('profiles')
               .update(profileData)
               .eq('id', userId);
             if (updateError) {
-              console.error('Profile update after conflict error:', updateError);
               throw updateError;
             }
           } else {
@@ -555,9 +542,7 @@ const RegistrationForm = ({ onSubmit, onBackToLogin }: RegistrationFormProps) =>
         }
       }
       
-      console.log('Profile saved successfully for user:', userId);
     } catch (err) {
-      console.error('Profile save error:', err);
       setIsSubmitting(false); // Reset loading state
       toast({
         title: 'Profile Save Error',
@@ -568,18 +553,13 @@ const RegistrationForm = ({ onSubmit, onBackToLogin }: RegistrationFormProps) =>
     }
 
     // 3. Upload approved images to storage and save to DB (after user is created)
-    console.log('Starting image upload for user:', userId);
-    console.log('Images to upload:', imagesWithFiles.length);
     
     let imageOrder = 1;
     for (const image of imagesWithFiles) {
       try {
         if (!image.file) {
-          console.warn('Skipping image upload - file is null');
           continue;
         }
-        
-        console.log(`Uploading image ${imageOrder} for user ${userId}`);
         
         // Upload to storage
         const fileExt = image.file.name?.split('.').pop() || 'jpg';
@@ -591,7 +571,6 @@ const RegistrationForm = ({ onSubmit, onBackToLogin }: RegistrationFormProps) =>
           .upload(filePath, image.file);
           
         if (uploadError) {
-          console.error('Upload error:', uploadError);
           throw uploadError;
         }
         
@@ -599,8 +578,6 @@ const RegistrationForm = ({ onSubmit, onBackToLogin }: RegistrationFormProps) =>
         const { data: { publicUrl } } = supabase.storage
           .from('user-photos')
           .getPublicUrl(filePath);
-        
-        console.log(`Image uploaded successfully, saving to DB: ${publicUrl}`);
         
         // Save to database with proper image order (1-based index, max 7)
         const { error: dbError } = await supabase
@@ -616,14 +593,11 @@ const RegistrationForm = ({ onSubmit, onBackToLogin }: RegistrationFormProps) =>
           });
           
         if (dbError) {
-          console.error('Database error:', dbError);
           throw dbError;
         }
         
-        console.log(`Image ${imageOrder} saved to database successfully`);
         imageOrder++;
       } catch (error) {
-        console.error(`Error uploading image ${imageOrder}:`, error);
         toast({
           title: 'Image Upload Error',
           description: `Image ${imageOrder} failed to upload. You can add it later from your profile.`,
@@ -634,8 +608,6 @@ const RegistrationForm = ({ onSubmit, onBackToLogin }: RegistrationFormProps) =>
     }
 
     setIsSubmitting(false); // Reset loading state
-    
-    console.log('Registration completed successfully for user:', userId);
     
     toast({
       title: 'Account Created!',
@@ -653,23 +625,19 @@ const RegistrationForm = ({ onSubmit, onBackToLogin }: RegistrationFormProps) =>
       }
       
       if (user) {
-        console.log('Passing user data to parent component:', user.id);
         // Try to force a reload/redirect if onSubmit does not update the app state
         onSubmit({ ...formData, images: approvedImages, user });
         
         // If the parent does not update view, do it here as a fallback
         if (typeof window !== 'undefined') {
           setTimeout(() => {
-            console.log('Fallback: reloading page to update app state');
             window.location.reload();
           }, 1000); // Increased timeout to give parent more time to handle
         }
       } else {
-        console.log('No user found after registration, passing form data only');
         onSubmit({ ...formData, images: approvedImages });
       }
     } catch (error) {
-      console.error('Error in final user fetch:', error);
       onSubmit({ ...formData, images: approvedImages });
     }
   };

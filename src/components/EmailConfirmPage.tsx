@@ -53,7 +53,6 @@ const completeRegistration = async (userId: string, formData: any, images: any[]
   }
 
   // 2. Upload images (skip this for now as files are not preserved in session storage)
-  console.log('Profile created successfully. Images will need to be re-uploaded by user.');
 };
 
 const EmailConfirmPage = () => {
@@ -77,7 +76,6 @@ const EmailConfirmPage = () => {
           return;
         }
 
-        console.log('Attempting email confirmation with token:', token);
 
         // Try to confirm email with the token
         const { data, error } = await supabase.auth.verifyOtp({
@@ -99,14 +97,12 @@ const EmailConfirmPage = () => {
         }
 
         if (data.user) {
-          console.log('Email confirmed successfully for user:', data.user.id);
           
           // Check if there's pending registration data to complete
           const pendingData = sessionStorage.getItem('pending_registration_data');
           if (pendingData) {
             try {
               const { formData, images, userId } = JSON.parse(pendingData);
-              console.log('Found pending registration data, completing profile...');
               
               // Complete the profile creation
               await completeRegistration(userId, formData, images);

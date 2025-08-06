@@ -254,7 +254,6 @@ const ImageModerationPanel = () => {
     try {
       setProcessingReports(prev => ({ ...prev, [reportId]: true }));
 
-      console.log('Attempting to delete image:', { imageUrl, reportedUserId });
 
       // Delete directly with admin privileges (after running the SQL fix)
       const { error: deleteError } = await supabase
@@ -276,9 +275,7 @@ const ImageModerationPanel = () => {
           console.error('Delete by URL error:', deleteByUrlError);
           throw deleteByUrlError;
         }
-        console.log('Deleted images by URL only');
       } else {
-        console.log('Successfully deleted specific image');
       }
 
       // Try to delete from storage as well
@@ -290,13 +287,10 @@ const ImageModerationPanel = () => {
             .remove([fileName]);
           
           if (storageError) {
-            console.log('Storage deletion error:', storageError);
           } else {
-            console.log('Storage file deleted:', fileName);
           }
         }
       } catch (storageError) {
-        console.log('Storage deletion failed:', storageError);
       }
 
       // Update the report status

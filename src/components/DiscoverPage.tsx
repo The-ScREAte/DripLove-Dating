@@ -98,17 +98,13 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, isPremium }: DiscoverPage
     }
   }, [refetchSubscription, toast]);
 
-  // Debug function to check subscription status
   const debugSubscription = async () => {
-    // Debug info available via window.debugSubscription
-    
     // Test direct database call
     if (currentUser?.id) {
       try {
         const { data, error } = await supabase.rpc('get_user_subscription', {
           user_id_param: currentUser.id
         });
-        // ...removed console.log...
         
         // Also try direct table query
         const { data: directData, error: directError } = await supabase
@@ -116,7 +112,6 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, isPremium }: DiscoverPage
           .select('*')
           .eq('user_id', currentUser.id)
           .single();
-        // ...removed console.log...
       } catch (err) {
         console.error('🐛 DEBUG - Error in direct calls:', err);
       }

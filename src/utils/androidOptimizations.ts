@@ -135,7 +135,6 @@ export const setupAndroidGestureNavigation = (): void => {
 export const initializeAndroidOptimizations = (): void => {
   if (!isAndroid()) return;
   
-  console.log('🤖 Initializing Android optimizations for DripLove...');
   
   // Set up gesture navigation
   setupAndroidGestureNavigation();
@@ -168,7 +167,6 @@ export const initializeAndroidOptimizations = (): void => {
     }
   });
   
-  console.log('✅ Android optimizations applied successfully!');
 };
 
 /**

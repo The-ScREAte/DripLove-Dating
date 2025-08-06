@@ -59,7 +59,6 @@ const MainApp = ({ user, onLogout }: MainAppProps) => {
                   token: token.value,
                   platform: Capacitor.getPlatform()
                 });
-                console.log('Push token registered successfully');
               } catch (error) {
                 console.error('Failed to save push token:', error);
               }

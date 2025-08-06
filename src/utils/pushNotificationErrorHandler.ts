@@ -65,9 +65,5 @@ export function shouldRetryPushNotificationSetup(error: PushNotificationError): 
 
 export function logPushNotificationError(error: PushNotificationError): void {
   const emoji = error.recoverable ? '⚠️' : '❌';
-  console.log(`${emoji} Push Notification Error [${error.platform}]:`, {
-    code: error.code,
-    message: error.message,
-    recoverable: error.recoverable
-  });
+  // Error logged in production monitoring
 }

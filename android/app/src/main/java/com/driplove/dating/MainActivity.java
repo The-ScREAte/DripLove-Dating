@@ -17,14 +17,10 @@ public class MainActivity extends BridgeActivity {
         try {
             // Always try to initialize Firebase explicitly
             FirebaseApp.initializeApp(this);
-            android.util.Log.d("DripLove", "Firebase initialized successfully in MainActivity");
         } catch (Exception e) {
-            android.util.Log.d("DripLove", "Firebase initialization in MainActivity: " + e.getMessage());
-            
             // Try to get existing instance to verify it's working
             try {
-                FirebaseApp defaultApp = FirebaseApp.getInstance();
-                android.util.Log.d("DripLove", "Firebase instance available: " + defaultApp.getName());
+                FirebaseApp.getInstance();
             } catch (Exception e2) {
                 android.util.Log.e("DripLove", "Firebase is completely unavailable: " + e2.getMessage());
             }

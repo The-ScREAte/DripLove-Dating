@@ -47,7 +47,6 @@ export const useSafeAreaInsets = (): SafeAreaInsets => {
             });
           }
         } catch (error) {
-          console.warn('Failed to get status bar info:', error);
           // Fallback to default values
           setInsets({
             top: 20,

@@ -242,7 +242,6 @@ class SupabasePushNotificationService {
 
   async requestWebNotificationPermission(): Promise<boolean> {
     if (!('Notification' in window)) {
-      console.warn('⚠️ Browser does not support notifications');
       return false;
     }
 

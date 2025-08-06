@@ -25,7 +25,6 @@ const Index = () => {
       if (session?.user) {
         // Check if email is confirmed before proceeding
         if (!session.user.email_confirmed_at) {
-          console.log('Existing session found but email not confirmed - staying on welcome screen');
           setLoading(false);
           return;
         }
@@ -44,7 +43,6 @@ const Index = () => {
       if (session?.user) {
         // Check if email is confirmed before proceeding
         if (!session.user.email_confirmed_at) {
-          console.log('User session exists but email not confirmed - staying on welcome screen');
           setUser(null);
           setCurrentView('welcome');
           setLoading(false);

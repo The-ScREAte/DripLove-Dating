@@ -73,7 +73,6 @@ const AuthForm = ({ isLogin, onToggle, onOAuthSuccess }: AuthFormProps) => {
       const { getSupabaseAuthConfig } = await import('@/config/oauth');
       const authConfig = getSupabaseAuthConfig();
       
-      console.log('OAuth config:', authConfig);
 
       const { data, error } = await supabase.auth.signInWithOAuth({
         provider: provider,
@@ -95,7 +94,6 @@ const AuthForm = ({ isLogin, onToggle, onOAuthSuccess }: AuthFormProps) => {
       }
 
       // For mobile and web, the OAuth flow will redirect automatically
-      console.log('OAuth initiated successfully, redirecting...');
 
     } catch (error: any) {
       console.error('OAuth error:', error);
@@ -124,19 +122,13 @@ const AuthForm = ({ isLogin, onToggle, onOAuthSuccess }: AuthFormProps) => {
     
     try {
       // Clear any cached session data that might affect URL generation
-      console.log('[Password Reset] Clearing any cached data...');
       
       const redirectUri = getPasswordResetRedirectUri();
-      console.log('[Password Reset] Using redirect URI:', redirectUri);
-      console.log('[Password Reset] Current location:', window.location.href);
-      console.log('[Password Reset] Is localhost:', window.location.hostname === 'localhost');
-      console.log('[Password Reset] Hostname:', window.location.hostname);
       
       // Double-check the URI before sending
       if (window.location.hostname === 'localhost' && !redirectUri.includes('localhost')) {
         console.error('[Password Reset] ERROR: Expected localhost URI but got:', redirectUri);
         const correctedUri = `${window.location.origin}/reset-password`;
-        console.log('[Password Reset] Using corrected URI:', correctedUri);
         
         const { error } = await supabase.auth.resetPasswordForEmail(formData.email, {
           redirectTo: correctedUri,
@@ -169,7 +161,6 @@ const AuthForm = ({ isLogin, onToggle, onOAuthSuccess }: AuthFormProps) => {
         }
       }
 
-      console.log('[Password Reset] Email sent successfully');
       toast({
         title: "Password Reset Email Sent",
         description: "Please check your email for password reset instructions.",
@@ -192,7 +183,6 @@ const AuthForm = ({ isLogin, onToggle, onOAuthSuccess }: AuthFormProps) => {
     setResendingConfirmation(true);
     try {
       const emailConfirmRedirectUri = getEmailConfirmRedirectUri();
-      console.log('[Resend Confirmation] Using redirect URI:', emailConfirmRedirectUri);
 
       const { error } = await supabase.auth.resend({
         type: 'signup',
@@ -268,7 +258,6 @@ const AuthForm = ({ isLogin, onToggle, onOAuthSuccess }: AuthFormProps) => {
             });
             
             // Store email for potential resend
-            console.log('[Login] Email not confirmed for:', email);
             
             // Show option to resend confirmation email
             if (window.confirm("Would you like us to send a new confirmation email?")) {
@@ -370,7 +359,6 @@ const AuthForm = ({ isLogin, onToggle, onOAuthSuccess }: AuthFormProps) => {
         try {
           // Get the appropriate email confirmation redirect URI
           const emailConfirmRedirectUri = getEmailConfirmRedirectUri();
-          console.log('[Registration] Using email confirmation redirect URI:', emailConfirmRedirectUri);
           
           const { data: authData, error: authError } = await supabase.auth.signUp({
             email,
@@ -401,9 +389,6 @@ const AuthForm = ({ isLogin, onToggle, onOAuthSuccess }: AuthFormProps) => {
             return;
           }
 
-          console.log('[Registration] User created:', authData.user.id);
-          console.log('[Registration] Session created:', !!authData.session);
-          console.log('[Registration] Email confirmation required:', !authData.session);
 
           // With email confirmation enabled, there should be no session initially
           if (!authData.session) {
@@ -427,7 +412,6 @@ const AuthForm = ({ isLogin, onToggle, onOAuthSuccess }: AuthFormProps) => {
           } else {
             // If a session was created immediately, email confirmation might be disabled
             // We should still create a profile and warn the user
-            console.warn('[Registration] Session created immediately - email confirmation may be disabled');
             
             // Create a basic profile for manual registration users
             const { error: profileError } = await supabase
@@ -453,7 +437,6 @@ const AuthForm = ({ isLogin, onToggle, onOAuthSuccess }: AuthFormProps) => {
             if (profileError) {
               console.error('[Registration] Profile creation error:', profileError);
               // Don't fail the registration, just log the error
-              console.log('[Registration] User can complete profile later');
             }
 
             toast({

@@ -27,7 +27,6 @@ const ResetPasswordPage = () => {
     // Set up auth state listener to handle the recovery flow
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       async (event, session) => {
-        console.log('Auth event:', event, session);
         // Just log the events, don't redirect immediately
       }
     );

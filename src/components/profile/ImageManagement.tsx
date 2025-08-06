@@ -305,7 +305,6 @@ const ImageManagement = ({ currentUser }: ImageManagementProps) => {
           .remove([filePath]);
         
         if (storageError) {
-          console.warn('Storage deletion warning:', storageError);
           // Don't throw here as database deletion succeeded
         }
       }

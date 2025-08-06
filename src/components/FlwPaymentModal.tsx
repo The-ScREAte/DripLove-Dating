@@ -18,7 +18,6 @@ const loadFlutterwaveScript = () => {
   return new Promise((resolve, reject) => {
     // Check if Flutterwave is already loaded
     if ((window as any).FlutterwaveCheckout) {
-      console.log('Flutterwave already loaded');
       resolve(true);
       return;
     }
@@ -36,12 +35,10 @@ const loadFlutterwaveScript = () => {
       return;
     }
     
-    console.log('Loading Flutterwave script...');
     const script = document.createElement('script');
     script.id = 'flw-js';
     script.src = 'https://checkout.flutterwave.com/v3.js';
     script.onload = () => {
-      console.log('Flutterwave script loaded successfully');
       // Give it a moment to initialize
       setTimeout(() => {
         if ((window as any).FlutterwaveCheckout) {
@@ -67,16 +64,13 @@ const FlwPaymentModal: React.FC<FlwPaymentModalProps> = ({ isOpen, onClose, amou
   // Set initial selected method when paymentMethods change
   React.useEffect(() => {
     if (paymentMethods && paymentMethods.length > 0 && !selectedMethod) {
-      console.log('Setting initial payment method:', paymentMethods[0]);
       setSelectedMethod(paymentMethods[0]);
     }
   }, [paymentMethods, selectedMethod]);
 
   React.useEffect(() => {
     const loadConfig = async () => {
-      console.log('Loading payment config...');
       const config = await getPaymentConfig();
-      console.log('Payment config loaded:', config);
       setPaymentConfig(config);
     };
     loadConfig();
@@ -84,7 +78,6 @@ const FlwPaymentModal: React.FC<FlwPaymentModalProps> = ({ isOpen, onClose, amou
   
   React.useEffect(() => {
     if (isOpen) {
-      console.log('Modal opened, preloading Flutterwave script...');
       loadFlutterwaveScript().catch(console.error);
     }
   }, [isOpen]);
@@ -92,9 +85,6 @@ const FlwPaymentModal: React.FC<FlwPaymentModalProps> = ({ isOpen, onClose, amou
   const handlePay = async () => {
     try {
       setIsLoading(true);
-      console.log('Starting payment process...');
-      console.log('Selected method:', selectedMethod);
-      console.log('Payment config:', paymentConfig);
       
       await loadFlutterwaveScript();
       
@@ -165,7 +155,6 @@ const FlwPaymentModal: React.FC<FlwPaymentModalProps> = ({ isOpen, onClose, amou
         return;
       }
 
-      console.log('Debug payment config structure:', {
         hasPaymentMethods: !!paymentConfig.payment_methods,
         paymentMethodsLength: paymentConfig.payment_methods?.length || 0,
         paymentMethodsArray: paymentConfig.payment_methods,
@@ -174,7 +163,6 @@ const FlwPaymentModal: React.FC<FlwPaymentModalProps> = ({ isOpen, onClose, amou
         envViteKey: !!import.meta.env.VITE_FLW_PUBLIC_KEY
       });
 
-      console.log('Using public key:', publicKey ? (publicKey.substring(0, 15) + '...') : 'NONE FOUND');
       
       // Add a unique prefix to tx_ref for easy filtering in Flutterwave dashboard
       const txRefPrefix = 'DRIPLOVE-';
@@ -192,7 +180,6 @@ const FlwPaymentModal: React.FC<FlwPaymentModalProps> = ({ isOpen, onClose, amou
         meta: meta,
         redirect_url: window.location.origin + '/payment-success',
         callback: function(data: any) {
-          console.log('Payment callback:', data);
           if (data.status === 'successful') {
             onSuccess();
             onClose();
@@ -200,7 +187,6 @@ const FlwPaymentModal: React.FC<FlwPaymentModalProps> = ({ isOpen, onClose, amou
           setIsLoading(false);
         },
         onclose: function() {
-          console.log('Payment modal closed');
           setIsLoading(false);
         },
         customizations: {
@@ -210,7 +196,6 @@ const FlwPaymentModal: React.FC<FlwPaymentModalProps> = ({ isOpen, onClose, amou
         },
       };
 
-      console.log('Initiating Flutterwave payment with data:', paymentData);
       
       (window as any).FlutterwaveCheckout(paymentData);
     } catch (error) {
@@ -222,7 +207,6 @@ const FlwPaymentModal: React.FC<FlwPaymentModalProps> = ({ isOpen, onClose, amou
 
   if (!isOpen) return null;
 
-  console.log('Rendering modal with:', { 
     paymentMethods, 
     selectedMethod, 
     paymentConfig: !!paymentConfig,

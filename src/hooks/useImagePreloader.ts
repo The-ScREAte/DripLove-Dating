@@ -105,7 +105,6 @@ export const useImagePreloader = (options: ImagePreloaderOptions = {}) => {
     while (loadingQueue.current.length > 0) {
       const batch = loadingQueue.current.splice(0, maxConcurrent);
       const promises = batch.map(url => preloadImage(url).catch(error => {
-        console.warn('Failed to preload image:', url, error);
       }));
       
       await Promise.all(promises);
