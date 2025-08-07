@@ -186,7 +186,7 @@ const NotificationTester = ({ currentUser }: NotificationTesterProps) => {
         </div>
 
         {/* Status Message */}
-        <div className="mt-6 p-4 bg-blue-50 rounded-lg">
+        {/* <div className="mt-6 p-4 bg-blue-50 rounded-lg">
           <div className="flex items-start">
             <Shield className="w-5 h-5 text-blue-600 mr-2 mt-0.5" />
             <div className="text-sm text-blue-800">
@@ -199,7 +199,7 @@ const NotificationTester = ({ currentUser }: NotificationTesterProps) => {
               </ul>
             </div>
           </div>
-        </div>
+        </div> */}
 
         {!isInitialized && (
           <div className="text-center text-sm text-gray-500 mt-4">

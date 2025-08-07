@@ -1289,6 +1289,7 @@ const AdminPageComponent = ({ currentUser, onLogout }: AdminPageProps) => {
               setSelectedUserId(null);
             }}
             userId={selectedUserId}
+            isAdmin={true}
           />
         )}
       </div>

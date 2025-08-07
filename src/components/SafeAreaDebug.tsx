@@ -29,25 +29,6 @@ export const SafeAreaDebug: React.FC<SafeAreaDebugProps> = ({ className = '' }) 
     };
   }, []);
 
-  return (
-    <div className={`fixed top-4 left-4 bg-black/80 text-white p-3 rounded-lg text-xs z-[9999] max-w-xs ${className}`}>
-      <div className="font-bold mb-2">Safe Area Debug</div>
-      <div>Top: {insets.top}px</div>
-      <div>Right: {insets.right}px</div>
-      <div>Bottom: {insets.bottom}px</div>
-      <div>Left: {insets.left}px</div>
-      <div className="mt-2 text-xs opacity-75">
-        env() support: {supportsEnv ? '✅' : '❌'}
-      </div>
-      <div className="text-xs opacity-75">
-        Has notch: {hasNotchDetected ? '✅' : '❌'}
-      </div>
-      <div className="text-xs opacity-75">
-        UA: {navigator.userAgent.includes('iPhone') ? 'iOS' : 
-             navigator.userAgent.includes('Android') ? 'Android' : 'Other'}
-      </div>
-    </div>
-  );
 };
 
 export default SafeAreaDebug;

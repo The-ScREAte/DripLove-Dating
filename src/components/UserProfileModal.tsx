@@ -2,20 +2,54 @@ import React, { useState, useEffect } from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
 import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { MapPin, Heart, Briefcase, GraduationCap, User } from 'lucide-react';
+import { MapPin, Heart, Briefcase, GraduationCap, User, Trash2 } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { Avatar, AvatarImage, AvatarFallback } from '@/components/ui/avatar';
 import ImageViewer from './ImageViewer';
+
 
 interface UserProfileModalProps {
   isOpen: boolean;
   onClose: () => void;
   userId: string;
+  isAdmin?: boolean;
 }
 
-const UserProfileModal = ({ isOpen, onClose, userId }: UserProfileModalProps) => {
+const UserProfileModal = ({ isOpen, onClose, userId, isAdmin = false }: UserProfileModalProps) => {
   const [profile, setProfile] = useState<any>(null);
   const [userImages, setUserImages] = useState<string[]>([]);
+  const [deletingImageIndex, setDeletingImageIndex] = useState<number | null>(null);
+  // Delete image from DB and storage
+  const handleDeleteImage = async (imageUrl: string, index: number) => {
+    if (!userId || !imageUrl) return;
+    setDeletingImageIndex(index);
+    try {
+      // Delete from DB
+      const { error: dbError } = await supabase
+        .from('user_images')
+        .delete()
+        .eq('user_id', userId)
+        .eq('image_url', imageUrl);
+      if (dbError) throw dbError;
+
+      // Delete from storage
+      const fileName = imageUrl.split('/').pop();
+      if (fileName) {
+        const { error: storageError } = await supabase.storage
+          .from('user-photos')
+          .remove([fileName]);
+        if (storageError) throw storageError;
+      }
+
+      // Refresh images
+      fetchUserImages();
+    } catch (error) {
+      console.error('Error deleting image:', error);
+      // Optionally show a toast here
+    } finally {
+      setDeletingImageIndex(null);
+    }
+  };
   const [loading, setLoading] = useState(true);
   const [isImageViewerOpen, setIsImageViewerOpen] = useState(false);
   const [selectedImageIndex, setSelectedImageIndex] = useState(0);
@@ -142,20 +176,36 @@ const UserProfileModal = ({ isOpen, onClose, userId }: UserProfileModalProps) =>
           <div className="space-y-6">
               {/* Header with main image and basic info */}
               <div className="text-center">
-                {userImages.length > 0 ? (
+              {userImages.length > 0 ? (
+                <div className="relative w-32 h-32 mx-auto mb-4">
                   <img 
                     src={userImages[0]} 
                     alt={`${profile?.first_name} ${profile?.last_name}`}
-                    className="w-32 h-32 rounded-full mx-auto object-cover mb-4 cursor-pointer hover:opacity-90 transition-opacity border-4 border-blue-100"
+                    className="w-32 h-32 rounded-full object-cover cursor-pointer hover:opacity-90 transition-opacity border-4 border-blue-100"
                     onClick={() => handleImageClick(0)}
                   />
-                ) : (
-                  <Avatar className="w-32 h-32 mx-auto mb-4">
-                    <AvatarFallback className="bg-blue-100 text-blue-700 text-2xl">
-                      {profile?.first_name?.charAt(0)}{profile?.last_name?.charAt(0)}
-                    </AvatarFallback>
-                  </Avatar>
-                )}
+                  {isAdmin && (
+                    <button
+                      className="absolute top-1 right-1 bg-red-600 text-white rounded-full p-1 shadow hover:bg-red-700 focus:outline-none flex items-center justify-center"
+                      title="Delete image"
+                      onClick={() => handleDeleteImage(userImages[0], 0)}
+                      disabled={deletingImageIndex === 0}
+                    >
+                      {deletingImageIndex === 0 ? (
+                        <span className="w-4 h-4">...</span>
+                      ) : (
+                        <Trash2 className="w-4 h-4" />
+                      )}
+                    </button>
+                  )}
+                </div>
+              ) : (
+                <Avatar className="w-32 h-32 mx-auto mb-4">
+                  <AvatarFallback className="bg-blue-100 text-blue-700 text-2xl">
+                    {profile?.first_name?.charAt(0)}{profile?.last_name?.charAt(0)}
+                  </AvatarFallback>
+                </Avatar>
+              )}
                 
                 <h2 className="text-2xl font-bold text-gray-800">
                   {profile?.first_name} {profile?.last_name}
@@ -185,13 +235,28 @@ const UserProfileModal = ({ isOpen, onClose, userId }: UserProfileModalProps) =>
                     </h3>
                     <div className="grid grid-cols-3 gap-2">
                       {userImages.slice(0, 6).map((image, index) => (
-                        <img
-                          key={index}
-                          src={image}
-                          alt={`Photo ${index + 1}`}
-                          className="w-full h-24 object-cover rounded-lg cursor-pointer hover:opacity-90 transition-opacity"
-                          onClick={() => handleImageClick(index)}
-                        />
+                        <div key={index} className="relative group">
+                          <img
+                            src={image}
+                            alt={`Photo ${index + 1}`}
+                            className="w-full h-24 object-cover rounded-lg cursor-pointer hover:opacity-90 transition-opacity"
+                            onClick={() => handleImageClick(index)}
+                          />
+                          {isAdmin && (
+                            <button
+                              className="absolute top-1 right-1 bg-red-600 text-white rounded-full p-1 shadow hover:bg-red-700 focus:outline-none opacity-80 group-hover:opacity-100 flex items-center justify-center"
+                              title="Delete image"
+                              onClick={() => handleDeleteImage(image, index)}
+                              disabled={deletingImageIndex === index}
+                            >
+                              {deletingImageIndex === index ? (
+                                <span className="w-4 h-4">...</span>
+                              ) : (
+                                <Trash2 className="w-4 h-4" />
+                              )}
+                            </button>
+                          )}
+                        </div>
                       ))}
                     </div>
                   </CardContent>

@@ -191,6 +191,14 @@ const ImageModerationPanel = () => {
     try {
       setRejectingImages(prev => ({ ...prev, [imageId]: true }));
 
+      // First get the image URL before deleting from database
+      const { data: imageData } = await supabase
+        .from('user_images')
+        .select('image_url')
+        .eq('id', imageId)
+        .single();
+
+      // Delete from database using RPC function
       const { error } = await supabase.rpc('reject_image', {
         image_id: imageId,
         admin_notes: 'Rejected by admin - inappropriate content'
@@ -198,9 +206,29 @@ const ImageModerationPanel = () => {
 
       if (error) throw error;
 
+      // Delete from storage if we have the image URL
+      if (imageData?.image_url) {
+        try {
+          const fileName = imageData.image_url.split('/').pop();
+          if (fileName) {
+            const { error: storageError } = await supabase.storage
+              .from('user-photos')
+              .remove([fileName]);
+            
+            if (storageError) {
+              console.error('Storage deletion error:', storageError);
+              // Continue even if storage deletion fails
+            }
+          }
+        } catch (storageError) {
+          console.error('Storage deletion exception:', storageError);
+          // Continue even if storage deletion fails
+        }
+      }
+
       toast({
         title: 'Success',
-        description: 'Image rejected and removed'
+        description: 'Image rejected and permanently removed from database and storage'
       });
 
       fetchPendingImages();
@@ -254,8 +282,7 @@ const ImageModerationPanel = () => {
     try {
       setProcessingReports(prev => ({ ...prev, [reportId]: true }));
 
-
-      // Delete directly with admin privileges (after running the SQL fix)
+      // Delete from database - try specific user/image combination first
       const { error: deleteError } = await supabase
         .from('user_images')
         .delete()
@@ -275,10 +302,9 @@ const ImageModerationPanel = () => {
           console.error('Delete by URL error:', deleteByUrlError);
           throw deleteByUrlError;
         }
-      } else {
       }
 
-      // Try to delete from storage as well
+      // Delete from storage
       try {
         const fileName = imageUrl.split('/').pop();
         if (fileName) {
@@ -287,10 +313,13 @@ const ImageModerationPanel = () => {
             .remove([fileName]);
           
           if (storageError) {
-          } else {
+            console.error('Storage deletion error:', storageError);
+            // Continue even if storage deletion fails
           }
         }
       } catch (storageError) {
+        console.error('Storage deletion exception:', storageError);
+        // Continue even if storage deletion fails
       }
 
       // Update the report status
