@@ -301,3 +301,84 @@
     }
   }
 }
+
+/* Safe area support for mobile devices */
+@layer base {
+  :root {
+    --safe-area-inset-top: env(safe-area-inset-top, 0px);
+    --safe-area-inset-bottom: env(safe-area-inset-bottom, 0px);
+    --safe-area-inset-left: env(safe-area-inset-left, 0px);
+    --safe-area-inset-right: env(safe-area-inset-right, 0px);
+  }
+
+  /* Admin page safe area */
+  .admin-page-container {
+    padding-top: max(var(--safe-area-inset-top), 20px);
+    padding-bottom: max(var(--safe-area-inset-bottom), 20px);
+    padding-left: max(var(--safe-area-inset-left), 16px);
+    padding-right: max(var(--safe-area-inset-right), 16px);
+    min-height: 100vh;
+    box-sizing: border-box;
+  }
+
+  /* Privacy/Terms pages safe area */
+  .terms-container {
+    padding-top: max(var(--safe-area-inset-top), 20px);
+    padding-bottom: max(var(--safe-area-inset-bottom), 20px);
+    padding-left: max(var(--safe-area-inset-left), 16px);
+    padding-right: max(var(--safe-area-inset-right), 16px);
+    min-height: 100vh;
+    box-sizing: border-box;
+  }
+
+  /* Toast and notification safe positioning */
+  @media screen and (max-width: 768px) {
+    /* Force all toasts and notifications down on mobile */
+    [data-radix-toast-viewport],
+    [data-sonner-toaster],
+    .toast-viewport,
+    .Toastify__toast-container,
+    [class*="toast"],
+    [class*="notification"],
+    [class*="alert"],
+    [class*="flash"] {
+      top: 60px !important;
+      position: fixed !important;
+      z-index: 9999 !important;
+      left: 16px !important;
+      right: 16px !important;
+      max-width: calc(100vw - 32px) !important;
+    }
+
+    /* Admin page mobile adjustments */
+    .admin-page-container {
+      padding-top: max(var(--safe-area-inset-top), 44px) !important;
+    }
+
+    /* Privacy/Terms mobile adjustments */
+    .terms-container {
+      padding-top: max(var(--safe-area-inset-top), 44px) !important;
+    }
+  }
+
+  /* iOS specific - more spacing for devices with notch */
+  @supports (-webkit-appearance: none) {
+    @media screen and (max-width: 768px) {
+      [data-radix-toast-viewport],
+      [data-sonner-toaster],
+      .toast-viewport,
+      .Toastify__toast-container,
+      [class*="toast"],
+      [class*="notification"],
+      [class*="alert"],
+      [class*="flash"] {
+        top: 70px !important;
+      }
+
+      .admin-page-container,
+      .terms-container {
+        padding-top: max(env(safe-area-inset-top), 47px) !important;
+      }
+    }
+  }
+}
