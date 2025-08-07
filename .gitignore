@@ -33,3 +33,11 @@ dist-ssr
 # Capacitor
 android/app/src/main/assets/public
 ios/App/App/public
+
+# Android signing
+android/app/release-key.keystore
+android/gradle.properties
+android/app/google-services.json.backup
+
+# iOS signing
+ios/App/App/GoogleService-Info.plist.backup
