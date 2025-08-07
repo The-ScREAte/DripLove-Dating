@@ -1,10 +1,10 @@
 
+/* Import safe area styles */
+@import './styles/safeArea.css';
+
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
-
-/* Import safe area styles */
-@import './styles/safeArea.css';
 
 /* Mobile optimizations and safe areas */
 @layer base {
