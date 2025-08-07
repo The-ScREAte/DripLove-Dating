@@ -155,14 +155,6 @@ const FlwPaymentModal: React.FC<FlwPaymentModalProps> = ({ isOpen, onClose, amou
         return;
       }
 
-        hasPaymentMethods: !!paymentConfig.payment_methods,
-        paymentMethodsLength: paymentConfig.payment_methods?.length || 0,
-        paymentMethodsArray: paymentConfig.payment_methods,
-        hasPublicKey: !!paymentConfig.public_key,
-        envPublicKey: !!FLW_PUBLIC_KEY,
-        envViteKey: !!import.meta.env.VITE_FLW_PUBLIC_KEY
-      });
-
       
       // Add a unique prefix to tx_ref for easy filtering in Flutterwave dashboard
       const txRefPrefix = 'DRIPLOVE-';
@@ -206,14 +198,6 @@ const FlwPaymentModal: React.FC<FlwPaymentModalProps> = ({ isOpen, onClose, amou
   };
 
   if (!isOpen) return null;
-
-    paymentMethods, 
-    selectedMethod, 
-    paymentConfig: !!paymentConfig,
-    amount,
-    currency,
-    email 
-  });
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">

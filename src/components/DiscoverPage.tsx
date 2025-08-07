@@ -9,6 +9,13 @@ import { useImagePreloader } from '@/hooks/useImagePreloader';
 import { calculateDistance } from '@/constants/locationData';
 import { debounce, optimizeImageUrl, createPagination, userDataCache } from '@/utils/performanceOptimizer';
 import { calculateProfileCompletion, getTodaySwipeCount, checkSwipeRestrictions } from '@/utils/profileCompletion';
+import PremiumUpgrade from './PremiumUpgrade';
+import MatchAnimation from './MatchAnimation';
+import MatchCard from './discover/MatchCard';
+import SwipeButtons from './discover/SwipeButtons';
+import ProfileCompletionModal from './ProfileCompletionModal';
+import SwipeCounter from './SwipeCounter';
+import { CurrentUser, PotentialMatch } from '@/types';
 
 // Helper function to calculate age from date of birth
 const calculateAge = (dateOfBirth: string): number => {
@@ -23,15 +30,6 @@ const calculateAge = (dateOfBirth: string): number => {
   
   return age;
 };
-
-import PremiumUpgrade from './PremiumUpgrade';
-import MatchAnimation from './MatchAnimation';
-import MatchCard from './discover/MatchCard';
-import SwipeButtons from './discover/SwipeButtons';
-import ProfileCompletionModal from './ProfileCompletionModal';
-import SwipeCounter from './SwipeCounter';
-import { CurrentUser, PotentialMatch } from '@/types';
-import { checkSwipeRestrictions, calculateProfileCompletion, getTodaySwipeCount } from '@/utils/profileCompletion';
 
 interface DiscoverPageProps {
   currentUser: CurrentUser;

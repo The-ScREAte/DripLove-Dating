@@ -156,10 +156,6 @@ const ChatPage = ({ currentUser, onUnreadChange }: ChatPageProps) => {
         };
       }) || [];
 
-        name: `${m.first_name} ${m.last_name}`, 
-        unread: m.unread_messages 
-      })));
-
       setMatches(matchesWithPartner as ChatMatch[]);
     } catch (error) {
       console.error('Error fetching matches:', error);
