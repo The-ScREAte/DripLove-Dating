@@ -748,11 +748,12 @@ class PhotoModerationService {
       message = 'Image file is corrupted or invalid and cannot be uploaded.';
       // Image blocked: Invalid file
     }
-    // ❌ REJECT only COMPLETE nudity - must be extremely explicit (95%+ confidence)
+    // ⚠️ REVIEW: For explicit nudity, allow upload but require admin review (never outright reject for nudity)
     else if (combinedDetails.explicitContent && combinedDetails.explicitContent >= 95) {
-      isApproved = false;
-      confidence = 95;
-      message = 'Image contains explicit nudity and cannot be uploaded.';
+      isApproved = true; // Allow upload
+      requiresReview = true;
+      confidence = 20;
+      message = 'Image uploaded but requires admin approval due to explicit nudity.';
     }
     // ⚠️ REVIEW blood/gore content (send to admin, don't auto-approve)
     else if (allFlags.includes(MODERATION_FLAGS.BLOOD_GORE)) {
