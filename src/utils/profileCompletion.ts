@@ -139,7 +139,7 @@ export const calculateProfileCompletion = (
     const userInterests = profile?.interests || [];
     completionCriteria.interests.completed = Array.isArray(userInterests) && userInterests.length >= 3;
   } catch (error) {
-    console.error('Error calculating profile completion:', error);
+    // Removed for production: console.error('Error calculating profile completion:', error);
   }
 
   // Calculate total completion percentage
@@ -194,7 +194,7 @@ export const checkSwipeRestrictions = async (
       .maybeSingle();
 
     if (error && error.code !== 'PGRST116') {
-      console.error('Error fetching swipe usage:', error);
+      // Removed for production: console.error('Error fetching swipe usage:', error);
       // Fallback: allow swiping if we can't check usage
       return { canSwipe: true };
     }
@@ -230,7 +230,7 @@ export const checkSwipeRestrictions = async (
       requiresProfileCompletion: false
     };
   } catch (error) {
-    console.error('Error checking swipe restrictions:', error);
+    // Removed for production: console.error('Error checking swipe restrictions:', error);
     // Fallback: allow swiping if there's an error
     return { canSwipe: true };
   }
@@ -249,13 +249,13 @@ export const getTodaySwipeCount = async (userId: string): Promise<number> => {
       .maybeSingle();
 
     if (error && error.code !== 'PGRST116') {
-      console.error('Error fetching swipe count:', error);
+      // Removed for production: console.error('Error fetching swipe count:', error);
       return 0;
     }
 
     return data?.swipes_used || 0;
   } catch (error) {
-    console.error('Error fetching swipe count:', error);
+    // Removed for production: console.error('Error fetching swipe count:', error);
     return 0;
   }
 };

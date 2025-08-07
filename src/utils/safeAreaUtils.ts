@@ -46,7 +46,7 @@ export const getSafeAreaInsets = (): SafeAreaInsets => {
 
     return { top, right, bottom, left };
   } catch (error) {
-    console.warn('Failed to get safe area insets:', error);
+    // Removed for production: console.warn('Failed to get safe area insets:', error);
     return getMobileFallbackInsets();
   }
 };
