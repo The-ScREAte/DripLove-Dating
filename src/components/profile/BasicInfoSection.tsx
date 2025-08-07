@@ -46,6 +46,12 @@ const handleSecureInputChange = (
 };
 
 const BasicInfoSection = ({ editedProfile, isEditing, onInputChange }: BasicInfoSectionProps) => {
+  console.log('BasicInfoSection render:', { 
+    isEditing, 
+    firstName: editedProfile?.first_name, 
+    lastName: editedProfile?.last_name,
+    bio: editedProfile?.bio 
+  });
   return (
     <Card>
       <CardHeader>
@@ -60,8 +66,11 @@ const BasicInfoSection = ({ editedProfile, isEditing, onInputChange }: BasicInfo
                 type="text"
                 id="first_name"
                 name="first_name"
-                value={editedProfile.first_name}
-                onChange={(e) => handleSecureInputChange(e, onInputChange)}
+                value={editedProfile.first_name || ''}
+                onChange={(e) => {
+                  console.log('First name input change:', e.target.value);
+                  handleSecureInputChange(e, onInputChange);
+                }}
                 disabled={!isEditing}
                 className="w-full"
               />
@@ -72,8 +81,11 @@ const BasicInfoSection = ({ editedProfile, isEditing, onInputChange }: BasicInfo
                 type="text"
                 id="last_name"
                 name="last_name"
-                value={editedProfile.last_name}
-                onChange={(e) => handleSecureInputChange(e, onInputChange)}
+                value={editedProfile.last_name || ''}
+                onChange={(e) => {
+                  console.log('Last name input change:', e.target.value);
+                  handleSecureInputChange(e, onInputChange);
+                }}
                 disabled={!isEditing}
                 className="w-full"
               />
@@ -84,8 +96,11 @@ const BasicInfoSection = ({ editedProfile, isEditing, onInputChange }: BasicInfo
             <Textarea
               id="bio"
               name="bio"
-              value={editedProfile.bio}
-              onChange={(e) => handleSecureInputChange(e, onInputChange)}
+              value={editedProfile.bio || ''}
+              onChange={(e) => {
+                console.log('Bio input change:', e.target.value);
+                handleSecureInputChange(e, onInputChange);
+              }}
               disabled={!isEditing}
               className="w-full min-h-[100px] resize-none"
               placeholder="Tell us about yourself..."
