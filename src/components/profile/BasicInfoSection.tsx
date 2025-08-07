@@ -12,16 +12,9 @@ interface BasicInfoSectionProps {
   onInputChange: (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => void;
 }
 
-const handleSecureInputChange = (
-  e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>,
-  onInputChange: (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => void
-) => {
-  const { name, value } = e.target;
+const getSanitizedValue = (name: string, value: string) => {
   let sanitizedValue = value;
-  
-  // Apply basic sanitization - remove only dangerous scripts, allow normal text
   if (name === 'first_name' || name === 'last_name') {
-    // More permissive name validation - allow numbers, unicode chars, common punctuation
     sanitizedValue = value
       .replace(/<script\b[^<]*(?:(?!<\/script>)<[^<]*)*<\/script>/gi, '')
       .replace(/<[^>]*>?/gm, '')
@@ -32,26 +25,11 @@ const handleSecureInputChange = (
   } else if (name === 'bio') {
     sanitizedValue = sanitizeBio(value);
   }
-  
-  // Create new event with sanitized value
-  const sanitizedEvent = {
-    ...e,
-    target: {
-      ...e.target,
-      value: sanitizedValue
-    }
-  } as React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>;
-  
-  onInputChange(sanitizedEvent);
+  return sanitizedValue;
 };
 
 const BasicInfoSection = ({ editedProfile, isEditing, onInputChange }: BasicInfoSectionProps) => {
-  console.log('BasicInfoSection render:', { 
-    isEditing, 
-    firstName: editedProfile?.first_name, 
-    lastName: editedProfile?.last_name,
-    bio: editedProfile?.bio 
-  });
+  // ...existing code...
   return (
     <Card>
       <CardHeader>
@@ -68,8 +46,15 @@ const BasicInfoSection = ({ editedProfile, isEditing, onInputChange }: BasicInfo
                 name="first_name"
                 value={editedProfile.first_name || ''}
                 onChange={(e) => {
-                  console.log('First name input change:', e.target.value);
-                  handleSecureInputChange(e, onInputChange);
+                  const sanitized = getSanitizedValue('first_name', e.target.value);
+                  onInputChange({
+                    ...e,
+                    target: {
+                      ...e.target,
+                      name: 'first_name',
+                      value: sanitized
+                    }
+                  });
                 }}
                 disabled={!isEditing}
                 className="w-full"
@@ -83,8 +68,15 @@ const BasicInfoSection = ({ editedProfile, isEditing, onInputChange }: BasicInfo
                 name="last_name"
                 value={editedProfile.last_name || ''}
                 onChange={(e) => {
-                  console.log('Last name input change:', e.target.value);
-                  handleSecureInputChange(e, onInputChange);
+                  const sanitized = getSanitizedValue('last_name', e.target.value);
+                  onInputChange({
+                    ...e,
+                    target: {
+                      ...e.target,
+                      name: 'last_name',
+                      value: sanitized
+                    }
+                  });
                 }}
                 disabled={!isEditing}
                 className="w-full"
@@ -98,8 +90,15 @@ const BasicInfoSection = ({ editedProfile, isEditing, onInputChange }: BasicInfo
               name="bio"
               value={editedProfile.bio || ''}
               onChange={(e) => {
-                console.log('Bio input change:', e.target.value);
-                handleSecureInputChange(e, onInputChange);
+                const sanitized = getSanitizedValue('bio', e.target.value);
+                onInputChange({
+                  ...e,
+                  target: {
+                    ...e.target,
+                    name: 'bio',
+                    value: sanitized
+                  }
+                });
               }}
               disabled={!isEditing}
               className="w-full min-h-[100px] resize-none"
