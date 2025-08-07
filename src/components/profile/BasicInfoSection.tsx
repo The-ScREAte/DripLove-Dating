@@ -19,9 +19,16 @@ const handleSecureInputChange = (
   const { name, value } = e.target;
   let sanitizedValue = value;
   
-  // Apply appropriate sanitization based on field type
+  // Apply basic sanitization - remove only dangerous scripts, allow normal text
   if (name === 'first_name' || name === 'last_name') {
-    sanitizedValue = sanitizeName(value);
+    // More permissive name validation - allow numbers, unicode chars, common punctuation
+    sanitizedValue = value
+      .replace(/<script\b[^<]*(?:(?!<\/script>)<[^<]*)*<\/script>/gi, '')
+      .replace(/<[^>]*>?/gm, '')
+      .replace(/javascript:/gi, '')
+      .replace(/on\w+\s*=/gi, '')
+      .trim()
+      .slice(0, 50);
   } else if (name === 'bio') {
     sanitizedValue = sanitizeBio(value);
   }
