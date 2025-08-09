@@ -22,6 +22,22 @@ allprojects {
         google()
         mavenCentral()
     }
+    
+    // Use Java 21 toolchain across subprojects
+    tasks.withType(JavaCompile).configureEach {
+        sourceCompatibility = JavaVersion.VERSION_21
+        targetCompatibility = JavaVersion.VERSION_21
+    }
+    
+    afterEvaluate { project ->
+        if (project.hasProperty('java')) {
+            project.java {
+                toolchain {
+                    languageVersion = JavaLanguageVersion.of(21)
+                }
+            }
+        }
+    }
 }
 
 task clean(type: Delete) {
