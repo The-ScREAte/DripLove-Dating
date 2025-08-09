@@ -5,48 +5,17 @@
 # For more details, see
 #   http://developer.android.com/guide/developing/tools/proguard.html
 
-# Capacitor WebView rules
--keep class com.getcapacitor.** { *; }
--keep class com.getcapacitor.plugin.** { *; }
--keepattributes SourceFile,LineNumberTable,*Annotation*
+# If your project uses WebView with JS, uncomment the following
+# and specify the fully qualified class name to the JavaScript interface
+# class:
+#-keepclassmembers class fqcn.of.javascript.interface.for.webview {
+#   public *;
+#}
 
-# WebView JavaScript Interface
--keepclassmembers class * {
-    @android.webkit.JavascriptInterface <methods>;
-}
+# Uncomment this to preserve the line number information for
+# debugging stack traces.
+#-keepattributes SourceFile,LineNumberTable
 
-# Keep WebView classes
--keep class android.webkit.** { *; }
-
-# Firebase rules (if using Firebase)
--keep class com.google.firebase.** { *; }
--keep class com.google.android.gms.** { *; }
-
-# Preserve line numbers for crash reports
--keepattributes SourceFile,LineNumberTable
-
-# Keep JavaScript interfaces
--keepclassmembers class * {
-    @android.webkit.JavascriptInterface <methods>;
-}
-
-# If your project uses WebView with JS, keep JavaScript interfaces
--keepclassmembers class com.driplove.dating.** {
-   public *;
-}
-
-# Keep R classes
--keep class **.R
--keep class **.R$* {
-    <fields>;
-}
-
-# Remove debug logging in release
--assumenosideeffects class android.util.Log {
-    public static boolean isLoggable(java.lang.String, int);
-    public static int v(...);
-    public static int i(...);
-    public static int w(...);
-    public static int d(...);
-    public static int e(...);
-}
+# If you keep the line number information, uncomment this to
+# hide the original source file name.
+#-renamesourcefileattribute SourceFile
