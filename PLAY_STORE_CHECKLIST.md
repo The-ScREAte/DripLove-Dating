@@ -17,7 +17,7 @@
 
 ### App Content
 - [ ] **App icons** present (check android/app/src/main/res/mipmap-*)
-- [ ] **App name** set: "DripLove Dating" ✅
+- [ ] **App name** set: "DripLove" ✅
 - [ ] **Permissions** properly declared in AndroidManifest.xml ✅
 
 ### Google Play Console Setup

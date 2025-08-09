@@ -28,7 +28,7 @@ Your **DripLove Dating App** has been successfully synced to both iOS and Androi
 
 ```typescript
 App ID: com.driplove.dating
-App Name: DripLove Dating
+App Name: DripLove
 iOS Scheme: driplove
 Bundle Size: 686KB (202KB gzipped)
 ```
