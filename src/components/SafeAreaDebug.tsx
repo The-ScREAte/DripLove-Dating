@@ -29,6 +29,16 @@ export const SafeAreaDebug: React.FC<SafeAreaDebugProps> = ({ className = '' }) 
     };
   }, []);
 
+  return (
+    <div
+      className={`pointer-events-none fixed bottom-2 left-2 z-[1000] rounded-md border bg-background/80 backdrop-blur px-3 py-2 text-xs text-foreground shadow ${className}`}
+      role="status"
+      aria-live="polite"
+    >
+      <div>safe-area: t {insets.top}px r {insets.right}px b {insets.bottom}px l {insets.left}px</div>
+      <div>env(): {supportsEnv ? 'yes' : 'no'} • notch: {hasNotchDetected ? 'yes' : 'no'}</div>
+    </div>
+  );
 };
 
 export default SafeAreaDebug;
