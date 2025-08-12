@@ -18,8 +18,8 @@ const Unsubscribe: React.FC = () => {
     setLoading(true);
     setError('');
     try {
-      // Call the edge function to cancel subscription
-      const { error } = await supabase.functions.invoke('cancel-paystack-subscription');
+      // Cancel via Postgres function (no external API required)
+      const { error } = await supabase.rpc('cancel_user_subscription');
       if (error) throw error;
       toast({
         title: 'Subscription Cancelled',
