@@ -61,6 +61,14 @@ serve(async (req) => {
     // callback_url is not needed for plan-based init and can trigger validation errors on some accounts
     if (callback_url && !plan) payload.callback_url = callback_url
 
+    console.log('Paystack init starting', {
+      isPlan: Boolean(plan),
+      hasAmount: Boolean(amount),
+      currency,
+      hasChannels: Boolean(channels && channels.length),
+      hasCallback: Boolean(callback_url)
+    })
+
     const res = await fetch('https://api.paystack.co/transaction/initialize', {
       method: 'POST',
       headers: {
@@ -71,6 +79,7 @@ serve(async (req) => {
     })
 
     const data = (await res.json()) as PaystackInitResponse
+    console.log('Paystack init response', { httpStatus: res.status, ok: res.ok, paystackStatus: data?.status, message: data?.message })
     if (!res.ok || !data.status) {
       return json(res.status || 400, { error: data.message || 'Init failed', details: data })
     }
