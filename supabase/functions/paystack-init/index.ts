@@ -58,8 +58,8 @@ serve(async (req) => {
     }
 
     if (metadata) payload.metadata = metadata
-    // callback_url is not needed for plan-based init and can trigger validation errors on some accounts
-    if (callback_url && !plan) payload.callback_url = callback_url
+    // Include callback_url for both one-time and plan flows so app can handle redirects
+    if (callback_url) payload.callback_url = callback_url
 
     const res = await fetch('https://api.paystack.co/transaction/initialize', {
       method: 'POST',
