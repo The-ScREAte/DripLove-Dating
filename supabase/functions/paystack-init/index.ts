@@ -22,15 +22,22 @@ interface PaystackInitResponse {
   }
 }
 
+const corsHeaders = {
+  'Access-Control-Allow-Origin': '*',
+  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
+  'Access-Control-Allow-Methods': 'POST, OPTIONS',
+}
+
 function json(status: number, body: unknown) {
   return new Response(JSON.stringify(body), {
     status,
-    headers: { 'content-type': 'application/json' },
+    headers: { ...corsHeaders, 'content-type': 'application/json' },
   })
 }
 
 serve(async (req) => {
   try {
+    if (req.method === 'OPTIONS') return new Response('ok', { headers: corsHeaders })
     if (req.method !== 'POST') return json(405, { error: 'Method not allowed' })
     const secret = Deno.env.get('PAYSTACK_SECRET_KEY')
     if (!secret) return json(500, { error: 'Missing PAYSTACK_SECRET_KEY' })
