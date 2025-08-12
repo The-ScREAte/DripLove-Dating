@@ -19,6 +19,8 @@ const PremiumUpgrade = ({ currentUser, onClose, preselectedPlan }: PremiumUpgrad
   const [loading, setLoading] = useState(false);
   const { toast } = useToast();
   const [showPaymentModal, setShowPaymentModal] = useState(false);
+  const [showPaymentOptions, setShowPaymentOptions] = useState(false);
+  const [paymentType, setPaymentType] = useState<'subscription' | 'one-time' | null>(null);
   const [price, setPrice] = useState('50');
   const [paymentMethods, setPaymentMethods] = useState<any[]>([]);
   const [currency, setCurrency] = useState('GHS');
@@ -72,7 +74,13 @@ const PremiumUpgrade = ({ currentUser, onClose, preselectedPlan }: PremiumUpgrad
       });
       return;
     }
-    // Optionally, you can let user pick method if >1, or just use the first
+    // Show payment options selection
+    setShowPaymentOptions(true);
+  };
+
+  const handlePaymentTypeSelection = (type: 'subscription' | 'one-time') => {
+    setPaymentType(type);
+    setShowPaymentOptions(false);
     setShowPaymentModal(true);
   };
 
@@ -235,7 +243,38 @@ const PremiumUpgrade = ({ currentUser, onClose, preselectedPlan }: PremiumUpgrad
         </div>
       </div>
 
-      {/* Payment Modal */}
+      {/* Payment Type Selection Modal */}
+      {showPaymentOptions && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
+          <div className="bg-white rounded-lg shadow-lg p-6 w-full max-w-md relative">
+            <button 
+              onClick={() => setShowPaymentOptions(false)} 
+              className="absolute top-2 right-2 text-gray-400 hover:text-gray-600"
+            >
+              ✕
+            </button>
+            <h2 className="text-xl font-bold mb-4 text-center">Choose Payment Option</h2>
+            <div className="space-y-4">
+              <button
+                onClick={() => handlePaymentTypeSelection('subscription')}
+                className="w-full p-4 bg-gradient-to-r from-green-500 to-green-600 text-white rounded-lg hover:from-green-600 hover:to-green-700 transition-all duration-200 font-semibold"
+              >
+                <div className="text-lg">💳 Subscribe Monthly</div>
+                <div className="text-sm opacity-90">Automatic renewal • Cancel anytime</div>
+              </button>
+              <button
+                onClick={() => handlePaymentTypeSelection('one-time')}
+                className="w-full p-4 bg-gradient-to-r from-blue-500 to-blue-600 text-white rounded-lg hover:from-blue-600 hover:to-blue-700 transition-all duration-200 font-semibold"
+              >
+                <div className="text-lg">📱 One-Time Payment</div>
+                <div className="text-sm opacity-90">1 month access • No auto-renewal</div>
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Payment Modals */}
       <PaystackPaymentModal
         isOpen={showPaymentModal}
         onClose={() => setShowPaymentModal(false)}
@@ -243,6 +282,7 @@ const PremiumUpgrade = ({ currentUser, onClose, preselectedPlan }: PremiumUpgrad
         email={currentUser?.email || ''}
         onSuccess={handlePaymentSuccess}
         paymentMethod={paymentMethods[0]?.type || 'card'}
+        isOneTime={paymentType === 'one-time'}
       />
     </div>
   );

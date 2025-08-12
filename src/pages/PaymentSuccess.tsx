@@ -64,6 +64,7 @@ const PaymentSuccess: React.FC = () => {
     const status = params.get('status');
     const tx_ref = params.get('tx_ref');
     const transaction_id = params.get('transaction_id');
+    const payment_type = params.get('payment_type') || 'subscription'; // Default to subscription for backward compatibility
     
     // ...removed console.log...
     
@@ -143,19 +144,19 @@ const PaymentSuccess: React.FC = () => {
           // ...removed console.log...
           // ...removed console.log...
           
-          // Since Flutterwave confirmed the payment was successful,
+          // Since Paystack confirmed the payment was successful,
           // create the subscription directly
           const expiryDate = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000);
           const subscriptionData = {
             user_id: user.id,
             plan_name: 'premium',
             status: 'active',
-            flutterwave_transaction_id: transaction_id,
+            flutterwave_transaction_id: transaction_id, // Using existing field for Paystack transaction
             starts_at: new Date().toISOString(),
             expires_at: expiryDate.toISOString(),
-            next_billing_date: expiryDate.toISOString(),
-            auto_renew: true,
-            payment_method: 'flutterwave',
+            next_billing_date: payment_type === 'one-time' ? null : expiryDate.toISOString(), // No next billing for one-time
+            auto_renew: payment_type !== 'one-time', // No auto-renewal for one-time payments
+            payment_method: 'paystack', // Changed from flutterwave to paystack
             updated_at: new Date().toISOString(),
           };
           
@@ -180,11 +181,11 @@ const PaymentSuccess: React.FC = () => {
               .update({
                 plan_name: 'premium',
                 status: 'active',
-                flutterwave_transaction_id: transaction_id,
+                flutterwave_transaction_id: transaction_id, // Using existing field for Paystack transaction
                 expires_at: expiryDate.toISOString(),
-                next_billing_date: expiryDate.toISOString(),
-                auto_renew: true,
-                payment_method: 'flutterwave',
+                next_billing_date: payment_type === 'one-time' ? null : expiryDate.toISOString(), // No next billing for one-time
+                auto_renew: payment_type !== 'one-time', // No auto-renewal for one-time payments
+                payment_method: 'paystack', // Changed from flutterwave to paystack
                 updated_at: new Date().toISOString(),
               })
               .eq('user_id', user.id)
