@@ -57,8 +57,9 @@ const PaystackPaymentModal: React.FC<PaystackPaymentModalProps> = ({ isOpen, onC
   React.useEffect(() => {
     if (isOpen) {
       loadPaystackScript().catch(console.error);
+      if (!isOneTime) setSelectedPaymentMethod('card'); // enforce card for subscriptions
     }
-  }, [isOpen]);
+  }, [isOpen, isOneTime]);
 
   const handlePay = async () => {
     setIsLoading(true);
@@ -138,8 +139,15 @@ const PaystackPaymentModal: React.FC<PaystackPaymentModalProps> = ({ isOpen, onC
       window.location.href = data.authorization_url as string;
       return;
     } catch (serverErr) {
-      console.warn('Falling back to inline init due to server error:', serverErr);
-      // If server init fails, attempt inline as fallback using public key
+      console.warn('Server init failed:', serverErr);
+      // For subscriptions, do NOT fallback to inline to avoid key/plan mismatches
+      if (!isOneTime) {
+        alert(`Subscription initialization failed. Please ensure your Paystack Test Secret Key and the plan code are from the same environment (Test) and try again. Details: ${ (serverErr as any)?.message || serverErr }`);
+        setIsLoading(false);
+        return;
+      }
+      console.warn('Falling back to inline init for one-time due to server error:', serverErr);
+      // If server init fails for one-time, attempt inline as fallback using public key
       try {
         const ref = 'DRIPLOVE-' + Date.now() + '-' + Math.random().toString(36).substring(2, 8);
         const trimmedKey = PAYSTACK_PUBLIC_KEY.trim();
@@ -253,6 +261,7 @@ const PaystackPaymentModal: React.FC<PaystackPaymentModalProps> = ({ isOpen, onC
               <p>✅ Monthly automatic billing</p>
               <p>✅ Cancel anytime</p>
               <p>✅ All premium features included</p>
+              <p>💳 Card payments only</p>
             </div>
           )}
         </div>
