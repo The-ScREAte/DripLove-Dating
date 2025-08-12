@@ -48,6 +48,7 @@ serve(async (req) => {
     const payload: Record<string, unknown> = { email }
 
     if (plan) {
+      // For subscriptions, keep payload minimal to avoid Paystack 400s
       payload.plan = plan
     } else {
       if (!amount) return json(400, { error: 'amount required for one-time' })
@@ -57,7 +58,8 @@ serve(async (req) => {
     }
 
     if (metadata) payload.metadata = metadata
-    if (callback_url) payload.callback_url = callback_url
+    // callback_url is not needed for plan-based init and can trigger validation errors on some accounts
+    if (callback_url && !plan) payload.callback_url = callback_url
 
     const res = await fetch('https://api.paystack.co/transaction/initialize', {
       method: 'POST',
