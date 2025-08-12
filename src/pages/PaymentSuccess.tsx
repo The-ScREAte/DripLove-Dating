@@ -61,9 +61,13 @@ const PaymentSuccess: React.FC = () => {
 
     // Check for payment status in query params
     const params = new URLSearchParams(location.search);
-    const status = params.get('status');
+    const statusRaw = params.get('status')?.toLowerCase() || '';
+    // Normalize status (Paystack may return 'success' or 'successful')
+    const status = statusRaw === 'success' ? 'successful' : statusRaw;
     const tx_ref = params.get('tx_ref');
     const transaction_id = params.get('transaction_id');
+    const reference = params.get('reference') || params.get('trxref') || params.get('txref') || params.get('tx_ref');
+    const txnId = transaction_id || reference || null;
     const payment_type = params.get('payment_type') || 'subscription'; // Default to subscription for backward compatibility
     
     // ...removed console.log...
@@ -101,7 +105,7 @@ const PaymentSuccess: React.FC = () => {
       return;
     }
     
-    if (status !== 'successful' || !transaction_id) {
+    if (status !== 'successful' || !txnId) {
       // ...removed console.log...
       setError('Payment verification failed. Please contact support if money was deducted.');
       // Auto-redirect after 10 seconds for error cases
@@ -127,7 +131,7 @@ const PaymentSuccess: React.FC = () => {
     }
     
     // Process successful payment
-    if (status === 'successful' && transaction_id) {
+    if (status === 'successful' && txnId) {
       setUpgrading(true);
       supabase.auth.getSession().then(async ({ data: { session } }) => {
         const user = session?.user;
@@ -151,7 +155,7 @@ const PaymentSuccess: React.FC = () => {
             user_id: user.id,
             plan_name: 'premium',
             status: 'active',
-            flutterwave_transaction_id: transaction_id, // Using existing field for Paystack transaction
+            flutterwave_transaction_id: txnId, // Using existing field for Paystack transaction
             starts_at: new Date().toISOString(),
             expires_at: expiryDate.toISOString(),
             next_billing_date: payment_type === 'one-time' ? null : expiryDate.toISOString(), // No next billing for one-time
@@ -181,7 +185,7 @@ const PaymentSuccess: React.FC = () => {
               .update({
                 plan_name: 'premium',
                 status: 'active',
-                flutterwave_transaction_id: transaction_id, // Using existing field for Paystack transaction
+                flutterwave_transaction_id: txnId, // Using existing field for Paystack transaction
                 expires_at: expiryDate.toISOString(),
                 next_billing_date: payment_type === 'one-time' ? null : expiryDate.toISOString(), // No next billing for one-time
                 auto_renew: payment_type !== 'one-time', // No auto-renewal for one-time payments
@@ -208,7 +212,7 @@ const PaymentSuccess: React.FC = () => {
           if (subscriptionError) {
             console.error('Subscription error:', subscriptionError);
             const errorDetails = subscriptionError.message || subscriptionError.details || 'Unknown database error';
-            setError(`Could not activate premium: ${errorDetails}. Please contact support with transaction ID: ${transaction_id}`);
+            setError(`Could not activate premium: ${errorDetails}. Please contact support with transaction ID: ${txnId}`);
           } else {
             // ...removed console.log...
             // ...removed console.log...
@@ -255,7 +259,7 @@ const PaymentSuccess: React.FC = () => {
           }
         } catch (err) {
           console.error('Unexpected error during premium activation:', err);
-          setError('An unexpected error occurred. Please contact support with transaction ID: ' + transaction_id);
+          setError('An unexpected error occurred. Please contact support with transaction ID: ' + txnId);
         }
         
         setUpgrading(false);
