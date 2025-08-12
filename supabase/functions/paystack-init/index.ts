@@ -58,7 +58,8 @@ serve(async (req) => {
     }
 
     if (metadata) payload.metadata = metadata
-    // callback_url is not needed for plan-based init and can trigger validation errors on some accounts
+    // Only include callback_url for one-time payments, not for plan-based subscriptions
+    // Plan-based transactions may reject callback_url parameter on some accounts
     if (callback_url && !plan) payload.callback_url = callback_url
 
     console.log('Paystack init starting', {

@@ -64,11 +64,30 @@ const PaystackPaymentModal: React.FC<PaystackPaymentModalProps> = ({ isOpen, onC
   const handlePay = async () => {
     setIsLoading(true);
     
-    // For subscriptions, redirect directly to Paystack subscription page
+    // For subscriptions, use direct Payment Page URL instead of server initialization
+    // This is because plan-based server init often rejects callback_url parameters
     if (!isOneTime) {
-      // Direct redirect to your Paystack subscription page
-      window.location.href = 'https://paystack.shop/pay/9yfwtz2c7g';
-      return;
+      try {
+        // Validate subscription configuration
+        if (!PAYSTACK_PLAN_CODE) {
+          alert('Subscription plan is not configured. Please contact support.');
+          setIsLoading(false);
+          return;
+        }
+        
+        console.log('Redirecting to Paystack Payment Page for subscription');
+        
+        // For subscriptions, redirect to your configured Paystack Payment Page
+        // Make sure to set the redirect URL in your Paystack dashboard to your GitHub Pages URL
+        window.location.href = 'https://paystack.shop/pay/9yfwtz2c7g';
+        return;
+        
+      } catch (subscriptionErr) {
+        console.error('Subscription redirect failed:', subscriptionErr);
+        alert('Subscription setup failed. Please try again later.');
+        setIsLoading(false);
+        return;
+      }
     }
     
     // Debug logging for one-time payments
@@ -114,13 +133,20 @@ const PaystackPaymentModal: React.FC<PaystackPaymentModalProps> = ({ isOpen, onC
         ],
       };
 
+      // Use Supabase function with authorization header in the URL
+      const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
+      const anonKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
+      
+      // We'll pass the auth token as a parameter and handle it in the function
+      const httpsCallbackUrl = `${supabaseUrl}/functions/v1/paystack-redirect?authorization=${encodeURIComponent('Bearer ' + anonKey)}&status=successful&payment_type=one-time`;
+      
       const payload = {
         email: email.trim(),
         amount: Number(amount),
         currency: (currency || 'GHS').toUpperCase(),
         channels: [selectedPaymentMethod === 'momo' ? 'mobile_money' : 'card'],
         metadata,
-        callback_url: `${window.location.origin}/payment-success?status=successful&payment_type=one-time`,
+        callback_url: httpsCallbackUrl,
       };
 
       // Call Supabase Edge Function via supabase-js (handles URL/env)

@@ -73,7 +73,7 @@ const PaymentSuccess: React.FC = () => {
     // ...removed console.log...
     
     // If no payment parameters, redirect to discover page
-    if (!status && !tx_ref && !transaction_id) {
+  if (!status && !tx_ref && !transaction_id) {
       // ...removed console.log...
       toast({
         title: 'Invalid Access',
@@ -95,7 +95,7 @@ const PaymentSuccess: React.FC = () => {
       return;
     }
     
-    if (status === 'failed') {
+  if (status === 'failed') {
       toast({
         title: 'Payment Failed',
         description: 'Your payment could not be processed. Please try again.',
@@ -105,7 +105,8 @@ const PaymentSuccess: React.FC = () => {
       return;
     }
     
-    if (status !== 'successful' || !txnId) {
+  // If Paystack didn't include a status but we have a reference, proceed to verify
+  if (!txnId || (status && status !== 'successful')) {
       // ...removed console.log...
       setError('Payment verification failed. Please contact support if money was deducted.');
       // Auto-redirect after 10 seconds for error cases
@@ -131,7 +132,7 @@ const PaymentSuccess: React.FC = () => {
     }
     
     // Process successful payment
-    if (status === 'successful' && txnId) {
+  if (txnId) {
       setUpgrading(true);
       supabase.auth.getSession().then(async ({ data: { session } }) => {
         const user = session?.user;
@@ -143,6 +144,29 @@ const PaymentSuccess: React.FC = () => {
         }
 
         try {
+          // Verify transaction on server (Paystack) before granting access
+          let verified = false;
+          let verifyError: string | null = null;
+          try {
+            const { data: verifyData, error: verifyErr } = await supabase.functions.invoke('paystack-verify', {
+              body: { reference: txnId },
+            });
+            if (verifyErr) {
+              verifyError = verifyErr.message || 'Verification error';
+            } else if (verifyData?.ok && verifyData?.data?.status && (verifyData.data.status === 'success' || verifyData.data.status === 'successful')) {
+              verified = true;
+            } else {
+              verifyError = verifyData?.error || 'Unable to verify payment';
+            }
+          } catch (e: any) {
+            verifyError = e?.message || 'Verification failed';
+          }
+
+          if (!verified) {
+            setError(`Could not verify payment with Paystack. ${verifyError || ''}`.trim());
+            setUpgrading(false);
+            return;
+          }
           // ...removed console.log...
           // ...removed console.log...
           // ...removed console.log...

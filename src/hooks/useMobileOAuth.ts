@@ -233,6 +233,42 @@ export const useMobileOAuth = () => {
           navigate('/');
         }
       }
+      
+      // Handle payment callback deep link
+      else if (event.url.startsWith('driplove://payment/callback')) {
+        try {
+          // Extract payment parameters from the URL
+          const url = new URL(event.url);
+          const params = new URLSearchParams(url.search);
+          const reference = params.get('reference');
+          const status = params.get('status');
+          const paymentType = params.get('payment_type');
+          
+          console.log('[Mobile Payment] Payment callback received:', { reference, status, paymentType });
+          
+          // Navigate to payment success page with parameters
+          const searchParams = new URLSearchParams();
+          if (reference) searchParams.set('reference', reference);
+          if (status) searchParams.set('status', status);
+          if (paymentType) searchParams.set('payment_type', paymentType);
+          
+          navigate(`/payment-success?${searchParams.toString()}`);
+          
+          toast({
+            title: "Payment Processing",
+            description: "Verifying your payment...",
+          });
+          
+        } catch (error) {
+          console.error('[Mobile Payment] Error processing payment callback:', error);
+          toast({
+            title: "Payment Error",
+            description: "Failed to process payment callback.",
+            variant: "destructive",
+          });
+          navigate('/dashboard');
+        }
+      }
     };
 
     // Add the listener
