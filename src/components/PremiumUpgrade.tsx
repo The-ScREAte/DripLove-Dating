@@ -22,6 +22,7 @@ const PremiumUpgrade = ({ currentUser, onClose, preselectedPlan }: PremiumUpgrad
   const [showPaymentOptions, setShowPaymentOptions] = useState(false);
   const [paymentType, setPaymentType] = useState<'subscription' | 'one-time' | null>(null);
   const [price, setPrice] = useState('50');
+  const [monthlyPrice, setMonthlyPrice] = useState<string | null>(null);
   const [paymentMethods, setPaymentMethods] = useState<any[]>([]);
   const [currency, setCurrency] = useState('GHS');
 
@@ -59,6 +60,7 @@ const PremiumUpgrade = ({ currentUser, onClose, preselectedPlan }: PremiumUpgrad
       }
 
       setPrice(selectedPrice);
+      setMonthlyPrice(config.monthlyPrice);
       setPaymentMethods(config.paymentMethods);
       setCurrency(selectedCurrency);
     };
@@ -149,7 +151,15 @@ const PremiumUpgrade = ({ currentUser, onClose, preselectedPlan }: PremiumUpgrad
                   <div className="text-3xl sm:text-4xl lg:text-5xl font-bold text-gray-800 responsive-text">
                     {currency} {price}
                   </div>
-                  <div className="text-xs sm:text-sm text-green-600 font-medium mt-1">✨ Lifetime access</div>
+                  <div className="text-xs sm:text-sm text-green-600 font-medium mt-1">✨ One-time payment</div>
+                  {monthlyPrice && (
+                    <div className="mt-2">
+                      <div className="text-lg sm:text-xl font-semibold text-gray-700">
+                        or {currency} {monthlyPrice}/month
+                      </div>
+                      <div className="text-xs sm:text-sm text-blue-600 font-medium">📱 Cancel anytime</div>
+                    </div>
+                  )}
                 </div>
               </CardHeader>
               
@@ -255,19 +265,19 @@ const PremiumUpgrade = ({ currentUser, onClose, preselectedPlan }: PremiumUpgrad
             </button>
             <h2 className="text-xl font-bold mb-4 text-center">Choose Payment Option</h2>
             <div className="space-y-4">
-              <button
+               <button
                 onClick={() => handlePaymentTypeSelection('subscription')}
                 className="w-full p-4 bg-gradient-to-r from-green-500 to-green-600 text-white rounded-lg hover:from-green-600 hover:to-green-700 transition-all duration-200 font-semibold"
               >
                 <div className="text-lg">💳 Subscribe Monthly</div>
-                <div className="text-sm opacity-90">Automatic renewal • Cancel anytime</div>
+                <div className="text-sm opacity-90">{currency} {monthlyPrice || price}/month • Cancel anytime</div>
               </button>
               <button
                 onClick={() => handlePaymentTypeSelection('one-time')}
                 className="w-full p-4 bg-gradient-to-r from-blue-500 to-blue-600 text-white rounded-lg hover:from-blue-600 hover:to-blue-700 transition-all duration-200 font-semibold"
               >
                 <div className="text-lg">📱 One-Time Payment</div>
-                <div className="text-sm opacity-90">1 month access • No auto-renewal</div>
+                <div className="text-sm opacity-90">{currency} {price} • 1 month access • No auto-renewal</div>
               </button>
             </div>
           </div>
