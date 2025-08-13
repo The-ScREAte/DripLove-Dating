@@ -64,39 +64,15 @@ const PaystackPaymentModal: React.FC<PaystackPaymentModalProps> = ({ isOpen, onC
   const handlePay = async () => {
     setIsLoading(true);
     
-    // For subscriptions, use direct Payment Page URL instead of server initialization
-    // This is because plan-based server init often rejects callback_url parameters
-    if (!isOneTime) {
-      try {
-        // Validate subscription configuration
-        if (!PAYSTACK_PLAN_CODE) {
-          alert('Subscription plan is not configured. Please contact support.');
-          setIsLoading(false);
-          return;
-        }
-        
-        console.log('Redirecting to Paystack Payment Page for subscription');
-        
-        // For subscriptions, redirect to your configured Paystack Payment Page
-        // Make sure to set the redirect URL in your Paystack dashboard to your GitHub Pages URL
-        window.location.href = 'https://paystack.shop/pay/9yfwtz2c7g';
-        return;
-        
-      } catch (subscriptionErr) {
-        console.error('Subscription redirect failed:', subscriptionErr);
-        alert('Subscription setup failed. Please try again later.');
-        setIsLoading(false);
-        return;
-      }
-    }
-    
-    // Debug logging for one-time payments
+    // Debug logging
     console.log('Paystack Public Key:', PAYSTACK_PUBLIC_KEY ? 'Set' : 'Not set');
-    console.log('Payment Type:', 'one-time');
+    console.log('Actual Key Value:', PAYSTACK_PUBLIC_KEY);
+    console.log('Key Length:', PAYSTACK_PUBLIC_KEY?.length);
+    console.log('Payment Type:', isOneTime ? 'one-time' : 'subscription');
     console.log('Amount:', amount);
     console.log('Currency:', currency);
     
-    // Validate Paystack configuration for one-time payments
+    // Validate Paystack configuration
     if (!PAYSTACK_PUBLIC_KEY) {
       alert('Paystack is not configured. Please set VITE_PAYSTACK_PUBLIC_KEY in your environment variables.');
       setIsLoading(false);
@@ -123,31 +99,34 @@ const PaystackPaymentModal: React.FC<PaystackPaymentModalProps> = ({ isOpen, onC
       return;
     }
 
-    // For one-time payments, try server initialization first
+    // Prefer server-side initialization via Supabase Edge Function
     try {
       const metadata = {
         custom_fields: [
           { display_name: 'DripLove User', variable_name: 'driplove_user', value: email },
           { display_name: 'Payment Method', variable_name: 'payment_method', value: selectedPaymentMethod },
-          { display_name: 'Payment Type', variable_name: 'payment_type', value: 'one-time' },
+          { display_name: 'Payment Type', variable_name: 'payment_type', value: isOneTime ? 'one-time' : 'subscription' },
         ],
       };
 
-      // Use Supabase function with authorization header in the URL
-      const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
-      const anonKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
-      
-      // We'll pass the auth token as a parameter and handle it in the function
-      const httpsCallbackUrl = `${supabaseUrl}/functions/v1/paystack-redirect?authorization=${encodeURIComponent('Bearer ' + anonKey)}&status=successful&payment_type=one-time`;
-      
-      const payload = {
+      const payload: any = {
         email: email.trim(),
-        amount: Number(amount),
-        currency: (currency || 'GHS').toUpperCase(),
-        channels: [selectedPaymentMethod === 'momo' ? 'mobile_money' : 'card'],
         metadata,
-        callback_url: httpsCallbackUrl,
+        // include status so PaymentSuccess flow remains consistent
+        callback_url: `${window.location.origin}/payment-success?status=successful&payment_type=${isOneTime ? 'one-time' : 'subscription'}`,
       };
+      if (isOneTime) {
+        payload.amount = Number(amount);
+        payload.currency = (currency || 'GHS').toUpperCase();
+        payload.channels = [selectedPaymentMethod === 'momo' ? 'mobile_money' : 'card'];
+      } else {
+        if (!PAYSTACK_PLAN_CODE) {
+          alert('Subscription plan is not configured. Please contact support.');
+          setIsLoading(false);
+          return;
+        }
+        payload.plan = PAYSTACK_PLAN_CODE;
+      }
 
       // Call Supabase Edge Function via supabase-js (handles URL/env)
       const { data, error } = await supabase.functions.invoke('paystack-init', {
@@ -160,7 +139,13 @@ const PaystackPaymentModal: React.FC<PaystackPaymentModalProps> = ({ isOpen, onC
       window.location.href = data.authorization_url as string;
       return;
     } catch (serverErr) {
-      console.warn('Server init failed, falling back to inline:', serverErr);
+      console.warn('Server init failed:', serverErr);
+      // For subscriptions, do NOT fallback to inline to avoid key/plan mismatches
+      if (!isOneTime) {
+        alert(`Subscription initialization failed. Please ensure your Paystack Test Secret Key and the plan code are from the same environment (Test) and try again. Details: ${ (serverErr as any)?.message || serverErr }`);
+        setIsLoading(false);
+        return;
+      }
       console.warn('Falling back to inline init for one-time due to server error:', serverErr);
       // If server init fails for one-time, attempt inline as fallback using public key
       try {
