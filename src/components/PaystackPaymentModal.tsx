@@ -129,11 +129,12 @@ const PaystackPaymentModal: React.FC<PaystackPaymentModalProps> = ({ isOpen, onC
       }
 
       // For subscriptions, use direct Paystack URL
-      if (!isOneTime) {
-        const subscriptionUrl = "https://paystack.shop/pay/9yfwtz2c7g";
-        window.location.href = subscriptionUrl;
-        return;
-      }
+      // COMMENTED OUT: Monthly subscription functionality temporarily disabled
+      // if (!isOneTime) {
+      //   const subscriptionUrl = "https://paystack.shop/pay/9yfwtz2c7g";
+      //   window.location.href = subscriptionUrl;
+      //   return;
+      // }
 
       // For one-time payments, use the edge function
       const { data, error } = await supabase.functions.invoke('paystack-init', {
@@ -148,11 +149,12 @@ const PaystackPaymentModal: React.FC<PaystackPaymentModalProps> = ({ isOpen, onC
     } catch (serverErr) {
       console.warn('Server init failed:', serverErr);
       // For subscriptions, do NOT fallback to inline to avoid key/plan mismatches
-      if (!isOneTime) {
-        alert(`Subscription initialization failed. Please ensure your Paystack Test Secret Key and the plan code are from the same environment (Test) and try again. Details: ${ (serverErr as any)?.message || serverErr }`);
-        setIsLoading(false);
-        return;
-      }
+      // COMMENTED OUT: Monthly subscription functionality temporarily disabled
+      // if (!isOneTime) {
+      //   alert(`Subscription initialization failed. Please ensure your Paystack Test Secret Key and the plan code are from the same environment (Test) and try again. Details: ${ (serverErr as any)?.message || serverErr }`);
+      //   setIsLoading(false);
+      //   return;
+      // }
       console.warn('Falling back to inline init for one-time due to server error:', serverErr);
       // If server init fails for one-time, attempt inline as fallback using public key
       try {
@@ -192,11 +194,13 @@ const PaystackPaymentModal: React.FC<PaystackPaymentModalProps> = ({ isOpen, onC
           paymentConfig.amount = paystackAmount;
           paymentConfig.currency = (currency || 'GHS').toUpperCase();
           paymentConfig.channels = [selectedPaymentMethod === 'momo' ? 'mobile_money' : 'card'];
-        } else {
-          paymentConfig.plan = PAYSTACK_PLAN_CODE;
-          delete paymentConfig.currency;
-          delete paymentConfig.amount;
-        }
+        } 
+        // COMMENTED OUT: Monthly subscription functionality temporarily disabled
+        // else {
+        //   paymentConfig.plan = PAYSTACK_PLAN_CODE;
+        //   delete paymentConfig.currency;
+        //   delete paymentConfig.amount;
+        // }
 
         const handler = (window as any).PaystackPop.setup(paymentConfig);
         handler.openIframe();
@@ -265,10 +269,9 @@ const PaystackPaymentModal: React.FC<PaystackPaymentModalProps> = ({ isOpen, onC
             </div>
           ) : (
             <div>
-              <p>✅ Monthly automatic billing</p>
-              <p>✅ Cancel anytime</p>
-              <p>✅ All premium features included</p>
-              <p>💳 Card payments only</p>
+              {/* COMMENTED OUT: Monthly subscription functionality temporarily disabled */}
+              <p>🚧 Monthly subscriptions temporarily unavailable</p>
+              <p>📝 Please use one-time payment for now</p>
             </div>
           )}
         </div>
