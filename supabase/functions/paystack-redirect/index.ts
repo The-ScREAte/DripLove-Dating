@@ -29,8 +29,8 @@ serve(async (req) => {
       // For localhost development
       webRedirectUrl = `http://localhost:8080/payment-success?status=${encodeURIComponent(status)}&reference=${encodeURIComponent(reference || '')}&payment_type=${encodeURIComponent(paymentType)}`
     } else {
-      // For production - use your actual app domain
-      webRedirectUrl = `https://dating-buddy-companion.lovable.app/payment-success?status=${encodeURIComponent(status)}&reference=${encodeURIComponent(reference || '')}&payment_type=${encodeURIComponent(paymentType)}`
+      // For production - use relative path so it works on any domain
+      webRedirectUrl = `/payment-success?status=${encodeURIComponent(status)}&reference=${encodeURIComponent(reference || '')}&payment_type=${encodeURIComponent(paymentType)}`
     }
     
     // Always create deep link for mobile
