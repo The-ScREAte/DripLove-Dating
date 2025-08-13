@@ -310,6 +310,7 @@ export type Database = {
           enabled_countries: Json | null
           id: string
           payment_methods: Json
+          paystack_plan_code: string | null
           premium_price: number
           updated_at: string
         }
@@ -320,6 +321,7 @@ export type Database = {
           enabled_countries?: Json | null
           id?: string
           payment_methods?: Json
+          paystack_plan_code?: string | null
           premium_price?: number
           updated_at?: string
         }
@@ -330,6 +332,7 @@ export type Database = {
           enabled_countries?: Json | null
           id?: string
           payment_methods?: Json
+          paystack_plan_code?: string | null
           premium_price?: number
           updated_at?: string
         }

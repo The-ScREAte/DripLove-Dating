@@ -13,7 +13,6 @@ interface PaystackPaymentModalProps {
 }
 
 const PAYSTACK_PUBLIC_KEY = import.meta.env.VITE_PAYSTACK_PUBLIC_KEY as string;
-const PAYSTACK_PLAN_CODE = import.meta.env.VITE_PAYSTACK_PLAN_CODE as string;
 
 const loadPaystackScript = () => {
   return new Promise((resolve, reject) => {
@@ -53,6 +52,28 @@ const loadPaystackScript = () => {
 const PaystackPaymentModal: React.FC<PaystackPaymentModalProps> = ({ isOpen, onClose, amount, currency = 'GHS', email, onSuccess, paymentMethod = 'card', isOneTime = false }) => {
   const [isLoading, setIsLoading] = React.useState(false);
   const [selectedPaymentMethod, setSelectedPaymentMethod] = React.useState<'card' | 'momo'>(paymentMethod);
+  const [paystackPlanCode, setPaystackPlanCode] = React.useState<string>('');
+
+  // Fetch payment config on component mount
+  React.useEffect(() => {
+    const fetchPaymentConfig = async () => {
+      try {
+        const { data, error } = await supabase
+          .from('payment_config')
+          .select('paystack_plan_code')
+          .limit(1)
+          .single();
+        
+        if (!error && data?.paystack_plan_code) {
+          setPaystackPlanCode(data.paystack_plan_code);
+        }
+      } catch (err) {
+        console.error('Failed to fetch payment config:', err);
+      }
+    };
+    
+    fetchPaymentConfig();
+  }, []);
 
   React.useEffect(() => {
     if (isOpen) {
@@ -67,7 +88,7 @@ const PaystackPaymentModal: React.FC<PaystackPaymentModalProps> = ({ isOpen, onC
     // Debug logging
     console.log('Paystack Public Key:', PAYSTACK_PUBLIC_KEY ? 'Set' : 'Not set');
     console.log('Key Environment:', PAYSTACK_PUBLIC_KEY?.startsWith('pk_live_') ? 'LIVE' : 'TEST');
-    console.log('Plan Code:', PAYSTACK_PLAN_CODE);
+    console.log('Plan Code:', paystackPlanCode);
     console.log('Payment Type:', isOneTime ? 'one-time' : 'subscription');
     console.log('Amount:', amount);
     console.log('Currency:', currency);
@@ -86,8 +107,8 @@ const PaystackPaymentModal: React.FC<PaystackPaymentModalProps> = ({ isOpen, onC
     }
 
     // Validate plan code for subscriptions
-    if (!isOneTime && !PAYSTACK_PLAN_CODE) {
-      alert('Subscription plan is not configured. Please set VITE_PAYSTACK_PLAN_CODE in your environment variables.');
+    if (!isOneTime && !paystackPlanCode) {
+      alert('Subscription plan is not configured. Please check payment configuration.');
       setIsLoading(false);
       return;
     }
@@ -128,26 +149,12 @@ const PaystackPaymentModal: React.FC<PaystackPaymentModalProps> = ({ isOpen, onC
         payload.channels = [selectedPaymentMethod === 'momo' ? 'mobile_money' : 'card'];
       } else {
         // Use the monthly plan ID for subscriptions
-        payload.plan = PAYSTACK_PLAN_CODE;
+        payload.plan = paystackPlanCode;
       }
 
-      // For subscriptions, use direct Paystack URL
-      if (!isOneTime) {
-        const subscriptionUrl = "https://paystack.shop/pay/9yfwtz2c7g";
-        window.location.href = subscriptionUrl;
-        return;
-      }
-
+      // Use edge function for all payments
       console.log('About to call edge function with payload:', payload);
       
-      // For subscriptions, use client-side initialization to avoid server key issues
-      if (!isOneTime) {
-        console.log('Using client-side initialization for subscription');
-        // Skip edge function for subscriptions and go directly to client-side
-        throw new Error('Using client-side for subscription');
-      }
-      
-      // For one-time payments, use the edge function
       const { data, error } = await supabase.functions.invoke('paystack-init', {
         body: payload,
       });
@@ -212,7 +219,7 @@ const PaystackPaymentModal: React.FC<PaystackPaymentModalProps> = ({ isOpen, onC
           paymentConfig.channels = [selectedPaymentMethod === 'momo' ? 'mobile_money' : 'card'];
         } else {
           // For subscription payments, use the monthly plan ID
-          paymentConfig.plan = PAYSTACK_PLAN_CODE;
+          paymentConfig.plan = paystackPlanCode;
           delete paymentConfig.currency;
           delete paymentConfig.amount;
         }

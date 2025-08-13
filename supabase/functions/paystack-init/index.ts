@@ -1,6 +1,7 @@
 // Supabase Edge Function: paystack-init
 // Initializes Paystack transaction server-side using secret key and returns authorization_url/reference
 import { serve } from 'https://deno.land/std@0.177.0/http/server.ts'
+import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.45.0'
 
 interface InitRequest {
   email: string
@@ -39,17 +40,39 @@ serve(async (req) => {
   try {
     if (req.method === 'OPTIONS') return new Response('ok', { headers: corsHeaders })
     if (req.method !== 'POST') return json(405, { error: 'Method not allowed' })
+    
     const secret = Deno.env.get('PAYSTACK_SECRET_KEY')
     if (!secret) return json(500, { error: 'Missing PAYSTACK_SECRET_KEY' })
+
+    // Initialize Supabase client
+    const supabaseClient = createClient(
+      Deno.env.get('SUPABASE_URL') ?? '',
+      Deno.env.get('SUPABASE_ANON_KEY') ?? ''
+    )
 
     const { email, amount, currency, plan, channels, metadata, callback_url } = (await req.json()) as InitRequest
     if (!email) return json(400, { error: 'email required' })
 
     const payload: Record<string, unknown> = { email }
+    let actualPlan = plan
 
-    if (plan) {
+    // If no plan provided but we need one (when amount is not provided), fetch from database
+    if (!plan && !amount) {
+      const { data: paymentConfig, error } = await supabaseClient
+        .from('payment_config')
+        .select('paystack_plan_code')
+        .limit(1)
+        .single()
+      
+      if (error || !paymentConfig?.paystack_plan_code) {
+        return json(400, { error: 'No plan provided and none configured in database' })
+      }
+      actualPlan = paymentConfig.paystack_plan_code
+    }
+
+    if (actualPlan) {
       // For subscriptions, use plan directly without other parameters
-      payload.plan = plan
+      payload.plan = actualPlan
       // Remove any other parameters that might conflict with subscription plans
       delete payload.channels
       delete payload.amount
