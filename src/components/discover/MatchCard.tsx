@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { MapPin, Briefcase, GraduationCap, Calendar, Crown, Shield, ChevronDown, ChevronUp, User, Quote, Heart, Coffee, Search, Loader2 } from 'lucide-react';
 import { PotentialMatch } from '@/types';
 
@@ -214,6 +214,28 @@ const MatchCard: React.FC<MatchCardProps> = ({
     "Other"
   ];
 
+  // Prevent body scrolling when modal is open
+  useEffect(() => {
+    if (showReportModal) {
+      // Prevent scrolling when modal is open
+      document.body.style.overflow = 'hidden';
+      document.body.style.position = 'fixed';
+      document.body.style.width = '100%';
+    } else {
+      // Re-enable scrolling when modal is closed
+      document.body.style.overflow = '';
+      document.body.style.position = '';
+      document.body.style.width = '';
+    }
+
+    // Cleanup function to restore scrolling
+    return () => {
+      document.body.style.overflow = '';
+      document.body.style.position = '';
+      document.body.style.width = '';
+    };
+  }, [showReportModal]);
+
   // Handle report submit
   const handleReportImage = async () => {
     if (!selectedReason) {
@@ -408,119 +430,113 @@ const MatchCard: React.FC<MatchCardProps> = ({
 
           {/* Report Modal */}
           {showReportModal && (
-            <div 
-              className="fixed inset-0 z-[9999] bg-black/50 backdrop-blur-sm flex items-center justify-center" 
-              onClick={closeReportModal}
-            >
+            <>
               <div 
-                className="bg-white rounded-2xl shadow-2xl w-80 max-w-[90vw] max-h-[80vh] flex flex-col relative" 
-                onClick={e => e.stopPropagation()} 
+                className="fixed inset-0 z-[9999] bg-black/50 backdrop-blur-sm flex items-center justify-center p-4" 
+                onClick={closeReportModal}
                 style={{
-                  position: 'relative',
-                  overflow: 'hidden',
-                  boxSizing: 'border-box',
-                  display: 'flex',
-                  flexDirection: 'column',
-                  height: 'auto',
-                  minHeight: '0',
-                  maxHeight: '80vh',
+                  position: 'fixed',
+                  top: 0,
+                  left: 0,
+                  right: 0,
+                  bottom: 0,
+                  zIndex: 9999,
+                  willChange: 'auto',
+                  backfaceVisibility: 'hidden',
+                  transform: 'translateZ(0)'
                 }}
               >
-                {/* Modal content container with scrollable area */}
-                <div className="p-6 flex-1 overflow-y-auto" style={{width: '100%', boxSizing: 'border-box', minHeight: '0', maxHeight: 'calc(80vh - 0px)'}}>
-                  {/* Close X button */}
-                  <button
-                    onClick={closeReportModal}
-                    className="absolute top-4 right-4 text-gray-400 hover:text-gray-600 transition-colors"
-                    disabled={reporting}
-                    style={{
-                      width: '24px', 
-                      height: '24px',
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                      flexShrink: 0
-                    }} 
-                  >
-                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                    </svg>
-                  </button>
+                <div 
+                  className="bg-white rounded-2xl shadow-2xl w-full max-w-sm mx-auto transform transition-all duration-200 ease-out" 
+                  onClick={e => e.stopPropagation()}
+                  style={{
+                    maxHeight: '90vh',
+                    width: '100%',
+                    maxWidth: '400px',
+                    overflow: 'hidden',
+                    willChange: 'auto',
+                    backfaceVisibility: 'hidden'
+                  }}
+                >
+                  {/* Modal header with close button */}
+                  <div className="relative p-6 pb-2">
+                    <button
+                      onClick={closeReportModal}
+                      className="absolute top-4 right-4 w-6 h-6 flex items-center justify-center text-gray-400 hover:text-gray-600 transition-colors rounded-full hover:bg-gray-100"
+                      disabled={reporting}
+                    >
+                      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                      </svg>
+                    </button>
+                    
+                    <h3 className="text-xl font-bold text-red-600 pr-8">Report Image</h3>
+                  </div>
 
-                  <h3 className="text-xl font-bold mb-4 text-red-600 pr-8">Report Image</h3>
-                  
-                  {reportSuccess ? (
-                    <div className="text-green-600 font-semibold text-center py-8">
-                      <div className="mb-2">✓</div>
-                      <div>Reported! Thank you.</div>
-                    </div>
-                  ) : (
-                    <>
-                      <p className="text-gray-700 mb-4 text-sm font-semibold">Please select a reason for reporting this image:</p>
-                      {/* Reason selection with fixed heights and no movement */}
-                      <div className="space-y-2 mb-6">
-                        {reportReasons.map((reason) => (
-                          <button
-                            key={reason}
-                            onClick={() => setSelectedReason(reason)}
-                            disabled={reporting}
-                            className={`w-full text-left rounded-lg border-2 transition-colors duration-150 ${
-                              selectedReason === reason
-                                ? 'border-red-500 bg-red-50 text-red-700'
-                                : 'border-gray-200 bg-gray-50 text-gray-700 hover:border-gray-300'
-                            } ${reporting ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer'}`}
-                            style={{
-                              height: '48px',
-                              display: 'flex', 
-                              alignItems: 'center',
-                              padding: '0 16px',
-                              fontWeight: 500, 
-                              fontSize: '15px',
-                              boxSizing: 'border-box',
-                              flexShrink: 0
-                            }}
-                          >
-                            <div className="flex items-center justify-between w-full" style={{width: '100%'}}>
-                              <span className="text-sm font-medium" style={{width: '80%', whiteSpace: 'normal'}}>{reason}</span>
+                  {/* Modal content */}
+                  <div className="px-6 pb-6 max-h-96 overflow-y-auto">
+                    {reportSuccess ? (
+                      <div className="text-green-600 font-semibold text-center py-8">
+                        <div className="mb-2 text-2xl">✓</div>
+                        <div>Reported! Thank you.</div>
+                      </div>
+                    ) : (
+                      <>
+                        <p className="text-gray-700 mb-4 text-sm font-semibold">Please select a reason for reporting this image:</p>
+                        
+                        {/* Reason selection with stable layout */}
+                        <div className="space-y-3 mb-6">
+                          {reportReasons.map((reason) => (
+                            <button
+                              key={reason}
+                              onClick={() => setSelectedReason(reason)}
+                              disabled={reporting}
+                              className={`w-full h-12 px-4 text-left rounded-lg border-2 transition-all duration-200 flex items-center justify-between ${
+                                selectedReason === reason
+                                  ? 'border-red-500 bg-red-50 text-red-700'
+                                  : 'border-gray-200 bg-gray-50 text-gray-700 hover:border-gray-300 hover:bg-gray-100'
+                              } ${reporting ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer'}`}
+                            >
+                              <span className="text-sm font-medium flex-1 pr-2">{reason}</span>
                               {selectedReason === reason && (
-                                <svg className="w-5 h-5 text-red-500 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20" style={{minWidth: '20px', minHeight: '20px'}}>
+                                <svg className="w-5 h-5 text-red-500 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
                                   <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
                                 </svg>
                               )}
-                            </div>
-                          </button>
-                        ))}
-                      </div>
-
-                      {/* Action buttons */}
-                      <div className="space-y-3">
-                        <button
-                          className="w-full bg-red-500 hover:bg-red-600 text-white font-bold rounded-lg disabled:opacity-60 disabled:cursor-not-allowed transition-colors duration-150"
-                          onClick={handleReportImage}
-                          disabled={reporting || !selectedReason}
-                          style={{minHeight: '48px', height: '48px'}} 
-                        >
-                          {reporting ? 'Reporting...' : 'Report Image'}
-                        </button>
-                        <button
-                          className="w-full bg-gray-200 hover:bg-gray-300 text-gray-800 font-semibold rounded-lg disabled:opacity-60 disabled:cursor-not-allowed transition-colors duration-150"
-                          onClick={closeReportModal}
-                          disabled={reporting}
-                          style={{minHeight: '48px', height: '48px'}} 
-                        >
-                          Cancel
-                        </button>
-                      </div>
-                      {reportError && (
-                        <div className="text-red-500 text-sm mt-3 text-center bg-red-50 p-2 rounded-lg">
-                          {reportError}
+                            </button>
+                          ))}
                         </div>
-                      )}
-                    </>
-                  )}
+
+                        {/* Action buttons with stable height */}
+                        <div className="space-y-3">
+                          <button
+                            className="w-full h-12 bg-red-500 hover:bg-red-600 text-white font-semibold rounded-lg disabled:opacity-50 disabled:cursor-not-allowed transition-colors duration-200"
+                            onClick={handleReportImage}
+                            disabled={reporting || !selectedReason}
+                          >
+                            {reporting ? 'Reporting...' : 'Report Image'}
+                          </button>
+                          
+                          <button
+                            className="w-full h-12 bg-gray-200 hover:bg-gray-300 text-gray-800 font-semibold rounded-lg disabled:opacity-50 disabled:cursor-not-allowed transition-colors duration-200"
+                            onClick={closeReportModal}
+                            disabled={reporting}
+                          >
+                            Cancel
+                          </button>
+                        </div>
+                        
+                        {reportError && (
+                          <div className="text-red-500 text-sm mt-4 text-center bg-red-50 p-3 rounded-lg border border-red-200">
+                            {reportError}
+                          </div>
+                        )}
+                      </>
+                    )}
+                  </div>
                 </div>
               </div>
-            </div>
+            </>
           )}
         </div>
       </div>

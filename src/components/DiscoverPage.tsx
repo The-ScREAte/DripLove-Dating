@@ -268,7 +268,7 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, isPremium }: DiscoverPage
         .in('gender', allowedGenders)
         .eq('account_status', 'active')
         .eq('is_admin', false)
-        .limit(200); // Increased limit to show more potential matches
+        .limit(50); // Optimized limit for faster loading
 
       if (error) throw error;
 
@@ -276,39 +276,51 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, isPremium }: DiscoverPage
       let filteredProfiles = profiles || [];
       const userMaxDistance = currentUser.max_distance || currentUser.distance_preference || 50;
       if (currentUser.latitude && currentUser.longitude && userMaxDistance) {
+        // Create a pre-computed distance map to avoid recalculating
+        const profileDistances = new Map();
+        
         const nearbyProfiles = (profiles || []).filter(profile => {
           // If profile doesn't have coordinates, include it (fallback to country/city matching)
           if (!profile.latitude || !profile.longitude) {
             return profile.country === currentUser.country;
           }
 
-          // Calculate distance between users
-          const distance = calculateDistance(
-            currentUser.latitude,
-            currentUser.longitude,
-            profile.latitude,
-            profile.longitude
-          );
-
-          return distance <= userMaxDistance;
-        });
-
-        // If there aren't enough nearby profiles, gradually expand the search radius
-        if (nearbyProfiles.length < 20) { // Reduced threshold from 10 to 20
-          const expandedProfiles = (profiles || []).filter(profile => {
-            if (!profile.latitude || !profile.longitude) {
-              return profile.country === currentUser.country;
-            }
-
-            const distance = calculateDistance(
+          // Check if distance already calculated
+          let distance = profileDistances.get(profile.id);
+          if (!distance) {
+            // Calculate distance only once per profile
+            distance = calculateDistance(
               currentUser.latitude,
               currentUser.longitude,
               profile.latitude,
               profile.longitude
             );
+            profileDistances.set(profile.id, distance);
+          }
 
-            // Expand to 3x the preferred distance if not enough matches
-            return distance <= (userMaxDistance * 3); // Increased from 2x to 3x
+          return distance <= userMaxDistance;
+        });
+
+        // If there aren't enough nearby profiles, gradually expand the search radius
+        if (nearbyProfiles.length < 10) { // Reduced threshold from 20 to 10 for faster loading
+          const expandedProfiles = (profiles || []).filter(profile => {
+            if (!profile.latitude || !profile.longitude) {
+              return profile.country === currentUser.country;
+            }
+
+            let distance = profileDistances.get(profile.id);
+            if (!distance) {
+              distance = calculateDistance(
+                currentUser.latitude,
+                currentUser.longitude,
+                profile.latitude,
+                profile.longitude
+              );
+              profileDistances.set(profile.id, distance);
+            }
+
+            // Expand to 2x the preferred distance if not enough matches
+            return distance <= (userMaxDistance * 2); // Reduced from 3x to 2x for performance
           });
 
           filteredProfiles = expandedProfiles.length > nearbyProfiles.length ? expandedProfiles : nearbyProfiles;
@@ -358,9 +370,12 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, isPremium }: DiscoverPage
       setCurrentIndex(indexToShow);
       setLastShuffleTime(Date.now());
 
-      // Preload images for the first 5 profiles immediately
+  // Preload images for the first 2 profiles only for faster initial loading (non-blocking)
       if (shuffled.length > 0) {
-        await preloadNextProfileImages(shuffled, {}, 0);
+        // Use setTimeout to make image preloading non-blocking for faster UI
+        setTimeout(() => {
+          preloadNextProfileImages(shuffled, {}, 0);
+        }, 100);
       }
     } catch (error) {
       console.error('Error fetching potential matches:', error);
@@ -432,26 +447,20 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, isPremium }: DiscoverPage
     }
   }, [userImages, preloadImages]);
 
-  // Enhanced preloading strategy - load more profiles ahead
+  // Optimized preloading strategy - load fewer profiles ahead for faster performance
   const preloadNextProfileImages = useCallback(async (matches: PotentialMatch[], alreadyLoaded: { [key: string]: string[] }, startIdx: number) => {
-    // Increased from 2 to 5 profiles for better preloading
-    const PRELOAD_COUNT = 5;
+    // Reduced from 5 to 2 profiles for better performance
+    const PRELOAD_COUNT = 2;
     const toPreload = matches.slice(startIdx, startIdx + PRELOAD_COUNT)
       .filter(match => !alreadyLoaded[match.id] || alreadyLoaded[match.id]?.length === 0);
     
-    // Process profiles in batches to avoid overwhelming the system
-    const BATCH_SIZE = 2;
-    for (let i = 0; i < toPreload.length; i += BATCH_SIZE) {
-      const batch = toPreload.slice(i, i + BATCH_SIZE);
-      const promises = batch.map(match => loadFullImages(match.id));
-      await Promise.all(promises);
-      
-      // Small delay between batches to maintain smooth UI
-      if (i + BATCH_SIZE < toPreload.length) {
-        await new Promise(resolve => setTimeout(resolve, 100));
-      }
+    // Process profiles sequentially to avoid overwhelming the system
+    for (const match of toPreload) {
+      await loadFullImages(match.id);
+      // Small delay between loads to maintain smooth UI
+      await new Promise(resolve => setTimeout(resolve, 50));
     }
-  }, [loadFullImages, preloadUserImages]);
+  }, [loadFullImages]);
 
   useEffect(() => {
     if (currentUser?.id) {
@@ -476,8 +485,8 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, isPremium }: DiscoverPage
     if (currentMatch && !userImages[currentMatch.id]) {
       loadFullImages(currentMatch.id);
     }
-    // Enhanced preloading: preload images for the next 5 profiles and refresh every 3 swipes
-    const shouldPreloadMore = currentIndex % 3 === 0; // Every 3 swipes
+    // Optimized preloading: preload images for the next 2 profiles and refresh every 5 swipes
+    const shouldPreloadMore = currentIndex % 5 === 0; // Every 5 swipes (reduced frequency)
     if (shouldPreloadMore) {
       preloadNextProfileImages(potentialMatches, userImages, currentIndex + 1);
     }
@@ -660,26 +669,35 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, isPremium }: DiscoverPage
         .in('gender', allowedGenders)
         .eq('account_status', 'active')
         .eq('is_admin', false)
-        .limit(50); // Load 50 new profiles
+        .limit(25); // Optimized load more batch size
 
       if (error) throw error;
 
-      // Apply same filtering logic as original fetch
+      // Apply same filtering logic as original fetch with distance caching
       let filteredProfiles = newProfiles || [];
       const userMaxDistance = currentUser.max_distance || currentUser.distance_preference || 50;
       
       if (currentUser.latitude && currentUser.longitude) {
+        // Create distance cache for new profiles too
+        const profileDistances = new Map();
+        
         filteredProfiles = filteredProfiles.filter(profile => {
           if (!profile.latitude || !profile.longitude) {
             return profile.country === currentUser.country;
           }
-          const distance = calculateDistance(
-            currentUser.latitude,
-            currentUser.longitude,
-            profile.latitude,
-            profile.longitude
-          );
-          return distance <= (userMaxDistance * 3);
+          
+          let distance = profileDistances.get(profile.id);
+          if (!distance) {
+            distance = calculateDistance(
+              currentUser.latitude,
+              currentUser.longitude,
+              profile.latitude,
+              profile.longitude
+            );
+            profileDistances.set(profile.id, distance);
+          }
+          
+          return distance <= (userMaxDistance * 2); // Reduced from 3x to 2x for performance
         });
       }
 
@@ -711,7 +729,7 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, isPremium }: DiscoverPage
     } finally {
       setIsLoadingMore(false);
     }
-  }, [currentUser, allowedGenders, potentialMatches, calculateAge, calculateDistance, isLoading, isLoadingMore, userImages, preloadNextProfileImages]);
+  }, [currentUser, allowedGenders, potentialMatches, calculateAge, calculateDistance, isLoading, isLoadingMore, userImages, preloadNextProfileImages, loadFullImages]);
   // Function to check if a profile is verified (90%+ completion with photos and basic info)
   const calculateProfileVerification = useCallback((profile: PotentialMatch) => {
     if (!profile) return false;
