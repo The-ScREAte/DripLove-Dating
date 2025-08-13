@@ -48,8 +48,12 @@ serve(async (req) => {
     const payload: Record<string, unknown> = { email }
 
     if (plan) {
-      // For subscriptions, keep payload minimal to avoid Paystack 400s
+      // For subscriptions, use plan directly without other parameters
       payload.plan = plan
+      // Remove any other parameters that might conflict with subscription plans
+      delete payload.channels
+      delete payload.amount
+      delete payload.currency
     } else {
       if (!amount) return json(400, { error: 'amount required for one-time' })
       payload.amount = Math.round(Number(amount) * 100)

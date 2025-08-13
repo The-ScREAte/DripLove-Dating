@@ -132,11 +132,11 @@ const PaystackPaymentModal: React.FC<PaystackPaymentModalProps> = ({ isOpen, onC
       }
 
       // For subscriptions, use direct Paystack URL
-      // if (!isOneTime) {
-      //   const subscriptionUrl = "https://paystack.shop/pay/9yfwtz2c7g";
-      //   window.location.href = subscriptionUrl;
-      //   return;
-      // }
+      if (!isOneTime) {
+        const subscriptionUrl = "https://paystack.shop/pay/9yfwtz2c7g";
+        window.location.href = subscriptionUrl;
+        return;
+      }
 
       console.log('About to call edge function with payload:', payload);
       
