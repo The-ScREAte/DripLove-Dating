@@ -66,8 +66,8 @@ const PaystackPaymentModal: React.FC<PaystackPaymentModalProps> = ({ isOpen, onC
     
     // Debug logging
     console.log('Paystack Public Key:', PAYSTACK_PUBLIC_KEY ? 'Set' : 'Not set');
-    console.log('Actual Key Value:', PAYSTACK_PUBLIC_KEY);
-    console.log('Key Length:', PAYSTACK_PUBLIC_KEY?.length);
+    console.log('Key Environment:', PAYSTACK_PUBLIC_KEY?.startsWith('pk_live_') ? 'LIVE' : 'TEST');
+    console.log('Plan Code:', PAYSTACK_PLAN_CODE);
     console.log('Payment Type:', isOneTime ? 'one-time' : 'subscription');
     console.log('Amount:', amount);
     console.log('Currency:', currency);
@@ -81,6 +81,13 @@ const PaystackPaymentModal: React.FC<PaystackPaymentModalProps> = ({ isOpen, onC
     
     if (!PAYSTACK_PUBLIC_KEY.startsWith('pk_')) {
       alert('Invalid Paystack public key format. It should start with "pk_".');
+      setIsLoading(false);
+      return;
+    }
+
+    // Validate plan code for subscriptions
+    if (!isOneTime && !PAYSTACK_PLAN_CODE) {
+      alert('Subscription plan is not configured. Please set VITE_PAYSTACK_PLAN_CODE in your environment variables.');
       setIsLoading(false);
       return;
     }
@@ -120,42 +127,51 @@ const PaystackPaymentModal: React.FC<PaystackPaymentModalProps> = ({ isOpen, onC
         payload.currency = (currency || 'GHS').toUpperCase();
         payload.channels = [selectedPaymentMethod === 'momo' ? 'mobile_money' : 'card'];
       } else {
-        if (!PAYSTACK_PLAN_CODE) {
-          alert('Subscription plan is not configured. Please contact support.');
-          setIsLoading(false);
-          return;
-        }
+        // Use the monthly plan ID for subscriptions
         payload.plan = PAYSTACK_PLAN_CODE;
       }
 
       // For subscriptions, use direct Paystack URL
-      // COMMENTED OUT: Monthly subscription functionality temporarily disabled
       // if (!isOneTime) {
       //   const subscriptionUrl = "https://paystack.shop/pay/9yfwtz2c7g";
       //   window.location.href = subscriptionUrl;
       //   return;
       // }
 
+      console.log('About to call edge function with payload:', payload);
+      
+      // For subscriptions, use client-side initialization to avoid server key issues
+      if (!isOneTime) {
+        console.log('Using client-side initialization for subscription');
+        // Skip edge function for subscriptions and go directly to client-side
+        throw new Error('Using client-side for subscription');
+      }
+      
       // For one-time payments, use the edge function
       const { data, error } = await supabase.functions.invoke('paystack-init', {
         body: payload,
       });
+      
+      console.log('Edge function response:', { data, error });
+      console.log('Payload sent:', payload);
+      
       if (error || !data?.ok || !data?.authorization_url) {
         console.error('Server init failed:', error || data);
-        throw new Error(error?.message || data?.error || 'Server init failed');
+        const errorMessage = error?.message || data?.error || 'Server init failed';
+        const errorDetails = data?.details || error?.details || '';
+        console.error('Error details:', errorDetails);
+        throw new Error(`${errorMessage}${errorDetails ? ` - Details: ${JSON.stringify(errorDetails)}` : ''}`);
       }
       window.location.href = data.authorization_url as string;
       return;
     } catch (serverErr) {
       console.warn('Server init failed:', serverErr);
-      // For subscriptions, do NOT fallback to inline to avoid key/plan mismatches
-      // COMMENTED OUT: Monthly subscription functionality temporarily disabled
-      // if (!isOneTime) {
-      //   alert(`Subscription initialization failed. Please ensure your Paystack Test Secret Key and the plan code are from the same environment (Test) and try again. Details: ${ (serverErr as any)?.message || serverErr }`);
-      //   setIsLoading(false);
-      //   return;
-      // }
-      console.warn('Falling back to inline init for one-time due to server error:', serverErr);
+      // For subscriptions, always fallback to client-side
+      if (!isOneTime) {
+        console.log('Falling back to client-side for subscription');
+      } else {
+        console.warn('Falling back to inline init for one-time due to server error:', serverErr);
+      }
       // If server init fails for one-time, attempt inline as fallback using public key
       try {
         const ref = 'DRIPLOVE-' + Date.now() + '-' + Math.random().toString(36).substring(2, 8);
@@ -194,13 +210,12 @@ const PaystackPaymentModal: React.FC<PaystackPaymentModalProps> = ({ isOpen, onC
           paymentConfig.amount = paystackAmount;
           paymentConfig.currency = (currency || 'GHS').toUpperCase();
           paymentConfig.channels = [selectedPaymentMethod === 'momo' ? 'mobile_money' : 'card'];
-        } 
-        // COMMENTED OUT: Monthly subscription functionality temporarily disabled
-        // else {
-        //   paymentConfig.plan = PAYSTACK_PLAN_CODE;
-        //   delete paymentConfig.currency;
-        //   delete paymentConfig.amount;
-        // }
+        } else {
+          // For subscription payments, use the monthly plan ID
+          paymentConfig.plan = PAYSTACK_PLAN_CODE;
+          delete paymentConfig.currency;
+          delete paymentConfig.amount;
+        }
 
         const handler = (window as any).PaystackPop.setup(paymentConfig);
         handler.openIframe();
@@ -269,9 +284,10 @@ const PaystackPaymentModal: React.FC<PaystackPaymentModalProps> = ({ isOpen, onC
             </div>
           ) : (
             <div>
-              {/* COMMENTED OUT: Monthly subscription functionality temporarily disabled */}
-              <p>🚧 Monthly subscriptions temporarily unavailable</p>
-              <p>📝 Please use one-time payment for now</p>
+              <p>✅ Monthly subscription</p>
+              <p>✅ Automatic renewal</p>
+              <p>✅ Cancel anytime</p>
+              <p>✅ All premium features included</p>
             </div>
           )}
         </div>
