@@ -128,7 +128,14 @@ const PaystackPaymentModal: React.FC<PaystackPaymentModalProps> = ({ isOpen, onC
         payload.plan = PAYSTACK_PLAN_CODE;
       }
 
-      // Call Supabase Edge Function via supabase-js (handles URL/env)
+      // For subscriptions, use direct Paystack URL
+      if (!isOneTime) {
+        const subscriptionUrl = "https://paystack.shop/pay/9yfwtz2c7g";
+        window.location.href = subscriptionUrl;
+        return;
+      }
+
+      // For one-time payments, use the edge function
       const { data, error } = await supabase.functions.invoke('paystack-init', {
         body: payload,
       });
