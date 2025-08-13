@@ -36,14 +36,48 @@ serve(async (req) => {
     // Always create deep link for mobile
     deepLinkUrl = `driplove://payment/callback?status=${encodeURIComponent(status)}&reference=${encodeURIComponent(reference || '')}&payment_type=${encodeURIComponent(paymentType)}`
     
-    // Simple immediate redirect
-    const redirectUrl = isLocalhost ? webRedirectUrl : webRedirectUrl
+    // Return simple HTML with meta refresh (CSP compliant)
+    const html = `
+    <!DOCTYPE html>
+    <html>
+    <head>
+      <title>Payment Complete</title>
+      <meta charset="utf-8">
+      <meta name="viewport" content="width=device-width, initial-scale=1">
+      <meta http-equiv="refresh" content="1;url=${isLocalhost ? webRedirectUrl : deepLinkUrl}">
+    </head>
+    <body style="text-align: center; padding: 50px; font-family: Arial, sans-serif; background: #667eea; color: white;">
+      <h2>Payment ${status === 'successful' ? 'Successful' : 'Processing'}!</h2>
+      <p>Redirecting you back to DripLove app...</p>
+      <p><small>Reference: ${reference || 'N/A'}</small></p>
+      <p><a href="${isLocalhost ? webRedirectUrl : deepLinkUrl}" style="color: white;">Click here if not redirected automatically</a></p>
+      <script>
+        // Immediate redirect without violating CSP
+        setTimeout(function() {
+          try {
+            if (${isLocalhost}) {
+              window.location.href = '${webRedirectUrl}';
+            } else {
+              // Try deep link first
+              window.location.href = '${deepLinkUrl}';
+              // Fallback to web after 2 seconds
+              setTimeout(function() {
+                window.location.href = '${webRedirectUrl}';
+              }, 2000);
+            }
+          } catch (e) {
+            window.location.href = '${webRedirectUrl}';
+          }
+        }, 500);
+      </script>
+    </body>
+    </html>
+    `
     
-    return new Response(null, {
-      status: 302,
+    return new Response(html, {
       headers: {
         ...corsHeaders,
-        'Location': redirectUrl,
+        'content-type': 'text/html',
       },
     })
   } catch (error) {
