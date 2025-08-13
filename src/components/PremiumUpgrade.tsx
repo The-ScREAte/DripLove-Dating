@@ -279,7 +279,6 @@ const PremiumUpgrade = ({ currentUser, onClose, preselectedPlan }: PremiumUpgrad
         isOpen={showPaymentModal}
         onClose={() => setShowPaymentModal(false)}
         amount={parseFloat(price)}
-        currency={currency}
         email={currentUser?.email || ''}
         onSuccess={handlePaymentSuccess}
         paymentMethod={paymentMethods[0]?.type || 'card'}
