@@ -16,7 +16,6 @@ import SwipeButtons from './discover/SwipeButtons';
 import ProfileCompletionModal from './ProfileCompletionModal';
 import SwipeCounter from './SwipeCounter';
 import { CurrentUser, PotentialMatch } from '@/types';
-import { usePricing } from '@/hooks/usePricing';
 
 // Helper function to calculate age from date of birth
 const calculateAge = (dateOfBirth: string): number => {
@@ -59,7 +58,6 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, isPremium }: DiscoverPage
   const [userImages, setUserImages] = useState<{ [key: string]: string[] }>({});
   const [preloadedImages, setPreloadedImages] = useState<{ [key: string]: HTMLImageElement[] }>({});
   const [reverseUsageToday, setReverseUsageToday] = useState(0);
-  const { oneTimePrice, monthlyPrice, currency } = usePricing();
   const [profileCompletion, setProfileCompletion] = useState(0);
   const [profileMissingFields, setProfileMissingFields] = useState<string[]>([]);
   const [userProfileImages, setUserProfileImages] = useState<any[]>([]);
@@ -764,7 +762,7 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, isPremium }: DiscoverPage
         setIsOutOfSwipes(true);
         toast({
           title: 'Daily Limit Reached',
-          description: usageResult.message + ` Upgrade from ${currency} ${oneTimePrice}${monthlyPrice ? ` or ${currency} ${monthlyPrice}/month` : ''} for unlimited swipes.`,
+          description: usageResult.message + ' Upgrade to Premium for unlimited swipes.',
           variant: 'destructive'
         });
         return;
@@ -879,7 +877,7 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, isPremium }: DiscoverPage
         setIsOutOfSwipes(true);
         toast({
           title: 'Daily Limit Reached',
-          description: usageResult.message + ` Upgrade from ${currency} ${oneTimePrice}${monthlyPrice ? ` or ${currency} ${monthlyPrice}/month` : ''} for unlimited swipes.`,
+          description: usageResult.message + ' Upgrade to Premium for unlimited swipes.',
           variant: 'destructive'
         });
         return;
@@ -982,7 +980,7 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, isPremium }: DiscoverPage
       if (!usageResult.success) {
         toast({
           title: 'Daily Limit Reached',
-          description: usageResult.message + ` Upgrade from ${currency} ${oneTimePrice}${monthlyPrice ? ` or ${currency} ${monthlyPrice}/month` : ''} for unlimited reverse dislikes.`,
+          description: usageResult.message + ' Upgrade to Premium for unlimited reverse dislikes.',
           variant: 'destructive'
         });
         return;
@@ -1133,7 +1131,7 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, isPremium }: DiscoverPage
             <p className="text-gray-600 mb-4">
               {isPremium 
                 ? "Refreshing your matches..." 
-                : `Free users get 12 swipes per day. Come back tomorrow or upgrade from ${currency} ${oneTimePrice}${monthlyPrice ? ` or ${currency} ${monthlyPrice}/month` : ''} for unlimited swipes!`
+                : "Free users get 12 swipes per day. Come back tomorrow or upgrade to Premium for unlimited swipes!"
               }
             </p>
             <div className="space-y-3">

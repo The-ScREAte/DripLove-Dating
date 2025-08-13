@@ -32,27 +32,9 @@ export async function getPremiumPaymentConfig() {
     const validMethods = (data.payment_methods as any[]).filter((m: any) => 
       m.details && (m.type !== 'momo' || m.name)
     );
-
-    // Fetch monthly plan price from Paystack if plan code exists
-    let monthlyPrice = null;
-    if (data.paystack_plan_code) {
-      try {
-        const { data: planData, error: planError } = await supabase.functions.invoke('paystack-get-plan', {
-          body: { planCode: data.paystack_plan_code }
-        });
-        
-        if (!planError && planData?.success && planData?.plan?.amount) {
-          // Convert from kobo to main currency unit
-          monthlyPrice = (planData.plan.amount / 100).toString();
-        }
-      } catch (planError) {
-        console.error('Error fetching plan price:', planError);
-      }
-    }
     
     return { 
       price: data.premium_price.toString(), 
-      monthlyPrice,
       paymentMethods: validMethods,
       currency: data.currency,
       countryPrices: data.country_prices || {},
@@ -62,7 +44,6 @@ export async function getPremiumPaymentConfig() {
     console.error('Error fetching payment config:', error);
     return { 
       price: '50', 
-      monthlyPrice: null,
       paymentMethods: [],
       currency: 'GHS',
       countryPrices: {},

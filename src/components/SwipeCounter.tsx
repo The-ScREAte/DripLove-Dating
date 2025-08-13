@@ -2,7 +2,6 @@ import React from 'react';
 import { Card, CardContent } from '@/components/ui/card';
 import { Progress } from '@/components/ui/progress';
 import { AlertTriangle, Eye, Heart } from 'lucide-react';
-import { usePricing } from '@/hooks/usePricing';
 
 interface SwipeCounterProps {
   swipesUsedToday: number;
@@ -17,8 +16,6 @@ const SwipeCounter: React.FC<SwipeCounterProps> = ({
   profileCompletion,
   isPremium
 }) => {
-  const { oneTimePrice, monthlyPrice, currency, loading } = usePricing();
-  
   if (isPremium) return null; // Premium users don't have restrictions
 
   const remainingSwipes = swipeLimit - swipesUsedToday;
@@ -67,11 +64,7 @@ const SwipeCounter: React.FC<SwipeCounterProps> = ({
         
         {!showWarning && (
           <p className="text-xs text-gray-500 text-center">
-            {remainingSwipes} swipes remaining today • {loading ? (
-              "Upgrade to Premium"
-            ) : (
-              `Upgrade from ${currency} ${oneTimePrice}${monthlyPrice ? ` or ${currency} ${monthlyPrice}/month` : ''}`
-            )}
+            {remainingSwipes} swipes remaining today
           </p>
         )}
       </CardContent>

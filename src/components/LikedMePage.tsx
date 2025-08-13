@@ -7,7 +7,6 @@ import { useToast } from '@/hooks/use-toast';
 import { useSubscription } from '@/hooks/useSubscription';
 import BlockDialog from './BlockDialog';
 import PremiumUpgrade from './PremiumUpgrade';
-import { usePricing } from '@/hooks/usePricing';
 
 interface LikedMePageProps {
   currentUser: any;
@@ -26,7 +25,6 @@ const LikedMePage = ({ currentUser, isPremium = false }: LikedMePageProps) => {
   const [lockoutEndDate, setLockoutEndDate] = useState<Date | null>(null);
   const [hasInteractedToday, setHasInteractedToday] = useState(false);
   const { toast } = useToast();
-  const { oneTimePrice, monthlyPrice, currency } = usePricing();
 
   const { subscription, getLikedMeVisibleCount } = useSubscription(currentUser?.id);
 
@@ -636,7 +634,7 @@ const LikedMePage = ({ currentUser, isPremium = false }: LikedMePageProps) => {
             <div className="flex items-center space-x-2 text-yellow-800">
               <Lock className="w-4 h-4" />
               <span className="text-xs font-medium">
-                Upgrade from {currency} {oneTimePrice}{monthlyPrice ? ` or ${currency} ${monthlyPrice}/month` : ''} to see who liked you and interact with them
+                Upgrade to Premium to see who liked you and interact with them
               </span>
             </div>
           </div>

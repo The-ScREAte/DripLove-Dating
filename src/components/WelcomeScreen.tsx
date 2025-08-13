@@ -1,7 +1,6 @@
 
 import React from 'react';
 import { Button } from '@/components/ui/button';
-import { usePricing } from '@/hooks/usePricing';
 
 interface WelcomeScreenProps {
   onGetStarted: () => void;
@@ -12,8 +11,6 @@ interface WelcomeScreenProps {
 }
 
 const WelcomeScreen = ({ onGetStarted, onAdminAccess, onShowAbout, onShowTerms, onShowPrivacy }: WelcomeScreenProps) => {
-  const { oneTimePrice, monthlyPrice, currency, loading } = usePricing();
-  
   return (
     <div className="min-h-screen w-full bg-gradient-to-br from-pink-400 via-purple-500 to-indigo-600 flex flex-col items-center justify-center text-white relative overflow-hidden">
       {/* Background Pattern */}
@@ -40,16 +37,8 @@ const WelcomeScreen = ({ onGetStarted, onAdminAccess, onShowAbout, onShowTerms, 
           Feel the Spark. Drip in Love
         </h2>
         
-        <p className="text-lg md:text-xl mb-4 opacity-90 leading-relaxed">
+        <p className="text-lg md:text-xl mb-8 opacity-90 leading-relaxed">
           Real Vibes. Real People. Real Love.
-        </p>
-        
-        <p className="text-sm md:text-base mb-8 opacity-80 leading-relaxed">
-          {loading ? (
-            "Start for free • Premium upgrades available"
-          ) : (
-            `Start for free • Upgrade from ${currency} ${oneTimePrice}${monthlyPrice ? ` or ${currency} ${monthlyPrice}/month` : ''}`
-          )}
         </p>
         
         {/* CTA Button */}
