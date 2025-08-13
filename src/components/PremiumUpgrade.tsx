@@ -24,6 +24,8 @@ const PremiumUpgrade = ({ currentUser, onClose, preselectedPlan }: PremiumUpgrad
   const [price, setPrice] = useState('50');
   const [paymentMethods, setPaymentMethods] = useState<any[]>([]);
   const [currency, setCurrency] = useState('GHS');
+  const [monthlyPrice, setMonthlyPrice] = useState<string>('');
+  const [loadingPlanPrice, setLoadingPlanPrice] = useState(true);
 
   React.useEffect(() => {
     const loadPaymentConfig = async () => {
@@ -61,6 +63,30 @@ const PremiumUpgrade = ({ currentUser, onClose, preselectedPlan }: PremiumUpgrad
       setPrice(selectedPrice);
       setPaymentMethods(config.paymentMethods);
       setCurrency(selectedCurrency);
+
+      // Fetch monthly plan price from Paystack
+      if (config.paystackPlanCode) {
+        try {
+          setLoadingPlanPrice(true);
+          const { data, error } = await supabase.functions.invoke('paystack-get-plan', {
+            body: { planCode: config.paystackPlanCode }
+          });
+
+          if (!error && data?.success && data?.plan) {
+            // Convert from kobo/pesewas to main currency
+            const planAmount = data.plan.amount / 100;
+            setMonthlyPrice(planAmount.toString());
+          } else {
+            console.error('Error fetching plan price:', error || data?.error);
+          }
+        } catch (error) {
+          console.error('Error fetching plan price:', error);
+        } finally {
+          setLoadingPlanPrice(false);
+        }
+      } else {
+        setLoadingPlanPrice(false);
+      }
     };
     loadPaymentConfig();
   }, [currentUser]);
@@ -255,20 +281,22 @@ const PremiumUpgrade = ({ currentUser, onClose, preselectedPlan }: PremiumUpgrad
             </button>
             <h2 className="text-xl font-bold mb-4 text-center">Choose Payment Option</h2>
             <div className="space-y-4">
-              <button
-                onClick={() => handlePaymentTypeSelection('subscription')}
-                className="w-full p-4 bg-gradient-to-r from-green-500 to-green-600 text-white rounded-lg hover:from-green-600 hover:to-green-700 transition-all duration-200 font-semibold"
-              >
-                <div className="text-lg">💳 Subscribe Monthly</div>
-                <div className="text-sm opacity-90">Automatic renewal • Cancel anytime</div>
-              </button>
-              <button
-                onClick={() => handlePaymentTypeSelection('one-time')}
-                className="w-full p-4 bg-gradient-to-r from-blue-500 to-blue-600 text-white rounded-lg hover:from-blue-600 hover:to-blue-700 transition-all duration-200 font-semibold"
-              >
-                <div className="text-lg">📱 One-Time Payment</div>
-                <div className="text-sm opacity-90">1 month access • No auto-renewal</div>
-              </button>
+                <button
+                  onClick={() => handlePaymentTypeSelection('subscription')}
+                  className="w-full p-4 bg-gradient-to-r from-green-500 to-green-600 text-white rounded-lg hover:from-green-600 hover:to-green-700 transition-all duration-200 font-semibold"
+                >
+                  <div className="text-lg">💳 Subscribe Monthly</div>
+                  <div className="text-sm opacity-90">
+                    {loadingPlanPrice ? 'Loading price...' : monthlyPrice ? `${currency} ${monthlyPrice}/month` : 'Automatic renewal'} • Cancel anytime
+                  </div>
+                </button>
+                <button
+                  onClick={() => handlePaymentTypeSelection('one-time')}
+                  className="w-full p-4 bg-gradient-to-r from-blue-500 to-blue-600 text-white rounded-lg hover:from-blue-600 hover:to-blue-700 transition-all duration-200 font-semibold"
+                >
+                  <div className="text-lg">📱 One-Time Payment</div>
+                  <div className="text-sm opacity-90">{currency} {price} • 1 month access • No auto-renewal</div>
+                </button>
             </div>
           </div>
         </div>
