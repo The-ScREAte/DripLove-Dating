@@ -68,7 +68,7 @@ const PaystackPaymentModal: React.FC<PaystackPaymentModalProps> = ({ isOpen, onC
           setPaystackPlanCode(data.paystack_plan_code);
         }
       } catch (err) {
-        console.error('Failed to fetch payment config:', err);
+        // Silent error handling
       }
     };
     
@@ -77,21 +77,13 @@ const PaystackPaymentModal: React.FC<PaystackPaymentModalProps> = ({ isOpen, onC
 
   React.useEffect(() => {
     if (isOpen) {
-      loadPaystackScript().catch(console.error);
+      loadPaystackScript();
       if (!isOneTime) setSelectedPaymentMethod('card'); // enforce card for subscriptions
     }
   }, [isOpen, isOneTime]);
 
   const handlePay = async () => {
     setIsLoading(true);
-    
-    // Debug logging
-    console.log('Paystack Public Key:', PAYSTACK_PUBLIC_KEY ? 'Set' : 'Not set');
-    console.log('Key Environment:', PAYSTACK_PUBLIC_KEY?.startsWith('pk_live_') ? 'LIVE' : 'TEST');
-    console.log('Plan Code:', paystackPlanCode);
-    console.log('Payment Type:', isOneTime ? 'one-time' : 'subscription');
-    console.log('Amount:', amount);
-    console.log('Currency:', currency);
     
     // Validate Paystack configuration
     if (!PAYSTACK_PUBLIC_KEY) {
@@ -153,31 +145,23 @@ const PaystackPaymentModal: React.FC<PaystackPaymentModalProps> = ({ isOpen, onC
       }
 
       // Use edge function for all payments
-      console.log('About to call edge function with payload:', payload);
-      
       const { data, error } = await supabase.functions.invoke('paystack-init', {
         body: payload,
       });
       
-      console.log('Edge function response:', { data, error });
-      console.log('Payload sent:', payload);
-      
       if (error || !data?.ok || !data?.authorization_url) {
-        console.error('Server init failed:', error || data);
         const errorMessage = error?.message || data?.error || 'Server init failed';
         const errorDetails = data?.details || error?.details || '';
-        console.error('Error details:', errorDetails);
         throw new Error(`${errorMessage}${errorDetails ? ` - Details: ${JSON.stringify(errorDetails)}` : ''}`);
       }
       window.location.href = data.authorization_url as string;
       return;
     } catch (serverErr) {
-      console.warn('Server init failed:', serverErr);
       // For subscriptions, always fallback to client-side
       if (!isOneTime) {
-        console.log('Falling back to client-side for subscription');
+        // Falling back to client-side for subscription
       } else {
-        console.warn('Falling back to inline init for one-time due to server error:', serverErr);
+        // Falling back to inline init for one-time due to server error
       }
       // If server init fails for one-time, attempt inline as fallback using public key
       try {
@@ -227,7 +211,6 @@ const PaystackPaymentModal: React.FC<PaystackPaymentModalProps> = ({ isOpen, onC
         const handler = (window as any).PaystackPop.setup(paymentConfig);
         handler.openIframe();
       } catch (fallbackErr) {
-        console.error('Inline fallback failed:', fallbackErr);
         alert('Payment initialization failed. Please try again later.');
         setIsLoading(false);
       }

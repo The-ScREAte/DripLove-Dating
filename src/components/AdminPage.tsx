@@ -81,7 +81,8 @@ const AdminPageComponent = ({ currentUser, onLogout }: AdminPageProps) => {
   
   // All state hooks first - consistent order
   const [paymentMethods, setPaymentMethods] = useState<PaymentMethod[]>(defaultPaymentMethods);
-  const [premiumPrice, setPremiumPrice] = useState('50');
+  const [premiumPriceOneTime, setPremiumPriceOneTime] = useState('50');
+  const [premiumPriceMonthly, setPremiumPriceMonthly] = useState('25');
   // Now an array of { country, currency, price }
   const [countryPrices, setCountryPrices] = useState<{ country: string; currency: string; price: string }[]>([]);
   const [loadingConfig, setLoadingConfig] = useState(true);
@@ -113,22 +114,25 @@ const AdminPageComponent = ({ currentUser, onLogout }: AdminPageProps) => {
     const fetchConfig = async () => {
       setLoadingConfig(true);
       try {
-        const { data, error } = await supabase
+        const response = await supabase
           .from('payment_config')
-          .select('premium_price, payment_methods, country_prices')
+          .select('premium_price, premium_price_monthly, payment_methods, country_prices')
           .order('created_at', { ascending: false })
           .limit(1)
           .single();
 
-        if (error) throw error;
+        if (response.error) throw response.error;
 
+        const data = response.data as any; // Use any to bypass TypeScript issues
         setPaymentMethods(data.payment_methods as unknown as PaymentMethod[]);
-        setPremiumPrice(data.premium_price.toString());
+        setPremiumPriceOneTime(data.premium_price?.toString() || '');
+        setPremiumPriceMonthly(data.premium_price_monthly?.toString() || '');
         setCountryPrices(Array.isArray(data.country_prices) ? (data.country_prices as { country: string; currency: string; price: string }[]) : []);
       } catch (error) {
         console.error('Error fetching payment config:', error);
         setPaymentMethods(defaultPaymentMethods);
-        setPremiumPrice('50');
+        setPremiumPriceOneTime('');
+        setPremiumPriceMonthly('');
         setCountryPrices([]);
       }
       setLoadingConfig(false);
@@ -161,7 +165,8 @@ const AdminPageComponent = ({ currentUser, onLogout }: AdminPageProps) => {
           .from('payment_config')
           .update({
             payment_methods: paymentMethods as unknown as any,
-            premium_price: Number(premiumPrice),
+            premium_price: Number(premiumPriceOneTime) || 0,
+            premium_price_monthly: Number(premiumPriceMonthly) || 0,
             country_prices: countryPrices,
             updated_at: new Date().toISOString(),
           })
@@ -174,7 +179,8 @@ const AdminPageComponent = ({ currentUser, onLogout }: AdminPageProps) => {
           .from('payment_config')
           .insert({
             payment_methods: paymentMethods as unknown as any,
-            premium_price: Number(premiumPrice),
+            premium_price: Number(premiumPriceOneTime) || 0,
+            premium_price_monthly: Number(premiumPriceMonthly) || 0,
             country_prices: countryPrices,
           });
 
@@ -182,7 +188,7 @@ const AdminPageComponent = ({ currentUser, onLogout }: AdminPageProps) => {
       }
 
       setShowPaymentConfig(false);
-      toast({ title: 'Saved', description: 'Payment methods and price updated.' });
+      toast({ title: 'Saved', description: 'Payment methods and prices updated.' });
     } catch (error) {
       console.error('Error saving payment config:', error);
       toast({ title: 'Error', description: 'Failed to save payment config', variant: 'destructive' });
@@ -214,9 +220,15 @@ const AdminPageComponent = ({ currentUser, onLogout }: AdminPageProps) => {
             <h2 className="text-2xl font-bold mb-6 text-center text-yellow-600 flex items-center justify-center gap-2">
               <span>⚙️</span> Configure Premium Payment
             </h2>
-            <div className="mb-6">
-              <label className="block font-semibold mb-2 text-gray-700">Default Premium Price (GHS)</label>
-              <Input value={premiumPrice} onChange={e => setPremiumPrice(e.target.value)} type="number" min="1" className="w-full border-2 border-yellow-200 focus:border-yellow-400 rounded-lg" />
+            <div className="mb-6 space-y-4">
+              <div>
+                <label className="block font-semibold mb-2 text-gray-700">One-Time Premium Price (GHS)</label>
+                <Input value={premiumPriceOneTime} onChange={e => setPremiumPriceOneTime(e.target.value)} type="number" min="1" className="w-full border-2 border-yellow-200 focus:border-yellow-400 rounded-lg" />
+              </div>
+              <div>
+                <label className="block font-semibold mb-2 text-gray-700">Monthly Premium Price (GHS)</label>
+                <Input value={premiumPriceMonthly} onChange={e => setPremiumPriceMonthly(e.target.value)} type="number" min="1" className="w-full border-2 border-yellow-200 focus:border-yellow-400 rounded-lg" />
+              </div>
             </div>
             <div className="mb-6">
               <h3 className="font-semibold mb-3 text-gray-800">Country-Specific Prices</h3>

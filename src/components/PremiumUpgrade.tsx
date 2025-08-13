@@ -148,18 +148,25 @@ const PremiumUpgrade = ({ currentUser, onClose, preselectedPlan }: PremiumUpgrad
                   Premium Plan
                 </CardTitle>
                 <div className="mt-3 sm:mt-4">
-                  <div className="text-3xl sm:text-4xl lg:text-5xl font-bold text-gray-800 responsive-text">
-                    {currency} {price}
-                  </div>
-                  <div className="text-xs sm:text-sm text-green-600 font-medium mt-1">✨ One-time payment</div>
-                  {monthlyPrice && (
-                    <div className="mt-2">
-                      <div className="text-lg sm:text-xl font-semibold text-gray-700">
-                        or {currency} {monthlyPrice}/month
+                  <div className="space-y-3">
+                    {/* One-time payment option */}
+                    <div className="p-3 bg-gradient-to-r from-green-50 to-emerald-50 border border-green-200 rounded-lg">
+                      <div className="text-2xl sm:text-3xl lg:text-4xl font-bold text-gray-800 responsive-text">
+                        {currency} {price}
                       </div>
-                      <div className="text-xs sm:text-sm text-blue-600 font-medium">📱 Cancel anytime</div>
+                      <div className="text-xs sm:text-sm text-green-600 font-medium mt-1">✨ One-time payment - Lifetime access</div>
                     </div>
-                  )}
+                    
+                    {/* Monthly payment option */}
+                    {monthlyPrice && (
+                      <div className="p-3 bg-gradient-to-r from-blue-50 to-sky-50 border border-blue-200 rounded-lg">
+                        <div className="text-xl sm:text-2xl lg:text-3xl font-bold text-gray-800 responsive-text">
+                          {currency} {monthlyPrice}/month
+                        </div>
+                        <div className="text-xs sm:text-sm text-blue-600 font-medium mt-1">📱 Monthly subscription - Cancel anytime</div>
+                      </div>
+                    )}
+                  </div>
                 </div>
               </CardHeader>
               
@@ -211,7 +218,7 @@ const PremiumUpgrade = ({ currentUser, onClose, preselectedPlan }: PremiumUpgrad
               <CardHeader className="text-center pb-4 sm:pb-6 px-4">
                 <CardTitle className="text-xl sm:text-2xl font-bold text-gray-700 responsive-text">Free Plan</CardTitle>
                 <div className="mt-3 sm:mt-4">
-                  <div className="text-3xl sm:text-4xl font-bold text-gray-700 responsive-text">$0</div>
+                  <div className="text-3xl sm:text-4xl font-bold text-gray-700 responsive-text">GHS 0</div>
                   <div className="text-xs sm:text-sm text-gray-500 mt-1">Basic features only</div>
                 </div>
               </CardHeader>
@@ -288,7 +295,7 @@ const PremiumUpgrade = ({ currentUser, onClose, preselectedPlan }: PremiumUpgrad
       <PaystackPaymentModal
         isOpen={showPaymentModal}
         onClose={() => setShowPaymentModal(false)}
-        amount={parseFloat(price)}
+        amount={parseFloat(paymentType === 'one-time' ? price : (monthlyPrice || price))}
         currency={currency}
         email={currentUser?.email || ''}
         onSuccess={handlePaymentSuccess}
