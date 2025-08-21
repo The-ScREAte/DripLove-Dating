@@ -20,6 +20,7 @@ interface MatchCardProps {
   isSwipeAreaOnly?: boolean; // New prop to render only swipeable image area
   isDetailsAreaOnly?: boolean; // New prop to render only details area
   getOptimizedUrl?: (url: string) => string; // New prop for image optimization
+  preCalculatedDistance?: number; // Distance already calculated by location service
 }
 
 const MatchCard: React.FC<MatchCardProps> = ({
@@ -39,7 +40,8 @@ const MatchCard: React.FC<MatchCardProps> = ({
   swipeDistance,
   isSwipeAreaOnly = false,
   isDetailsAreaOnly = false,
-  getOptimizedUrl = (url: string) => url.includes('supabase') ? `${url}?width=800&quality=85&format=webp` : url
+  getOptimizedUrl = (url: string) => url.includes('supabase') ? `${url}?width=800&quality=85&format=webp` : url,
+  preCalculatedDistance
 }) => {
   const [currentSlide, setCurrentSlide] = useState(0);
   const [imageLoading, setImageLoading] = useState(false);
@@ -571,7 +573,11 @@ const MatchCard: React.FC<MatchCardProps> = ({
                 <MapPin className="w-4 h-4 mr-1" />
                 <span className="text-sm">
                   {match.city}, {match.country}
-                  {currentUserLatitude && currentUserLongitude && match.latitude && match.longitude && (
+                  {preCalculatedDistance !== undefined ? (
+                    <span className="ml-2">
+                      • {Math.round(preCalculatedDistance)} km away
+                    </span>
+                  ) : (currentUserLatitude && currentUserLongitude && match.latitude && match.longitude && (
                     <span className="ml-2">
                       • {Math.round(calculateDistance(
                         currentUserLatitude,
@@ -580,7 +586,7 @@ const MatchCard: React.FC<MatchCardProps> = ({
                         match.longitude
                       ))} km away
                     </span>
-                  )}
+                  ))}
                 </span>
               </div>
             )}

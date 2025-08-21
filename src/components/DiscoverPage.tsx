@@ -58,6 +58,8 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, isPremium }: DiscoverPage
   // New: Store images by userId for instant access
   const [userImages, setUserImages] = useState<{ [key: string]: string[] }>({});
   const [preloadedImages, setPreloadedImages] = useState<{ [key: string]: HTMLImageElement[] }>({});
+  // Store distances from location service
+  const [userDistances, setUserDistances] = useState<{ [key: string]: number }>({});
   const [reverseUsageToday, setReverseUsageToday] = useState(0);
   const [profileCompletion, setProfileCompletion] = useState(0);
   const [profileMissingFields, setProfileMissingFields] = useState<string[]>([]);
@@ -265,6 +267,13 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, isPremium }: DiscoverPage
       // Get location-based matches using the locationService
       const userMaxDistance = currentUser.max_distance || currentUser.distance_preference || 50;
       const locationMatches = await locationService.getLocationBasedMatches(currentUser.id, userMaxDistance);
+      
+      // Store distances for each user
+      const distanceMap: { [key: string]: number } = {};
+      locationMatches.forEach(match => {
+        distanceMap[match.profile_id] = match.distance_km;
+      });
+      setUserDistances(distanceMap);
       
       // Extract profile IDs from location matches for filtering
       const locationProfileIds = locationMatches.map(match => match.profile_id);
@@ -1420,6 +1429,7 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, isPremium }: DiscoverPage
               isVerified={calculateProfileVerification(currentMatch)}
               isSwipeAreaOnly={true}
               getOptimizedUrl={getOptimizedUrl}
+              preCalculatedDistance={userDistances[currentMatch.id]}
             />
           </div>
           {/* ...existing code... */}
@@ -1443,6 +1453,7 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, isPremium }: DiscoverPage
               isVerified={calculateProfileVerification(currentMatch)}
               isDetailsAreaOnly={true}
               getOptimizedUrl={getOptimizedUrl}
+              preCalculatedDistance={userDistances[currentMatch.id]}
             />
           </div>
         </div>
