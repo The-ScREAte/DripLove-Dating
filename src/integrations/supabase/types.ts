@@ -7,7 +7,7 @@ export type Json =
   | Json[]
 
 export type Database = {
-  // Allows to automatically instanciate createClient with right options
+  // Allows to automatically instantiate createClient with right options
   // instead of createClient<Database, { PostgrestVersion: 'XX' }>(URL, KEY)
   __InternalSupabase: {
     PostgrestVersion: "12.2.3 (519615d)"
@@ -312,6 +312,7 @@ export type Database = {
           payment_methods: Json
           paystack_plan_code: string | null
           premium_price: number
+          premium_price_monthly: number | null
           updated_at: string
         }
         Insert: {
@@ -323,6 +324,7 @@ export type Database = {
           payment_methods?: Json
           paystack_plan_code?: string | null
           premium_price?: number
+          premium_price_monthly?: number | null
           updated_at?: string
         }
         Update: {
@@ -334,6 +336,7 @@ export type Database = {
           payment_methods?: Json
           paystack_plan_code?: string | null
           premium_price?: number
+          premium_price_monthly?: number | null
           updated_at?: string
         }
         Relationships: []
@@ -748,15 +751,15 @@ export type Database = {
         Returns: undefined
       }
       admin_update_account_status: {
-        Args: { target_user_id: string; new_status: string }
+        Args: { new_status: string; target_user_id: string }
         Returns: undefined
       }
       approve_image: {
-        Args: { image_id: string; admin_notes?: string }
+        Args: { admin_notes?: string; image_id: string }
         Returns: boolean
       }
       calculate_distance: {
-        Args: { lat1: number; lon1: number; lat2: number; lon2: number }
+        Args: { lat1: number; lat2: number; lon1: number; lon2: number }
         Returns: number
       }
       cancel_user_subscription: {
@@ -770,8 +773,8 @@ export type Database = {
       create_admin_user: {
         Args: {
           admin_email: string
-          admin_password: string
           admin_name: string
+          admin_password: string
         }
         Returns: Json
       }
@@ -784,12 +787,12 @@ export type Database = {
         Returns: undefined
       }
       find_matches_by_location: {
-        Args: { user_id: string; max_distance_km?: number }
+        Args: { max_distance_km?: number; user_id: string }
         Returns: {
-          profile_id: string
-          distance_km: number
           city: string
           country_code: string
+          distance_km: number
+          profile_id: string
         }[]
       }
       get_admin_stats: {
@@ -810,29 +813,29 @@ export type Database = {
       get_user_subscription: {
         Args: { user_id_param: string }
         Returns: {
+          auto_renew: boolean
+          expires_at: string
+          features: Json
+          next_billing_date: string
           plan_name: string
           status: string
-          expires_at: string
-          next_billing_date: string
-          auto_renew: boolean
-          features: Json
         }[]
       }
       handle_subscription_payment: {
         Args: {
-          p_user_id: string
-          p_transaction_id: string
           p_amount: number
           p_currency?: string
+          p_transaction_id: string
+          p_user_id: string
         }
         Returns: boolean
       }
       increment_unread_count: {
-        Args: { match_id_input: string; field_name: string }
+        Args: { field_name: string; match_id_input: string }
         Returns: undefined
       }
       reject_image: {
-        Args: { image_id: string; admin_notes?: string }
+        Args: { admin_notes?: string; image_id: string }
         Returns: boolean
       }
       test_subscription_info: {
@@ -841,9 +844,9 @@ export type Database = {
       }
       update_user_usage: {
         Args: {
-          user_id_param: string
-          usage_type: string
           increment_by?: number
+          usage_type: string
+          user_id_param: string
         }
         Returns: Json
       }
