@@ -84,7 +84,7 @@ const EmailConfirmPage = () => {
         });
 
         if (error) {
-          console.error('Email confirmation error:', error);
+          // ...removed log...
           
           if (error.message.includes('already confirmed') || error.message.includes('already verified')) {
             setStatus('already_confirmed');
@@ -123,7 +123,7 @@ const EmailConfirmPage = () => {
                 window.location.href = '/';
               }, 3000);
             } catch (error) {
-              console.error('Error completing registration:', error);
+              // ...removed log...
               setStatus('success');
               setMessage('Your email has been confirmed! Please sign in to complete your profile.');
               
@@ -151,7 +151,7 @@ const EmailConfirmPage = () => {
         }
 
       } catch (error) {
-        console.error('Unexpected error during email confirmation:', error);
+  // ...removed log...
         setStatus('error');
         setMessage('An unexpected error occurred. Please try again.');
       }

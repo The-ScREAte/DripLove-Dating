@@ -122,7 +122,7 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, isPremium }: DiscoverPage
           .single();
 
         if (profileError) {
-          console.error('Error fetching user profile:', profileError);
+      // ...removed log...
           return;
         }
 
@@ -133,7 +133,7 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, isPremium }: DiscoverPage
           .eq('user_id', currentUser.id);
 
         if (imagesError) {
-          console.error('Error fetching user images:', imagesError);
+      // ...removed log...
         }
 
         const userImages = images || [];
@@ -148,7 +148,7 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, isPremium }: DiscoverPage
         const swipeCount = await getTodaySwipeCount(currentUser.id);
         setTodaySwipeCount(swipeCount);
       } catch (error) {
-        console.error('Error calculating profile completion:', error);
+  // ...removed log...
       }
     };
 
@@ -167,13 +167,13 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, isPremium }: DiscoverPage
         .maybeSingle();
 
       if (error && error.code !== 'PGRST116') {
-        console.error('Error fetching reverse usage:', error);
+  // ...removed log...
         return;
       }
 
       setReverseUsageToday(data?.reverse_dislikes_used || 0);
     } catch (error) {
-      console.error('Error fetching reverse usage:', error);
+  // ...removed log...
     }
   }, [currentUser?.id]);
   const [lastShuffleTime, setLastShuffleTime] = useState<number>(0);
@@ -266,18 +266,11 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, isPremium }: DiscoverPage
       
       // Get location-based matches using the locationService
       const userMaxDistance = currentUser.max_distance || currentUser.distance_preference || 50;
-      console.log('🏠 Current user location data:', {
-        id: currentUser.id,
-        city: currentUser.city,
-        country: currentUser.country,
-        latitude: currentUser.latitude,
-        longitude: currentUser.longitude,
-        maxDistance: userMaxDistance
-      });
+  // ...removed log...
 
       const locationMatches = await locationService.getLocationBasedMatches(currentUser.id, userMaxDistance);
       
-      console.log('📍 Location matches received:', locationMatches.length, locationMatches);
+  // ...removed log...
       
       // Store distances for each user
       const distanceMap: { [key: string]: number } = {};
@@ -288,13 +281,13 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, isPremium }: DiscoverPage
       
       // Extract profile IDs from location matches for filtering
       const locationProfileIds = locationMatches.map(match => match.profile_id);
-      console.log('👥 Profile IDs to fetch:', locationProfileIds.length, locationProfileIds);
+  // ...removed log...
       
       // Fetch full profile data for location matches
       let filteredProfiles: any[] = [];
       if (locationProfileIds.length > 0) {
-        console.log('🔍 Fetching profiles for IDs:', locationProfileIds);
-        console.log('❌ Excluded IDs:', excludedIds);
+  // ...removed log...
+  // ...removed log...
         
         const { data: profiles, error } = await supabase
           .from('profiles')
@@ -306,12 +299,12 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, isPremium }: DiscoverPage
           .eq('is_admin', false)
           .limit(50);
 
-        console.log('📊 Profile query result:', { profilesCount: profiles?.length, error });
+  // ...removed log...
         
         if (error) throw error;
         filteredProfiles = profiles || [];
       } else {
-        console.log('⚠️ No location profile IDs, using fallback query');
+  // ...removed log...
         // Fallback: get profiles from same country if no location matches
         const { data: profiles, error } = await supabase
           .from('profiles')
@@ -323,7 +316,7 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, isPremium }: DiscoverPage
           .eq('country', currentUser.country || 'Ghana')
           .limit(50);
 
-        console.log('📊 Fallback query result:', { profilesCount: profiles?.length, error });
+  // ...removed log...
         
         if (error) throw error;
         filteredProfiles = profiles || [];
@@ -333,7 +326,7 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, isPremium }: DiscoverPage
       const userMinAge = currentUser.min_age || 18;
       const userMaxAge = currentUser.max_age || 99;
       
-      console.log('🎂 Age filtering - Min:', userMinAge, 'Max:', userMaxAge, 'Profiles before:', filteredProfiles.length);
+  // ...removed log...
       
       const beforeAgeFilter = filteredProfiles.length;
       filteredProfiles = filteredProfiles.filter(profile => {
@@ -343,13 +336,17 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, isPremium }: DiscoverPage
         return age >= userMinAge && age <= userMaxAge;
       });
 
-      console.log('✅ Final filtered profiles after age filter:', filteredProfiles.length);
+  // ...removed log...
       
       // Add empty images array to match interface
-      const profilesWithImages = filteredProfiles.map(profile => ({
-        ...profile,
-        images: [] // Will be loaded separately
-      }));
+
+      // Final safeguard: filter out current user's profile if present
+      const profilesWithImages = filteredProfiles
+        .filter(profile => profile.id !== currentUser.id)
+        .map(profile => ({
+          ...profile,
+          images: [] // Will be loaded separately
+        }));
 
       const shuffled = profilesWithImages.sort(() => 0.5 - Math.random());
 
@@ -379,7 +376,7 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, isPremium }: DiscoverPage
         }, 100);
       }
     } catch (error) {
-      console.error('Error fetching potential matches:', error);
+  // ...removed log...
       toast({
         title: 'Error',
         description: 'Failed to load potential matches. Please try again.',
@@ -413,7 +410,7 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, isPremium }: DiscoverPage
         [userId]: loadedImages
       }));
     } catch (error) {
-      console.error('Error preloading images for user:', userId, error);
+  // ...removed log...
     }
   }, [preloadedImages]);
 
@@ -444,7 +441,7 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, isPremium }: DiscoverPage
         preloadImages(imageUrls); // Also use the hook for optimization
       }
     } catch (error) {
-      console.error('Error loading user images:', error);
+  // ...removed log...
     }
   }, [userImages, preloadImages]);
 
@@ -726,7 +723,7 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, isPremium }: DiscoverPage
         await preloadNextProfileImages(shuffled, userImages, 0);
       }
     } catch (error) {
-      console.error('Error loading more matches:', error);
+  // ...removed log...
     } finally {
       setIsLoadingMore(false);
     }
@@ -795,7 +792,7 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, isPremium }: DiscoverPage
           increment_by: 1
         });
       } catch (error) {
-        console.error('Error updating premium user swipe count:', error);
+  // ...removed log...
       }
     }
 
@@ -867,7 +864,7 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, isPremium }: DiscoverPage
         .maybeSingle();
 
       if (mutualError) {
-        console.error('Error checking mutual like:', mutualError.message);
+  // ...removed log...
       }
 
       if (mutualLike) {
@@ -875,7 +872,7 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, isPremium }: DiscoverPage
         setShowMatchAnimation(true);
       }
     } catch (error) {
-      console.error('Error liking user:', error);
+  // ...removed log...
       toast({
         title: 'Error',
         description: 'Failed to like user. Please try again.',
@@ -910,7 +907,7 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, isPremium }: DiscoverPage
           increment_by: 1
         });
       } catch (error) {
-        console.error('Error updating premium user swipe count:', error);
+  // ...removed log...
       }
     }
 
@@ -981,7 +978,7 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, isPremium }: DiscoverPage
         }
       }
     } catch (err) {
-      console.error('Error saving pass:', err);
+  // ...removed log...
       toast({
         title: 'Error',
         description: 'Could not skip this profile.',
@@ -1019,7 +1016,7 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, isPremium }: DiscoverPage
         });
 
       if (deleteError) {
-        console.error('Error deleting pass record:', deleteError);
+  // ...removed log...
         toast({
           title: 'Error',
           description: 'Could not reverse the dislike. Please try again.',
@@ -1069,7 +1066,7 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, isPremium }: DiscoverPage
       });
 
     } catch (error) {
-      console.error('Error reversing dislike:', error);
+  // ...removed log...
       toast({
         title: 'Error',
         description: 'Could not reverse the dislike. Please try again.',

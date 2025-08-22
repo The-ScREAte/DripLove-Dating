@@ -52,7 +52,7 @@ const LikedMePage = ({ currentUser, isPremium = false }: LikedMePageProps) => {
         .maybeSingle();
 
       if (error) {
-        console.error('Error checking lockout status:', error);
+  // ...removed log...
         return;
       }
 
@@ -63,7 +63,7 @@ const LikedMePage = ({ currentUser, isPremium = false }: LikedMePageProps) => {
         }
       }
     } catch (error) {
-      console.error('Error checking lockout status:', error);
+  // ...removed log...
     }
   }, [currentUser?.id, isPremium]);
 
@@ -87,7 +87,7 @@ const LikedMePage = ({ currentUser, isPremium = false }: LikedMePageProps) => {
         .select('liker_id, created_at')
         .eq('liked_id', currentUser.id);
       if (likesError) {
-        console.error('Supabase likesError:', likesError);
+  // ...removed log...
         throw likesError;
       }
       if (!likes || likes.length === 0) {
@@ -108,11 +108,11 @@ const LikedMePage = ({ currentUser, isPremium = false }: LikedMePageProps) => {
           .or(`blocker_id.eq.${currentUser.id},blocked_id.eq.${currentUser.id}`)
       ]);
       if (matchesRes.error) {
-        console.error('Supabase matchesError:', matchesRes.error);
+  // ...removed log...
         throw matchesRes.error;
       }
       if (blocksRes.error) {
-        console.error('Supabase blocksError:', blocksRes.error);
+  // ...removed log...
         throw blocksRes.error;
       }
       const matches = matchesRes.data || [];
@@ -140,7 +140,7 @@ const LikedMePage = ({ currentUser, isPremium = false }: LikedMePageProps) => {
         .in('id', likerIds)
         .neq('is_admin', true);
       if (profileError) {
-        console.error('Supabase profileError:', profileError, 'likerIds:', likerIds);
+  // ...removed log...
         throw profileError;
       }
       setLikers(profiles || []);
@@ -172,7 +172,7 @@ const LikedMePage = ({ currentUser, isPremium = false }: LikedMePageProps) => {
             imagesData = approvedImages;
           }
         } catch (error) {
-          console.error('Supabase imagesError:', error, 'likerIds:', likerIds);
+          // ...removed log...
           throw error;
         }
         // Only keep the first image for each user
@@ -193,7 +193,7 @@ const LikedMePage = ({ currentUser, isPremium = false }: LikedMePageProps) => {
         setUserImages({});
       }
     } catch (error) {
-      console.error('Error in fetchLikers:', error);
+  // ...removed log...
       toast({
         title: "Error",
         description: "Failed to load people who liked you",
@@ -238,7 +238,7 @@ const LikedMePage = ({ currentUser, isPremium = false }: LikedMePageProps) => {
         }));
       }
     } catch (error) {
-      console.error('Error loading additional images:', error);
+  // ...removed log...
     }
   }, [userImages]);
 
@@ -291,7 +291,7 @@ const LikedMePage = ({ currentUser, isPremium = false }: LikedMePageProps) => {
 
       setLockoutEndDate(lockoutDate);
     } catch (error) {
-      console.error('Error setting lockout period:', error);
+  // ...removed log...
     }
   };
 
@@ -347,7 +347,7 @@ const LikedMePage = ({ currentUser, isPremium = false }: LikedMePageProps) => {
       setLikers(prev => prev.filter(liker => liker.id !== profileId));
       setSelectedProfile(null);
     } catch (error) {
-      console.error('Error liking back:', error);
+  // ...removed log...
       toast({
         title: "Error",
         description: "Failed to like back",
@@ -380,7 +380,7 @@ const LikedMePage = ({ currentUser, isPremium = false }: LikedMePageProps) => {
       setLikers(prev => prev.filter(liker => liker.id !== profileId));
       setSelectedProfile(null);
     } catch (error) {
-      console.error('Error passing:', error);
+  // ...removed log...
       toast({
         title: "Error",
         description: "Failed to pass",

@@ -38,7 +38,7 @@ const AccountActions = ({ currentUser, onLogout, onShowTerms, onShowPrivacy, hid
         description: "See you again soon!",
       });
     } catch (error) {
-      console.error('Error logging out:', error);
+  // ...removed log...
     }
   };
 
@@ -85,7 +85,7 @@ const AccountActions = ({ currentUser, onLogout, onShowTerms, onShowPrivacy, hid
       await supabase.auth.signOut();
       onLogout();
     } catch (error: any) {
-      console.error('Error deleting account:', error);
+  // ...removed log...
       toast({
         title: "Error",
         description: "Failed to delete account. Please try again.",

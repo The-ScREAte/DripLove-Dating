@@ -83,7 +83,7 @@ const AuthForm = ({ isLogin, onToggle, onOAuthSuccess }: AuthFormProps) => {
       });
 
       if (error) {
-        console.error('OAuth error:', error);
+  // ...removed log...
         toast({
           title: "Authentication Error",
           description: error.message,
@@ -96,7 +96,7 @@ const AuthForm = ({ isLogin, onToggle, onOAuthSuccess }: AuthFormProps) => {
       // For mobile and web, the OAuth flow will redirect automatically
 
     } catch (error: any) {
-      console.error('OAuth error:', error);
+  // ...removed log...
       toast({
         title: "Authentication Error",
         description: "An unexpected error occurred. Please try again.",
@@ -127,7 +127,7 @@ const AuthForm = ({ isLogin, onToggle, onOAuthSuccess }: AuthFormProps) => {
       
       // Double-check the URI before sending
       if (window.location.hostname === 'localhost' && !redirectUri.includes('localhost')) {
-        console.error('[Password Reset] ERROR: Expected localhost URI but got:', redirectUri);
+  // ...removed log...
         const correctedUri = `${window.location.origin}/reset-password`;
         
         const { error } = await supabase.auth.resetPasswordForEmail(formData.email, {
@@ -135,7 +135,7 @@ const AuthForm = ({ isLogin, onToggle, onOAuthSuccess }: AuthFormProps) => {
         });
         
         if (error) {
-          console.error('[Password Reset] Supabase error:', error);
+          // ...removed log...
           toast({
             title: "Password Reset Failed",
             description: error.message,
@@ -150,7 +150,7 @@ const AuthForm = ({ isLogin, onToggle, onOAuthSuccess }: AuthFormProps) => {
         });
 
         if (error) {
-          console.error('[Password Reset] Supabase error:', error);
+          // ...removed log...
           toast({
             title: "Password Reset Failed",
             description: error.message,

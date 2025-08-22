@@ -78,7 +78,7 @@ const ImageManagement = ({ currentUser }: ImageManagementProps) => {
         })));
       }
     } catch (error) {
-      console.error('Error fetching user images:', error);
+  // ...removed log...
     }
   }, [currentUser?.id]);
 
@@ -93,7 +93,7 @@ const ImageManagement = ({ currentUser }: ImageManagementProps) => {
         // Refresh images after bulk approval
         setTimeout(fetchUserImages, 1500);
       }).catch(error => {
-        console.error('Bulk approval failed:', error);
+  // ...removed log...
         // Don't set completion flag if it failed
       });
     }
@@ -153,7 +153,7 @@ const ImageManagement = ({ currentUser }: ImageManagementProps) => {
       }
 
     } catch (error) {
-      console.error('❌ Moderation error:', error);
+  // ...removed log...
       // STRICT: If moderation fails, require manual review
       moderationResult = {
         isApproved: false, // Changed to false - no auto-approval on error
@@ -194,7 +194,7 @@ const ImageManagement = ({ currentUser }: ImageManagementProps) => {
         .order('image_order', { ascending: true });
 
       if (orderError) {
-        console.error('Error fetching existing image orders:', orderError);
+  // ...removed log...
         throw orderError;
       }
 
@@ -232,7 +232,7 @@ const ImageManagement = ({ currentUser }: ImageManagementProps) => {
         .insert(insertData);
 
       if (dbError) {
-        console.error('❌ Database error:', dbError);
+  // ...removed log...
         throw dbError;
       }
         
@@ -254,7 +254,7 @@ const ImageManagement = ({ currentUser }: ImageManagementProps) => {
         });
       }
     } catch (error) {
-      console.error('Image upload error:', error);
+  // ...removed log...
       
       // Provide more specific error messages
       let errorMessage = "Failed to upload image.";
@@ -312,7 +312,7 @@ const ImageManagement = ({ currentUser }: ImageManagementProps) => {
       await fetchUserImages();
       toast({ title: "Image deleted", description: "Your image has been deleted successfully." });
     } catch (error) {
-      console.error('Image deletion error:', error);
+  // ...removed log...
       toast({ title: "Error", description: "Failed to delete image. Please try again.", variant: "destructive" });
     } finally {
       setDeleting(false);

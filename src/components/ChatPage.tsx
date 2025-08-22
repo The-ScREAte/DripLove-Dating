@@ -155,7 +155,7 @@ const ChatPage = ({ currentUser, onUnreadChange }: ChatPageProps) => {
 
       setMatches(matchesWithPartner as unknown as ChatMatch[]);
     } catch (error) {
-      console.error('Error fetching matches:', error);
+  // ...removed log...
       toast({
         title: 'Error',
         description: 'Failed to load conversations.',
@@ -189,7 +189,7 @@ const ChatPage = ({ currentUser, onUnreadChange }: ChatPageProps) => {
 
       setMessages(mappedMessages as unknown as ChatMessage[]);
     } catch (error) {
-      console.error('Error fetching messages:', error);
+  // ...removed log...
     }
   };
 
@@ -299,7 +299,7 @@ const ChatPage = ({ currentUser, onUnreadChange }: ChatPageProps) => {
       setNewMessage('');
       onUnreadChange?.();
     } catch (error) {
-      console.error('Error sending message:', error);
+  // ...removed log...
       toast({
         title: 'Error',
         description: 'Failed to send message. Please try again.',

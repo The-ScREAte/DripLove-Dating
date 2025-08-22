@@ -15,7 +15,7 @@ const OAuthCallback = () => {
     const handleAuthCallback = async () => {
       
       const timeout = setTimeout(() => {
-        console.error('OAuth callback timeout after 10 seconds');
+  // ...removed log...
         toast({
           title: "Authentication Timeout",
           description: "The login process took too long. Please try again.",
@@ -112,7 +112,7 @@ const OAuthCallback = () => {
         navigate('/');
 
       } catch (error: any) {
-        console.error('OAuth callback error:', error);
+  // ...removed log...
         toast({
           title: "Authentication Error",
           description: error.message || "An error occurred during authentication. Please try again.",

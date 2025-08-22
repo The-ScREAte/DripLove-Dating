@@ -399,7 +399,7 @@ const MatchCard: React.FC<MatchCardProps> = ({
                 </div>
               ) : (
                 // Fallback for no images - show placeholder with initials
-                <div className="w-full h-full bg-gradient-to-br from-pink-200 to-purple-200 flex items-center justify-center transition-all duration-300">
+                <div className="w-full min-h-[400px] max-h-[calc(100vh-200px)] bg-gradient-to-br from-pink-200 to-purple-200 flex items-center justify-center">
                   <div className="text-center">
                     <div className="bg-white/80 rounded-full p-8 mb-4 shadow-xl">
                       <User className="w-16 h-16 mx-auto text-gray-500" />
@@ -434,7 +434,7 @@ const MatchCard: React.FC<MatchCardProps> = ({
           {showReportModal && (
             <>
               <div 
-                className="fixed inset-0 z-[9999] bg-black/50 backdrop-blur-sm flex items-center justify-center p-4" 
+                className="fixed inset-0 z-[9999] bg-black/50 backdrop-blur-sm flex items-center justify-center p-4 touch-none select-none" 
                 onClick={closeReportModal}
                 style={{
                   position: 'fixed',
@@ -445,13 +445,17 @@ const MatchCard: React.FC<MatchCardProps> = ({
                   zIndex: 9999,
                   willChange: 'auto',
                   backfaceVisibility: 'hidden',
-                  transform: 'translateZ(0)'
+                  transform: 'translateZ(0)',
+                  pointerEvents: 'auto',
+                  touchAction: 'none',
+                  userSelect: 'none'
                 }}
               >
                 <div 
-                  className="bg-white rounded-2xl shadow-2xl w-full max-w-sm mx-auto transform transition-all duration-200 ease-out" 
+                  className="bg-white rounded-2xl shadow-2xl w-full max-w-sm mx-auto" 
                   onClick={e => e.stopPropagation()}
                   style={{
+                    minHeight: '350px',
                     maxHeight: '90vh',
                     width: '100%',
                     maxWidth: '400px',

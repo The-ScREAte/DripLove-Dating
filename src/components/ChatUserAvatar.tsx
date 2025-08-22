@@ -41,7 +41,7 @@ const ChatUserAvatar = ({ userId, firstName = '', lastName = '', onClick, size =
       if (error) {
         // Only log actual errors, not missing table errors
         if (!error.message.includes('does not exist') && !error.message.includes('relation')) {
-          console.error('Error fetching profile image:', error);
+          // ...removed log...
         }
         return;
       }
@@ -50,7 +50,7 @@ const ChatUserAvatar = ({ userId, firstName = '', lastName = '', onClick, size =
         setProfileImage(images[0].image_url);
       }
     } catch (error) {
-      console.error('Error fetching profile image:', error);
+  // ...removed log...
     }
   };
 
