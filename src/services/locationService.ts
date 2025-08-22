@@ -28,6 +28,8 @@ class LocationService {
     maxDistance?: number
   ): Promise<LocationMatch[]> {
     try {
+      console.log('🔍 Getting location matches for user:', userId, 'max distance:', maxDistance);
+      
       // First try to use the database function
       const { data: dbMatches, error: dbError } = await supabase
         .rpc('find_matches_by_location', {
@@ -35,10 +37,14 @@ class LocationService {
           max_distance_km: maxDistance
         });
 
-      if (!dbError && dbMatches) {
+      console.log('📊 RPC result:', { dbMatches, dbError });
+
+      if (!dbError && dbMatches && dbMatches.length > 0) {
+        console.log('✅ Using RPC matches:', dbMatches.length, 'matches found');
         return dbMatches;
       }
 
+      console.log('⚠️ RPC failed or returned empty, using fallback');
       // Fallback to manual location matching
       return await this.getFallbackLocationMatches(userId, maxDistance);
       

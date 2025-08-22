@@ -266,7 +266,18 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, isPremium }: DiscoverPage
       
       // Get location-based matches using the locationService
       const userMaxDistance = currentUser.max_distance || currentUser.distance_preference || 50;
+      console.log('🏠 Current user location data:', {
+        id: currentUser.id,
+        city: currentUser.city,
+        country: currentUser.country,
+        latitude: currentUser.latitude,
+        longitude: currentUser.longitude,
+        maxDistance: userMaxDistance
+      });
+
       const locationMatches = await locationService.getLocationBasedMatches(currentUser.id, userMaxDistance);
+      
+      console.log('📍 Location matches received:', locationMatches.length, locationMatches);
       
       // Store distances for each user
       const distanceMap: { [key: string]: number } = {};
@@ -277,10 +288,14 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, isPremium }: DiscoverPage
       
       // Extract profile IDs from location matches for filtering
       const locationProfileIds = locationMatches.map(match => match.profile_id);
+      console.log('👥 Profile IDs to fetch:', locationProfileIds.length, locationProfileIds);
       
       // Fetch full profile data for location matches
       let filteredProfiles: any[] = [];
       if (locationProfileIds.length > 0) {
+        console.log('🔍 Fetching profiles for IDs:', locationProfileIds);
+        console.log('❌ Excluded IDs:', excludedIds);
+        
         const { data: profiles, error } = await supabase
           .from('profiles')
           .select('id, first_name, last_name, bio, city, country, country_code, occupation, education_level, date_of_birth, interests, gender, latitude, longitude, fun_fact, perfect_first_date, last_googled, relationship_intent, smoking, drinking, exercise_level, sleeping_schedule, introvert_extrovert, spontaneous_planner, messy_organized')
@@ -291,9 +306,12 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, isPremium }: DiscoverPage
           .eq('is_admin', false)
           .limit(50);
 
+        console.log('📊 Profile query result:', { profilesCount: profiles?.length, error });
+        
         if (error) throw error;
         filteredProfiles = profiles || [];
       } else {
+        console.log('⚠️ No location profile IDs, using fallback query');
         // Fallback: get profiles from same country if no location matches
         const { data: profiles, error } = await supabase
           .from('profiles')
@@ -305,6 +323,8 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, isPremium }: DiscoverPage
           .eq('country', currentUser.country || 'Ghana')
           .limit(50);
 
+        console.log('📊 Fallback query result:', { profilesCount: profiles?.length, error });
+        
         if (error) throw error;
         filteredProfiles = profiles || [];
       }
@@ -312,6 +332,8 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, isPremium }: DiscoverPage
       // Apply age filtering based on user preferences
       const userMinAge = currentUser.min_age || 18;
       const userMaxAge = currentUser.max_age || 99;
+      
+      console.log('🎂 Age filtering - Min:', userMinAge, 'Max:', userMaxAge, 'Profiles before:', filteredProfiles.length);
       
       const beforeAgeFilter = filteredProfiles.length;
       filteredProfiles = filteredProfiles.filter(profile => {
@@ -321,6 +343,8 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, isPremium }: DiscoverPage
         return age >= userMinAge && age <= userMaxAge;
       });
 
+      console.log('✅ Final filtered profiles after age filter:', filteredProfiles.length);
+      
       // Add empty images array to match interface
       const profilesWithImages = filteredProfiles.map(profile => ({
         ...profile,
