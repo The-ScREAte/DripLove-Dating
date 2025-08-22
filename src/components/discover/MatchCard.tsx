@@ -289,7 +289,7 @@ const MatchCard: React.FC<MatchCardProps> = ({
   if (isSwipeAreaOnly) {
     // Render only the swipeable image area
     return (
-      <div className="relative w-full h-full overflow-hidden">
+  <div className="relative w-full h-full min-h-full overflow-hidden">
         {/* Image/Bio Container - Swipeable Area Only */}
         <div className="relative w-full h-full overflow-hidden" onClick={handleSlideClick}>
           {/* Current slide content */}
@@ -297,7 +297,7 @@ const MatchCard: React.FC<MatchCardProps> = ({
             <div className="w-full h-full transition-all duration-300 ease-in-out">
               {/* Report button for image slides - positioned sticky in top right */}
               {slides[currentSlide]?.type === 'image' && (
-                <div className="absolute right-3 top-20 z-50">
+                <div className="absolute right-3 top-32 sm:top-20 z-50">
                   <button
                     className="bg-white/95 hover:bg-red-100 text-red-600 rounded-full shadow-lg transition-colors duration-200 border border-red-200 focus:outline-none focus:ring-2 focus:ring-red-300"
                     style={{
@@ -399,9 +399,9 @@ const MatchCard: React.FC<MatchCardProps> = ({
                 </div>
               ) : (
                 // Fallback for no images - show placeholder with initials
-                <div className="w-full min-h-[400px] max-h-[calc(100vh-200px)] bg-gradient-to-br from-pink-200 to-purple-200 flex items-center justify-center">
-                  <div className="text-center">
-                    <div className="bg-white/80 rounded-full p-8 mb-4 shadow-xl">
+                <div className="w-full h-full min-h-full bg-gradient-to-br from-pink-200 to-purple-200 flex items-center justify-center">
+                  <div className="text-center w-full">
+                    <div className="bg-white/80 rounded-full p-8 mb-4 shadow-xl mx-auto">
                       <User className="w-16 h-16 mx-auto text-gray-500" />
                     </div>
                     <span className="text-6xl font-bold text-gray-700 bg-white/50 rounded-full px-6 py-3">
