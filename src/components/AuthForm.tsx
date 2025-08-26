@@ -29,7 +29,7 @@ const AuthForm = ({ isLogin, onToggle, onOAuthSuccess }: AuthFormProps) => {
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [loading, setLoading] = useState(false);
-  const [oauthLoading, setOauthLoading] = useState<'google' | null>(null);
+  const [oauthLoading, setOauthLoading] = useState<'google' | 'apple' | null>(null);
   const [errors, setErrors] = useState<{[key: string]: string}>({});
   const [showForgotPassword, setShowForgotPassword] = useState(false);
   const [resendingConfirmation, setResendingConfirmation] = useState(false);
@@ -65,7 +65,7 @@ const AuthForm = ({ isLogin, onToggle, onOAuthSuccess }: AuthFormProps) => {
     return Object.keys(newErrors).length === 0;
   };
 
-  const handleOAuthSignIn = async (provider: 'google') => {
+  const handleOAuthSignIn = async (provider: 'google' | 'apple') => {
     setOauthLoading(provider);
     
     try {
@@ -493,6 +493,26 @@ const AuthForm = ({ isLogin, onToggle, onOAuthSuccess }: AuthFormProps) => {
           <>
             {/* OAuth Buttons */}
             <div className="space-y-3 mb-6">
+              <Button
+                type="button"
+                variant="outline"
+                className="w-full bg-black hover:bg-gray-900 text-white font-medium border-2 border-black hover:border-gray-800 py-3 rounded-lg transition-all duration-200 flex items-center justify-center"
+                onClick={() => handleOAuthSignIn('apple')}
+                disabled={oauthLoading !== null || loading}
+                aria-label="Sign in with Apple"
+              >
+                {oauthLoading === 'apple' ? (
+                  'Connecting...'
+                ) : (
+                  <>
+                    <svg className="w-5 h-5 mr-2" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+                      <path d="M16.365 1.43c0 1.14-.93 2.06-2.07 2.06-.02-1.18.95-2.06 2.07-2.06zm3.98 17.45c-.24.55-.5 1.08-.8 1.59-.53.87-1.08 1.7-1.95 1.72-.84.02-1.11-.56-2.07-.56-.96 0-1.25.54-2.04.58-.82.03-1.45-.93-1.98-1.8-1.08-1.7-1.91-4.8-.8-6.9.56-1.04 1.56-1.7 2.66-1.72.83-.02 1.62.58 2.07.58.44 0 1.32-.71 2.23-.6.38.02 1.45.16 2.14 1.23-.06.04-1.28.75-1.27 2.23.01 1.77 1.56 2.36 1.57 2.36-.02.07-.25.87-.82 1.72zm-3.47-13.6c.38-.46.64-1.1.57-1.75-.55.02-1.21.37-1.6.83-.35.41-.66 1.07-.54 1.7.6.05 1.19-.31 1.57-.78z" />
+                    </svg>
+                    Sign in with Apple
+                  </>
+                )}
+              </Button>
+
               <Button
                 type="button"
                 variant="outline"
