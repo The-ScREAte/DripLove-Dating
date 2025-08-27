@@ -37,13 +37,17 @@ const ReportButton: React.FC<ReportButtonProps> = ({
   const handleSubmit = async () => {
     if (!reason) return;
     setLoading(true);
-    const { error } = await supabase.from('reports').insert({
-      reporter_id: reporterId,
-      reported_user_id: reportedUserId,
-      content_type: contentType,
-      content_id: contentId,
-      reason,
-      description,
+    const { error } = await supabase.from('admin_actions').insert({
+      action_type: 'user_report',
+      target_user_id: reportedUserId,
+      target_user_id_2: reporterId, // Using this field to store the reporter
+      details: {
+        content_type: contentType,
+        content_id: contentId,
+        reason,
+        description,
+        timestamp: new Date().toISOString()
+      },
     });
     setLoading(false);
     setOpen(false);
