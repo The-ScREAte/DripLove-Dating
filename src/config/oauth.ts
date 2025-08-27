@@ -1,6 +1,12 @@
 /**
  * OAuth Configuration for Mobile App Deep Linking
  * Handles Google OAuth redirects for iOS and Android
+ * 
+ * IMPORTANT FOR APPLE SIGN IN:
+ * You must add these URLs to Apple Developer Console > Sign In with Apple > Website URLs:
+ * - https://tgjsyyihabsovironesw.supabase.co/auth/v1/callback (Required for Supabase)
+ * - https://fef6ab36-77bc-4046-b6f5-fc5b2ad8c182.lovableproject.com/auth/callback (For Lovable)
+ * - localhost URLs for development if needed
  */
 
 import { isMobileApp, isLocalhost } from '@/utils/platformUtils';
