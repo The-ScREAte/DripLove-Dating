@@ -16,6 +16,16 @@ export const OAUTH_CONFIG = {
     // Add other providers as needed
   },
   
+  // Web redirect URIs for development and production
+  webRedirectUris: {
+    google: typeof window !== 'undefined' && window.location.origin 
+      ? `${window.location.origin}/auth/callback`
+      : 'https://fef6ab36-77bc-4046-b6f5-fc5b2ad8c182.lovableproject.com/auth/callback',
+    apple: typeof window !== 'undefined' && window.location.origin 
+      ? `${window.location.origin}/auth/callback`  
+      : 'https://fef6ab36-77bc-4046-b6f5-fc5b2ad8c182.lovableproject.com/auth/callback'
+  },
+  
   // Password reset redirect URI for mobile
   passwordResetUri: 'driplove://reset-password',
   
@@ -48,8 +58,8 @@ export const getRedirectUri = (provider: 'google' | 'apple' = 'google') => {
     return OAUTH_CONFIG.localhostRedirectUri;
   }
   
-  // Fallback to web redirect for browser/development
-  return OAUTH_CONFIG.webRedirectUri;
+  // Use provider-specific web redirect
+  return OAUTH_CONFIG.webRedirectUris[provider] || OAUTH_CONFIG.webRedirectUri;
 };
 
 /**

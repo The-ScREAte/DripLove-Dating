@@ -70,23 +70,26 @@ const AuthForm = ({ isLogin, onToggle, onOAuthSuccess }: AuthFormProps) => {
     
     try {
       // Import OAuth config
-      const { getSupabaseAuthConfig } = await import('@/config/oauth');
-      const authConfig = getSupabaseAuthConfig();
+      const { getRedirectUri } = await import('@/config/oauth');
       
-
+      // Get platform-specific redirect URI for the provider
+      const redirectTo = getRedirectUri(provider);
+      
       const { data, error } = await supabase.auth.signInWithOAuth({
         provider: provider,
         options: {
-          redirectTo: authConfig.redirectTo,
-          queryParams: authConfig.queryParams
+          redirectTo,
+          queryParams: {
+            prompt: 'select_account',
+          }
         }
       });
 
       if (error) {
-  // ...removed log...
+        console.error(`${provider} OAuth error:`, error);
         toast({
           title: "Authentication Error",
-          description: error.message,
+          description: error.message || `Failed to sign in with ${provider}. Please try again.`,
           variant: "destructive",
         });
         setOauthLoading(null);
@@ -96,7 +99,7 @@ const AuthForm = ({ isLogin, onToggle, onOAuthSuccess }: AuthFormProps) => {
       // For mobile and web, the OAuth flow will redirect automatically
 
     } catch (error: any) {
-  // ...removed log...
+      console.error(`${provider} OAuth unexpected error:`, error);
       toast({
         title: "Authentication Error",
         description: "An unexpected error occurred. Please try again.",
