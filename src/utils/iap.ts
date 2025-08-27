@@ -38,6 +38,27 @@ export async function buyIAPProduct(productId: string): Promise<any> {
       reject('IAP not available');
       return;
     }
-    window.store.order(productId).then(resolve).catch(reject);
+    // Register product if not already registered
+    try {
+      if (!window.store.products || !window.store.get(productId)) {
+        window.store.register([{ id: productId, type: window.store.PAID_SUBSCRIPTION }]);
+      }
+      window.store.ready(() => {
+        const product = window.store.get(productId);
+        if (!product) {
+          reject('IAP product not found or not registered');
+          return;
+        }
+        if (typeof window.store.order !== 'function') {
+          reject('IAP order function not available. Plugin may not be initialized.');
+          return;
+        }
+        window.store.order(productId).then(resolve).catch(reject);
+      });
+      window.store.error((err: any) => reject(err));
+      window.store.refresh();
+    } catch (err) {
+      reject(err);
+    }
   });
 }
