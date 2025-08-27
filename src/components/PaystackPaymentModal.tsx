@@ -92,17 +92,7 @@ const PaystackPaymentModal: React.FC<PaystackPaymentModalProps> = ({ isOpen, onC
         await buyIAPProduct(productId);
         onSuccess();
       } catch (err: any) {
-        const errorMessage = err?.message || String(err) || 'IAP failed';
-        console.error('IAP Error:', errorMessage);
-        
-        // Show specific error messages for common issues
-        if (errorMessage.includes('not available')) {
-          alert('In-App Purchases are only available on real iOS/Android devices. Please use web payment or try on a physical device.');
-        } else if (errorMessage.includes('not ready')) {
-          alert('Payment system is still loading. Please wait a moment and try again.');
-        } else {
-          alert(`Payment failed: ${errorMessage}`);
-        }
+        alert(err?.message || String(err) || 'IAP failed');
       } finally {
         setIsLoading(false);
       }
