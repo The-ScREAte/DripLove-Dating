@@ -18,6 +18,7 @@ import InterestsSection from './profile/InterestsSection';
 import ImageManagement from './profile/ImageManagement';
 import AccountActions from './profile/AccountActions';
 import ProfileSummaryCard from './ProfileSummaryCard';
+import ReportButton from './ReportButton';
 import { calculateProfileCompletion } from '@/utils/profileCompletion';
 import PremiumUpgrade from './PremiumUpgrade';
 import CollapsibleSection from './ui/CollapsibleSection';
@@ -532,8 +533,19 @@ const ProfilePage = ({ currentUser, profile, onProfileUpdate, onLogout, onShowTe
       {/* Scrollable Content - with padding to account for fixed header */}
       <div className="max-w-4xl mx-auto p-6 pb-12 space-y-8 overflow-x-hidden w-full" style={{ paddingTop: '180px', paddingBottom: '40px' }}>
         <div className="w-full max-w-full overflow-hidden">
-          <ProfileSummaryCard currentUser={currentUser} />
-          <div className="mb-2" />
+          <div className="flex flex-col sm:flex-row sm:items-center gap-2 mb-2">
+            <ProfileSummaryCard currentUser={currentUser} />
+            {/* Show report button for other users' profiles only */}
+            {currentUser?.id && profile?.id && currentUser.id !== profile.id && (
+              <ReportButton
+                reporterId={currentUser.id}
+                reportedUserId={profile.id}
+                contentType="profile"
+                contentId={profile.id}
+                className="sm:ml-4 mt-2 sm:mt-0"
+              />
+            )}
+          </div>
           <BasicInfoSection 
             editedProfile={editedProfile} 
             isEditing={isEditing} 

@@ -2,6 +2,7 @@
 import React, { useState } from 'react';
 import PaystackPaymentModal from './PaystackPaymentModal';
 import { getPremiumPaymentConfig } from '@/utils/paymentConfig';
+import { isIOS, buyIAPProduct } from '@/utils/iap';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Crown, Heart, RotateCcw, Users, Check, X } from 'lucide-react';
@@ -20,7 +21,8 @@ const PremiumUpgrade = ({ currentUser, onClose, preselectedPlan }: PremiumUpgrad
   const { toast } = useToast();
   const [showPaymentModal, setShowPaymentModal] = useState(false);
   const [showPaymentOptions, setShowPaymentOptions] = useState(false);
-  const [paymentType, setPaymentType] = useState<'subscription' | 'one-time' | null>(null);
+  const [paymentType, setPaymentType] = useState<'subscription' | 'one-time' | 'iap' | null>(null);
+  const [iapLoading, setIapLoading] = useState(false);
   const [price, setPrice] = useState('50');
   const [monthlyPrice, setMonthlyPrice] = useState<string | null>(null);
   const [paymentMethods, setPaymentMethods] = useState<any[]>([]);
@@ -80,10 +82,30 @@ const PremiumUpgrade = ({ currentUser, onClose, preselectedPlan }: PremiumUpgrad
     setShowPaymentOptions(true);
   };
 
-  const handlePaymentTypeSelection = (type: 'subscription' | 'one-time') => {
-    setPaymentType(type);
-    setShowPaymentOptions(false);
-    setShowPaymentModal(true);
+  const handlePaymentTypeSelection = async (type: 'subscription' | 'one-time' | 'iap') => {
+    if (type === 'iap') {
+      setIapLoading(true);
+      try {
+        // Use a static product ID or map price/currency to product ID as needed
+        // For demo, assume product ID is 'premium_lifetime' for one-time, 'premium_monthly' for monthly
+        const productId = monthlyPrice && paymentType === 'subscription' ? 'premium_monthly' : 'premium_lifetime';
+        await buyIAPProduct(productId);
+        handlePaymentSuccess();
+      } catch (err: any) {
+        toast({
+          title: 'IAP Failed',
+          description: err?.message || String(err),
+          variant: 'destructive',
+        });
+      } finally {
+        setIapLoading(false);
+        setShowPaymentOptions(false);
+      }
+    } else {
+      setPaymentType(type);
+      setShowPaymentOptions(false);
+      setShowPaymentModal(true);
+    }
   };
 
   const handlePaymentSuccess = () => {
@@ -272,7 +294,7 @@ const PremiumUpgrade = ({ currentUser, onClose, preselectedPlan }: PremiumUpgrad
             </button>
             <h2 className="text-xl font-bold mb-4 text-center">Choose Payment Option</h2>
             <div className="space-y-4">
-               <button
+              <button
                 onClick={() => handlePaymentTypeSelection('subscription')}
                 className="w-full p-4 bg-gradient-to-r from-green-500 to-green-600 text-white rounded-lg hover:from-green-600 hover:to-green-700 transition-all duration-200 font-semibold"
               >
@@ -286,6 +308,7 @@ const PremiumUpgrade = ({ currentUser, onClose, preselectedPlan }: PremiumUpgrad
                 <div className="text-lg">📱 One-Time Payment</div>
                 <div className="text-sm opacity-90">{currency} {price} • 1 month access • No auto-renewal</div>
               </button>
+              {/* Apple IAP removed from here; now only in payment modal */}
             </div>
           </div>
         </div>

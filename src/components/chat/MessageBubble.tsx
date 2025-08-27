@@ -1,5 +1,6 @@
 import React from 'react';
 import { ChatMessage, CurrentUser } from '@/types';
+import ReportButton from '../ReportButton';
 
 interface MessageBubbleProps {
   message: ChatMessage;
@@ -17,7 +18,7 @@ const MessageBubble: React.FC<MessageBubbleProps> = ({
   return (
     <div className={`flex ${isOwnMessage ? 'justify-end' : 'justify-start'} ${isConsecutive ? 'mt-1' : 'mt-4'}`}>
       <div
-        className={`max-w-xs lg:max-w-md px-4 py-2 rounded-lg ${
+        className={`relative max-w-xs lg:max-w-md px-4 py-2 rounded-lg ${
           isOwnMessage
             ? 'bg-blue-500 text-white'
             : 'bg-gray-200 text-gray-900'
@@ -35,6 +36,18 @@ const MessageBubble: React.FC<MessageBubbleProps> = ({
             </span>
           )}
         </div>
+        {/* Only allow reporting messages from others */}
+        {!isOwnMessage && (
+          <div className="absolute top-1 right-1">
+            <ReportButton
+              reporterId={currentUser.id}
+              reportedUserId={message.sender_id}
+              contentType="message"
+              contentId={message.id}
+              className="z-10"
+            />
+          </div>
+        )}
       </div>
     </div>
   );

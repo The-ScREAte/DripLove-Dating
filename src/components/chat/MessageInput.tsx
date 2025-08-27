@@ -4,6 +4,7 @@ import { Input } from '@/components/ui/input';
 import { Smile, Send } from 'lucide-react';
 import EmojiPicker from '../EmojiPicker';
 import { sanitizeMessage } from '@/utils/inputSanitization';
+import { containsBadWords } from '@/utils/textModeration';
 
 interface MessageInputProps {
   newMessage: string;
@@ -30,6 +31,10 @@ const MessageInput: React.FC<MessageInputProps> = ({
   const handleKeyPress = (e: React.KeyboardEvent) => {
     if (e.key === 'Enter' && !e.shiftKey) {
       e.preventDefault();
+      if (containsBadWords(newMessage)) {
+        alert('Your message contains inappropriate language. Please remove it.');
+        return;
+      }
       onSendMessage();
     }
   };

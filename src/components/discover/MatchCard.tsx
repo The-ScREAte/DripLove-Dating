@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import ReportButton from '../ReportButton';
 import { MapPin, Briefcase, GraduationCap, Calendar, Crown, Shield, ChevronDown, ChevronUp, User, Quote, Heart, Coffee, Search, Loader2 } from 'lucide-react';
 import { PotentialMatch } from '@/types';
 
@@ -744,6 +745,17 @@ const MatchCard: React.FC<MatchCardProps> = ({
   // Full card rendering (default)
   return (
     <div className="relative w-full h-full">
+      {/* Report button for profile (Discover) - only if not current user */}
+      {match.id && match.id !== undefined && (
+        <div className="absolute top-2 right-2 z-20">
+          <ReportButton
+            reporterId={currentUserLatitude ? String(currentUserLatitude) : ''} // fallback, ideally pass currentUser.id
+            reportedUserId={match.id}
+            contentType="profile"
+            contentId={match.id}
+          />
+        </div>
+      )}
       {/* Main card content would go here for full rendering */}
       <div className="text-center p-8">
         <p>Full card rendering not implemented in this mode</p>

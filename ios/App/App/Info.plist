@@ -58,5 +58,9 @@
 			</array>
 		</dict>
 	</array>
+	<key>NSCameraUsageDescription</key>
+	<string>We use your camera to let you take profile photos.</string>
+	<key>NSPhotoLibraryUsageDescription</key>
+	<string>We need access to your photos so you can upload a profile picture.</string>
 </dict>
 </plist>

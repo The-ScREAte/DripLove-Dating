@@ -5,6 +5,7 @@ import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Label } from '@/components/ui/label';
 import { sanitizeName, sanitizeBio } from '@/utils/inputSanitization';
+import { containsBadWords } from '@/utils/textModeration';
 
 interface BasicInfoSectionProps {
   editedProfile: any;
@@ -24,6 +25,10 @@ const getSanitizedValue = (name: string, value: string) => {
       .slice(0, 50);
   } else if (name === 'bio') {
     sanitizedValue = sanitizeBio(value);
+    if (containsBadWords(sanitizedValue)) {
+      sanitizedValue = '';
+      alert('Your bio contains inappropriate language. Please remove it.');
+    }
   }
   return sanitizedValue;
 };

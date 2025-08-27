@@ -1,5 +1,6 @@
 import React from 'react';
 import { supabase } from '@/integrations/supabase/client';
+import { isIOS, buyIAPProduct } from '@/utils/iap';
 
 interface PaystackPaymentModalProps {
   isOpen: boolean;
@@ -8,7 +9,7 @@ interface PaystackPaymentModalProps {
   currency?: string;
   email: string;
   onSuccess: () => void;
-  paymentMethod?: 'card' | 'momo';
+  paymentMethod?: 'card' | 'momo' | 'iap';
   isOneTime?: boolean; // New prop to distinguish one-time vs subscription
 }
 
@@ -51,7 +52,7 @@ const loadPaystackScript = () => {
 
 const PaystackPaymentModal: React.FC<PaystackPaymentModalProps> = ({ isOpen, onClose, amount, currency = 'GHS', email, onSuccess, paymentMethod = 'card', isOneTime = false }) => {
   const [isLoading, setIsLoading] = React.useState(false);
-  const [selectedPaymentMethod, setSelectedPaymentMethod] = React.useState<'card' | 'momo'>(paymentMethod);
+  const [selectedPaymentMethod, setSelectedPaymentMethod] = React.useState<'card' | 'momo' | 'iap'>(paymentMethod);
   const [paystackPlanCode, setPaystackPlanCode] = React.useState<string>('');
 
   // Fetch payment config on component mount
@@ -83,42 +84,52 @@ const PaystackPaymentModal: React.FC<PaystackPaymentModalProps> = ({ isOpen, onC
   }, [isOpen, isOneTime]);
 
   const handlePay = async () => {
+    if (selectedPaymentMethod === 'iap') {
+      setIsLoading(true);
+      try {
+        // Use a static product ID or map price/currency to product ID as needed
+        const productId = isOneTime ? 'premium_lifetime' : 'premium_monthly';
+        await buyIAPProduct(productId);
+        onSuccess();
+      } catch (err: any) {
+        alert(err?.message || String(err) || 'IAP failed');
+      } finally {
+        setIsLoading(false);
+      }
+      return;
+    }
     setIsLoading(true);
-    
+    // ...existing code for Paystack/MoMo...
     // Validate Paystack configuration
     if (!PAYSTACK_PUBLIC_KEY) {
       alert('Paystack is not configured. Please set VITE_PAYSTACK_PUBLIC_KEY in your environment variables.');
       setIsLoading(false);
       return;
     }
-    
     if (!PAYSTACK_PUBLIC_KEY.startsWith('pk_')) {
       alert('Invalid Paystack public key format. It should start with "pk_".');
       setIsLoading(false);
       return;
     }
-
     // Validate plan code for subscriptions
     if (!isOneTime && !paystackPlanCode) {
       alert('Subscription plan is not configured. Please check payment configuration.');
       setIsLoading(false);
       return;
     }
-
     // Validate email
     if (!email || !email.includes('@')) {
       alert('Please provide a valid email address.');
       setIsLoading(false);
       return;
     }
-
     await loadPaystackScript();
     if (!(window as any).PaystackPop) {
       alert('Payment system is not ready. Please refresh and try again.');
       setIsLoading(false);
       return;
     }
-
+    // ...existing code for Paystack/MoMo...
     // Prefer server-side initialization via Supabase Edge Function
     try {
       const metadata = {
@@ -128,11 +139,9 @@ const PaystackPaymentModal: React.FC<PaystackPaymentModalProps> = ({ isOpen, onC
           { display_name: 'Payment Type', variable_name: 'payment_type', value: isOneTime ? 'one-time' : 'subscription' },
         ],
       };
-
       const payload: any = {
         email: email.trim(),
         metadata,
-        // include status so PaymentSuccess flow remains consistent
         callback_url: `${window.location.origin}/payment-success?status=successful&payment_type=${isOneTime ? 'one-time' : 'subscription'}`,
       };
       if (isOneTime) {
@@ -140,15 +149,11 @@ const PaystackPaymentModal: React.FC<PaystackPaymentModalProps> = ({ isOpen, onC
         payload.currency = (currency || 'GHS').toUpperCase();
         payload.channels = [selectedPaymentMethod === 'momo' ? 'mobile_money' : 'card'];
       } else {
-        // Use the monthly plan ID for subscriptions
         payload.plan = paystackPlanCode;
       }
-
-      // Use edge function for all payments
       const { data, error } = await supabase.functions.invoke('paystack-init', {
         body: payload,
       });
-      
       if (error || !data?.ok || !data?.authorization_url) {
         const errorMessage = error?.message || data?.error || 'Server init failed';
         const errorDetails = data?.details || error?.details || '';
@@ -190,7 +195,6 @@ const PaystackPaymentModal: React.FC<PaystackPaymentModalProps> = ({ isOpen, onC
             ],
           },
         };
-
         if (isOneTime) {
           const paystackAmount = Math.round(Number(amount) * 100);
           if (!Number.isFinite(paystackAmount) || paystackAmount < 100) {
@@ -202,12 +206,10 @@ const PaystackPaymentModal: React.FC<PaystackPaymentModalProps> = ({ isOpen, onC
           paymentConfig.currency = (currency || 'GHS').toUpperCase();
           paymentConfig.channels = [selectedPaymentMethod === 'momo' ? 'mobile_money' : 'card'];
         } else {
-          // For subscription payments, use the monthly plan ID
           paymentConfig.plan = paystackPlanCode;
           delete paymentConfig.currency;
           delete paymentConfig.amount;
         }
-
         const handler = (window as any).PaystackPop.setup(paymentConfig);
         handler.openIframe();
       } catch (fallbackErr) {
@@ -227,20 +229,20 @@ const PaystackPaymentModal: React.FC<PaystackPaymentModalProps> = ({ isOpen, onC
           {isOneTime ? 'One-Time Premium Payment' : 'Subscribe to Premium'}
         </h2>
         
-        {isOneTime && (
-          <div className="mb-4">
-            <label className="block font-medium mb-2">Select Payment Method:</label>
-            <div className="flex gap-2 mb-3">
-              <button
-                onClick={() => setSelectedPaymentMethod('card')}
-                className={`flex-1 px-4 py-2 rounded border text-sm font-medium ${
-                  selectedPaymentMethod === 'card' 
-                    ? 'bg-green-600 text-white border-green-600' 
-                    : 'bg-gray-100 text-gray-700 border-gray-300 hover:bg-gray-200'
-                }`}
-              >
-                💳 Card
-              </button>
+        <div className="mb-4">
+          <label className="block font-medium mb-2">Select Payment Method:</label>
+          <div className="flex gap-2 mb-3">
+            <button
+              onClick={() => setSelectedPaymentMethod('card')}
+              className={`flex-1 px-4 py-2 rounded border text-sm font-medium ${
+                selectedPaymentMethod === 'card' 
+                  ? 'bg-green-600 text-white border-green-600' 
+                  : 'bg-gray-100 text-gray-700 border-gray-300 hover:bg-gray-200'
+              }`}
+            >
+              💳 Card
+            </button>
+            {isOneTime && (
               <button
                 onClick={() => setSelectedPaymentMethod('momo')}
                 className={`flex-1 px-4 py-2 rounded border text-sm font-medium ${
@@ -251,9 +253,21 @@ const PaystackPaymentModal: React.FC<PaystackPaymentModalProps> = ({ isOpen, onC
               >
                 📱 Mobile Money
               </button>
-            </div>
+            )}
+            {isIOS() && (
+              <button
+                onClick={() => setSelectedPaymentMethod('iap')}
+                className={`flex-1 px-4 py-2 rounded border text-sm font-medium ${
+                  selectedPaymentMethod === 'iap'
+                    ? 'bg-yellow-500 text-black border-yellow-600'
+                    : 'bg-yellow-100 text-yellow-700 border-yellow-300 hover:bg-yellow-200'
+                }`}
+              >
+                 Apple In-App Purchase
+              </button>
+            )}
           </div>
-        )}
+        </div>
         
         <div className="mb-4">
           <label className="block font-medium mb-1">Amount</label>
@@ -285,11 +299,17 @@ const PaystackPaymentModal: React.FC<PaystackPaymentModalProps> = ({ isOpen, onC
         <button 
           onClick={handlePay} 
           disabled={isLoading}
-          className={`w-full text-white mt-2 py-3 rounded font-bold text-lg ${
-            isLoading ? 'bg-gray-400 cursor-not-allowed' : 'bg-green-600 hover:bg-green-700'
+          className={`w-full mt-2 py-3 rounded font-bold text-lg ${
+            selectedPaymentMethod === 'iap'
+              ? (isLoading ? 'bg-yellow-300 text-black cursor-not-allowed' : 'bg-yellow-500 text-black hover:bg-yellow-600')
+              : (isLoading ? 'bg-gray-400 text-white cursor-not-allowed' : 'bg-green-600 text-white hover:bg-green-700')
           }`}
         >
-          {isLoading ? 'Processing...' : `Pay ${currency} ${amount}`}
+          {isLoading
+            ? 'Processing...'
+            : selectedPaymentMethod === 'iap'
+              ? `Pay with Apple (${currency} ${amount})`
+              : `Pay with Card (${currency} ${amount})`}
         </button>
       </div>
     </div>
