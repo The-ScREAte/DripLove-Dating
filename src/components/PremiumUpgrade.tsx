@@ -86,9 +86,8 @@ const PremiumUpgrade = ({ currentUser, onClose, preselectedPlan }: PremiumUpgrad
     if (type === 'iap') {
       setIapLoading(true);
       try {
-        // Use a static product ID or map price/currency to product ID as needed
-        // For demo, assume product ID is 'premium_lifetime' for one-time, 'premium_monthly' for monthly
-        const productId = monthlyPrice && paymentType === 'subscription' ? 'premium_monthly' : 'premium_lifetime';
+        // Use the correct App Store Connect product ID for monthly premium
+        const productId = 'com.driplove.dating.premium.monthly';
         await buyIAPProduct(productId);
         handlePaymentSuccess();
       } catch (err: any) {

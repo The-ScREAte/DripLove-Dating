@@ -87,8 +87,8 @@ const PaystackPaymentModal: React.FC<PaystackPaymentModalProps> = ({ isOpen, onC
     if (selectedPaymentMethod === 'iap') {
       setIsLoading(true);
       try {
-        // Use a static product ID or map price/currency to product ID as needed
-        const productId = isOneTime ? 'premium_lifetime' : 'premium_monthly';
+        // Use the correct App Store Connect product ID for monthly premium
+        const productId = 'com.driplove.dating.premium.monthly';
         await buyIAPProduct(productId);
         onSuccess();
       } catch (err: any) {
