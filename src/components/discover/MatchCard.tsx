@@ -298,7 +298,7 @@ const MatchCard: React.FC<MatchCardProps> = ({
             <div className="w-full h-full transition-all duration-300 ease-in-out">
               {/* Report button for image slides - positioned sticky in top right */}
               {slides[currentSlide]?.type === 'image' && (
-                <div className="absolute right-3 top-32 sm:top-20 z-50">
+                <div className="absolute right-3 top-28 sm:top-16 z-50">
                   <button
                     className="bg-white/95 hover:bg-red-100 text-red-600 rounded-full shadow-lg transition-colors duration-200 border border-red-200 focus:outline-none focus:ring-2 focus:ring-red-300"
                     style={{
