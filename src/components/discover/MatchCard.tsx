@@ -580,16 +580,16 @@ const MatchCard: React.FC<MatchCardProps> = ({
                   {match.city}, {match.country}
                   {preCalculatedDistance !== undefined ? (
                     <span className="ml-2">
-                      • {Math.round(preCalculatedDistance)} km away
+                      • {Math.max(1, Math.round(preCalculatedDistance))} km away
                     </span>
                   ) : (currentUserLatitude && currentUserLongitude && match.latitude && match.longitude && (
                     <span className="ml-2">
-                      • {Math.round(calculateDistance(
+                      • {Math.max(1, Math.round(calculateDistance(
                         currentUserLatitude,
                         currentUserLongitude,
                         match.latitude,
                         match.longitude
-                      ))} km away
+                      )))} km away
                     </span>
                   ))}
                 </span>
