@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import ReportButton from '../ReportButton';
 import { MapPin, Briefcase, GraduationCap, Calendar, Crown, Shield, ChevronDown, ChevronUp, User, Quote, Heart, Coffee, Search, Loader2 } from 'lucide-react';
 import { PotentialMatch } from '@/types';
+import { useImageEdgeColor } from '@/hooks/useImageEdgeColor';
 
 interface MatchCardProps {
   match: PotentialMatch;
@@ -170,6 +171,12 @@ const MatchCard: React.FC<MatchCardProps> = ({
     return mixedSlides;
   }, [userImages, match.bio, match.fun_fact, match.perfect_first_date, match.last_googled]);
 
+  // Get edge color for current image - must be after slides are defined
+  const currentImageUrl = slides.length > 0 && slides[currentSlide]?.type === 'image' 
+    ? getOptimizedUrl(slides[currentSlide].content) 
+    : '';
+  const { edgeColor } = useImageEdgeColor(currentImageUrl);
+
   const handleSlideClick = (e: React.MouseEvent<HTMLDivElement>) => {
     e.stopPropagation();
     
@@ -296,9 +303,9 @@ const MatchCard: React.FC<MatchCardProps> = ({
           {/* Current slide content */}
           {slides.length > 0 && (
             <div className="w-full h-full transition-all duration-300 ease-in-out">
-              {/* Report button for image slides - positioned sticky in top right */}
+              {/* Report button for image slides - positioned closer to top edge */}
               {slides[currentSlide]?.type === 'image' && (
-                <div className="absolute right-3 top-28 sm:top-16 z-50">
+                <div className="absolute right-3 top-16 sm:top-8 z-50">
                   <button
                     className="bg-white/95 hover:bg-red-100 text-red-600 rounded-full shadow-lg transition-colors duration-200 border border-red-200 focus:outline-none focus:ring-2 focus:ring-red-300"
                     style={{
@@ -329,12 +336,13 @@ const MatchCard: React.FC<MatchCardProps> = ({
                   <img
                     src={getOptimizedUrl(slides[currentSlide].content)}
                     alt={`${match.first_name} ${match.last_name}`}
-                    className="w-full h-full object-contain bg-black transition-opacity duration-300"
+                    className="w-full h-full object-contain transition-opacity duration-300"
                     draggable={false}
                     onLoadStart={() => setImageLoading(true)}
                     onLoad={() => setImageLoading(false)}
                     onError={() => setImageLoading(false)}
                     style={{
+                      backgroundColor: edgeColor,
                       touchAction: 'manipulation',
                       userSelect: 'none',
                       WebkitUserSelect: 'none',
