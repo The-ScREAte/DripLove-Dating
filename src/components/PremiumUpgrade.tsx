@@ -307,7 +307,17 @@ const PremiumUpgrade = ({ currentUser, onClose, preselectedPlan }: PremiumUpgrad
                 <div className="text-lg">📱 One-Time Payment</div>
                 <div className="text-sm opacity-90">{currency} {price} • 1 month access • No auto-renewal</div>
               </button>
-              {/* Apple IAP removed from here; now only in payment modal */}
+              {/* Apple IAP - only show on iOS native */}
+              {isIOS() && (
+                <button
+                  onClick={() => handlePaymentTypeSelection('iap')}
+                  disabled={iapLoading}
+                  className="w-full p-4 bg-gradient-to-r from-gray-800 to-black text-white rounded-lg hover:from-gray-700 hover:to-gray-900 transition-all duration-200 font-semibold disabled:opacity-50"
+                >
+                  <div className="text-lg">🍎 {iapLoading ? 'Processing...' : 'Pay with Apple'}</div>
+                  <div className="text-sm opacity-90">In-App Purchase • Secure & Fast</div>
+                </button>
+              )}
             </div>
           </div>
         </div>

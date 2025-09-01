@@ -68,18 +68,34 @@ export async function fetchIAPProducts(productIds: string[]): Promise<any[]> {
     await waitForStore();
     // Use the correct App Store Connect product ID for monthly premium by default if none provided
     const ids = productIds && productIds.length > 0 ? productIds : ['com.driplove.dating.premium.monthly'];
+    console.log('[IAP] Fetching products:', ids);
+    
     return new Promise((resolve, reject) => {
       window.store.verbosity = window.store.DEBUG;
       const products = ids.map(id => ({ id, type: window.store.PAID_SUBSCRIPTION }));
+      console.log('[IAP] Registering products:', products);
+      
       window.store.register(products);
+      
       window.store.ready(() => {
-        const fetchedProducts = ids.map(id => window.store.get(id));
+        console.log('[IAP] Store ready, fetching products...');
+        const fetchedProducts = ids.map(id => {
+          const product = window.store.get(id);
+          console.log(`[IAP] Product ${id}:`, product);
+          return product;
+        });
         resolve(fetchedProducts);
       });
-      window.store.error((err: any) => reject(err));
+      
+      window.store.error((err: any) => {
+        console.error('[IAP] Store error:', err);
+        reject(err);
+      });
+      
       window.store.refresh();
     });
   } catch (error) {
+    console.error('[IAP] Fetch products failed:', error);
     throw new Error(`IAP not available: ${error}`);
   }
 }
