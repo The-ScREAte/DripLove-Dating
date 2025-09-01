@@ -2,7 +2,8 @@
 import React, { useState } from 'react';
 import PaystackPaymentModal from './PaystackPaymentModal';
 import { getPremiumPaymentConfig } from '@/utils/paymentConfig';
-import { isIOS, buyIAPProduct } from '@/utils/iap';
+import { isIOS, isNativeApp } from '@/utils/iap';
+import { buyMonthly } from '../iap';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Crown, Heart, RotateCcw, Users, Check, X } from 'lucide-react';
@@ -23,6 +24,23 @@ const PremiumUpgrade = ({ currentUser, onClose, preselectedPlan }: PremiumUpgrad
   const [showPaymentOptions, setShowPaymentOptions] = useState(false);
   const [paymentType, setPaymentType] = useState<'subscription' | 'one-time' | 'iap' | null>(null);
   const [iapLoading, setIapLoading] = useState(false);
+  const [canBuy, setCanBuy] = useState(false);
+
+  React.useEffect(() => {
+    // Listen for productUpdated to enable the Apple Pay button
+    function onProductUpdated() {
+      // @ts-ignore
+      const p = window.CdvPurchase?.store?.get('com.driplove.dating.premium.monthlysub');
+      setCanBuy(!!p && !!p.getOffer());
+    }
+    // @ts-ignore
+    const store = window.CdvPurchase?.store;
+    if (store && store.when) {
+      store.when().productUpdated(onProductUpdated);
+    }
+    onProductUpdated();
+    // No off/unsubscribe in plugin
+  }, []);
   const [price, setPrice] = useState('50');
   const [monthlyPrice, setMonthlyPrice] = useState<string | null>(null);
   const [paymentMethods, setPaymentMethods] = useState<any[]>([]);
@@ -86,9 +104,7 @@ const PremiumUpgrade = ({ currentUser, onClose, preselectedPlan }: PremiumUpgrad
     if (type === 'iap') {
       setIapLoading(true);
       try {
-        // Use the correct App Store Connect product ID for monthly premium
-        const productId = 'com.driplove.dating.premium.monthly';
-        await buyIAPProduct(productId);
+        await buyMonthly();
         handlePaymentSuccess();
       } catch (err: any) {
         toast({
@@ -308,10 +324,10 @@ const PremiumUpgrade = ({ currentUser, onClose, preselectedPlan }: PremiumUpgrad
                 <div className="text-sm opacity-90">{currency} {price} • 1 month access • No auto-renewal</div>
               </button>
               {/* Apple IAP - only show on iOS native */}
-              {isIOS() && (
+              {isIOS() && isNativeApp() && (
                 <button
                   onClick={() => handlePaymentTypeSelection('iap')}
-                  disabled={iapLoading}
+                  disabled={iapLoading || !canBuy}
                   className="w-full p-4 bg-gradient-to-r from-gray-800 to-black text-white rounded-lg hover:from-gray-700 hover:to-gray-900 transition-all duration-200 font-semibold disabled:opacity-50"
                 >
                   <div className="text-lg">🍎 {iapLoading ? 'Processing...' : 'Pay with Apple'}</div>

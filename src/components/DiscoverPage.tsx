@@ -1,35 +1,80 @@
 
-function DominantColorImageBg(props) {
-  const { imageUrl, children } = props;
-  const [bgColor, setBgColor] = React.useState('#fff');
-  React.useEffect(() => {
-    if (!imageUrl) return;
-    const img = new window.Image();
-    img.crossOrigin = 'Anonymous';
-    img.src = imageUrl;
-    img.onload = () => {
-      try {
-        const color = ColorThief.getColor(img);
-        setBgColor(`rgb(${color[0]},${color[1]},${color[2]})`);
-      } catch (e) {
-        setBgColor('#fff');
+
+
+// In-app purchase setup (runs once on mount)
+import 'cordova-plugin-purchase';
+
+
+if (typeof window !== 'undefined') {
+  document.addEventListener('deviceready', () => {
+    // @ts-ignore
+    const { store, LogLevel, Platform, ProductType, log } = window.CdvPurchase || {};
+    if (!store) {
+      console.error('CdvPurchase.store not available!');
+      return;
+    }
+    if (log && LogLevel && typeof log.setLevel === 'function') {
+      log.setLevel(LogLevel.DEBUG);
+    }
+    // 1) Register EXACT product IDs (must match .storekit for Simulator tests)
+    store.register([
+      {
+        id: 'com.driplove.dating.premium.monthlysub',
+        platform: Platform?.APPLE_APPSTORE,
+        type: ProductType?.PAID_SUBSCRIPTION
       }
-    };
-    img.onerror = () => setBgColor('#fff');
-  }, [imageUrl]);
+    ]);
+    // 2) Observe everything (so we see why it fails)
+    store.error((err: any) => console.warn('[IAP] error:', err?.code, err?.message));
+    store.when().initiated((p: any) => console.log('[IAP] initiated:', p.id));
+    store.when().productUpdated((p: any) => console.log('[IAP] productUpdated:', p?.id, p?.title, p?.pricing?.price));
+    store.when().approved((t: any) => { console.log('[IAP] approved:', t.productId); t.verify(); });
+    store.when().verified((r: any) => { console.log('[IAP] verified:', r.productId); r.finish(); });
+    // @ts-ignore
+    if (store.when().cancelled) store.when().cancelled((p: any) => console.log('[IAP] cancelled:', p?.id));
+    // 3) Initialize AFTER register
+    store.initialize([{ platform: Platform?.APPLE_APPSTORE, options: { needAppReceipt: true } }]);
+    // 4) Fetch products/ownership
+    store.refresh();
+    console.log('[IAP] deviceready and IAP setup complete');
+  });
+}
+
+
+// Use shared IAP actions
+import { buyMonthly, restorePurchases } from '../iap';
+
+import { useImageEdgeColor } from '@/hooks/useImageEdgeColor';
+function DominantColorImageBg({ imageUrl, children }) {
+  const { edgeColor } = useImageEdgeColor(imageUrl);
   return (
-    <div
-      className="absolute inset-0 z-0 scale-95 transition-all duration-300 pointer-events-none flex items-center justify-center"
-      style={{
-        transition: 'filter 0.2s, opacity 0.2s, transform 0.2s',
-        top: '8vh',
-        bottom: 0,
-        left: 0,
-        right: 0,
-        background: bgColor,
-      }}
-    >
-      {children}
+    <div className="absolute inset-0 z-0 pointer-events-none">
+      {/* Solid color overlay fills all space */}
+      <div
+        className="absolute inset-0"
+        style={{ background: edgeColor, zIndex: 0 }}
+        aria-hidden="true"
+      />
+      {/* Blurred image overlays the color for a soft effect */}
+      {imageUrl && (
+        <img
+          src={imageUrl}
+          aria-hidden="true"
+          className="absolute inset-0 w-full h-full object-cover"
+          style={{
+            filter: 'blur(48px) brightness(1.08)',
+            zIndex: 1,
+            objectFit: 'cover',
+            width: '100%',
+            height: '100%',
+            transform: 'scale(1.25)'
+          }}
+          draggable={false}
+        />
+      )}
+      <div className="absolute inset-0 z-10">
+        {children}
+      </div>
     </div>
   );
 }
@@ -172,6 +217,27 @@ interface PassedUser {
 }
 
 const DiscoverPage = ({ currentUser, onNavigateToChat, isPremium }: DiscoverPageProps) => {
+  // IAP: Track if buy is enabled
+  const [canBuy, setCanBuy] = useState(false);
+  useEffect(() => {
+    function onProductUpdated() {
+      // @ts-ignore
+      const p = window.CdvPurchase?.store?.get('com.driplove.dating.premium.monthlysub');
+      setCanBuy(!!p && !!p.getOffer());
+    }
+    // @ts-ignore
+    const store = window.CdvPurchase?.store;
+    if (store && store.when) {
+      store.when().productUpdated(onProductUpdated);
+    }
+    onProductUpdated();
+    // No off/unsubscribe in plugin
+  }, []);
+  // ...existing code...
+
+  // Example: Add Buy/Restore buttons to your UI (place where appropriate)
+  // <button onClick={buyMonthly} disabled={!canBuy}>Buy Premium</button>
+  // <button onClick={restorePurchases}>Restore Purchases</button>
   const [potentialMatches, setPotentialMatches] = useState<PotentialMatch[]>([]);
   const [currentIndex, setCurrentIndex] = useState(0);
   const [imageIndex, setImageIndex] = useState(0);
@@ -1447,7 +1513,7 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, isPremium }: DiscoverPage
                 src={getOptimizedUrl(nextMatchImages[0])}
                 alt={`${nextMatch.first_name}'s photo`}
                 className="w-full h-full object-contain rounded-2xl md:rounded-3xl"
-                style={{ borderRadius: '1.25rem', position: 'relative', zIndex: 1, background: 'transparent' }}
+                style={{ borderRadius: '1.25rem', position: 'relative', zIndex: 1 }}
                 draggable={false}
                 loading="eager"
               />

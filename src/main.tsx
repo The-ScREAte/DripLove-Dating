@@ -1,11 +1,15 @@
 
 import React from 'react';
+import { initIAP } from './iap';
 import { createRoot } from 'react-dom/client';
 import App from './App.tsx';
 import './index.css';
 import { App as CapacitorApp } from '@capacitor/app';
 import { Capacitor } from '@capacitor/core';
 import { supabase } from './integrations/supabase/client';
+
+// Initialize In-App Purchases
+initIAP();
 
 // Handle OAuth deep link for mobile (Capacitor)
 if (Capacitor.isNativePlatform()) {
