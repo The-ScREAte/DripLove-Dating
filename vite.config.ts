@@ -27,6 +27,10 @@ export default defineConfig(({ mode }) => ({
       interval: 1000,
     },
   },
+  define: {
+    // Define process.env for browser compatibility
+    'process.env': {},
+  },
   plugins: [
     react(),
     visualizer({ open: true })

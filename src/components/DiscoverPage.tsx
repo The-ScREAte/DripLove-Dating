@@ -1,8 +1,3 @@
-
-
-
-
-
 // Use shared IAP actions
 import { buyMonthly, restorePurchases } from '../iap';
 
@@ -45,40 +40,40 @@ import React, { useState, useEffect, useCallback, useMemo } from 'react';
 // --- AdinkraBar component and symbols ---
 const adinkraSymbols = [
   // 30 Adinkra symbols (SVGs are illustrative, not all unique for brevity)
-  { name: 'Aya', meaning: 'The fern. Symbol of endurance and resourcefulness.', svg: (<svg width="32" height="32"><ellipse cx="16" cy="16" rx="14" ry="8" fill="#A5D6A7" stroke="#388E3C" strokeWidth="2" /><path d="M16 8v16M12 12l8 8M20 12l-8 8" stroke="#388E3C" strokeWidth="2" /></svg>) },
-  { name: 'Nkyinkyim', meaning: 'Twisting. Symbol of initiative, dynamism, and versatility.', svg: (<svg width="32" height="32"><path d="M8 24c8-16 16 0 16-16" stroke="#E53935" strokeWidth="3" fill="none"/><circle cx="8" cy="24" r="2" fill="#F9A825" /><circle cx="24" cy="8" r="2" fill="#43A047" /></svg>) },
-  { name: 'Eban', meaning: 'Fence. Symbol of love, safety, and security.', svg: (<svg width="32" height="32"><rect x="6" y="6" width="20" height="20" rx="6" fill="#FFFDE7" stroke="#E53935" strokeWidth="2" /><path d="M10 6v20M16 6v20M22 6v20" stroke="#43A047" strokeWidth="2" /></svg>) },
-  { name: 'Fihankra', meaning: 'House/compound. Symbol of security and safety.', svg: (<svg width="32" height="32"><rect x="8" y="14" width="16" height="10" fill="#E3F2FD" stroke="#1E88E5" strokeWidth="2" /><polygon points="16,6 8,14 24,14" fill="#F9A825" stroke="#E53935" strokeWidth="2"/></svg>) },
-  { name: 'Gye Nyame', meaning: 'Except for God. Symbol of the supremacy of God.', svg: (<svg width="32" height="32"><circle cx="16" cy="16" r="15" stroke="#F9A825" strokeWidth="2" fill="#FFFDE7" /><path d="M16 7c-2 2-2 6 0 8s2 6 0 8" stroke="#E53935" strokeWidth="2" fill="none"/><path d="M16 25c2-2 2-6 0-8s-2-6 0-8" stroke="#43A047" strokeWidth="2" fill="none"/><circle cx="16" cy="16" r="2" fill="#1E88E5" /></svg>) },
-  { name: 'Sankofa', meaning: 'Go back and get it. Symbol of learning from the past.', svg: (<svg width="32" height="32"><circle cx="16" cy="16" r="15" stroke="#43A047" strokeWidth="2" fill="#E8F5E9" /><path d="M22 16c0-3.3-2.7-6-6-6s-6 2.7-6 6 2.7 6 6 6c2.2 0 4-1.8 4-4" stroke="#E53935" strokeWidth="2" fill="none"/><path d="M16 20l4-4-4-4" stroke="#F9A825" strokeWidth="2" fill="none"/></svg>) },
-  { name: 'Duafe', meaning: 'Wooden comb. Symbol of beauty, cleanliness, feminine qualities.', svg: (<svg width="32" height="32"><rect x="4" y="8" width="24" height="16" rx="8" fill="#FFF3E0" stroke="#E53935" strokeWidth="2" /><rect x="12" y="4" width="8" height="8" rx="4" fill="#F9A825" stroke="#43A047" strokeWidth="2" /><rect x="10" y="20" width="2" height="6" fill="#1E88E5" /><rect x="15" y="20" width="2" height="6" fill="#1E88E5" /><rect x="20" y="20" width="2" height="6" fill="#1E88E5" /></svg>) },
-  { name: 'Fawohodie', meaning: 'Independence. Symbol of freedom, emancipation, independence.', svg: (<svg width="32" height="32"><rect x="8" y="8" width="16" height="16" rx="8" fill="#E3F2FD" stroke="#1E88E5" strokeWidth="2" /><path d="M16 8v16M8 16h16" stroke="#E53935" strokeWidth="2" /><circle cx="16" cy="16" r="3" fill="#F9A825" /></svg>) },
-  { name: 'Akoma', meaning: 'The heart. Symbol of patience and tolerance.', svg: (<svg width="32" height="32"><path d="M16 28s-8-6-8-12a8 8 0 0 1 16 0c0 6-8 12-8 12z" fill="#E53935" stroke="#F9A825" strokeWidth="2" /><circle cx="12" cy="14" r="2" fill="#FFFDE7" /><circle cx="20" cy="14" r="2" fill="#FFFDE7" /></svg>) },
-  { name: 'Akoben', meaning: 'War horn. Symbol of vigilance and wariness.', svg: (<svg width="32" height="32"><ellipse cx="16" cy="16" rx="14" ry="8" fill="#a5d6a7" stroke="#388e3c" strokeWidth="2"/><path d="M16 8v16M12 12l8 8M20 12l-8 8" stroke="#388e3c" strokeWidth="2"/></svg>) },
-  { name: 'Adinkrahene', meaning: 'Chief of the adinkra symbols. Symbol of greatness, charisma, and leadership.', svg: (<svg width="32" height="32"><circle cx="16" cy="16" r="14" fill="#f9a825" stroke="#e53935" strokeWidth="2"/><circle cx="16" cy="16" r="8" fill="#43a047"/></svg>) },
-  { name: 'Bese Saka', meaning: 'Sack of cola nuts. Symbol of affluence, power, abundance, unity.', svg: (<svg width="32" height="32"><ellipse cx="16" cy="20" rx="10" ry="6" fill="#e3f2fd" stroke="#1e88e5" strokeWidth="2"/><ellipse cx="16" cy="12" rx="6" ry="4" fill="#f9a825" stroke="#e53935" strokeWidth="2"/></svg>) },
-  { name: 'Dame-Dame', meaning: 'Checkerboard. Symbol of intelligence and ingenuity.', svg: (<svg width="32" height="32"><rect x="4" y="4" width="24" height="24" fill="#fffde7" stroke="#e53935" strokeWidth="2"/><rect x="4" y="4" width="12" height="12" fill="#43a047"/><rect x="16" y="16" width="12" height="12" fill="#f9a825"/></svg>) },
-  { name: 'Fihankra', meaning: 'House/compound. Symbol of security and safety.', svg: (<svg width="32" height="32"><rect x="8" y="14" width="16" height="10" fill="#e3f2fd" stroke="#1e88e5" strokeWidth="2"/><polygon points="16,6 8,14 24,14" fill="#f9a825" stroke="#e53935" strokeWidth="2"/></svg>) },
-  { name: 'Dwennimmen', meaning: 'Ram’s horns. Symbol of humility together with strength.', svg: (<svg width="32" height="32"><circle cx="16" cy="16" r="15" fill="#fff3e0" stroke="#e53935" strokeWidth="2"/><path d="M10 20c-4-4 4-12 8-8" stroke="#43a047" strokeWidth="2" fill="none"/><path d="M22 20c4-4-4-12-8-8" stroke="#43a047" strokeWidth="2" fill="none"/></svg>) },
-  { name: 'Nyame Dua', meaning: 'Tree of God. Symbol of God’s presence and protection.', svg: (<svg width="32" height="32"><rect x="14" y="18" width="4" height="10" fill="#43a047"/><circle cx="16" cy="14" r="8" fill="#f9a825" stroke="#e53935" strokeWidth="2"/></svg>) },
-  { name: 'Boa Me Na Me Mmoa Wo', meaning: 'Help me and let me help you. Symbol of cooperation and interdependence.', svg: (<svg width="32" height="32"><rect x="8" y="8" width="16" height="16" rx="8" fill="#e3f2fd" stroke="#1e88e5" strokeWidth="2"/><path d="M16 8v16M8 16h16" stroke="#e53935" strokeWidth="2"/></svg>) },
-  { name: 'Nkyinkyim', meaning: 'Twisting. Symbol of initiative, dynamism, and versatility.', svg: (<svg width="32" height="32"><path d="M8 24c8-16 16 0 16-16" stroke="#e53935" strokeWidth="3" fill="none"/><circle cx="8" cy="24" r="2" fill="#f9a825"/><circle cx="24" cy="8" r="2" fill="#43a047"/></svg>) },
-  { name: 'Eban', meaning: 'Fence. Symbol of love, safety, and security.', svg: (<svg width="32" height="32"><rect x="6" y="6" width="20" height="20" rx="6" fill="#fffde7" stroke="#e53935" strokeWidth="2"/><path d="M10 6v20M16 6v20M22 6v20" stroke="#43a047" strokeWidth="2"/></svg>) },
-  { name: 'Akoben', meaning: 'War horn. Symbol of vigilance and wariness.', svg: (<svg width="32" height="32"><ellipse cx="16" cy="16" rx="14" ry="8" fill="#a5d6a7" stroke="#388e3c" strokeWidth="2"/><path d="M16 8v16M12 12l8 8M20 12l-8 8" stroke="#388e3c" strokeWidth="2"/></svg>) },
-  { name: 'Adinkrahene', meaning: 'Chief of the adinkra symbols. Symbol of greatness, charisma, and leadership.', svg: (<svg width="32" height="32"><circle cx="16" cy="16" r="14" fill="#f9a825" stroke="#e53935" strokeWidth="2"/><circle cx="16" cy="16" r="8" fill="#43a047"/></svg>) },
-  { name: 'Bese Saka', meaning: 'Sack of cola nuts. Symbol of affluence, power, abundance, unity.', svg: (<svg width="32" height="32"><ellipse cx="16" cy="20" rx="10" ry="6" fill="#e3f2fd" stroke="#1e88e5" strokeWidth="2"/><ellipse cx="16" cy="12" rx="6" ry="4" fill="#f9a825" stroke="#e53935" strokeWidth="2"/></svg>) },
-  { name: 'Dame-Dame', meaning: 'Checkerboard. Symbol of intelligence and ingenuity.', svg: (<svg width="32" height="32"><rect x="4" y="4" width="24" height="24" fill="#fffde7" stroke="#e53935" strokeWidth="2"/><rect x="4" y="4" width="12" height="12" fill="#43a047"/><rect x="16" y="16" width="12" height="12" fill="#f9a825"/></svg>) },
-  { name: 'Fihankra', meaning: 'House/compound. Symbol of security and safety.', svg: (<svg width="32" height="32"><rect x="8" y="14" width="16" height="10" fill="#e3f2fd" stroke="#1e88e5" strokeWidth="2"/><polygon points="16,6 8,14 24,14" fill="#f9a825" stroke="#e53935" strokeWidth="2"/></svg>) },
-  { name: 'Dwennimmen', meaning: 'Ram’s horns. Symbol of humility together with strength.', svg: (<svg width="32" height="32"><circle cx="16" cy="16" r="15" fill="#fff3e0" stroke="#e53935" strokeWidth="2"/><path d="M10 20c-4-4 4-12 8-8" stroke="#43a047" strokeWidth="2" fill="none"/><path d="M22 20c4-4-4-12-8-8" stroke="#43a047" strokeWidth="2" fill="none"/></svg>) },
-  { name: 'Nyame Dua', meaning: 'Tree of God. Symbol of God’s presence and protection.', svg: (<svg width="32" height="32"><rect x="14" y="18" width="4" height="10" fill="#43a047"/><circle cx="16" cy="14" r="8" fill="#f9a825" stroke="#e53935" strokeWidth="2"/></svg>) },
-  { name: 'Boa Me Na Me Mmoa Wo', meaning: 'Help me and let me help you. Symbol of cooperation and interdependence.', svg: (<svg width="32" height="32"><rect x="8" y="8" width="16" height="16" rx="8" fill="#e3f2fd" stroke="#1e88e5" strokeWidth="2"/><path d="M16 8v16M8 16h16" stroke="#e53935" strokeWidth="2"/></svg>) },
-  { name: 'Nkyinkyim', meaning: 'Twisting. Symbol of initiative, dynamism, and versatility.', svg: (<svg width="32" height="32"><path d="M8 24c8-16 16 0 16-16" stroke="#e53935" strokeWidth="3" fill="none"/><circle cx="8" cy="24" r="2" fill="#f9a825"/><circle cx="24" cy="8" r="2" fill="#43a047"/></svg>) },
-  { name: 'Eban', meaning: 'Fence. Symbol of love, safety, and security.', svg: (<svg width="32" height="32"><rect x="6" y="6" width="20" height="20" rx="6" fill="#fffde7" stroke="#e53935" strokeWidth="2"/><path d="M10 6v20M16 6v20M22 6v20" stroke="#43a047" strokeWidth="2"/></svg>) },
-  { name: 'Akoben', meaning: 'War horn. Symbol of vigilance and wariness.', svg: (<svg width="32" height="32"><ellipse cx="16" cy="16" rx="14" ry="8" fill="#a5d6a7" stroke="#388e3c" strokeWidth="2"/><path d="M16 8v16M12 12l8 8M20 12l-8 8" stroke="#388e3c" strokeWidth="2"/></svg>) },
-  { name: 'Adinkrahene', meaning: 'Chief of the adinkra symbols. Symbol of greatness, charisma, and leadership.', svg: (<svg width="32" height="32"><circle cx="16" cy="16" r="14" fill="#f9a825" stroke="#e53935" strokeWidth="2"/><circle cx="16" cy="16" r="8" fill="#43a047"/></svg>) },
-  { name: 'Bese Saka', meaning: 'Sack of cola nuts. Symbol of affluence, power, abundance, unity.', svg: (<svg width="32" height="32"><ellipse cx="16" cy="20" rx="10" ry="6" fill="#e3f2fd" stroke="#1e88e5" strokeWidth="2"/><ellipse cx="16" cy="12" rx="6" ry="4" fill="#f9a825" stroke="#e53935" strokeWidth="2"/></svg>) },
-  { name: 'Dame-Dame', meaning: 'Checkerboard. Symbol of intelligence and ingenuity.', svg: (<svg width="32" height="32"><rect x="4" y="4" width="24" height="24" fill="#fffde7" stroke="#e53935" strokeWidth="2"/><rect x="4" y="4" width="12" height="12" fill="#43a047"/><rect x="16" y="16" width="12" height="12" fill="#f9a825"/></svg>) },
-  { name: 'Fihankra', meaning: 'House/compound. Symbol of security and safety.', svg: (<svg width="32" height="32"><rect x="8" y="14" width="16" height="10" fill="#e3f2fd" stroke="#1e88e5" strokeWidth="2"/><polygon points="16,6 8,14 24,14" fill="#f9a825" stroke="#e53935" strokeWidth="2"/></svg>) },
+  { name: 'Aya', meaning: 'The fern. Symbol of endurance and resourcefulness.', svg: (<svg width="24" height="24"><ellipse cx="12" cy="12" rx="10" ry="6" fill="#A5D6A7" stroke="#388E3C" strokeWidth="2" /><path d="M12 6v12M9 9l6 6M15 9l-6 6" stroke="#388E3C" strokeWidth="2" /></svg>) },
+  { name: 'Nkyinkyim', meaning: 'Twisting. Symbol of initiative, dynamism, and versatility.', svg: (<svg width="24" height="24"><path d="M6 18c6-12 12 0 12-12" stroke="#E53935" strokeWidth="2" fill="none"/><circle cx="6" cy="18" r="1.5" fill="#F9A825" /><circle cx="18" cy="6" r="1.5" fill="#43A047" /></svg>) },
+  { name: 'Eban', meaning: 'Fence. Symbol of love, safety, and security.', svg: (<svg width="24" height="24"><rect x="4" y="4" width="16" height="16" rx="4" fill="#FFFDE7" stroke="#E53935" strokeWidth="2" /><path d="M7 4v16M12 4v16M17 4v16" stroke="#43A047" strokeWidth="2" /></svg>) },
+  { name: 'Fihankra', meaning: 'House/compound. Symbol of security and safety.', svg: (<svg width="24" height="24"><rect x="6" y="10" width="12" height="8" fill="#E3F2FD" stroke="#1E88E5" strokeWidth="2" /><polygon points="12,4 6,10 18,10" fill="#F9A825" stroke="#E53935" strokeWidth="2"/></svg>) },
+  { name: 'Gye Nyame', meaning: 'Except for God. Symbol of the supremacy of God.', svg: (<svg width="24" height="24"><circle cx="12" cy="12" r="11" stroke="#F9A825" strokeWidth="2" fill="#FFFDE7" /><path d="M12 5c-1.5 1.5-1.5 4.5 0 6s1.5 4.5 0 6" stroke="#E53935" strokeWidth="2" fill="none"/><path d="M12 19c1.5-1.5 1.5-4.5 0-6s-1.5-4.5 0-6" stroke="#43A047" strokeWidth="2" fill="none"/><circle cx="12" cy="12" r="1.5" fill="#1E88E5" /></svg>) },
+  { name: 'Sankofa', meaning: 'Go back and get it. Symbol of learning from the past.', svg: (<svg width="24" height="24"><circle cx="12" cy="12" r="11" stroke="#43A047" strokeWidth="2" fill="#E8F5E9" /><path d="M16 12c0-2.2-1.8-4-4-4s-4 1.8-4 4 1.8 4 4 4c1.5 0 3-1.2 3-3" stroke="#E53935" strokeWidth="2" fill="none"/><path d="M12 15l3-3-3-3" stroke="#F9A825" strokeWidth="2" fill="none"/></svg>) },
+  { name: 'Duafe', meaning: 'Wooden comb. Symbol of beauty, cleanliness, feminine qualities.', svg: (<svg width="24" height="24"><rect x="3" y="6" width="18" height="12" rx="6" fill="#FFF3E0" stroke="#E53935" strokeWidth="2" /><rect x="9" y="3" width="6" height="6" rx="3" fill="#F9A825" stroke="#43A047" strokeWidth="2" /><rect x="7" y="15" width="1.5" height="4" fill="#1E88E5" /><rect x="11" y="15" width="1.5" height="4" fill="#1E88E5" /><rect x="15" y="15" width="1.5" height="4" fill="#1E88E5" /></svg>) },
+  { name: 'Fawohodie', meaning: 'Independence. Symbol of freedom, emancipation, independence.', svg: (<svg width="24" height="24"><rect x="6" y="6" width="12" height="12" rx="6" fill="#E3F2FD" stroke="#1E88E5" strokeWidth="2" /><path d="M12 6v12M6 12h12" stroke="#E53935" strokeWidth="2" /><circle cx="12" cy="12" r="2" fill="#F9A825" /></svg>) },
+  { name: 'Akoma', meaning: 'The heart. Symbol of patience and tolerance.', svg: (<svg width="24" height="24"><path d="M12 21s-6-4.5-6-9a6 6 0 0 1 12 0c0 4.5-6 9-6 9z" fill="#E53935" stroke="#F9A825" strokeWidth="2" /><circle cx="9" cy="10.5" r="1.5" fill="#FFFDE7" /><circle cx="15" cy="10.5" r="1.5" fill="#FFFDE7" /></svg>) },
+  { name: 'Akoben', meaning: 'War horn. Symbol of vigilance and wariness.', svg: (<svg width="24" height="24"><ellipse cx="12" cy="12" rx="14" ry="8" fill="#a5d6a7" stroke="#388e3c" strokeWidth="2"/><path d="M16 8v16M12 12l8 8M20 12l-8 8" stroke="#388e3c" strokeWidth="2"/></svg>) },
+  { name: 'Adinkrahene', meaning: 'Chief of the adinkra symbols. Symbol of greatness, charisma, and leadership.', svg: (<svg width="24" height="24"><circle cx="12" cy="12" r="14" fill="#f9a825" stroke="#e53935" strokeWidth="2"/><circle cx="12" cy="12" r="8" fill="#43a047"/></svg>) },
+  { name: 'Bese Saka', meaning: 'Sack of cola nuts. Symbol of affluence, power, abundance, unity.', svg: (<svg width="24" height="24"><ellipse cx="16" cy="20" rx="10" ry="6" fill="#e3f2fd" stroke="#1e88e5" strokeWidth="2"/><ellipse cx="16" cy="12" rx="6" ry="4" fill="#f9a825" stroke="#e53935" strokeWidth="2"/></svg>) },
+  { name: 'Dame-Dame', meaning: 'Checkerboard. Symbol of intelligence and ingenuity.', svg: (<svg width="24" height="24"><rect x="4" y="4" width="24" height="24" fill="#fffde7" stroke="#e53935" strokeWidth="2"/><rect x="4" y="4" width="12" height="12" fill="#43a047"/><rect x="16" y="16" width="12" height="12" fill="#f9a825"/></svg>) },
+  { name: 'Fihankra', meaning: 'House/compound. Symbol of security and safety.', svg: (<svg width="24" height="24"><rect x="8" y="14" width="16" height="10" fill="#e3f2fd" stroke="#1e88e5" strokeWidth="2"/><polygon points="16,6 8,14 24,14" fill="#f9a825" stroke="#e53935" strokeWidth="2"/></svg>) },
+  { name: 'Dwennimmen', meaning: 'Ram’s horns. Symbol of humility together with strength.', svg: (<svg width="24" height="24"><circle cx="12" cy="12" r="15" fill="#fff3e0" stroke="#e53935" strokeWidth="2"/><path d="M10 20c-4-4 4-12 8-8" stroke="#43a047" strokeWidth="2" fill="none"/><path d="M22 20c4-4-4-12-8-8" stroke="#43a047" strokeWidth="2" fill="none"/></svg>) },
+  { name: 'Nyame Dua', meaning: 'Tree of God. Symbol of God’s presence and protection.', svg: (<svg width="24" height="24"><rect x="14" y="18" width="4" height="10" fill="#43a047"/><circle cx="16" cy="14" r="8" fill="#f9a825" stroke="#e53935" strokeWidth="2"/></svg>) },
+  { name: 'Boa Me Na Me Mmoa Wo', meaning: 'Help me and let me help you. Symbol of cooperation and interdependence.', svg: (<svg width="24" height="24"><rect x="8" y="8" width="16" height="16" rx="8" fill="#e3f2fd" stroke="#1e88e5" strokeWidth="2"/><path d="M16 8v16M8 16h16" stroke="#e53935" strokeWidth="2"/></svg>) },
+  { name: 'Nkyinkyim', meaning: 'Twisting. Symbol of initiative, dynamism, and versatility.', svg: (<svg width="24" height="24"><path d="M8 24c8-16 16 0 16-16" stroke="#e53935" strokeWidth="3" fill="none"/><circle cx="8" cy="24" r="2" fill="#f9a825"/><circle cx="24" cy="8" r="2" fill="#43a047"/></svg>) },
+  { name: 'Eban', meaning: 'Fence. Symbol of love, safety, and security.', svg: (<svg width="24" height="24"><rect x="6" y="6" width="20" height="20" rx="6" fill="#fffde7" stroke="#e53935" strokeWidth="2"/><path d="M10 6v20M16 6v20M22 6v20" stroke="#43a047" strokeWidth="2"/></svg>) },
+  { name: 'Akoben', meaning: 'War horn. Symbol of vigilance and wariness.', svg: (<svg width="24" height="24"><ellipse cx="12" cy="12" rx="14" ry="8" fill="#a5d6a7" stroke="#388e3c" strokeWidth="2"/><path d="M16 8v16M12 12l8 8M20 12l-8 8" stroke="#388e3c" strokeWidth="2"/></svg>) },
+  { name: 'Adinkrahene', meaning: 'Chief of the adinkra symbols. Symbol of greatness, charisma, and leadership.', svg: (<svg width="24" height="24"><circle cx="12" cy="12" r="14" fill="#f9a825" stroke="#e53935" strokeWidth="2"/><circle cx="12" cy="12" r="8" fill="#43a047"/></svg>) },
+  { name: 'Bese Saka', meaning: 'Sack of cola nuts. Symbol of affluence, power, abundance, unity.', svg: (<svg width="24" height="24"><ellipse cx="16" cy="20" rx="10" ry="6" fill="#e3f2fd" stroke="#1e88e5" strokeWidth="2"/><ellipse cx="16" cy="12" rx="6" ry="4" fill="#f9a825" stroke="#e53935" strokeWidth="2"/></svg>) },
+  { name: 'Dame-Dame', meaning: 'Checkerboard. Symbol of intelligence and ingenuity.', svg: (<svg width="24" height="24"><rect x="4" y="4" width="24" height="24" fill="#fffde7" stroke="#e53935" strokeWidth="2"/><rect x="4" y="4" width="12" height="12" fill="#43a047"/><rect x="16" y="16" width="12" height="12" fill="#f9a825"/></svg>) },
+  { name: 'Fihankra', meaning: 'House/compound. Symbol of security and safety.', svg: (<svg width="24" height="24"><rect x="8" y="14" width="16" height="10" fill="#e3f2fd" stroke="#1e88e5" strokeWidth="2"/><polygon points="16,6 8,14 24,14" fill="#f9a825" stroke="#e53935" strokeWidth="2"/></svg>) },
+  { name: 'Dwennimmen', meaning: 'Ram’s horns. Symbol of humility together with strength.', svg: (<svg width="24" height="24"><circle cx="12" cy="12" r="15" fill="#fff3e0" stroke="#e53935" strokeWidth="2"/><path d="M10 20c-4-4 4-12 8-8" stroke="#43a047" strokeWidth="2" fill="none"/><path d="M22 20c4-4-4-12-8-8" stroke="#43a047" strokeWidth="2" fill="none"/></svg>) },
+  { name: 'Nyame Dua', meaning: 'Tree of God. Symbol of God’s presence and protection.', svg: (<svg width="24" height="24"><rect x="14" y="18" width="4" height="10" fill="#43a047"/><circle cx="16" cy="14" r="8" fill="#f9a825" stroke="#e53935" strokeWidth="2"/></svg>) },
+  { name: 'Boa Me Na Me Mmoa Wo', meaning: 'Help me and let me help you. Symbol of cooperation and interdependence.', svg: (<svg width="24" height="24"><rect x="8" y="8" width="16" height="16" rx="8" fill="#e3f2fd" stroke="#1e88e5" strokeWidth="2"/><path d="M16 8v16M8 16h16" stroke="#e53935" strokeWidth="2"/></svg>) },
+  { name: 'Nkyinkyim', meaning: 'Twisting. Symbol of initiative, dynamism, and versatility.', svg: (<svg width="24" height="24"><path d="M8 24c8-16 16 0 16-16" stroke="#e53935" strokeWidth="3" fill="none"/><circle cx="8" cy="24" r="2" fill="#f9a825"/><circle cx="24" cy="8" r="2" fill="#43a047"/></svg>) },
+  { name: 'Eban', meaning: 'Fence. Symbol of love, safety, and security.', svg: (<svg width="24" height="24"><rect x="6" y="6" width="20" height="20" rx="6" fill="#fffde7" stroke="#e53935" strokeWidth="2"/><path d="M10 6v20M16 6v20M22 6v20" stroke="#43a047" strokeWidth="2"/></svg>) },
+  { name: 'Akoben', meaning: 'War horn. Symbol of vigilance and wariness.', svg: (<svg width="24" height="24"><ellipse cx="12" cy="12" rx="14" ry="8" fill="#a5d6a7" stroke="#388e3c" strokeWidth="2"/><path d="M16 8v16M12 12l8 8M20 12l-8 8" stroke="#388e3c" strokeWidth="2"/></svg>) },
+  { name: 'Adinkrahene', meaning: 'Chief of the adinkra symbols. Symbol of greatness, charisma, and leadership.', svg: (<svg width="24" height="24"><circle cx="12" cy="12" r="14" fill="#f9a825" stroke="#e53935" strokeWidth="2"/><circle cx="12" cy="12" r="8" fill="#43a047"/></svg>) },
+  { name: 'Bese Saka', meaning: 'Sack of cola nuts. Symbol of affluence, power, abundance, unity.', svg: (<svg width="24" height="24"><ellipse cx="16" cy="20" rx="10" ry="6" fill="#e3f2fd" stroke="#1e88e5" strokeWidth="2"/><ellipse cx="16" cy="12" rx="6" ry="4" fill="#f9a825" stroke="#e53935" strokeWidth="2"/></svg>) },
+  { name: 'Dame-Dame', meaning: 'Checkerboard. Symbol of intelligence and ingenuity.', svg: (<svg width="24" height="24"><rect x="4" y="4" width="24" height="24" fill="#fffde7" stroke="#e53935" strokeWidth="2"/><rect x="4" y="4" width="12" height="12" fill="#43a047"/><rect x="16" y="16" width="12" height="12" fill="#f9a825"/></svg>) },
+  { name: 'Fihankra', meaning: 'House/compound. Symbol of security and safety.', svg: (<svg width="24" height="24"><rect x="8" y="14" width="16" height="10" fill="#e3f2fd" stroke="#1e88e5" strokeWidth="2"/><polygon points="16,6 8,14 24,14" fill="#f9a825" stroke="#e53935" strokeWidth="2"/></svg>) },
 ];
 
 const ROTATE_INTERVAL_MS = 2 * 60 * 1000; // 2 minutes
@@ -100,18 +95,18 @@ const AdinkraBar: React.FC = () => {
   const visibleSymbols = adinkraSymbols.slice(start, start + SYMBOLS_PER_SET);
   return (
     <div
-      className="w-full flex justify-center items-center gap-4 py-1 relative select-none"
+      className="w-full flex justify-center items-center gap-3 py-1 relative select-none"
       style={{
-        backgroundImage: `url('data:image/svg+xml;utf8,<svg width=\"320\" height=\"48\" viewBox=\"0 0 320 48\" fill=\"none\" xmlns=\"http://www.w3.org/2000/svg\"><rect width=\"320\" height=\"48\" fill=\"%23007bdb\"/><g><rect x=\"0\" y=\"0\" width=\"32\" height=\"48\" fill=\"%23ffc72c\"/><rect x=\"32\" y=\"0\" width=\"32\" height=\"48\" fill=\"%23007bdb\"/><rect x=\"64\" y=\"0\" width=\"32\" height=\"48\" fill=\"%23ffc72c\"/><rect x=\"96\" y=\"0\" width=\"32\" height=\"48\" fill=\"%23007bdb\"/><rect x=\"128\" y=\"0\" width=\"32\" height=\"48\" fill=\"%23ffc72c\"/><rect x=\"160\" y=\"0\" width=\"32\" height=\"48\" fill=\"%23007bdb\"/><rect x=\"192\" y=\"0\" width=\"32\" height=\"48\" fill=\"%23ffc72c\"/><rect x=\"224\" y=\"0\" width=\"32\" height=\"48\" fill=\"%23007bdb\"/><rect x=\"256\" y=\"0\" width=\"32\" height=\"48\" fill=\"%23ffc72c\"/><rect x=\"288\" y=\"0\" width=\"32\" height=\"48\" fill=\"%23007bdb\"/></g><g><polygon points=\"32,0 48,24 32,48 64,48 48,24 64,0\" fill=\"%23e63946\"/><polygon points=\"96,0 112,24 96,48 128,48 112,24 128,0\" fill=\"%2300b159\"/><polygon points=\"160,0 176,24 160,48 192,48 176,24 192,0\" fill=\"%23e63946\"/><polygon points=\"224,0 240,24 224,48 256,48 240,24 256,0\" fill=\"%2300b159\"/></g><g><rect x=\"0\" y=\"0\" width=\"320\" height=\"8\" fill=\"%23fff\" fill-opacity=\"0.15\"/><rect x=\"0\" y=\"40\" width=\"320\" height=\"8\" fill=\"%23fff\" fill-opacity=\"0.15\"/></g><g><rect x=\"31\" y=\"0\" width=\"2\" height=\"48\" fill=\"%23fff\"/><rect x=\"63\" y=\"0\" width=\"2\" height=\"48\" fill=\"%23fff\"/><rect x=\"95\" y=\"0\" width=\"2\" height=\"48\" fill=\"%23fff\"/><rect x=\"127\" y=\"0\" width=\"2\" height=\"48\" fill=\"%23fff\"/><rect x=\"159\" y=\"0\" width=\"2\" height=\"48\" fill=\"%23fff\"/><rect x=\"191\" y=\"0\" width=\"2\" height=\"48\" fill=\"%23fff\"/><rect x=\"223\" y=\"0\" width=\"2\" height=\"48\" fill=\"%23fff\"/><rect x=\"255\" y=\"0\" width=\"2\" height=\"48\" fill=\"%23fff\"/><rect x=\"287\" y=\"0\" width=\"2\" height=\"48\" fill=\"%23fff\"/></g></svg>')`,
+        backgroundImage: `url('data:image/svg+xml;utf8,<svg width=\"240\" height=\"36\" viewBox=\"0 0 240 36\" fill=\"none\" xmlns=\"http://www.w3.org/2000/svg\"><rect width=\"240\" height=\"36\" fill=\"%23007bdb\"/><g><rect x=\"0\" y=\"0\" width=\"24\" height=\"36\" fill=\"%23ffc72c\"/><rect x=\"24\" y=\"0\" width=\"24\" height=\"36\" fill=\"%23007bdb\"/><rect x=\"48\" y=\"0\" width=\"24\" height=\"36\" fill=\"%23ffc72c\"/><rect x=\"72\" y=\"0\" width=\"24\" height=\"36\" fill=\"%23007bdb\"/><rect x=\"96\" y=\"0\" width=\"24\" height=\"36\" fill=\"%23ffc72c\"/><rect x=\"120\" y=\"0\" width=\"24\" height=\"36\" fill=\"%23007bdb\"/><rect x=\"144\" y=\"0\" width=\"24\" height=\"36\" fill=\"%23ffc72c\"/><rect x=\"168\" y=\"0\" width=\"24\" height=\"36\" fill=\"%23007bdb\"/><rect x=\"192\" y=\"0\" width=\"24\" height=\"36\" fill=\"%23ffc72c\"/><rect x=\"216\" y=\"0\" width=\"24\" height=\"36\" fill=\"%23007bdb\"/></g><g><polygon points=\"24,0 36,18 24,36 48,36 36,18 48,0\" fill=\"%23e63946\"/><polygon points=\"72,0 84,18 72,36 96,36 84,18 96,0\" fill=\"%2300b159\"/><polygon points=\"120,0 132,18 120,36 144,36 132,18 144,0\" fill=\"%23e63946\"/><polygon points=\"168,0 180,18 168,36 192,36 180,18 192,0\" fill=\"%2300b159\"/></g><g><rect x=\"0\" y=\"0\" width=\"240\" height=\"6\" fill=\"%23fff\" fill-opacity=\"0.15\"/><rect x=\"0\" y=\"30\" width=\"240\" height=\"6\" fill=\"%23fff\" fill-opacity=\"0.15\"/></g><g><rect x=\"23\" y=\"0\" width=\"2\" height=\"36\" fill=\"%23fff\"/><rect x=\"47\" y=\"0\" width=\"2\" height=\"36\" fill=\"%23fff\"/><rect x=\"71\" y=\"0\" width=\"2\" height=\"36\" fill=\"%23fff\"/><rect x=\"95\" y=\"0\" width=\"2\" height=\"36\" fill=\"%23fff\"/><rect x=\"119\" y=\"0\" width=\"2\" height=\"36\" fill=\"%23fff\"/><rect x=\"143\" y=\"0\" width=\"2\" height=\"36\" fill=\"%23fff\"/><rect x=\"167\" y=\"0\" width=\"2\" height=\"36\" fill=\"%23fff\"/><rect x=\"191\" y=\"0\" width=\"2\" height=\"36\" fill=\"%23fff\"/><rect x=\"215\" y=\"0\" width=\"2\" height=\"36\" fill=\"%23fff\"/></g></svg>')`,
         backgroundRepeat: 'repeat',
-        backgroundSize: '320px 48px',
+        backgroundSize: '240px 36px',
       }}
     >
       {visibleSymbols.map((symbol, idx) => (
         <button
           key={symbol.name}
           className="focus:outline-none bg-white rounded-full shadow hover:scale-110 transition-transform border border-yellow-300"
-          style={{ width: 40, height: 40, display: 'flex', alignItems: 'center', justifyContent: 'center' }}
+          style={{ width: 32, height: 28, display: 'flex', alignItems: 'center', justifyContent: 'center' }}
           onClick={() => setTooltipIdx(start + idx)}
           tabIndex={0}
           aria-label={symbol.name + ' symbol'}
@@ -178,53 +173,6 @@ interface PassedUser {
 }
 
 const DiscoverPage = ({ currentUser, onNavigateToChat, isPremium }: DiscoverPageProps) => {
-  // Initialize IAP on component mount (moved from module level for better performance)
-  useEffect(() => {
-    const initializeIAP = async () => {
-      try {
-        // Check if we're in a Cordova environment before initializing
-        if (typeof window !== 'undefined' && window.document) {
-          document.addEventListener('deviceready', () => {
-            // @ts-ignore
-            const { store, LogLevel, Platform, ProductType, log } = window.CdvPurchase || {};
-            if (!store) {
-              console.error('CdvPurchase.store not available!');
-              return;
-            }
-            if (log && LogLevel && typeof log.setLevel === 'function') {
-              log.setLevel(LogLevel.DEBUG);
-            }
-            // 1) Register EXACT product IDs (must match .storekit for Simulator tests)
-            store.register([
-              {
-                id: 'com.driplove.dating.premium.monthlysub',
-                platform: Platform?.APPLE_APPSTORE,
-                type: ProductType?.PAID_SUBSCRIPTION
-              }
-            ]);
-            // 2) Observe everything (so we see why it fails)
-            store.error((err: any) => console.warn('[IAP] error:', err?.code, err?.message));
-            store.when().initiated((p: any) => console.log('[IAP] initiated:', p.id));
-            store.when().productUpdated((p: any) => console.log('[IAP] productUpdated:', p?.id, p?.title, p?.pricing?.price));
-            store.when().approved((t: any) => { console.log('[IAP] approved:', t.productId); t.verify(); });
-            store.when().verified((r: any) => { console.log('[IAP] verified:', r.productId); r.finish(); });
-            // @ts-ignore
-            if (store.when().cancelled) store.when().cancelled((p: any) => console.log('[IAP] cancelled:', p?.id));
-            // 3) Initialize AFTER register
-            store.initialize([{ platform: Platform?.APPLE_APPSTORE, options: { needAppReceipt: true } }]);
-            // 4) Fetch products/ownership
-            store.refresh();
-            console.log('[IAP] deviceready and IAP setup complete');
-          });
-        }
-      } catch (error) {
-        console.log('IAP not available in this environment:', error);
-      }
-    };
-
-    initializeIAP();
-  }, []);
-
   // IAP: Track if buy is enabled
   const [canBuy, setCanBuy] = useState(false);
   useEffect(() => {
@@ -1423,8 +1371,10 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, isPremium }: DiscoverPage
 
 
   return (
-    <div className="h-full w-full fixed top-0 left-0 overflow-hidden"
+    <div className="h-full w-full fixed left-0 overflow-hidden"
          style={{ 
+           top: '60px', // Start below the header instead of top-0
+           height: 'calc(100vh - 60px)', // Adjust height to account for header
            touchAction: 'pan-x pan-y',
            userSelect: 'none',
            WebkitUserSelect: 'none',
@@ -1503,7 +1453,7 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, isPremium }: DiscoverPage
         </div>
       )}
       {/* Main Image Area - Card stack */}
-  <div className="flex-1 relative overflow-hidden" style={{ height: 'calc(100vh - 80px)', display: 'flex', flexDirection: 'column', justifyContent: 'flex-end', paddingBottom: 0 }}>
+  <div className="flex-1 relative overflow-hidden" style={{ height: 'calc(100vh - 140px)', display: 'flex', flexDirection: 'column', justifyContent: 'flex-end', paddingBottom: 0 }}>
         {/* AdinkraBar overlays the top of the image area */}
         <div className="absolute top-0 left-0 w-full z-20 pointer-events-none">
           <div className="pointer-events-auto">
@@ -1556,7 +1506,7 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, isPremium }: DiscoverPage
           <div
             className="flex-1 cursor-pointer select-none relative transition-all duration-300 overflow-hidden"
             style={{
-              minHeight: showMoreInfo ? 'calc(100vh - 402px)' : 'calc(100vh - 402px)' // Adjusted for new expanded height
+              minHeight: showMoreInfo ? 'calc(100vh - 402px)' : 'calc(100vh - 302px)' // Adjusted for new expanded height
             }}
             onTouchStart={handleTouchStart}
             onTouchMove={handleTouchMove}
@@ -1669,10 +1619,20 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, isPremium }: DiscoverPage
           {/* African Adinkra symbols bar - fixed height */}
           <AdinkraBar />
 
-          {/* Info section - fixed stable height */}
-          <div className={`bg-white border-t border-gray-400 p-1 transition-all duration-300 flex-shrink-0 ${
-            showMoreInfo ? 'h-[320px] overflow-y-auto pb-5' : 'h-[120px] overflow-hidden pb-3'
+          {/* Info section - fixed stable height with proper scrolling */}
+          <div className={`bg-white border-t border-gray-400 transition-all duration-300 flex-shrink-0 ${
+            showMoreInfo ? 'h-[320px]' : 'h-[120px]'
           }`}>
+            <div 
+              className={`w-full h-full p-1 ${
+                showMoreInfo ? 'overflow-y-scroll pb-5' : 'overflow-hidden pb-3'
+              }`} 
+              style={{
+                WebkitOverflowScrolling: 'touch',
+                overscrollBehavior: 'contain',
+                scrollBehavior: 'smooth'
+              }}
+            >
             <MatchCard
               match={currentMatch}
               imageIndex={imageIndex}
@@ -1692,6 +1652,7 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, isPremium }: DiscoverPage
               getOptimizedUrl={getOptimizedUrl}
               preCalculatedDistance={userDistances[currentMatch.id]}
             />
+            </div>
           </div>
         </div>
         {/* Loading more indicator */}

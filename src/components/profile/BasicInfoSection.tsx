@@ -25,10 +25,8 @@ const getSanitizedValue = (name: string, value: string) => {
       .slice(0, 50);
   } else if (name === 'bio') {
     sanitizedValue = sanitizeBio(value);
-    if (containsBadWords(sanitizedValue)) {
-      sanitizedValue = '';
-      alert('Your bio contains inappropriate language. Please remove it.');
-    }
+    // Only check for bad words when the user finishes typing (not on every keystroke)
+    // This prevents clearing the bio while they're still typing
   }
   return sanitizedValue;
 };
@@ -51,13 +49,20 @@ const BasicInfoSection = ({ editedProfile, isEditing, onInputChange }: BasicInfo
                 name="first_name"
                 value={editedProfile.first_name || ''}
                 onChange={(e) => {
-                  const sanitized = getSanitizedValue('first_name', e.target.value);
+                  // Only sanitize for security (remove scripts/HTML) but preserve spaces for names
+                  const basicSanitized = e.target.value
+                    .replace(/<script\b[^<]*(?:(?!<\/script>)<[^<]*)*<\/script>/gi, '')
+                    .replace(/<[^>]*>?/gm, '')
+                    .replace(/javascript:/gi, '')
+                    .replace(/on\w+\s*=/gi, '')
+                    .slice(0, 50);
+                  
                   onInputChange({
                     ...e,
                     target: {
                       ...e.target,
                       name: 'first_name',
-                      value: sanitized
+                      value: basicSanitized
                     }
                   });
                 }}
@@ -73,13 +78,20 @@ const BasicInfoSection = ({ editedProfile, isEditing, onInputChange }: BasicInfo
                 name="last_name"
                 value={editedProfile.last_name || ''}
                 onChange={(e) => {
-                  const sanitized = getSanitizedValue('last_name', e.target.value);
+                  // Only sanitize for security (remove scripts/HTML) but preserve spaces for names
+                  const basicSanitized = e.target.value
+                    .replace(/<script\b[^<]*(?:(?!<\/script>)<[^<]*)*<\/script>/gi, '')
+                    .replace(/<[^>]*>?/gm, '')
+                    .replace(/javascript:/gi, '')
+                    .replace(/on\w+\s*=/gi, '')
+                    .slice(0, 50);
+                  
                   onInputChange({
                     ...e,
                     target: {
                       ...e.target,
                       name: 'last_name',
-                      value: sanitized
+                      value: basicSanitized
                     }
                   });
                 }}
@@ -95,13 +107,23 @@ const BasicInfoSection = ({ editedProfile, isEditing, onInputChange }: BasicInfo
               name="bio"
               value={editedProfile.bio || ''}
               onChange={(e) => {
-                const sanitized = getSanitizedValue('bio', e.target.value);
+                // Only sanitize for security (remove scripts/HTML) but preserve spaces
+                const basicSanitized = e.target.value
+                  .replace(/<script\b[^<]*(?:(?!<\/script>)<[^<]*)*<\/script>/gi, '')
+                  .replace(/<[^>]*>?/gm, '')
+                  .replace(/javascript:/gi, '')
+                  .replace(/on\w+\s*=/gi, '')
+                  .replace(/data:/gi, '')
+                  .replace(/vbscript:/gi, '')
+                  .replace(/[<>]/g, '')
+                  .slice(0, 500);
+                
                 onInputChange({
                   ...e,
                   target: {
                     ...e.target,
                     name: 'bio',
-                    value: sanitized
+                    value: basicSanitized
                   }
                 });
               }}

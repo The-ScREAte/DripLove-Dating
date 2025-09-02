@@ -48,8 +48,7 @@ export const sanitizeBio = (bio: string): string => {
     .replace(/data:/gi, '')
     .replace(/vbscript:/gi, '')
     .replace(/[<>]/g, '') // Remove angle brackets entirely
-    .trim()
-    .slice(0, 500); // Limit bio length
+    .slice(0, 500); // Limit bio length but don't trim spaces during typing
 };
 
 /**

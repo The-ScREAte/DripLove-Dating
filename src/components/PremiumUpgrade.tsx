@@ -104,16 +104,20 @@ const PremiumUpgrade = ({ currentUser, onClose, preselectedPlan }: PremiumUpgrad
     if (type === 'iap') {
       setIapLoading(true);
       try {
+        // Don't redirect immediately - wait for the actual purchase to complete
         await buyMonthly();
-        // Redirect to payment success page with Apple IAP params
-        window.location.href = '/payment-success?status=successful&payment_type=iap';
+        // The buyMonthly function should handle the success callback
+        // Only redirect when the purchase is actually verified
+        toast({
+          title: 'Purchase Processing',
+          description: 'Please complete the payment in the Apple purchase dialog.',
+        });
       } catch (err: any) {
         toast({
           title: 'IAP Failed',
           description: err?.message || String(err),
           variant: 'destructive',
         });
-      } finally {
         setIapLoading(false);
         setShowPaymentOptions(false);
       }

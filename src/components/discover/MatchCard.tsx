@@ -561,7 +561,7 @@ const MatchCard: React.FC<MatchCardProps> = ({
   if (isDetailsAreaOnly) {
     // Render only the non-swipeable details area
     return (
-      <div className="w-full h-full">
+      <div className="w-full" style={{ minHeight: '400px' }}>
         {/* Basic Info - Always shown */}
         <div className="flex justify-between items-start">
           <div className="flex-1">

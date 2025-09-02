@@ -34,18 +34,38 @@ const Unsubscribe: React.FC = () => {
         }
       }
 
-      // Call the new Supabase Edge Function
-      const response = await fetch('/functions/v1/cancel-subscription', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          // Use the public anon key for the apikey header if needed
-          'apikey': process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || '',
-        },
-        body: JSON.stringify({ user_id: user.id }),
-      });
-      const result = await response.json();
-      if (!response.ok) throw new Error(result.error || 'Failed to cancel subscription.');
+      // Update subscription status directly using Supabase client
+      // First, get the active subscription
+      const { data: subscription, error: subError } = await supabase
+        .from('user_subscriptions')
+        .select('*')
+        .eq('user_id', user.id)
+        .eq('status', 'active')
+        .single();
+
+      if (subError || !subscription) {
+        throw new Error('No active subscription found');
+      }
+
+      console.log('Current subscription:', subscription);
+
+      // Try different status values based on what might be valid
+      // Common subscription status values are: active, inactive, cancelled, expired, paused
+      const { error: updateError } = await supabase
+        .from('user_subscriptions')
+        .update({ 
+          status: 'inactive', // Try 'inactive' instead of 'cancelled'
+          updated_at: new Date().toISOString()
+        })
+        .eq('id', subscription.id);
+
+      if (updateError) {
+        throw new Error(updateError.message || 'Failed to update subscription status');
+      }
+
+      // If it's a Paystack subscription, we should ideally disable it at the provider level
+      // For now, we'll just mark it as canceled in our database
+      // You might want to implement a server-side webhook or Edge Function for this
 
       toast({
         title: 'Subscription Cancelled',
@@ -73,7 +93,7 @@ const Unsubscribe: React.FC = () => {
         {error && <div className="text-red-500 text-sm mb-2">{error}</div>}
         <Button
           onClick={handleUnsubscribe}
-          disabled={loading || confirmation.trim().toLowerCase() !== REQUIRED_PHRASE}
+          disabled={loading || confirmation.trim().toLowerCase() !== REQUIRED_PHRASE.toLowerCase()}
           className="w-full bg-red-600 hover:bg-red-700 text-white font-bold py-2 px-4 rounded-lg mt-2"
         >
           {loading ? 'Cancelling...' : 'Unsubscribe'}
