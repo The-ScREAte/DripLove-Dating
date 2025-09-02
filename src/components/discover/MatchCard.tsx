@@ -586,28 +586,6 @@ const MatchCard: React.FC<MatchCardProps> = ({
     // Render only the non-swipeable details area
     return (
       <div className="w-full h-full">
-        {/* Decorative Adinkra Bar - above info card */}
-        <div className="flex justify-center items-center py-2 mb-3">
-          <div className="flex space-x-2 opacity-60">
-            {/* Simple adinkra-inspired decorative elements */}
-            <svg width="20" height="20" className="text-pink-400">
-              <circle cx="10" cy="10" r="8" fill="none" stroke="currentColor" strokeWidth="2"/>
-              <circle cx="10" cy="10" r="4" fill="currentColor"/>
-            </svg>
-            <svg width="20" height="20" className="text-pink-400">
-              <path d="M10 2v16M4 6l12 8M16 6L4 14" stroke="currentColor" strokeWidth="2"/>
-            </svg>
-            <svg width="20" height="20" className="text-pink-400">
-              <ellipse cx="10" cy="10" rx="8" ry="5" fill="none" stroke="currentColor" strokeWidth="2"/>
-              <line x1="10" y1="5" x2="10" y2="15" stroke="currentColor" strokeWidth="2"/>
-            </svg>
-            <svg width="20" height="20" className="text-pink-400">
-              <circle cx="10" cy="10" r="8" fill="none" stroke="currentColor" strokeWidth="2"/>
-              <circle cx="10" cy="10" r="4" fill="currentColor"/>
-            </svg>
-          </div>
-        </div>
-
         {/* Basic Info - Always shown */}
         <div className="flex justify-between items-start">
           <div className="flex-1">
