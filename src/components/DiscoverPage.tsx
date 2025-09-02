@@ -1,44 +1,6 @@
 
 
 
-// In-app purchase setup (runs once on mount)
-import 'cordova-plugin-purchase';
-
-
-if (typeof window !== 'undefined') {
-  document.addEventListener('deviceready', () => {
-    // @ts-ignore
-    const { store, LogLevel, Platform, ProductType, log } = window.CdvPurchase || {};
-    if (!store) {
-      console.error('CdvPurchase.store not available!');
-      return;
-    }
-    if (log && LogLevel && typeof log.setLevel === 'function') {
-      log.setLevel(LogLevel.DEBUG);
-    }
-    // 1) Register EXACT product IDs (must match .storekit for Simulator tests)
-    store.register([
-      {
-        id: 'com.driplove.dating.premium.monthlysub',
-        platform: Platform?.APPLE_APPSTORE,
-        type: ProductType?.PAID_SUBSCRIPTION
-      }
-    ]);
-    // 2) Observe everything (so we see why it fails)
-    store.error((err: any) => console.warn('[IAP] error:', err?.code, err?.message));
-    store.when().initiated((p: any) => console.log('[IAP] initiated:', p.id));
-    store.when().productUpdated((p: any) => console.log('[IAP] productUpdated:', p?.id, p?.title, p?.pricing?.price));
-    store.when().approved((t: any) => { console.log('[IAP] approved:', t.productId); t.verify(); });
-    store.when().verified((r: any) => { console.log('[IAP] verified:', r.productId); r.finish(); });
-    // @ts-ignore
-    if (store.when().cancelled) store.when().cancelled((p: any) => console.log('[IAP] cancelled:', p?.id));
-    // 3) Initialize AFTER register
-    store.initialize([{ platform: Platform?.APPLE_APPSTORE, options: { needAppReceipt: true } }]);
-    // 4) Fetch products/ownership
-    store.refresh();
-    console.log('[IAP] deviceready and IAP setup complete');
-  });
-}
 
 
 // Use shared IAP actions
@@ -78,7 +40,6 @@ function DominantColorImageBg({ imageUrl, children }) {
     </div>
   );
 }
-import ColorThief from 'color-thief-browser';
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
 
 // --- AdinkraBar component and symbols ---
@@ -217,6 +178,53 @@ interface PassedUser {
 }
 
 const DiscoverPage = ({ currentUser, onNavigateToChat, isPremium }: DiscoverPageProps) => {
+  // Initialize IAP on component mount (moved from module level for better performance)
+  useEffect(() => {
+    const initializeIAP = async () => {
+      try {
+        // Check if we're in a Cordova environment before initializing
+        if (typeof window !== 'undefined' && window.document) {
+          document.addEventListener('deviceready', () => {
+            // @ts-ignore
+            const { store, LogLevel, Platform, ProductType, log } = window.CdvPurchase || {};
+            if (!store) {
+              console.error('CdvPurchase.store not available!');
+              return;
+            }
+            if (log && LogLevel && typeof log.setLevel === 'function') {
+              log.setLevel(LogLevel.DEBUG);
+            }
+            // 1) Register EXACT product IDs (must match .storekit for Simulator tests)
+            store.register([
+              {
+                id: 'com.driplove.dating.premium.monthlysub',
+                platform: Platform?.APPLE_APPSTORE,
+                type: ProductType?.PAID_SUBSCRIPTION
+              }
+            ]);
+            // 2) Observe everything (so we see why it fails)
+            store.error((err: any) => console.warn('[IAP] error:', err?.code, err?.message));
+            store.when().initiated((p: any) => console.log('[IAP] initiated:', p.id));
+            store.when().productUpdated((p: any) => console.log('[IAP] productUpdated:', p?.id, p?.title, p?.pricing?.price));
+            store.when().approved((t: any) => { console.log('[IAP] approved:', t.productId); t.verify(); });
+            store.when().verified((r: any) => { console.log('[IAP] verified:', r.productId); r.finish(); });
+            // @ts-ignore
+            if (store.when().cancelled) store.when().cancelled((p: any) => console.log('[IAP] cancelled:', p?.id));
+            // 3) Initialize AFTER register
+            store.initialize([{ platform: Platform?.APPLE_APPSTORE, options: { needAppReceipt: true } }]);
+            // 4) Fetch products/ownership
+            store.refresh();
+            console.log('[IAP] deviceready and IAP setup complete');
+          });
+        }
+      } catch (error) {
+        console.log('IAP not available in this environment:', error);
+      }
+    };
+
+    initializeIAP();
+  }, []);
+
   // IAP: Track if buy is enabled
   const [canBuy, setCanBuy] = useState(false);
   useEffect(() => {
@@ -285,7 +293,7 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, isPremium }: DiscoverPage
   }, [currentUser?.id]);
   // --- END: Swipe Guide Popup State ---
 
-  // Check for premium activation from payment success
+  // Check for premium activation from payment success (run once on mount)
   useEffect(() => {
     const urlParams = new URLSearchParams(window.location.search);
     if (urlParams.get('premium') === 'activated') {
@@ -299,7 +307,7 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, isPremium }: DiscoverPage
       const newUrl = window.location.pathname;
       window.history.replaceState({}, '', newUrl);
     }
-  }, [refetchSubscription, toast]);
+  }, []); // Empty dependency array - only run once on mount
 
   // Fetch current reverse usage for today
   // Fetch user profile and calculate completion on mount
@@ -654,12 +662,13 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, isPremium }: DiscoverPage
     }
   }, [loadFullImages]);
 
+  // Main effect to fetch data - only run when user ID changes and we don't have data
   useEffect(() => {
-    if (currentUser?.id) {
+    if (currentUser?.id && (potentialMatches.length === 0 || isLoading)) {
       fetchPotentialMatches();
       fetchReverseUsage();
     }
-  }, [currentUser?.id, fetchPotentialMatches, fetchReverseUsage]);
+  }, [currentUser?.id]); // Only depend on user ID, not the functions
 
   // Save current match state
   useEffect(() => {
@@ -1505,7 +1514,6 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, isPremium }: DiscoverPage
         {nextMatch && (
           <DominantColorImageBg
             imageUrl={nextMatchImages[0] ? getOptimizedUrl(nextMatchImages[0]) : undefined}
-            altText={nextMatch.first_name}
           >
             {/* ...existing code for overlays, etc... */}
             {nextMatchImages.length > 0 ? (
@@ -1541,15 +1549,15 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, isPremium }: DiscoverPage
             transition: exitingCard ? 'transform 0.3s cubic-bezier(0.25, 0.46, 0.45, 0.94)' : 
                        isDragging ? 'none' : 'transform 0.3s cubic-bezier(0.22, 1, 0.36, 1)',
             boxShadow: isDragging ? '0 8px 32px 0 rgba(0,0,0,0.25)' : '0 4px 16px 0 rgba(0,0,0,0.10)',
-            opacity: exitingCard ? 0 : 1,
-            paddingTop: 52 // leave space for the AdinkraBar
+            opacity: exitingCard ? 0 : 1
           }}
         >
-          {/* ...existing code... */}
+          {/* Image area - flexible height that fills remaining space */}
           <div
-            className={`cursor-pointer select-none relative transition-all duration-300 ${
-              showMoreInfo ? 'h-[calc(100%-250px)]' : 'h-[calc(100%-120px)]'
-            }`}
+            className="flex-1 cursor-pointer select-none relative transition-all duration-300 overflow-hidden"
+            style={{
+              minHeight: showMoreInfo ? 'calc(100vh - 402px)' : 'calc(100vh - 402px)' // Adjusted for new expanded height
+            }}
             onTouchStart={handleTouchStart}
             onTouchMove={handleTouchMove}
             onTouchEnd={handleTouchEnd}
@@ -1658,11 +1666,12 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, isPremium }: DiscoverPage
             />
           </div>
           {/* ...existing code... */}
-          {/* African Adinkra symbols bar */}
+          {/* African Adinkra symbols bar - fixed height */}
           <AdinkraBar />
 
-          <div className={`bg-white border-t border-gray-400 p-1 transition-all duration-300 ${
-            showMoreInfo ? 'h-[250px] overflow-y-auto pb-5' : 'h-[120px] overflow-y-auto pb-3'
+          {/* Info section - fixed stable height */}
+          <div className={`bg-white border-t border-gray-400 p-1 transition-all duration-300 flex-shrink-0 ${
+            showMoreInfo ? 'h-[320px] overflow-y-auto pb-5' : 'h-[120px] overflow-hidden pb-3'
           }`}>
             <MatchCard
               match={currentMatch}
