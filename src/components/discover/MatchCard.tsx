@@ -309,14 +309,17 @@ const MatchCard: React.FC<MatchCardProps> = ({
 
   // Handle split rendering modes
   if (isSwipeAreaOnly) {
+    // Determine background color for the entire card
+    const cardBackgroundColor = slides[currentSlide]?.type === 'image' ? edgeColor : getFallbackColor();
+    
     // Render only the swipeable image area
     return (
-  <div 
-    className="relative w-full h-full min-h-full overflow-hidden"
-    style={{ 
-      backgroundColor: slides[currentSlide]?.type === 'image' ? edgeColor : getFallbackColor()
-    }}
-  >
+      <div 
+        className="relative w-full h-full min-h-full overflow-hidden"
+        style={{ 
+          backgroundColor: cardBackgroundColor
+        }}
+      >
         {/* Image/Bio Container - Swipeable Area Only */}
         <div className="relative w-full h-full overflow-hidden" onClick={handleSlideClick}>
           {/* Current slide content */}
@@ -426,16 +429,15 @@ const MatchCard: React.FC<MatchCardProps> = ({
                   </div>
                 </div>
               ) : (
-                // Fallback for no images - show placeholder with initials, using consistent background
+                // Fallback for no images - show placeholder with initials, using consistent card background
                 <div 
                   className="w-full h-full min-h-full flex items-center justify-center"
-                  style={{ backgroundColor: getFallbackColor() }}
                 >
                   <div className="text-center w-full">
-                    <div className="bg-white/80 rounded-full p-8 mb-4 shadow-xl mx-auto">
+                    <div className="bg-white/80 rounded-full p-8 mb-4 shadow-xl mx-auto w-fit">
                       <User className="w-16 h-16 mx-auto text-gray-500" />
                     </div>
-                    <span className="text-6xl font-bold text-gray-700 bg-white/50 rounded-full px-6 py-3">
+                    <span className="text-6xl font-bold text-gray-700 bg-white/50 rounded-full px-6 py-3 inline-block">
                       {match.first_name?.[0]}{match.last_name?.[0]}
                     </span>
                     <p className="text-gray-600 mt-4 text-sm">No photos uploaded yet</p>
@@ -584,6 +586,28 @@ const MatchCard: React.FC<MatchCardProps> = ({
     // Render only the non-swipeable details area
     return (
       <div className="w-full h-full">
+        {/* Decorative Adinkra Bar - above info card */}
+        <div className="flex justify-center items-center py-2 mb-3">
+          <div className="flex space-x-2 opacity-60">
+            {/* Simple adinkra-inspired decorative elements */}
+            <svg width="20" height="20" className="text-pink-400">
+              <circle cx="10" cy="10" r="8" fill="none" stroke="currentColor" strokeWidth="2"/>
+              <circle cx="10" cy="10" r="4" fill="currentColor"/>
+            </svg>
+            <svg width="20" height="20" className="text-pink-400">
+              <path d="M10 2v16M4 6l12 8M16 6L4 14" stroke="currentColor" strokeWidth="2"/>
+            </svg>
+            <svg width="20" height="20" className="text-pink-400">
+              <ellipse cx="10" cy="10" rx="8" ry="5" fill="none" stroke="currentColor" strokeWidth="2"/>
+              <line x1="10" y1="5" x2="10" y2="15" stroke="currentColor" strokeWidth="2"/>
+            </svg>
+            <svg width="20" height="20" className="text-pink-400">
+              <circle cx="10" cy="10" r="8" fill="none" stroke="currentColor" strokeWidth="2"/>
+              <circle cx="10" cy="10" r="4" fill="currentColor"/>
+            </svg>
+          </div>
+        </div>
+
         {/* Basic Info - Always shown */}
         <div className="flex justify-between items-start">
           <div className="flex-1">
