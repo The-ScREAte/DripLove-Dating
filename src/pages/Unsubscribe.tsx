@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { isNativeApp } from '@/utils/iap';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { useNavigate } from 'react-router-dom';
@@ -18,9 +19,34 @@ const Unsubscribe: React.FC = () => {
     setLoading(true);
     setError('');
     try {
-      // Cancel via Postgres function (no external API required)
-      const { error } = await supabase.rpc('cancel_user_subscription');
-      if (error) throw error;
+      // Get current user ID from Supabase Auth
+      const { data: { user }, error: userError } = await supabase.auth.getUser();
+      if (userError || !user) throw new Error('Could not get user ID');
+
+      // If on native app, attempt to cancel IAP subscription first
+      if (isNativeApp()) {
+        try {
+          if (window.store && typeof window.store.cancel === 'function') {
+            await window.store.cancel();
+          }
+        } catch (iapErr) {
+          console.error('IAP cancel error:', iapErr);
+        }
+      }
+
+      // Call the new Supabase Edge Function
+      const response = await fetch('/functions/v1/cancel-subscription', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          // Use the public anon key for the apikey header if needed
+          'apikey': process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || '',
+        },
+        body: JSON.stringify({ user_id: user.id }),
+      });
+      const result = await response.json();
+      if (!response.ok) throw new Error(result.error || 'Failed to cancel subscription.');
+
       toast({
         title: 'Subscription Cancelled',
         description: 'Your premium subscription has been cancelled. You will retain access until the end of your billing period.',

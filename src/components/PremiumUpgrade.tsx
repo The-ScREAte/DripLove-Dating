@@ -105,7 +105,8 @@ const PremiumUpgrade = ({ currentUser, onClose, preselectedPlan }: PremiumUpgrad
       setIapLoading(true);
       try {
         await buyMonthly();
-        handlePaymentSuccess();
+        // Redirect to payment success page with Apple IAP params
+        window.location.href = '/payment-success?status=successful&payment_type=iap';
       } catch (err: any) {
         toast({
           title: 'IAP Failed',
@@ -142,8 +143,8 @@ const PremiumUpgrade = ({ currentUser, onClose, preselectedPlan }: PremiumUpgrad
   ];
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-pink-500 via-purple-600 to-indigo-700 p-4 sm:p-6 lg:p-8 overflow-y-auto">
-      <div className="max-w-5xl mx-auto">
+    <div className="min-h-screen bg-gradient-to-br from-pink-500 via-purple-600 to-indigo-700 p-2 sm:p-4 md:p-6 lg:p-8 overflow-y-auto">
+      <div className="max-w-3xl md:max-w-4xl lg:max-w-5xl mx-auto">
         {onClose && (
           <Button
             onClick={onClose}
@@ -156,126 +157,119 @@ const PremiumUpgrade = ({ currentUser, onClose, preselectedPlan }: PremiumUpgrad
         )}
           
           {/* Header Section */}
-          <div className="text-center mb-6">
-            <div className="flex items-center justify-center mb-4">
+          <div className="text-center mb-4 md:mb-6">
+            <div className="flex items-center justify-center mb-2 md:mb-4">
               <div className="relative">
-                <Crown className="w-12 h-12 sm:w-16 sm:h-16 text-yellow-400 drop-shadow-lg" />
-                <div className="absolute -top-1 -right-1 w-3 h-3 sm:w-4 sm:h-4 bg-yellow-300 rounded-full animate-pulse"></div>
+                <Crown className="w-10 h-10 sm:w-14 sm:h-14 md:w-16 md:h-16 text-yellow-400 drop-shadow-lg" />
+                <div className="absolute -top-1 -right-1 w-2.5 h-2.5 sm:w-3.5 sm:h-3.5 md:w-4 md:h-4 bg-yellow-300 rounded-full animate-pulse"></div>
               </div>
             </div>
-            <h1 className="text-3xl sm:text-4xl lg:text-5xl font-bold text-white mb-3 drop-shadow-lg">
-              Upgrade to <span className="text-yellow-300">Premium</span>
-            </h1>
           </div>
 
           {/* Plans Section */}
-          <div className="grid lg:grid-cols-2 gap-4 lg:gap-6 w-full">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-3 md:gap-5 lg:gap-6 w-full">
             
             {/* Premium Plan - Featured */}
-            <div className="order-1 lg:order-1 w-full">
-              <Card className="border-2 sm:border-3 border-yellow-400 relative overflow-hidden shadow-2xl bg-gradient-to-br from-white to-yellow-50 transition-all duration-300 w-full no-overflow">
+            <div className="order-1 md:order-1 w-full">
+              <Card className="border-2 border-yellow-400 relative overflow-hidden shadow-xl bg-gradient-to-br from-white to-yellow-50 transition-all duration-300 w-full">
                 {/* Popular Badge */}
-                <div className="absolute -top-1 -right-1 bg-gradient-to-r from-yellow-400 to-orange-400 text-black px-2 sm:px-4 py-1 sm:py-2 text-xs sm:text-sm font-bold rounded-bl-lg shadow-lg responsive-text">
-                ⭐ MOST POPULAR
-              </div>
+                <div className="absolute -top-1 -right-1 bg-gradient-to-r from-yellow-400 to-orange-400 text-black px-2 md:px-3 py-1 md:py-1.5 text-xs md:text-sm font-bold rounded-bl-lg shadow-lg responsive-text">
+                  ⭐ MOST POPULAR
+                </div>
               
-              <CardHeader className="text-center pb-4 sm:pb-6 pt-6 sm:pt-8 px-4">
-                <CardTitle className="text-xl sm:text-2xl lg:text-3xl font-bold flex items-center justify-center text-gray-800 responsive-text">
-                  <Crown className="w-6 h-6 sm:w-8 sm:h-8 text-yellow-500 mr-2 sm:mr-3" />
+              <CardHeader className="text-center pb-3 md:pb-5 pt-4 md:pt-7 px-2 md:px-4">
+                <CardTitle className="text-lg sm:text-xl md:text-2xl lg:text-3xl font-bold flex items-center justify-center text-gray-800 responsive-text">
+                  <Crown className="w-5 h-5 sm:w-7 sm:h-7 md:w-8 md:h-8 text-yellow-500 mr-2 sm:mr-3" />
                   Premium Plan
                 </CardTitle>
-                <div className="mt-3 sm:mt-4">
-                  <div className="space-y-3">
+                <div className="mt-2 md:mt-3">
+                  <div className="space-y-2 md:space-y-3">
                     {/* One-time payment option */}
-                    <div className="p-3 bg-gradient-to-r from-green-50 to-emerald-50 border border-green-200 rounded-lg">
-                      <div className="text-2xl sm:text-3xl lg:text-4xl font-bold text-gray-800 responsive-text">
+                    <div className="p-2 md:p-3 bg-gradient-to-r from-green-50 to-emerald-50 border border-green-200 rounded-lg">
+                      <div className="text-xl sm:text-2xl md:text-3xl font-bold text-gray-800 responsive-text">
                         {currency} {price}
                       </div>
-                      <div className="text-xs sm:text-sm text-green-600 font-medium mt-1">✨ One-time payment - Lifetime access</div>
+                      <div className="text-xs md:text-sm text-green-600 font-medium mt-1">✨ One-time payment - Lifetime access</div>
                     </div>
                     
                     {/* Monthly payment option */}
                     {monthlyPrice && (
-                      <div className="p-3 bg-gradient-to-r from-blue-50 to-sky-50 border border-blue-200 rounded-lg">
-                        <div className="text-xl sm:text-2xl lg:text-3xl font-bold text-gray-800 responsive-text">
+                      <div className="p-2 md:p-3 bg-gradient-to-r from-blue-50 to-sky-50 border border-blue-200 rounded-lg">
+                        <div className="text-lg sm:text-xl md:text-2xl font-bold text-gray-800 responsive-text">
                           {currency} {monthlyPrice}/month
                         </div>
-                        <div className="text-xs sm:text-sm text-blue-600 font-medium mt-1">📱 Monthly subscription - Cancel anytime</div>
+                        <div className="text-xs md:text-sm text-blue-600 font-medium mt-1">📱 Monthly subscription - Cancel anytime</div>
                       </div>
                     )}
                   </div>
                 </div>
               </CardHeader>
               
-              <CardContent className="space-y-3 sm:space-y-5 px-4 sm:px-6 pb-6 sm:pb-8">
+              <CardContent className="space-y-2 md:space-y-4 px-2 md:px-5 pb-4 md:pb-7">
                 {features.map((feature, index) => (
-                  <div key={index} className="flex items-center space-x-3 sm:space-x-4 p-2 sm:p-3 bg-white/60 rounded-lg">
-                    <div className="bg-yellow-100 p-1.5 sm:p-2 rounded-full flex-shrink-0">
-                      <feature.icon className="w-4 h-4 sm:w-5 sm:h-5 text-yellow-600" />
+                  <div key={index} className="flex items-center space-x-2 md:space-x-3 p-1.5 md:p-2.5 bg-white/60 rounded-lg">
+                    <div className="bg-yellow-100 p-1 md:p-1.5 rounded-full flex-shrink-0">
+                      <feature.icon className="w-4 h-4 md:w-5 md:h-5 text-yellow-600" />
                     </div>
                     <div className="flex-1 min-w-0">
-                      <div className="font-semibold text-gray-800 text-sm sm:text-base responsive-text truncate">{feature.name}</div>
-                      <div className="text-xs sm:text-sm text-green-600 font-medium responsive-text">{feature.premium}</div>
+                      <div className="font-semibold text-gray-800 text-xs md:text-base responsive-text truncate">{feature.name}</div>
+                      <div className="text-xs md:text-sm text-green-600 font-medium responsive-text">{feature.premium}</div>
                     </div>
-                    <Check className="w-4 h-4 sm:w-5 sm:h-5 text-green-500 flex-shrink-0" />
+                    <Check className="w-4 h-4 md:w-5 md:h-5 text-green-500 flex-shrink-0" />
                   </div>
                 ))}
                 
                 {/* Extra Premium Features */}
-                <div className="flex items-center space-x-3 sm:space-x-4 p-2 sm:p-3 bg-gradient-to-r from-yellow-50 to-orange-50 rounded-lg border border-yellow-200">
-                  <div className="bg-yellow-100 p-1.5 sm:p-2 rounded-full flex-shrink-0">
-                    <Crown className="w-4 h-4 sm:w-5 sm:h-5 text-yellow-600" />
+                <div className="flex items-center space-x-2 md:space-x-3 p-1.5 md:p-2.5 bg-gradient-to-r from-yellow-50 to-orange-50 rounded-lg border border-yellow-200">
+                  <div className="bg-yellow-100 p-1 md:p-1.5 rounded-full flex-shrink-0">
+                    <Crown className="w-4 h-4 md:w-5 md:h-5 text-yellow-600" />
                   </div>
                   <div className="flex-1 min-w-0">
-                    <div className="font-semibold text-gray-800 text-sm sm:text-base responsive-text truncate">All Future Features</div>
-                    <div className="text-xs sm:text-sm text-green-600 font-medium responsive-text">Included forever!</div>
+                    <div className="font-semibold text-gray-800 text-xs md:text-base responsive-text truncate">All Future Features</div>
+                    <div className="text-xs md:text-sm text-green-600 font-medium responsive-text">Included forever!</div>
                   </div>
-                  <Check className="w-4 h-4 sm:w-5 sm:h-5 text-green-500 flex-shrink-0" />
+                  <Check className="w-4 h-4 md:w-5 md:h-5 text-green-500 flex-shrink-0" />
                 </div>
 
                 {/* CTA Button */}
-                <div className="pt-4 sm:pt-6 text-center">
+                <div className="pt-3 md:pt-5 text-center">
                   <Button
                     onClick={handleUpgrade}
-                    className="w-full bg-gradient-to-r from-yellow-400 via-yellow-500 to-orange-400 hover:from-yellow-500 hover:via-yellow-600 hover:to-orange-500 text-black font-bold py-3 sm:py-4 px-6 sm:px-8 rounded-xl text-base sm:text-lg shadow-xl transition-all duration-200 responsive-text"
+                    className="w-full bg-gradient-to-r from-yellow-400 via-yellow-500 to-orange-400 hover:from-yellow-500 hover:via-yellow-600 hover:to-orange-500 text-black font-bold py-2.5 md:py-4 px-4 md:px-8 rounded-xl text-base md:text-lg shadow-xl transition-all duration-200 responsive-text"
                   >
-                    <Crown className="w-5 h-5 sm:w-6 sm:h-6 mr-2 sm:mr-3" />
+                    <Crown className="w-5 h-5 md:w-6 md:h-6 mr-2 md:mr-3" />
                     Upgrade to Premium Now
                   </Button>
-                  
-                 
                 </div>
               </CardContent>
             </Card>
           </div>
 
           {/* Free Plan */}
-          <div className="order-2 lg:order-2 w-full">
-            <Card className="border-2 border-gray-200 shadow-lg bg-white relative transition-all duration-300 w-full no-overflow">
-              <CardHeader className="text-center pb-4 sm:pb-6 px-4">
-                <CardTitle className="text-xl sm:text-2xl font-bold text-gray-700 responsive-text">Free Plan</CardTitle>
-                <div className="mt-3 sm:mt-4">
-                  <div className="text-3xl sm:text-4xl font-bold text-gray-700 responsive-text">GHS 0</div>
-                  <div className="text-xs sm:text-sm text-gray-500 mt-1">Basic features only</div>
+          <div className="order-2 md:order-2 w-full">
+            <Card className="border-2 border-gray-200 shadow-md bg-white relative transition-all duration-300 w-full">
+              <CardHeader className="text-center pb-3 md:pb-5 px-2 md:px-4">
+                <CardTitle className="text-lg sm:text-xl md:text-2xl font-bold text-gray-700 responsive-text">Free Plan</CardTitle>
+                <div className="mt-2 md:mt-3">
+                  <div className="text-2xl sm:text-3xl md:text-4xl font-bold text-gray-700 responsive-text">GHS 0</div>
+                  <div className="text-xs md:text-sm text-gray-500 mt-1">Basic features only</div>
                 </div>
               </CardHeader>
-              
-              <CardContent className="space-y-3 sm:space-y-4 px-4 sm:px-6 pb-6 sm:pb-8">
+              <CardContent className="space-y-2 md:space-y-3 px-2 md:px-5 pb-4 md:pb-7">
                 {features.map((feature, index) => (
-                  <div key={index} className="flex items-center space-x-3 sm:space-x-4 p-2 sm:p-3 bg-gray-50 rounded-lg">
-                    <div className="bg-gray-100 p-1.5 sm:p-2 rounded-full flex-shrink-0">
-                      <feature.icon className="w-4 h-4 sm:w-5 sm:h-5 text-gray-400" />
+                  <div key={index} className="flex items-center space-x-2 md:space-x-3 p-1.5 md:p-2.5 bg-gray-50 rounded-lg">
+                    <div className="bg-gray-100 p-1 md:p-1.5 rounded-full flex-shrink-0">
+                      <feature.icon className="w-4 h-4 md:w-5 md:h-5 text-gray-400" />
                     </div>
                     <div className="flex-1 min-w-0">
-                      <div className="font-medium text-gray-700 text-sm sm:text-base responsive-text truncate">{feature.name}</div>
-                      <div className="text-xs sm:text-sm text-gray-500 responsive-text">{feature.free}</div>
+                      <div className="font-medium text-gray-700 text-xs md:text-base responsive-text truncate">{feature.name}</div>
+                      <div className="text-xs md:text-sm text-gray-500 responsive-text">{feature.free}</div>
                     </div>
-                    <X className="w-4 h-4 sm:w-5 sm:h-5 text-gray-400 flex-shrink-0" />
+                    <X className="w-4 h-4 md:w-5 md:h-5 text-gray-400 flex-shrink-0" />
                   </div>
                 ))}
-                
-                <div className="pt-4 sm:pt-6 text-center">
-                  <p className="text-gray-500 text-xs sm:text-sm mt-3 responsive-text">
+                <div className="pt-3 md:pt-5 text-center">
+                  <p className="text-gray-500 text-xs md:text-sm mt-2 responsive-text">
                     Limited features • Basic support
                   </p>
                 </div>
@@ -285,11 +279,11 @@ const PremiumUpgrade = ({ currentUser, onClose, preselectedPlan }: PremiumUpgrad
         </div>
 
         {/* Trust Indicators */}
-        <div className="text-center mt-8 sm:mt-12 mb-4 sm:mb-6">
-          <p className="text-white/80 text-xs sm:text-sm mb-3 sm:mb-4 responsive-text">
+        <div className="text-center mt-6 md:mt-10 mb-3 md:mb-5">
+          <p className="text-white/80 text-xs md:text-sm mb-2 md:mb-3 responsive-text">
             ✨ Join 10,000+ happy premium members
           </p>
-          <div className="flex flex-wrap justify-center items-center gap-3 sm:gap-6 text-white/60">
+          <div className="flex flex-wrap justify-center items-center gap-2 md:gap-5 text-white/60">
             <span className="text-xs">🔒 SSL Secured</span>
             <span className="text-xs">💳 Safe Payments</span>
             <span className="text-xs">📱 Mobile Optimized</span>
@@ -299,8 +293,8 @@ const PremiumUpgrade = ({ currentUser, onClose, preselectedPlan }: PremiumUpgrad
 
       {/* Payment Type Selection Modal */}
       {showPaymentOptions && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
-          <div className="bg-white rounded-lg shadow-lg p-6 w-full max-w-md relative">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 px-2 sm:px-4">
+          <div className="bg-white rounded-lg shadow-lg p-4 sm:p-6 w-full max-w-md relative">
             <button 
               onClick={() => setShowPaymentOptions(false)} 
               className="absolute top-2 right-2 text-gray-400 hover:text-gray-600"

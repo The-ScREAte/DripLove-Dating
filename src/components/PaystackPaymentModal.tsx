@@ -254,18 +254,7 @@ const PaystackPaymentModal: React.FC<PaystackPaymentModalProps> = ({ isOpen, onC
                 📱 Mobile Money
               </button>
             )}
-            {isIOS() && (
-              <button
-                onClick={() => setSelectedPaymentMethod('iap')}
-                className={`flex-1 px-4 py-2 rounded border text-sm font-medium ${
-                  selectedPaymentMethod === 'iap'
-                    ? 'bg-yellow-500 text-black border-yellow-600'
-                    : 'bg-yellow-100 text-yellow-700 border-yellow-300 hover:bg-yellow-200'
-                }`}
-              >
-                 Apple In-App Purchase
-              </button>
-            )}
+            {/* Apple In-App Purchase button removed as per request */}
           </div>
         </div>
         
