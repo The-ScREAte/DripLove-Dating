@@ -1505,6 +1505,7 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, isPremium }: DiscoverPage
         {nextMatch && (
           <DominantColorImageBg
             imageUrl={nextMatchImages[0] ? getOptimizedUrl(nextMatchImages[0]) : undefined}
+            altText={nextMatch.first_name}
           >
             {/* ...existing code for overlays, etc... */}
             {nextMatchImages.length > 0 ? (
@@ -1546,7 +1547,9 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, isPremium }: DiscoverPage
         >
           {/* ...existing code... */}
           <div
-            className="cursor-pointer select-none relative transition-all duration-300 h-[calc(100%-120px)]"
+            className={`cursor-pointer select-none relative transition-all duration-300 ${
+              showMoreInfo ? 'h-[calc(100%-250px)]' : 'h-[calc(100%-120px)]'
+            }`}
             onTouchStart={handleTouchStart}
             onTouchMove={handleTouchMove}
             onTouchEnd={handleTouchEnd}
@@ -1655,55 +1658,31 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, isPremium }: DiscoverPage
             />
           </div>
           {/* ...existing code... */}
-          {/* Fixed Info Card Container - always at bottom with fixed height for collapsed state */}
-          <div className="absolute bottom-0 left-0 right-0 bg-white border-t border-gray-400">
-            {/* Collapsed info card - always visible at fixed position */}
-            <div className="h-[120px] overflow-hidden">
-              <MatchCard
-                match={currentMatch}
-                imageIndex={imageIndex}
-                showMoreInfo={false} // Always show collapsed version here
-                isPremium={isPremium}
-                userImages={currentMatchImages}
-                currentUserLatitude={currentUser.latitude}
-                currentUserLongitude={currentUser.longitude}
-                onImageClick={() => handleImageAreaClick({} as React.MouseEvent<HTMLDivElement>)}
-                onToggleInfo={() => setShowMoreInfo(!showMoreInfo)}
-                calculateAge={calculateAge}
-                calculateDistance={calculateDistance}
-                swipeDirection={swipeDirection}
-                swipeDistance={swipeDistance}
-                isVerified={calculateProfileVerification(currentMatch)}
-                isDetailsAreaOnly={true}
-                getOptimizedUrl={getOptimizedUrl}
-                preCalculatedDistance={userDistances[currentMatch.id]}
-              />
-            </div>
-            
-            {/* Expanded info overlay - only shown when showMoreInfo is true */}
-            {showMoreInfo && (
-              <div className="absolute bottom-0 left-0 right-0 bg-white border-t border-gray-400 h-[250px] overflow-y-auto pb-5 shadow-2xl">
-                <MatchCard
-                  match={currentMatch}
-                  imageIndex={imageIndex}
-                  showMoreInfo={true}
-                  isPremium={isPremium}
-                  userImages={currentMatchImages}
-                  currentUserLatitude={currentUser.latitude}
-                  currentUserLongitude={currentUser.longitude}
-                  onImageClick={() => handleImageAreaClick({} as React.MouseEvent<HTMLDivElement>)}
-                  onToggleInfo={() => setShowMoreInfo(!showMoreInfo)}
-                  calculateAge={calculateAge}
-                  calculateDistance={calculateDistance}
-                  swipeDirection={swipeDirection}
-                  swipeDistance={swipeDistance}
-                  isVerified={calculateProfileVerification(currentMatch)}
-                  isDetailsAreaOnly={true}
-                  getOptimizedUrl={getOptimizedUrl}
-                  preCalculatedDistance={userDistances[currentMatch.id]}
-                />
-              </div>
-            )}
+          {/* African Adinkra symbols bar */}
+          <AdinkraBar />
+
+          <div className={`bg-white border-t border-gray-400 p-1 transition-all duration-300 ${
+            showMoreInfo ? 'h-[250px] overflow-y-auto pb-5' : 'h-[120px] overflow-y-auto pb-3'
+          }`}>
+            <MatchCard
+              match={currentMatch}
+              imageIndex={imageIndex}
+              showMoreInfo={showMoreInfo}
+              isPremium={isPremium}
+              userImages={currentMatchImages}
+              currentUserLatitude={currentUser.latitude}
+              currentUserLongitude={currentUser.longitude}
+              onImageClick={() => handleImageAreaClick({} as React.MouseEvent<HTMLDivElement>)}
+              onToggleInfo={() => setShowMoreInfo(!showMoreInfo)}
+              calculateAge={calculateAge}
+              calculateDistance={calculateDistance}
+              swipeDirection={swipeDirection}
+              swipeDistance={swipeDistance}
+              isVerified={calculateProfileVerification(currentMatch)}
+              isDetailsAreaOnly={true}
+              getOptimizedUrl={getOptimizedUrl}
+              preCalculatedDistance={userDistances[currentMatch.id]}
+            />
           </div>
         </div>
         {/* Loading more indicator */}

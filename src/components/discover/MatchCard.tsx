@@ -171,25 +171,11 @@ const MatchCard: React.FC<MatchCardProps> = ({
     return mixedSlides;
   }, [userImages, match.bio, match.fun_fact, match.perfect_first_date, match.last_googled]);
 
-  // Get edge color for current content
+  // Get edge color for current image - must be after slides are defined
   const currentImageUrl = slides.length > 0 && slides[currentSlide]?.type === 'image' 
     ? getOptimizedUrl(slides[currentSlide].content) 
     : '';
   const { edgeColor } = useImageEdgeColor(currentImageUrl);
-  
-  // Generate fallback color for non-image content
-  const getFallbackColor = () => {
-    if (!match.id) return '#f8fafc';
-    let hash = 0;
-    const str = match.id.toString();
-    for (let i = 0; i < str.length; i++) {
-      const char = str.charCodeAt(i);
-      hash = ((hash << 5) - hash) + char;
-      hash = hash & hash;
-    }
-    const colors = ['#e8f5ff', '#f0fff4', '#fef3e2', '#fdf2f8', '#f3f0ff', '#ecfccb'];
-    return colors[Math.abs(hash) % colors.length];
-  };
 
   const handleSlideClick = (e: React.MouseEvent<HTMLDivElement>) => {
     e.stopPropagation();
@@ -309,17 +295,9 @@ const MatchCard: React.FC<MatchCardProps> = ({
 
   // Handle split rendering modes
   if (isSwipeAreaOnly) {
-    // Determine background color for the entire card
-    const cardBackgroundColor = slides[currentSlide]?.type === 'image' ? edgeColor : getFallbackColor();
-    
     // Render only the swipeable image area
     return (
-      <div 
-        className="relative w-full h-full min-h-full overflow-hidden"
-        style={{ 
-          backgroundColor: cardBackgroundColor
-        }}
-      >
+  <div className="relative w-full h-full min-h-full overflow-hidden">
         {/* Image/Bio Container - Swipeable Area Only */}
         <div className="relative w-full h-full overflow-hidden" onClick={handleSlideClick}>
           {/* Current slide content */}
@@ -429,15 +407,13 @@ const MatchCard: React.FC<MatchCardProps> = ({
                   </div>
                 </div>
               ) : (
-                // Fallback for no images - show placeholder with initials, using consistent card background
-                <div 
-                  className="w-full h-full min-h-full flex items-center justify-center"
-                >
+                // Fallback for no images - show placeholder with initials
+                <div className="w-full h-full min-h-full bg-gradient-to-br from-pink-200 to-purple-200 flex items-center justify-center">
                   <div className="text-center w-full">
-                    <div className="bg-white/80 rounded-full p-8 mb-4 shadow-xl mx-auto w-fit">
+                    <div className="bg-white/80 rounded-full p-8 mb-4 shadow-xl mx-auto">
                       <User className="w-16 h-16 mx-auto text-gray-500" />
                     </div>
-                    <span className="text-6xl font-bold text-gray-700 bg-white/50 rounded-full px-6 py-3 inline-block">
+                    <span className="text-6xl font-bold text-gray-700 bg-white/50 rounded-full px-6 py-3">
                       {match.first_name?.[0]}{match.last_name?.[0]}
                     </span>
                     <p className="text-gray-600 mt-4 text-sm">No photos uploaded yet</p>

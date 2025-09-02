@@ -30,19 +30,15 @@ export function initIAP() {
       console.log('[IAP] productUpdated:', p?.id, p?.title, p?.pricing?.price)
     );
     store.when().approved(t => {
-      console.log('[IAP] approved:', t);
+      console.log('[IAP] approved:', t.productId);
       t.verify();
     });
     store.when().verified(r => {
-      console.log('[IAP] verified (granting):', r);
+      console.log('[IAP] verified (granting):', r.productId);
       // TODO: grant entitlement in your app state here
       r.finish();
     });
-    // @ts-ignore - Handle cancelled if available (may not exist in all versions)
-    const whenObj: any = store.when();
-    if (typeof whenObj.cancelled === 'function') {
-      whenObj.cancelled((p: any) => console.log('[IAP] cancelled:', p?.id));
-    }
+    store.when().cancelled(p => console.log('[IAP] cancelled:', p?.id));
     // 3) Initialize AFTER register
     store.initialize([{ platform: Platform.APPLE_APPSTORE, options: { needAppReceipt: true } }]);
     // 4) Ask for product/ownership data
