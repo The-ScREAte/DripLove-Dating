@@ -41,22 +41,27 @@ const Unsubscribe: React.FC = () => {
         .select('*')
         .eq('user_id', user.id)
         .eq('status', 'active')
-        .single();
+        .maybeSingle();
 
-      if (subError || !subscription) {
+      if (subError) {
+        throw new Error(subError.message);
+      }
+
+      if (!subscription) {
         throw new Error('No active subscription found');
       }
 
       console.log('Current subscription:', subscription);
 
-      // Try different status values based on what might be valid
-      // Common subscription status values are: active, inactive, cancelled, expired, paused
+      // Update subscription status to cancelled
       const { error: updateError } = await supabase
         .from('user_subscriptions')
         .update({ 
-          status: 'inactive', // Try 'inactive' instead of 'cancelled'
+          status: 'cancelled',
+          auto_renew: false,
           updated_at: new Date().toISOString()
         })
+        .eq('user_id', user.id)
         .eq('id', subscription.id);
 
       if (updateError) {

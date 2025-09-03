@@ -774,7 +774,7 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, isPremium }: DiscoverPage
     // The actual image/slide navigation is handled within MatchCard
   };
 
-  // Function to load more matches when running low
+  // Function to load more matches when running low - optimized for 5 at a time
   const loadMoreMatches = useCallback(async () => {
     if (!currentUser?.id || isLoading || isLoadingMore) return;
     
@@ -818,7 +818,7 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, isPremium }: DiscoverPage
         .in('gender', allowedGenders)
         .eq('account_status', 'active')
         .eq('is_admin', false)
-        .limit(25); // Optimized load more batch size
+        .limit(5); // Load 5 profiles at a time for better performance
 
       if (error) throw error;
 
@@ -879,6 +879,20 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, isPremium }: DiscoverPage
       setIsLoadingMore(false);
     }
   }, [currentUser, allowedGenders, potentialMatches, calculateAge, calculateDistance, isLoading, isLoadingMore, userImages, preloadNextProfileImages, loadFullImages]);
+
+  // Auto-load more matches when getting low (only 1 left) and load more frequently
+  useEffect(() => {
+    if (potentialMatches.length - currentIndex <= 1 && !isLoadingMore && !isLoading) {
+      loadMoreMatches();
+    }
+  }, [currentIndex, potentialMatches.length, loadMoreMatches, isLoadingMore, isLoading]);
+
+  // Background loading - preload next batch when user has swiped through half
+  useEffect(() => {
+    if (currentIndex > 0 && currentIndex % 3 === 0 && !isLoadingMore && !isLoading) {
+      loadMoreMatches();
+    }
+  }, [currentIndex, loadMoreMatches, isLoadingMore, isLoading]);
   // Function to check if a profile is verified (90%+ completion with photos and basic info)
   const calculateProfileVerification = useCallback((profile: PotentialMatch) => {
     if (!profile) return false;

@@ -30,11 +30,17 @@ export function initIAP() {
       console.log('[IAP] productUpdated:', p?.id, p?.title, p?.pricing?.price)
     );
     store.when().approved(t => {
-      console.log('[IAP] approved:', t.productId);
-      t.verify();
+      console.log('[IAP] approved:', t.products?.[0]?.id || 'unknown');
+      // Only verify if user explicitly initiated the purchase
+      if (window.iapPurchaseInitiated) {
+        t.verify();
+      } else {
+        console.log('[IAP] Skipping auto-verification - purchase not initiated by user');
+        t.finish();
+      }
     });
     store.when().verified(async (r) => {
-      console.log('[IAP] verified (granting):', r.productId);
+      console.log('[IAP] verified (granting):', r.products?.[0]?.id || 'unknown');
       
       // Grant entitlement in your app state here
       try {
@@ -48,7 +54,7 @@ export function initIAP() {
             user_id: user.id,
             plan_name: 'premium',
             status: 'active',
-            flutterwave_transaction_id: (r as any).transactionId || null,
+            flutterwave_transaction_id: r.products?.[0]?.id || null,
             starts_at: new Date().toISOString(),
             expires_at: expiryDate.toISOString(),
             next_billing_date: expiryDate.toISOString(),
@@ -119,13 +125,26 @@ export function buyMonthly(): Promise<void> {
 
       console.log('[IAP] Starting purchase for:', p.id);
       
-      // The global verified handler will handle the success
-      // and redirect to the payment success page
-      offer.order(); // shows Apple purchase sheet (Simulator uses your .storekit)
+      // Set flag to indicate user initiated this purchase
+      window.iapPurchaseInitiated = true;
       
-      // For now, just resolve immediately after initiating the purchase
-      // The actual completion will be handled by the global verified handler
-      resolve();
+      // Set up one-time listeners for this specific purchase
+      const cleanup = () => {
+        window.iapPurchaseInitiated = false;
+      };
+      
+      store.when(p.id).approved(() => {
+        cleanup();
+        resolve();
+      });
+      
+      store.when(p.id).error((error: any) => {
+        cleanup();
+        reject(error);
+      });
+      
+      // Show Apple purchase sheet
+      offer.order();
     } catch (error) {
       console.error('[IAP] Error in buyMonthly:', error);
       reject(error);
