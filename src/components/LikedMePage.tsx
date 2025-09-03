@@ -24,6 +24,9 @@ const LikedMePage = ({ currentUser, isPremium = false }: LikedMePageProps) => {
   const [showPremiumUpgrade, setShowPremiumUpgrade] = useState(false);
   const [lockoutEndDate, setLockoutEndDate] = useState<Date | null>(null);
   const [hasInteractedToday, setHasInteractedToday] = useState(false);
+  const [isRefreshing, setIsRefreshing] = useState(false);
+  const [pullDistance, setPullDistance] = useState(0);
+  const [startY, setStartY] = useState(0);
   const { toast } = useToast();
 
   const { subscription, getLikedMeVisibleCount } = useSubscription(currentUser?.id);
@@ -69,7 +72,7 @@ const LikedMePage = ({ currentUser, isPremium = false }: LikedMePageProps) => {
 
 
   // Optimized: batch queries and filter in SQL
-  const fetchLikers = useCallback(async () => {
+  const fetchLikers = useCallback(async (showLoading = false) => {
     if (!currentUser?.id) {
       setLikers([]);
       setUserImages({});
@@ -77,7 +80,12 @@ const LikedMePage = ({ currentUser, isPremium = false }: LikedMePageProps) => {
       return;
     }
     try {
-      setLoading(true);
+      if (showLoading) {
+        setIsRefreshing(true);
+      } else {
+        setLoading(true);
+      }
+      
       // Defensive: clear previous data to avoid UI blinking forever
       setLikers([]);
       setUserImages({});
@@ -194,13 +202,20 @@ const LikedMePage = ({ currentUser, isPremium = false }: LikedMePageProps) => {
       }
     } catch (error) {
   // ...removed log...
-      toast({
-        title: "Error",
-        description: "Failed to load people who liked you",
-        variant: "destructive",
-      });
+      if (showLoading) {
+        toast({
+          title: "Error",
+          description: "Failed to refresh people who liked you",
+          variant: "destructive",
+        });
+      }
     } finally {
-      setLoading(false);
+      if (showLoading) {
+        setIsRefreshing(false);
+        setPullDistance(0);
+      } else {
+        setLoading(false);
+      }
     }
   }, [currentUser?.id, toast]);
 
@@ -258,17 +273,19 @@ const LikedMePage = ({ currentUser, isPremium = false }: LikedMePageProps) => {
   );
 
   useEffect(() => {
-    // Only run on mount, not on every render
+    // State persistence - only load if no likers exist
     if (!currentUser?.id) {
       setLoading(false);
       setLikers([]);
       setUserImages({});
       return;
     }
-    fetchLikers();
+    if (likers.length === 0) {
+      fetchLikers();
+    }
     checkLockoutStatus();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [currentUser?.id]);
 
   useEffect(() => {
     setImageIndex(0);
@@ -423,6 +440,33 @@ const LikedMePage = ({ currentUser, isPremium = false }: LikedMePageProps) => {
     !isPremium && lockoutEndDate && new Date() < lockoutEndDate,
     [isPremium, lockoutEndDate]
   );
+
+  // Pull to refresh handlers
+  const handleTouchStart = (e: React.TouchEvent) => {
+    if (!selectedProfile) {
+      const container = e.currentTarget as HTMLElement;
+      if (container.scrollTop === 0) {
+        setStartY(e.touches[0].clientY);
+      }
+    }
+  };
+
+  const handleTouchMove = (e: React.TouchEvent) => {
+    if (!selectedProfile && startY > 0 && !isRefreshing) {
+      const currentY = e.touches[0].clientY;
+      const distance = Math.max(0, Math.min(100, currentY - startY));
+      setPullDistance(distance);
+    }
+  };
+
+  const handleTouchEnd = () => {
+    if (!selectedProfile && pullDistance > 50 && !isRefreshing) {
+      fetchLikers(true);
+    } else {
+      setPullDistance(0);
+    }
+    setStartY(0);
+  };
 
   if (showPremiumUpgrade) {
     return <PremiumUpgrade currentUser={currentUser} onClose={() => setShowPremiumUpgrade(false)} preselectedPlan="premium" />;
@@ -604,13 +648,30 @@ const LikedMePage = ({ currentUser, isPremium = false }: LikedMePageProps) => {
   }
 
   return (
-    <div className="h-full flex flex-col bg-white"
-         style={{ 
-           touchAction: 'pan-x pan-y',
-           userSelect: 'none',
-           WebkitUserSelect: 'none',
-           WebkitTouchCallout: 'none'
-         }}>
+    <div 
+      className="h-full flex flex-col bg-white"
+      style={{ 
+        touchAction: 'pan-x pan-y',
+        userSelect: 'none',
+        WebkitUserSelect: 'none',
+        WebkitTouchCallout: 'none'
+      }}
+      onTouchStart={handleTouchStart}
+      onTouchMove={handleTouchMove}
+      onTouchEnd={handleTouchEnd}
+    >
+      {/* Pull to refresh indicator */}
+      {pullDistance > 0 && (
+        <div 
+          className="flex items-center justify-center bg-pink-50 transition-all duration-200"
+          style={{ height: `${pullDistance}px` }}
+        >
+          <div className="text-pink-600 text-sm">
+            {pullDistance > 50 ? (isRefreshing ? '🔄 Refreshing...' : '↓ Release to refresh') : '↓ Pull to refresh'}
+          </div>
+        </div>
+      )}
+      
       <div className="flex-shrink-0 bg-white border-b p-4">
         <div className="flex items-center justify-between mb-2">
           <div className="flex items-center space-x-2">

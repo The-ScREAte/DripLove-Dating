@@ -26,12 +26,19 @@ const ChatPage = ({ currentUser, onUnreadChange }: ChatPageProps) => {
   const [isBlockDialogOpen, setIsBlockDialogOpen] = useState(false);
   const [userToBlock, setUserToBlock] = useState<ChatMatch | null>(null);
   const [isKeyboardVisible, setIsKeyboardVisible] = useState(false);
+  const [isRefreshing, setIsRefreshing] = useState(false);
+  const [pullDistance, setPullDistance] = useState(0);
+  const [startY, setStartY] = useState(0);
   const { toast } = useToast();
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const messagesContainerRef = useRef<HTMLDivElement>(null);
+  const chatListRef = useRef<HTMLDivElement>(null);
 
+  // State persistence - only load if no matches exist
   useEffect(() => {
-    fetchMatches();
+    if (matches.length === 0) {
+      fetchMatches();
+    }
   }, [currentUser]);
 
   useEffect(() => {
@@ -111,8 +118,10 @@ const ChatPage = ({ currentUser, onUnreadChange }: ChatPageProps) => {
     }
   }, [selectedMatch, currentUser.id, onUnreadChange]);
 
-  const fetchMatches = async () => {
+  const fetchMatches = async (showLoading = false) => {
     try {
+      if (showLoading) setIsRefreshing(true);
+      
       const { data: matches, error } = await supabase
         .from('matches')
         .select(`
@@ -159,11 +168,18 @@ const ChatPage = ({ currentUser, onUnreadChange }: ChatPageProps) => {
       setMatches(matchesWithPartner as ChatMatch[]);
     } catch (error) {
   // ...removed log...
-      toast({
-        title: 'Error',
-        description: 'Failed to load conversations.',
-        variant: 'destructive'
-      });
+      if (showLoading) {
+        toast({
+          title: 'Error',
+          description: 'Failed to refresh conversations.',
+          variant: 'destructive'
+        });
+      }
+    } finally {
+      if (showLoading) {
+        setIsRefreshing(false);
+        setPullDistance(0);
+      }
     }
   };
 
@@ -358,19 +374,62 @@ const ChatPage = ({ currentUser, onUnreadChange }: ChatPageProps) => {
     });
   };
 
+  // Pull to refresh handlers
+  const handleTouchStart = (e: React.TouchEvent) => {
+    if (!selectedMatch && chatListRef.current?.scrollTop === 0) {
+      setStartY(e.touches[0].clientY);
+    }
+  };
+
+  const handleTouchMove = (e: React.TouchEvent) => {
+    if (!selectedMatch && startY > 0 && !isRefreshing) {
+      const currentY = e.touches[0].clientY;
+      const distance = Math.max(0, Math.min(100, currentY - startY));
+      setPullDistance(distance);
+    }
+  };
+
+  const handleTouchEnd = () => {
+    if (!selectedMatch && pullDistance > 50 && !isRefreshing) {
+      fetchMatches(true);
+    } else {
+      setPullDistance(0);
+    }
+    setStartY(0);
+  };
+
   // Show chat list view
   if (!selectedMatch) {
     return (
-      <div className="flex flex-col h-screen max-h-screen overflow-hidden">
-        <ChatUserList
-          matches={filteredMatches}
-          selectedMatch={selectedMatch}
-          searchTerm={searchTerm}
-          onMatchSelect={setSelectedMatch}
-          onUserProfileOpen={handleUserProfileClick}
-          onSearchChange={setSearchTerm}
-          currentUserId={currentUser.id}
-        />
+      <div 
+        className="flex flex-col h-screen max-h-screen overflow-hidden"
+        onTouchStart={handleTouchStart}
+        onTouchMove={handleTouchMove}
+        onTouchEnd={handleTouchEnd}
+      >
+        {/* Pull to refresh indicator */}
+        {pullDistance > 0 && (
+          <div 
+            className="flex items-center justify-center bg-pink-50 transition-all duration-200"
+            style={{ height: `${pullDistance}px` }}
+          >
+            <div className="text-pink-600 text-sm">
+              {pullDistance > 50 ? (isRefreshing ? '🔄 Refreshing...' : '↓ Release to refresh') : '↓ Pull to refresh'}
+            </div>
+          </div>
+        )}
+        
+        <div ref={chatListRef} className="flex-1 overflow-auto">
+          <ChatUserList
+            matches={filteredMatches}
+            selectedMatch={selectedMatch}
+            searchTerm={searchTerm}
+            onMatchSelect={setSelectedMatch}
+            onUserProfileOpen={handleUserProfileClick}
+            onSearchChange={setSearchTerm}
+            currentUserId={currentUser.id}
+          />
+        </div>
 
         {/* User Profile Modal */}
         <UserProfileModal
