@@ -412,6 +412,24 @@ const MatchCard: React.FC<MatchCardProps> = ({
                   <div className="text-center w-full">
                     <div className="bg-white/80 rounded-full p-8 mb-4 shadow-xl mx-auto">
                       <User className="w-16 h-16 mx-auto text-gray-500" />
+                      <style>{`
+                        .centered-user-icon {
+                          display: flex;
+                          align-items: center;
+                          justify-content: center;
+                          margin: 0 auto;
+                          box-sizing: border-box;
+                          max-width: 96px;
+                          max-height: 96px;
+                          padding: 1.5rem;
+                          background: rgba(255,255,255,0.8);
+                          border-radius: 9999px;
+                          box-shadow: 0 8px 32px 0 rgba(0,0,0,0.18);
+                        }
+                      `}</style>
+                      <div className="centered-user-icon">
+                        <User className="w-16 h-16 mx-auto text-gray-500" />
+                      </div>
                     </div>
                     <span className="text-6xl font-bold text-gray-700 bg-white/50 rounded-full px-6 py-3">
                       {match.first_name?.[0]}{match.last_name?.[0]}
@@ -704,24 +722,57 @@ const MatchCard: React.FC<MatchCardProps> = ({
             {/* Personality */}
             {(typeof match.introvert_extrovert === 'number' || typeof match.spontaneous_planner === 'number' || typeof match.messy_organized === 'number') && (
               <div className="bg-gray-50 rounded-lg p-3">
-                <h4 className="font-semibold text-pink-600 mb-2">Personality</h4>
-                <div className="space-y-2">
+                <h4 className="font-semibold text-pink-600 mb-3">Personality</h4>
+                <div className="space-y-4">
                   {typeof match.introvert_extrovert === 'number' && (
-                    <div className="flex items-center text-xs">
-                      <span className="font-semibold mr-2">Introvert/Extrovert:</span>
-                      <span className="text-gray-700">{match.introvert_extrovert}</span>
+                    <div>
+                      <div className="flex justify-between items-center mb-1">
+                        <span className="text-xs font-medium text-gray-600">Introvert vs Extrovert: {match.introvert_extrovert}%</span>
+                      </div>
+                      <div className="flex items-center space-x-2">
+                        <span className="text-xs text-gray-500">Introvert</span>
+                        <div className="flex-1 bg-gray-200 rounded-full h-2">
+                          <div 
+                            className="bg-gradient-to-r from-blue-400 to-blue-600 h-2 rounded-full transition-all duration-300"
+                            style={{ width: `${match.introvert_extrovert}%` }}
+                          ></div>
+                        </div>
+                        <span className="text-xs text-gray-500">Extrovert</span>
+                      </div>
                     </div>
                   )}
                   {typeof match.spontaneous_planner === 'number' && (
-                    <div className="flex items-center text-xs">
-                      <span className="font-semibold mr-2">Spontaneous/Planner:</span>
-                      <span className="text-gray-700">{match.spontaneous_planner}</span>
+                    <div>
+                      <div className="flex justify-between items-center mb-1">
+                        <span className="text-xs font-medium text-gray-600">Spontaneous vs Planner: {match.spontaneous_planner}%</span>
+                      </div>
+                      <div className="flex items-center space-x-2">
+                        <span className="text-xs text-gray-500">Spontaneous</span>
+                        <div className="flex-1 bg-gray-200 rounded-full h-2">
+                          <div 
+                            className="bg-gradient-to-r from-green-400 to-green-600 h-2 rounded-full transition-all duration-300"
+                            style={{ width: `${match.spontaneous_planner}%` }}
+                          ></div>
+                        </div>
+                        <span className="text-xs text-gray-500">Planner</span>
+                      </div>
                     </div>
                   )}
                   {typeof match.messy_organized === 'number' && (
-                    <div className="flex items-center text-xs">
-                      <span className="font-semibold mr-2">Messy/Organized:</span>
-                      <span className="text-gray-700">{match.messy_organized}</span>
+                    <div>
+                      <div className="flex justify-between items-center mb-1">
+                        <span className="text-xs font-medium text-gray-600">Messy vs Organized: {match.messy_organized}%</span>
+                      </div>
+                      <div className="flex items-center space-x-2">
+                        <span className="text-xs text-gray-500">Messy</span>
+                        <div className="flex-1 bg-gray-200 rounded-full h-2">
+                          <div 
+                            className="bg-gradient-to-r from-purple-400 to-purple-600 h-2 rounded-full transition-all duration-300"
+                            style={{ width: `${match.messy_organized}%` }}
+                          ></div>
+                        </div>
+                        <span className="text-xs text-gray-500">Organized</span>
+                      </div>
                     </div>
                   )}
                 </div>

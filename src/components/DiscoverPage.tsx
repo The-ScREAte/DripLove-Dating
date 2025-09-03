@@ -35,7 +35,7 @@ function DominantColorImageBg({ imageUrl, children }) {
     </div>
   );
 }
-import React, { useState, useEffect, useCallback, useMemo } from 'react';
+import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 
 // --- AdinkraBar component and symbols ---
 const adinkraSymbols = [
@@ -216,6 +216,11 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, isPremium }: DiscoverPage
   const [userProfileImages, setUserProfileImages] = useState<any[]>([]);
   const [showProfileCompletionModal, setShowProfileCompletionModal] = useState(false);
   const [todaySwipeCount, setTodaySwipeCount] = useState(0);
+  
+  // Dynamic content height management
+  const contentRef = useRef<HTMLDivElement>(null);
+  const [contentHeight, setContentHeight] = useState(0);
+  
   const { toast } = useToast();
   const { subscription, checkUsageLimit, refetchSubscription } = useSubscription(currentUser?.id);
   const { preloadImages, getOptimizedUrl, isImageLoaded } = useImagePreloader({
@@ -595,19 +600,21 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, isPremium }: DiscoverPage
     }
   }, [userImages, preloadImages]);
 
-  // Optimized preloading strategy - load fewer profiles ahead for faster performance
+  // Optimized preloading strategy - load 6 profiles ahead for smooth swiping
   const preloadNextProfileImages = useCallback(async (matches: PotentialMatch[], alreadyLoaded: { [key: string]: string[] }, startIdx: number) => {
-    // Reduced from 5 to 2 profiles for better performance
-    const PRELOAD_COUNT = 2;
+    // Increased to 6 profiles for smooth swiping experience
+    const PRELOAD_COUNT = 6;
     const toPreload = matches.slice(startIdx, startIdx + PRELOAD_COUNT)
       .filter(match => !alreadyLoaded[match.id] || alreadyLoaded[match.id]?.length === 0);
     
-    // Process profiles sequentially to avoid overwhelming the system
-    for (const match of toPreload) {
-      await loadFullImages(match.id);
-      // Small delay between loads to maintain smooth UI
-      await new Promise(resolve => setTimeout(resolve, 50));
-    }
+    // Process profiles in parallel for faster loading
+    const loadPromises = toPreload.map(async (match, index) => {
+      // Stagger the loading slightly to avoid overwhelming the system
+      await new Promise(resolve => setTimeout(resolve, index * 25));
+      return loadFullImages(match.id);
+    });
+    
+    await Promise.all(loadPromises);
   }, [loadFullImages]);
 
   // Main effect to fetch data - only run when user ID changes and we don't have data
@@ -627,19 +634,50 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, isPremium }: DiscoverPage
   }, [currentIndex, potentialMatches]);
 
   useEffect(() => {
-    setImageIndex(0);
-    setShowMoreInfo(false);
+  setImageIndex(0);
     // Load images for current match if not already loaded
     const currentMatch = potentialMatches[currentIndex];
     if (currentMatch && !userImages[currentMatch.id]) {
       loadFullImages(currentMatch.id);
     }
-    // Optimized preloading: preload images for the next 2 profiles and refresh every 5 swipes
-    const shouldPreloadMore = currentIndex % 5 === 0; // Every 5 swipes (reduced frequency)
+    // Aggressive preloading: preload images for the next 6 profiles every 2 swipes for smooth experience
+    const shouldPreloadMore = currentIndex % 2 === 0; // Every 2 swipes for frequent preloading
     if (shouldPreloadMore) {
       preloadNextProfileImages(potentialMatches, userImages, currentIndex + 1);
     }
   }, [currentIndex, potentialMatches, userImages, preloadNextProfileImages, loadFullImages]);
+
+  // Dynamic content height measurement
+  useEffect(() => {
+    const measureContentHeight = () => {
+      if (contentRef.current && showMoreInfo) {
+        // Wait a bit for content to render, then measure
+        setTimeout(() => {
+          if (contentRef.current) {
+            const scrollHeight = contentRef.current.scrollHeight;
+            const clientHeight = contentRef.current.clientHeight;
+            
+            // Calculate padding needed to make all content scrollable
+            // If content is longer than container, add padding to ensure scroll access
+            const paddingNeeded = scrollHeight > clientHeight 
+              ? Math.max(60, scrollHeight - clientHeight + 40) // Extra padding for long content
+              : 60; // Minimal padding for short content
+            
+            setContentHeight(paddingNeeded);
+          }
+        }, 100);
+      } else {
+        // Reset when collapsed
+        setContentHeight(60);
+      }
+    };
+
+    measureContentHeight();
+    
+    // Also measure when window resizes
+    window.addEventListener('resize', measureContentHeight);
+    return () => window.removeEventListener('resize', measureContentHeight);
+  }, [showMoreInfo, currentIndex, potentialMatches]);
 
   const handleTouchStart = (e: React.TouchEvent) => {
     const touch = e.touches[0];
@@ -818,7 +856,7 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, isPremium }: DiscoverPage
         .in('gender', allowedGenders)
         .eq('account_status', 'active')
         .eq('is_admin', false)
-        .limit(5); // Load 5 profiles at a time for better performance
+        .limit(8); // Load 8 profiles at a time for better performance and smoother experience
 
       if (error) throw error;
 
@@ -880,16 +918,16 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, isPremium }: DiscoverPage
     }
   }, [currentUser, allowedGenders, potentialMatches, calculateAge, calculateDistance, isLoading, isLoadingMore, userImages, preloadNextProfileImages, loadFullImages]);
 
-  // Auto-load more matches when getting low (only 1 left) and load more frequently
+  // Auto-load more matches when getting low (3 profiles left) for seamless experience
   useEffect(() => {
-    if (potentialMatches.length - currentIndex <= 1 && !isLoadingMore && !isLoading) {
+    if (potentialMatches.length - currentIndex <= 3 && !isLoadingMore && !isLoading) {
       loadMoreMatches();
     }
   }, [currentIndex, potentialMatches.length, loadMoreMatches, isLoadingMore, isLoading]);
 
-  // Background loading - preload next batch when user has swiped through half
+  // Background loading - preload next batch more frequently for smooth swiping
   useEffect(() => {
-    if (currentIndex > 0 && currentIndex % 3 === 0 && !isLoadingMore && !isLoading) {
+    if (currentIndex > 0 && currentIndex % 2 === 0 && !isLoadingMore && !isLoading) {
       loadMoreMatches();
     }
   }, [currentIndex, loadMoreMatches, isLoadingMore, isLoading]);
@@ -1468,12 +1506,6 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, isPremium }: DiscoverPage
       )}
       {/* Main Image Area - Card stack */}
   <div className="flex-1 relative overflow-hidden" style={{ height: 'calc(100vh - 140px)', display: 'flex', flexDirection: 'column', justifyContent: 'flex-end', paddingBottom: 0 }}>
-        {/* AdinkraBar overlays the top of the image area */}
-        <div className="absolute top-0 left-0 w-full z-20 pointer-events-none">
-          <div className="pointer-events-auto">
-            <AdinkraBar />
-          </div>
-        </div>
         {/* ...existing code... */}
         {nextMatch && (
           <DominantColorImageBg
@@ -1633,18 +1665,18 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, isPremium }: DiscoverPage
           {/* African Adinkra symbols bar - fixed height */}
           <AdinkraBar />
 
-          {/* Info section - fixed stable height with proper scrolling */}
+          {/* Info section - dynamic height that fits content exactly */}
           <div className={`bg-white border-t border-gray-400 transition-all duration-300 flex-shrink-0 ${
-            showMoreInfo ? 'h-[320px]' : 'h-[120px]'
+            showMoreInfo ? 'h-[380px]' : 'h-[120px] overflow-hidden'
           }`}>
             <div 
-              className={`w-full h-full p-1 ${
-                showMoreInfo ? 'overflow-y-scroll pb-5' : 'overflow-hidden pb-3'
-              }`} 
+              ref={contentRef}
+              className={`w-full p-1 ${showMoreInfo ? 'overflow-y-auto h-[380px]' : 'overflow-hidden pb-3'}`} 
               style={{
                 WebkitOverflowScrolling: 'touch',
                 overscrollBehavior: 'contain',
-                scrollBehavior: 'smooth'
+                scrollBehavior: 'smooth',
+                paddingBottom: showMoreInfo ? `${Math.max(contentHeight, 40)}px` : '0.75rem' // Dynamic padding based on content
               }}
             >
             <MatchCard
@@ -1670,14 +1702,7 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, isPremium }: DiscoverPage
           </div>
         </div>
         {/* Loading more indicator */}
-        {isLoadingMore && (
-          <div className="absolute top-4 right-4 z-50 bg-white/90 backdrop-blur-sm rounded-full px-3 py-2 shadow-lg border border-pink-200">
-            <div className="flex items-center gap-2">
-              <div className="animate-spin rounded-full h-4 w-4 border-2 border-pink-500 border-t-transparent"></div>
-              <span className="text-sm font-medium text-pink-600">Loading...</span>
-            </div>
-          </div>
-        )}
+  {/* Loading more indicator removed for professional background loading */}
         {/* ...existing code... */}
         <SwipeButtons
           onPass={handlePass}
