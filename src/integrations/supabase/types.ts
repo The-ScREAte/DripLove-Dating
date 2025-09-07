@@ -821,6 +821,10 @@ export type Database = {
           status: string
         }[]
       }
+      handle_subscription_expiry: {
+        Args: Record<PropertyKey, never>
+        Returns: undefined
+      }
       handle_subscription_payment: {
         Args: {
           p_amount: number
