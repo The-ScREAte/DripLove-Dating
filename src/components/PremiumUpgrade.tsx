@@ -155,6 +155,19 @@ const PremiumUpgrade = ({ currentUser, onClose, preselectedPlan }: PremiumUpgrad
   }, [currentUser]);
 
   const handleUpgrade = () => {
+    // On iOS, if IAP is available and ready, use it directly
+    if (isIOS() && isNativeApp()) {
+      if (canBuy) {
+        // Directly trigger IAP purchase on iOS
+        handlePaymentTypeSelection('iap');
+      } else {
+        // Show payment options modal for iOS to show "loading" state
+        setShowPaymentOptions(true);
+      }
+      return;
+    }
+
+    // On non-iOS platforms, check for Paystack payment methods
     if (!paymentMethods.length) {
       toast({
         title: 'Payment Method Required',
@@ -400,20 +413,25 @@ const PremiumUpgrade = ({ currentUser, onClose, preselectedPlan }: PremiumUpgrad
             </button>
             <h2 className="text-xl font-bold mb-4 text-center">Choose Payment Option</h2>
             <div className="space-y-4">
-              <button
-                onClick={() => handlePaymentTypeSelection('subscription')}
-                className="w-full p-4 bg-gradient-to-r from-green-500 to-green-600 text-white rounded-lg hover:from-green-600 hover:to-green-700 transition-all duration-200 font-semibold"
-              >
-                <div className="text-lg">💳 Subscribe Monthly</div>
-                <div className="text-sm opacity-90">{currency} {monthlyPrice || price}/month • Cancel anytime</div>
-              </button>
-              <button
-                onClick={() => handlePaymentTypeSelection('one-time')}
-                className="w-full p-4 bg-gradient-to-r from-blue-500 to-blue-600 text-white rounded-lg hover:from-blue-600 hover:to-blue-700 transition-all duration-200 font-semibold"
-              >
-                <div className="text-lg">📱 One-Time Payment</div>
-                <div className="text-sm opacity-90">{currency} {price} • 1 month access • No auto-renewal</div>
-              </button>
+              {/* Hide Paystack options on iOS - only show on non-iOS platforms */}
+              {!isIOS() && (
+                <>
+                  <button
+                    onClick={() => handlePaymentTypeSelection('subscription')}
+                    className="w-full p-4 bg-gradient-to-r from-green-500 to-green-600 text-white rounded-lg hover:from-green-600 hover:to-green-700 transition-all duration-200 font-semibold"
+                  >
+                    <div className="text-lg">💳 Subscribe Monthly</div>
+                    <div className="text-sm opacity-90">{currency} {monthlyPrice || price}/month • Cancel anytime</div>
+                  </button>
+                  <button
+                    onClick={() => handlePaymentTypeSelection('one-time')}
+                    className="w-full p-4 bg-gradient-to-r from-blue-500 to-blue-600 text-white rounded-lg hover:from-blue-600 hover:to-blue-700 transition-all duration-200 font-semibold"
+                  >
+                    <div className="text-lg">📱 One-Time Payment</div>
+                    <div className="text-sm opacity-90">{currency} {price} • 1 month access • No auto-renewal</div>
+                  </button>
+                </>
+              )}
               {/* Apple IAP - only show on iOS native */}
               {isIOS() && isNativeApp() && (
                 <button
@@ -426,6 +444,14 @@ const PremiumUpgrade = ({ currentUser, onClose, preselectedPlan }: PremiumUpgrad
                     {!canBuy ? 'Loading product...' : 'In-App Purchase • Secure & Fast'}
                   </div>
                 </button>
+              )}
+              
+              {/* Fallback message when no payment options are available */}
+              {isIOS() && isNativeApp() && !canBuy && !iapLoading && (
+                <div className="text-center p-4 bg-gray-100 rounded-lg">
+                  <div className="text-gray-600 mb-2">Payment system is loading...</div>
+                  <div className="text-sm text-gray-500">Please wait a moment for Apple Pay to become available.</div>
+                </div>
               )}
             </div>
           </div>
