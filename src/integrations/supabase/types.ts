@@ -821,6 +821,10 @@ export type Database = {
           status: string
         }[]
       }
+      handle_payment_failure: {
+        Args: { p_reason?: string; p_user_id: string }
+        Returns: boolean
+      }
       handle_subscription_expiry: {
         Args: Record<PropertyKey, never>
         Returns: undefined
