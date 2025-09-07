@@ -70,55 +70,89 @@ export function initIAP() {
           // Reset the purchase flag
           window.iapPurchaseInitiated = false;
           
-          // Grant entitlement in your app state here
+          // Validate receipt with server-side function for security
           try {
-            // Update database with premium subscription
             const { supabase } = await import('@/integrations/supabase/client');
             const { data: { user } } = await supabase.auth.getUser();
             
             if (user) {
-              const expiryDate = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000);
-              const subscriptionData = {
-                user_id: user.id,
-                plan_name: 'premium',
-                status: 'active',
-                flutterwave_transaction_id: r.productId || null,
-                starts_at: new Date().toISOString(),
-                expires_at: expiryDate.toISOString(),
-                next_billing_date: expiryDate.toISOString(),
-                auto_renew: true,
-                payment_method: 'apple',
-                updated_at: new Date().toISOString(),
-              };
-
-              // Check if user already has a subscription
-              const { data: existingSubscription } = await supabase
-                .from('user_subscriptions')
-                .select('*')
-                .eq('user_id', user.id)
-                .single();
-
-              if (existingSubscription) {
-                await supabase
-                  .from('user_subscriptions')
-                  .update({
-                    ...subscriptionData,
-                    updated_at: new Date().toISOString(),
-                  })
-                  .eq('user_id', user.id);
-              } else {
-                await supabase
-                  .from('user_subscriptions')
-                  .insert([subscriptionData]);
-              }
-
-              console.log('[IAP] Subscription updated successfully');
+              // Get receipt data from the transaction
+              const receiptData = r.receipt || r.payload || r.transactionReceipt;
               
-              // Redirect to success page
-              window.location.href = '/payment-success?status=successful&payment_type=iap';
+              if (receiptData) {
+                console.log('[IAP] Validating receipt with server');
+                
+                // Validate receipt with server-side function
+                const { data: validation, error: validationError } = await supabase.functions.invoke('iap-receipt-validator', {
+                  body: {
+                    receiptData: receiptData,
+                    productId: r.productId
+                  }
+                });
+
+                if (validationError || !validation?.valid) {
+                  console.error('[IAP] Receipt validation failed:', validationError || validation);
+                  // Handle failed validation - downgrade to free
+                  await supabase.rpc('handle_payment_failure', {
+                    p_user_id: user.id,
+                    p_reason: 'IAP receipt validation failed'
+                  });
+                  
+                  alert('Payment verification failed. Please contact support if this persists.');
+                  return;
+                }
+
+                if (validation.active) {
+                  console.log('[IAP] Receipt validated successfully');
+                  // Redirect to success page
+                  window.location.href = '/payment-success?status=successful&payment_type=iap';
+                } else {
+                  console.log('[IAP] Receipt valid but subscription inactive');
+                  alert('Your subscription has expired. Please renew your subscription.');
+                }
+              } else {
+                // Fallback: Direct database update if no receipt data available
+                console.log('[IAP] No receipt data available, using fallback method');
+                
+                const expiryDate = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000);
+                const subscriptionData = {
+                  user_id: user.id,
+                  plan_name: 'premium',
+                  status: 'active',
+                  flutterwave_transaction_id: r.productId || null,
+                  starts_at: new Date().toISOString(),
+                  expires_at: expiryDate.toISOString(),
+                  next_billing_date: expiryDate.toISOString(),
+                  auto_renew: true,
+                  payment_method: 'apple',
+                  updated_at: new Date().toISOString(),
+                };
+
+                // Upsert subscription
+                await supabase
+                  .from('user_subscriptions')
+                  .upsert(subscriptionData, { onConflict: 'user_id' });
+
+                console.log('[IAP] Subscription updated successfully (fallback)');
+                window.location.href = '/payment-success?status=successful&payment_type=iap';
+              }
             }
           } catch (error) {
-            console.error('[IAP] Error updating subscription:', error);
+            console.error('[IAP] Error processing verified receipt:', error);
+            // Handle error - ensure user doesn't get premium access on failure
+            try {
+              const { supabase } = await import('@/integrations/supabase/client');
+              const { data: { user } } = await supabase.auth.getUser();
+              if (user) {
+                await supabase.rpc('handle_payment_failure', {
+                  p_user_id: user.id,
+                  p_reason: 'IAP verification error: ' + error.message
+                });
+              }
+            } catch (fallbackError) {
+              console.error('[IAP] Fallback error handling failed:', fallbackError);
+            }
+            alert('Payment processing failed. Please try again or contact support.');
           }
           
           if (r.finish && typeof r.finish === 'function') {

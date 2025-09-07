@@ -3,5 +3,20 @@ project_id = "tgjsyyihabsovironesw"
 [functions.paystack-init]
 verify_jwt = false
 
-[functions.paystack-redirect]
+[functions.paystack-redirect]  
 verify_jwt = false
+
+[functions.cancel-subscription]
+verify_jwt = true
+
+[functions.paystack-webhook]
+verify_jwt = false
+
+[functions.subscription-checker]
+verify_jwt = false
+
+[functions.iap-receipt-validator]
+verify_jwt = true
+
+[functions.send-push-notification]
+verify_jwt = true

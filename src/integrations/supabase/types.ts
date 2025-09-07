@@ -803,6 +803,15 @@ export type Database = {
         Args: Record<PropertyKey, never>
         Returns: Json
       }
+      get_current_subscription_status: {
+        Args: { p_user_id: string }
+        Returns: {
+          expires_at: string
+          is_active: boolean
+          plan_name: string
+          status: string
+        }[]
+      }
       get_enabled_countries: {
         Args: Record<PropertyKey, never>
         Returns: {

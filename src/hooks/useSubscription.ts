@@ -30,17 +30,47 @@ export const useSubscription = (userId: string | undefined) => {
     if (!userId) return;
 
     try {
-      const { data, error } = await supabase.rpc('get_user_subscription', {
-        user_id_param: userId
+      // Use real-time subscription status checker
+      const { data, error } = await supabase.rpc('get_current_subscription_status', {
+        p_user_id: userId
       });
 
-      if (error) throw error;
+      if (error) {
+        console.error('Error fetching real-time subscription status:', error);
+        // Fallback to old method
+        const { data: fallbackData, error: fallbackError } = await supabase.rpc('get_user_subscription', {
+          user_id_param: userId
+        });
+        
+        if (fallbackError) throw fallbackError;
+        
+        const subscriptionData = fallbackData as unknown as SubscriptionInfo;
+        setSubscription(subscriptionData);
+        return;
+      }
       
-      const subscriptionData = data as unknown as SubscriptionInfo;
-      setSubscription(subscriptionData);
+      const statusData = Array.isArray(data) ? data[0] : data;
+      
+      // Convert real-time status to subscription info format
+      const subscriptionInfo: SubscriptionInfo = {
+        plan_name: statusData.plan_name || 'free',
+        status: statusData.status || 'active',
+        expires_at: statusData.expires_at,
+        features: statusData.plan_name === 'premium' ? {
+          daily_swipes: -1, // Unlimited
+          reverse_dislikes: -1, // Unlimited
+          liked_me_visible: -1 // Unlimited
+        } : {
+          daily_swipes: 12,
+          reverse_dislikes: 1,
+          liked_me_visible: 1
+        }
+      };
+      
+      setSubscription(subscriptionInfo);
     } catch (error) {
       console.error('Error fetching subscription:', error);
-      // Fallback to default free subscription if function doesn't exist
+      // Fallback to default free subscription
       setSubscription({
         plan_name: 'free',
         status: 'active',
@@ -86,7 +116,7 @@ export const useSubscription = (userId: string | undefined) => {
   const isPremium = () => {
     // Handle both array and object formats from the RPC function
     const sub = Array.isArray(subscription) ? subscription[0] : subscription;
-    return sub?.plan_name === 'premium';
+    return sub?.plan_name === 'premium' && sub?.status === 'active';
   };
 
   const canUseFeature = (feature: 'swipe' | 'reverse_dislike' | 'liked_me_full') => {
@@ -105,6 +135,31 @@ export const useSubscription = (userId: string | undefined) => {
 
   useEffect(() => {
     fetchSubscription();
+    
+    // Set up real-time subscription monitoring
+    if (userId) {
+      const channel = supabase
+        .channel('subscription-changes')
+        .on(
+          'postgres_changes',
+          {
+            event: '*',
+            schema: 'public',
+            table: 'user_subscriptions',
+            filter: `user_id=eq.${userId}`
+          },
+          (payload) => {
+            console.log('Subscription changed:', payload);
+            // Refetch subscription when it changes
+            fetchSubscription();
+          }
+        )
+        .subscribe();
+
+      return () => {
+        supabase.removeChannel(channel);
+      };
+    }
   }, [userId]);
 
   return {
