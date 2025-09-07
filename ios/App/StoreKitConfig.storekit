@@ -88,8 +88,8 @@
           "introductoryOffer" : null,
           "localizations" : [
             {
-              "description" : "",
-              "displayName" : "",
+              "description" : "Get unlimited swipes, see who liked you, and reverse dislikes with our premium monthly subscription",
+              "displayName" : "Premium Monthly Subscription",
               "locale" : "en_US"
             }
           ],

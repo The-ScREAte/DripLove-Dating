@@ -3,7 +3,7 @@ import React, { useState } from 'react';
 import PaystackPaymentModal from './PaystackPaymentModal';
 import { getPremiumPaymentConfig } from '@/utils/paymentConfig';
 import { isIOS, isNativeApp } from '@/utils/iap';
-import { buyMonthly } from '../iap';
+import { buyMonthly, debugIAPState } from '../iap';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Crown, Heart, RotateCcw, Users, Check, X } from 'lucide-react';
@@ -28,19 +28,86 @@ const PremiumUpgrade = ({ currentUser, onClose, preselectedPlan }: PremiumUpgrad
 
   React.useEffect(() => {
     // Listen for productUpdated to enable the Apple Pay button
-    function onProductUpdated() {
+    function onProductUpdated(p?: any) {
+      console.log('[UI] Product updated:', p?.id, p?.state);
       // @ts-ignore
-      const p = window.CdvPurchase?.store?.get('com.driplove.dating.premium.monthlysub');
-      setCanBuy(!!p && !!p.getOffer());
+      const product = window.CdvPurchase?.store?.get?.('com.driplove.dating.premium.monthlysub');
+      const hasOffer = !!product?.getOffer?.();
+      console.log('[UI] Product check:', { product: !!product, hasOffer, state: product?.state });
+      setCanBuy(hasOffer);
     }
+    
+    // Listen for verified purchases to reset loading state
+    function onVerified(r?: any) {
+      console.log('[UI] Purchase verified:', r?.productId);
+      if (r?.productId === 'com.driplove.dating.premium.monthlysub') {
+        setIapLoading(false);
+        setShowPaymentOptions(false);
+        toast({
+          title: 'Purchase Successful!',
+          description: 'Your premium subscription has been activated.',
+        });
+      }
+    }
+    
+    // Listen for unverified purchases (includes cancellations)
+    function onUnverified(r?: any, err?: any) {
+      console.log('[UI] Purchase unverified/cancelled:', r?.productId, err?.message);
+      if (r?.productId === 'com.driplove.dating.premium.monthlysub') {
+        setIapLoading(false);
+        toast({
+          title: 'Purchase Cancelled',
+          description: 'The purchase was cancelled or could not be verified.',
+        });
+      }
+    }
+    
+    // Listen for errors (includes user cancellations)
+    function onError(e?: any) {
+      console.log('[UI] IAP Error:', e?.code, e?.message);
+      // User cancellation typically has specific error codes
+      if (e?.code === 'UserCancel' || e?.code === 2 || e?.message?.toLowerCase()?.includes('cancel')) {
+        setIapLoading(false);
+        toast({
+          title: 'Purchase Cancelled',
+          description: 'The purchase was cancelled.',
+        });
+      }
+    }
+    
     // @ts-ignore
     const store = window.CdvPurchase?.store;
-    if (store && store.when) {
-      store.when().productUpdated(onProductUpdated);
+    if (store && store.when && typeof store.when === 'function') {
+      try {
+        // Listen to purchase events using the correct API
+        store.when()
+          .productUpdated(onProductUpdated)
+          .verified(onVerified)
+          .unverified(onUnverified);
+      } catch (error) {
+        console.warn('[UI] Error setting up IAP listeners:', error);
+      }
     }
+    
+    // Also listen for global errors
+    if (store && store.error && typeof store.error === 'function') {
+      try {
+        store.error(onError);
+      } catch (error) {
+        console.warn('[UI] Error setting up global error listener:', error);
+      }
+    }
+    
+    // Also check current state
     onProductUpdated();
+    
+    // Initial check with delay
+    setTimeout(() => {
+      onProductUpdated();
+    }, 1000);
+    
     // No off/unsubscribe in plugin
-  }, []);
+  }, [toast]);
   const [price, setPrice] = useState('50');
   const [monthlyPrice, setMonthlyPrice] = useState<string | null>(null);
   const [paymentMethods, setPaymentMethods] = useState<any[]>([]);
@@ -102,24 +169,50 @@ const PremiumUpgrade = ({ currentUser, onClose, preselectedPlan }: PremiumUpgrad
 
   const handlePaymentTypeSelection = async (type: 'subscription' | 'one-time' | 'iap') => {
     if (type === 'iap') {
-      setIapLoading(true);
-      try {
-        // Don't redirect immediately - wait for the actual purchase to complete
-        await buyMonthly();
-        // The buyMonthly function should handle the success callback
-        // Only redirect when the purchase is actually verified
+      // Debug current state
+      debugIAPState();
+      
+      if (!canBuy) {
         toast({
-          title: 'Purchase Processing',
-          description: 'Please complete the payment in the Apple purchase dialog.',
-        });
-      } catch (err: any) {
-        toast({
-          title: 'IAP Failed',
-          description: err?.message || String(err),
+          title: 'Product Not Ready',
+          description: 'The subscription product is not available yet. Please wait and try again.',
           variant: 'destructive',
         });
+        return;
+      }
+      
+      setIapLoading(true);
+      try {
+        console.log('[UI] Starting IAP purchase...');
+        await buyMonthly();
+        
+        toast({
+          title: 'Purchase Started',
+          description: 'Please complete the payment in the Apple purchase dialog.',
+        });
+        
+        // Don't close the modal immediately - let the purchase flow complete
+      } catch (err: any) {
+        console.error('[UI] IAP purchase failed:', err);
+        
+        let errorMessage = 'Purchase failed. Please try again.';
+        
+        if (err?.message?.includes('not loaded')) {
+          errorMessage = 'Product not loaded yet. Please wait and try again.';
+        } else if (err?.message?.includes('No purchasable offer')) {
+          errorMessage = 'Product not ready for purchase. Please wait and try again.';
+        } else if (err?.message) {
+          errorMessage = err.message;
+        }
+        
+        toast({
+          title: 'Purchase Failed',
+          description: errorMessage,
+          variant: 'destructive',
+        });
+        
         setIapLoading(false);
-        setShowPaymentOptions(false);
+        // Don't close payment options to allow retry
       }
     } else {
       setPaymentType(type);
@@ -329,7 +422,9 @@ const PremiumUpgrade = ({ currentUser, onClose, preselectedPlan }: PremiumUpgrad
                   className="w-full p-4 bg-gradient-to-r from-gray-800 to-black text-white rounded-lg hover:from-gray-700 hover:to-gray-900 transition-all duration-200 font-semibold disabled:opacity-50"
                 >
                   <div className="text-lg">🍎 {iapLoading ? 'Processing...' : 'Pay with Apple'}</div>
-                  <div className="text-sm opacity-90">In-App Purchase • Secure & Fast</div>
+                  <div className="text-sm opacity-90">
+                    {!canBuy ? 'Loading product...' : 'In-App Purchase • Secure & Fast'}
+                  </div>
                 </button>
               )}
             </div>
