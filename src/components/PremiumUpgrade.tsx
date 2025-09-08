@@ -112,7 +112,7 @@ const PremiumUpgrade = ({ currentUser, onClose, preselectedPlan }: PremiumUpgrad
     
     // No off/unsubscribe in plugin
   }, [toast]);
-  const [price, setPrice] = useState('50');
+  const [price, setPrice] = useState<string | null>(null);
   const [monthlyPrice, setMonthlyPrice] = useState<string | null>(null);
   const [paymentMethods, setPaymentMethods] = useState<any[]>([]);
   const [currency, setCurrency] = useState('GHS');
@@ -125,7 +125,7 @@ const PremiumUpgrade = ({ currentUser, onClose, preselectedPlan }: PremiumUpgrad
       let userCountry = currentUser?.country?.toLowerCase() || '';
       let userCurrency = currentUser?.currency?.toUpperCase?.() || '';
       let selectedCurrency = 'GHS';
-      let selectedPrice = config.price || '50';
+      let selectedPrice = config.price || '0'; // Fallback to 0 if no price configured in database
 
       // Try to find a match in countryPrices by country or currency
       if (Array.isArray(config.countryPrices)) {
@@ -159,6 +159,15 @@ const PremiumUpgrade = ({ currentUser, onClose, preselectedPlan }: PremiumUpgrad
   }, [currentUser]);
 
   const handleUpgrade = () => {
+    // Don't allow upgrade if price hasn't loaded yet
+    if (price === null) {
+      toast({
+        title: 'Loading...',
+        description: 'Please wait while we load pricing information.',
+      });
+      return;
+    }
+    
     // Always show payment options - let user choose
     setShowPaymentOptions(true);
   };
@@ -284,9 +293,11 @@ const PremiumUpgrade = ({ currentUser, onClose, preselectedPlan }: PremiumUpgrad
                     {/* One-time payment option */}
                     <div className="p-2 md:p-3 bg-gradient-to-r from-green-50 to-emerald-50 border border-green-200 rounded-lg">
                       <div className="text-xl sm:text-2xl md:text-3xl font-bold text-gray-800 responsive-text">
-                        {currency} {price}
+                        {price !== null ? `${currency} ${price}` : 'Loading...'}
                       </div>
-                      <div className="text-xs md:text-sm text-green-600 font-medium mt-1">✨ One-time payment - Lifetime access</div>
+                      {!isIOS() && (
+                        <div className="text-xs md:text-sm text-green-600 font-medium mt-1">✨ One-time payment - Lifetime access</div>
+                      )}
                     </div>
                     
                     {/* Monthly payment option */}
@@ -348,7 +359,7 @@ const PremiumUpgrade = ({ currentUser, onClose, preselectedPlan }: PremiumUpgrad
               <CardHeader className="text-center pb-3 md:pb-5 px-2 md:px-4">
                 <CardTitle className="text-lg sm:text-xl md:text-2xl font-bold text-gray-700 responsive-text">Free Plan</CardTitle>
                 <div className="mt-2 md:mt-3">
-                  <div className="text-2xl sm:text-3xl md:text-4xl font-bold text-gray-700 responsive-text">GHS 0</div>
+                  <div className="text-2xl sm:text-3xl md:text-4xl font-bold text-gray-700 responsive-text">{currency} 0</div>
                   <div className="text-xs md:text-sm text-gray-500 mt-1">Basic features only</div>
                 </div>
               </CardHeader>
@@ -415,7 +426,7 @@ const PremiumUpgrade = ({ currentUser, onClose, preselectedPlan }: PremiumUpgrad
                     className="w-full p-4 bg-gradient-to-r from-blue-500 to-blue-600 text-white rounded-lg hover:from-blue-600 hover:to-blue-700 transition-all duration-200 font-semibold"
                   >
                     <div className="text-lg">📱 One-Time Payment</div>
-                    <div className="text-sm opacity-90">{currency} {price} • 1 month access • No auto-renewal</div>
+                    <div className="text-sm opacity-90">{price !== null ? `${currency} ${price}` : 'Loading...'} • 1 month access • No auto-renewal</div>
                   </button>
                 </>
               )}
@@ -448,7 +459,7 @@ const PremiumUpgrade = ({ currentUser, onClose, preselectedPlan }: PremiumUpgrad
       <PaystackPaymentModal
         isOpen={showPaymentModal}
         onClose={() => setShowPaymentModal(false)}
-        amount={parseFloat(paymentType === 'one-time' ? price : (monthlyPrice || price))}
+        amount={parseFloat(paymentType === 'one-time' ? (price || '0') : (monthlyPrice || price || '0'))}
         currency={currency}
         email={currentUser?.email || ''}
         onSuccess={handlePaymentSuccess}

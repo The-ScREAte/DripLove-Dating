@@ -28,22 +28,48 @@ export function useEnhancedSubscription() {
         return
       }
 
-      // Use the database function for real-time subscription checking
-      const { data, error } = await supabase.rpc('get_current_subscription_status', {
-        p_user_id: user.id
-      })
+      // First, quickly check user_subscriptions table for immediate feedback
+      const { data: quickCheck } = await supabase
+        .from('user_subscriptions')
+        .select('plan_name, status, expires_at')
+        .eq('user_id', user.id)
+        .order('created_at', { ascending: false })
+        .limit(1)
+        .single()
 
-      if (error) {
-        console.error('Subscription check failed:', error)
-        // Fallback to free plan on error
+      // Set loading to false immediately to show UI faster
+      setLoading(false)
+
+      if (quickCheck && quickCheck.plan_name === 'premium' && quickCheck.status === 'active') {
+        // Quick check shows active premium, set it immediately
+        const isActive = !quickCheck.expires_at || new Date(quickCheck.expires_at) > new Date()
+        setSubscriptionStatus({
+          plan_name: quickCheck.plan_name,
+          status: quickCheck.status,
+          expires_at: quickCheck.expires_at,
+          is_active: isActive
+        })
+      } else {
+        // Set to free immediately if no active premium found
         setSubscriptionStatus({
           plan_name: 'free',
           status: 'active',
           expires_at: null,
           is_active: false
         })
+      }
+
+      // Now do the comprehensive check with the database function for accuracy
+      const { data, error } = await supabase.rpc('get_current_subscription_status', {
+        p_user_id: user.id
+      })
+
+      if (error) {
+        console.error('Subscription check failed:', error)
+        // Keep the quick check result if comprehensive check fails
       } else if (data && data.length > 0) {
         const status = data[0]
+        // Update with the comprehensive result
         setSubscriptionStatus(status)
         
         // Show notification if subscription was downgraded due to payment failure
@@ -57,7 +83,21 @@ export function useEnhancedSubscription() {
           })
         }
       } else {
-        // No subscription found, default to free
+        // Comprehensive check found no subscription, confirm free status
+        // (but don't change if quick check already set premium - avoid flicker)
+        if (subscriptionStatus?.plan_name !== 'premium') {
+          setSubscriptionStatus({
+            plan_name: 'free',
+            status: 'active',
+            expires_at: null,
+            is_active: false
+          })
+        }
+      }
+    } catch (error) {
+      console.error('Subscription check failed:', error)
+      // Keep existing status or set to free if none exists
+      if (!subscriptionStatus) {
         setSubscriptionStatus({
           plan_name: 'free',
           status: 'active',
@@ -65,16 +105,6 @@ export function useEnhancedSubscription() {
           is_active: false
         })
       }
-    } catch (error) {
-      console.error('Subscription check failed:', error)
-      setSubscriptionStatus({
-        plan_name: 'free',
-        status: 'active',
-        expires_at: null,
-        is_active: false
-      })
-    } finally {
-      setLoading(false)
     }
   }
 

@@ -9,7 +9,7 @@ import { LogOut, AlertTriangle, Mail } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 
-import { useSubscription } from '@/hooks/useSubscription';
+import { useEnhancedSubscription } from '@/hooks/useEnhancedSubscription';
 import { useNavigate } from 'react-router-dom';
 
 interface AccountActionsProps {
@@ -26,7 +26,7 @@ const AccountActions = ({ currentUser, onLogout, onShowTerms, onShowPrivacy, hid
   const [password, setPassword] = useState('');
   const [passwordError, setPasswordError] = useState('');
   const { toast } = useToast();
-  const { isPremium, subscription } = useSubscription(currentUser?.id);
+  const { isPremium, subscriptionStatus, loading } = useEnhancedSubscription();
   const navigate = useNavigate();
 
   const handleLogout = async () => {
@@ -161,7 +161,8 @@ const AccountActions = ({ currentUser, onLogout, onShowTerms, onShowPrivacy, hid
           </>
         )}
         {/* Cancel Subscription (only if premium and active) */}
-        {isPremium() && subscription && Array.isArray(subscription) && subscription[0]?.status === 'active' && (
+        {(isPremium || (subscriptionStatus && subscriptionStatus.plan_name === 'premium')) && 
+         (!subscriptionStatus || subscriptionStatus.status === 'active') && (
           <div className="flex flex-col sm:flex-row gap-4 mt-4">
             <Button
               variant="outline"
