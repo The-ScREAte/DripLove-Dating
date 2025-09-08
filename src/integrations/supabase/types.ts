@@ -757,6 +757,15 @@ export type Database = {
         Args: { user1_id: string; user2_id: string }
         Returns: undefined
       }
+      admin_get_user_premium_status: {
+        Args: { target_user_id: string }
+        Returns: {
+          expires_at: string
+          is_premium: boolean
+          plan_name: string
+          status: string
+        }[]
+      }
       admin_set_premium_subscription: {
         Args: { months_count: number; target_user_id: string }
         Returns: boolean

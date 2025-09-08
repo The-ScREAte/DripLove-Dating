@@ -89,6 +89,7 @@ export interface AdminStats {
   blocked_users: number;
   users_on_hold: number;
   total_admins: number;
+  premium_users: number;
 }
 
 export interface AdminUser {

@@ -74,6 +74,12 @@ const StatsCard: React.FC<StatsCardProps> = ({ stats }) => {
             <span className="text-2xl font-bold text-gray-600">{stats.total_admins}</span>
             <span className="text-sm text-gray-600">Total Admins</span>
           </div>
+          
+          <div className="flex flex-col items-center p-4 bg-orange-50 rounded-lg">
+            <TrendingUp className="w-8 h-8 text-orange-600 mb-2" />
+            <span className="text-2xl font-bold text-orange-600">{stats.premium_users}</span>
+            <span className="text-sm text-gray-600">Premium Users</span>
+          </div>
         </div>
       </CardContent>
     </Card>

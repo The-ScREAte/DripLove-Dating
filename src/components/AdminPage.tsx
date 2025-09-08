@@ -19,6 +19,7 @@ import CountryManagement from './admin/CountryManagement';
 import ImageModerationPanel from './admin/ImageModerationPanel';
 import SafeAreaDebug from './SafeAreaDebug';
 import NotificationTester from './NotificationTester';
+import ManualPremiumManager from './admin/ManualPremiumManager';
 import { debounce, userDataCache, createPagination } from '@/utils/performanceOptimizer';
 import { useSupabaseSubscription, useMemoryMonitor } from '@/hooks/usePerformance';
 import { CurrentUser, AdminStats } from '@/types';
@@ -1022,6 +1023,13 @@ const AdminPageComponent = ({ currentUser, onLogout }: AdminPageProps) => {
                         </div>
                         <Shield className="w-6 h-6 text-gray-500" />
                       </div>
+                      <div className="flex items-center justify-between p-3 bg-gradient-to-r from-orange-50 to-orange-100 rounded-lg border border-orange-200">
+                        <div>
+                          <p className="text-xs text-orange-700 font-medium">Premium Users</p>
+                          <p className="text-lg font-bold text-orange-900">{stats.premium_users}</p>
+                        </div>
+                        <TrendingUp className="w-6 h-6 text-orange-500" />
+                      </div>
                     </div>
                   </CardContent>
                 </Card>
@@ -1065,6 +1073,19 @@ const AdminPageComponent = ({ currentUser, onLogout }: AdminPageProps) => {
                   <Button onClick={createManualMatch} className="w-full" size="sm">
                     Create Match
                   </Button>
+                </CardContent>
+              </Card>
+
+              {/* Manual Premium Management */}
+              <Card>
+                <CardHeader className="pb-3">
+                  <CardTitle className="flex items-center gap-2 text-lg">
+                    <CreditCard className="w-5 h-5" />
+                    Manual Premium Management
+                  </CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-3">
+                  <ManualPremiumManager users={users} onRefreshStats={fetchAppStats} />
                 </CardContent>
               </Card>
             </TabsContent>
