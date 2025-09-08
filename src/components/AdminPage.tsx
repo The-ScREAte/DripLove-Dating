@@ -41,7 +41,8 @@ import {
   Settings,
   Image,
   CreditCard,
-  BarChart3
+  BarChart3,
+  Crown
 } from 'lucide-react';
 
 interface AdminPageProps {
@@ -592,7 +593,7 @@ const AdminPageComponent = ({ currentUser, onLogout }: AdminPageProps) => {
         return;
       }
 
-      const { data, error } = await supabase.rpc('get_app_stats');
+      const { data, error } = await supabase.rpc('get_admin_stats');
       if (error) throw error;
       
       if (data && typeof data === 'object' && !Array.isArray(data)) {
@@ -964,6 +965,9 @@ const AdminPageComponent = ({ currentUser, onLogout }: AdminPageProps) => {
                       <BarChart3 className="w-5 h-5" />
                       Platform Statistics
                     </CardTitle>
+                    <p className="text-sm text-gray-600 mt-1">
+                      Real-time metrics including active premium subscriptions
+                    </p>
                   </CardHeader>
                   <CardContent>
                     <div className="grid grid-cols-2 gap-3">
@@ -1027,8 +1031,9 @@ const AdminPageComponent = ({ currentUser, onLogout }: AdminPageProps) => {
                         <div>
                           <p className="text-xs text-orange-700 font-medium">Premium Users</p>
                           <p className="text-lg font-bold text-orange-900">{stats.premium_users}</p>
+                          <p className="text-xs text-orange-600 opacity-75">Active subscriptions</p>
                         </div>
-                        <TrendingUp className="w-6 h-6 text-orange-500" />
+                        <Crown className="w-6 h-6 text-orange-500" />
                       </div>
                     </div>
                   </CardContent>
