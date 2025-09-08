@@ -86,7 +86,8 @@ export function initIAP() {
                 const { data: validation, error: validationError } = await supabase.functions.invoke('iap-receipt-validator', {
                   body: {
                     receiptData: receiptData,
-                    productId: r.productId
+                    productId: r.productId,
+                    userId: user.id
                   }
                 });
 
@@ -104,6 +105,16 @@ export function initIAP() {
 
                 if (validation.active) {
                   console.log('[IAP] Receipt validated successfully');
+                  
+                  // Reset payment attempts on successful validation
+                  await supabase
+                    .from('user_subscriptions')
+                    .update({ 
+                      payment_attempts: 0,
+                      updated_at: new Date().toISOString()
+                    })
+                    .eq('user_id', user.id);
+                  
                   // Redirect to success page
                   window.location.href = '/payment-success?status=successful&payment_type=iap';
                 } else {
@@ -125,6 +136,7 @@ export function initIAP() {
                   next_billing_date: expiryDate.toISOString(),
                   auto_renew: true,
                   payment_method: 'apple',
+                  payment_attempts: 0, // Reset payment attempts
                   updated_at: new Date().toISOString(),
                 };
 
@@ -144,10 +156,31 @@ export function initIAP() {
               const { supabase } = await import('@/integrations/supabase/client');
               const { data: { user } } = await supabase.auth.getUser();
               if (user) {
-                await supabase.rpc('handle_payment_failure', {
-                  p_user_id: user.id,
-                  p_reason: 'IAP verification error: ' + error.message
-                });
+                // Get current payment attempts
+                const { data: currentSub } = await supabase
+                  .from('user_subscriptions')
+                  .select('payment_attempts')
+                  .eq('user_id', user.id)
+                  .single();
+
+                const attempts = (currentSub?.payment_attempts || 0) + 1;
+
+                if (attempts >= 3) {
+                  // Max attempts reached, deactivate subscription
+                  await supabase.rpc('handle_payment_failure', {
+                    p_user_id: user.id,
+                    p_reason: `IAP verification failed after ${attempts} attempts: ` + error.message
+                  });
+                } else {
+                  // Increment attempt counter
+                  await supabase
+                    .from('user_subscriptions')
+                    .update({ 
+                      payment_attempts: attempts,
+                      updated_at: new Date().toISOString()
+                    })
+                    .eq('user_id', user.id);
+                }
               }
             } catch (fallbackError) {
               console.error('[IAP] Fallback error handling failed:', fallbackError);

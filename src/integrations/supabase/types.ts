@@ -649,6 +649,7 @@ export type Database = {
           flutterwave_transaction_id: string | null
           id: string
           next_billing_date: string | null
+          payment_attempts: number | null
           payment_method: string | null
           plan_name: string
           starts_at: string
@@ -664,6 +665,7 @@ export type Database = {
           flutterwave_transaction_id?: string | null
           id?: string
           next_billing_date?: string | null
+          payment_attempts?: number | null
           payment_method?: string | null
           plan_name: string
           starts_at?: string
@@ -679,6 +681,7 @@ export type Database = {
           flutterwave_transaction_id?: string | null
           id?: string
           next_billing_date?: string | null
+          payment_attempts?: number | null
           payment_method?: string | null
           plan_name?: string
           starts_at?: string

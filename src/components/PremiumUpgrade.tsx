@@ -9,6 +9,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Crown, Heart, RotateCcw, Users, Check, X } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
+import { useEnhancedSubscription } from '@/hooks/useEnhancedSubscription';
 
 interface PremiumUpgradeProps {
   currentUser: any;
@@ -25,6 +26,9 @@ const PremiumUpgrade = ({ currentUser, onClose, preselectedPlan }: PremiumUpgrad
   const [paymentType, setPaymentType] = useState<'subscription' | 'one-time' | 'iap' | null>(null);
   const [iapLoading, setIapLoading] = useState(false);
   const [canBuy, setCanBuy] = useState(false);
+  
+  // Enhanced subscription status monitoring
+  const { subscriptionStatus, isPremium, loading: subscriptionLoading, refetch: refetchSubscription } = useEnhancedSubscription();
 
   React.useEffect(() => {
     // Listen for productUpdated to enable the Apple Pay button
@@ -155,28 +159,7 @@ const PremiumUpgrade = ({ currentUser, onClose, preselectedPlan }: PremiumUpgrad
   }, [currentUser]);
 
   const handleUpgrade = () => {
-    // On iOS, if IAP is available and ready, use it directly
-    if (isIOS() && isNativeApp()) {
-      if (canBuy) {
-        // Directly trigger IAP purchase on iOS
-        handlePaymentTypeSelection('iap');
-      } else {
-        // Show payment options modal for iOS to show "loading" state
-        setShowPaymentOptions(true);
-      }
-      return;
-    }
-
-    // On non-iOS platforms, check for Paystack payment methods
-    if (!paymentMethods.length) {
-      toast({
-        title: 'Payment Method Required',
-        description: 'No payment method is configured. Please contact admin.',
-        variant: 'destructive',
-      });
-      return;
-    }
-    // Show payment options selection
+    // Always show payment options - let user choose
     setShowPaymentOptions(true);
   };
 
@@ -240,6 +223,10 @@ const PremiumUpgrade = ({ currentUser, onClose, preselectedPlan }: PremiumUpgrad
       description: 'Your account has been upgraded to premium.',
     });
     setShowPaymentModal(false);
+    
+    // Refetch subscription status to update UI
+    refetchSubscription();
+    
     if (onClose) onClose();
     // Optionally, trigger a refetch of subscription status here
     window.location.href = '/discover?upgraded=1';
@@ -413,8 +400,8 @@ const PremiumUpgrade = ({ currentUser, onClose, preselectedPlan }: PremiumUpgrad
             </button>
             <h2 className="text-xl font-bold mb-4 text-center">Choose Payment Option</h2>
             <div className="space-y-4">
-              {/* Hide Paystack options on iOS - only show on non-iOS platforms */}
-              {!isIOS() && (
+              {/* Always show Paystack options, but prioritize IAP on iOS */}
+              {(!isIOS() || !isNativeApp() || !canBuy) && (
                 <>
                   <button
                     onClick={() => handlePaymentTypeSelection('subscription')}
@@ -432,25 +419,24 @@ const PremiumUpgrade = ({ currentUser, onClose, preselectedPlan }: PremiumUpgrad
                   </button>
                 </>
               )}
-              {/* Apple IAP - only show on iOS native */}
-              {isIOS() && isNativeApp() && (
+              
+              {/* Apple IAP - show on iOS native when available */}
+              {isIOS() && isNativeApp() && canBuy && (
                 <button
                   onClick={() => handlePaymentTypeSelection('iap')}
-                  disabled={iapLoading || !canBuy}
+                  disabled={iapLoading}
                   className="w-full p-4 bg-gradient-to-r from-gray-800 to-black text-white rounded-lg hover:from-gray-700 hover:to-gray-900 transition-all duration-200 font-semibold disabled:opacity-50"
                 >
                   <div className="text-lg">🍎 {iapLoading ? 'Processing...' : 'Pay with Apple'}</div>
-                  <div className="text-sm opacity-90">
-                    {!canBuy ? 'Loading product...' : 'In-App Purchase • Secure & Fast'}
-                  </div>
+                  <div className="text-sm opacity-90">In-App Purchase • Secure & Fast</div>
                 </button>
               )}
               
-              {/* Fallback message when no payment options are available */}
+              {/* Loading message when IAP is not ready on iOS */}
               {isIOS() && isNativeApp() && !canBuy && !iapLoading && (
-                <div className="text-center p-4 bg-gray-100 rounded-lg">
-                  <div className="text-gray-600 mb-2">Payment system is loading...</div>
-                  <div className="text-sm text-gray-500">Please wait a moment for Apple Pay to become available.</div>
+                <div className="text-center p-4 bg-blue-50 rounded-lg border border-blue-200">
+                  <div className="text-blue-600 mb-2">⏳ Apple Pay is loading...</div>
+                  <div className="text-sm text-blue-500">You can use the payment options above, or wait for Apple Pay to become available.</div>
                 </div>
               )}
             </div>

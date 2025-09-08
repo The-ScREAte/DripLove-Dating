@@ -112,18 +112,53 @@ serve(async (req) => {
           return json(404, { error: 'User not found' })
         }
 
-        // Handle payment failure
-        const { error: failureError } = await supabase.rpc('handle_payment_failure', {
-          p_user_id: user.id,
-          p_reason: `Paystack webhook: ${event.event}`
-        })
+        // Get current subscription and payment attempts
+        const { data: subscription } = await supabase
+          .from('user_subscriptions')
+          .select('payment_attempts, status')
+          .eq('user_id', user.id)
+          .eq('status', 'active')
+          .single()
 
-        if (failureError) {
-          console.error('[PAYSTACK-WEBHOOK] Error handling payment failure:', failureError)
-          return json(500, { error: 'Failed to handle payment failure' })
+        if (!subscription) {
+          console.log('[PAYSTACK-WEBHOOK] No active subscription found for user:', user.id)
+          return json(404, { error: 'No active subscription found' })
         }
 
-        console.log('[PAYSTACK-WEBHOOK] Successfully handled payment failure for user:', user.id)
+        const currentAttempts = subscription.payment_attempts || 0
+        const newAttempts = currentAttempts + 1
+
+        console.log(`[PAYSTACK-WEBHOOK] Payment failed for user ${user.id}, attempt ${newAttempts}/3`)
+
+        // Update payment attempts
+        await supabase
+          .from('user_subscriptions')
+          .update({ 
+            payment_attempts: newAttempts,
+            updated_at: new Date().toISOString()
+          })
+          .eq('user_id', user.id)
+          .eq('status', 'active')
+
+        // If 3rd attempt failed, deactivate subscription
+        if (newAttempts >= 3) {
+          console.log(`[PAYSTACK-WEBHOOK] 3rd payment attempt failed for user ${user.id}, deactivating subscription`)
+          
+          // Handle payment failure - downgrade to free
+          const { error: failureError } = await supabase.rpc('handle_payment_failure', {
+            p_user_id: user.id,
+            p_reason: `Payment failed after ${newAttempts} attempts. Event: ${event.event}. Gateway response: ${event.data.gateway_response || 'Unknown error'}`
+          })
+
+          if (failureError) {
+            console.error('[PAYSTACK-WEBHOOK] Error handling payment failure:', failureError)
+            return json(500, { error: 'Failed to handle payment failure' })
+          }
+
+          console.log('[PAYSTACK-WEBHOOK] Successfully deactivated subscription after 3 failed attempts for user:', user.id)
+        } else {
+          console.log(`[PAYSTACK-WEBHOOK] Payment failed for user ${user.id}, will retry. Attempt ${newAttempts}/3`)
+        }
         break
       }
 
@@ -146,21 +181,22 @@ serve(async (req) => {
           return json(404, { error: 'User not found' })
         }
 
-        // Update subscription to active if it was previously failed
+        // Update subscription to active and reset payment attempts
         const { error: updateError } = await supabase
           .from('user_subscriptions')
           .update({
             status: 'active',
             plan_name: 'premium',
+            payment_attempts: 0, // Reset payment attempts on successful payment
             updated_at: new Date().toISOString()
           })
           .eq('user_id', user.id)
-          .in('status', ['payment_failed', 'expired'])
+          .in('status', ['payment_failed', 'expired', 'active']) // Include active to reset attempts
 
         if (updateError) {
           console.error('[PAYSTACK-WEBHOOK] Error updating subscription:', updateError)
         } else {
-          console.log('[PAYSTACK-WEBHOOK] Successfully reactivated subscription for user:', user.id)
+          console.log('[PAYSTACK-WEBHOOK] Successfully reactivated subscription and reset payment attempts for user:', user.id)
         }
         break
       }

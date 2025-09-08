@@ -53,28 +53,6 @@ const loadPaystackScript = () => {
 const PaystackPaymentModal: React.FC<PaystackPaymentModalProps> = ({ isOpen, onClose, amount, currency = 'GHS', email, onSuccess, paymentMethod = 'card', isOneTime = false }) => {
   const [isLoading, setIsLoading] = React.useState(false);
   const [selectedPaymentMethod, setSelectedPaymentMethod] = React.useState<'card' | 'momo' | 'iap'>(paymentMethod);
-  const [paystackPlanCode, setPaystackPlanCode] = React.useState<string>('');
-
-  // Fetch payment config on component mount
-  React.useEffect(() => {
-    const fetchPaymentConfig = async () => {
-      try {
-        const { data, error } = await supabase
-          .from('payment_config')
-          .select('paystack_plan_code')
-          .limit(1)
-          .single();
-        
-        if (!error && data?.paystack_plan_code) {
-          setPaystackPlanCode(data.paystack_plan_code);
-        }
-      } catch (err) {
-        // Silent error handling
-      }
-    };
-    
-    fetchPaymentConfig();
-  }, []);
 
   React.useEffect(() => {
     if (isOpen) {
@@ -111,12 +89,6 @@ const PaystackPaymentModal: React.FC<PaystackPaymentModalProps> = ({ isOpen, onC
       setIsLoading(false);
       return;
     }
-    // Validate plan code for subscriptions
-    if (!isOneTime && !paystackPlanCode) {
-      alert('Subscription plan is not configured. Please check payment configuration.');
-      setIsLoading(false);
-      return;
-    }
     // Validate email
     if (!email || !email.includes('@')) {
       alert('Please provide a valid email address.');
@@ -149,7 +121,10 @@ const PaystackPaymentModal: React.FC<PaystackPaymentModalProps> = ({ isOpen, onC
         payload.currency = (currency || 'GHS').toUpperCase();
         payload.channels = [selectedPaymentMethod === 'momo' ? 'mobile_money' : 'card'];
       } else {
-        payload.plan = paystackPlanCode;
+        // Use dynamic amount for subscription instead of fixed plan
+        payload.amount = Number(amount);
+        payload.currency = (currency || 'GHS').toUpperCase();
+        payload.channels = [selectedPaymentMethod === 'momo' ? 'mobile_money' : 'card'];
       }
       const { data, error } = await supabase.functions.invoke('paystack-init', {
         body: payload,
@@ -206,9 +181,26 @@ const PaystackPaymentModal: React.FC<PaystackPaymentModalProps> = ({ isOpen, onC
           paymentConfig.currency = (currency || 'GHS').toUpperCase();
           paymentConfig.channels = [selectedPaymentMethod === 'momo' ? 'mobile_money' : 'card'];
         } else {
-          paymentConfig.plan = paystackPlanCode;
-          delete paymentConfig.currency;
-          delete paymentConfig.amount;
+          // For subscriptions, use dynamic amount instead of plan if amount differs from plan
+          // This ensures the displayed amount matches what user actually pays
+          const paystackAmount = Math.round(Number(amount) * 100);
+          if (!Number.isFinite(paystackAmount) || paystackAmount < 100) {
+            alert('Amount invalid. Minimum amount is 1.00');
+            setIsLoading(false);
+            return;
+          }
+          
+          // Use dynamic amount for subscription to match displayed price
+          paymentConfig.amount = paystackAmount;
+          paymentConfig.currency = (currency || 'GHS').toUpperCase();
+          paymentConfig.channels = [selectedPaymentMethod === 'momo' ? 'mobile_money' : 'card'];
+          
+          // Add subscription metadata to track this as a recurring payment
+          paymentConfig.metadata.custom_fields.push({
+            display_name: 'Subscription Type',
+            variable_name: 'subscription_type',
+            value: 'monthly_recurring'
+          });
         }
         const handler = (window as any).PaystackPop.setup(paymentConfig);
         handler.openIframe();
