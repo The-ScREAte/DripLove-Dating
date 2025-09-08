@@ -749,6 +749,10 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      admin_cancel_premium_subscription: {
+        Args: { target_user_id: string }
+        Returns: boolean
+      }
       admin_create_match: {
         Args: { user1_id: string; user2_id: string }
         Returns: undefined
