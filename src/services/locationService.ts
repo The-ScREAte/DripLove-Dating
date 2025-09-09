@@ -111,6 +111,16 @@ class LocationService {
             profile.latitude,
             profile.longitude
           );
+          
+          // Debug: Log suspicious distances
+          if (distance > 1000) {
+            console.warn('Large distance calculated:', {
+              distance: distance,
+              currentUser: { lat: currentUser.latitude, lon: currentUser.longitude, city: currentUser.city, country: currentUser.country },
+              profile: { lat: profile.latitude, lon: profile.longitude, city: profile.city, country: profile.country }
+            });
+          }
+          
           includeProfile = distance <= searchDistance;
         }
         // Otherwise, use country/city matching
