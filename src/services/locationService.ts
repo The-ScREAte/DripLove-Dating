@@ -112,16 +112,29 @@ class LocationService {
             profile.longitude
           );
           
-          // Debug: Log suspicious distances
+          // Validate distance calculation - if distance is suspiciously large,
+          // fall back to country/city matching instead of coordinates
           if (distance > 1000) {
-            console.warn('Large distance calculated:', {
-              distance: distance,
-              currentUser: { lat: currentUser.latitude, lon: currentUser.longitude, city: currentUser.city, country: currentUser.country },
-              profile: { lat: profile.latitude, lon: profile.longitude, city: profile.city, country: profile.country }
-            });
+            // Large distance detected - likely coordinate data issue
+            // Fall back to country/city matching instead
+            if (profile.country_code === currentUser.country_code) {
+              if (profile.city && currentUser.city && profile.city.toLowerCase() === currentUser.city.toLowerCase()) {
+                distance = 0; // Same city
+                includeProfile = true;
+              } else {
+                distance = 25; // Same country, different city
+                includeProfile = searchDistance >= 25;
+              }
+            } else if (currentUser.country_code && this.areCountriesInSameRegion(currentUser.country_code, profile.country_code)) {
+              distance = 100; // Regional match
+              includeProfile = searchDistance >= 100;
+            } else {
+              // Don't include profiles with suspicious coordinate distances
+              includeProfile = false;
+            }
+          } else {
+            includeProfile = distance <= searchDistance;
           }
-          
-          includeProfile = distance <= searchDistance;
         }
         // Otherwise, use country/city matching
         else {
