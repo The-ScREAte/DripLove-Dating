@@ -18,6 +18,26 @@ interface MainAppProps {
 }
 
 const MainApp = ({ user, onLogout }: MainAppProps) => {
+  // Safety check - if no user data, show error
+  if (!user || !user.id) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-pink-50 to-purple-50 p-4">
+        <div className="text-center bg-white rounded-lg p-8 shadow-lg max-w-md w-full">
+          <h2 className="text-xl font-bold text-gray-800 mb-4">No User Data</h2>
+          <p className="text-gray-600 mb-6">
+            Unable to load user information. Please log in again.
+          </p>
+          <button 
+            onClick={onLogout}
+            className="bg-pink-500 hover:bg-pink-600 text-white px-6 py-2 rounded-lg font-medium"
+          >
+            Back to Login
+          </button>
+        </div>
+      </div>
+    );
+  }
+
   const [activeTab, setActiveTab] = useState('discover');
   const [isKeyboardOpen, setIsKeyboardOpen] = useState(false);
 
@@ -38,43 +58,66 @@ const MainApp = ({ user, onLogout }: MainAppProps) => {
       };
     }
   }, []);
-  // Register device token for push notifications (mobile only)
+  // Register device token for push notifications (mobile only) - with error handling
   useEffect(() => {
     const registerDeviceToken = async () => {
       try {
         const { Capacitor } = await import('@capacitor/core');
-        if (Capacitor.isNativePlatform() && user?.id) {
-          const { PushNotifications } = await import('@capacitor/push-notifications');
-          
-          // Request permission first to prevent crashes
-          const permissionResult = await PushNotifications.requestPermissions();
-          if (permissionResult.receive === 'granted') {
-            await PushNotifications.register();
-            
-            PushNotifications.addListener('registration', async (token) => {
-              try {
-                // Save token to Supabase
-                await supabase.from('push_tokens').upsert({
-                  user_id: user.id,
-                  token: token.value,
-                  platform: Capacitor.getPlatform()
-                });
-              } catch (error) {
-                console.error('Failed to save push token:', error);
-              }
-            });
+        if (!Capacitor.isNativePlatform() || !user?.id) {
+          console.log('[MainApp] Skipping push notifications - not native platform or no user');
+          return;
+        }
 
-            PushNotifications.addListener('registrationError', (error) => {
-              console.error('Push registration error:', error);
-            });
-          }
+        console.log('[MainApp] Attempting to setup push notifications...');
+        const { PushNotifications } = await import('@capacitor/push-notifications');
+        
+        // Add error listener first to catch Firebase initialization errors
+        PushNotifications.addListener('registrationError', (error) => {
+          console.error('[MainApp] Push registration error (Firebase may not be configured):', error);
+        });
+        
+        // Request permission first to prevent crashes
+        console.log('[MainApp] Requesting push notification permissions...');
+        const permissionResult = await PushNotifications.requestPermissions();
+        
+        if (permissionResult.receive === 'granted') {
+          console.log('[MainApp] Permission granted, attempting to register...');
+          
+          // Use setTimeout to prevent blocking the main thread
+          setTimeout(async () => {
+            try {
+              await PushNotifications.register();
+              console.log('[MainApp] Push notification registration successful');
+              
+              PushNotifications.addListener('registration', async (token) => {
+                try {
+                  // Save token to Supabase
+                  await supabase.from('push_tokens').upsert({
+                    user_id: user.id,
+                    token: token.value,
+                    platform: Capacitor.getPlatform()
+                  });
+                  console.log('[MainApp] Push token saved successfully');
+                } catch (error) {
+                  console.error('[MainApp] Failed to save push token:', error);
+                }
+              });
+            } catch (regError) {
+              console.error('[MainApp] Push registration failed (likely Firebase not configured):', regError);
+              // Continue without push notifications
+            }
+          }, 500);
+        } else {
+          console.log('[MainApp] Push notification permission not granted');
         }
       } catch (err) {
-        console.error('Push notification setup error:', err);
+        console.error('[MainApp] Push notification setup error:', err);
         // Don't throw error to prevent app crash
       }
     };
-    registerDeviceToken();
+    
+    // Add a small delay to prevent race conditions
+    setTimeout(registerDeviceToken, 1000);
   }, [user?.id]);
   const [showTerms, setShowTerms] = useState(false);
   const [showPrivacy, setShowPrivacy] = useState(false);
@@ -103,11 +146,15 @@ const MainApp = ({ user, onLogout }: MainAppProps) => {
   }, [pushSupported, pushError]);
 
   useEffect(() => {
-    fetchUserProfile();
-    fetchUnreadCount();
-  }, [user]);
+    if (user?.id) {
+      fetchUserProfile();
+      fetchUnreadCount();
+    }
+  }, [user?.id]); // More specific dependency
 
   useEffect(() => {
+    if (!user?.id) return;
+
     const channel = supabase
       .channel('nav-matches')
       .on('postgres_changes', {
@@ -122,10 +169,13 @@ const MainApp = ({ user, onLogout }: MainAppProps) => {
     return () => {
       supabase.removeChannel(channel);
     };
-  }, [user]);
+  }, [user?.id]); // Depend on user.id rather than full user object
 
   const fetchUserProfile = async () => {
-    if (!user?.id) return;
+    if (!user?.id) {
+      console.warn('[MainApp] No user ID provided');
+      return;
+    }
 
     try {
       const { data, error } = await supabase
@@ -134,9 +184,18 @@ const MainApp = ({ user, onLogout }: MainAppProps) => {
         .eq('id', user.id)
         .maybeSingle();
 
-      if (error) throw error;
+      if (error) {
+        console.error('[MainApp] Profile fetch error:', error);
+        toast({
+          title: 'Profile Error',
+          description: 'Failed to load profile data. Please try refreshing.',
+          variant: 'destructive',
+        });
+        return;
+      }
 
       if (!data) {
+        console.warn('[MainApp] No profile found for user:', user.id);
         toast({
           title: 'Profile not found',
           description: 'No profile found for this user.',
@@ -145,27 +204,36 @@ const MainApp = ({ user, onLogout }: MainAppProps) => {
         return;
       }
 
-      // [MainApp] Profile fetched
+      console.log('[MainApp] Profile fetched successfully');
       setProfile(data);
+      
       // Check premium status from user_subscriptions
       if (data?.id) {
-        const { data: subData, error: subError } = await supabase
-          .from('user_subscriptions')
-          .select('plan_name, status')
-          .eq('user_id', data.id)
-          .eq('plan_name', 'premium')
-          .eq('status', 'active')
-          .maybeSingle();
-        setIsPremium(!!subData);
-        // [MainApp] Subscription fetched
-      } else {
-        setIsPremium(false);
+        try {
+          const { data: subData, error: subError } = await supabase
+            .from('user_subscriptions')
+            .select('plan_name, status')
+            .eq('user_id', data.id)
+            .eq('plan_name', 'premium')
+            .eq('status', 'active')
+            .maybeSingle();
+          
+          if (subError) {
+            console.error('[MainApp] Subscription fetch error:', subError);
+          }
+          
+          setIsPremium(!!subData);
+          console.log('[MainApp] Subscription status checked');
+        } catch (subErr) {
+          console.error('[MainApp] Subscription check failed:', subErr);
+          setIsPremium(false); // Default to free
+        }
       }
-    } catch (error) {
-      console.error('Error fetching profile:', error);
+    } catch (err) {
+      console.error('[MainApp] Fatal error in fetchUserProfile:', err);
       toast({
-        title: 'Profile Error',
-        description: 'Failed to load profile.',
+        title: 'Error',
+        description: 'Failed to load user data. Please restart the app.',
         variant: 'destructive',
       });
     }

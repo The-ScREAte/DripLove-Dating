@@ -9,6 +9,7 @@ import AdminPage from '@/components/AdminPage';
 import AboutUs from '@/components/AboutUs';
 import TermsOfService from '@/components/TermsOfService';
 import PrivacyPolicy from '@/components/PrivacyPolicy';
+import ErrorBoundary from '@/components/ErrorBoundary';
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
 import { transformFormDataForSubmission } from '@/utils/formValidation';
@@ -290,7 +291,11 @@ const Index = () => {
           />
         )}
 
-        {currentView === 'app' && <MainApp user={user} onLogout={handleLogout} />}
+        {currentView === 'app' && (
+          <ErrorBoundary>
+            <MainApp user={user} onLogout={handleLogout} />
+          </ErrorBoundary>
+        )}
       </div>
     </div>
   );
