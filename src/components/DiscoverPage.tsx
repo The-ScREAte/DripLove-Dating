@@ -1799,27 +1799,33 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, isPremium }: DiscoverPage
 
       {/* Action Buttons at Bottom */}
       <div className="absolute bottom-0 left-0 right-0 z-20 bg-gradient-to-t from-purple-900 to-transparent pb-6 pt-8">
-        <div className="flex items-center justify-center gap-8 px-8">
-          {/* Drip Button (with logo) */}
+        <div className="flex items-center justify-center gap-6 px-8">
+          {/* Reverse Button */}
+          <div className="relative">
+            <button
+              onClick={handleReverse}
+              disabled={!canReverse}
+              className="w-16 h-16 bg-yellow-500/20 hover:bg-yellow-500/30 disabled:opacity-30 border-2 border-yellow-500 rounded-full flex items-center justify-center shadow-lg hover:scale-105 transition-transform backdrop-blur-sm"
+            >
+              <Undo2 className="w-6 h-6 text-yellow-500" />
+            </button>
+            {!isPremium && reversesLeft !== undefined && reversesLeft > 0 && (
+              <div className="absolute -top-2 -right-2 w-6 h-6 bg-yellow-500 text-black text-xs font-bold rounded-full flex items-center justify-center shadow-lg">
+                {reversesLeft}
+              </div>
+            )}
+          </div>
+
+          {/* Like Button (Drip Logo - Bigger) */}
           <button
-            onClick={handlePass}
-            className="w-16 h-16 bg-white rounded-full flex items-center justify-center shadow-lg hover:scale-105 transition-transform"
+            onClick={handleLike}
+            className="w-24 h-24 bg-white rounded-full flex items-center justify-center shadow-lg hover:scale-105 transition-transform"
           >
             <img 
               src="/driplove-logo.png" 
-              alt="Drip" 
-              className="w-8 h-8 object-contain"
+              alt="Like" 
+              className="w-12 h-12 object-contain"
             />
-          </button>
-
-          {/* Spark Button */}
-          <button
-            onClick={handleLike}
-            className="w-20 h-20 bg-gradient-to-br from-orange-400 to-orange-600 rounded-full flex items-center justify-center shadow-lg hover:scale-105 transition-transform"
-          >
-            <svg className="w-10 h-10 text-white" fill="currentColor" viewBox="0 0 24 24">
-              <path d="M12.76 3.76a6 6 0 0 1 8.48 8.48l-8.53 8.54a1 1 0 0 1-1.42 0l-8.53-8.54a6 6 0 0 1 8.48-8.48l.76.75.76-.75z"/>
-            </svg>
           </button>
 
           {/* Pass Button */}
@@ -1827,35 +1833,8 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, isPremium }: DiscoverPage
             onClick={handlePass}
             className="w-16 h-16 bg-gradient-to-br from-red-400 to-pink-500 rounded-full flex items-center justify-center shadow-lg hover:scale-105 transition-transform"
           >
-            <X className="w-8 h-8 text-white" />
+            <X className="w-6 h-6 text-white" />
           </button>
-        </div>
-
-        <div className="flex items-center justify-center gap-8 mt-2">
-          <span className="text-white text-sm font-medium">Drip</span>
-          <span className="text-white text-sm font-medium">Spark</span>
-          <span className="text-white text-sm font-medium">Pass</span>
-        </div>
-      </div>
-
-      {/* Reverse Button (top right) */}
-      <div className="absolute top-20 right-4 z-30">
-        <div className="relative">
-          <Button
-            onClick={handleReverse}
-            variant="outline"
-            disabled={!canReverse}
-            className="rounded-full border-2 border-yellow-500 bg-yellow-500/20 hover:bg-yellow-500/30 disabled:opacity-30 backdrop-blur-sm shadow-lg hover:border-yellow-400 transition-all duration-200"
-            style={{ width: 48, height: 48 }}
-            aria-label="Undo last action"
-          >
-            <Undo2 className="w-5 h-5 text-yellow-500" />
-          </Button>
-          {!isPremium && reversesLeft !== undefined && reversesLeft > 0 && (
-            <div className="absolute -top-2 -right-2 w-6 h-6 bg-yellow-500 text-black text-xs font-bold rounded-full flex items-center justify-center shadow-lg">
-              {reversesLeft}
-            </div>
-          )}
         </div>
       </div>
         {/* ...existing code... */}
@@ -2013,17 +1992,13 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, isPremium }: DiscoverPage
               preCalculatedDistance={userDistances[currentMatch.id]}
             />
           </div>
-          {/* ...existing code... */}
-          {/* African Adinkra symbols bar - fixed height */}
-          <AdinkraBar />
-
           {/* Info section - dynamic height that fits content exactly */}
           <div className={`bg-white border-t border-gray-400 transition-all duration-300 flex-shrink-0 ${
-            showMoreInfo ? 'h-[380px]' : 'h-[120px] overflow-hidden'
+            showMoreInfo ? 'h-[200px]' : 'h-[80px] overflow-hidden'
           }`}>
             <div 
               ref={contentRef}
-              className={`w-full p-1 ${showMoreInfo ? 'overflow-y-auto h-[380px]' : 'overflow-hidden pb-3'}`} 
+              className={`w-full p-1 ${showMoreInfo ? 'overflow-y-auto h-[200px]' : 'overflow-hidden pb-3'}`} 
               style={{
                 WebkitOverflowScrolling: 'touch',
                 overscrollBehavior: 'contain',

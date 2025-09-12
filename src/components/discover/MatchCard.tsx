@@ -378,6 +378,58 @@ const MatchCard: React.FC<MatchCardProps> = ({
                     </p>
                   </div>
                 </div>
+              ) : null}
+              
+              {/* Top overlay with name, age, and distance - Always visible */}
+              <div className="absolute top-0 left-0 right-0 z-20 bg-gradient-to-b from-black/60 via-black/20 to-transparent p-6 pt-8">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <h2 className="text-2xl font-bold text-white">
+                      {match.first_name}
+                    </h2>
+                    <span className="text-xl text-white/90">
+                      {calculateAge(match.date_of_birth)}
+                    </span>
+                    {/* Distance */}
+                    {preCalculatedDistance !== undefined ? (
+                      <span className="text-sm text-white/80 bg-white/20 px-2 py-1 rounded-full backdrop-blur-sm">
+                        {Math.max(1, Math.round(preCalculatedDistance))}km away
+                      </span>
+                    ) : (currentUserLatitude && currentUserLongitude && match.latitude && match.longitude && (
+                      <span className="text-sm text-white/80 bg-white/20 px-2 py-1 rounded-full backdrop-blur-sm">
+                        {Math.max(1, Math.round(calculateDistance(
+                          currentUserLatitude,
+                          currentUserLongitude,
+                          match.latitude,
+                          match.longitude
+                        )))}km away
+                      </span>
+                    ))}
+                  </div>
+                  
+                  {/* Verified badge */}
+                  {isVerified && (
+                    <div className="bg-green-500 text-white px-2 py-1 rounded-full flex items-center text-xs font-semibold">
+                      <Shield className="w-3 h-3 mr-1" />
+                      Verified
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              {/* Slide indicators */}
+              {slides.length > 1 && (
+                <div className="absolute top-20 left-1/2 transform -translate-x-1/2 flex gap-2 z-20">
+                  {slides.map((_, index) => (
+                    <div
+                      key={index}
+                      className={`h-1 rounded-full transition-all duration-300 ${
+                        index === currentSlide ? 'bg-white w-8' : 'bg-white/50 w-2'
+                      }`}
+                    />
+                  ))}
+                </div>
+              )}
               ) : slides[currentSlide]?.type === 'perfect_first_date' ? (
                 <div className={`w-full h-full ${userBackgroundColor} flex items-center justify-center p-8`}>
                   <div className="max-w-sm mx-auto text-center">
@@ -412,24 +464,6 @@ const MatchCard: React.FC<MatchCardProps> = ({
                   <div className="text-center w-full">
                     <div className="bg-white/80 rounded-full p-8 mb-4 shadow-xl mx-auto">
                       <User className="w-16 h-16 mx-auto text-gray-500" />
-                      <style>{`
-                        .centered-user-icon {
-                          display: flex;
-                          align-items: center;
-                          justify-content: center;
-                          margin: 0 auto;
-                          box-sizing: border-box;
-                          max-width: 96px;
-                          max-height: 96px;
-                          padding: 1.5rem;
-                          background: rgba(255,255,255,0.8);
-                          border-radius: 9999px;
-                          box-shadow: 0 8px 32px 0 rgba(0,0,0,0.18);
-                        }
-                      `}</style>
-                      <div className="centered-user-icon">
-                        <User className="w-16 h-16 mx-auto text-gray-500" />
-                      </div>
                     </div>
                     <span className="text-6xl font-bold text-gray-700 bg-white/50 rounded-full px-6 py-3">
                       {match.first_name?.[0]}{match.last_name?.[0]}
@@ -440,25 +474,85 @@ const MatchCard: React.FC<MatchCardProps> = ({
               )}
             </div>
           )}
-          
-          {/* Slide indicators */}
-          {slides.length > 1 && (
-            <div className="absolute top-4 left-4 right-4 flex space-x-1 z-10">
-              {slides.map((_, index) => (
-                <div
-                  key={index}
-                  className={`flex-1 h-1 rounded-full transition-all duration-300 ${
-                    index === currentSlide 
-                      ? 'bg-white shadow-lg' 
-                      : 'bg-white/30'
-                  }`}
-                />
-              ))}
-            </div>
-          )}
+        </div>
+      </div>
 
-          {/* Report Modal */}
-          {showReportModal && (
+      {/* Report Modal */}
+      {showReportModal && (
+        <>
+          <div 
+            className="fixed inset-0 z-[9999] bg-black/50 backdrop-blur-sm flex items-center justify-center p-4 touch-none select-none" 
+            onClick={closeReportModal}
+            style={{
+              position: 'fixed',
+              top: 0,
+              left: 0,
+              right: 0,
+              bottom: 0,
+              zIndex: 9999
+            }}
+          >
+            <div 
+              className="bg-white rounded-xl p-6 max-w-sm w-full shadow-2xl transform transition-all"
+              onClick={(e) => e.stopPropagation()}
+            >
+              <h3 className="text-lg font-semibold mb-4 text-gray-900">Report Image</h3>
+              <p className="text-gray-600 mb-4 text-sm">
+                Help keep our community safe by reporting inappropriate content.
+              </p>
+              
+              <div className="space-y-3 mb-6">
+                {reportReasons.map((reason) => (
+                  <label key={reason} className="flex items-center space-x-3 cursor-pointer">
+                    <input
+                      type="radio"
+                      name="reportReason"
+                      value={reason}
+                      checked={selectedReason === reason}
+                      onChange={(e) => setSelectedReason(e.target.value)}
+                      className="w-4 h-4 text-pink-600 focus:ring-pink-500"
+                    />
+                    <span className="text-gray-700 text-sm">{reason}</span>
+                  </label>
+                ))}
+              </div>
+
+              {reportError && (
+                <div className="mb-4 p-3 bg-red-100 border border-red-300 text-red-700 rounded-md text-sm">
+                  {reportError}
+                </div>
+              )}
+
+              {reportSuccess && (
+                <div className="mb-4 p-3 bg-green-100 border border-green-300 text-green-700 rounded-md text-sm">
+                  Report submitted successfully. Thank you for helping keep our community safe.
+                </div>
+              )}
+
+              <div className="flex space-x-3">
+                <button
+                  onClick={closeReportModal}
+                  className="flex-1 px-4 py-2 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-lg transition-colors text-sm font-medium"
+                  disabled={reporting}
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={handleReportImage}
+                  disabled={!selectedReason || reporting}
+                  className="flex-1 px-4 py-2 bg-red-600 hover:bg-red-700 disabled:bg-red-300 text-white rounded-lg transition-colors text-sm font-medium"
+                >
+                  {reporting ? 'Reporting...' : 'Report'}
+                </button>
+              </div>
+            </div>
+          </div>
+        </>
+      )}
+    </div>
+  );
+}
+           {showReportModal && (
             <>
               <div 
                 className="fixed inset-0 z-[9999] bg-black/50 backdrop-blur-sm flex items-center justify-center p-4 touch-none select-none" 
@@ -577,59 +671,22 @@ const MatchCard: React.FC<MatchCardProps> = ({
   }
 
   if (isDetailsAreaOnly) {
-    // Render only the non-swipeable details area
+    // Render compact info section with expandable details
     return (
-      <div className="w-full" style={{ minHeight: '400px' }}>
-        {/* Basic Info - Always shown */}
-        <div className="flex justify-between items-start">
-          <div className="flex-1">
-            <div className="flex items-center gap-2 mb-1">
-              <h2 className="text-2xl font-bold text-gray-900">
-                {match.first_name} {match.last_name}
+      <div className="w-full p-3">
+        {/* Compact header with expand button */}
+        <div className="flex justify-between items-center">
+          <div className="flex items-center gap-3">
+            <div>
+              <h2 className="text-lg font-bold text-gray-900">
+                {match.first_name}
               </h2>
-              <span className="text-xl text-gray-600">
-                {calculateAge(match.date_of_birth)}
-              </span>
-              {/* Verified badge beside name and age */}
-              {isVerified && (
-                <div className="bg-green-5 text-white px-2 py-1 rounded-full flex items-center text-xs font-semibold">
-                  <Shield className="w-3 h-3 mr-1" />
-                  Verified
-                </div>
+              {match.relationship_intent && (
+                <p className="text-sm text-gray-600 capitalize">
+                  {match.relationship_intent === 'open_to_anything' ? 'Open to anything' : match.relationship_intent}
+                </p>
               )}
             </div>
-            
-            {match.city && (
-              <div className="flex items-center mt-1 text-gray-600">
-                <MapPin className="w-4 h-4 mr-1" />
-                <span className="text-sm">
-                  {match.city}, {match.country}
-                  {preCalculatedDistance !== undefined ? (
-                    <span className="ml-2">
-                      • {Math.max(1, Math.round(preCalculatedDistance))} km away
-                    </span>
-                  ) : (currentUserLatitude && currentUserLongitude && match.latitude && match.longitude && (
-                    <span className="ml-2">
-                      • {Math.max(1, Math.round(calculateDistance(
-                        currentUserLatitude,
-                        currentUserLongitude,
-                        match.latitude,
-                        match.longitude
-                      )))} km away
-                    </span>
-                  ))}
-                </span>
-              </div>
-            )}
-            
-            {match.relationship_intent && (
-              <div className="flex items-center mt-1 text-gray-600">
-                <Heart className="w-4 h-4 mr-1" />
-                <span className="text-sm capitalize">
-                  {match.relationship_intent === 'open_to_anything' ? 'Open to anything' : match.relationship_intent}
-                </span>
-              </div>
-            )}
           </div>
 
           {/* Expandable info button */}
@@ -638,13 +695,13 @@ const MatchCard: React.FC<MatchCardProps> = ({
               e.stopPropagation();
               onToggleInfo();
             }}
-            className="bg-pink-500 hover:bg-pink-600 text-white rounded-full p-3 transition-colors shadow-lg"
+            className="bg-pink-500 hover:bg-pink-600 text-white rounded-full p-2 transition-colors shadow-lg"
             aria-label={showMoreInfo ? "Hide details" : "Show details"}
           >
             {showMoreInfo ? (
-              <ChevronUp className="w-5 h-5" />
+              <ChevronUp className="w-4 h-4" />
             ) : (
-              <ChevronDown className="w-5 h-5" />
+              <ChevronDown className="w-4 h-4" />
             )}
           </button>
         </div>
