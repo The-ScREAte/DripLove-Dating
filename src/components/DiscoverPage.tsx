@@ -36,8 +36,7 @@ function DominantColorImageBg({ imageUrl, children }) {
   );
 }
 import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
-
-// --- AdinkraBar component and symbols ---
+import { Loader2, Quote, Coffee, Search } from 'lucide-react';
 const adinkraSymbols = [
   // 30 Adinkra symbols (SVGs are illustrative, not all unique for brevity)
   { name: 'Aya', meaning: 'The fern. Symbol of endurance and resourcefulness.', svg: (<svg width="24" height="24"><ellipse cx="12" cy="12" rx="10" ry="6" fill="#A5D6A7" stroke="#388E3C" strokeWidth="2" /><path d="M12 6v12M9 9l6 6M15 9l-6 6" stroke="#388E3C" strokeWidth="2" /></svg>) },
@@ -216,6 +215,7 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, isPremium }: DiscoverPage
   const [userProfileImages, setUserProfileImages] = useState<any[]>([]);
   const [showProfileCompletionModal, setShowProfileCompletionModal] = useState(false);
   const [todaySwipeCount, setTodaySwipeCount] = useState(0);
+  const [imageLoading, setImageLoading] = useState(false);
   
   // Dynamic content height management
   const contentRef = useRef<HTMLDivElement>(null);
@@ -228,6 +228,10 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, isPremium }: DiscoverPage
     quality: 85,
     width: 800
   });
+
+  // Calculate reverse availability and usage
+  const canReverse = isPremium ? true : passedUsers.length > 0;
+  const reversesLeft = isPremium ? undefined : Math.max(0, 2 - reverseUsageToday);
 
   // --- BEGIN: Swipe Guide Popup State ---
   const [showSwipeGuide, setShowSwipeGuide] = useState(false);
@@ -1423,15 +1427,21 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, isPremium }: DiscoverPage
 
 
   return (
-    <div className="h-full w-full fixed left-0 overflow-hidden"
+    <div className="h-full w-full fixed left-0 overflow-hidden bg-gradient-to-br from-purple-600 via-purple-700 to-purple-800"
          style={{ 
-           top: '60px', // Start below the header instead of top-0
-           height: 'calc(100vh - 60px)', // Adjust height to account for header
+           top: '60px',
+           height: 'calc(100vh - 60px)',
            touchAction: 'pan-x pan-y',
            userSelect: 'none',
            WebkitUserSelect: 'none',
            WebkitTouchCallout: 'none'
          }}>
+      
+      {/* Adinkra Bar at the top */}
+      <div className="relative z-10">
+        <AdinkraBar />
+      </div>
+
       {/* --- Swipe Guide Popup for New Users --- */}
       {showSwipeGuide && (
         <div
@@ -1504,8 +1514,350 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, isPremium }: DiscoverPage
           </div>
         </div>
       )}
-      {/* Main Image Area - Card stack */}
-  <div className="flex-1 relative overflow-hidden" style={{ height: 'calc(100vh - 140px)', display: 'flex', flexDirection: 'column', justifyContent: 'flex-end', paddingBottom: 0 }}>
+
+      {/* Main Profile Card Area */}
+      <div className="flex-1 flex flex-col items-center justify-center px-4 py-6" style={{ height: 'calc(100vh - 200px)' }}>
+        {nextMatch && (
+          <div className="absolute inset-0 z-0 scale-95 opacity-30 blur-sm">
+            <DominantColorImageBg
+              imageUrl={nextMatchImages[0] ? getOptimizedUrl(nextMatchImages[0]) : undefined}
+            >
+              {nextMatchImages.length > 0 ? (
+                <img
+                  src={getOptimizedUrl(nextMatchImages[0])}
+                  alt={`${nextMatch.first_name}'s photo`}
+                  className="w-full h-full object-cover rounded-3xl"
+                  draggable={false}
+                  loading="eager"
+                />
+              ) : (
+                <div className="w-full h-full bg-gradient-to-br from-pink-200 to-purple-200 flex items-center justify-center rounded-3xl">
+                  <span className="text-6xl font-bold text-gray-700">
+                    {nextMatch.first_name?.[0]}{nextMatch.last_name?.[0]}
+                  </span>
+                </div>
+              )}
+            </DominantColorImageBg>
+          </div>
+        )}
+
+        {/* Current Profile Card */}
+        <div
+          className="relative w-full max-w-sm mx-auto bg-white rounded-3xl overflow-hidden shadow-2xl z-10"
+          style={{
+            transform: cardTransform,
+            transition: exitingCard ? 'transform 0.3s cubic-bezier(0.25, 0.46, 0.45, 0.94)' : 
+                       isDragging ? 'none' : 'transform 0.3s cubic-bezier(0.22, 1, 0.36, 1)',
+            opacity: exitingCard ? 0 : 1,
+            height: '600px'
+          }}
+        >
+          {/* Swipe Overlays */}
+          {isDragging && swipeDirection && (
+            <>
+              {/* Like Overlay - Right Swipe */}
+              {swipeDirection === 'right' && (
+                <div 
+                  className="absolute inset-0 z-20 flex items-center justify-center pointer-events-none"
+                  style={{ 
+                    background: `linear-gradient(135deg, rgba(34, 197, 94, ${swipeOpacity * 0.7}), rgba(74, 222, 128, ${swipeOpacity * 0.5}))`,
+                    transition: 'none'
+                  }}
+                >
+                  <div 
+                    className="bg-green-500/90 backdrop-blur-sm rounded-full p-6 shadow-2xl transform"
+                    style={{ 
+                      scale: Math.min(0.8 + (swipeOpacity * 0.4), 1.2),
+                      transition: 'none'
+                    }}
+                  >
+                    <Heart 
+                      className="w-12 h-12 text-white fill-current" 
+                      style={{ 
+                        filter: `drop-shadow(0 4px 8px rgba(0,0,0,0.3))`,
+                        transform: `rotate(${swipeDistance * 0.1}deg)`
+                      }}
+                    />
+                  </div>
+                  <div 
+                    className="absolute bottom-32 bg-green-500/95 backdrop-blur-sm px-8 py-3 rounded-full shadow-xl"
+                    style={{ 
+                      opacity: Math.min(swipeOpacity + 0.2, 1),
+                      transform: `translateY(${-swipeDistance * 0.1}px)`,
+                      transition: 'none'
+                    }}
+                  >
+                    <span className="text-white font-bold text-2xl tracking-wider">LIKE</span>
+                  </div>
+                </div>
+              )}
+
+              {/* Pass Overlay - Left Swipe */}
+              {swipeDirection === 'left' && (
+                <div 
+                  className="absolute inset-0 z-20 flex items-center justify-center pointer-events-none"
+                  style={{ 
+                    background: `linear-gradient(135deg, rgba(239, 68, 68, ${swipeOpacity * 0.7}), rgba(248, 113, 113, ${swipeOpacity * 0.5}))`,
+                    transition: 'none'
+                  }}
+                >
+                  <div 
+                    className="bg-red-500/90 backdrop-blur-sm rounded-full p-6 shadow-2xl transform"
+                    style={{ 
+                      scale: Math.min(0.8 + (swipeOpacity * 0.4), 1.2),
+                      transition: 'none'
+                    }}
+                  >
+                    <X 
+                      className="w-12 h-12 text-white" 
+                      style={{ 
+                        filter: `drop-shadow(0 4px 8px rgba(0,0,0,0.3))`,
+                        transform: `rotate(${-swipeDistance * 0.1}deg)`
+                      }}
+                    />
+                  </div>
+                  <div 
+                    className="absolute bottom-32 bg-red-500/95 backdrop-blur-sm px-8 py-3 rounded-full shadow-xl"
+                    style={{ 
+                      opacity: Math.min(swipeOpacity + 0.2, 1),
+                      transform: `translateY(${-swipeDistance * 0.1}px)`,
+                      transition: 'none'
+                    }}
+                  >
+                    <span className="text-white font-bold text-2xl tracking-wider">NOPE</span>
+                  </div>
+                </div>
+              )}
+            </>
+          )}
+
+          {/* Profile Image Container */}
+          <div 
+            className="relative h-80 cursor-pointer select-none overflow-hidden"
+            onTouchStart={handleTouchStart}
+            onTouchMove={handleTouchMove}
+            onTouchEnd={handleTouchEnd}
+            onMouseDown={handleMouseDown}
+            onMouseMove={handleMouseMove}
+            onMouseUp={handleMouseUp}
+            onClick={handleImageAreaClick}
+          >
+            {currentMatchImages.length > 0 ? (
+              <>
+                {imageLoading && (
+                  <div className="absolute inset-0 bg-gray-100 flex items-center justify-center z-10">
+                    <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-pink-500" />
+                  </div>
+                )}
+                <img
+                  src={getOptimizedUrl(currentMatchImages[imageIndex])}
+                  alt={`${currentMatch.first_name} ${currentMatch.last_name}`}
+                  className="w-full h-full object-cover"
+                  draggable={false}
+                  onLoadStart={() => setImageLoading(true)}
+                  onLoad={() => setImageLoading(false)}
+                  onError={() => setImageLoading(false)}
+                  style={{
+                    touchAction: 'manipulation',
+                    userSelect: 'none',
+                    WebkitUserSelect: 'none',
+                    WebkitTouchCallout: 'none'
+                  }}
+                />
+              </>
+            ) : (
+              <div className="w-full h-full bg-gradient-to-br from-pink-200 to-purple-200 flex items-center justify-center">
+                <span className="text-6xl font-bold text-gray-700">
+                  {currentMatch.first_name?.[0]}{currentMatch.last_name?.[0]}
+                </span>
+              </div>
+            )}
+
+            {/* Photo indicators */}
+            {currentMatchImages.length > 1 && (
+              <div className="absolute top-4 left-4 right-4 flex gap-1">
+                {currentMatchImages.map((_, idx) => (
+                  <div
+                    key={idx}
+                    className={`flex-1 h-1 rounded-full transition-all duration-300 ${
+                      idx === imageIndex ? 'bg-white' : 'bg-white/40'
+                    }`}
+                  />
+                ))}
+              </div>
+            )}
+
+            {/* Listen Intro Button */}
+            <div className="absolute top-4 right-4">
+              <button className="bg-pink-500 hover:bg-pink-600 text-white rounded-full p-3 shadow-lg transition-colors duration-200">
+                <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 24 24">
+                  <path d="M12 2c-1.66 0-3 1.34-3 3v6c0 1.66 1.34 3 3 3s3-1.34 3-3V5c0-1.66-1.34-3-3-3zM17 11c0 2.76-2.24 5-5 5s-5-2.24-5-5H5c0 3.53 2.61 6.43 6 6.92V21h2v-3.08c3.39-.49 6-3.39 6-6.92h-2z"/>
+                </svg>
+              </button>
+              <div className="text-white text-xs font-medium mt-1 text-center">Listen<br/>Intro</div>
+            </div>
+
+            {/* Gradient overlay for better text readability */}
+            <div className="absolute inset-x-0 bottom-0 h-32 bg-gradient-to-t from-black/60 via-black/20 to-transparent" />
+          </div>
+
+          {/* Profile Info */}
+          <div className="p-6 bg-white">
+            {/* Name, Age, Distance */}
+            <div className="flex items-center justify-between mb-4">
+              <h2 className="text-2xl font-bold text-gray-900">
+                {currentMatch.first_name}, {calculateAge(currentMatch.date_of_birth)}
+              </h2>
+              <span className="text-gray-600 text-sm">
+                {userDistances[currentMatch.id] 
+                  ? `${Math.round(userDistances[currentMatch.id])}km away`
+                  : `${currentMatch.city || 'Location not set'}`}
+              </span>
+            </div>
+
+            {/* Interests */}
+            <div className="flex flex-wrap gap-2 mb-6">
+              {currentMatch.interests?.slice(0, 3).map((interest, index) => (
+                <span 
+                  key={index}
+                  className="px-3 py-2 bg-purple-100 text-purple-700 rounded-full text-sm font-medium"
+                >
+                  {interest}
+                </span>
+              ))}
+              {currentMatch.interests?.length > 3 && (
+                <button 
+                  onClick={() => setShowMoreInfo(!showMoreInfo)}
+                  className="px-3 py-2 bg-gray-100 text-gray-600 rounded-full text-sm font-medium hover:bg-gray-200 transition-colors"
+                >
+                  +{currentMatch.interests.length - 3}
+                </button>
+              )}
+            </div>
+
+            {/* Expandable Details */}
+            {showMoreInfo && (
+              <div className="border-t pt-4 space-y-3 animate-fade-in">
+                {currentMatch.bio && (
+                  <div>
+                    <h4 className="font-semibold text-gray-900 mb-1">About</h4>
+                    <p className="text-gray-600 text-sm">{currentMatch.bio}</p>
+                  </div>
+                )}
+                
+                <div className="grid grid-cols-2 gap-4 text-sm">
+                  {currentMatch.occupation && (
+                    <div>
+                      <h5 className="font-medium text-gray-900">Work</h5>
+                      <p className="text-gray-600">{currentMatch.occupation}</p>
+                    </div>
+                  )}
+                  {currentMatch.education_level && (
+                    <div>
+                      <h5 className="font-medium text-gray-900">Education</h5>
+                      <p className="text-gray-600">{currentMatch.education_level}</p>
+                    </div>
+                  )}
+                </div>
+
+                {currentMatch.interests?.length > 3 && (
+                  <div>
+                    <h4 className="font-semibold text-gray-900 mb-2">More Interests</h4>
+                    <div className="flex flex-wrap gap-2">
+                      {currentMatch.interests.slice(3).map((interest, index) => (
+                        <span 
+                          key={index}
+                          className="px-2 py-1 bg-gray-100 text-gray-700 rounded-full text-xs"
+                        >
+                          {interest}
+                        </span>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                <button 
+                  onClick={() => setShowMoreInfo(false)}
+                  className="w-full py-2 text-center text-gray-500 hover:text-gray-700 transition-colors"
+                >
+                  <ChevronUp className="w-5 h-5 mx-auto" />
+                </button>
+              </div>
+            )}
+
+            {!showMoreInfo && currentMatch.bio && (
+              <button 
+                onClick={() => setShowMoreInfo(true)}
+                className="w-full py-2 text-center text-gray-500 hover:text-gray-700 transition-colors"
+              >
+                <ChevronDown className="w-5 h-5 mx-auto" />
+              </button>
+            )}
+          </div>
+        </div>
+      </div>
+
+      {/* Action Buttons at Bottom */}
+      <div className="absolute bottom-0 left-0 right-0 z-20 bg-gradient-to-t from-purple-900 to-transparent pb-6 pt-8">
+        <div className="flex items-center justify-center gap-8 px-8">
+          {/* Drip Button (with logo) */}
+          <button
+            onClick={handlePass}
+            className="w-16 h-16 bg-white rounded-full flex items-center justify-center shadow-lg hover:scale-105 transition-transform"
+          >
+            <img 
+              src="/driplove-logo.png" 
+              alt="Drip" 
+              className="w-8 h-8 object-contain"
+            />
+          </button>
+
+          {/* Spark Button */}
+          <button
+            onClick={handleLike}
+            className="w-20 h-20 bg-gradient-to-br from-orange-400 to-orange-600 rounded-full flex items-center justify-center shadow-lg hover:scale-105 transition-transform"
+          >
+            <svg className="w-10 h-10 text-white" fill="currentColor" viewBox="0 0 24 24">
+              <path d="M12.76 3.76a6 6 0 0 1 8.48 8.48l-8.53 8.54a1 1 0 0 1-1.42 0l-8.53-8.54a6 6 0 0 1 8.48-8.48l.76.75.76-.75z"/>
+            </svg>
+          </button>
+
+          {/* Pass Button */}
+          <button
+            onClick={handlePass}
+            className="w-16 h-16 bg-gradient-to-br from-red-400 to-pink-500 rounded-full flex items-center justify-center shadow-lg hover:scale-105 transition-transform"
+          >
+            <X className="w-8 h-8 text-white" />
+          </button>
+        </div>
+
+        <div className="flex items-center justify-center gap-8 mt-2">
+          <span className="text-white text-sm font-medium">Drip</span>
+          <span className="text-white text-sm font-medium">Spark</span>
+          <span className="text-white text-sm font-medium">Pass</span>
+        </div>
+      </div>
+
+      {/* Reverse Button (top right) */}
+      <div className="absolute top-20 right-4 z-30">
+        <div className="relative">
+          <Button
+            onClick={handleReverse}
+            variant="outline"
+            disabled={!canReverse}
+            className="rounded-full border-2 border-yellow-500 bg-yellow-500/20 hover:bg-yellow-500/30 disabled:opacity-30 backdrop-blur-sm shadow-lg hover:border-yellow-400 transition-all duration-200"
+            style={{ width: 48, height: 48 }}
+            aria-label="Undo last action"
+          >
+            <Undo2 className="w-5 h-5 text-yellow-500" />
+          </Button>
+          {!isPremium && reversesLeft !== undefined && reversesLeft > 0 && (
+            <div className="absolute -top-2 -right-2 w-6 h-6 bg-yellow-500 text-black text-xs font-bold rounded-full flex items-center justify-center shadow-lg">
+              {reversesLeft}
+            </div>
+          )}
+        </div>
+      </div>
         {/* ...existing code... */}
         {nextMatch && (
           <DominantColorImageBg
@@ -1701,18 +2053,6 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, isPremium }: DiscoverPage
             </div>
           </div>
         </div>
-        {/* Loading more indicator */}
-  {/* Loading more indicator removed for professional background loading */}
-        {/* ...existing code... */}
-        <SwipeButtons
-          onPass={handlePass}
-          onReverse={handleReverse}
-          onLike={handleLike}
-          canReverse={isPremium ? true : passedUsers.length > 0}
-          reversesLeft={isPremium ? undefined : Math.max(0, 2 - reverseUsageToday)}
-          isPremium={isPremium}
-        />
-      </div>
     </div>
   );
 }
