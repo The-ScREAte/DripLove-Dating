@@ -322,7 +322,7 @@ const MainApp = ({ user, onLogout }: MainAppProps) => {
       <div className="w-full h-screen flex flex-col bg-white relative shadow-md overflow-hidden">
         
         {/* Fixed Header with Professional Safe Area */}
-        {!showTerms && !showPrivacy && (
+        {!showTerms && !showPrivacy && activeTab !== 'discover' && (
           <SafeAreaView edges={['top']} className="fixed top-0 left-0 right-0 w-full bg-white shadow-sm border-b z-50">
             <div className="px-4 py-2 flex justify-between items-center">
               <img 
@@ -344,7 +344,7 @@ const MainApp = ({ user, onLogout }: MainAppProps) => {
         <div 
           className={`flex-1 overflow-y-auto ${!showTerms && !showPrivacy ? 'pb-[70px]' : ''}`}
           style={{ 
-            paddingTop: !showTerms && !showPrivacy ? (60 + insets.top) : 0 
+            paddingTop: !showTerms && !showPrivacy && activeTab !== 'discover' ? (60 + insets.top) : 0 
           }}
         >
           {renderContent()}
@@ -355,19 +355,19 @@ const MainApp = ({ user, onLogout }: MainAppProps) => {
           <SafeAreaView edges={['bottom']} className="fixed bottom-0 left-0 right-0 w-full bg-white border-t border-gray-200 px-2 py-2 z-50">
             <div className="flex justify-around items-center">
               {[
-                { label: 'Discover', icon: Heart }, 
+                { label: 'DripCheck', icon: Heart }, 
                 { label: 'Chat', icon: MessageCircle }, 
                 { label: 'Liked', icon: Users }, 
                 { label: 'Profile', icon: User }
               ].map(({ label, icon: Icon }) => (
                 <button
                   key={label}
-                  onClick={() => setActiveTab(label.toLowerCase())}
+                  onClick={() => setActiveTab(label === 'DripCheck' ? 'discover' : label.toLowerCase())}
                   className={`flex flex-col items-center space-y-1 py-2 px-2 rounded-lg transition-colors relative ${
-                    activeTab === label.toLowerCase() ? 'text-pink-600' : 'text-gray-500'
+                    (label === 'DripCheck' ? activeTab === 'discover' : activeTab === label.toLowerCase()) ? 'text-pink-600' : 'text-gray-500'
                   }`}
                 >
-                  <Icon className={`w-5 h-5 ${activeTab === label.toLowerCase() ? 'fill-current' : ''}`} />
+                  <Icon className={`w-5 h-5 ${(label === 'DripCheck' ? activeTab === 'discover' : activeTab === label.toLowerCase()) ? 'fill-current' : ''}`} />
                   <span className="text-xs font-medium">{label}</span>
                    {label === 'Chat' && unreadCount > 0 && (
                      <div className="absolute -top-1 -right-1 h-5 w-5 rounded-full bg-red-500 border-2 border-white z-10 flex items-center justify-center">

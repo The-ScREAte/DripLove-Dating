@@ -4,31 +4,65 @@ import { buyMonthly, restorePurchases } from '../iap';
 import { useImageEdgeColor } from '@/hooks/useImageEdgeColor';
 function DominantColorImageBg({ imageUrl, children }) {
   const { edgeColor } = useImageEdgeColor(imageUrl);
+  
+  // Generate bright gradient colors matching the reference image (purple to pink)
+  const brightGradients = [
+    'bg-gradient-to-br from-purple-600 via-purple-500 to-pink-500',
+    'bg-gradient-to-br from-purple-700 via-purple-600 to-pink-600', 
+    'bg-gradient-to-br from-indigo-600 via-purple-500 to-pink-500',
+    'bg-gradient-to-br from-purple-800 via-purple-600 to-pink-400',
+    'bg-gradient-to-br from-violet-600 via-purple-500 to-pink-500',
+    'bg-gradient-to-br from-purple-600 via-fuchsia-500 to-pink-500',
+    'bg-gradient-to-br from-indigo-700 via-purple-600 to-pink-600',
+    'bg-gradient-to-br from-purple-700 via-fuchsia-600 to-pink-500'
+  ];
+  
+  // Generate consistent gradient based on edge color
+  const getGradientFromColor = (color) => {
+    if (!color || color === '#000000') {
+      return brightGradients[0]; // Default bright gradient
+    }
+    
+    // Convert hex to number for consistent selection
+    const hex = color.replace('#', '');
+    const num = parseInt(hex, 16);
+    const index = num % brightGradients.length;
+    return brightGradients[index];
+  };
+  
+  const selectedGradient = getGradientFromColor(edgeColor);
+  
   return (
     <div className="absolute inset-0 z-0 pointer-events-none">
-      {/* Solid color overlay fills all space */}
+      {/* Bright gradient background for better contrast */}
       <div
-        className="absolute inset-0"
-        style={{ background: edgeColor, zIndex: 0 }}
+        className={`absolute inset-0 ${selectedGradient}`}
+        style={{ zIndex: 0 }}
         aria-hidden="true"
       />
-      {/* Blurred image overlays the color for a soft effect */}
+      {/* Blurred image overlays the gradient for a soft effect - made very subtle for small screens */}
       {imageUrl && (
         <img
           src={imageUrl}
           aria-hidden="true"
-          className="absolute inset-0 w-full h-full object-cover"
+          className="absolute inset-0 w-full h-full object-cover opacity-5"
           style={{
-            filter: 'blur(48px) brightness(1.08)',
+            filter: 'blur(60px) brightness(1.1)',
             zIndex: 1,
             objectFit: 'cover',
             width: '100%',
             height: '100%',
-            transform: 'scale(1.25)'
+            transform: 'scale(1.1)'
           }}
           draggable={false}
         />
       )}
+      {/* Dark overlay for better text readability */}
+      <div 
+        className="absolute inset-0 bg-black/20"
+        style={{ zIndex: 2 }}
+        aria-hidden="true"
+      />
       <div className="absolute inset-0 z-10">
         {children}
       </div>
@@ -76,9 +110,12 @@ const adinkraSymbols = [
 ];
 
 const ROTATE_INTERVAL_MS = 2 * 60 * 1000; // 2 minutes
-const AdinkraBar: React.FC = () => {
+interface AdinkraBarProps {
+  onSymbolClick: (index: number) => void;
+}
+
+const AdinkraBar: React.FC<AdinkraBarProps> = ({ onSymbolClick }) => {
   const SYMBOLS_PER_SET = 4;
-  const [tooltipIdx, setTooltipIdx] = useState<number | null>(null);
   const [setIndex, setSetIndex] = useState(() => Math.floor(Math.random() * Math.ceil(adinkraSymbols.length / SYMBOLS_PER_SET)));
   useEffect(() => {
     const interval = setInterval(() => {
@@ -104,32 +141,22 @@ const AdinkraBar: React.FC = () => {
       {visibleSymbols.map((symbol, idx) => (
         <button
           key={symbol.name}
-          className="focus:outline-none bg-white rounded-full shadow hover:scale-110 transition-transform border border-yellow-300"
+          className="focus:outline-none bg-white rounded-full shadow hover:scale-110 transition-all duration-300 border border-yellow-300 hover:border-yellow-400 hover:shadow-lg cursor-pointer"
           style={{ width: 32, height: 28, display: 'flex', alignItems: 'center', justifyContent: 'center' }}
-          onClick={() => setTooltipIdx(start + idx)}
+          onClick={() => onSymbolClick(start + idx)}
           tabIndex={0}
-          aria-label={symbol.name + ' symbol'}
+          aria-label={`Click to see meaning of ${symbol.name} symbol`}
+          title={`Click to learn about ${symbol.name}`}
         >
           {symbol.svg}
         </button>
       ))}
-      {tooltipIdx !== null && (
-        <div
-          className="fixed left-1/2 top-1/2 z-50 px-4 py-3 rounded-lg shadow-lg bg-white border border-gray-300 text-xs text-gray-800 animate-fade-in flex flex-col items-center"
-          style={{ transform: 'translate(-50%, -50%)', minWidth: 180, maxWidth: 260 }}
-          onClick={() => setTooltipIdx(null)}
-        >
-          <strong className="text-base mb-1">{adinkraSymbols[tooltipIdx].name}</strong>
-          <div className="mt-1 text-center">{adinkraSymbols[tooltipIdx].meaning}</div>
-          <div className="text-[10px] text-gray-400 mt-2">(Click to close)</div>
-        </div>
-      )}
     </div>
   );
 };
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Heart, X, Crown, Calendar, MapPin, ChevronDown, ChevronUp, Briefcase, GraduationCap, Undo2 } from 'lucide-react';
+import { Heart, X, Crown, Calendar, MapPin, ChevronDown, ChevronUp, ChevronLeft, ChevronRight, Briefcase, GraduationCap, Undo2 } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import { useSubscription } from '@/hooks/useSubscription';
@@ -214,8 +241,18 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, isPremium }: DiscoverPage
   const [profileMissingFields, setProfileMissingFields] = useState<string[]>([]);
   const [userProfileImages, setUserProfileImages] = useState<any[]>([]);
   const [showProfileCompletionModal, setShowProfileCompletionModal] = useState(false);
+  
+  // Card shuffling system
+  const [currentCardType, setCurrentCardType] = useState<'photo' | 'about' | 'funfact' | 'questions'>('photo');
+  const [cardOrder, setCardOrder] = useState<('photo' | 'about' | 'funfact' | 'questions')[]>([]);
   const [todaySwipeCount, setTodaySwipeCount] = useState(0);
   const [imageLoading, setImageLoading] = useState(false);
+  
+  // Adinkra tooltip state
+  const [tooltipIdx, setTooltipIdx] = useState<number | null>(null);
+  
+  // Interests display state
+  const [showAllInterests, setShowAllInterests] = useState(false);
   
   // Dynamic content height management
   const contentRef = useRef<HTMLDivElement>(null);
@@ -637,10 +674,50 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, isPremium }: DiscoverPage
     }
   }, [currentIndex, potentialMatches]);
 
+  // Effect that only runs when switching profiles (currentIndex changes)
   useEffect(() => {
-  setImageIndex(0);
-    // Load images for current match if not already loaded
+    setImageIndex(0);
+    setShowMoreInfo(false); // Reset expanded state when switching profiles
+    
+    // Generate card order for the current match
     const currentMatch = potentialMatches[currentIndex];
+    if (currentMatch) {
+      const generateCardOrder = () => {
+        const availableCards: ('photo' | 'about' | 'funfact' | 'questions')[] = ['photo'];
+        
+        // Add about card if bio exists
+        if (currentMatch.bio) availableCards.push('about');
+        
+        // Add fun fact card if it exists
+        if (currentMatch.fun_fact) availableCards.push('funfact');
+        
+        // Add questions card if relevant fields exist
+        if (currentMatch.perfect_first_date || currentMatch.last_googled) {
+          availableCards.push('questions');
+        }
+        
+        // Shuffle the non-photo cards
+        const nonPhotoCards = availableCards.slice(1);
+        for (let i = nonPhotoCards.length - 1; i > 0; i--) {
+          const j = Math.floor(Math.random() * (i + 1));
+          [nonPhotoCards[i], nonPhotoCards[j]] = [nonPhotoCards[j], nonPhotoCards[i]];
+        }
+        
+        // Return photo first, then shuffled other cards
+        return ['photo', ...nonPhotoCards] as ('photo' | 'about' | 'funfact' | 'questions')[];
+      };
+      
+      const newOrder = generateCardOrder();
+      setCardOrder(newOrder);
+      setCurrentCardType('photo'); // Always start with photo
+    }
+  }, [currentIndex, potentialMatches]); // Removed userImages, preloadNextProfileImages, loadFullImages
+
+  // Separate effect for image loading that doesn't reset showMoreInfo
+  useEffect(() => {
+    const currentMatch = potentialMatches[currentIndex];
+    
+    // Load images for current match if not already loaded
     if (currentMatch && !userImages[currentMatch.id]) {
       loadFullImages(currentMatch.id);
     }
@@ -808,12 +885,63 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, isPremium }: DiscoverPage
     }
   };
 
-  const handleImageAreaClick = (e: React.MouseEvent<HTMLDivElement>) => {
-    // Prevent swipe action if dragging occurred
+  const handleCardAreaClick = (e: React.MouseEvent<HTMLDivElement>) => {
+    // Prevent action if dragging occurred
     if (Math.abs(currentX - startX) > 10) return;
 
-    // This function is now mainly used for compatibility
-    // The actual image/slide navigation is handled within MatchCard
+    // Get click position relative to the container
+    const rect = e.currentTarget.getBoundingClientRect();
+    const clickX = e.clientX - rect.left;
+    const containerWidth = rect.width;
+    const isLeftSide = clickX < containerWidth / 2;
+
+    if (currentCardType === 'photo') {
+      // Handle image navigation for photo cards
+      if (!currentMatch || currentMatchImages.length <= 1) return;
+      
+      if (isLeftSide) {
+        // Go to previous image
+        setImageIndex(prevIndex => 
+          prevIndex > 0 ? prevIndex - 1 : currentMatchImages.length - 1
+        );
+      } else {
+        // Go to next image or next card type
+        if (imageIndex < currentMatchImages.length - 1) {
+          setImageIndex(prevIndex => prevIndex + 1);
+        } else {
+          // Move to next card type if available
+          const currentCardIndex = cardOrder.indexOf(currentCardType);
+          if (currentCardIndex < cardOrder.length - 1) {
+            setCurrentCardType(cardOrder[currentCardIndex + 1]);
+            setImageIndex(0);
+          } else {
+            setImageIndex(0); // Loop back to first image
+          }
+        }
+      }
+    } else {
+      // Handle navigation for other card types
+      const currentCardIndex = cardOrder.indexOf(currentCardType);
+      
+      if (isLeftSide) {
+        // Go to previous card type
+        if (currentCardIndex > 0) {
+          const prevCardType = cardOrder[currentCardIndex - 1];
+          setCurrentCardType(prevCardType);
+          if (prevCardType === 'photo') {
+            setImageIndex(currentMatchImages.length - 1); // Go to last image
+          }
+        }
+      } else {
+        // Go to next card type or loop back
+        if (currentCardIndex < cardOrder.length - 1) {
+          setCurrentCardType(cardOrder[currentCardIndex + 1]);
+        } else {
+          setCurrentCardType('photo');
+          setImageIndex(0);
+        }
+      }
+    }
   };
 
   // Function to load more matches when running low - optimized for 5 at a time
@@ -1429,8 +1557,8 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, isPremium }: DiscoverPage
   return (
     <div className="h-full w-full fixed left-0 overflow-hidden bg-gradient-to-br from-purple-600 via-purple-700 to-purple-800"
          style={{ 
-           top: '60px',
-           height: 'calc(100vh - 60px)',
+           top: '0px',
+           height: '100vh',
            touchAction: 'pan-x pan-y',
            userSelect: 'none',
            WebkitUserSelect: 'none',
@@ -1439,7 +1567,7 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, isPremium }: DiscoverPage
       
       {/* Adinkra Bar at the top */}
       <div className="relative z-10">
-        <AdinkraBar />
+        <AdinkraBar onSymbolClick={setTooltipIdx} />
       </div>
 
       {/* --- Swipe Guide Popup for New Users --- */}
@@ -1515,41 +1643,95 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, isPremium }: DiscoverPage
         </div>
       )}
 
+      {/* Listen Intro Button - Outside match card area */}
+      <div className="absolute top-20 right-2 z-50">
+        <button 
+          className="bg-gradient-to-br from-pink-500 to-pink-600 hover:from-pink-600 hover:to-pink-700 text-white rounded-full p-4 shadow-xl transition-all duration-200 hover:scale-110 active:scale-95 border-2 border-white/30"
+          onClick={() => {
+            // Add voice intro functionality here
+            console.log('Play voice intro for:', currentMatch.first_name);
+          }}
+        >
+          <svg className="w-6 h-6" fill="currentColor" viewBox="0 0 24 24">
+            <path d="M12 2c-1.66 0-3 1.34-3 3v6c0 1.66 1.34 3 3 3s3-1.34 3-3V5c0-1.66-1.34-3-3-3zM17 11c0 2.76-2.24 5-5 5s-5-2.24-5-5H5c0 3.53 2.61 6.43 6 6.92V21h2v-3.08c3.39-.49 6-3.39 6-6.92h-2z"/>
+          </svg>
+        </button>
+      </div>
+
       {/* Main Profile Card Area */}
-      <div className="flex-1 flex flex-col items-center justify-center px-4 py-6" style={{ height: 'calc(100vh - 200px)' }}>
-        {nextMatch && (
-          <div className="absolute inset-0 z-0 scale-95 opacity-30 blur-sm">
-            <DominantColorImageBg
-              imageUrl={nextMatchImages[0] ? getOptimizedUrl(nextMatchImages[0]) : undefined}
-            >
-              {nextMatchImages.length > 0 ? (
-                <img
-                  src={getOptimizedUrl(nextMatchImages[0])}
-                  alt={`${nextMatch.first_name}'s photo`}
-                  className="w-full h-full object-cover rounded-3xl"
-                  draggable={false}
-                  loading="eager"
-                />
-              ) : (
-                <div className="w-full h-full bg-gradient-to-br from-pink-200 to-purple-200 flex items-center justify-center rounded-3xl">
-                  <span className="text-6xl font-bold text-gray-700">
-                    {nextMatch.first_name?.[0]}{nextMatch.last_name?.[0]}
+      <div className="flex-1 flex flex-col items-center justify-start px-4 pt-2 relative" style={{ height: 'calc(100vh - 160px)', marginBottom: '90px' }}>
+  {/* Next Profile Card - Behind Current Card - Removed as requested */}
+
+        {/* Profile Info Above Card - Outside the card container */}
+        <div className="w-full max-w-sm mx-auto mb-4 z-20">
+          <div className="bg-transparent px-4 py-4">
+            {/* Name, Age, Distance */}
+            <div className="text-center mb-3">
+              <h2 
+                className="text-2xl font-bold text-white mb-1"
+                style={{
+                  textShadow: '0 2px 8px rgba(0,0,0,0.8), 0 4px 16px rgba(0,0,0,0.6), 0 0 0 1px rgba(255,255,255,0.3)',
+                  WebkitTextStroke: '0.5px rgba(255,255,255,0.1)'
+                }}
+              >
+                {currentMatch.first_name}, {calculateAge(currentMatch.date_of_birth)}
+              </h2>
+              <span 
+                className="text-white/95 text-sm font-medium"
+                style={{
+                  textShadow: '0 2px 6px rgba(0,0,0,0.7), 0 4px 12px rgba(0,0,0,0.5)'
+                }}
+              >
+                {userDistances[currentMatch.id] 
+                  ? `${Math.round(userDistances[currentMatch.id])}km away`
+                  : `${currentMatch.city || 'Location not set'}`}
+              </span>
+            </div>
+            
+            {/* Interests */}
+            {currentMatch.interests?.length > 0 && (
+              <div className="flex flex-wrap justify-center gap-2 mt-3">
+                {currentMatch.interests.slice(0, 3).map((interest, index) => (
+                  <span 
+                    key={index}
+                    className="px-3 py-1.5 bg-white/25 backdrop-blur-sm text-white rounded-full text-sm font-semibold border border-white/20"
+                    style={{
+                      textShadow: '0 1px 4px rgba(0,0,0,0.6)',
+                      boxShadow: '0 4px 12px rgba(0,0,0,0.3), inset 0 1px 0 rgba(255,255,255,0.2)'
+                    }}
+                  >
+                    {interest}
                   </span>
-                </div>
-              )}
-            </DominantColorImageBg>
+                ))}
+                {currentMatch.interests.length > 3 && (
+                  <button 
+                    onClick={() => setShowAllInterests(true)}
+                    className="px-3 py-1.5 bg-white/25 backdrop-blur-sm text-white rounded-full text-sm font-semibold border border-white/20 hover:bg-white/35 transition-all duration-200 cursor-pointer"
+                    style={{
+                      textShadow: '0 1px 4px rgba(0,0,0,0.6)',
+                      boxShadow: '0 4px 12px rgba(0,0,0,0.3), inset 0 1px 0 rgba(255,255,255,0.2)'
+                    }}
+                  >
+                    +{currentMatch.interests.length - 3}
+                  </button>
+                )}
+              </div>
+            )}
           </div>
-        )}
+        </div>
 
         {/* Current Profile Card */}
         <div
-          className="relative w-full max-w-sm mx-auto bg-white rounded-3xl overflow-hidden shadow-2xl z-10"
+          className={`relative w-full max-w-sm mx-auto bg-white rounded-3xl shadow-2xl z-10 transition-all duration-300 ${
+            showMoreInfo ? 'overflow-visible' : 'overflow-hidden'
+          }`}
           style={{
             transform: cardTransform,
             transition: exitingCard ? 'transform 0.3s cubic-bezier(0.25, 0.46, 0.45, 0.94)' : 
                        isDragging ? 'none' : 'transform 0.3s cubic-bezier(0.22, 1, 0.36, 1)',
             opacity: exitingCard ? 0 : 1,
-            height: '600px'
+            minHeight: '400px',
+            maxHeight: showMoreInfo ? 'none' : '400px'
           }}
         >
           {/* Swipe Overlays */}
@@ -1631,241 +1813,450 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, isPremium }: DiscoverPage
             </>
           )}
 
-          {/* Profile Image Container */}
+          {/* Profile Card Container - Dynamic Content */}
           <div 
-            className="relative h-80 cursor-pointer select-none overflow-hidden"
+            className="relative h-80 select-none overflow-hidden rounded-t-3xl"
             onTouchStart={handleTouchStart}
             onTouchMove={handleTouchMove}
             onTouchEnd={handleTouchEnd}
             onMouseDown={handleMouseDown}
             onMouseMove={handleMouseMove}
             onMouseUp={handleMouseUp}
-            onClick={handleImageAreaClick}
+            onClick={handleCardAreaClick}
+            style={{ cursor: 'pointer' }}
           >
-            {currentMatchImages.length > 0 ? (
+            {/* Card Content Based on Current Card Type */}
+            {currentCardType === 'photo' ? (
               <>
-                {imageLoading && (
-                  <div className="absolute inset-0 bg-gray-100 flex items-center justify-center z-10">
-                    <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-pink-500" />
+                {/* Photo Card */}
+                {currentMatchImages.length > 0 ? (
+                  <>
+                    {imageLoading && (
+                      <div className="absolute inset-0 bg-gray-100 flex items-center justify-center z-10">
+                        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-pink-500" />
+                      </div>
+                    )}
+                    <img
+                      src={getOptimizedUrl(currentMatchImages[imageIndex])}
+                      alt={`${currentMatch.first_name} ${currentMatch.last_name}`}
+                      className="w-full h-full object-cover"
+                      draggable={false}
+                      onLoadStart={() => setImageLoading(true)}
+                      onLoad={() => setImageLoading(false)}
+                      onError={() => setImageLoading(false)}
+                      style={{
+                        touchAction: 'manipulation',
+                        userSelect: 'none',
+                        WebkitUserSelect: 'none',
+                        WebkitTouchCallout: 'none'
+                      }}
+                    />
+                  </>
+                ) : (
+                  <div className="w-full h-full bg-gradient-to-br from-purple-500 to-pink-500 flex items-center justify-center">
+                    <span className="text-6xl font-bold text-white drop-shadow-lg">
+                      {currentMatch.first_name?.[0]}{currentMatch.last_name?.[0]}
+                    </span>
                   </div>
                 )}
-                <img
-                  src={getOptimizedUrl(currentMatchImages[imageIndex])}
-                  alt={`${currentMatch.first_name} ${currentMatch.last_name}`}
-                  className="w-full h-full object-cover"
-                  draggable={false}
-                  onLoadStart={() => setImageLoading(true)}
-                  onLoad={() => setImageLoading(false)}
-                  onError={() => setImageLoading(false)}
-                  style={{
-                    touchAction: 'manipulation',
-                    userSelect: 'none',
-                    WebkitUserSelect: 'none',
-                    WebkitTouchCallout: 'none'
-                  }}
-                />
               </>
-            ) : (
-              <div className="w-full h-full bg-gradient-to-br from-pink-200 to-purple-200 flex items-center justify-center">
-                <span className="text-6xl font-bold text-gray-700">
-                  {currentMatch.first_name?.[0]}{currentMatch.last_name?.[0]}
-                </span>
-              </div>
-            )}
+            ) : currentCardType === 'about' ? (
+              <>
+                {/* About Card */}
+                <DominantColorImageBg imageUrl={currentMatchImages[0]}>
+                  <div className="absolute inset-0 flex flex-col justify-center items-center p-6 text-white">
+                    <div className="text-center space-y-4 max-w-xs">
+                      <h3 className="text-2xl font-bold mb-4">About {currentMatch.first_name}</h3>
+                      {currentMatch.bio && (
+                        <p className="text-lg leading-relaxed font-medium text-white/95 drop-shadow-lg">
+                          {currentMatch.bio}
+                        </p>
+                      )}
+                      {currentMatch.occupation && (
+                        <div className="mt-4">
+                          <p className="text-sm font-semibold text-white/90 drop-shadow">
+                            {currentMatch.occupation}
+                          </p>
+                        </div>
+                      )}
+                      {currentMatch.education_level && (
+                        <div>
+                          <p className="text-sm text-white/80 drop-shadow">
+                            {currentMatch.education_level}
+                          </p>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                </DominantColorImageBg>
+              </>
+            ) : currentCardType === 'funfact' ? (
+              <>
+                {/* Fun Fact Card */}
+                <DominantColorImageBg imageUrl={currentMatchImages[0]}>
+                  <div className="absolute inset-0 flex flex-col justify-center items-center p-6 text-white">
+                    <div className="text-center space-y-4 max-w-xs">
+                      <h3 className="text-2xl font-bold mb-4">Fun Fact</h3>
+                      {currentMatch.fun_fact && (
+                        <p className="text-lg leading-relaxed font-medium text-white/95 drop-shadow-lg">
+                          {currentMatch.fun_fact}
+                        </p>
+                      )}
+                    </div>
+                  </div>
+                </DominantColorImageBg>
+              </>
+            ) : currentCardType === 'questions' ? (
+              <>
+                {/* Questions Card */}
+                <DominantColorImageBg imageUrl={currentMatchImages[0]}>
+                  <div className="absolute inset-0 flex flex-col justify-center items-center p-6 text-white">
+                    <div className="text-center space-y-6 max-w-xs">
+                      <h3 className="text-2xl font-bold mb-4">Get to Know Me</h3>
+                      {currentMatch.perfect_first_date && (
+                        <div className="space-y-2">
+                          <p className="text-sm font-semibold text-white/90 drop-shadow">
+                            Perfect First Date:
+                          </p>
+                          <p className="text-lg leading-relaxed font-medium text-white/95 drop-shadow-lg">
+                            {currentMatch.perfect_first_date}
+                          </p>
+                        </div>
+                      )}
+                      {currentMatch.last_googled && (
+                        <div className="space-y-2">
+                          <p className="text-sm font-semibold text-white/90 drop-shadow">
+                            Last Googled:
+                          </p>
+                          <p className="text-lg leading-relaxed font-medium text-white/95 drop-shadow-lg">
+                            {currentMatch.last_googled}
+                          </p>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                </DominantColorImageBg>
+              </>
+            ) : null}
 
-            {/* Photo indicators */}
-            {currentMatchImages.length > 1 && (
-              <div className="absolute top-4 left-4 right-4 flex gap-1">
-                {currentMatchImages.map((_, idx) => (
+            {/* Card indicators */}
+            <div className="absolute top-4 left-4 right-4 flex gap-1">
+              {currentCardType === 'photo' && currentMatchImages.length > 1 ? (
+                // Photo indicators for image navigation
+                currentMatchImages.map((_, idx) => (
                   <div
                     key={idx}
                     className={`flex-1 h-1 rounded-full transition-all duration-300 ${
                       idx === imageIndex ? 'bg-white' : 'bg-white/40'
                     }`}
                   />
-                ))}
-              </div>
-            )}
-
-            {/* Listen Intro Button */}
-            <div className="absolute top-4 right-4">
-              <button className="bg-pink-500 hover:bg-pink-600 text-white rounded-full p-3 shadow-lg transition-colors duration-200">
-                <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 24 24">
-                  <path d="M12 2c-1.66 0-3 1.34-3 3v6c0 1.66 1.34 3 3 3s3-1.34 3-3V5c0-1.66-1.34-3-3-3zM17 11c0 2.76-2.24 5-5 5s-5-2.24-5-5H5c0 3.53 2.61 6.43 6 6.92V21h2v-3.08c3.39-.49 6-3.39 6-6.92h-2z"/>
-                </svg>
-              </button>
-              <div className="text-white text-xs font-medium mt-1 text-center">Listen<br/>Intro</div>
+                ))
+              ) : (
+                // Card type indicators
+                cardOrder.map((cardType, idx) => {
+                  const isActive = cardType === currentCardType;
+                  return (
+                    <div
+                      key={cardType}
+                      className={`flex-1 h-1 rounded-full transition-all duration-300 ${
+                        isActive ? 'bg-white' : 'bg-white/40'
+                      }`}
+                    />
+                  );
+                })
+              )}
             </div>
+
+            {/* Navigation hint arrows */}
+            <div className="absolute left-4 top-1/2 transform -translate-y-1/2 pointer-events-none">
+              <ChevronLeft className="w-6 h-6 text-white/60 drop-shadow-lg" />
+            </div>
+            <div className="absolute right-4 top-1/2 transform -translate-y-1/2 pointer-events-none">
+              <ChevronRight className="w-6 h-6 text-white/60 drop-shadow-lg" />
+            </div>
+
+            {/* Navigation areas */}
+            <>
+              {/* Left navigation area */}
+              <div 
+                className="absolute left-0 top-0 w-1/2 h-full z-20 flex items-center justify-start pl-2 cursor-pointer active:bg-black/5"
+                onClick={(e) => {
+                  e.preventDefault();
+                  e.stopPropagation();
+                  
+                  if (currentCardType === 'photo' && currentMatchImages.length > 1) {
+                    // Navigate through images
+                    setImageIndex(prevIndex => 
+                      prevIndex > 0 ? prevIndex - 1 : currentMatchImages.length - 1
+                    );
+                  } else {
+                    // Navigate to previous card type
+                    const currentCardIndex = cardOrder.indexOf(currentCardType);
+                    if (currentCardIndex > 0) {
+                      const prevCardType = cardOrder[currentCardIndex - 1];
+                      setCurrentCardType(prevCardType);
+                      if (prevCardType === 'photo') {
+                        setImageIndex(currentMatchImages.length - 1);
+                      }
+                    }
+                  }
+                }}
+                onTouchEnd={(e) => {
+                  e.preventDefault();
+                  e.stopPropagation();
+                }}
+                style={{ backgroundColor: 'transparent' }}
+              >
+                <div className="bg-black/30 backdrop-blur-sm rounded-full p-1.5 opacity-0 hover:opacity-100 active:opacity-100 transition-all duration-200">
+                  <ChevronLeft className="w-5 h-5 text-white drop-shadow-lg" />
+                </div>
+              </div>
+
+              {/* Right navigation area */}
+              <div 
+                className="absolute right-0 top-0 w-1/2 h-full z-20 flex items-center justify-end pr-2 cursor-pointer active:bg-black/5"
+                onClick={(e) => {
+                  e.preventDefault();
+                  e.stopPropagation();
+                  
+                  if (currentCardType === 'photo') {
+                    if (currentMatchImages.length > 1 && imageIndex < currentMatchImages.length - 1) {
+                      // Navigate to next image
+                      setImageIndex(prevIndex => prevIndex + 1);
+                    } else {
+                      // Navigate to next card type
+                      const currentCardIndex = cardOrder.indexOf(currentCardType);
+                      if (currentCardIndex < cardOrder.length - 1) {
+                        setCurrentCardType(cardOrder[currentCardIndex + 1]);
+                        setImageIndex(0);
+                      } else {
+                        // Loop back to first image of photos
+                        setImageIndex(0);
+                      }
+                    }
+                  } else {
+                    // Navigate to next card type
+                    const currentCardIndex = cardOrder.indexOf(currentCardType);
+                    if (currentCardIndex < cardOrder.length - 1) {
+                      setCurrentCardType(cardOrder[currentCardIndex + 1]);
+                    } else {
+                      setCurrentCardType('photo');
+                      setImageIndex(0);
+                    }
+                  }
+                }}
+                onTouchEnd={(e) => {
+                }}
+                style={{ backgroundColor: 'transparent' }}
+              >
+                <div className="bg-black/30 backdrop-blur-sm rounded-full p-1.5 opacity-0 hover:opacity-100 active:opacity-100 transition-all duration-200">
+                  <ChevronRight className="w-5 h-5 text-white drop-shadow-lg" />
+                </div>
+              </div>
+            </>
+
+
 
             {/* Gradient overlay for better text readability */}
             <div className="absolute inset-x-0 bottom-0 h-32 bg-gradient-to-t from-black/60 via-black/20 to-transparent" />
           </div>
 
-          {/* Profile Info */}
-          <div className="p-6 bg-white">
-            {/* Name, Age, Distance */}
-            <div className="flex items-center justify-between mb-4">
-              <h2 className="text-2xl font-bold text-gray-900">
-                {currentMatch.first_name}, {calculateAge(currentMatch.date_of_birth)}
-              </h2>
-              <span className="text-gray-600 text-sm">
-                {userDistances[currentMatch.id] 
-                  ? `${Math.round(userDistances[currentMatch.id])}km away`
-                  : `${currentMatch.city || 'Location not set'}`}
-              </span>
-            </div>
-
-            {/* Interests */}
-            <div className="flex flex-wrap gap-2 mb-6">
-              {currentMatch.interests?.slice(0, 3).map((interest, index) => (
-                <span 
-                  key={index}
-                  className="px-3 py-2 bg-purple-100 text-purple-700 rounded-full text-sm font-medium"
-                >
-                  {interest}
-                </span>
-              ))}
-              {currentMatch.interests?.length > 3 && (
-                <button 
-                  onClick={() => setShowMoreInfo(!showMoreInfo)}
-                  className="px-3 py-2 bg-gray-100 text-gray-600 rounded-full text-sm font-medium hover:bg-gray-200 transition-colors"
-                >
-                  +{currentMatch.interests.length - 3}
-                </button>
+          {/* Profile Info - Minimized */}
+          <div className="bg-white">
+            {/* Compact info section for expandable content */}
+            <div className="px-4 py-2">
+              {/* Show more info button if there's additional content to show */}
+              {(currentMatch.bio || currentMatch.occupation || currentMatch.education_level || 
+                (currentMatch.interests && currentMatch.interests.length > 0)) && (
+                <div className="flex justify-center">
+                  <button 
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      e.preventDefault();
+                      setShowMoreInfo(!showMoreInfo);
+                    }}
+                    className="flex items-center px-3 py-1.5 bg-pink-500 hover:bg-pink-600 text-white rounded-full text-xs font-medium transition-colors"
+                  >
+                    {showMoreInfo ? (
+                      <>
+                        <ChevronUp className="w-3 h-3 mr-1" />
+                        Less Info
+                      </>
+                    ) : (
+                      <>
+                        <ChevronDown className="w-3 h-3 mr-1" />
+                        More Info
+                      </>
+                    )}
+                  </button>
+                </div>
               )}
             </div>
 
             {/* Expandable Details */}
             {showMoreInfo && (
-              <div className="border-t pt-4 space-y-3 animate-fade-in">
-                {currentMatch.bio && (
-                  <div>
-                    <h4 className="font-semibold text-gray-900 mb-1">About</h4>
-                    <p className="text-gray-600 text-sm">{currentMatch.bio}</p>
-                  </div>
-                )}
-                
-                <div className="grid grid-cols-2 gap-4 text-sm">
-                  {currentMatch.occupation && (
+              <div className="border-t border-gray-200 bg-gray-50 max-h-80 overflow-y-auto animate-fade-in">
+                <div className="px-4 py-3 space-y-3">
+                  {currentMatch.bio && (
                     <div>
-                      <h5 className="font-medium text-gray-900">Work</h5>
-                      <p className="text-gray-600">{currentMatch.occupation}</p>
+                      <h4 className="font-medium text-gray-900 mb-1 text-sm">About</h4>
+                      <p className="text-gray-600 text-xs leading-relaxed">{currentMatch.bio}</p>
                     </div>
                   )}
-                  {currentMatch.education_level && (
+                  
+                  {(currentMatch.occupation || currentMatch.education_level) && (
+                    <div className="grid grid-cols-2 gap-2 text-xs">
+                      {currentMatch.occupation && (
+                        <div>
+                          <h5 className="font-medium text-gray-900">Work</h5>
+                          <p className="text-gray-600">{currentMatch.occupation}</p>
+                        </div>
+                      )}
+                      {currentMatch.education_level && (
+                        <div>
+                          <h5 className="font-medium text-gray-900">Education</h5>
+                          <p className="text-gray-600">{currentMatch.education_level}</p>
+                        </div>
+                      )}
+                    </div>
+                  )}
+
+                  {/* Show all interests in expanded view */}
+                  {currentMatch.interests?.length > 3 && (
                     <div>
-                      <h5 className="font-medium text-gray-900">Education</h5>
-                      <p className="text-gray-600">{currentMatch.education_level}</p>
+                      <h4 className="font-medium text-gray-900 mb-1.5 text-sm">All Interests</h4>
+                      <div className="flex flex-wrap gap-1.5">
+                        {currentMatch.interests.map((interest, index) => (
+                          <span 
+                            key={index}
+                            className="px-2 py-0.5 bg-purple-100 text-purple-700 rounded-full text-xs"
+                          >
+                            {interest}
+                          </span>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Additional profile information */}
+                  {(currentMatch.drinking || currentMatch.smoking || currentMatch.exercise_level) && (
+                    <div>
+                      <h4 className="font-medium text-gray-900 mb-2 text-sm">Lifestyle</h4>
+                      <div className="space-y-2">
+                        {currentMatch.drinking && (
+                          <div className="flex justify-between text-xs">
+                            <span className="text-gray-500">Drinking</span>
+                            <span className="text-gray-900 capitalize">{currentMatch.drinking}</span>
+                          </div>
+                        )}
+                        {currentMatch.smoking && (
+                          <div className="flex justify-between text-xs">
+                            <span className="text-gray-500">Smoking</span>
+                            <span className="text-gray-900 capitalize">{currentMatch.smoking}</span>
+                          </div>
+                        )}
+                        {currentMatch.exercise_level && (
+                          <div className="flex justify-between text-xs">
+                            <span className="text-gray-500">Exercise</span>
+                            <span className="text-gray-900 capitalize">{currentMatch.exercise_level}</span>
+                          </div>
+                        )}
+                      </div>
                     </div>
                   )}
                 </div>
-
-                {currentMatch.interests?.length > 3 && (
-                  <div>
-                    <h4 className="font-semibold text-gray-900 mb-2">More Interests</h4>
-                    <div className="flex flex-wrap gap-2">
-                      {currentMatch.interests.slice(3).map((interest, index) => (
-                        <span 
-                          key={index}
-                          className="px-2 py-1 bg-gray-100 text-gray-700 rounded-full text-xs"
-                        >
-                          {interest}
-                        </span>
-                      ))}
-                    </div>
-                  </div>
-                )}
-
-                <button 
-                  onClick={() => setShowMoreInfo(false)}
-                  className="w-full py-2 text-center text-gray-500 hover:text-gray-700 transition-colors"
-                >
-                  <ChevronUp className="w-5 h-5 mx-auto" />
-                </button>
               </div>
-            )}
-
-            {!showMoreInfo && currentMatch.bio && (
-              <button 
-                onClick={() => setShowMoreInfo(true)}
-                className="w-full py-2 text-center text-gray-500 hover:text-gray-700 transition-colors"
-              >
-                <ChevronDown className="w-5 h-5 mx-auto" />
-              </button>
             )}
           </div>
         </div>
       </div>
 
-      {/* Action Buttons at Bottom */}
-      <div className="absolute bottom-0 left-0 right-0 z-20 bg-gradient-to-t from-purple-900 to-transparent pb-6 pt-8">
-        <div className="flex items-center justify-center gap-6 px-8">
-          {/* Reverse Button */}
-          <div className="relative">
+      {/* Bottom Adinkra Bar with Action Buttons */}
+      <div className="absolute left-0 right-0 z-20 bg-gradient-to-t from-black/30 to-transparent pb-2 pt-4" style={{ bottom: '70px' }}>
+        {/* Adinkra Pattern Background */}
+        <div
+          className="w-full flex justify-center items-center relative"
+          style={{
+            backgroundImage: `url('data:image/svg+xml;utf8,<svg width="240" height="50" viewBox="0 0 240 50" fill="none" xmlns="http://www.w3.org/2000/svg"><rect width="240" height="50" fill="%23007bdb"/><g><rect x="0" y="0" width="24" height="50" fill="%23ffc72c"/><rect x="24" y="0" width="24" height="50" fill="%23007bdb"/><rect x="48" y="0" width="24" height="50" fill="%23ffc72c"/><rect x="72" y="0" width="24" height="50" fill="%23007bdb"/><rect x="96" y="0" width="24" height="50" fill="%23ffc72c"/><rect x="120" y="0" width="24" height="50" fill="%23007bdb"/><rect x="144" y="0" width="24" height="50" fill="%23ffc72c"/><rect x="168" y="0" width="24" height="50" fill="%23007bdb"/><rect x="192" y="0" width="24" height="50" fill="%23ffc72c"/><rect x="216" y="0" width="24" height="50" fill="%23007bdb"/></g><g><polygon points="24,0 36,25 24,50 48,50 36,25 48,0" fill="%23e63946"/><polygon points="72,0 84,25 72,50 96,50 84,25 96,0" fill="%2300b159"/><polygon points="120,0 132,25 120,50 144,50 132,25 144,0" fill="%23e63946"/><polygon points="168,0 180,25 168,50 192,50 180,25 192,0" fill="%2300b159"/></g><g><rect x="0" y="0" width="240" height="8" fill="%23fff" fill-opacity="0.15"/><rect x="0" y="42" width="240" height="8" fill="%23fff" fill-opacity="0.15"/></g><g><rect x="23" y="0" width="2" height="50" fill="%23fff"/><rect x="47" y="0" width="2" height="50" fill="%23fff"/><rect x="71" y="0" width="2" height="50" fill="%23fff"/><rect x="95" y="0" width="2" height="50" fill="%23fff"/><rect x="119" y="0" width="2" height="50" fill="%23fff"/><rect x="143" y="0" width="2" height="50" fill="%23fff"/><rect x="167" y="0" width="2" height="50" fill="%23fff"/><rect x="191" y="0" width="2" height="50" fill="%23fff"/><rect x="215" y="0" width="2" height="50" fill="%23fff"/></g></svg>')`,
+            backgroundRepeat: 'repeat',
+            backgroundSize: '240px 50px',
+            minHeight: '50px',
+          }}
+        >
+          {/* Action Buttons Container */}
+          <div className="flex items-center justify-center gap-4 px-6 py-2 bg-black/20 rounded-full backdrop-blur-sm">
+            {/* Pass Button (Left) */}
             <button
-              onClick={handleReverse}
-              disabled={!canReverse}
-              className="w-16 h-16 bg-yellow-500/20 hover:bg-yellow-500/30 disabled:opacity-30 border-2 border-yellow-500 rounded-full flex items-center justify-center shadow-lg hover:scale-105 transition-transform backdrop-blur-sm"
+              onClick={handlePass}
+              className="w-12 h-12 bg-red-500/30 hover:bg-red-500/50 border-2 border-red-400 rounded-full flex items-center justify-center shadow-lg hover:scale-105 transition-transform backdrop-blur-sm"
             >
-              <Undo2 className="w-6 h-6 text-yellow-500" />
+              <X className="w-4 h-4 text-red-100" />
             </button>
-            {!isPremium && reversesLeft !== undefined && reversesLeft > 0 && (
-              <div className="absolute -top-2 -right-2 w-6 h-6 bg-yellow-500 text-black text-xs font-bold rounded-full flex items-center justify-center shadow-lg">
-                {reversesLeft}
-              </div>
-            )}
+
+            {/* Reverse Button (Center) */}
+            <div className="relative">
+              <button
+                onClick={handleReverse}
+                disabled={!canReverse}
+                className="w-12 h-12 bg-yellow-500/30 hover:bg-yellow-500/50 disabled:opacity-30 border-2 border-yellow-400 rounded-full flex items-center justify-center shadow-lg hover:scale-105 transition-transform backdrop-blur-sm"
+              >
+                <Undo2 className="w-4 h-4 text-yellow-100" />
+              </button>
+              {!isPremium && reversesLeft !== undefined && reversesLeft > 0 && (
+                <div className="absolute -top-1 -right-1 w-4 h-4 bg-yellow-400 text-black text-[10px] font-bold rounded-full flex items-center justify-center shadow-lg">
+                  {reversesLeft}
+                </div>
+              )}
+            </div>
+
+            {/* Like Button (Heart-Shaped with Logo) */}
+            <div className="relative">
+              <button
+                onClick={handleLike}
+                className="relative w-16 h-16 hover:scale-105 transition-transform shadow-lg border-2 border-yellow-400 flex items-center justify-center"
+                style={{
+                  background: 'linear-gradient(135deg, #ffffff 0%, #fef7cd 100%)',
+                  borderRadius: '50%',
+                  position: 'relative',
+                  overflow: 'hidden',
+                  padding: 0
+                }}
+              >
+                <img 
+                  src="/driplove-logo.png" 
+                  alt="DripLove" 
+                  className="w-10 h-10 object-contain z-10"
+                />
+              </button>
+            </div>
           </div>
-
-          {/* Like Button (Drip Logo - Bigger) */}
-          <button
-            onClick={handleLike}
-            className="w-24 h-24 bg-white rounded-full flex items-center justify-center shadow-lg hover:scale-105 transition-transform"
-          >
-            <img 
-              src="/driplove-logo.png" 
-              alt="Like" 
-              className="w-12 h-12 object-contain"
-            />
-          </button>
-
-          {/* Pass Button */}
-          <button
-            onClick={handlePass}
-            className="w-16 h-16 bg-gradient-to-br from-red-400 to-pink-500 rounded-full flex items-center justify-center shadow-lg hover:scale-105 transition-transform"
-          >
-            <X className="w-6 h-6 text-white" />
-          </button>
         </div>
       </div>
-        {/* ...existing code... */}
-        {nextMatch && (
-          <DominantColorImageBg
-            imageUrl={nextMatchImages[0] ? getOptimizedUrl(nextMatchImages[0]) : undefined}
-          >
-            {/* ...existing code for overlays, etc... */}
-            {nextMatchImages.length > 0 ? (
-              <img
-                src={getOptimizedUrl(nextMatchImages[0])}
-                alt={`${nextMatch.first_name}'s photo`}
-                className="w-full h-full object-contain rounded-2xl md:rounded-3xl"
-                style={{ borderRadius: '1.25rem', position: 'relative', zIndex: 1 }}
-                draggable={false}
-                loading="eager"
-              />
-            ) : (
-              <div className="w-full h-full bg-gradient-to-br from-pink-200 to-purple-200 flex items-center justify-center">
-                <span className="text-6xl font-bold text-gray-700">
-                  {nextMatch.first_name?.[0]}{nextMatch.last_name?.[0]}
-                </span>
-              </div>
-            )}
-            <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-transparent to-transparent pointer-events-none" />
-          </DominantColorImageBg>
-
-// Helper component to extract and apply dominant color as background
-
-// Helper component to extract and apply dominant color as background
-        )}
+        
+        {/* Next profile image - same size as main card for smooth transition */}
+        <div 
+          className="absolute w-full max-w-sm mx-auto bg-white rounded-3xl shadow-xl overflow-hidden z-0" 
+          style={{ 
+            borderRadius: '1.5rem',
+            left: '50%',
+            top: '0px',
+            transform: 'translateX(-50%) translateY(8px) scale(0.98)',
+            opacity: 0.7
+          }}
+        >
+          <div className="absolute inset-0">
+            <img
+              src="https://tgjsyyihabsovironesw.supabase.co/storage/v1/object/public/user-photos/07a638dd-2563-4649-9c75-a7451bab2bab/1756874666423-d6nr53q3awt.jpg?width=800&quality=85&format=webp"
+              alt="Sandra's photo"
+              className="w-full h-full object-cover rounded-3xl"
+              draggable="false"
+              loading="eager"
+              style={{ borderRadius: '1.5rem' }}
+            />
+            <div className="absolute inset-0 bg-gradient-to-t from-black/40 via-transparent to-transparent pointer-events-none"></div>
+          </div>
+        </div>
+        {/* Next match hidden for small screen display */}
 // Helper component to extract and apply dominant color as background
 
         {/* ...existing code... */}
@@ -1891,7 +2282,7 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, isPremium }: DiscoverPage
             onMouseDown={handleMouseDown}
             onMouseMove={handleMouseMove}
             onMouseUp={handleMouseUp}
-            onClick={handleImageAreaClick}
+            onClick={handleCardAreaClick}
           >
             {/* ...existing code... */}
             {isDragging && swipeDirection && (
@@ -1980,14 +2371,11 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, isPremium }: DiscoverPage
               userImages={currentMatchImages}
               currentUserLatitude={currentUser.latitude}
               currentUserLongitude={currentUser.longitude}
-              onImageClick={() => handleImageAreaClick({} as React.MouseEvent<HTMLDivElement>)}
+              onImageClick={() => handleCardAreaClick({} as React.MouseEvent<HTMLDivElement>)}
               onToggleInfo={() => setShowMoreInfo(!showMoreInfo)}
               calculateAge={calculateAge}
               calculateDistance={calculateDistance}
-              swipeDirection={swipeDirection}
-              swipeDistance={swipeDistance}
               isVerified={calculateProfileVerification(currentMatch)}
-              isSwipeAreaOnly={true}
               getOptimizedUrl={getOptimizedUrl}
               preCalculatedDistance={userDistances[currentMatch.id]}
             />
@@ -2014,20 +2402,84 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, isPremium }: DiscoverPage
               userImages={currentMatchImages}
               currentUserLatitude={currentUser.latitude}
               currentUserLongitude={currentUser.longitude}
-              onImageClick={() => handleImageAreaClick({} as React.MouseEvent<HTMLDivElement>)}
+              onImageClick={() => handleCardAreaClick({} as React.MouseEvent<HTMLDivElement>)}
               onToggleInfo={() => setShowMoreInfo(!showMoreInfo)}
               calculateAge={calculateAge}
               calculateDistance={calculateDistance}
-              swipeDirection={swipeDirection}
-              swipeDistance={swipeDistance}
               isVerified={calculateProfileVerification(currentMatch)}
-              isDetailsAreaOnly={true}
               getOptimizedUrl={getOptimizedUrl}
               preCalculatedDistance={userDistances[currentMatch.id]}
             />
             </div>
           </div>
         </div>
+
+        {/* Adinkra Symbol Tooltip */}
+        {tooltipIdx !== null && (
+          <div
+            className="fixed left-1/2 z-[10000] px-4 py-3 rounded-lg shadow-xl bg-white border border-gray-300 text-xs text-gray-800 animate-fade-in flex flex-col items-center"
+            style={{ 
+              transform: 'translateX(-50%)', 
+              top: '30%',
+              marginTop: '-50px',
+              minWidth: 200, 
+              maxWidth: 280 
+            }}
+            onClick={() => setTooltipIdx(null)}
+          >
+            <strong className="text-base mb-1">{adinkraSymbols[tooltipIdx].name}</strong>
+            <div className="mt-1 text-center">{adinkraSymbols[tooltipIdx].meaning}</div>
+            <div className="text-[10px] text-gray-400 mt-2">(Click to close)</div>
+            {/* Arrow pointing up to the symbol */}
+            <div 
+              className="absolute -top-2 left-1/2 transform -translate-x-1/2 w-4 h-4 bg-white border-l border-t border-gray-300 rotate-45"
+            ></div>
+          </div>
+        )}
+
+        {/* All Interests Modal */}
+        {showAllInterests && currentMatch?.interests && (
+          <div
+            className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/50 backdrop-blur-sm"
+            onClick={() => setShowAllInterests(false)}
+          >
+            <div
+              className="bg-white rounded-2xl p-6 m-4 max-w-md w-full max-h-[70vh] overflow-y-auto"
+              onClick={(e) => e.stopPropagation()}
+            >
+              <div className="flex justify-between items-center mb-4">
+                <h3 className="text-xl font-bold text-gray-800">
+                  {currentMatch.first_name}'s Interests
+                </h3>
+                <button
+                  onClick={() => setShowAllInterests(false)}
+                  className="w-8 h-8 flex items-center justify-center rounded-full bg-gray-100 hover:bg-gray-200 transition-colors"
+                >
+                  <svg className="w-5 h-5 text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                  </svg>
+                </button>
+              </div>
+              
+              <div className="flex flex-wrap gap-2">
+                {currentMatch.interests.map((interest, index) => (
+                  <span
+                    key={index}
+                    className="px-4 py-2 bg-gradient-to-br from-purple-500 to-pink-500 text-white rounded-full text-sm font-semibold shadow-md"
+                  >
+                    {interest}
+                  </span>
+                ))}
+              </div>
+              
+              <div className="mt-4 text-center">
+                <p className="text-sm text-gray-500">
+                  {currentMatch.interests.length} interest{currentMatch.interests.length !== 1 ? 's' : ''} total
+                </p>
+              </div>
+            </div>
+          </div>
+        )}
     </div>
   );
 }
