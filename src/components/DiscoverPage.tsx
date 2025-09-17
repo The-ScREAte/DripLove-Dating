@@ -373,15 +373,7 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, isPremium }: DiscoverPage
     }
   }, [currentUser?.id]);
   const [lastShuffleTime, setLastShuffleTime] = useState<number>(0);
-  const [startX, setStartX] = useState(0);
-  const [startY, setStartY] = useState(0);
-  const [currentX, setCurrentX] = useState(0);
-  const [currentY, setCurrentY] = useState(0);
-  const [isDragging, setIsDragging] = useState(false);
-  const [swipeDirection, setSwipeDirection] = useState<'left' | 'right' | null>(null);
-  const [swipeDistance, setSwipeDistance] = useState(0);
-  const [exitingCard, setExitingCard] = useState(false);
-  const [exitDirection, setExitDirection] = useState<'left' | 'right' | null>(null);
+  // Removed swipe gesture state
 
   // Memoize expensive calculations
   const getGenderFilter = useCallback((userPreference: string) => {
@@ -760,134 +752,11 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, isPremium }: DiscoverPage
     return () => window.removeEventListener('resize', measureContentHeight);
   }, [showMoreInfo, currentIndex, potentialMatches]);
 
-  const handleTouchStart = (e: React.TouchEvent) => {
-    const touch = e.touches[0];
-    setStartX(touch.clientX);
-    setStartY(touch.clientY);
-    setCurrentX(touch.clientX);
-    setCurrentY(touch.clientY);
-    setIsDragging(true);
-    setSwipeDirection(null);
-    setSwipeDistance(0);
-  };
-
-  const handleTouchMove = (e: React.TouchEvent) => {
-    if (!isDragging) return;
-    const touch = e.touches[0];
-    setCurrentX(touch.clientX);
-    setCurrentY(touch.clientY);
-    
-    const deltaX = touch.clientX - startX;
-    const deltaY = Math.abs(touch.clientY - startY);
-    
-    // Only show swipe feedback if horizontal movement is greater than vertical
-    if (Math.abs(deltaX) > deltaY) {
-      setSwipeDistance(Math.abs(deltaX));
-      setSwipeDirection(deltaX > 0 ? 'right' : 'left');
-    }
-  };
-
-  const handleTouchEnd = (e: React.TouchEvent) => {
-    if (!isDragging) return;
-    setIsDragging(false);
-  
-    const deltaX = currentX - startX;
-    const deltaY = Math.abs(currentY - startY);
-    const screenWidth = window.innerWidth;
-    const minSwipeDistance = screenWidth * 0.4;
-  
-    if (Math.abs(deltaX) > minSwipeDistance && Math.abs(deltaX) > deltaY) {
-      // Trigger exit animation before handling like/pass
-      setExitingCard(true);
-      setExitDirection(deltaX > 0 ? 'right' : 'left');
-      
-      // Wait for animation to complete before proceeding
-      setTimeout(() => {
-        if (deltaX > 0) {
-          handleLike();
-        } else {
-          handlePass();
-        }
-        setExitingCard(false);
-        setExitDirection(null);
-      }, 300);
-    } else {
-      // Reset values if swipe wasn't far enough
-      setStartX(0);
-      setStartY(0);
-      setCurrentX(0);
-      setCurrentY(0);
-      setSwipeDirection(null);
-      setSwipeDistance(0);
-    }
-  };
-
-  // Mouse event handlers for swipe on desktop
-  const handleMouseDown = (e: React.MouseEvent) => {
-    setStartX(e.clientX);
-    setStartY(e.clientY);
-    setCurrentX(e.clientX);
-    setCurrentY(e.clientY);
-    setIsDragging(true);
-    setSwipeDirection(null);
-    setSwipeDistance(0);
-  };
-
-  const handleMouseMove = (e: React.MouseEvent) => {
-    if (!isDragging) return;
-    setCurrentX(e.clientX);
-    setCurrentY(e.clientY);
-    
-    const deltaX = e.clientX - startX;
-    const deltaY = Math.abs(e.clientY - startY);
-    
-    // Only show swipe feedback if horizontal movement is greater than vertical
-    if (Math.abs(deltaX) > deltaY) {
-      setSwipeDistance(Math.abs(deltaX));
-      setSwipeDirection(deltaX > 0 ? 'right' : 'left');
-    }
-  };
-
-  const handleMouseUp = (e: React.MouseEvent) => {
-    if (!isDragging) return;
-    setIsDragging(false);
-
-    const deltaX = currentX - startX;
-    const deltaY = Math.abs(e.clientY - startY);
-    const minSwipeDistance = 80;
-
-    // Only trigger swipe if horizontal movement is greater than vertical
-    if (Math.abs(deltaX) > minSwipeDistance && Math.abs(deltaX) > deltaY) {
-      // Trigger exit animation before handling like/pass
-      setExitingCard(true);
-      setExitDirection(deltaX > 0 ? 'right' : 'left');
-      
-      // Wait for animation to complete before proceeding
-      setTimeout(() => {
-        if (deltaX > 0) {
-          // Swipe right - like
-          handleLike();
-        } else {
-          // Swipe left - dislike
-          handlePass();
-        }
-        setExitingCard(false);
-        setExitDirection(null);
-      }, 300);
-    } else {
-      // Reset values if swipe wasn't far enough
-      setStartX(0);
-      setStartY(0);
-      setCurrentX(0);
-      setCurrentY(0);
-      setSwipeDirection(null);
-      setSwipeDistance(0);
-    }
-  };
+  // Removed swipe gesture handlers
 
   const handleCardAreaClick = (e: React.MouseEvent<HTMLDivElement>) => {
     // Prevent action if dragging occurred
-    if (Math.abs(currentX - startX) > 10) return;
+  // Swipe gesture state removed; always allow click navigation
 
     // Get click position relative to the container
     const rect = e.currentTarget.getBoundingClientRect();
@@ -897,25 +766,44 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, isPremium }: DiscoverPage
 
     if (currentCardType === 'photo') {
       // Handle image navigation for photo cards
-      if (!currentMatch || currentMatchImages.length <= 1) return;
-      
-      if (isLeftSide) {
-        // Go to previous image
-        setImageIndex(prevIndex => 
-          prevIndex > 0 ? prevIndex - 1 : currentMatchImages.length - 1
-        );
-      } else {
-        // Go to next image or next card type
-        if (imageIndex < currentMatchImages.length - 1) {
-          setImageIndex(prevIndex => prevIndex + 1);
+      if (!currentMatch) return;
+
+      if (currentMatchImages.length > 1) {
+        if (isLeftSide) {
+          // Go to previous image
+          setImageIndex(prevIndex => prevIndex > 0 ? prevIndex - 1 : currentMatchImages.length - 1);
         } else {
-          // Move to next card type if available
-          const currentCardIndex = cardOrder.indexOf(currentCardType);
+          // Go to next image or next card type
+          if (imageIndex < currentMatchImages.length - 1) {
+            setImageIndex(prevIndex => prevIndex + 1);
+          } else {
+            // Move to next card type if available
+            const currentCardIndex = cardOrder.indexOf(currentCardType);
+            if (currentCardIndex < cardOrder.length - 1) {
+              setCurrentCardType(cardOrder[currentCardIndex + 1]);
+              setImageIndex(0);
+            } else {
+              setImageIndex(0); // Loop back to first image
+            }
+          }
+        }
+      } else {
+        // Single-image case: navigate between card types
+        const currentCardIndex = cardOrder.indexOf(currentCardType);
+        if (isLeftSide) {
+          if (currentCardIndex > 0) {
+            const prevCardType = cardOrder[currentCardIndex - 1];
+            setCurrentCardType(prevCardType);
+            if (prevCardType === 'photo') setImageIndex(0);
+          }
+        } else {
           if (currentCardIndex < cardOrder.length - 1) {
             setCurrentCardType(cardOrder[currentCardIndex + 1]);
             setImageIndex(0);
           } else {
-            setImageIndex(0); // Loop back to first image
+            // Loop back to photo
+            setCurrentCardType('photo');
+            setImageIndex(0);
           }
         }
       }
@@ -1538,19 +1426,8 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, isPremium }: DiscoverPage
     );
   }
 
-  // Calculate swipe overlay opacity and transform
-  const swipeOpacity = Math.min(swipeDistance / 100, 0.8);
-  
-  // Enhanced card transform with exit animation
-  const getCardTransform = () => {
-    if (exitingCard && exitDirection) {
-      const exitDistance = exitDirection === 'right' ? window.innerWidth : -window.innerWidth;
-      return `translateX(${exitDistance}px) translateY(100px) rotate(${exitDirection === 'right' ? 30 : -30}deg) scale(0.8)`;
-    }
-    return isDragging ? `translateX(${currentX - startX}px) rotate(${(currentX - startX) * 0.1}deg)` : '';
-  };
-  
-  const cardTransform = getCardTransform();
+  // Removed swipe overlay opacity and transform logic
+  const cardTransform = '';
 
 
 
@@ -1722,106 +1599,20 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, isPremium }: DiscoverPage
 
         {/* Current Profile Card */}
         <div
-          className={`relative w-full max-w-sm mx-auto bg-white rounded-3xl shadow-2xl z-10 transition-all duration-300 ${
+          className={`relative w-full max-w-[22rem] mx-auto bg-white rounded-3xl shadow-2xl z-10 transition-all duration-300 ${
             showMoreInfo ? 'overflow-visible' : 'overflow-hidden'
           }`}
           style={{
-            transform: cardTransform,
-            transition: exitingCard ? 'transform 0.3s cubic-bezier(0.25, 0.46, 0.45, 0.94)' : 
-                       isDragging ? 'none' : 'transform 0.3s cubic-bezier(0.22, 1, 0.36, 1)',
-            opacity: exitingCard ? 0 : 1,
-            minHeight: '400px',
-            maxHeight: showMoreInfo ? 'none' : '400px'
+            minHeight: '420px',
+            maxHeight: '420px'
           }}
         >
-          {/* Swipe Overlays */}
-          {isDragging && swipeDirection && (
-            <>
-              {/* Like Overlay - Right Swipe */}
-              {swipeDirection === 'right' && (
-                <div 
-                  className="absolute inset-0 z-20 flex items-center justify-center pointer-events-none"
-                  style={{ 
-                    background: `linear-gradient(135deg, rgba(34, 197, 94, ${swipeOpacity * 0.7}), rgba(74, 222, 128, ${swipeOpacity * 0.5}))`,
-                    transition: 'none'
-                  }}
-                >
-                  <div 
-                    className="bg-green-500/90 backdrop-blur-sm rounded-full p-6 shadow-2xl transform"
-                    style={{ 
-                      scale: Math.min(0.8 + (swipeOpacity * 0.4), 1.2),
-                      transition: 'none'
-                    }}
-                  >
-                    <Heart 
-                      className="w-12 h-12 text-white fill-current" 
-                      style={{ 
-                        filter: `drop-shadow(0 4px 8px rgba(0,0,0,0.3))`,
-                        transform: `rotate(${swipeDistance * 0.1}deg)`
-                      }}
-                    />
-                  </div>
-                  <div 
-                    className="absolute bottom-32 bg-green-500/95 backdrop-blur-sm px-8 py-3 rounded-full shadow-xl"
-                    style={{ 
-                      opacity: Math.min(swipeOpacity + 0.2, 1),
-                      transform: `translateY(${-swipeDistance * 0.1}px)`,
-                      transition: 'none'
-                    }}
-                  >
-                    <span className="text-white font-bold text-2xl tracking-wider">LIKE</span>
-                  </div>
-                </div>
-              )}
-
-              {/* Pass Overlay - Left Swipe */}
-              {swipeDirection === 'left' && (
-                <div 
-                  className="absolute inset-0 z-20 flex items-center justify-center pointer-events-none"
-                  style={{ 
-                    background: `linear-gradient(135deg, rgba(239, 68, 68, ${swipeOpacity * 0.7}), rgba(248, 113, 113, ${swipeOpacity * 0.5}))`,
-                    transition: 'none'
-                  }}
-                >
-                  <div 
-                    className="bg-red-500/90 backdrop-blur-sm rounded-full p-6 shadow-2xl transform"
-                    style={{ 
-                      scale: Math.min(0.8 + (swipeOpacity * 0.4), 1.2),
-                      transition: 'none'
-                    }}
-                  >
-                    <X 
-                      className="w-12 h-12 text-white" 
-                      style={{ 
-                        filter: `drop-shadow(0 4px 8px rgba(0,0,0,0.3))`,
-                        transform: `rotate(${-swipeDistance * 0.1}deg)`
-                      }}
-                    />
-                  </div>
-                  <div 
-                    className="absolute bottom-32 bg-red-500/95 backdrop-blur-sm px-8 py-3 rounded-full shadow-xl"
-                    style={{ 
-                      opacity: Math.min(swipeOpacity + 0.2, 1),
-                      transform: `translateY(${-swipeDistance * 0.1}px)`,
-                      transition: 'none'
-                    }}
-                  >
-                    <span className="text-white font-bold text-2xl tracking-wider">NOPE</span>
-                  </div>
-                </div>
-              )}
-            </>
-          )}
+          {/* Swipe gesture overlays and state fully removed */}
 
           {/* Profile Card Container - Dynamic Content */}
           <div 
-            className="relative h-80 select-none overflow-hidden rounded-t-3xl"
-            onTouchStart={handleTouchStart}
-            onTouchMove={handleTouchMove}
-            onTouchEnd={handleTouchEnd}
-            onMouseDown={handleMouseDown}
-            onMouseMove={handleMouseMove}
-            onMouseUp={handleMouseUp}
+            className="relative h-[420px] select-none overflow-hidden rounded-t-3xl"
+            // Swipe gesture handlers fully removed
             onClick={handleCardAreaClick}
             style={{ cursor: 'pointer' }}
           >
@@ -2012,6 +1803,16 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, isPremium }: DiscoverPage
                 </div>
               </div>
 
+              {/* Show More button anchored bottom-left inside the card */}
+              {(currentMatch.bio || currentMatch.occupation || currentMatch.education_level || (currentMatch.interests && currentMatch.interests.length > 0)) && (
+                <button 
+                  onClick={(e) => { e.stopPropagation(); e.preventDefault(); setShowMoreInfo(true); }}
+                  className="absolute left-3 bottom-3 z-30 px-3 py-1.5 bg-pink-600 hover:bg-pink-700 text-white rounded-full text-xs font-medium shadow-lg border border-white/20"
+                >
+                  More Info
+                </button>
+              )}
+
               {/* Right navigation area */}
               <div 
                 className="absolute right-0 top-0 w-1/2 h-full z-20 flex items-center justify-end pr-2 cursor-pointer active:bg-black/5"
@@ -2045,8 +1846,7 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, isPremium }: DiscoverPage
                     }
                   }
                 }}
-                onTouchEnd={(e) => {
-                }}
+                onTouchEnd={(e) => { e.preventDefault(); e.stopPropagation(); }}
                 style={{ backgroundColor: 'transparent' }}
               >
                 <div className="bg-black/30 backdrop-blur-sm rounded-full p-1.5 opacity-0 hover:opacity-100 active:opacity-100 transition-all duration-200">
@@ -2061,113 +1861,95 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, isPremium }: DiscoverPage
             <div className="absolute inset-x-0 bottom-0 h-32 bg-gradient-to-t from-black/60 via-black/20 to-transparent" />
           </div>
 
-          {/* Profile Info - Minimized */}
-          <div className="bg-white">
-            {/* Compact info section for expandable content */}
-            <div className="px-4 py-2">
-              {/* Show more info button if there's additional content to show */}
-              {(currentMatch.bio || currentMatch.occupation || currentMatch.education_level || 
-                (currentMatch.interests && currentMatch.interests.length > 0)) && (
-                <div className="flex justify-center">
-                  <button 
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      e.preventDefault();
-                      setShowMoreInfo(!showMoreInfo);
-                    }}
-                    className="flex items-center px-3 py-1.5 bg-pink-500 hover:bg-pink-600 text-white rounded-full text-xs font-medium transition-colors"
-                  >
-                    {showMoreInfo ? (
-                      <>
-                        <ChevronUp className="w-3 h-3 mr-1" />
-                        Less Info
-                      </>
-                    ) : (
-                      <>
-                        <ChevronDown className="w-3 h-3 mr-1" />
-                        More Info
-                      </>
-                    )}
-                  </button>
-                </div>
-              )}
-            </div>
-
-            {/* Expandable Details */}
+          {/* Profile Info - Minimized removed to eliminate bottom white space */}
+            
+            {/* Expandable Details - overlay that covers the match card with close (X) above */}
             {showMoreInfo && (
-              <div className="border-t border-gray-200 bg-gray-50 max-h-80 overflow-y-auto animate-fade-in">
-                <div className="px-4 py-3 space-y-3">
-                  {currentMatch.bio && (
-                    <div>
-                      <h4 className="font-medium text-gray-900 mb-1 text-sm">About</h4>
-                      <p className="text-gray-600 text-xs leading-relaxed">{currentMatch.bio}</p>
-                    </div>
-                  )}
-                  
-                  {(currentMatch.occupation || currentMatch.education_level) && (
-                    <div className="grid grid-cols-2 gap-2 text-xs">
-                      {currentMatch.occupation && (
-                        <div>
-                          <h5 className="font-medium text-gray-900">Work</h5>
-                          <p className="text-gray-600">{currentMatch.occupation}</p>
-                        </div>
-                      )}
-                      {currentMatch.education_level && (
-                        <div>
-                          <h5 className="font-medium text-gray-900">Education</h5>
-                          <p className="text-gray-600">{currentMatch.education_level}</p>
-                        </div>
-                      )}
-                    </div>
-                  )}
-
-                  {/* Show all interests in expanded view */}
-                  {currentMatch.interests?.length > 3 && (
-                    <div>
-                      <h4 className="font-medium text-gray-900 mb-1.5 text-sm">All Interests</h4>
-                      <div className="flex flex-wrap gap-1.5">
-                        {currentMatch.interests.map((interest, index) => (
-                          <span 
-                            key={index}
-                            className="px-2 py-0.5 bg-purple-100 text-purple-700 rounded-full text-xs"
-                          >
-                            {interest}
-                          </span>
-                        ))}
+              <>
+                {/* Backdrop */}
+                <div
+                  className="fixed inset-0 z-40 bg-black/30"
+                  onClick={() => setShowMoreInfo(false)}
+                />
+                {/* Panel sized to the card area */}
+                <div
+                  className="fixed left-1/2 z-50 w-full max-w-sm px-4 animate-fade-in"
+                  style={{ transform: 'translateX(-50%)', top: '230px' }}
+                >
+                  <div className="relative">
+                    {/* Close button removed – backdrop handles closing on outside click */}
+                    <div className="rounded-2xl border border-gray-200 bg-white/95 backdrop-blur-sm shadow-2xl overflow-y-auto max-h-[60vh]">
+                      <div className="px-4 py-3 space-y-3">
+                    {currentMatch.bio && (
+                      <div>
+                        <h4 className="font-medium text-gray-900 mb-1 text-sm">About</h4>
+                        <p className="text-gray-600 text-xs leading-relaxed">{currentMatch.bio}</p>
                       </div>
-                    </div>
-                  )}
-
-                  {/* Additional profile information */}
-                  {(currentMatch.drinking || currentMatch.smoking || currentMatch.exercise_level) && (
-                    <div>
-                      <h4 className="font-medium text-gray-900 mb-2 text-sm">Lifestyle</h4>
-                      <div className="space-y-2">
-                        {currentMatch.drinking && (
-                          <div className="flex justify-between text-xs">
-                            <span className="text-gray-500">Drinking</span>
-                            <span className="text-gray-900 capitalize">{currentMatch.drinking}</span>
+                    )}
+                    {(currentMatch.occupation || currentMatch.education_level) && (
+                      <div className="grid grid-cols-2 gap-2 text-xs">
+                        {currentMatch.occupation && (
+                          <div>
+                            <h5 className="font-medium text-gray-900">Work</h5>
+                            <p className="text-gray-600">{currentMatch.occupation}</p>
                           </div>
                         )}
-                        {currentMatch.smoking && (
-                          <div className="flex justify-between text-xs">
-                            <span className="text-gray-500">Smoking</span>
-                            <span className="text-gray-900 capitalize">{currentMatch.smoking}</span>
-                          </div>
-                        )}
-                        {currentMatch.exercise_level && (
-                          <div className="flex justify-between text-xs">
-                            <span className="text-gray-500">Exercise</span>
-                            <span className="text-gray-900 capitalize">{currentMatch.exercise_level}</span>
+                        {currentMatch.education_level && (
+                          <div>
+                            <h5 className="font-medium text-gray-900">Education</h5>
+                            <p className="text-gray-600">{currentMatch.education_level}</p>
                           </div>
                         )}
                       </div>
+                    )}
+                    {/* Show all interests in expanded view */}
+                    {currentMatch.interests?.length > 0 && (
+                      <div>
+                        <h4 className="font-medium text-gray-900 mb-1.5 text-sm">Interests</h4>
+                        <div className="flex flex-wrap gap-1.5">
+                          {currentMatch.interests.map((interest, index) => (
+                            <span
+                              key={index}
+                              className="px-2 py-0.5 bg-purple-100 text-purple-700 rounded-full text-xs"
+                            >
+                              {interest}
+                            </span>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+                    {/* Additional profile information */}
+                    {(currentMatch.drinking || currentMatch.smoking || currentMatch.exercise_level) && (
+                      <div>
+                        <h4 className="font-medium text-gray-900 mb-2 text-sm">Lifestyle</h4>
+                        <div className="space-y-2">
+                          {currentMatch.drinking && (
+                            <div className="flex justify-between text-xs">
+                              <span className="text-gray-500">Drinking</span>
+                              <span className="text-gray-900 capitalize">{currentMatch.drinking}</span>
+                            </div>
+                          )}
+                          {currentMatch.smoking && (
+                            <div className="flex justify-between text-xs">
+                              <span className="text-gray-500">Smoking</span>
+                              <span className="text-gray-900 capitalize">{currentMatch.smoking}</span>
+                            </div>
+                          )}
+                          {currentMatch.exercise_level && (
+                            <div className="flex justify-between text-xs">
+                              <span className="text-gray-500">Exercise</span>
+                              <span className="text-gray-900 capitalize">{currentMatch.exercise_level}</span>
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    )}
+                      </div>
                     </div>
-                  )}
+                  </div>
                 </div>
-              </div>
+              </>
             )}
-          </div>
         </div>
       </div>
 
@@ -2235,7 +2017,7 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, isPremium }: DiscoverPage
         
         {/* Next profile image - same size as main card for smooth transition */}
         <div 
-          className="absolute w-full max-w-sm mx-auto bg-white rounded-3xl shadow-xl overflow-hidden z-0" 
+          className="absolute w-full max-w-[22rem] mx-auto bg-white rounded-3xl shadow-xl overflow-hidden z-0" 
           style={{ 
             borderRadius: '1.5rem',
             left: '50%',
@@ -2244,7 +2026,7 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, isPremium }: DiscoverPage
             opacity: 0.7
           }}
         >
-          <div className="absolute inset-0">
+          <div className="absolute inset-0 h-[420px]">
             <img
               src="https://tgjsyyihabsovironesw.supabase.co/storage/v1/object/public/user-photos/07a638dd-2563-4649-9c75-a7451bab2bab/1756874666423-d6nr53q3awt.jpg?width=800&quality=85&format=webp"
               alt="Sandra's photo"
@@ -2263,105 +2045,22 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, isPremium }: DiscoverPage
         <div
           className="h-full w-full relative z-10 flex flex-col"
           style={{
-            transform: cardTransform,
-            transition: exitingCard ? 'transform 0.3s cubic-bezier(0.25, 0.46, 0.45, 0.94)' : 
-                       isDragging ? 'none' : 'transform 0.3s cubic-bezier(0.22, 1, 0.36, 1)',
-            boxShadow: isDragging ? '0 8px 32px 0 rgba(0,0,0,0.25)' : '0 4px 16px 0 rgba(0,0,0,0.10)',
-            opacity: exitingCard ? 0 : 1
+            boxShadow: '0 4px 16px 0 rgba(0,0,0,0.10)',
+            opacity: 1
           }}
         >
-          {/* Image area - flexible height that fills remaining space */}
+      {/* Image area - flexible height that fills remaining space */}
           <div
             className="flex-1 cursor-pointer select-none relative transition-all duration-300 overflow-hidden"
             style={{
-              minHeight: showMoreInfo ? 'calc(100vh - 402px)' : 'calc(100vh - 302px)' // Adjusted for new expanded height
+        // Fill available height reliably
+        height: '100%'
             }}
-            onTouchStart={handleTouchStart}
-            onTouchMove={handleTouchMove}
-            onTouchEnd={handleTouchEnd}
-            onMouseDown={handleMouseDown}
-            onMouseMove={handleMouseMove}
-            onMouseUp={handleMouseUp}
+            // All swipe gesture handlers removed
             onClick={handleCardAreaClick}
           >
             {/* ...existing code... */}
-            {isDragging && swipeDirection && (
-              <>
-                {/* Like Overlay - Right Swipe */}
-                {swipeDirection === 'right' && (
-                  <div 
-                    className="absolute inset-0 z-20 flex items-center justify-center pointer-events-none"
-                    style={{ 
-                      background: `linear-gradient(135deg, rgba(34, 197, 94, ${swipeOpacity * 0.7}), rgba(74, 222, 128, ${swipeOpacity * 0.5}))`,
-                      transition: 'none'
-                    }}
-                  >
-                    <div 
-                      className="bg-green-500/90 backdrop-blur-sm rounded-full p-6 shadow-2xl transform"
-                      style={{ 
-                        scale: Math.min(0.8 + (swipeOpacity * 0.4), 1.2),
-                        transition: 'none'
-                      }}
-                    >
-                      <Heart 
-                        className="w-12 h-12 text-white fill-current" 
-                        style={{ 
-                          filter: `drop-shadow(0 4px 8px rgba(0,0,0,0.3))`,
-                          transform: `rotate(${swipeDistance * 0.1}deg)`
-                        }}
-                      />
-                    </div>
-                    <div 
-                      className="absolute bottom-32 bg-green-500/95 backdrop-blur-sm px-8 py-3 rounded-full shadow-xl"
-                      style={{ 
-                        opacity: Math.min(swipeOpacity + 0.2, 1),
-                        transform: `translateY(${-swipeDistance * 0.1}px)`,
-                        transition: 'none'
-                      }}
-                    >
-                      <span className="text-white font-bold text-2xl tracking-wider">LIKE</span>
-                    </div>
-                  </div>
-                )}
-
-                {/* Pass Overlay - Left Swipe */}
-                {swipeDirection === 'left' && (
-                  <div 
-                    className="absolute inset-0 z-20 flex items-center justify-center pointer-events-none"
-                    style={{ 
-                      background: `linear-gradient(135deg, rgba(239, 68, 68, ${swipeOpacity * 0.7}), rgba(248, 113, 113, ${swipeOpacity * 0.5}))`,
-                      transition: 'none'
-                    }}
-                  >
-                    <div 
-                      className="bg-red-500/90 backdrop-blur-sm rounded-full p-6 shadow-2xl transform"
-                      style={{ 
-                        scale: Math.min(0.8 + (swipeOpacity * 0.4), 1.2),
-                        transition: 'none'
-                      }}
-                    >
-                      <X 
-                        className="w-12 h-12 text-white" 
-                        style={{ 
-                          filter: `drop-shadow(0 4px 8px rgba(0,0,0,0.3))`,
-                          transform: `rotate(${-swipeDistance * 0.1}deg)`
-                        }}
-                      />
-                    </div>
-                    <div 
-                      className="absolute bottom-32 bg-red-500/95 backdrop-blur-sm px-8 py-3 rounded-full shadow-xl"
-                      style={{ 
-                        opacity: Math.min(swipeOpacity + 0.2, 1),
-                        transform: `translateY(${-swipeDistance * 0.1}px)`,
-                        transition: 'none'
-                      }}
-                    >
-                      <span className="text-white font-bold text-2xl tracking-wider">NOPE</span>
-                    </div>
-                  </div>
-                )}
-              </>
-            )}
+            {/* Swipe overlays and gesture state fully removed */}
             {/* ...existing code... */}
             <MatchCard
               match={currentMatch}
@@ -2378,20 +2077,19 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, isPremium }: DiscoverPage
               isVerified={calculateProfileVerification(currentMatch)}
               getOptimizedUrl={getOptimizedUrl}
               preCalculatedDistance={userDistances[currentMatch.id]}
+              isDetailsAreaOnly={true}
             />
           </div>
-          {/* Info section - dynamic height that fits content exactly */}
-          <div className={`bg-white border-t border-gray-400 transition-all duration-300 flex-shrink-0 ${
-            showMoreInfo ? 'h-[200px]' : 'h-[80px] overflow-hidden'
-          }`}>
+          {/* Info section - fixed compact height under the image */}
+          <div className={`bg-white border-t border-gray-400 transition-all duration-300 flex-shrink-0 h-[64px] overflow-hidden`}>
             <div 
               ref={contentRef}
-              className={`w-full p-1 ${showMoreInfo ? 'overflow-y-auto h-[200px]' : 'overflow-hidden pb-3'}`} 
+              className={`w-full p-1 overflow-hidden pb-2`} 
               style={{
                 WebkitOverflowScrolling: 'touch',
                 overscrollBehavior: 'contain',
                 scrollBehavior: 'smooth',
-                paddingBottom: showMoreInfo ? `${Math.max(contentHeight, 40)}px` : '0.75rem' // Dynamic padding based on content
+                paddingBottom: '0.5rem'
               }}
             >
             <MatchCard
@@ -2409,6 +2107,7 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, isPremium }: DiscoverPage
               isVerified={calculateProfileVerification(currentMatch)}
               getOptimizedUrl={getOptimizedUrl}
               preCalculatedDistance={userDistances[currentMatch.id]}
+              isDetailsAreaOnly={true}
             />
             </div>
           </div>
