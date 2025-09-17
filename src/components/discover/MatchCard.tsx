@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import ReportButton from '../ReportButton';
-import { Briefcase, GraduationCap, ChevronDown, ChevronUp } from 'lucide-react';
+import { MapPin, Briefcase, GraduationCap, Calendar, Crown, Shield, ChevronDown, ChevronUp, User, Quote, Heart, Coffee, Search, Loader2 } from 'lucide-react';
 import { PotentialMatch } from '@/types';
 import { useImageEdgeColor } from '@/hooks/useImageEdgeColor';
 
@@ -17,6 +17,9 @@ interface MatchCardProps {
   onToggleInfo: () => void;
   calculateAge: (dateOfBirth: string) => number;
   calculateDistance: (lat1: number, lon1: number, lat2: number, lon2: number) => number;
+  swipeDirection: 'left' | 'right' | null;
+  swipeDistance: number;
+  isSwipeAreaOnly?: boolean; // New prop to render only swipeable image area
   isDetailsAreaOnly?: boolean; // New prop to render only details area
   getOptimizedUrl?: (url: string) => string; // New prop for image optimization
   preCalculatedDistance?: number; // Distance already calculated by location service
@@ -35,6 +38,9 @@ const MatchCard: React.FC<MatchCardProps> = ({
   onToggleInfo,
   calculateAge,
   calculateDistance,
+  swipeDirection,
+  swipeDistance,
+  isSwipeAreaOnly = false,
   isDetailsAreaOnly = false,
   getOptimizedUrl = (url: string) => url.includes('supabase') ? `${url}?width=800&quality=85&format=webp` : url,
   preCalculatedDistance
@@ -186,6 +192,21 @@ const MatchCard: React.FC<MatchCardProps> = ({
       setCurrentSlide(prev => (prev < slides.length - 1 ? prev + 1 : prev));
     }
   };
+  const getSwipeTransform = () => {
+    if (!swipeDirection) return 'translateX(0) rotate(0deg)';
+    
+    const rotation = swipeDistance * 0.1;
+    const maxRotation = 15;
+    const clampedRotation = Math.min(Math.max(rotation, -maxRotation), maxRotation);
+    
+    return `translateX(${swipeDistance}px) rotate(${clampedRotation}deg)`;
+  };
+
+  const getSwipeColor = () => {
+    if (!swipeDirection) return '';
+    if (swipeDirection === 'right') return 'rgba(34, 197, 94, 0.8)';
+    return 'rgba(239, 68, 68, 0.8)';
+  };
 
   // Report image modal state
   const [showReportModal, setShowReportModal] = useState(false);
@@ -272,24 +293,343 @@ const MatchCard: React.FC<MatchCardProps> = ({
     setReportError("");
   };
 
-  // If isDetailsAreaOnly is true, render compact view
-  if (isDetailsAreaOnly) {
-    // Render compact info section with expandable details
+  // Handle split rendering modes
+  if (isSwipeAreaOnly) {
+    // Render only the swipeable image area
     return (
-      <div className="w-full p-3">
-        {/* Compact header with expand button */}
-        <div className="flex justify-between items-center">
-          <div className="flex items-center gap-3">
-            <div>
-              <h2 className="text-lg font-bold text-gray-900">
-                {match.first_name}
-              </h2>
-              {match.relationship_intent && (
-                <p className="text-sm text-gray-600 capitalize">
-                  {match.relationship_intent === 'open_to_anything' ? 'Open to anything' : match.relationship_intent}
-                </p>
+  <div className="relative w-full h-full min-h-full overflow-hidden">
+        {/* Image/Bio Container - Swipeable Area Only */}
+        <div className="relative w-full h-full overflow-hidden" onClick={handleSlideClick}>
+          {/* Current slide content */}
+          {slides.length > 0 && (
+            <div className="w-full h-full transition-all duration-300 ease-in-out">
+              {/* Report button for image slides - positioned closer to top edge */}
+              {slides[currentSlide]?.type === 'image' && (
+                <div className="absolute right-3 top-16 sm:top-8 z-50">
+                  <button
+                    className="bg-white/95 hover:bg-red-100 text-red-600 rounded-full shadow-lg transition-colors duration-200 border border-red-200 focus:outline-none focus:ring-2 focus:ring-red-300"
+                    style={{
+                      backdropFilter: 'blur(8px)', 
+                      width: '24px', 
+                      height: '24px', 
+                      display: 'flex', 
+                      alignItems: 'center', 
+                      justifyContent: 'center',
+                      flexShrink: 0
+                    }} 
+                    onClick={e => { e.stopPropagation(); setShowReportModal(true); }}
+                    aria-label="Report image"
+                  >
+                    <svg xmlns="http://www.w3.org/2000/svg" className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v2m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                    </svg>
+                  </button>
+                </div>
+              )}
+              {slides[currentSlide]?.type === 'image' ? (
+                <div className="relative w-full h-full">
+                  {imageLoading && (
+                    <div className="absolute inset-0 bg-gray-100 flex items-center justify-center z-10">
+                      <Loader2 className="h-8 w-8 animate-spin text-pink-500" />
+                    </div>
+                  )}
+                  <img
+                    src={getOptimizedUrl(slides[currentSlide].content)}
+                    alt={`${match.first_name} ${match.last_name}`}
+                    className="w-full h-full object-contain transition-opacity duration-300"
+                    draggable={false}
+                    onLoadStart={() => setImageLoading(true)}
+                    onLoad={() => setImageLoading(false)}
+                    onError={() => setImageLoading(false)}
+                    style={{
+                      backgroundColor: edgeColor,
+                      touchAction: 'manipulation',
+                      userSelect: 'none',
+                      WebkitUserSelect: 'none',
+                      WebkitTouchCallout: 'none'
+                    }}
+                  />
+                </div>
+              ) : slides[currentSlide]?.type === 'bio' ? (
+                <div className={`w-full h-full ${userBackgroundColor} flex items-center justify-center p-8`}>
+                  <div className="max-w-sm mx-auto text-center">
+                    <div className="flex items-center justify-center mb-6">
+                      <div className="bg-white/20 backdrop-blur-sm rounded-full p-4 shadow-lg">
+                        <Quote className="w-8 h-8 text-white" />
+                      </div>
+                    </div>
+                    <h3 className="text-2xl font-bold text-white mb-6">About {match.first_name}</h3>
+                    <p className="text-white text-lg leading-relaxed font-medium">
+                      {slides[currentSlide].content}
+                    </p>
+                  </div>
+                </div>
+              ) : slides[currentSlide]?.type === 'fun_fact' ? (
+                <div className={`w-full h-full ${userBackgroundColor} flex items-center justify-center p-8`}>
+                  <div className="max-w-sm mx-auto text-center">
+                    <div className="flex items-center justify-center mb-6">
+                      <div className="bg-white/20 backdrop-blur-sm rounded-full p-4 shadow-lg">
+                        <Heart className="w-8 h-8 text-white" />
+                      </div>
+                    </div>
+                    <h3 className="text-2xl font-bold text-white mb-6">Fun Fact</h3>
+                    <p className="text-white text-lg leading-relaxed font-medium">
+                      {slides[currentSlide].content}
+                    </p>
+                  </div>
+                </div>
+              ) : slides[currentSlide]?.type === 'perfect_first_date' ? (
+                <div className={`w-full h-full ${userBackgroundColor} flex items-center justify-center p-8`}>
+                  <div className="max-w-sm mx-auto text-center">
+                    <div className="flex items-center justify-center mb-6">
+                      <div className="bg-white/20 backdrop-blur-sm rounded-full p-4 shadow-lg">
+                        <Coffee className="w-8 h-8 text-white" />
+                      </div>
+                    </div>
+                    <h3 className="text-2xl font-bold text-white mb-6">Perfect First Date</h3>
+                    <p className="text-white text-lg leading-relaxed font-medium">
+                      {slides[currentSlide].content}
+                    </p>
+                  </div>
+                </div>
+              ) : slides[currentSlide]?.type === 'last_googled' ? (
+                <div className={`w-full h-full ${userBackgroundColor} flex items-center justify-center p-8`}>
+                  <div className="max-w-sm mx-auto text-center">
+                    <div className="flex items-center justify-center mb-6">
+                      <div className="bg-white/20 backdrop-blur-sm rounded-full p-4 shadow-lg">
+                        <Search className="w-8 h-8 text-white" />
+                      </div>
+                    </div>
+                    <h3 className="text-2xl font-bold text-white mb-6">Last Googled</h3>
+                    <p className="text-white text-lg leading-relaxed font-medium">
+                      {slides[currentSlide].content}
+                    </p>
+                  </div>
+                </div>
+              ) : (
+                // Fallback for no images - show placeholder with initials
+                <div className="w-full h-full min-h-full bg-gradient-to-br from-pink-200 to-purple-200 flex items-center justify-center">
+                  <div className="text-center w-full">
+                    <div className="bg-white/80 rounded-full p-8 mb-4 shadow-xl mx-auto">
+                      <User className="w-16 h-16 mx-auto text-gray-500" />
+                      <style>{`
+                        .centered-user-icon {
+                          display: flex;
+                          align-items: center;
+                          justify-content: center;
+                          margin: 0 auto;
+                          box-sizing: border-box;
+                          max-width: 96px;
+                          max-height: 96px;
+                          padding: 1.5rem;
+                          background: rgba(255,255,255,0.8);
+                          border-radius: 9999px;
+                          box-shadow: 0 8px 32px 0 rgba(0,0,0,0.18);
+                        }
+                      `}</style>
+                      <div className="centered-user-icon">
+                        <User className="w-16 h-16 mx-auto text-gray-500" />
+                      </div>
+                    </div>
+                    <span className="text-6xl font-bold text-gray-700 bg-white/50 rounded-full px-6 py-3">
+                      {match.first_name?.[0]}{match.last_name?.[0]}
+                    </span>
+                    <p className="text-gray-600 mt-4 text-sm">No photos uploaded yet</p>
+                  </div>
+                </div>
               )}
             </div>
+          )}
+          
+          {/* Slide indicators */}
+          {slides.length > 1 && (
+            <div className="absolute top-4 left-4 right-4 flex space-x-1 z-10">
+              {slides.map((_, index) => (
+                <div
+                  key={index}
+                  className={`flex-1 h-1 rounded-full transition-all duration-300 ${
+                    index === currentSlide 
+                      ? 'bg-white shadow-lg' 
+                      : 'bg-white/30'
+                  }`}
+                />
+              ))}
+            </div>
+          )}
+
+          {/* Report Modal */}
+          {showReportModal && (
+            <>
+              <div 
+                className="fixed inset-0 z-[9999] bg-black/50 backdrop-blur-sm flex items-center justify-center p-4 touch-none select-none" 
+                onClick={closeReportModal}
+                style={{
+                  position: 'fixed',
+                  top: 0,
+                  left: 0,
+                  right: 0,
+                  bottom: 0,
+                  zIndex: 9999,
+                  willChange: 'auto',
+                  backfaceVisibility: 'hidden',
+                  transform: 'translateZ(0)',
+                  pointerEvents: 'auto',
+                  touchAction: 'none',
+                  userSelect: 'none'
+                }}
+              >
+                <div 
+                  className="bg-white rounded-2xl shadow-2xl w-full max-w-sm mx-auto" 
+                  onClick={e => e.stopPropagation()}
+                  style={{
+                    minHeight: '350px',
+                    maxHeight: '90vh',
+                    width: '100%',
+                    maxWidth: '400px',
+                    overflow: 'hidden',
+                    willChange: 'auto',
+                    backfaceVisibility: 'hidden'
+                  }}
+                >
+                  {/* Modal header with close button */}
+                  <div className="relative p-6 pb-2">
+                    <button
+                      onClick={closeReportModal}
+                      className="absolute top-4 right-4 w-6 h-6 flex items-center justify-center text-gray-400 hover:text-gray-600 transition-colors rounded-full hover:bg-gray-100"
+                      disabled={reporting}
+                    >
+                      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                      </svg>
+                    </button>
+                    
+                    <h3 className="text-xl font-bold text-red-600 pr-8">Report Image</h3>
+                  </div>
+
+                  {/* Modal content */}
+                  <div className="px-6 pb-6 max-h-96 overflow-y-auto">
+                    {reportSuccess ? (
+                      <div className="text-green-600 font-semibold text-center py-8">
+                        <div className="mb-2 text-2xl">✓</div>
+                        <div>Reported! Thank you.</div>
+                      </div>
+                    ) : (
+                      <>
+                        <p className="text-gray-700 mb-4 text-sm font-semibold">Please select a reason for reporting this image:</p>
+                        
+                        {/* Reason selection with stable layout */}
+                        <div className="space-y-3 mb-6">
+                          {reportReasons.map((reason) => (
+                            <button
+                              key={reason}
+                              onClick={() => setSelectedReason(reason)}
+                              disabled={reporting}
+                              className={`w-full h-12 px-4 text-left rounded-lg border-2 transition-all duration-200 flex items-center justify-between ${
+                                selectedReason === reason
+                                  ? 'border-red-500 bg-red-50 text-red-700'
+                                  : 'border-gray-200 bg-gray-50 text-gray-700 hover:border-gray-300 hover:bg-gray-100'
+                              } ${reporting ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer'}`}
+                            >
+                              <span className="text-sm font-medium flex-1 pr-2">{reason}</span>
+                              {selectedReason === reason && (
+                                <svg className="w-5 h-5 text-red-500 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
+                                  <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
+                                </svg>
+                              )}
+                            </button>
+                          ))}
+                        </div>
+
+                        {/* Action buttons with stable height */}
+                        <div className="space-y-3">
+                          <button
+                            className="w-full h-12 bg-red-500 hover:bg-red-600 text-white font-semibold rounded-lg disabled:opacity-50 disabled:cursor-not-allowed transition-colors duration-200"
+                            onClick={handleReportImage}
+                            disabled={reporting || !selectedReason}
+                          >
+                            {reporting ? 'Reporting...' : 'Report Image'}
+                          </button>
+                          
+                          <button
+                            className="w-full h-12 bg-gray-200 hover:bg-gray-300 text-gray-800 font-semibold rounded-lg disabled:opacity-50 disabled:cursor-not-allowed transition-colors duration-200"
+                            onClick={closeReportModal}
+                            disabled={reporting}
+                          >
+                            Cancel
+                          </button>
+                        </div>
+                        
+                        {reportError && (
+                          <div className="text-red-500 text-sm mt-4 text-center bg-red-50 p-3 rounded-lg border border-red-200">
+                            {reportError}
+                          </div>
+                        )}
+                      </>
+                    )}
+                  </div>
+                </div>
+              </div>
+            </>
+          )}
+        </div>
+      </div>
+    );
+  }
+
+  if (isDetailsAreaOnly) {
+    // Render only the non-swipeable details area
+    return (
+      <div className="w-full" style={{ minHeight: '400px' }}>
+        {/* Basic Info - Always shown */}
+        <div className="flex justify-between items-start">
+          <div className="flex-1">
+            <div className="flex items-center gap-2 mb-1">
+              <h2 className="text-2xl font-bold text-gray-900">
+                {match.first_name} {match.last_name}
+              </h2>
+              <span className="text-xl text-gray-600">
+                {calculateAge(match.date_of_birth)}
+              </span>
+              {/* Verified badge beside name and age */}
+              {isVerified && (
+                <div className="bg-green-5 text-white px-2 py-1 rounded-full flex items-center text-xs font-semibold">
+                  <Shield className="w-3 h-3 mr-1" />
+                  Verified
+                </div>
+              )}
+            </div>
+            
+            {match.city && (
+              <div className="flex items-center mt-1 text-gray-600">
+                <MapPin className="w-4 h-4 mr-1" />
+                <span className="text-sm">
+                  {match.city}, {match.country}
+                  {preCalculatedDistance !== undefined ? (
+                    <span className="ml-2">
+                      • {Math.max(1, Math.round(preCalculatedDistance))} km away
+                    </span>
+                  ) : (currentUserLatitude && currentUserLongitude && match.latitude && match.longitude && (
+                    <span className="ml-2">
+                      • {Math.max(1, Math.round(calculateDistance(
+                        currentUserLatitude,
+                        currentUserLongitude,
+                        match.latitude,
+                        match.longitude
+                      )))} km away
+                    </span>
+                  ))}
+                </span>
+              </div>
+            )}
+            
+            {match.relationship_intent && (
+              <div className="flex items-center mt-1 text-gray-600">
+                <Heart className="w-4 h-4 mr-1" />
+                <span className="text-sm capitalize">
+                  {match.relationship_intent === 'open_to_anything' ? 'Open to anything' : match.relationship_intent}
+                </span>
+              </div>
+            )}
           </div>
 
           {/* Expandable info button */}
@@ -298,13 +638,13 @@ const MatchCard: React.FC<MatchCardProps> = ({
               e.stopPropagation();
               onToggleInfo();
             }}
-            className="bg-pink-500 hover:bg-pink-600 text-white rounded-full p-2 transition-colors shadow-lg"
+            className="bg-pink-500 hover:bg-pink-600 text-white rounded-full p-3 transition-colors shadow-lg"
             aria-label={showMoreInfo ? "Hide details" : "Show details"}
           >
             {showMoreInfo ? (
-              <ChevronUp className="w-4 h-4" />
+              <ChevronUp className="w-5 h-5" />
             ) : (
-              <ChevronDown className="w-4 h-4" />
+              <ChevronDown className="w-5 h-5" />
             )}
           </button>
         </div>

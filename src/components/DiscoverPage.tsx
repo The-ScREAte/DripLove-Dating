@@ -4,65 +4,31 @@ import { buyMonthly, restorePurchases } from '../iap';
 import { useImageEdgeColor } from '@/hooks/useImageEdgeColor';
 function DominantColorImageBg({ imageUrl, children }) {
   const { edgeColor } = useImageEdgeColor(imageUrl);
-  
-  // Generate bright gradient colors matching the reference image (purple to pink)
-  const brightGradients = [
-    'bg-gradient-to-br from-purple-600 via-purple-500 to-pink-500',
-    'bg-gradient-to-br from-purple-700 via-purple-600 to-pink-600', 
-    'bg-gradient-to-br from-indigo-600 via-purple-500 to-pink-500',
-    'bg-gradient-to-br from-purple-800 via-purple-600 to-pink-400',
-    'bg-gradient-to-br from-violet-600 via-purple-500 to-pink-500',
-    'bg-gradient-to-br from-purple-600 via-fuchsia-500 to-pink-500',
-    'bg-gradient-to-br from-indigo-700 via-purple-600 to-pink-600',
-    'bg-gradient-to-br from-purple-700 via-fuchsia-600 to-pink-500'
-  ];
-  
-  // Generate consistent gradient based on edge color
-  const getGradientFromColor = (color) => {
-    if (!color || color === '#000000') {
-      return brightGradients[0]; // Default bright gradient
-    }
-    
-    // Convert hex to number for consistent selection
-    const hex = color.replace('#', '');
-    const num = parseInt(hex, 16);
-    const index = num % brightGradients.length;
-    return brightGradients[index];
-  };
-  
-  const selectedGradient = getGradientFromColor(edgeColor);
-  
   return (
     <div className="absolute inset-0 z-0 pointer-events-none">
-      {/* Bright gradient background for better contrast */}
+      {/* Solid color overlay fills all space */}
       <div
-        className={`absolute inset-0 ${selectedGradient}`}
-        style={{ zIndex: 0 }}
+        className="absolute inset-0"
+        style={{ background: edgeColor, zIndex: 0 }}
         aria-hidden="true"
       />
-      {/* Blurred image overlays the gradient for a soft effect - made very subtle for small screens */}
+      {/* Blurred image overlays the color for a soft effect */}
       {imageUrl && (
         <img
           src={imageUrl}
           aria-hidden="true"
-          className="absolute inset-0 w-full h-full object-cover opacity-5"
+          className="absolute inset-0 w-full h-full object-cover"
           style={{
-            filter: 'blur(60px) brightness(1.1)',
+            filter: 'blur(48px) brightness(1.08)',
             zIndex: 1,
             objectFit: 'cover',
             width: '100%',
             height: '100%',
-            transform: 'scale(1.1)'
+            transform: 'scale(1.25)'
           }}
           draggable={false}
         />
       )}
-      {/* Dark overlay for better text readability */}
-      <div 
-        className="absolute inset-0 bg-black/20"
-        style={{ zIndex: 2 }}
-        aria-hidden="true"
-      />
       <div className="absolute inset-0 z-10">
         {children}
       </div>
@@ -70,7 +36,8 @@ function DominantColorImageBg({ imageUrl, children }) {
   );
 }
 import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
-import { Loader2, Quote, Coffee, Search } from 'lucide-react';
+
+// --- AdinkraBar component and symbols ---
 const adinkraSymbols = [
   // 30 Adinkra symbols (SVGs are illustrative, not all unique for brevity)
   { name: 'Aya', meaning: 'The fern. Symbol of endurance and resourcefulness.', svg: (<svg width="24" height="24"><ellipse cx="12" cy="12" rx="10" ry="6" fill="#A5D6A7" stroke="#388E3C" strokeWidth="2" /><path d="M12 6v12M9 9l6 6M15 9l-6 6" stroke="#388E3C" strokeWidth="2" /></svg>) },
@@ -110,12 +77,9 @@ const adinkraSymbols = [
 ];
 
 const ROTATE_INTERVAL_MS = 2 * 60 * 1000; // 2 minutes
-interface AdinkraBarProps {
-  onSymbolClick: (index: number) => void;
-}
-
-const AdinkraBar: React.FC<AdinkraBarProps> = ({ onSymbolClick }) => {
+const AdinkraBar: React.FC = () => {
   const SYMBOLS_PER_SET = 4;
+  const [tooltipIdx, setTooltipIdx] = useState<number | null>(null);
   const [setIndex, setSetIndex] = useState(() => Math.floor(Math.random() * Math.ceil(adinkraSymbols.length / SYMBOLS_PER_SET)));
   useEffect(() => {
     const interval = setInterval(() => {
@@ -141,22 +105,32 @@ const AdinkraBar: React.FC<AdinkraBarProps> = ({ onSymbolClick }) => {
       {visibleSymbols.map((symbol, idx) => (
         <button
           key={symbol.name}
-          className="focus:outline-none bg-white rounded-full shadow hover:scale-110 transition-all duration-300 border border-yellow-300 hover:border-yellow-400 hover:shadow-lg cursor-pointer"
+          className="focus:outline-none bg-white rounded-full shadow hover:scale-110 transition-transform border border-yellow-300"
           style={{ width: 32, height: 28, display: 'flex', alignItems: 'center', justifyContent: 'center' }}
-          onClick={() => onSymbolClick(start + idx)}
+          onClick={() => setTooltipIdx(start + idx)}
           tabIndex={0}
-          aria-label={`Click to see meaning of ${symbol.name} symbol`}
-          title={`Click to learn about ${symbol.name}`}
+          aria-label={symbol.name + ' symbol'}
         >
           {symbol.svg}
         </button>
       ))}
+      {tooltipIdx !== null && (
+        <div
+          className="fixed left-1/2 top-1/2 z-50 px-4 py-3 rounded-lg shadow-lg bg-white border border-gray-300 text-xs text-gray-800 animate-fade-in flex flex-col items-center"
+          style={{ transform: 'translate(-50%, -50%)', minWidth: 180, maxWidth: 260 }}
+          onClick={() => setTooltipIdx(null)}
+        >
+          <strong className="text-base mb-1">{adinkraSymbols[tooltipIdx].name}</strong>
+          <div className="mt-1 text-center">{adinkraSymbols[tooltipIdx].meaning}</div>
+          <div className="text-[10px] text-gray-400 mt-2">(Click to close)</div>
+        </div>
+      )}
     </div>
   );
 };
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Heart, X, Crown, Calendar, MapPin, ChevronDown, ChevronUp, ChevronLeft, ChevronRight, Briefcase, GraduationCap, Undo2 } from 'lucide-react';
+import { Heart, X, Crown, Calendar, MapPin, ChevronDown, ChevronUp, Briefcase, GraduationCap, Undo2 } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import { useSubscription } from '@/hooks/useSubscription';
@@ -241,18 +215,7 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, isPremium }: DiscoverPage
   const [profileMissingFields, setProfileMissingFields] = useState<string[]>([]);
   const [userProfileImages, setUserProfileImages] = useState<any[]>([]);
   const [showProfileCompletionModal, setShowProfileCompletionModal] = useState(false);
-  
-  // Card shuffling system
-  const [currentCardType, setCurrentCardType] = useState<'photo' | 'about' | 'funfact' | 'questions'>('photo');
-  const [cardOrder, setCardOrder] = useState<('photo' | 'about' | 'funfact' | 'questions')[]>([]);
   const [todaySwipeCount, setTodaySwipeCount] = useState(0);
-  const [imageLoading, setImageLoading] = useState(false);
-  
-  // Adinkra tooltip state
-  const [tooltipIdx, setTooltipIdx] = useState<number | null>(null);
-  
-  // Interests display state
-  const [showAllInterests, setShowAllInterests] = useState(false);
   
   // Dynamic content height management
   const contentRef = useRef<HTMLDivElement>(null);
@@ -265,10 +228,6 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, isPremium }: DiscoverPage
     quality: 85,
     width: 800
   });
-
-  // Calculate reverse availability and usage
-  const canReverse = isPremium ? true : passedUsers.length > 0;
-  const reversesLeft = isPremium ? undefined : Math.max(0, 2 - reverseUsageToday);
 
   // --- BEGIN: Swipe Guide Popup State ---
   const [showSwipeGuide, setShowSwipeGuide] = useState(false);
@@ -373,7 +332,15 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, isPremium }: DiscoverPage
     }
   }, [currentUser?.id]);
   const [lastShuffleTime, setLastShuffleTime] = useState<number>(0);
-  // Removed swipe gesture state
+  const [startX, setStartX] = useState(0);
+  const [startY, setStartY] = useState(0);
+  const [currentX, setCurrentX] = useState(0);
+  const [currentY, setCurrentY] = useState(0);
+  const [isDragging, setIsDragging] = useState(false);
+  const [swipeDirection, setSwipeDirection] = useState<'left' | 'right' | null>(null);
+  const [swipeDistance, setSwipeDistance] = useState(0);
+  const [exitingCard, setExitingCard] = useState(false);
+  const [exitDirection, setExitDirection] = useState<'left' | 'right' | null>(null);
 
   // Memoize expensive calculations
   const getGenderFilter = useCallback((userPreference: string) => {
@@ -666,50 +633,10 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, isPremium }: DiscoverPage
     }
   }, [currentIndex, potentialMatches]);
 
-  // Effect that only runs when switching profiles (currentIndex changes)
   useEffect(() => {
-    setImageIndex(0);
-    setShowMoreInfo(false); // Reset expanded state when switching profiles
-    
-    // Generate card order for the current match
-    const currentMatch = potentialMatches[currentIndex];
-    if (currentMatch) {
-      const generateCardOrder = () => {
-        const availableCards: ('photo' | 'about' | 'funfact' | 'questions')[] = ['photo'];
-        
-        // Add about card if bio exists
-        if (currentMatch.bio) availableCards.push('about');
-        
-        // Add fun fact card if it exists
-        if (currentMatch.fun_fact) availableCards.push('funfact');
-        
-        // Add questions card if relevant fields exist
-        if (currentMatch.perfect_first_date || currentMatch.last_googled) {
-          availableCards.push('questions');
-        }
-        
-        // Shuffle the non-photo cards
-        const nonPhotoCards = availableCards.slice(1);
-        for (let i = nonPhotoCards.length - 1; i > 0; i--) {
-          const j = Math.floor(Math.random() * (i + 1));
-          [nonPhotoCards[i], nonPhotoCards[j]] = [nonPhotoCards[j], nonPhotoCards[i]];
-        }
-        
-        // Return photo first, then shuffled other cards
-        return ['photo', ...nonPhotoCards] as ('photo' | 'about' | 'funfact' | 'questions')[];
-      };
-      
-      const newOrder = generateCardOrder();
-      setCardOrder(newOrder);
-      setCurrentCardType('photo'); // Always start with photo
-    }
-  }, [currentIndex, potentialMatches]); // Removed userImages, preloadNextProfileImages, loadFullImages
-
-  // Separate effect for image loading that doesn't reset showMoreInfo
-  useEffect(() => {
-    const currentMatch = potentialMatches[currentIndex];
-    
+  setImageIndex(0);
     // Load images for current match if not already loaded
+    const currentMatch = potentialMatches[currentIndex];
     if (currentMatch && !userImages[currentMatch.id]) {
       loadFullImages(currentMatch.id);
     }
@@ -752,84 +679,137 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, isPremium }: DiscoverPage
     return () => window.removeEventListener('resize', measureContentHeight);
   }, [showMoreInfo, currentIndex, potentialMatches]);
 
-  // Removed swipe gesture handlers
+  const handleTouchStart = (e: React.TouchEvent) => {
+    const touch = e.touches[0];
+    setStartX(touch.clientX);
+    setStartY(touch.clientY);
+    setCurrentX(touch.clientX);
+    setCurrentY(touch.clientY);
+    setIsDragging(true);
+    setSwipeDirection(null);
+    setSwipeDistance(0);
+  };
 
-  const handleCardAreaClick = (e: React.MouseEvent<HTMLDivElement>) => {
-    // Prevent action if dragging occurred
-  // Swipe gesture state removed; always allow click navigation
-
-    // Get click position relative to the container
-    const rect = e.currentTarget.getBoundingClientRect();
-    const clickX = e.clientX - rect.left;
-    const containerWidth = rect.width;
-    const isLeftSide = clickX < containerWidth / 2;
-
-    if (currentCardType === 'photo') {
-      // Handle image navigation for photo cards
-      if (!currentMatch) return;
-
-      if (currentMatchImages.length > 1) {
-        if (isLeftSide) {
-          // Go to previous image
-          setImageIndex(prevIndex => prevIndex > 0 ? prevIndex - 1 : currentMatchImages.length - 1);
-        } else {
-          // Go to next image or next card type
-          if (imageIndex < currentMatchImages.length - 1) {
-            setImageIndex(prevIndex => prevIndex + 1);
-          } else {
-            // Move to next card type if available
-            const currentCardIndex = cardOrder.indexOf(currentCardType);
-            if (currentCardIndex < cardOrder.length - 1) {
-              setCurrentCardType(cardOrder[currentCardIndex + 1]);
-              setImageIndex(0);
-            } else {
-              setImageIndex(0); // Loop back to first image
-            }
-          }
-        }
-      } else {
-        // Single-image case: navigate between card types
-        const currentCardIndex = cardOrder.indexOf(currentCardType);
-        if (isLeftSide) {
-          if (currentCardIndex > 0) {
-            const prevCardType = cardOrder[currentCardIndex - 1];
-            setCurrentCardType(prevCardType);
-            if (prevCardType === 'photo') setImageIndex(0);
-          }
-        } else {
-          if (currentCardIndex < cardOrder.length - 1) {
-            setCurrentCardType(cardOrder[currentCardIndex + 1]);
-            setImageIndex(0);
-          } else {
-            // Loop back to photo
-            setCurrentCardType('photo');
-            setImageIndex(0);
-          }
-        }
-      }
-    } else {
-      // Handle navigation for other card types
-      const currentCardIndex = cardOrder.indexOf(currentCardType);
-      
-      if (isLeftSide) {
-        // Go to previous card type
-        if (currentCardIndex > 0) {
-          const prevCardType = cardOrder[currentCardIndex - 1];
-          setCurrentCardType(prevCardType);
-          if (prevCardType === 'photo') {
-            setImageIndex(currentMatchImages.length - 1); // Go to last image
-          }
-        }
-      } else {
-        // Go to next card type or loop back
-        if (currentCardIndex < cardOrder.length - 1) {
-          setCurrentCardType(cardOrder[currentCardIndex + 1]);
-        } else {
-          setCurrentCardType('photo');
-          setImageIndex(0);
-        }
-      }
+  const handleTouchMove = (e: React.TouchEvent) => {
+    if (!isDragging) return;
+    const touch = e.touches[0];
+    setCurrentX(touch.clientX);
+    setCurrentY(touch.clientY);
+    
+    const deltaX = touch.clientX - startX;
+    const deltaY = Math.abs(touch.clientY - startY);
+    
+    // Only show swipe feedback if horizontal movement is greater than vertical
+    if (Math.abs(deltaX) > deltaY) {
+      setSwipeDistance(Math.abs(deltaX));
+      setSwipeDirection(deltaX > 0 ? 'right' : 'left');
     }
+  };
+
+  const handleTouchEnd = (e: React.TouchEvent) => {
+    if (!isDragging) return;
+    setIsDragging(false);
+  
+    const deltaX = currentX - startX;
+    const deltaY = Math.abs(currentY - startY);
+    const screenWidth = window.innerWidth;
+    const minSwipeDistance = screenWidth * 0.4;
+  
+    if (Math.abs(deltaX) > minSwipeDistance && Math.abs(deltaX) > deltaY) {
+      // Trigger exit animation before handling like/pass
+      setExitingCard(true);
+      setExitDirection(deltaX > 0 ? 'right' : 'left');
+      
+      // Wait for animation to complete before proceeding
+      setTimeout(() => {
+        if (deltaX > 0) {
+          handleLike();
+        } else {
+          handlePass();
+        }
+        setExitingCard(false);
+        setExitDirection(null);
+      }, 300);
+    } else {
+      // Reset values if swipe wasn't far enough
+      setStartX(0);
+      setStartY(0);
+      setCurrentX(0);
+      setCurrentY(0);
+      setSwipeDirection(null);
+      setSwipeDistance(0);
+    }
+  };
+
+  // Mouse event handlers for swipe on desktop
+  const handleMouseDown = (e: React.MouseEvent) => {
+    setStartX(e.clientX);
+    setStartY(e.clientY);
+    setCurrentX(e.clientX);
+    setCurrentY(e.clientY);
+    setIsDragging(true);
+    setSwipeDirection(null);
+    setSwipeDistance(0);
+  };
+
+  const handleMouseMove = (e: React.MouseEvent) => {
+    if (!isDragging) return;
+    setCurrentX(e.clientX);
+    setCurrentY(e.clientY);
+    
+    const deltaX = e.clientX - startX;
+    const deltaY = Math.abs(e.clientY - startY);
+    
+    // Only show swipe feedback if horizontal movement is greater than vertical
+    if (Math.abs(deltaX) > deltaY) {
+      setSwipeDistance(Math.abs(deltaX));
+      setSwipeDirection(deltaX > 0 ? 'right' : 'left');
+    }
+  };
+
+  const handleMouseUp = (e: React.MouseEvent) => {
+    if (!isDragging) return;
+    setIsDragging(false);
+
+    const deltaX = currentX - startX;
+    const deltaY = Math.abs(e.clientY - startY);
+    const minSwipeDistance = 80;
+
+    // Only trigger swipe if horizontal movement is greater than vertical
+    if (Math.abs(deltaX) > minSwipeDistance && Math.abs(deltaX) > deltaY) {
+      // Trigger exit animation before handling like/pass
+      setExitingCard(true);
+      setExitDirection(deltaX > 0 ? 'right' : 'left');
+      
+      // Wait for animation to complete before proceeding
+      setTimeout(() => {
+        if (deltaX > 0) {
+          // Swipe right - like
+          handleLike();
+        } else {
+          // Swipe left - dislike
+          handlePass();
+        }
+        setExitingCard(false);
+        setExitDirection(null);
+      }, 300);
+    } else {
+      // Reset values if swipe wasn't far enough
+      setStartX(0);
+      setStartY(0);
+      setCurrentX(0);
+      setCurrentY(0);
+      setSwipeDirection(null);
+      setSwipeDistance(0);
+    }
+  };
+
+  const handleImageAreaClick = (e: React.MouseEvent<HTMLDivElement>) => {
+    // Prevent swipe action if dragging occurred
+    if (Math.abs(currentX - startX) > 10) return;
+
+    // This function is now mainly used for compatibility
+    // The actual image/slide navigation is handled within MatchCard
   };
 
   // Function to load more matches when running low - optimized for 5 at a time
@@ -1426,27 +1406,32 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, isPremium }: DiscoverPage
     );
   }
 
-  // Removed swipe overlay opacity and transform logic
-  const cardTransform = '';
+  // Calculate swipe overlay opacity and transform
+  const swipeOpacity = Math.min(swipeDistance / 100, 0.8);
+  
+  // Enhanced card transform with exit animation
+  const getCardTransform = () => {
+    if (exitingCard && exitDirection) {
+      const exitDistance = exitDirection === 'right' ? window.innerWidth : -window.innerWidth;
+      return `translateX(${exitDistance}px) translateY(100px) rotate(${exitDirection === 'right' ? 30 : -30}deg) scale(0.8)`;
+    }
+    return isDragging ? `translateX(${currentX - startX}px) rotate(${(currentX - startX) * 0.1}deg)` : '';
+  };
+  
+  const cardTransform = getCardTransform();
 
 
 
   return (
-    <div className="h-full w-full fixed left-0 overflow-hidden bg-gradient-to-br from-purple-600 via-purple-700 to-purple-800"
+    <div className="h-full w-full fixed left-0 overflow-hidden"
          style={{ 
-           top: '0px',
-           height: '100vh',
+           top: '60px', // Start below the header instead of top-0
+           height: 'calc(100vh - 60px)', // Adjust height to account for header
            touchAction: 'pan-x pan-y',
            userSelect: 'none',
            WebkitUserSelect: 'none',
            WebkitTouchCallout: 'none'
          }}>
-      
-      {/* Adinkra Bar at the top */}
-      <div className="relative z-10">
-        <AdinkraBar onSymbolClick={setTooltipIdx} />
-      </div>
-
       {/* --- Swipe Guide Popup for New Users --- */}
       {showSwipeGuide && (
         <div
@@ -1519,548 +1504,142 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, isPremium }: DiscoverPage
           </div>
         </div>
       )}
-
-      {/* Listen Intro Button - Outside match card area */}
-      <div className="absolute top-20 right-2 z-50">
-        <button 
-          className="bg-gradient-to-br from-pink-500 to-pink-600 hover:from-pink-600 hover:to-pink-700 text-white rounded-full p-4 shadow-xl transition-all duration-200 hover:scale-110 active:scale-95 border-2 border-white/30"
-          onClick={() => {
-            // Add voice intro functionality here
-            console.log('Play voice intro for:', currentMatch.first_name);
-          }}
-        >
-          <svg className="w-6 h-6" fill="currentColor" viewBox="0 0 24 24">
-            <path d="M12 2c-1.66 0-3 1.34-3 3v6c0 1.66 1.34 3 3 3s3-1.34 3-3V5c0-1.66-1.34-3-3-3zM17 11c0 2.76-2.24 5-5 5s-5-2.24-5-5H5c0 3.53 2.61 6.43 6 6.92V21h2v-3.08c3.39-.49 6-3.39 6-6.92h-2z"/>
-          </svg>
-        </button>
-      </div>
-
-      {/* Main Profile Card Area */}
-      <div className="flex-1 flex flex-col items-center justify-start px-4 pt-2 relative" style={{ height: 'calc(100vh - 160px)', marginBottom: '90px' }}>
-  {/* Next Profile Card - Behind Current Card - Removed as requested */}
-
-        {/* Profile Info Above Card - Outside the card container */}
-        <div className="w-full max-w-sm mx-auto mb-4 z-20">
-          <div className="bg-transparent px-4 py-4">
-            {/* Name, Age, Distance */}
-            <div className="text-center mb-3">
-              <h2 
-                className="text-2xl font-bold text-white mb-1"
-                style={{
-                  textShadow: '0 2px 8px rgba(0,0,0,0.8), 0 4px 16px rgba(0,0,0,0.6), 0 0 0 1px rgba(255,255,255,0.3)',
-                  WebkitTextStroke: '0.5px rgba(255,255,255,0.1)'
-                }}
-              >
-                {currentMatch.first_name}, {calculateAge(currentMatch.date_of_birth)}
-              </h2>
-              <span 
-                className="text-white/95 text-sm font-medium"
-                style={{
-                  textShadow: '0 2px 6px rgba(0,0,0,0.7), 0 4px 12px rgba(0,0,0,0.5)'
-                }}
-              >
-                {userDistances[currentMatch.id] 
-                  ? `${Math.round(userDistances[currentMatch.id])}km away`
-                  : `${currentMatch.city || 'Location not set'}`}
-              </span>
-            </div>
-            
-            {/* Interests */}
-            {currentMatch.interests?.length > 0 && (
-              <div className="flex flex-wrap justify-center gap-2 mt-3">
-                {currentMatch.interests.slice(0, 3).map((interest, index) => (
-                  <span 
-                    key={index}
-                    className="px-3 py-1.5 bg-white/25 backdrop-blur-sm text-white rounded-full text-sm font-semibold border border-white/20"
-                    style={{
-                      textShadow: '0 1px 4px rgba(0,0,0,0.6)',
-                      boxShadow: '0 4px 12px rgba(0,0,0,0.3), inset 0 1px 0 rgba(255,255,255,0.2)'
-                    }}
-                  >
-                    {interest}
-                  </span>
-                ))}
-                {currentMatch.interests.length > 3 && (
-                  <button 
-                    onClick={() => setShowAllInterests(true)}
-                    className="px-3 py-1.5 bg-white/25 backdrop-blur-sm text-white rounded-full text-sm font-semibold border border-white/20 hover:bg-white/35 transition-all duration-200 cursor-pointer"
-                    style={{
-                      textShadow: '0 1px 4px rgba(0,0,0,0.6)',
-                      boxShadow: '0 4px 12px rgba(0,0,0,0.3), inset 0 1px 0 rgba(255,255,255,0.2)'
-                    }}
-                  >
-                    +{currentMatch.interests.length - 3}
-                  </button>
-                )}
-              </div>
-            )}
-          </div>
-        </div>
-
-        {/* Current Profile Card */}
-        <div
-          className={`relative w-full max-w-[22rem] mx-auto bg-white rounded-3xl shadow-2xl z-10 transition-all duration-300 ${
-            showMoreInfo ? 'overflow-visible' : 'overflow-hidden'
-          }`}
-          style={{
-            minHeight: '420px',
-            maxHeight: '420px'
-          }}
-        >
-          {/* Swipe gesture overlays and state fully removed */}
-
-          {/* Profile Card Container - Dynamic Content */}
-          <div 
-            className="relative h-[420px] select-none overflow-hidden rounded-t-3xl"
-            // Swipe gesture handlers fully removed
-            onClick={handleCardAreaClick}
-            style={{ cursor: 'pointer' }}
+      {/* Main Image Area - Card stack */}
+  <div className="flex-1 relative overflow-hidden" style={{ height: 'calc(100vh - 140px)', display: 'flex', flexDirection: 'column', justifyContent: 'flex-end', paddingBottom: 0 }}>
+        {/* ...existing code... */}
+        {nextMatch && (
+          <DominantColorImageBg
+            imageUrl={nextMatchImages[0] ? getOptimizedUrl(nextMatchImages[0]) : undefined}
           >
-            {/* Card Content Based on Current Card Type */}
-            {currentCardType === 'photo' ? (
-              <>
-                {/* Photo Card */}
-                {currentMatchImages.length > 0 ? (
-                  <>
-                    {imageLoading && (
-                      <div className="absolute inset-0 bg-gray-100 flex items-center justify-center z-10">
-                        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-pink-500" />
-                      </div>
-                    )}
-                    <img
-                      src={getOptimizedUrl(currentMatchImages[imageIndex])}
-                      alt={`${currentMatch.first_name} ${currentMatch.last_name}`}
-                      className="w-full h-full object-cover"
-                      draggable={false}
-                      onLoadStart={() => setImageLoading(true)}
-                      onLoad={() => setImageLoading(false)}
-                      onError={() => setImageLoading(false)}
-                      style={{
-                        touchAction: 'manipulation',
-                        userSelect: 'none',
-                        WebkitUserSelect: 'none',
-                        WebkitTouchCallout: 'none'
-                      }}
-                    />
-                  </>
-                ) : (
-                  <div className="w-full h-full bg-gradient-to-br from-purple-500 to-pink-500 flex items-center justify-center">
-                    <span className="text-6xl font-bold text-white drop-shadow-lg">
-                      {currentMatch.first_name?.[0]}{currentMatch.last_name?.[0]}
-                    </span>
-                  </div>
-                )}
-              </>
-            ) : currentCardType === 'about' ? (
-              <>
-                {/* About Card */}
-                <DominantColorImageBg imageUrl={currentMatchImages[0]}>
-                  <div className="absolute inset-0 flex flex-col justify-center items-center p-6 text-white">
-                    <div className="text-center space-y-4 max-w-xs">
-                      <h3 className="text-2xl font-bold mb-4">About {currentMatch.first_name}</h3>
-                      {currentMatch.bio && (
-                        <p className="text-lg leading-relaxed font-medium text-white/95 drop-shadow-lg">
-                          {currentMatch.bio}
-                        </p>
-                      )}
-                      {currentMatch.occupation && (
-                        <div className="mt-4">
-                          <p className="text-sm font-semibold text-white/90 drop-shadow">
-                            {currentMatch.occupation}
-                          </p>
-                        </div>
-                      )}
-                      {currentMatch.education_level && (
-                        <div>
-                          <p className="text-sm text-white/80 drop-shadow">
-                            {currentMatch.education_level}
-                          </p>
-                        </div>
-                      )}
-                    </div>
-                  </div>
-                </DominantColorImageBg>
-              </>
-            ) : currentCardType === 'funfact' ? (
-              <>
-                {/* Fun Fact Card */}
-                <DominantColorImageBg imageUrl={currentMatchImages[0]}>
-                  <div className="absolute inset-0 flex flex-col justify-center items-center p-6 text-white">
-                    <div className="text-center space-y-4 max-w-xs">
-                      <h3 className="text-2xl font-bold mb-4">Fun Fact</h3>
-                      {currentMatch.fun_fact && (
-                        <p className="text-lg leading-relaxed font-medium text-white/95 drop-shadow-lg">
-                          {currentMatch.fun_fact}
-                        </p>
-                      )}
-                    </div>
-                  </div>
-                </DominantColorImageBg>
-              </>
-            ) : currentCardType === 'questions' ? (
-              <>
-                {/* Questions Card */}
-                <DominantColorImageBg imageUrl={currentMatchImages[0]}>
-                  <div className="absolute inset-0 flex flex-col justify-center items-center p-6 text-white">
-                    <div className="text-center space-y-6 max-w-xs">
-                      <h3 className="text-2xl font-bold mb-4">Get to Know Me</h3>
-                      {currentMatch.perfect_first_date && (
-                        <div className="space-y-2">
-                          <p className="text-sm font-semibold text-white/90 drop-shadow">
-                            Perfect First Date:
-                          </p>
-                          <p className="text-lg leading-relaxed font-medium text-white/95 drop-shadow-lg">
-                            {currentMatch.perfect_first_date}
-                          </p>
-                        </div>
-                      )}
-                      {currentMatch.last_googled && (
-                        <div className="space-y-2">
-                          <p className="text-sm font-semibold text-white/90 drop-shadow">
-                            Last Googled:
-                          </p>
-                          <p className="text-lg leading-relaxed font-medium text-white/95 drop-shadow-lg">
-                            {currentMatch.last_googled}
-                          </p>
-                        </div>
-                      )}
-                    </div>
-                  </div>
-                </DominantColorImageBg>
-              </>
-            ) : null}
-
-            {/* Card indicators */}
-            <div className="absolute top-4 left-4 right-4 flex gap-1">
-              {currentCardType === 'photo' && currentMatchImages.length > 1 ? (
-                // Photo indicators for image navigation
-                currentMatchImages.map((_, idx) => (
-                  <div
-                    key={idx}
-                    className={`flex-1 h-1 rounded-full transition-all duration-300 ${
-                      idx === imageIndex ? 'bg-white' : 'bg-white/40'
-                    }`}
-                  />
-                ))
-              ) : (
-                // Card type indicators
-                cardOrder.map((cardType, idx) => {
-                  const isActive = cardType === currentCardType;
-                  return (
-                    <div
-                      key={cardType}
-                      className={`flex-1 h-1 rounded-full transition-all duration-300 ${
-                        isActive ? 'bg-white' : 'bg-white/40'
-                      }`}
-                    />
-                  );
-                })
-              )}
-            </div>
-
-            {/* Navigation hint arrows */}
-            <div className="absolute left-4 top-1/2 transform -translate-y-1/2 pointer-events-none">
-              <ChevronLeft className="w-6 h-6 text-white/60 drop-shadow-lg" />
-            </div>
-            <div className="absolute right-4 top-1/2 transform -translate-y-1/2 pointer-events-none">
-              <ChevronRight className="w-6 h-6 text-white/60 drop-shadow-lg" />
-            </div>
-
-            {/* Navigation areas */}
-            <>
-              {/* Left navigation area */}
-              <div 
-                className="absolute left-0 top-0 w-1/2 h-full z-20 flex items-center justify-start pl-2 cursor-pointer active:bg-black/5"
-                onClick={(e) => {
-                  e.preventDefault();
-                  e.stopPropagation();
-                  
-                  if (currentCardType === 'photo' && currentMatchImages.length > 1) {
-                    // Navigate through images
-                    setImageIndex(prevIndex => 
-                      prevIndex > 0 ? prevIndex - 1 : currentMatchImages.length - 1
-                    );
-                  } else {
-                    // Navigate to previous card type
-                    const currentCardIndex = cardOrder.indexOf(currentCardType);
-                    if (currentCardIndex > 0) {
-                      const prevCardType = cardOrder[currentCardIndex - 1];
-                      setCurrentCardType(prevCardType);
-                      if (prevCardType === 'photo') {
-                        setImageIndex(currentMatchImages.length - 1);
-                      }
-                    }
-                  }
-                }}
-                onTouchEnd={(e) => {
-                  e.preventDefault();
-                  e.stopPropagation();
-                }}
-                style={{ backgroundColor: 'transparent' }}
-              >
-                <div className="bg-black/30 backdrop-blur-sm rounded-full p-1.5 opacity-0 hover:opacity-100 active:opacity-100 transition-all duration-200">
-                  <ChevronLeft className="w-5 h-5 text-white drop-shadow-lg" />
-                </div>
+            {/* ...existing code for overlays, etc... */}
+            {nextMatchImages.length > 0 ? (
+              <img
+                src={getOptimizedUrl(nextMatchImages[0])}
+                alt={`${nextMatch.first_name}'s photo`}
+                className="w-full h-full object-contain rounded-2xl md:rounded-3xl"
+                style={{ borderRadius: '1.25rem', position: 'relative', zIndex: 1 }}
+                draggable={false}
+                loading="eager"
+              />
+            ) : (
+              <div className="w-full h-full bg-gradient-to-br from-pink-200 to-purple-200 flex items-center justify-center">
+                <span className="text-6xl font-bold text-gray-700">
+                  {nextMatch.first_name?.[0]}{nextMatch.last_name?.[0]}
+                </span>
               </div>
-
-              {/* Show More button anchored bottom-left inside the card */}
-              {(currentMatch.bio || currentMatch.occupation || currentMatch.education_level || (currentMatch.interests && currentMatch.interests.length > 0)) && (
-                <button 
-                  onClick={(e) => { e.stopPropagation(); e.preventDefault(); setShowMoreInfo(true); }}
-                  className="absolute left-3 bottom-3 z-30 px-3 py-1.5 bg-pink-600 hover:bg-pink-700 text-white rounded-full text-xs font-medium shadow-lg border border-white/20"
-                >
-                  More Info
-                </button>
-              )}
-
-              {/* Right navigation area */}
-              <div 
-                className="absolute right-0 top-0 w-1/2 h-full z-20 flex items-center justify-end pr-2 cursor-pointer active:bg-black/5"
-                onClick={(e) => {
-                  e.preventDefault();
-                  e.stopPropagation();
-                  
-                  if (currentCardType === 'photo') {
-                    if (currentMatchImages.length > 1 && imageIndex < currentMatchImages.length - 1) {
-                      // Navigate to next image
-                      setImageIndex(prevIndex => prevIndex + 1);
-                    } else {
-                      // Navigate to next card type
-                      const currentCardIndex = cardOrder.indexOf(currentCardType);
-                      if (currentCardIndex < cardOrder.length - 1) {
-                        setCurrentCardType(cardOrder[currentCardIndex + 1]);
-                        setImageIndex(0);
-                      } else {
-                        // Loop back to first image of photos
-                        setImageIndex(0);
-                      }
-                    }
-                  } else {
-                    // Navigate to next card type
-                    const currentCardIndex = cardOrder.indexOf(currentCardType);
-                    if (currentCardIndex < cardOrder.length - 1) {
-                      setCurrentCardType(cardOrder[currentCardIndex + 1]);
-                    } else {
-                      setCurrentCardType('photo');
-                      setImageIndex(0);
-                    }
-                  }
-                }}
-                onTouchEnd={(e) => { e.preventDefault(); e.stopPropagation(); }}
-                style={{ backgroundColor: 'transparent' }}
-              >
-                <div className="bg-black/30 backdrop-blur-sm rounded-full p-1.5 opacity-0 hover:opacity-100 active:opacity-100 transition-all duration-200">
-                  <ChevronRight className="w-5 h-5 text-white drop-shadow-lg" />
-                </div>
-              </div>
-            </>
-
-
-
-            {/* Gradient overlay for better text readability */}
-            <div className="absolute inset-x-0 bottom-0 h-32 bg-gradient-to-t from-black/60 via-black/20 to-transparent" />
-          </div>
-
-          {/* Profile Info - Minimized removed to eliminate bottom white space */}
-            
-            {/* Expandable Details - overlay that covers the match card with close (X) above */}
-            {showMoreInfo && (
-              <>
-                {/* Backdrop */}
-                <div
-                  className="fixed inset-0 z-40 bg-black/30"
-                  onClick={() => setShowMoreInfo(false)}
-                />
-                {/* Panel sized to the card area */}
-                <div
-                  className="fixed left-1/2 z-50 w-full max-w-sm px-4 animate-fade-in"
-                  style={{ transform: 'translateX(-50%)', top: '230px' }}
-                >
-                  <div className="relative">
-                    {/* Close button removed – backdrop handles closing on outside click */}
-                    <div className="rounded-2xl border border-gray-200 bg-white/95 backdrop-blur-sm shadow-2xl overflow-y-auto max-h-[60vh]">
-                      <div className="px-4 py-3 space-y-3">
-                    {currentMatch.bio && (
-                      <div>
-                        <h4 className="font-medium text-gray-900 mb-1 text-sm">About</h4>
-                        <p className="text-gray-600 text-xs leading-relaxed">{currentMatch.bio}</p>
-                      </div>
-                    )}
-                    {(currentMatch.occupation || currentMatch.education_level) && (
-                      <div className="grid grid-cols-2 gap-2 text-xs">
-                        {currentMatch.occupation && (
-                          <div>
-                            <h5 className="font-medium text-gray-900">Work</h5>
-                            <p className="text-gray-600">{currentMatch.occupation}</p>
-                          </div>
-                        )}
-                        {currentMatch.education_level && (
-                          <div>
-                            <h5 className="font-medium text-gray-900">Education</h5>
-                            <p className="text-gray-600">{currentMatch.education_level}</p>
-                          </div>
-                        )}
-                      </div>
-                    )}
-                    {/* Show all interests in expanded view */}
-                    {currentMatch.interests?.length > 0 && (
-                      <div>
-                        <h4 className="font-medium text-gray-900 mb-1.5 text-sm">Interests</h4>
-                        <div className="flex flex-wrap gap-1.5">
-                          {currentMatch.interests.map((interest, index) => (
-                            <span
-                              key={index}
-                              className="px-2 py-0.5 bg-purple-100 text-purple-700 rounded-full text-xs"
-                            >
-                              {interest}
-                            </span>
-                          ))}
-                        </div>
-                      </div>
-                    )}
-                    {/* Additional profile information */}
-                    {(currentMatch.drinking || currentMatch.smoking || currentMatch.exercise_level) && (
-                      <div>
-                        <h4 className="font-medium text-gray-900 mb-2 text-sm">Lifestyle</h4>
-                        <div className="space-y-2">
-                          {currentMatch.drinking && (
-                            <div className="flex justify-between text-xs">
-                              <span className="text-gray-500">Drinking</span>
-                              <span className="text-gray-900 capitalize">{currentMatch.drinking}</span>
-                            </div>
-                          )}
-                          {currentMatch.smoking && (
-                            <div className="flex justify-between text-xs">
-                              <span className="text-gray-500">Smoking</span>
-                              <span className="text-gray-900 capitalize">{currentMatch.smoking}</span>
-                            </div>
-                          )}
-                          {currentMatch.exercise_level && (
-                            <div className="flex justify-between text-xs">
-                              <span className="text-gray-500">Exercise</span>
-                              <span className="text-gray-900 capitalize">{currentMatch.exercise_level}</span>
-                            </div>
-                          )}
-                        </div>
-                      </div>
-                    )}
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              </>
             )}
-        </div>
-      </div>
+            <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-transparent to-transparent pointer-events-none" />
+          </DominantColorImageBg>
 
-      {/* Bottom Adinkra Bar with Action Buttons */}
-      <div className="absolute left-0 right-0 z-20 bg-gradient-to-t from-black/30 to-transparent pb-2 pt-4" style={{ bottom: '70px' }}>
-        {/* Adinkra Pattern Background */}
-        <div
-          className="w-full flex justify-center items-center relative"
-          style={{
-            backgroundImage: `url('data:image/svg+xml;utf8,<svg width="240" height="50" viewBox="0 0 240 50" fill="none" xmlns="http://www.w3.org/2000/svg"><rect width="240" height="50" fill="%23007bdb"/><g><rect x="0" y="0" width="24" height="50" fill="%23ffc72c"/><rect x="24" y="0" width="24" height="50" fill="%23007bdb"/><rect x="48" y="0" width="24" height="50" fill="%23ffc72c"/><rect x="72" y="0" width="24" height="50" fill="%23007bdb"/><rect x="96" y="0" width="24" height="50" fill="%23ffc72c"/><rect x="120" y="0" width="24" height="50" fill="%23007bdb"/><rect x="144" y="0" width="24" height="50" fill="%23ffc72c"/><rect x="168" y="0" width="24" height="50" fill="%23007bdb"/><rect x="192" y="0" width="24" height="50" fill="%23ffc72c"/><rect x="216" y="0" width="24" height="50" fill="%23007bdb"/></g><g><polygon points="24,0 36,25 24,50 48,50 36,25 48,0" fill="%23e63946"/><polygon points="72,0 84,25 72,50 96,50 84,25 96,0" fill="%2300b159"/><polygon points="120,0 132,25 120,50 144,50 132,25 144,0" fill="%23e63946"/><polygon points="168,0 180,25 168,50 192,50 180,25 192,0" fill="%2300b159"/></g><g><rect x="0" y="0" width="240" height="8" fill="%23fff" fill-opacity="0.15"/><rect x="0" y="42" width="240" height="8" fill="%23fff" fill-opacity="0.15"/></g><g><rect x="23" y="0" width="2" height="50" fill="%23fff"/><rect x="47" y="0" width="2" height="50" fill="%23fff"/><rect x="71" y="0" width="2" height="50" fill="%23fff"/><rect x="95" y="0" width="2" height="50" fill="%23fff"/><rect x="119" y="0" width="2" height="50" fill="%23fff"/><rect x="143" y="0" width="2" height="50" fill="%23fff"/><rect x="167" y="0" width="2" height="50" fill="%23fff"/><rect x="191" y="0" width="2" height="50" fill="%23fff"/><rect x="215" y="0" width="2" height="50" fill="%23fff"/></g></svg>')`,
-            backgroundRepeat: 'repeat',
-            backgroundSize: '240px 50px',
-            minHeight: '50px',
-          }}
-        >
-          {/* Action Buttons Container */}
-          <div className="flex items-center justify-center gap-4 px-6 py-2 bg-black/20 rounded-full backdrop-blur-sm">
-            {/* Pass Button (Left) */}
-            <button
-              onClick={handlePass}
-              className="w-12 h-12 bg-red-500/30 hover:bg-red-500/50 border-2 border-red-400 rounded-full flex items-center justify-center shadow-lg hover:scale-105 transition-transform backdrop-blur-sm"
-            >
-              <X className="w-4 h-4 text-red-100" />
-            </button>
+// Helper component to extract and apply dominant color as background
 
-            {/* Reverse Button (Center) */}
-            <div className="relative">
-              <button
-                onClick={handleReverse}
-                disabled={!canReverse}
-                className="w-12 h-12 bg-yellow-500/30 hover:bg-yellow-500/50 disabled:opacity-30 border-2 border-yellow-400 rounded-full flex items-center justify-center shadow-lg hover:scale-105 transition-transform backdrop-blur-sm"
-              >
-                <Undo2 className="w-4 h-4 text-yellow-100" />
-              </button>
-              {!isPremium && reversesLeft !== undefined && reversesLeft > 0 && (
-                <div className="absolute -top-1 -right-1 w-4 h-4 bg-yellow-400 text-black text-[10px] font-bold rounded-full flex items-center justify-center shadow-lg">
-                  {reversesLeft}
-                </div>
-              )}
-            </div>
-
-            {/* Like Button (Heart-Shaped with Logo) */}
-            <div className="relative">
-              <button
-                onClick={handleLike}
-                className="relative w-16 h-16 hover:scale-105 transition-transform shadow-lg border-2 border-yellow-400 flex items-center justify-center"
-                style={{
-                  background: 'linear-gradient(135deg, #ffffff 0%, #fef7cd 100%)',
-                  borderRadius: '50%',
-                  position: 'relative',
-                  overflow: 'hidden',
-                  padding: 0
-                }}
-              >
-                <img 
-                  src="/driplove-logo.png" 
-                  alt="DripLove" 
-                  className="w-10 h-10 object-contain z-10"
-                />
-              </button>
-            </div>
-          </div>
-        </div>
-      </div>
-        
-        {/* Next profile image - same size as main card for smooth transition */}
-        <div 
-          className="absolute w-full max-w-[22rem] mx-auto bg-white rounded-3xl shadow-xl overflow-hidden z-0" 
-          style={{ 
-            borderRadius: '1.5rem',
-            left: '50%',
-            top: '0px',
-            transform: 'translateX(-50%) translateY(8px) scale(0.98)',
-            opacity: 0.7
-          }}
-        >
-          <div className="absolute inset-0 h-[420px]">
-            <img
-              src="https://tgjsyyihabsovironesw.supabase.co/storage/v1/object/public/user-photos/07a638dd-2563-4649-9c75-a7451bab2bab/1756874666423-d6nr53q3awt.jpg?width=800&quality=85&format=webp"
-              alt="Sandra's photo"
-              className="w-full h-full object-cover rounded-3xl"
-              draggable="false"
-              loading="eager"
-              style={{ borderRadius: '1.5rem' }}
-            />
-            <div className="absolute inset-0 bg-gradient-to-t from-black/40 via-transparent to-transparent pointer-events-none"></div>
-          </div>
-        </div>
-        {/* Next match hidden for small screen display */}
+// Helper component to extract and apply dominant color as background
+        )}
 // Helper component to extract and apply dominant color as background
 
         {/* ...existing code... */}
         <div
           className="h-full w-full relative z-10 flex flex-col"
           style={{
-            boxShadow: '0 4px 16px 0 rgba(0,0,0,0.10)',
-            opacity: 1
+            transform: cardTransform,
+            transition: exitingCard ? 'transform 0.3s cubic-bezier(0.25, 0.46, 0.45, 0.94)' : 
+                       isDragging ? 'none' : 'transform 0.3s cubic-bezier(0.22, 1, 0.36, 1)',
+            boxShadow: isDragging ? '0 8px 32px 0 rgba(0,0,0,0.25)' : '0 4px 16px 0 rgba(0,0,0,0.10)',
+            opacity: exitingCard ? 0 : 1
           }}
         >
-      {/* Image area - flexible height that fills remaining space */}
+          {/* Image area - flexible height that fills remaining space */}
           <div
             className="flex-1 cursor-pointer select-none relative transition-all duration-300 overflow-hidden"
             style={{
-        // Fill available height reliably
-        height: '100%'
+              minHeight: showMoreInfo ? 'calc(100vh - 402px)' : 'calc(100vh - 302px)' // Adjusted for new expanded height
             }}
-            // All swipe gesture handlers removed
-            onClick={handleCardAreaClick}
+            onTouchStart={handleTouchStart}
+            onTouchMove={handleTouchMove}
+            onTouchEnd={handleTouchEnd}
+            onMouseDown={handleMouseDown}
+            onMouseMove={handleMouseMove}
+            onMouseUp={handleMouseUp}
+            onClick={handleImageAreaClick}
           >
             {/* ...existing code... */}
-            {/* Swipe overlays and gesture state fully removed */}
+            {isDragging && swipeDirection && (
+              <>
+                {/* Like Overlay - Right Swipe */}
+                {swipeDirection === 'right' && (
+                  <div 
+                    className="absolute inset-0 z-20 flex items-center justify-center pointer-events-none"
+                    style={{ 
+                      background: `linear-gradient(135deg, rgba(34, 197, 94, ${swipeOpacity * 0.7}), rgba(74, 222, 128, ${swipeOpacity * 0.5}))`,
+                      transition: 'none'
+                    }}
+                  >
+                    <div 
+                      className="bg-green-500/90 backdrop-blur-sm rounded-full p-6 shadow-2xl transform"
+                      style={{ 
+                        scale: Math.min(0.8 + (swipeOpacity * 0.4), 1.2),
+                        transition: 'none'
+                      }}
+                    >
+                      <Heart 
+                        className="w-12 h-12 text-white fill-current" 
+                        style={{ 
+                          filter: `drop-shadow(0 4px 8px rgba(0,0,0,0.3))`,
+                          transform: `rotate(${swipeDistance * 0.1}deg)`
+                        }}
+                      />
+                    </div>
+                    <div 
+                      className="absolute bottom-32 bg-green-500/95 backdrop-blur-sm px-8 py-3 rounded-full shadow-xl"
+                      style={{ 
+                        opacity: Math.min(swipeOpacity + 0.2, 1),
+                        transform: `translateY(${-swipeDistance * 0.1}px)`,
+                        transition: 'none'
+                      }}
+                    >
+                      <span className="text-white font-bold text-2xl tracking-wider">LIKE</span>
+                    </div>
+                  </div>
+                )}
+
+                {/* Pass Overlay - Left Swipe */}
+                {swipeDirection === 'left' && (
+                  <div 
+                    className="absolute inset-0 z-20 flex items-center justify-center pointer-events-none"
+                    style={{ 
+                      background: `linear-gradient(135deg, rgba(239, 68, 68, ${swipeOpacity * 0.7}), rgba(248, 113, 113, ${swipeOpacity * 0.5}))`,
+                      transition: 'none'
+                    }}
+                  >
+                    <div 
+                      className="bg-red-500/90 backdrop-blur-sm rounded-full p-6 shadow-2xl transform"
+                      style={{ 
+                        scale: Math.min(0.8 + (swipeOpacity * 0.4), 1.2),
+                        transition: 'none'
+                      }}
+                    >
+                      <X 
+                        className="w-12 h-12 text-white" 
+                        style={{ 
+                          filter: `drop-shadow(0 4px 8px rgba(0,0,0,0.3))`,
+                          transform: `rotate(${-swipeDistance * 0.1}deg)`
+                        }}
+                      />
+                    </div>
+                    <div 
+                      className="absolute bottom-32 bg-red-500/95 backdrop-blur-sm px-8 py-3 rounded-full shadow-xl"
+                      style={{ 
+                        opacity: Math.min(swipeOpacity + 0.2, 1),
+                        transform: `translateY(${-swipeDistance * 0.1}px)`,
+                        transition: 'none'
+                      }}
+                    >
+                      <span className="text-white font-bold text-2xl tracking-wider">NOPE</span>
+                    </div>
+                  </div>
+                )}
+              </>
+            )}
             {/* ...existing code... */}
             <MatchCard
               match={currentMatch}
@@ -2070,26 +1649,34 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, isPremium }: DiscoverPage
               userImages={currentMatchImages}
               currentUserLatitude={currentUser.latitude}
               currentUserLongitude={currentUser.longitude}
-              onImageClick={() => handleCardAreaClick({} as React.MouseEvent<HTMLDivElement>)}
+              onImageClick={() => handleImageAreaClick({} as React.MouseEvent<HTMLDivElement>)}
               onToggleInfo={() => setShowMoreInfo(!showMoreInfo)}
               calculateAge={calculateAge}
               calculateDistance={calculateDistance}
+              swipeDirection={swipeDirection}
+              swipeDistance={swipeDistance}
               isVerified={calculateProfileVerification(currentMatch)}
+              isSwipeAreaOnly={true}
               getOptimizedUrl={getOptimizedUrl}
               preCalculatedDistance={userDistances[currentMatch.id]}
-              isDetailsAreaOnly={true}
             />
           </div>
-          {/* Info section - fixed compact height under the image */}
-          <div className={`bg-white border-t border-gray-400 transition-all duration-300 flex-shrink-0 h-[64px] overflow-hidden`}>
+          {/* ...existing code... */}
+          {/* African Adinkra symbols bar - fixed height */}
+          <AdinkraBar />
+
+          {/* Info section - dynamic height that fits content exactly */}
+          <div className={`bg-white border-t border-gray-400 transition-all duration-300 flex-shrink-0 ${
+            showMoreInfo ? 'h-[380px]' : 'h-[120px] overflow-hidden'
+          }`}>
             <div 
               ref={contentRef}
-              className={`w-full p-1 overflow-hidden pb-2`} 
+              className={`w-full p-1 ${showMoreInfo ? 'overflow-y-auto h-[380px]' : 'overflow-hidden pb-3'}`} 
               style={{
                 WebkitOverflowScrolling: 'touch',
                 overscrollBehavior: 'contain',
                 scrollBehavior: 'smooth',
-                paddingBottom: '0.5rem'
+                paddingBottom: showMoreInfo ? `${Math.max(contentHeight, 40)}px` : '0.75rem' // Dynamic padding based on content
               }}
             >
             <MatchCard
@@ -2100,85 +1687,32 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, isPremium }: DiscoverPage
               userImages={currentMatchImages}
               currentUserLatitude={currentUser.latitude}
               currentUserLongitude={currentUser.longitude}
-              onImageClick={() => handleCardAreaClick({} as React.MouseEvent<HTMLDivElement>)}
+              onImageClick={() => handleImageAreaClick({} as React.MouseEvent<HTMLDivElement>)}
               onToggleInfo={() => setShowMoreInfo(!showMoreInfo)}
               calculateAge={calculateAge}
               calculateDistance={calculateDistance}
+              swipeDirection={swipeDirection}
+              swipeDistance={swipeDistance}
               isVerified={calculateProfileVerification(currentMatch)}
+              isDetailsAreaOnly={true}
               getOptimizedUrl={getOptimizedUrl}
               preCalculatedDistance={userDistances[currentMatch.id]}
-              isDetailsAreaOnly={true}
             />
             </div>
           </div>
         </div>
-
-        {/* Adinkra Symbol Tooltip */}
-        {tooltipIdx !== null && (
-          <div
-            className="fixed left-1/2 z-[10000] px-4 py-3 rounded-lg shadow-xl bg-white border border-gray-300 text-xs text-gray-800 animate-fade-in flex flex-col items-center"
-            style={{ 
-              transform: 'translateX(-50%)', 
-              top: '30%',
-              marginTop: '-50px',
-              minWidth: 200, 
-              maxWidth: 280 
-            }}
-            onClick={() => setTooltipIdx(null)}
-          >
-            <strong className="text-base mb-1">{adinkraSymbols[tooltipIdx].name}</strong>
-            <div className="mt-1 text-center">{adinkraSymbols[tooltipIdx].meaning}</div>
-            <div className="text-[10px] text-gray-400 mt-2">(Click to close)</div>
-            {/* Arrow pointing up to the symbol */}
-            <div 
-              className="absolute -top-2 left-1/2 transform -translate-x-1/2 w-4 h-4 bg-white border-l border-t border-gray-300 rotate-45"
-            ></div>
-          </div>
-        )}
-
-        {/* All Interests Modal */}
-        {showAllInterests && currentMatch?.interests && (
-          <div
-            className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/50 backdrop-blur-sm"
-            onClick={() => setShowAllInterests(false)}
-          >
-            <div
-              className="bg-white rounded-2xl p-6 m-4 max-w-md w-full max-h-[70vh] overflow-y-auto"
-              onClick={(e) => e.stopPropagation()}
-            >
-              <div className="flex justify-between items-center mb-4">
-                <h3 className="text-xl font-bold text-gray-800">
-                  {currentMatch.first_name}'s Interests
-                </h3>
-                <button
-                  onClick={() => setShowAllInterests(false)}
-                  className="w-8 h-8 flex items-center justify-center rounded-full bg-gray-100 hover:bg-gray-200 transition-colors"
-                >
-                  <svg className="w-5 h-5 text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                  </svg>
-                </button>
-              </div>
-              
-              <div className="flex flex-wrap gap-2">
-                {currentMatch.interests.map((interest, index) => (
-                  <span
-                    key={index}
-                    className="px-4 py-2 bg-gradient-to-br from-purple-500 to-pink-500 text-white rounded-full text-sm font-semibold shadow-md"
-                  >
-                    {interest}
-                  </span>
-                ))}
-              </div>
-              
-              <div className="mt-4 text-center">
-                <p className="text-sm text-gray-500">
-                  {currentMatch.interests.length} interest{currentMatch.interests.length !== 1 ? 's' : ''} total
-                </p>
-              </div>
-            </div>
-          </div>
-        )}
+        {/* Loading more indicator */}
+  {/* Loading more indicator removed for professional background loading */}
+        {/* ...existing code... */}
+        <SwipeButtons
+          onPass={handlePass}
+          onReverse={handleReverse}
+          onLike={handleLike}
+          canReverse={isPremium ? true : passedUsers.length > 0}
+          reversesLeft={isPremium ? undefined : Math.max(0, 2 - reverseUsageToday)}
+          isPremium={isPremium}
+        />
+      </div>
     </div>
   );
 }
