@@ -1,5 +1,5 @@
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -10,6 +10,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import { handleInputFocus, handleInputBlur, getInputStyles } from '@/utils/inputUtils';
 import { getPasswordResetRedirectUri, getEmailConfirmRedirectUri } from '@/config/oauth';
+import { openOAuthWithSafariViewController, cleanupSafariViewController } from '@/utils/safariViewController';
 
 interface AuthFormProps {
   isLogin: boolean;
@@ -33,6 +34,13 @@ const AuthForm = ({ isLogin, onToggle, onOAuthSuccess }: AuthFormProps) => {
   const [errors, setErrors] = useState<{[key: string]: string}>({});
   const [showForgotPassword, setShowForgotPassword] = useState(false);
   const [resendingConfirmation, setResendingConfirmation] = useState(false);
+
+  // Cleanup Safari View Controller listeners on unmount
+  useEffect(() => {
+    return () => {
+      cleanupSafariViewController();
+    };
+  }, []);
 
   const validateForm = () => {
     const newErrors: {[key: string]: string} = {};
@@ -75,28 +83,126 @@ const AuthForm = ({ isLogin, onToggle, onOAuthSuccess }: AuthFormProps) => {
       // Get platform-specific redirect URI for the provider
       const redirectTo = getRedirectUri(provider);
       
-      const { data, error } = await supabase.auth.signInWithOAuth({
-        provider: provider,
-        options: {
-          redirectTo,
-          queryParams: {
-            prompt: 'select_account',
-          }
-        }
-      });
-
-      if (error) {
-        console.error(`${provider} OAuth error:`, error);
-        toast({
-          title: "Authentication Error",
-          description: error.message || `Failed to sign in with ${provider}. Please try again.`,
-          variant: "destructive",
+      console.log(`Starting ${provider} OAuth with redirectTo: ${redirectTo}`);
+      
+      // Check if we're on native iOS and provider is Apple - only then use Safari View Controller
+      let useNativeAppleSignIn = false;
+      try {
+        const { Capacitor } = await import('@capacitor/core');
+        const platform = Capacitor.getPlatform();
+        const isNative = Capacitor.isNativePlatform();
+        useNativeAppleSignIn = provider === 'apple' && isNative && platform === 'ios';
+        
+        console.log('AuthForm Platform Detection:', {
+          provider,
+          platform,
+          isNative,
+          useNativeAppleSignIn
         });
-        setOauthLoading(null);
-        return;
+      } catch (e) {
+        // Capacitor not available - we're on web
+        console.log('Capacitor not available - using web OAuth');
+        useNativeAppleSignIn = false;
       }
+      
+      if (useNativeAppleSignIn) {
+        console.log('✅ AuthForm: Routing to Safari View Controller for Apple Sign In on iOS native');
+        // Use Safari View Controller for iOS native Apple Sign In
+        const { data, error } = await openOAuthWithSafariViewController(provider, redirectTo, {
+          onSuccess: async (callbackData) => {
+            console.log('✅ Safari View Controller OAuth success, processing callback');
+            
+            try {
+              // Wait a moment for any session updates to process
+              await new Promise(resolve => setTimeout(resolve, 1000));
+              
+              // Check if we now have a session
+              const { data: sessionData, error: sessionError } = await supabase.auth.getSession();
+              
+              if (sessionData?.session?.user) {
+                console.log('✅ Authentication successful, session established');
+                toast({
+                  title: "Welcome!",
+                  description: "You've been successfully signed in.",
+                });
+                setOauthLoading(null);
+                // The app will automatically navigate based on auth state change
+                return;
+              }
+              
+              // If no session yet, trigger a manual session refresh
+              console.log('No session found, refreshing...');
+              const { data: refreshData, error: refreshError } = await supabase.auth.refreshSession();
+              
+              if (refreshData?.session?.user) {
+                console.log('✅ Session refreshed successfully');
+                toast({
+                  title: "Welcome!",
+                  description: "You've been successfully signed in.",
+                });
+                setOauthLoading(null);
+                return;
+              }
+              
+              // If still no session, navigate to callback URL to handle auth params
+              console.log('Still no session, navigating to callback URL for processing');
+              window.location.href = callbackData.url;
+              
+            } catch (error) {
+              console.error('Error processing Safari View Controller callback:', error);
+              // Fallback: navigate to callback URL to handle auth params
+              window.location.href = callbackData.url;
+            }
+          },
+          onError: (error) => {
+            console.error(`${provider} OAuth callback error:`, error);
+            toast({
+              title: "Authentication Error", 
+              description: error.message || `Failed to sign in with ${provider}. Please try again.`,
+              variant: "destructive",
+            });
+            setOauthLoading(null);
+          },
+          onComplete: () => {
+            setOauthLoading(null);
+          }
+        });
+        
+        if (error) {
+          console.error(`${provider} OAuth error:`, error);
+          toast({
+            title: "Authentication Error",
+            description: error.message || `Failed to sign in with ${provider}. Please try again.`,
+            variant: "destructive",
+          });
+          setOauthLoading(null);
+        }
+      } else {
+        console.log(`Using standard OAuth flow for ${provider} on web/Android`);
+        // Standard OAuth flow for web and Android
+        const { data, error } = await supabase.auth.signInWithOAuth({
+          provider: provider,
+          options: {
+            redirectTo,
+            queryParams: {
+              prompt: 'select_account',
+            }
+          }
+        });
 
-      // For mobile and web, the OAuth flow will redirect automatically
+        if (error) {
+          console.error(`${provider} OAuth error:`, error);
+          toast({
+            title: "Authentication Error",
+            description: error.message || `Failed to sign in with ${provider}. Please try again.`,
+            variant: "destructive",
+          });
+          setOauthLoading(null);
+          return;
+        }
+
+        // For web and standard OAuth flows, the redirect will happen automatically
+      }
 
     } catch (error: any) {
       console.error(`${provider} OAuth unexpected error:`, error);

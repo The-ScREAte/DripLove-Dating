@@ -1,89 +1,67 @@
-
 import React from 'react';
 import { Button } from '@/components/ui/button';
 
 interface WelcomeScreenProps {
-  onGetStarted: () => void;
-  onAdminAccess: () => void;
-  onShowAbout: () => void;
-  onShowTerms: () => void;
-  onShowPrivacy: () => void;
+  onLogin: () => void;
+  onAbout: () => void;
+  onTerms: () => void;
+  onPrivacy: () => void;
 }
 
-const WelcomeScreen = ({ onGetStarted, onAdminAccess, onShowAbout, onShowTerms, onShowPrivacy }: WelcomeScreenProps) => {
+const WelcomeScreen: React.FC<WelcomeScreenProps> = ({ onLogin, onAbout, onTerms, onPrivacy }) => {
   return (
-    <div className="min-h-screen w-full bg-gradient-to-br from-pink-400 via-purple-500 to-indigo-600 flex flex-col items-center justify-center text-white relative overflow-hidden">
-      {/* Background Pattern */}
-      <div className="absolute inset-0 opacity-10">
-        <div className="absolute top-10 left-10 w-20 h-20 bg-white rounded-full"></div>
-        <div className="absolute top-32 right-20 w-16 h-16 bg-white rounded-full"></div>
-        <div className="absolute bottom-20 left-20 w-12 h-12 bg-white rounded-full"></div>
-        <div className="absolute bottom-32 right-32 w-24 h-24 bg-white rounded-full"></div>
+    <div className="min-h-screen bg-gradient-to-br from-purple-500 to-pink-500 flex flex-col items-center justify-start pt-32 text-center relative">
+      {/* Background Bubbles */}
+      <div className="absolute inset-0">
+        <div className="bg-purple-400 opacity-30 rounded-full w-20 h-20 absolute top-10 left-20"></div>
+        <div className="bg-pink-400 opacity-30 rounded-full w-48 h-48 absolute bottom-32 right-20"></div>
+        <div className="bg-purple-300 opacity-20 rounded-full w-12 h-12 absolute top-32 right-32"></div>
+        <div className="bg-pink-300 opacity-20 rounded-full w-32 h-32 absolute bottom-40 left-10"></div>
+        <div className="bg-purple-200 opacity-25 rounded-full w-24 h-24 absolute top-5 right-5"></div>
       </div>
-      
-      {/* Main Content */}
-      <div className="text-center z-10 px-4 w-full max-w-md mx-auto">
-        {/* Logo */}
-        <div className="mb-8 flex justify-center">
-          <img 
-            src="/driplove-logo.png" 
-            alt="DripLove Logo" 
-            className="h-56 w-auto"
-          />
-        </div>
-        
-        {/* Tagline */}
-        <h2 className="text-2xl md:text-3xl font-bold mb-4 leading-tight">
-          Feel the Spark. Drip in Love
-        </h2>
-        
-        <p className="text-lg md:text-xl mb-8 opacity-90 leading-relaxed">
-          Real Vibes. Real People. Real Love.
-        </p>
-        
-        {/* CTA Button */}
-        <Button 
-          onClick={onGetStarted}
-          size="lg"
-          className="bg-white text-purple-600 hover:bg-gray-100 font-semibold px-8 py-3 rounded-full text-lg shadow-lg transition-all duration-200 mb-6"
+
+      {/* Logo and Tagline */}
+      <div className="mb-12 flex flex-col items-center relative z-10 mt-12">
+        <img src="/driplove-logo.png" alt="DripLove Logo" className="w-50 h-40 mb-4" />
+        <p className="text-lg text-white">Feel the Spark. Drip in Love</p>
+        <p className="text-sm text-white/80">Real Vibes. Real People. Real Love.</p>
+      </div>
+
+      {/* Login Button */}
+      <div className="space-y-4 mb-16 relative z-10">
+        <Button
+          onClick={onLogin}
+          className="w-48 bg-white text-purple-600 font-semibold py-3 rounded-full shadow-lg hover:bg-gray-100"
         >
           Get Started
         </Button>
-        
-        {/* About Us Link */}
-        <div className="mb-8">
-          <button 
-            onClick={onShowAbout}
-            className="text-sm text-white/80 hover:text-white underline transition-colors"
-          >
-            About Us
-          </button>
-        </div>
-        
-        {/* Admin Access */}
-        <div className="mt-8">
-          <button 
-            onClick={onAdminAccess}
-            className="text-sm text-white/70 hover:text-white underline transition-colors"
-          >
-          </button>
-        </div>
       </div>
-      
-      {/* Footer */}
-      <div className="absolute bottom-8 text-center text-white/60 text-sm w-full px-4">
-        <p className="mb-3">Join thousands finding love across continents</p>
-        <div className="flex justify-center space-x-4">
-          <button 
-            onClick={onShowTerms}
-            className="text-white/70 hover:text-white underline transition-colors text-xs"
+
+      {/* About Us Link */}
+      <div className="relative z-10 mb-auto">
+        <button
+          onClick={onAbout}
+          className="text-white text-sm font-bold hover:text-white/80"
+        >
+          About DripLove
+        </button>
+      </div>
+
+      {/* Footer Section */}
+      <div className="absolute bottom-10 flex flex-col items-center space-y-4 relative z-10">
+        <div className="text-sm text-white/80">
+          Join thousands finding love across continents
+        </div>
+        <div className="flex justify-center space-x-4 text-sm">
+          <button
+            onClick={onTerms}
+            className="text-white font-bold hover:text-white/80"
           >
             Terms of Service
           </button>
-          <span className="text-white/50">•</span>
-          <button 
-            onClick={onShowPrivacy}
-            className="text-white/70 hover:text-white underline transition-colors text-xs"
+          <button
+            onClick={onPrivacy}
+            className="text-white font-bold hover:text-white/80"
           >
             Privacy Policy
           </button>

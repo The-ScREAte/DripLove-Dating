@@ -13,7 +13,6 @@ import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import { moderateImage, saveModerationResult, ModerationResult } from '@/utils/photoModeration';
 import { compressImage } from '@/utils/imageCompression';
-import { bulkApproveExistingImages } from '@/utils/bulkApproveImages';
 
 interface ImageManagementProps {
   currentUser: {
@@ -84,19 +83,6 @@ const ImageManagement = ({ currentUser }: ImageManagementProps) => {
 
   useEffect(() => {
     fetchUserImages();
-    
-    // Run bulk approval fix once when component mounts (only if needed)
-    const hasRunBulkApproval = localStorage.getItem('bulk_approval_completed');
-    if (!hasRunBulkApproval && currentUser?.id) {
-      bulkApproveExistingImages().then(() => {
-        localStorage.setItem('bulk_approval_completed', 'true');
-        // Refresh images after bulk approval
-        setTimeout(fetchUserImages, 1500);
-      }).catch(error => {
-  // ...removed log...
-        // Don't set completion flag if it failed
-      });
-    }
   }, [fetchUserImages, currentUser?.id]);
 
   const handleImageUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
