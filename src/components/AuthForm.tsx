@@ -111,14 +111,11 @@ const AuthForm = ({ isLogin, onToggle, onOAuthSuccess }: AuthFormProps) => {
         const { data, error } = await openOAuthWithSafariViewController(provider, redirectTo, {
           onSuccess: async (callbackData) => {
             console.log('✅ Safari View Controller OAuth success, processing callback');
-            
             try {
               // Wait a moment for any session updates to process
               await new Promise(resolve => setTimeout(resolve, 1000));
-              
               // Check if we now have a session
-              const { data: sessionData, error: sessionError } = await supabase.auth.getSession();
-              
+              const { data: sessionData } = await supabase.auth.getSession();
               if (sessionData?.session?.user) {
                 console.log('✅ Authentication successful, session established');
                 toast({
@@ -129,11 +126,9 @@ const AuthForm = ({ isLogin, onToggle, onOAuthSuccess }: AuthFormProps) => {
                 // The app will automatically navigate based on auth state change
                 return;
               }
-              
               // If no session yet, trigger a manual session refresh
               console.log('No session found, refreshing...');
-              const { data: refreshData, error: refreshError } = await supabase.auth.refreshSession();
-              
+              const { data: refreshData } = await supabase.auth.refreshSession();
               if (refreshData?.session?.user) {
                 console.log('✅ Session refreshed successfully');
                 toast({
@@ -143,15 +138,22 @@ const AuthForm = ({ isLogin, onToggle, onOAuthSuccess }: AuthFormProps) => {
                 setOauthLoading(null);
                 return;
               }
-              
-              // If still no session, navigate to callback URL to handle auth params
-              console.log('Still no session, navigating to callback URL for processing');
-              window.location.href = callbackData.url;
-              
+              // If still no session, show error and ask user to retry
+              console.error('❌ Could not establish session after Safari View Controller. Please try again.');
+              toast({
+                title: "Authentication Error",
+                description: "Could not complete sign in. Please try again.",
+                variant: "destructive",
+              });
+              setOauthLoading(null);
             } catch (error) {
               console.error('Error processing Safari View Controller callback:', error);
-              // Fallback: navigate to callback URL to handle auth params
-              window.location.href = callbackData.url;
+              toast({
+                title: "Authentication Error",
+                description: "Could not complete sign in. Please try again.",
+                variant: "destructive",
+              });
+              setOauthLoading(null);
             }
           },
           onError: (error) => {
@@ -167,7 +169,6 @@ const AuthForm = ({ isLogin, onToggle, onOAuthSuccess }: AuthFormProps) => {
             setOauthLoading(null);
           }
         });
-        
         if (error) {
           console.error(`${provider} OAuth error:`, error);
           toast({
