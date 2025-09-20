@@ -1,10 +1,11 @@
-import React, { useState, useEffect, Suspense, lazy } from 'react';
+import React, { useState, useEffect } from 'react';
 import WelcomeScreen from '@/components/WelcomeScreen';
 import AuthForm from '@/components/AuthForm';
 import RegistrationForm from '@/components/RegistrationForm';
 import ProfileCompletionForm from '@/components/ProfileCompletionForm';
 import TermsAcceptance from '@/components/TermsAcceptance';
 import MainApp from '@/components/MainApp';
+import AdminPage from '@/components/AdminPage';
 import AboutUs from '@/components/AboutUs';
 import TermsOfService from '@/components/TermsOfService';
 import PrivacyPolicy from '@/components/PrivacyPolicy';
@@ -12,19 +13,6 @@ import ErrorBoundary from '@/components/ErrorBoundary';
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
 import { transformFormDataForSubmission } from '@/utils/formValidation';
-
-// Lazy load AdminPage (54KB) - only loads when admin features are accessed
-const LazyAdminPage = lazy(() => import('@/components/AdminPage'));
-
-// Loading component for lazy-loaded pages
-const PageLoader = () => (
-  <div className="min-h-screen bg-gradient-to-br from-pink-50 to-purple-50 flex items-center justify-center">
-    <div className="text-center">
-      <div className="w-8 h-8 border-4 border-pink-500 border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
-      <p className="text-gray-600">Loading...</p>
-    </div>
-  </div>
-);
 
 const Index = () => {
   const [currentView, setCurrentView] = useState<'welcome' | 'login' | 'register' | 'profile-completion' | 'terms-acceptance' | 'app' | 'admin' | 'about' | 'terms' | 'privacy'>('welcome');
@@ -57,7 +45,7 @@ const Index = () => {
         // Check if email is confirmed before proceeding
         if (!session.user.email_confirmed_at) {
           setUser(null);
-          setCurrentView('login');
+          setCurrentView('welcome');
           setLoading(false);
           return;
         }
@@ -174,10 +162,6 @@ const Index = () => {
     setCurrentView('login'); // Redirect to login instead of direct admin access
   };
 
-  const handleShowLogin = () => {
-    setCurrentView('login');
-  };
-
   const handleBackToWelcome = () => {
     setCurrentView('welcome');
   };
@@ -243,25 +227,20 @@ const Index = () => {
   }
   
   if (currentView === 'admin') {
-    return (
-      <Suspense fallback={<PageLoader />}>
-        <LazyAdminPage currentUser={user} onLogout={handleLogout} />
-      </Suspense>
-    );
+    return <AdminPage currentUser={user} onLogout={handleLogout} />;
   }
   
   
   return (
     <div className="w-full min-h-screen flex justify-center bg-background">
       <div className="w-full h-full">
-
         {currentView === 'welcome' && (
-          <WelcomeScreen
-            onLogin={handleShowLogin}
-            onRegister={handleShowRegister}
-            onAbout={handleShowAbout}
-            onTerms={handleShowTerms}
-            onPrivacy={handleShowPrivacy}
+          <WelcomeScreen 
+            onGetStarted={handleGetStarted} 
+            onAdminAccess={handleAdminAccess}
+            onShowAbout={handleShowAbout}
+            onShowTerms={handleShowTerms}
+            onShowPrivacy={handleShowPrivacy}
           />
         )}
 

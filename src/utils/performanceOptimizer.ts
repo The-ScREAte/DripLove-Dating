@@ -27,74 +27,16 @@ export const throttle = <T extends (...args: any[]) => any>(
   };
 };
 
-// 3. Image lazy loading and optimization - ULTRA OPTIMIZED FOR SPEED
-export const optimizeImageUrl = (url: string, maxWidth: number = 300): string => {
-  // Ultra-aggressive optimization for maximum speed and concurrent users
+// 3. Image lazy loading and optimization
+export const optimizeImageUrl = (url: string, maxWidth: number = 400): string => {
+  // Add image optimization parameters for better mobile performance
   if (url.includes('supabase')) {
-    return `${url}?width=${maxWidth}&quality=60&format=webp&resize=fill`;
+    return `${url}?width=${maxWidth}&quality=85&format=webp`;
   }
   return url;
 };
 
-// 3.1. Progressive Profile Refill System
-export const checkAndTriggerRefill = (userId: string, currentIndex: number) => {
-  if (typeof window !== 'undefined' && (window as any).refillProfilesWhenNeeded) {
-    (window as any).refillProfilesWhenNeeded(userId, currentIndex);
-  }
-};
-
-// 3.1.1. Progressive Image Loading Manager
-export class ProgressiveImageLoader {
-  private loadingQueue: string[] = [];
-  private loadedImages: Set<string> = new Set();
-  private maxConcurrentLoads = 3;
-  private currentLoads = 0;
-
-  addToQueue(imageUrls: string[]) {
-    const newUrls = imageUrls.filter(url => !this.loadedImages.has(url) && !this.loadingQueue.includes(url));
-    this.loadingQueue.push(...newUrls);
-    this.processQueue();
-  }
-
-  private async processQueue() {
-    while (this.loadingQueue.length > 0 && this.currentLoads < this.maxConcurrentLoads) {
-      const url = this.loadingQueue.shift();
-      if (!url) continue;
-
-      this.currentLoads++;
-      try {
-        await this.loadImage(url);
-        this.loadedImages.add(url);
-      } catch (error) {
-        // Silently handle failed loads
-      } finally {
-        this.currentLoads--;
-        // Continue processing
-        if (this.loadingQueue.length > 0) {
-          setTimeout(() => this.processQueue(), 100);
-        }
-      }
-    }
-  }
-
-  private loadImage(url: string): Promise<void> {
-    return new Promise((resolve, reject) => {
-      const img = new Image();
-      img.onload = () => resolve();
-      img.onerror = () => reject();
-      img.src = optimizeImageUrl(url);
-    });
-  }
-
-  isLoaded(url: string): boolean {
-    return this.loadedImages.has(url);
-  }
-}
-
-// Global progressive image loader instance
-export const globalImageLoader = new ProgressiveImageLoader();
-
-// 3.2. Batch image preloader for discover page
+// 3.1. Batch image preloader for discover page
 export const preloadImagesBatch = async (imageUrls: string[], maxConcurrent: number = 3): Promise<HTMLImageElement[]> => {
   const results: HTMLImageElement[] = [];
   
@@ -110,8 +52,7 @@ export const preloadImagesBatch = async (imageUrls: string[], maxConcurrent: num
           placeholder.src = 'data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iNDAwIiBoZWlnaHQ9IjQwMCIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48cmVjdCB3aWR0aD0iMTAwJSIgaGVpZ2h0PSIxMDAlIiBmaWxsPSIjZjNmNGY2Ii8+PHRleHQgeD0iNTAlIiB5PSI1MCUiIGZvbnQtZmFtaWx5PSJBcmlhbCIgZm9udC1zaXplPSIxOCIgZmlsbD0iIzlmYTZiNyIgdGV4dC1hbmNob3I9Im1pZGRsZSIgZHk9Ii4zZW0iPk5vIEltYWdlPC90ZXh0Pjwvc3ZnPg==';
           resolve(placeholder);
         };
-        // Ultra-optimized image loading for maximum concurrent users
-        img.src = optimizeImageUrl(url, 280);
+        img.src = optimizeImageUrl(url, 800);
       });
     });
     

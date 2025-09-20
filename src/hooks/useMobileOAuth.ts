@@ -7,16 +7,13 @@ import { logPlatformInfo } from '@/utils/platformUtils';
 // Conditionally import Capacitor modules for mobile
 let App: any = null;
 let Capacitor: any = null;
-let Browser: any = null;
 
 try {
   // Try to import Capacitor modules - they will only be available on mobile
   const capacitorApp = require('@capacitor/app');
   const capacitorCore = require('@capacitor/core');
-  const capacitorBrowser = require('@capacitor/browser');
   App = capacitorApp.App;
   Capacitor = capacitorCore.Capacitor;
-  Browser = capacitorBrowser.Browser;
 } catch (error) {
   // Capacitor modules not available (running on web)
 }
@@ -238,76 +235,12 @@ export const useMobileOAuth = () => {
       }
     };
 
-    // Add the app URL listener
+    // Add the listener
     App.addListener('appUrlOpen', handleAppUrlOpen);
-
-    // Add Supabase auth state listener for Safari View Controller sessions
-    const { data: authListener } = supabase.auth.onAuthStateChange(async (event, session) => {
-      if (event === 'SIGNED_IN' && session?.user) {
-        // This handles sessions created through Safari View Controller
-        console.log('[Mobile OAuth] Auth state changed to SIGNED_IN via Safari View Controller');
-        
-        // Check if user profile exists
-        const { data: profile, error: profileError } = await supabase
-          .from('profiles')
-          .select('id, is_admin, account_status, first_name, last_name')
-          .eq('id', session.user.id)
-          .single();
-
-        if (profileError || !profile) {
-          // User doesn't have a profile - redirect to profile completion
-          navigate('/complete-profile');
-          return;
-        }
-
-        // Check account status
-        if (profile.account_status === 'blocked') {
-          await supabase.auth.signOut();
-          toast({
-            title: "Account Blocked",
-            description: "Your account has been blocked.",
-            variant: "destructive",
-          });
-          navigate('/');
-          return;
-        }
-
-        if (profile.account_status === 'on_hold') {
-          await supabase.auth.signOut();
-          toast({
-            title: "Account On Hold",
-            description: "Your account is on hold. Please contact support.",
-            variant: "destructive",
-          });
-          navigate('/');
-          return;
-        }
-
-        // Save profile ID to session
-        sessionStorage.setItem('profile_id', profile.id);
-
-        // Check if profile is complete
-        const isProfileComplete = profile.first_name && profile.last_name;
-
-        if (!isProfileComplete) {
-          navigate('/complete-profile');
-          return;
-        }
-
-        // Successful login
-        toast({
-          title: "Welcome back!",
-          description: "You've been successfully logged in.",
-        });
-
-        navigate('/');
-      }
-    });
 
     // Cleanup
     return () => {
       App.removeAllListeners();
-      authListener.subscription.unsubscribe();
     };
   }, [toast, navigate]);
 };

@@ -18,29 +18,8 @@ interface ChatPageProps {
   onUnreadChange?: () => void;
 }
 
-// Global cache for chat matches - persists across component mounts
-const chatMatchesCache = new Map<string, { matches: ChatMatch[], timestamp: number }>();
-const CACHE_DURATION = 30000; // 30 seconds
-
-// Global cache for individual chat messages
-const chatMessagesCache = new Map<string, { messages: ChatMessage[], timestamp: number }>();
-const MESSAGE_CACHE_DURATION = 60000; // 1 minute
-
-// Make caches globally accessible for preloading
-if (typeof window !== 'undefined') {
-  (window as any).chatMatchesCache = chatMatchesCache;
-  (window as any).chatMessagesCache = chatMessagesCache;
-}
-
 const ChatPage = ({ currentUser, onUnreadChange }: ChatPageProps) => {
-  const [matches, setMatches] = useState<ChatMatch[]>(() => {
-    // Initialize with cached data immediately if available
-    const cached = chatMatchesCache.get(currentUser.id);
-    if (cached && Date.now() - cached.timestamp < CACHE_DURATION) {
-      return cached.matches;
-    }
-    return [];
-  });
+  const [matches, setMatches] = useState<ChatMatch[]>([]);
   const matchesRef = useRef<ChatMatch[]>([]);
   const [selectedMatch, setSelectedMatch] = useState<ChatMatch | null>(null);
   const [messages, setMessages] = useState<ChatMessage[]>([]);
@@ -54,19 +33,9 @@ const ChatPage = ({ currentUser, onUnreadChange }: ChatPageProps) => {
   const { sendMessageNotification, isInitialized, isSupported } = usePushNotifications(currentUser.id);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const messagesContainerRef = useRef<HTMLDivElement>(null);
-  const backgroundFetchingRef = useRef(false);
 
   useEffect(() => {
-    // Check if we have fresh cached data first
-    const cached = chatMatchesCache.get(currentUser.id);
-    if (cached && Date.now() - cached.timestamp < CACHE_DURATION) {
-      setMatches(cached.matches);
-      // Still fetch in background to get latest data
-      fetchMatchesInBackground();
-    } else {
-      // No cache or stale cache, fetch immediately but don't show loading
-      fetchMatches();
-    }
+    fetchMatches();
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [currentUser]);
 
@@ -87,8 +56,8 @@ const ChatPage = ({ currentUser, onUnreadChange }: ChatPageProps) => {
           table: 'matches',
         },
         (payload) => {
-          // Background update without showing loading
-          fetchMatchesInBackground();
+          // On any insert/update/delete, refetch matches
+          fetchMatches();
         }
       )
       .subscribe();
@@ -124,17 +93,7 @@ const ChatPage = ({ currentUser, onUnreadChange }: ChatPageProps) => {
           },
           (payload) => {
             const newMsg = payload.new as ChatMessage;
-            
-            // Update messages state
-            setMessages((prev) => {
-              const updated = [...prev, newMsg];
-              // Update cache with new message
-              chatMessagesCache.set(selectedMatch.id, {
-                messages: updated,
-                timestamp: Date.now()
-              });
-              return updated;
-            });
+            setMessages((prev) => [...prev, newMsg]);
             
             if (newMsg.sender_id !== currentUser.id) {
               markMessagesAsRead();
@@ -152,72 +111,6 @@ const ChatPage = ({ currentUser, onUnreadChange }: ChatPageProps) => {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selectedMatch, currentUser.id, onUnreadChange]);
 
-  const processMatchesData = (matches: any[]) => {
-    const matchesWithPartner = (matches?.map(match => {
-      const partner = match.user1_id === currentUser.id ? match.user2 : match.user1;
-      const lastMessage = match.chats?.[match.chats.length - 1];
-      let unreadCount = 0;
-      if ('user1_unread_count' in match && 'user2_unread_count' in match) {
-        unreadCount = match.user1_id === currentUser.id ? Number(match.user1_unread_count) : Number(match.user2_unread_count);
-      }
-      if (!Number.isFinite(unreadCount) || unreadCount < 0) unreadCount = 0;
-      return {
-        ...match,
-        partner,
-        last_message_obj: lastMessage,
-        unread_messages: unreadCount,
-        id: match.id,
-        first_name: partner?.first_name || '',
-        last_name: partner?.last_name || '',
-        last_message: lastMessage?.message || '',
-        last_message_time: lastMessage?.created_at || match.created_at
-      };
-    }) || [])
-      // Sort by most recent message time (desc)
-      .sort((a, b) => {
-        const aTime = new Date(a.last_message_time || a.created_at).getTime();
-        const bTime = new Date(b.last_message_time || b.created_at).getTime();
-        return bTime - aTime;
-      });
-
-    return matchesWithPartner as unknown as ChatMatch[];
-  };
-
-  const fetchMatchesInBackground = async () => {
-    if (backgroundFetchingRef.current) return;
-    backgroundFetchingRef.current = true;
-
-    try {
-      const { data: matches, error } = await supabase
-        .from('matches')
-        .select(`
-          *,
-          user1:profiles!matches_user1_id_fkey(id, first_name, last_name, is_admin),
-          user2:profiles!matches_user2_id_fkey(id, first_name, last_name, is_admin),
-          chats(id, message, created_at, sender_id)
-        `)
-        .or(`user1_id.eq.${currentUser.id},user2_id.eq.${currentUser.id}`)
-        .order('created_at', { ascending: false });
-
-      if (error) throw error;
-
-      const processedMatches = processMatchesData(matches || []);
-      
-      // Update cache
-      chatMatchesCache.set(currentUser.id, {
-        matches: processedMatches,
-        timestamp: Date.now()
-      });
-
-      // Update state with fresh data
-      setMatches(processedMatches);
-    } catch (error) {
-      // Silently handle background fetch errors
-    } finally {
-      backgroundFetchingRef.current = false;
-    }
-  };
-
   const fetchMatches = async () => {
     try {
       const { data: matches, error } = await supabase
@@ -233,16 +126,36 @@ const ChatPage = ({ currentUser, onUnreadChange }: ChatPageProps) => {
 
       if (error) throw error;
 
-      const processedMatches = processMatchesData(matches || []);
-      
-      // Update cache
-      chatMatchesCache.set(currentUser.id, {
-        matches: processedMatches,
-        timestamp: Date.now()
-      });
+      const matchesWithPartner = (matches?.map(match => {
+        const partner = match.user1_id === currentUser.id ? match.user2 : match.user1;
+        const lastMessage = match.chats?.[match.chats.length - 1];
+        let unreadCount = 0;
+        if ('user1_unread_count' in match && 'user2_unread_count' in match) {
+          unreadCount = match.user1_id === currentUser.id ? Number(match.user1_unread_count) : Number(match.user2_unread_count);
+        }
+        if (!Number.isFinite(unreadCount) || unreadCount < 0) unreadCount = 0;
+        return {
+          ...match,
+          partner,
+          last_message_obj: lastMessage,
+          unread_messages: unreadCount,
+          id: match.id,
+          first_name: partner?.first_name || '',
+          last_name: partner?.last_name || '',
+          last_message: lastMessage?.message || '',
+          last_message_time: lastMessage?.created_at || match.created_at
+        };
+      }) || [])
+        // Sort by most recent message time (desc)
+        .sort((a, b) => {
+          const aTime = new Date(a.last_message_time || a.created_at).getTime();
+          const bTime = new Date(b.last_message_time || b.created_at).getTime();
+          return bTime - aTime;
+        });
 
-      setMatches(processedMatches);
+      setMatches(matchesWithPartner as unknown as ChatMatch[]);
     } catch (error) {
+  // ...removed log...
       toast({
         title: 'Error',
         description: 'Failed to load conversations.',
@@ -253,15 +166,6 @@ const ChatPage = ({ currentUser, onUnreadChange }: ChatPageProps) => {
 
   const fetchMessages = async () => {
     if (!selectedMatch) return;
-
-    // Check cache first
-    const cached = chatMessagesCache.get(selectedMatch.id);
-    if (cached && Date.now() - cached.timestamp < MESSAGE_CACHE_DURATION) {
-      setMessages(cached.messages);
-      // Still fetch in background for updates
-      fetchMessagesInBackground(selectedMatch.id);
-      return;
-    }
 
     try {
       const { data, error } = await supabase
@@ -283,55 +187,9 @@ const ChatPage = ({ currentUser, onUnreadChange }: ChatPageProps) => {
           : currentUser.id
       })) || [];
 
-      const processedMessages = mappedMessages as unknown as ChatMessage[];
-      
-      // Update cache
-      chatMessagesCache.set(selectedMatch.id, {
-        messages: processedMessages,
-        timestamp: Date.now()
-      });
-
-      setMessages(processedMessages);
+      setMessages(mappedMessages as unknown as ChatMessage[]);
     } catch (error) {
-      // ...removed log...
-    }
-  };
-
-  const fetchMessagesInBackground = async (matchId: string) => {
-    try {
-      const { data, error } = await supabase
-        .from('chats')
-        .select(`
-          *,
-          sender:profiles!chats_sender_id_fkey(first_name, last_name)
-        `)
-        .eq('match_id', matchId)
-        .order('created_at', { ascending: true });
-
-      if (error) throw error;
-
-      const mappedMessages = data?.map(msg => ({
-        ...msg,
-        sent_at: msg.created_at,
-        receiver_id: msg.sender_id === currentUser.id 
-          ? (selectedMatch?.user1_id === currentUser.id ? selectedMatch?.user2_id : selectedMatch?.user1_id)
-          : currentUser.id
-      })) || [];
-
-      const processedMessages = mappedMessages as unknown as ChatMessage[];
-      
-      // Update cache
-      chatMessagesCache.set(matchId, {
-        messages: processedMessages,
-        timestamp: Date.now()
-      });
-
-      // Update state if this is still the selected match
-      if (selectedMatch?.id === matchId) {
-        setMessages(processedMessages);
-      }
-    } catch (error) {
-      // Silently handle background fetch errors
+  // ...removed log...
     }
   };
 
@@ -390,86 +248,17 @@ const ChatPage = ({ currentUser, onUnreadChange }: ChatPageProps) => {
       return;
     }
 
-    const messageText = newMessage.trim();
-    const tempId = `temp_${Date.now()}`;
-    
-    // Optimistic update - show message immediately
-    const optimisticMessage: ChatMessage = {
-      id: tempId,
-      match_id: selectedMatch.id,
-      sender_id: currentUser.id,
-      message: messageText,
-      created_at: new Date().toISOString(),
-      sent_at: new Date().toISOString(),
-      receiver_id: selectedMatch.user1_id === currentUser.id ? selectedMatch.user2_id : selectedMatch.user1_id,
-      sender: {
-        first_name: currentUser.first_name,
-        last_name: currentUser.last_name
-      }
-    } as ChatMessage;
-
-    // Add to messages immediately
-    setMessages(prev => {
-      const updated = [...prev, optimisticMessage];
-      // Update cache
-      chatMessagesCache.set(selectedMatch.id, {
-        messages: updated,
-        timestamp: Date.now()
-      });
-      return updated;
-    });
-
-    // Clear input immediately
-    setNewMessage('');
-
     try {
-      // Send the message to server
-      const { data, error } = await supabase
+      // Send the message first
+      const { error } = await supabase
         .from('chats')
         .insert({
           match_id: selectedMatch.id,
           sender_id: currentUser.id,
-          message: messageText
-        })
-        .select()
-        .single();
+          message: newMessage.trim()
+        });
 
       if (error) throw error;
-
-      // Replace optimistic message with real one
-      if (data) {
-        setMessages(prev => {
-          const updated = prev.map(msg => 
-            msg.id === tempId ? { ...data, sent_at: data.created_at, receiver_id: optimisticMessage.receiver_id } as ChatMessage : msg
-          );
-          // Update cache
-          chatMessagesCache.set(selectedMatch.id, {
-            messages: updated,
-            timestamp: Date.now()
-          });
-          return updated;
-        });
-      }
-    } catch (error) {
-      // Remove optimistic message on error
-      setMessages(prev => {
-        const updated = prev.filter(msg => msg.id !== tempId);
-        chatMessagesCache.set(selectedMatch.id, {
-          messages: updated,
-          timestamp: Date.now()
-        });
-        return updated;
-      });
-      
-      toast({
-        title: 'Error',
-        description: 'Failed to send message. Please try again.',
-        variant: 'destructive'
-      });
-      return;
-    }
-
-    try {
 
       // Send push notification to the recipient
       const recipientId = selectedMatch.user1_id === currentUser.id 
@@ -507,6 +296,7 @@ const ChatPage = ({ currentUser, onUnreadChange }: ChatPageProps) => {
         // Silently handle if unread fields don't exist
       }
 
+      setNewMessage('');
       onUnreadChange?.();
     } catch (error) {
   // ...removed log...

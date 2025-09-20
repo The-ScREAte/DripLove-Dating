@@ -6,18 +6,16 @@
  * Check if the app is running in a mobile Capacitor environment
  */
 export const isMobileApp = () => {
-  // If running under Capacitor (capacitor: protocol) or file protocol, treat as mobile
-  // Check protocol first because in Capacitor the hostname may be 'localhost'.
-  const protocol = window.location.protocol;
-  if (protocol === 'capacitor:' || protocol === 'file:') return true;
-
-  // Custom scheme (driplove://) should also be considered mobile
-  if (typeof window.location.href === 'string' && window.location.href.startsWith('driplove://')) return true;
-
-  // Explicit localhost should be treated as web (development) unless protocol indicates Capacitor/file
-  if (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1') return false;
-
-  return false;
+  // Never treat localhost as mobile
+  if (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1') {
+    return false;
+  }
+  // Capacitor, file protocol, or custom scheme
+  return (
+    window.location.protocol === 'capacitor:' ||
+    window.location.protocol === 'file:' ||
+    window.location.href.startsWith('driplove://')
+  );
 };
 
 /**

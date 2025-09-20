@@ -13,21 +13,9 @@ const OAuthCallback = () => {
 
   useEffect(() => {
     const handleAuthCallback = async () => {
-      // Short-circuit early on native iOS: the deep-link is handled by
-      // App.addListener('appUrlOpen') in the native layer. Avoid running the
-      // WebView /auth/callback logic when inside the iOS Capacitor WebView.
-      try {
-        const { Capacitor } = await import('@capacitor/core');
-        if (Capacitor && Capacitor.isNativePlatform && Capacitor.getPlatform && Capacitor.isNativePlatform() && Capacitor.getPlatform() === 'ios') {
-          console.log('OAuthCallback: Skipping on native iOS; handled via appUrlOpen');
-          navigate('/');
-          return;
-        }
-      } catch (e) {
-        // Capacitor not available or import failed -> continue with web flow
-      }
-
+      
       const timeout = setTimeout(() => {
+  // ...removed log...
         toast({
           title: "Authentication Timeout",
           description: "The login process took too long. Please try again.",
@@ -39,63 +27,47 @@ const OAuthCallback = () => {
       try {
         setStatus('Checking authentication...');
 
-        // ✅ Step 1: Parse access_token and refresh_token from URL fragment if present
-        const hash = window.location.hash.substring(1); // remove #
-        const params = new URLSearchParams(hash);
-        const access_token = params.get('access_token');
-        const refresh_token = params.get('refresh_token');
+        const isMobileApp = window.location.protocol === 'capacitor:' || 
+                           window.location.protocol === 'file:' ||
+                           window.location.href.startsWith('driplove://');
 
-        if (access_token && refresh_token) {
-          setStatus('Setting Supabase session...');
-            // If running inside the native iOS app, the deep-link is handled by the
-            // App.addListener('appUrlOpen') handler. Avoid processing the WebView
-            // /auth/callback page there — it will still be capacitor://localhost.
-            try {
-              const { Capacitor } = await import('@capacitor/core');
-              if (Capacitor && Capacitor.isNativePlatform && Capacitor.getPlatform && Capacitor.isNativePlatform() && Capacitor.getPlatform() === 'ios') {
-                console.log('Skipping OAuthCallback inside WebView on native iOS; handled via App.appUrlOpen');
-                navigate('/');
-                return;
-              }
-            } catch (e) {
-              // Capacitor not available or import failed -> continue with web flow
-            }
-          const { data: setData, error: setError } = await supabase.auth.setSession({
-            access_token,
-            refresh_token,
-          } as any);
 
-          if (setError) throw setError;
-          console.log('[OAuthCallback] Supabase session set from URL fragment:', setData);
-        }
-
-        // ✅ Step 2: Always check session (covers cookie/session cases too)
+        // Wait for any potential session updates
+        await new Promise(resolve => setTimeout(resolve, 1500));
+        
         setStatus('Getting session...');
         const { data: sessionData, error: sessionError } = await supabase.auth.getSession();
-
+        
         clearTimeout(timeout);
+        
+        if (sessionError) {
+          throw sessionError;
+        }
 
-        if (sessionError) throw sessionError;
-        if (!sessionData.session?.user) throw new Error('No user session found');
+        if (!sessionData.session?.user) {
+          throw new Error('No user session found');
+        }
 
         const user = sessionData.session.user;
         setStatus('Checking account status...');
 
-        // ✅ Step 3: Ensure profile exists
+        // Check if user profile exists
         const { data: profile, error: profileError } = await supabase
           .from('profiles')
           .select('id, is_admin, account_status, first_name, last_name')
           .eq('id', user.id)
-          .maybeSingle();
+          .single();
 
-        if (profileError) throw profileError;
-
-        if (!profile) {
-          // No profile yet → go to complete profile page
+        if (profileError || !profile) {
+          // User doesn't have a profile - they need to complete profile setup
+          setStatus('Setting up your account...');
+          
+          // Redirect to the dedicated profile completion page
           navigate('/complete-profile');
           return;
         }
 
+        // Check account status
         if (profile.account_status === 'blocked') {
           await supabase.auth.signOut();
           toast({
@@ -121,21 +93,26 @@ const OAuthCallback = () => {
         // Save profile ID to session
         sessionStorage.setItem('profile_id', profile.id);
 
-        // Check if profile is complete
+        // Check if profile is complete (basic check)
         const isProfileComplete = profile.first_name && profile.last_name;
+
         if (!isProfileComplete) {
+          // Profile exists but incomplete - redirect to profile completion
           navigate('/complete-profile');
           return;
         }
 
+        // Successful login - redirect to main app
         toast({
           title: "Welcome back!",
           description: "You've been successfully logged in.",
         });
+
+        // Redirect to main app - let the auth state change handle the proper routing
         navigate('/');
 
       } catch (error: any) {
-        clearTimeout(timeout);
+  // ...removed log...
         toast({
           title: "Authentication Error",
           description: error.message || "An error occurred during authentication. Please try again.",

@@ -136,7 +136,6 @@ import { useToast } from '@/hooks/use-toast';
 import { useSubscription } from '@/hooks/useSubscription';
 import { useImagePreloader } from '@/hooks/useImagePreloader';
 import { calculateDistance } from '@/constants/locationData';
-import { checkAndTriggerRefill } from '@/utils/performanceOptimizer';
 import { debounce, optimizeImageUrl, createPagination, userDataCache } from '@/utils/performanceOptimizer';
 import { locationService } from '@/services/locationService';
 import { calculateProfileCompletion, getTodaySwipeCount, checkSwipeRestrictions } from '@/utils/profileCompletion';
@@ -147,21 +146,6 @@ import SwipeButtons from './discover/SwipeButtons';
 import ProfileCompletionModal from './ProfileCompletionModal';
 import SwipeCounter from './SwipeCounter';
 import { CurrentUser, PotentialMatch } from '@/types';
-
-// Global cache for discover page data - persists across component mounts
-const discoverCache = new Map<string, { 
-  potentialMatches: PotentialMatch[], 
-  userImages: { [key: string]: string[] },
-  userDistances: { [key: string]: number },
-  currentIndex: number,
-  timestamp: number 
-}>();
-const DISCOVER_CACHE_DURATION = 60000; // 1 minute
-
-// Make cache globally accessible for preloading
-if (typeof window !== 'undefined') {
-  (window as any).discoverCache = discoverCache;
-}
 
 // Helper function to calculate age from date of birth
 const calculateAge = (dateOfBirth: string): number => {
@@ -236,14 +220,13 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, isPremium }: DiscoverPage
   // Dynamic content height management
   const contentRef = useRef<HTMLDivElement>(null);
   const [contentHeight, setContentHeight] = useState(0);
-  const backgroundFetchingRef = useRef(false);
   
   const { toast } = useToast();
   const { subscription, checkUsageLimit, refetchSubscription } = useSubscription(currentUser?.id);
   const { preloadImages, getOptimizedUrl, isImageLoaded } = useImagePreloader({
-    maxConcurrent: 8, // Reduced for better performance with more users
-    quality: 50, // Ultra-low quality for maximum speed
-    width: 280 // Much smaller for instant loading
+    maxConcurrent: 3,
+    quality: 85,
+    width: 800
   });
 
   // --- BEGIN: Swipe Guide Popup State ---
@@ -395,246 +378,157 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, isPremium }: DiscoverPage
     return now - lastShuffleTime > tenMinutes;
   }, [lastShuffleTime]);
 
-  // Background fetching function
-  const fetchPotentialMatchesInBackground = useCallback(async () => {
-    if (!currentUser?.id || backgroundFetchingRef.current) return;
-    backgroundFetchingRef.current = true;
-
-    try {
-      const result = await fetchPotentialMatchesData(currentUser.id);
-      if (result) {
-        const { matches, images, distances, index } = result;
-        
-        // Update cache
-        discoverCache.set(currentUser.id, {
-          potentialMatches: matches,
-          userImages: images,
-          userDistances: distances,
-          currentIndex: index,
-          timestamp: Date.now()
-        });
-
-        // Update state with fresh data
-        setPotentialMatches(matches);
-        setUserImages(images);
-        setUserDistances(distances);
-        setCurrentIndex(index);
-      }
-    } catch (error) {
-      // Silently handle background fetch errors
-    } finally {
-      backgroundFetchingRef.current = false;
-    }
-  }, [currentUser?.id]);
-
-  // Shared data fetching logic
-  const fetchPotentialMatchesData = useCallback(async (userId: string) => {
-    // Parallel queries for better performance
-    const [
-      { data: likedUsers },
-      { data: blockedUsers },
-      { data: recentPasses }
-    ] = await Promise.all([
-      supabase
-        .from('likes')
-        .select('liked_id')
-        .eq('liker_id', userId),
-      supabase
-        .from('blocks')
-        .select('blocked_id, blocker_id')
-        .or(`blocker_id.eq.${userId},blocked_id.eq.${userId}`),
-      supabase
-        .from('passes')
-        .select('passed_id, passed_at')
-        .match({ passer_id: userId })
-        .gte('passed_at', new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString())
-    ]);
-
-    const likedUserIds = likedUsers?.map(like => like.liked_id) || [];
-    const blockedUserIds = blockedUsers?.flatMap(block => [block.blocked_id, block.blocker_id]) || [];
-    const hiddenPassedIds = recentPasses?.map(p => p.passed_id) || [];
-    const excludedIds = [...likedUserIds, ...blockedUserIds, ...hiddenPassedIds, userId];
-    
-    // Get user data for location and preferences
-    const { data: currentUserData } = await supabase
-      .from('profiles')
-      .select('max_distance, distance_preference, country, min_age, max_age, preference')
-      .eq('id', userId)
-      .single();
-
-    const userMaxDistance = currentUserData?.max_distance || currentUserData?.distance_preference || 50;
-    const allowedGenders = currentUserData?.preference === 'men' ? ['male'] : 
-                          currentUserData?.preference === 'women' ? ['female'] : 
-                          ['male', 'female', 'other'];
-
-    // Get location-based matches
-    const locationMatches = await locationService.getLocationBasedMatches(userId, userMaxDistance);
-    
-    const distanceMap: { [key: string]: number } = {};
-    locationMatches.forEach(match => {
-      distanceMap[match.profile_id] = match.distance_km;
-    });
-    
-    const locationProfileIds = locationMatches.map(match => match.profile_id);
-    
-    // Fetch full profile data
-    let filteredProfiles: any[] = [];
-    if (locationProfileIds.length > 0) {
-      const { data: profiles, error } = await supabase
-        .from('profiles')
-        .select('id, first_name, last_name, bio, city, country, country_code, occupation, education_level, date_of_birth, interests, gender, latitude, longitude, fun_fact, perfect_first_date, last_googled, relationship_intent, smoking, drinking, exercise_level, sleeping_schedule, introvert_extrovert, spontaneous_planner, messy_organized')
-        .in('id', locationProfileIds)
-        .not('id', 'in', `(${excludedIds.join(',')})`)
-        .in('gender', allowedGenders)
-        .eq('account_status', 'active')
-        .eq('is_admin', false)
-        .limit(35);
-
-      if (error) throw error;
-      filteredProfiles = profiles || [];
-    } else {
-      // Fallback: get profiles from same country
-      const { data: profiles, error } = await supabase
-        .from('profiles')
-        .select('id, first_name, last_name, bio, city, country, country_code, occupation, education_level, date_of_birth, interests, gender, latitude, longitude, fun_fact, perfect_first_date, last_googled, relationship_intent, smoking, drinking, exercise_level, sleeping_schedule, introvert_extrovert, spontaneous_planner, messy_organized')
-        .not('id', 'in', `(${excludedIds.join(',')})`)
-        .in('gender', allowedGenders)
-        .eq('account_status', 'active')
-        .eq('is_admin', false)
-        .eq('country', currentUserData?.country || 'Ghana')
-        .limit(25);
-
-      if (error) throw error;
-      filteredProfiles = profiles || [];
-    }
-
-    // Apply age filtering
-    const userMinAge = currentUserData?.min_age || 18;
-    const userMaxAge = currentUserData?.max_age || 99;
-    
-    filteredProfiles = filteredProfiles.filter(profile => {
-      if (!profile.date_of_birth) return false;
-      const age = calculateAge(profile.date_of_birth);
-      return age >= userMinAge && age <= userMaxAge;
-    });
-
-    // Add empty images array and shuffle
-    const profilesWithImages = filteredProfiles
-      .filter(profile => profile.id !== userId)
-      .map(profile => ({
-        ...profile,
-        images: []
-      }));
-
-    const shuffled = profilesWithImages.sort(() => 0.5 - Math.random());
-
-    // Load last profile ID and time from localStorage
-    const savedId = localStorage.getItem('driplove_last_profile_id');
-    const savedTime = parseInt(localStorage.getItem('driplove_last_profile_time') || '0');
-    const twentyFourHours = 24 * 60 * 60 * 1000;
-    const isSavedValid = savedId && Date.now() - savedTime < twentyFourHours;
-
-    let indexToShow = 0;
-    if (isSavedValid) {
-      const savedIndex = shuffled.findIndex(p => p.id === savedId);
-      if (savedIndex !== -1) {
-        indexToShow = savedIndex;
-      }
-    }
-
-    // Load first few profile images
-    const imageMap: { [key: string]: string[] } = {};
-    if (shuffled.length > 0) {
-      const firstProfile = shuffled.slice(0, 1); // Only load 1 profile initially
-      for (const profile of firstProfile) {
-        try {
-          const { data: images } = await supabase
-            .from('user_images')
-            .select('user_id, image_url, image_order')
-            .eq('user_id', profile.id)
-            .eq('is_approved', true)
-            .order('image_order', { ascending: true })
-            .limit(2); // Only load 2 images per profile initially
-
-          if (images?.length) {
-            imageMap[profile.id] = images.map(img => img.image_url);
-          }
-        } catch (error) {
-          // Silently handle individual image loading errors
-        }
-      }
-    }
-
-    return {
-      matches: shuffled,
-      images: imageMap,
-      distances: distanceMap,
-      index: indexToShow
-    };
-  }, []);
-
   const fetchPotentialMatches = useCallback(async () => {
     if (!currentUser?.id) return;
   
     try {
-      // Background loading - don't block UI
       setIsLoading(true);
+      
+      // Check cache first for better performance
+      const cacheKey = `potential_matches_${currentUser.id}`;
+      const cachedData = userDataCache.get(cacheKey);
+      if (cachedData) {
+        setPotentialMatches(cachedData);
+        setIsLoading(false);
+        return;
+      }
+      
+      // Parallel queries for better performance
+      const [
+        { data: likedUsers },
+        { data: blockedUsers },
+        { data: recentPasses }
+      ] = await Promise.all([
+        supabase
+          .from('likes')
+          .select('liked_id')
+          .eq('liker_id', currentUser.id),
+        supabase
+          .from('blocks')
+          .select('blocked_id, blocker_id')
+          .or(`blocker_id.eq.${currentUser.id},blocked_id.eq.${currentUser.id}`),
+        supabase
+          .from('passes')
+          .select('passed_id, passed_at')
+          .match({ passer_id: currentUser.id })
+          .gte('passed_at', new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString()) // Reduced from 2 days to 1 day
+      ]);
 
-      const result = await fetchPotentialMatchesData(currentUser.id);
-      if (result) {
-        const { matches, images, distances, index } = result;
+      const likedUserIds = likedUsers?.map(like => like.liked_id) || [];
+      const blockedUserIds = blockedUsers?.flatMap(block => [block.blocked_id, block.blocker_id]) || [];
+      const hiddenPassedIds = recentPasses?.map(p => p.passed_id) || [];
+      const excludedIds = [...likedUserIds, ...blockedUserIds, ...hiddenPassedIds, currentUser.id];
+      
+      // Get location-based matches using the locationService
+      const userMaxDistance = currentUser.max_distance || currentUser.distance_preference || 50;
+  // ...removed log...
+
+      const locationMatches = await locationService.getLocationBasedMatches(currentUser.id, userMaxDistance);
+      
+  // ...removed log...
+      
+      // Store distances for each user
+      const distanceMap: { [key: string]: number } = {};
+      locationMatches.forEach(match => {
+        distanceMap[match.profile_id] = match.distance_km;
+      });
+      setUserDistances(distanceMap);
+      
+      // Extract profile IDs from location matches for filtering
+      const locationProfileIds = locationMatches.map(match => match.profile_id);
+  // ...removed log...
+      
+      // Fetch full profile data for location matches
+      let filteredProfiles: any[] = [];
+      if (locationProfileIds.length > 0) {
+  // ...removed log...
+  // ...removed log...
         
-        // Update cache
-        discoverCache.set(currentUser.id, {
-          potentialMatches: matches,
-          userImages: images,
-          userDistances: distances,
-          currentIndex: index,
-          timestamp: Date.now()
-        });
+        const { data: profiles, error } = await supabase
+          .from('profiles')
+          .select('id, first_name, last_name, bio, city, country, country_code, occupation, education_level, date_of_birth, interests, gender, latitude, longitude, fun_fact, perfect_first_date, last_googled, relationship_intent, smoking, drinking, exercise_level, sleeping_schedule, introvert_extrovert, spontaneous_planner, messy_organized')
+          .in('id', locationProfileIds)
+          .not('id', 'in', `(${excludedIds.join(',')})`)
+          .in('gender', allowedGenders)
+          .eq('account_status', 'active')
+          .eq('is_admin', false)
+          .limit(50);
 
-        setPotentialMatches(matches);
-        setUserImages(images);
-        setUserDistances(distances);
-        setCurrentIndex(index);
-        setLastShuffleTime(Date.now());
+  // ...removed log...
+        
+        if (error) throw error;
+        filteredProfiles = profiles || [];
+      } else {
+  // ...removed log...
+        // Fallback: get profiles from same country if no location matches
+        const { data: profiles, error } = await supabase
+          .from('profiles')
+          .select('id, first_name, last_name, bio, city, country, country_code, occupation, education_level, date_of_birth, interests, gender, latitude, longitude, fun_fact, perfect_first_date, last_googled, relationship_intent, smoking, drinking, exercise_level, sleeping_schedule, introvert_extrovert, spontaneous_planner, messy_organized')
+          .not('id', 'in', `(${excludedIds.join(',')})`)
+          .in('gender', allowedGenders)
+          .eq('account_status', 'active')
+          .eq('is_admin', false)
+          .eq('country', currentUser.country || 'Ghana')
+          .limit(50);
 
-        // Immediately load images for current profile and preload next ones
-        if (matches.length > 0) {
-          const currentProfile = matches[index];
-          if (currentProfile && !images[currentProfile.id]) {
-            loadFullImages(currentProfile.id);
-          }
-          
-          // Preload next profiles immediately and aggressively
-          preloadNextProfileImages(matches, images, index + 1);
-          
-          // Only preload current profile for maximum performance
-          if (matches.length > 0) {
-            const currentProfile = matches[index];
-            if (currentProfile && !images[currentProfile.id]) {
-              loadFullImages(currentProfile.id);
-            }
-          }
+  // ...removed log...
+        
+        if (error) throw error;
+        filteredProfiles = profiles || [];
+      }
+
+      // Apply age filtering based on user preferences
+      const userMinAge = currentUser.min_age || 18;
+      const userMaxAge = currentUser.max_age || 99;
+      
+  // ...removed log...
+      
+      const beforeAgeFilter = filteredProfiles.length;
+      filteredProfiles = filteredProfiles.filter(profile => {
+        if (!profile.date_of_birth) return false; // Exclude profiles without birth date
+        
+        const age = calculateAge(profile.date_of_birth);
+        return age >= userMinAge && age <= userMaxAge;
+      });
+
+  // ...removed log...
+      
+      // Add empty images array to match interface
+
+      // Final safeguard: filter out current user's profile if present
+      const profilesWithImages = filteredProfiles
+        .filter(profile => profile.id !== currentUser.id)
+        .map(profile => ({
+          ...profile,
+          images: [] // Will be loaded separately
+        }));
+
+      const shuffled = profilesWithImages.sort(() => 0.5 - Math.random());
+
+      // Load last profile ID and time from localStorage
+      const savedId = localStorage.getItem('driplove_last_profile_id');
+      const savedTime = parseInt(localStorage.getItem('driplove_last_profile_time') || '0');
+      const twentyFourHours = 24 * 60 * 60 * 1000;
+      const isSavedValid = savedId && Date.now() - savedTime < twentyFourHours;
+
+      let indexToShow = 0;
+      if (isSavedValid) {
+        const savedIndex = shuffled.findIndex(p => p.id === savedId);
+        if (savedIndex !== -1) {
+          indexToShow = savedIndex;
         }
+      }
 
-        // Start continuous loading immediately after initial load
+      setPotentialMatches(shuffled);
+      setCurrentIndex(indexToShow);
+      setLastShuffleTime(Date.now());
+
+  // Preload images for the first 2 profiles only for faster initial loading (non-blocking)
+      if (shuffled.length > 0) {
+        // Use setTimeout to make image preloading non-blocking for faster UI
         setTimeout(() => {
-          loadMoreMatches(); // Load first batch of additional profiles
-          
-          // Set up continuous loading every 30 seconds to reduce server load
-          const continuousLoadingInterval = setInterval(() => {
-            const remainingProfiles = potentialMatches.length - currentIndex;
-            if (remainingProfiles < 10 && !isLoadingMore) { // Reduced buffer
-              loadMoreMatches();
-            }
-          }, 30000); // Reduced frequency for better performance
-          
-          // Store interval reference for cleanup
-          if (typeof window !== 'undefined') {
-            (window as any).continuousLoadingInterval = continuousLoadingInterval;
-          }
-        }, 2000); // Start 2 seconds after initial load
+          preloadNextProfileImages(shuffled, {}, 0);
+        }, 100);
       }
     } catch (error) {
   // ...removed log...
@@ -697,55 +591,38 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, isPremium }: DiscoverPage
           [profileId]: imageUrls
         }));
         
-        // Load only first image immediately for speed
-        if (imageUrls.length > 0) {
-          preloadImages([imageUrls[0]]); // Only preload first image
-        }
+        // Immediately start preloading the actual images using both methods
+        await preloadUserImages(imageUrls, profileId);
+        preloadImages(imageUrls); // Also use the hook for optimization
       }
     } catch (error) {
   // ...removed log...
     }
   }, [userImages, preloadImages]);
 
-  // Ultra-optimized preloading strategy - minimal images for maximum speed
+  // Optimized preloading strategy - load 6 profiles ahead for smooth swiping
   const preloadNextProfileImages = useCallback(async (matches: PotentialMatch[], alreadyLoaded: { [key: string]: string[] }, startIdx: number) => {
-    // Drastically reduced preload count for maximum concurrent users
-    const PRELOAD_COUNT = 2; // Only 2 profiles ahead - ultra-aggressive optimization
-    
+    // Increased to 6 profiles for smooth swiping experience
+    const PRELOAD_COUNT = 6;
     const toPreload = matches.slice(startIdx, startIdx + PRELOAD_COUNT)
       .filter(match => !alreadyLoaded[match.id] || alreadyLoaded[match.id]?.length === 0);
     
-    // Load profiles in background with longer delays to reduce server load
-    toPreload.forEach((match, index) => {
-      setTimeout(() => {
-        loadFullImages(match.id);
-      }, index * 200); // Longer delays to reduce concurrent requests
+    // Process profiles in parallel for faster loading
+    const loadPromises = toPreload.map(async (match, index) => {
+      // Stagger the loading slightly to avoid overwhelming the system
+      await new Promise(resolve => setTimeout(resolve, index * 25));
+      return loadFullImages(match.id);
     });
+    
+    await Promise.all(loadPromises);
   }, [loadFullImages]);
 
-  // Main effect to fetch data - check cache first but don't block render
+  // Main effect to fetch data - only run when user ID changes and we don't have data
   useEffect(() => {
-    if (!currentUser?.id) return;
-
-    // Use setTimeout to avoid blocking the initial render
-    setTimeout(() => {
-      // Check if we have fresh cached data first
-      const cached = discoverCache.get(currentUser.id);
-      if (cached && Date.now() - cached.timestamp < DISCOVER_CACHE_DURATION) {
-        setPotentialMatches(cached.potentialMatches);
-        setUserImages(cached.userImages);
-        setUserDistances(cached.userDistances);
-        setCurrentIndex(cached.currentIndex);
-        setIsLoading(false);
-        // Still fetch in background to get latest data
-        setTimeout(() => fetchPotentialMatchesInBackground(), 100);
-      } else if (potentialMatches.length === 0) {
-        // No cache or stale cache, fetch immediately
-        fetchPotentialMatches();
-      }
-    }, 0);
-    
-    fetchReverseUsage();
+    if (currentUser?.id && (potentialMatches.length === 0 || isLoading)) {
+      fetchPotentialMatches();
+      fetchReverseUsage();
+    }
   }, [currentUser?.id]); // Only depend on user ID, not the functions
 
   // Save current match state
@@ -756,34 +633,18 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, isPremium }: DiscoverPage
     }
   }, [currentIndex, potentialMatches]);
 
-  // Cleanup continuous loading interval on unmount
   useEffect(() => {
-    return () => {
-      if (typeof window !== 'undefined' && (window as any).continuousLoadingInterval) {
-        clearInterval((window as any).continuousLoadingInterval);
-        (window as any).continuousLoadingInterval = null;
-      }
-    };
-  }, []);
-
-  useEffect(() => {
-    setImageIndex(0);
-    
-    // Load images for current match immediately
+  setImageIndex(0);
+    // Load images for current match if not already loaded
     const currentMatch = potentialMatches[currentIndex];
-    if (currentMatch) {
-      // Load current profile images immediately (even if already loaded)
+    if (currentMatch && !userImages[currentMatch.id]) {
       loadFullImages(currentMatch.id);
-      
-      // Only load next 1 profile for maximum performance
-      const nextMatch = potentialMatches[currentIndex + 1];
-      if (nextMatch) {
-        loadFullImages(nextMatch.id);
-      }
     }
-    
-    // Ultra-aggressive preloading: preload many profiles ahead
-    preloadNextProfileImages(potentialMatches, userImages, currentIndex + 1);
+    // Aggressive preloading: preload images for the next 6 profiles every 2 swipes for smooth experience
+    const shouldPreloadMore = currentIndex % 2 === 0; // Every 2 swipes for frequent preloading
+    if (shouldPreloadMore) {
+      preloadNextProfileImages(potentialMatches, userImages, currentIndex + 1);
+    }
   }, [currentIndex, potentialMatches, userImages, preloadNextProfileImages, loadFullImages]);
 
   // Dynamic content height measurement
@@ -852,23 +713,23 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, isPremium }: DiscoverPage
     const deltaX = currentX - startX;
     const deltaY = Math.abs(currentY - startY);
     const screenWidth = window.innerWidth;
-    const minSwipeDistance = screenWidth * 0.25; // Reduced from 0.4 to 0.25 for faster swipes
+    const minSwipeDistance = screenWidth * 0.4;
   
     if (Math.abs(deltaX) > minSwipeDistance && Math.abs(deltaX) > deltaY) {
-      // Reset swipe state immediately for next card
-      setStartX(0);
-      setStartY(0);
-      setCurrentX(0);
-      setCurrentY(0);
-      setSwipeDirection(null);
-      setSwipeDistance(0);
+      // Trigger exit animation before handling like/pass
+      setExitingCard(true);
+      setExitDirection(deltaX > 0 ? 'right' : 'left');
       
-      // Immediate swipe action without delays
-      if (deltaX > 0) {
-        handleLike();
-      } else {
-        handlePass();
-      }
+      // Wait for animation to complete before proceeding
+      setTimeout(() => {
+        if (deltaX > 0) {
+          handleLike();
+        } else {
+          handlePass();
+        }
+        setExitingCard(false);
+        setExitDirection(null);
+      }, 300);
     } else {
       // Reset values if swipe wasn't far enough
       setStartX(0);
@@ -912,26 +773,26 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, isPremium }: DiscoverPage
 
     const deltaX = currentX - startX;
     const deltaY = Math.abs(e.clientY - startY);
-    const minSwipeDistance = 50; // Reduced from 80 to 50 for faster mouse swipes
+    const minSwipeDistance = 80;
 
     // Only trigger swipe if horizontal movement is greater than vertical
     if (Math.abs(deltaX) > minSwipeDistance && Math.abs(deltaX) > deltaY) {
-      // Reset swipe state immediately for next card
-      setStartX(0);
-      setStartY(0);
-      setCurrentX(0);
-      setCurrentY(0);
-      setSwipeDirection(null);
-      setSwipeDistance(0);
+      // Trigger exit animation before handling like/pass
+      setExitingCard(true);
+      setExitDirection(deltaX > 0 ? 'right' : 'left');
       
-      // Immediate swipe action without delays
-      if (deltaX > 0) {
-        // Swipe right - like
-        handleLike();
-      } else {
-        // Swipe left - dislike
-        handlePass();
-      }
+      // Wait for animation to complete before proceeding
+      setTimeout(() => {
+        if (deltaX > 0) {
+          // Swipe right - like
+          handleLike();
+        } else {
+          // Swipe left - dislike
+          handlePass();
+        }
+        setExitingCard(false);
+        setExitDirection(null);
+      }, 300);
     } else {
       // Reset values if swipe wasn't far enough
       setStartX(0);
@@ -953,7 +814,7 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, isPremium }: DiscoverPage
 
   // Function to load more matches when running low - optimized for 5 at a time
   const loadMoreMatches = useCallback(async () => {
-    if (!currentUser?.id || isLoadingMore) return;
+    if (!currentUser?.id || isLoading || isLoadingMore) return;
     
     try {
       setIsLoadingMore(true);
@@ -995,7 +856,7 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, isPremium }: DiscoverPage
         .in('gender', allowedGenders)
         .eq('account_status', 'active')
         .eq('is_admin', false)
-        .limit(25); // Load 25 profiles at a time for continuous buffer
+        .limit(8); // Load 8 profiles at a time for better performance and smoother experience
 
       if (error) throw error;
 
@@ -1055,21 +916,21 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, isPremium }: DiscoverPage
     } finally {
       setIsLoadingMore(false);
     }
-  }, [currentUser, allowedGenders, potentialMatches, calculateAge, calculateDistance, isLoadingMore, userImages, preloadNextProfileImages, loadFullImages]);
+  }, [currentUser, allowedGenders, potentialMatches, calculateAge, calculateDistance, isLoading, isLoadingMore, userImages, preloadNextProfileImages, loadFullImages]);
 
-  // Auto-load more matches when getting low (5 profiles left) - reduced for performance
+  // Auto-load more matches when getting low (3 profiles left) for seamless experience
   useEffect(() => {
-    if (potentialMatches.length - currentIndex <= 5 && !isLoadingMore) {
-      setTimeout(() => loadMoreMatches(), 2000); // Add delay to reduce server load
+    if (potentialMatches.length - currentIndex <= 3 && !isLoadingMore && !isLoading) {
+      loadMoreMatches();
     }
-  }, [currentIndex, potentialMatches.length, loadMoreMatches, isLoadingMore]);
+  }, [currentIndex, potentialMatches.length, loadMoreMatches, isLoadingMore, isLoading]);
 
-  // Background loading - preload next batch every swipe for instant experience
+  // Background loading - preload next batch more frequently for smooth swiping
   useEffect(() => {
-    if (currentIndex > 0 && !isLoadingMore) {
-      loadMoreMatches(); // Load more profiles on every swipe for instant access
+    if (currentIndex > 0 && currentIndex % 2 === 0 && !isLoadingMore && !isLoading) {
+      loadMoreMatches();
     }
-  }, [currentIndex, loadMoreMatches, isLoadingMore]);
+  }, [currentIndex, loadMoreMatches, isLoadingMore, isLoading]);
   // Function to check if a profile is verified (90%+ completion with photos and basic info)
   const calculateProfileVerification = useCallback((profile: PotentialMatch) => {
     if (!profile) return false;
@@ -1168,6 +1029,8 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, isPremium }: DiscoverPage
       }
     }
 
+    moveToNext(); // Move UI only after all checks pass
+
     try {
       // First check if like already exists to prevent duplicate key error
       const { data: existingLike, error: checkError } = await supabase
@@ -1207,11 +1070,7 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, isPremium }: DiscoverPage
   // ...removed log...
       }
 
-      // Always move to next profile immediately for instant feel
-      moveToNext();
-      
       if (mutualLike) {
-        // It's a match! Show animation on top of the new profile
         setMatchedUser(currentMatch);
         setShowMatchAnimation(true);
       }
@@ -1423,34 +1282,14 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, isPremium }: DiscoverPage
     if (currentIndex < potentialMatches.length - 1) {
       setCurrentIndex(currentIndex + 1);
       
-      // Progressive Refill System Integration
-      const newIndex = currentIndex + 1;
-      checkAndTriggerRefill(currentUser.id, newIndex);
-      
-      // Backup: Legacy loading system (less aggressive now)
-      const remainingProfiles = potentialMatches.length - newIndex;
-      if (remainingProfiles <= 3) { // Much smaller buffer since progressive system handles most loading
-        setTimeout(() => loadMoreMatches(), 1000); // Longer delay
+      // Load more matches when we're getting close to the end (within 5 profiles)
+      if (currentIndex >= potentialMatches.length - 5) {
+        loadMoreMatches();
       }
-      
     } else {
       fetchPotentialMatches();
       setCurrentIndex(0);
     }
-
-    // Update cache in background without blocking UI
-    setTimeout(() => {
-      if (currentUser?.id) {
-        const cached = discoverCache.get(currentUser.id);
-        if (cached) {
-          discoverCache.set(currentUser.id, {
-            ...cached,
-            currentIndex: currentIndex + 1,
-            timestamp: Date.now()
-          });
-        }
-      }
-    }, 0);
   };
 
   const handleStartChat = (userId: string) => {
@@ -1463,7 +1302,6 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, isPremium }: DiscoverPage
   const handleCloseMatch = () => {
     setShowMatchAnimation(false);
     setMatchedUser(null);
-    // Profile already moved when like was processed
   };
 
   if (showMatchAnimation && matchedUser) {
@@ -1494,7 +1332,13 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, isPremium }: DiscoverPage
     );
   }
 
-  // Removed loading indicator - everything loads in background
+  if (isLoading) {
+    return (
+      <div className="h-full w-full flex items-center justify-center">
+        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-pink-600"></div>
+      </div>
+    );
+  }
 
   if (isOutOfSwipes) {
     return (
@@ -1543,7 +1387,6 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, isPremium }: DiscoverPage
   const nextMatchImages = nextMatch ? (userImages[nextMatch.id] || []) : [];
 
   if (!currentMatch) {
-    // Only show no profiles message when we actually have no profiles
     return (
       <div className="h-full w-full flex items-center justify-center">
         <Card className="max-w-md w-full mx-4">
@@ -1566,8 +1409,16 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, isPremium }: DiscoverPage
   // Calculate swipe overlay opacity and transform
   const swipeOpacity = Math.min(swipeDistance / 100, 0.8);
   
-  // Simple card transform for smooth dragging only
-  const cardTransform = isDragging ? `translateX(${currentX - startX}px) rotate(${(currentX - startX) * 0.1}deg)` : '';
+  // Enhanced card transform with exit animation
+  const getCardTransform = () => {
+    if (exitingCard && exitDirection) {
+      const exitDistance = exitDirection === 'right' ? window.innerWidth : -window.innerWidth;
+      return `translateX(${exitDistance}px) translateY(100px) rotate(${exitDirection === 'right' ? 30 : -30}deg) scale(0.8)`;
+    }
+    return isDragging ? `translateX(${currentX - startX}px) rotate(${(currentX - startX) * 0.1}deg)` : '';
+  };
+  
+  const cardTransform = getCardTransform();
 
 
 
@@ -1691,8 +1542,10 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, isPremium }: DiscoverPage
           className="h-full w-full relative z-10 flex flex-col"
           style={{
             transform: cardTransform,
-            transition: isDragging ? 'none' : 'transform 0.2s ease-out', // Faster snap-back
-            boxShadow: isDragging ? '0 8px 32px 0 rgba(0,0,0,0.25)' : '0 4px 16px 0 rgba(0,0,0,0.10)'
+            transition: exitingCard ? 'transform 0.3s cubic-bezier(0.25, 0.46, 0.45, 0.94)' : 
+                       isDragging ? 'none' : 'transform 0.3s cubic-bezier(0.22, 1, 0.36, 1)',
+            boxShadow: isDragging ? '0 8px 32px 0 rgba(0,0,0,0.25)' : '0 4px 16px 0 rgba(0,0,0,0.10)',
+            opacity: exitingCard ? 0 : 1
           }}
         >
           {/* Image area - flexible height that fills remaining space */}
@@ -1814,17 +1667,16 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, isPremium }: DiscoverPage
 
           {/* Info section - dynamic height that fits content exactly */}
           <div className={`bg-white border-t border-gray-400 transition-all duration-300 flex-shrink-0 ${
-            showMoreInfo ? '' : 'overflow-hidden'
+            showMoreInfo ? 'h-[380px]' : 'h-[120px] overflow-hidden'
           }`}>
             <div 
               ref={contentRef}
-              className={`w-full p-1 ${showMoreInfo ? 'overflow-y-scroll' : 'overflow-hidden pb-3'}`} 
+              className={`w-full p-1 ${showMoreInfo ? 'overflow-y-auto h-[380px]' : 'overflow-hidden pb-3'}`} 
               style={{
                 WebkitOverflowScrolling: 'touch',
                 overscrollBehavior: 'contain',
                 scrollBehavior: 'smooth',
-                maxHeight: showMoreInfo ? 'calc(50vh - 30%)' : 'auto',
-                paddingBottom: showMoreInfo ? '120px' : '12px'
+                paddingBottom: showMoreInfo ? `${Math.max(contentHeight, 40)}px` : '0.75rem' // Dynamic padding based on content
               }}
             >
             <MatchCard

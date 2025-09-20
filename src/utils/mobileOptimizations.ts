@@ -41,11 +41,11 @@ export const mobileImageConfig = {
     threshold: 0.1,
   },
   
-  // Image compression settings - ULTRA OPTIMIZED FOR SPEED
+  // Image compression settings
   compressionOptions: {
-    quality: 0.55,
-    maxWidth: 300,
-    maxHeight: 450,
+    quality: 0.8,
+    maxWidth: 400,
+    maxHeight: 600,
     format: 'webp',
   },
   
