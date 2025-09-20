@@ -10,7 +10,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import { handleInputFocus, handleInputBlur, getInputStyles } from '@/utils/inputUtils';
 import { getPasswordResetRedirectUri, getEmailConfirmRedirectUri } from '@/config/oauth';
-import { openOAuthWithSafariViewController, cleanupSafariViewController } from '@/utils/safariViewController';
+import { openAppleSignInWithSafariViewController, cleanupSafariViewController } from '@/utils/safariViewController';
 
 interface AuthFormProps {
   isLogin: boolean;
@@ -73,6 +73,58 @@ const AuthForm = ({ isLogin, onToggle, onOAuthSuccess }: AuthFormProps) => {
     return Object.keys(newErrors).length === 0;
   };
 
+  // Ensure the user has a profiles row in the database. Used after setting the
+  // session for mobile Safari VC OAuth flows where Supabase doesn't auto-create
+  // a profile row.
+  const ensureProfileExists = async (user: any) => {
+    if (!user || !user.id) return;
+    try {
+      const { data: existingProfile, error: profileError } = await supabase
+        .from('profiles')
+        .select('id')
+        .eq('id', user.id)
+        .maybeSingle();
+
+      if (profileError) {
+        console.error('[OAuth] Error checking profile existence:', profileError);
+        return;
+      }
+
+      if (!existingProfile) {
+        const firstName = user.user_metadata?.full_name?.split(' ')[0] || user.user_metadata?.full_name || 'User';
+        const lastName = user.user_metadata?.full_name?.split(' ').slice(1).join(' ') || '';
+
+        const { error: insertError } = await supabase
+          .from('profiles')
+          .insert({
+            id: user.id,
+            email: user.email,
+            first_name: firstName,
+            last_name: lastName,
+            date_of_birth: '1990-01-01',
+            country: 'US',
+            city: 'Unknown',
+            gender: 'prefer-not-to-say',
+            preference: 'both',
+            relationship_intent: 'not-sure',
+            occupation: 'Not specified',
+            industry: 'Not specified',
+            education_level: 'not-specified',
+            account_status: 'active',
+            is_admin: false
+          });
+
+        if (insertError) {
+          console.error('[OAuth] Profile creation error:', insertError);
+        } else {
+          console.log('[OAuth] Created profile for user:', user.id);
+        }
+      }
+    } catch (err) {
+      console.error('[OAuth] ensureProfileExists exception:', err);
+    }
+  };
+
   const handleOAuthSignIn = async (provider: 'google' | 'apple') => {
     setOauthLoading(provider);
     
@@ -85,97 +137,38 @@ const AuthForm = ({ isLogin, onToggle, onOAuthSuccess }: AuthFormProps) => {
       
       console.log(`Starting ${provider} OAuth with redirectTo: ${redirectTo}`);
       
-      // Check if we're on native iOS and provider is Apple - only then use Safari View Controller
-      let useNativeAppleSignIn = false;
-      try {
-        const { Capacitor } = await import('@capacitor/core');
-        const platform = Capacitor.getPlatform();
-        const isNative = Capacitor.isNativePlatform();
-        useNativeAppleSignIn = provider === 'apple' && isNative && platform === 'ios';
-        
-        console.log('AuthForm Platform Detection:', {
-          provider,
-          platform,
-          isNative,
-          useNativeAppleSignIn
-        });
-      } catch (e) {
-        // Capacitor not available - we're on web
-        console.log('Capacitor not available - using web OAuth');
-        useNativeAppleSignIn = false;
-      }
-      
-      if (useNativeAppleSignIn) {
-        console.log('✅ AuthForm: Routing to Safari View Controller for Apple Sign In on iOS native');
-        // Use Safari View Controller for iOS native Apple Sign In
-        const { data, error } = await openOAuthWithSafariViewController(provider, redirectTo, {
-          onSuccess: async (callbackData) => {
-            console.log('✅ Safari View Controller OAuth success, processing callback');
+      // For Apple provider, always use the dedicated Safari View Controller helper.
+      if (provider === 'apple') {
+        console.log('🍎 Using Safari VC flow for Apple Sign In (delegated to helper)');
+        const { data, error } = await openAppleSignInWithSafariViewController(redirectTo, {
+          onSuccess: async () => {
             try {
-              // Wait a moment for any session updates to process
-              await new Promise(resolve => setTimeout(resolve, 1000));
-              // Check if we now have a session
               const { data: sessionData } = await supabase.auth.getSession();
               if (sessionData?.session?.user) {
-                console.log('✅ Authentication successful, session established');
-                toast({
-                  title: "Welcome!",
-                  description: "You've been successfully signed in.",
-                });
-                setOauthLoading(null);
-                // The app will automatically navigate based on auth state change
-                return;
+                await ensureProfileExists(sessionData.session.user);
               }
-              // If no session yet, trigger a manual session refresh
-              console.log('No session found, refreshing...');
-              const { data: refreshData } = await supabase.auth.refreshSession();
-              if (refreshData?.session?.user) {
-                console.log('✅ Session refreshed successfully');
-                toast({
-                  title: "Welcome!",
-                  description: "You've been successfully signed in.",
-                });
-                setOauthLoading(null);
-                return;
-              }
-              // If still no session, show error and ask user to retry
-              console.error('❌ Could not establish session after Safari View Controller. Please try again.');
-              toast({
-                title: "Authentication Error",
-                description: "Could not complete sign in. Please try again.",
-                variant: "destructive",
-              });
-              setOauthLoading(null);
-            } catch (error) {
-              console.error('Error processing Safari View Controller callback:', error);
-              toast({
-                title: "Authentication Error",
-                description: "Could not complete sign in. Please try again.",
-                variant: "destructive",
-              });
-              setOauthLoading(null);
+              toast({ title: 'Welcome!', description: "You've been successfully signed in." });
+              navigate('/');
+            } catch (err) {
+              console.error('Error after Apple OAuth success:', err);
             }
+            setOauthLoading(null);
           },
-          onError: (error) => {
-            console.error(`${provider} OAuth callback error:`, error);
+          onError: (err) => {
+            console.error('[Apple OAuth Error]:', err);
             toast({
-              title: "Authentication Error", 
-              description: error.message || `Failed to sign in with ${provider}. Please try again.`,
-              variant: "destructive",
+              title: 'Authentication Error',
+              description: err?.message || 'Failed to sign in with Apple',
+              variant: 'destructive',
             });
             setOauthLoading(null);
           },
-          onComplete: () => {
-            setOauthLoading(null);
-          }
+          onComplete: () => setOauthLoading(null),
         });
+
         if (error) {
-          console.error(`${provider} OAuth error:`, error);
-          toast({
-            title: "Authentication Error",
-            description: error.message || `Failed to sign in with ${provider}. Please try again.`,
-            variant: "destructive",
-          });
+          console.error('Apple OAuth error:', error);
+          toast({ title: 'Authentication Error', description: error?.message || 'Failed to sign in with Apple', variant: 'destructive' });
           setOauthLoading(null);
         }
       } else {
@@ -836,3 +829,4 @@ const AuthForm = ({ isLogin, onToggle, onOAuthSuccess }: AuthFormProps) => {
 };
 
 export default AuthForm;
+

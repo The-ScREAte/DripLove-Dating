@@ -1,206 +1,107 @@
 /**
- * Safari View Controller utility for iOS
- * Implements in-app browser functionality to comply with Apple App Store guidelines
+ * Apple Sign In with Safari View Controller (iOS only)
  */
-
 import { supabase } from '@/integrations/supabase/client';
-
 import { Browser } from '@capacitor/browser';
-import { Capacitor } from '@capacitor/core';
+import { App } from '@capacitor/app';
 
-interface SafariViewControllerOptions {
-  url: string;
+interface OAuthOptions {
   onSuccess?: (data: any) => void;
   onError?: (error: any) => void;
   onComplete?: () => void;
 }
 
-/**
- * Opens Apple Sign In using Safari View Controller on iOS
- * Falls back to external browser on other platforms
- */
 export const openAppleSignInWithSafariViewController = async (
   redirectTo: string,
-  options: {
-    onSuccess?: (data: any) => void;
-    onError?: (error: any) => void;
-    onComplete?: () => void;
-  } = {}
+  options: OAuthOptions = {}
 ) => {
   try {
-    // Check if we're on iOS native platform
-    const platform = Capacitor.getPlatform();
-    const isNativePlatform = Capacitor.isNativePlatform();
-    const isNativeiOS = isNativePlatform && platform === 'ios';
-    
-    console.log('Safari View Controller Debug:', {
-      platform,
-      isNativePlatform,
-      isNativeiOS
-    });
-    
-    if (isNativeiOS) {
-      console.log('✅ Using Safari View Controller for Apple Sign In on iOS native app');
-      
-      // Use Safari View Controller for iOS
-      const { data, error } = await supabase.auth.signInWithOAuth({
-        provider: 'apple',
-        options: {
-          redirectTo,
-          queryParams: {
-            prompt: 'select_account',
-          }
-        }
-      });
-
-      if (error) {
-        console.error('Apple OAuth error:', error);
-        options.onError?.(error);
-        return { data: null, error };
-      }
-
-      if (data?.url) {
-        console.log('Opening Apple OAuth URL in Safari View Controller:', data.url);
-        
-        // Open the OAuth URL in Safari View Controller
-        await Browser.open({
-          url: data.url,
-          // Safari View Controller configuration for iOS
-          toolbarColor: '#000000',
-        });
-
-        // Listen for URL changes to catch the callback
-        const browserPageLoadedListener = await Browser.addListener('browserPageLoaded', (info) => {
-          console.log('Safari View Controller page loaded:', info.url);
-          
-          // Check if this is our callback URL
-          if (info.url && (info.url.includes('capacitor://localhost/auth/callback') || info.url.includes('/auth/callback'))) {
-            console.log('✅ Detected callback URL in Safari View Controller, closing browser');
-            
-            // Clean up listeners first
-            browserPageLoadedListener.remove();
-            browserFinishedListener.remove();
-            
-            // Close the Safari View Controller
-            Browser.close();
-            
-            // Handle the success callback after a short delay
-            setTimeout(() => {
-              console.log('✅ Processing Safari View Controller callback success');
-              options.onSuccess?.({ url: info.url });
-            }, 300);
-          }
-        });
-
-        // Listen for the browser to close
-        const browserFinishedListener = await Browser.addListener('browserFinished', () => {
-          console.log('Safari View Controller closed');
-          browserPageLoadedListener.remove();
-          options.onComplete?.();
-        });
-
-        return { data, error: null };
-      } else {
-        console.error('No OAuth URL received from Supabase');
-        options.onError?.(new Error('No OAuth URL received'));
-        return { data: null, error: new Error('No OAuth URL received') };
-      }
-    } else {
-      // Fall back to standard OAuth flow for web and Android
-      const fallbackPlatform = Capacitor.getPlatform();
-      console.log(`Using standard OAuth flow for ${fallbackPlatform} platform`);
-      
-      const { data, error } = await supabase.auth.signInWithOAuth({
-        provider: 'apple',
-        options: {
-          redirectTo,
-          queryParams: {
-            prompt: 'select_account',
-          }
-        }
-      });
-
-      if (error) {
-        console.error('Apple OAuth error:', error);
-        options.onError?.(error);
-      } else if (data) {
-        console.log('Apple OAuth success:', data);
-        options.onSuccess?.(data);
-      }
-
-      return { data, error };
-    }
-  } catch (error: any) {
-    console.error('Safari View Controller error:', error);
-    options.onError?.(error);
-    return { data: null, error };
-  }
-};
-
-/**
- * Generic Safari View Controller opener for any OAuth provider
- */
-export const openOAuthWithSafariViewController = async (
-  provider: 'google' | 'apple',
-  redirectTo: string,
-  options: {
-    onSuccess?: (data: any) => void;
-    onError?: (error: any) => void;
-    onComplete?: () => void;
-  } = {}
-) => {
-  try {
-    // Check if we're on iOS native platform
-    const platform = Capacitor.getPlatform();
-    const isNativePlatform = Capacitor.isNativePlatform();
-    const isNativeiOS = isNativePlatform && platform === 'ios';
-    
-    // For Apple Sign In on iOS native app only, use Safari View Controller
-    if (provider === 'apple' && isNativeiOS) {
-      console.log('Routing Apple Sign In to Safari View Controller on iOS');
-      return await openAppleSignInWithSafariViewController(redirectTo, options);
-    }
-
-    // Standard OAuth flow for all other cases (web, Android, Google everywhere)
-    console.log(`Using standard OAuth flow for ${provider} on ${platform}`);
-    console.log(`OAuth redirectTo URL: ${redirectTo}`);
-    
+    // Request sign-in URL from Supabase
     const { data, error } = await supabase.auth.signInWithOAuth({
-      provider,
+      provider: 'apple',
       options: {
         redirectTo,
-        queryParams: {
-          prompt: 'select_account',
-        }
-      }
+        flowType: 'pkce', // PKCE flow for mobile
+        queryParams: { prompt: 'select_account' }
+      } as any
     });
 
     if (error) {
-      console.error(`${provider} OAuth error:`, error);
+      console.error('[Apple OAuth] Error:', error);
       options.onError?.(error);
-    } else if (data) {
-      console.log(`${provider} OAuth success:`, data);
-      options.onSuccess?.(data);
+      return;
     }
 
-    return { data, error };
-  } catch (error: any) {
-    console.error(`${provider} OAuth error:`, error);
-    options.onError?.(error);
-    return { data: null, error };
+    if (!data?.url) {
+      const err = new Error('No OAuth URL received from Supabase');
+      console.error(err);
+      options.onError?.(err);
+      return;
+    }
+
+    // Listen for the deep-link callback from Apple
+    const listener = App.addListener('appUrlOpen', async (event: any) => {
+      try {
+        const url: string = event?.url || '';
+        console.log('[Apple OAuth] appUrlOpen received:', url);
+
+        if (url.startsWith('driplove://auth/callback')) {
+          // Extract token hash from the callback
+          const hashIndex = url.indexOf('#');
+          if (hashIndex > -1) {
+            const hash = url.substring(hashIndex + 1);
+            const params = new URLSearchParams(hash);
+            const access_token = params.get('access_token');
+            const refresh_token = params.get('refresh_token');
+
+            if (access_token && refresh_token) {
+              console.log('[Apple OAuth] Setting Supabase session from deep-link');
+              const { error: setError } = await supabase.auth.setSession({
+                access_token,
+                refresh_token,
+              } as any);
+
+              if (setError) {
+                console.error('[Apple OAuth] Session error:', setError);
+                options.onError?.(setError);
+              } else {
+                console.log('[Apple OAuth] ✅ Session established successfully');
+                options.onSuccess?.({ access_token, refresh_token });
+              }
+            }
+          }
+        }
+      } catch (err) {
+        console.error('[Apple OAuth] Error handling callback:', err);
+        options.onError?.(err);
+      } finally {
+        listener.remove();
+        options.onComplete?.();
+        try { await Browser.close(); } catch (e) { /* ignore */ }
+      }
+    });
+
+    // Open the OAuth URL in Safari View Controller
+    console.log('[Apple OAuth] Opening Safari View Controller (Browser):', data.url);
+    await Browser.open({ url: data.url });
+
+  } catch (err) {
+    console.error('[Apple OAuth] Fatal error:', err);
+    options.onError?.(err);
   }
 };
 
 /**
- * Cleanup Safari View Controller listeners
+ * Cleanup Safari VC listeners (best-effort). AuthForm expects this export.
  */
 export const cleanupSafariViewController = () => {
   try {
-    if (Capacitor.isNativePlatform()) {
-      Browser.removeAllListeners();
-    }
-  } catch (error) {
-    // Ignore cleanup errors
-    console.log('Safari View Controller cleanup error:', error);
+    // Remove any Browser listeners if available
+    try { (Browser as any).removeAllListeners?.(); } catch (e) { /* ignore */ }
+    // Remove any App listeners if available
+    try { (App as any).removeAllListeners?.(); } catch (e) { /* ignore */ }
+  } catch (err) {
+    // ignore cleanup errors
+    console.log('cleanupSafariViewController error:', err);
   }
 };
