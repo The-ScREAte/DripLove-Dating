@@ -1,5 +1,5 @@
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -10,6 +10,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import { handleInputFocus, handleInputBlur, getInputStyles } from '@/utils/inputUtils';
 import { getPasswordResetRedirectUri, getEmailConfirmRedirectUri } from '@/config/oauth';
+import { openAppleSignInWithSafariViewController, cleanupSafariViewController } from '@/utils/safariViewController';
 
 interface AuthFormProps {
   isLogin: boolean;
@@ -33,6 +34,13 @@ const AuthForm = ({ isLogin, onToggle, onOAuthSuccess }: AuthFormProps) => {
   const [errors, setErrors] = useState<{[key: string]: string}>({});
   const [showForgotPassword, setShowForgotPassword] = useState(false);
   const [resendingConfirmation, setResendingConfirmation] = useState(false);
+
+  // Cleanup Safari View Controller listeners on unmount
+  useEffect(() => {
+    return () => {
+      cleanupSafariViewController();
+    };
+  }, []);
 
   const validateForm = () => {
     const newErrors: {[key: string]: string} = {};
@@ -65,6 +73,58 @@ const AuthForm = ({ isLogin, onToggle, onOAuthSuccess }: AuthFormProps) => {
     return Object.keys(newErrors).length === 0;
   };
 
+  // Ensure the user has a profiles row in the database. Used after setting the
+  // session for mobile Safari VC OAuth flows where Supabase doesn't auto-create
+  // a profile row.
+  const ensureProfileExists = async (user: any) => {
+    if (!user || !user.id) return;
+    try {
+      const { data: existingProfile, error: profileError } = await supabase
+        .from('profiles')
+        .select('id')
+        .eq('id', user.id)
+        .maybeSingle();
+
+      if (profileError) {
+        console.error('[OAuth] Error checking profile existence:', profileError);
+        return;
+      }
+
+      if (!existingProfile) {
+        const firstName = user.user_metadata?.full_name?.split(' ')[0] || user.user_metadata?.full_name || 'User';
+        const lastName = user.user_metadata?.full_name?.split(' ').slice(1).join(' ') || '';
+
+        const { error: insertError } = await supabase
+          .from('profiles')
+          .insert({
+            id: user.id,
+            email: user.email,
+            first_name: firstName,
+            last_name: lastName,
+            date_of_birth: '1990-01-01',
+            country: 'US',
+            city: 'Unknown',
+            gender: 'prefer-not-to-say',
+            preference: 'both',
+            relationship_intent: 'not-sure',
+            occupation: 'Not specified',
+            industry: 'Not specified',
+            education_level: 'not-specified',
+            account_status: 'active',
+            is_admin: false
+          });
+
+        if (insertError) {
+          console.error('[OAuth] Profile creation error:', insertError);
+        } else {
+          console.log('[OAuth] Created profile for user:', user.id);
+        }
+      }
+    } catch (err) {
+      console.error('[OAuth] ensureProfileExists exception:', err);
+    }
+  };
+
   const handleOAuthSignIn = async (provider: 'google' | 'apple') => {
     setOauthLoading(provider);
     
@@ -75,28 +135,68 @@ const AuthForm = ({ isLogin, onToggle, onOAuthSuccess }: AuthFormProps) => {
       // Get platform-specific redirect URI for the provider
       const redirectTo = getRedirectUri(provider);
       
-      const { data, error } = await supabase.auth.signInWithOAuth({
-        provider: provider,
-        options: {
-          redirectTo,
-          queryParams: {
-            prompt: 'select_account',
-          }
-        }
-      });
-
-      if (error) {
-        console.error(`${provider} OAuth error:`, error);
-        toast({
-          title: "Authentication Error",
-          description: error.message || `Failed to sign in with ${provider}. Please try again.`,
-          variant: "destructive",
+      console.log(`Starting ${provider} OAuth with redirectTo: ${redirectTo}`);
+      
+      // For Apple provider, always use the dedicated Safari View Controller helper.
+      if (provider === 'apple') {
+        console.log('🍎 Using Safari VC flow for Apple Sign In (delegated to helper)');
+        const { data, error } = await openAppleSignInWithSafariViewController(redirectTo, {
+          onSuccess: async () => {
+            try {
+              const { data: sessionData } = await supabase.auth.getSession();
+              if (sessionData?.session?.user) {
+                await ensureProfileExists(sessionData.session.user);
+              }
+              toast({ title: 'Welcome!', description: "You've been successfully signed in." });
+              navigate('/');
+            } catch (err) {
+              console.error('Error after Apple OAuth success:', err);
+            }
+            setOauthLoading(null);
+          },
+          onError: (err) => {
+            console.error('[Apple OAuth Error]:', err);
+            toast({
+              title: 'Authentication Error',
+              description: err?.message || 'Failed to sign in with Apple',
+              variant: 'destructive',
+            });
+            setOauthLoading(null);
+          },
+          onComplete: () => setOauthLoading(null),
         });
-        setOauthLoading(null);
-        return;
-      }
 
-      // For mobile and web, the OAuth flow will redirect automatically
+        if (error) {
+          console.error('Apple OAuth error:', error);
+          toast({ title: 'Authentication Error', description: error?.message || 'Failed to sign in with Apple', variant: 'destructive' });
+          setOauthLoading(null);
+        }
+      } else {
+        console.log(`Using standard OAuth flow for ${provider} on web/Android`);
+        // Standard OAuth flow for web and Android
+        const { data, error } = await supabase.auth.signInWithOAuth({
+          provider: provider,
+          options: {
+            redirectTo,
+            queryParams: {
+              prompt: 'select_account',
+            }
+          }
+        });
+
+        if (error) {
+          console.error(`${provider} OAuth error:`, error);
+          toast({
+            title: "Authentication Error",
+            description: error.message || `Failed to sign in with ${provider}. Please try again.`,
+            variant: "destructive",
+          });
+          setOauthLoading(null);
+          return;
+        }
+
+        // For web and standard OAuth flows, the redirect will happen automatically
+      }
 
     } catch (error: any) {
       console.error(`${provider} OAuth unexpected error:`, error);
@@ -729,3 +829,4 @@ const AuthForm = ({ isLogin, onToggle, onOAuthSuccess }: AuthFormProps) => {
 };
 
 export default AuthForm;
+

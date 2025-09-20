@@ -29,7 +29,7 @@ export const useImagePreloader = (options: ImagePreloaderOptions = {}) => {
 
   const optimizeImageUrl = useCallback((url: string): string => {
     if (url.includes('supabase')) {
-      return `${url}?width=${width}&quality=${quality}&format=${format}`;
+      return `${url}?width=${width}&quality=${quality}&format=${format}&resize=contain`;
     }
     return url;
   }, [width, quality, format]);
@@ -45,7 +45,7 @@ export const useImagePreloader = (options: ImagePreloaderOptions = {}) => {
         return;
       }
       if (existing?.loading) {
-        // Wait for existing load to complete
+        // Wait for existing load to complete with immediate checking
         const checkLoaded = () => {
           const current = preloadedImages.get(url);
           if (current?.loaded) {
@@ -53,7 +53,7 @@ export const useImagePreloader = (options: ImagePreloaderOptions = {}) => {
           } else if (current?.error) {
             reject(new Error('Image failed to load'));
           } else {
-            setTimeout(checkLoaded, 100);
+            setTimeout(checkLoaded, 10); // Much faster checking
           }
         };
         checkLoaded();
@@ -70,6 +70,9 @@ export const useImagePreloader = (options: ImagePreloaderOptions = {}) => {
       })));
 
       const img = new Image();
+      
+      // Set loading priority for faster loading
+      img.loading = 'eager';
       
       img.onload = () => {
         setPreloadedImages(prev => new Map(prev.set(url, {
@@ -109,10 +112,8 @@ export const useImagePreloader = (options: ImagePreloaderOptions = {}) => {
       
       await Promise.all(promises);
       
-      // Small delay between batches to prevent overwhelming the browser
-      if (loadingQueue.current.length > 0) {
-        await new Promise(resolve => setTimeout(resolve, 50));
-      }
+      // No delay between batches for maximum speed
+      // Removed delay for faster image loading
     }
     
     isProcessing.current = false;

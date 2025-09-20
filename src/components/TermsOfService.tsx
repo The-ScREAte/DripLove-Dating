@@ -1,6 +1,6 @@
 import React from 'react';
 import { Button } from '@/components/ui/button';
-import { ArrowLeft, FileText, Users, Crown, Shield, AlertTriangle, Gavel, Mail } from 'lucide-react';
+import { ArrowLeft, FileText, Users, Crown, Shield, Gavel, Mail } from 'lucide-react';
 
 interface TermsOfServiceProps {
   onBack: () => void;
@@ -8,25 +8,15 @@ interface TermsOfServiceProps {
 
 const TermsOfService = ({ onBack }: TermsOfServiceProps) => {
   return (
-    <div 
-      className="terms-container min-h-screen bg-gradient-to-br from-pink-400 via-purple-500 to-indigo-600 p-4 mobile-container"
-      style={{
-        paddingTop: `max(env(safe-area-inset-top, 0px), 16px)`,
-        paddingBottom: `max(env(safe-area-inset-bottom, 0px), 16px)`,
-        paddingLeft: `max(env(safe-area-inset-left, 0px), 16px)`,
-        paddingRight: `max(env(safe-area-inset-right, 0px), 16px)`,
-        minHeight: '100dvh'
-      }}
-    >
+    <div className="min-h-screen bg-gradient-to-br from-pink-400 via-purple-500 to-indigo-600 p-4">
       <div className="max-w-4xl mx-auto bg-white rounded-lg shadow-lg overflow-hidden">
         {/* Header */}
-        <div className="bg-gradient-to-r from-purple-600 to-pink-600 text-white p-6 sticky-header rounded-t-lg" style={{ top: 0, zIndex: 10 }}>
+        <div className="bg-gradient-to-r from-purple-600 to-pink-600 text-white p-6 sticky top-0 z-10">
           <Button
             onClick={onBack}
             variant="ghost"
             size="sm"
             className="text-white hover:bg-white/20 mb-4"
-            style={{ fontSize: '16px' }}
           >
             <ArrowLeft className="w-4 h-4 mr-2" />
             Back
@@ -37,10 +27,6 @@ const TermsOfService = ({ onBack }: TermsOfServiceProps) => {
 
         {/* Content */}
         <div className="p-8 space-y-8 max-h-[80vh] overflow-y-auto">
-          <div className="text-center mb-8">
-            <div className="text-gray-400 text-2xl font-light">⸻</div>
-          </div>
-
           <section>
             <h2 className="text-2xl font-semibold text-gray-800 mb-4 flex items-center">
               <FileText className="w-6 h-6 mr-2 text-blue-600" />
@@ -53,10 +39,6 @@ const TermsOfService = ({ onBack }: TermsOfServiceProps) => {
               DripLove is owned and operated by The ScREAte Ltd, a company committed to building innovative and inclusive digital experiences.
             </p>
           </section>
-
-          <div className="text-center">
-            <div className="text-gray-400 text-2xl font-light">⸻</div>
-          </div>
 
           <section>
             <h2 className="text-2xl font-semibold text-gray-800 mb-4 flex items-center">
@@ -75,10 +57,6 @@ const TermsOfService = ({ onBack }: TermsOfServiceProps) => {
             </ul>
           </section>
 
-          <div className="text-center">
-            <div className="text-gray-400 text-2xl font-light">⸻</div>
-          </div>
-
           <section>
             <h2 className="text-2xl font-semibold text-gray-800 mb-4">3. User Eligibility</h2>
             <p className="text-gray-600 leading-relaxed mb-3">To use DripLove, you must:</p>
@@ -91,13 +69,8 @@ const TermsOfService = ({ onBack }: TermsOfServiceProps) => {
             </ul>
           </section>
 
-          <div className="text-center">
-            <div className="text-gray-400 text-2xl font-light">⸻</div>
-          </div>
-
           <section>
-            <h2 className="text-2xl font-semibold text-gray-800 mb-4 flex items-center">
-              <AlertTriangle className="w-6 h-6 mr-2 text-red-600" />
+            <h2 className="text-2xl font-semibold text-gray-800 mb-4">
               4. User Conduct
             </h2>
             <p className="text-gray-600 leading-relaxed mb-3">
@@ -118,10 +91,6 @@ const TermsOfService = ({ onBack }: TermsOfServiceProps) => {
               </p>
             </div>
           </section>
-
-          <div className="text-center">
-            <div className="text-gray-400 text-2xl font-light">⸻</div>
-          </div>
 
           <section>
             <h2 className="text-2xl font-semibold text-gray-800 mb-4 flex items-center">
@@ -145,20 +114,12 @@ const TermsOfService = ({ onBack }: TermsOfServiceProps) => {
             </ul>
           </section>
 
-          <div className="text-center">
-            <div className="text-gray-400 text-2xl font-light">⸻</div>
-          </div>
-
           <section>
             <h2 className="text-2xl font-semibold text-gray-800 mb-4">6. Privacy and Data Protection</h2>
             <p className="text-gray-600 leading-relaxed">
               We respect your privacy. Our practices are explained in our Privacy Policy. By using DripLove, you consent to the collection and use of your information in accordance with that policy.
             </p>
           </section>
-
-          <div className="text-center">
-            <div className="text-gray-400 text-2xl font-light">⸻</div>
-          </div>
 
           <section>
             <h2 className="text-2xl font-semibold text-gray-800 mb-4">7. Content and Intellectual Property</h2>
@@ -167,10 +128,6 @@ const TermsOfService = ({ onBack }: TermsOfServiceProps) => {
               <li>All platform branding, visuals, and code remain the exclusive property of The ScREAte Ltd and may not be used without written permission.</li>
             </ul>
           </section>
-
-          <div className="text-center">
-            <div className="text-gray-400 text-2xl font-light">⸻</div>
-          </div>
 
           <section>
             <h2 className="text-2xl font-semibold text-gray-800 mb-4 flex items-center">
@@ -195,10 +152,6 @@ const TermsOfService = ({ onBack }: TermsOfServiceProps) => {
             </div>
           </section>
 
-          <div className="text-center">
-            <div className="text-gray-400 text-2xl font-light">⸻</div>
-          </div>
-
           <section>
             <h2 className="text-2xl font-semibold text-gray-800 mb-4">9. Account Termination</h2>
             <p className="text-gray-600 leading-relaxed mb-4">
@@ -208,10 +161,6 @@ const TermsOfService = ({ onBack }: TermsOfServiceProps) => {
               You may delete your account at any time via your profile settings. Account deletion is permanent and will remove your data from our active servers.
             </p>
           </section>
-
-          <div className="text-center">
-            <div className="text-gray-400 text-2xl font-light">⸻</div>
-          </div>
 
           <section>
             <h2 className="text-2xl font-semibold text-gray-800 mb-4 flex items-center">
@@ -229,20 +178,12 @@ const TermsOfService = ({ onBack }: TermsOfServiceProps) => {
             </ul>
           </section>
 
-          <div className="text-center">
-            <div className="text-gray-400 text-2xl font-light">⸻</div>
-          </div>
-
           <section>
             <h2 className="text-2xl font-semibold text-gray-800 mb-4">11. Changes to Terms</h2>
             <p className="text-gray-600 leading-relaxed">
               We may update these Terms periodically. You will be notified of significant changes, and continued use of the Service constitutes acceptance of the new Terms.
             </p>
           </section>
-
-          <div className="text-center">
-            <div className="text-gray-400 text-2xl font-light">⸻</div>
-          </div>
 
           <section>
             <h2 className="text-2xl font-semibold text-gray-800 mb-4 flex items-center">

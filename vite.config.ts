@@ -9,6 +9,10 @@ export default defineConfig(({ mode }) => ({
   server: {
     host: "::",
     port: 8080,
+    // Optimize dev server performance
+    hmr: {
+      overlay: false, // Disable error overlay for faster HMR
+    },
     watch: {
       // Exclude node_modules and other directories from watching
       ignored: [
@@ -20,7 +24,9 @@ export default defineConfig(({ mode }) => ({
         '**/coverage/**',
         '**/.nyc_output/**',
         '**/tmp/**',
-        '**/temp/**'
+        '**/temp/**',
+        '**/android/**',
+        '**/ios/**'
       ],
       // Use polling with a reasonable interval to reduce file watcher usage
       usePolling: true,
@@ -33,22 +39,29 @@ export default defineConfig(({ mode }) => ({
   },
   plugins: [
     react(),
-    visualizer({ open: true })
+    // Only use visualizer in production builds
+    ...(mode === 'production' ? [visualizer({ open: false, filename: 'dist/stats.html' })] : [])
   ],
   resolve: {
     alias: {
       "@": path.resolve(__dirname, "./src"),
     },
   },
-  // Optimize build performance
+  // Optimize dependency pre-bundling
   optimizeDeps: {
     include: [
       'react',
       'react-dom',
       'react-router-dom',
       '@supabase/supabase-js',
-      'lucide-react'
+      'lucide-react',
+      '@tanstack/react-query',
+      'class-variance-authority',
+      'clsx',
+      'tailwind-merge'
     ],
+    // Force re-bundling on certain changes
+    force: false
   },
   // Build configuration
   build: {

@@ -40,6 +40,12 @@ const config: CapacitorConfig = {
       style: 'dark',
       resizeOnFullScreen: true
     },
+    Browser: {
+      // Safari View Controller configuration for iOS
+      toolbarColor: '#000000',
+      // Enable Safari View Controller on iOS
+      presentationStyle: 'popover'
+    },
     // Performance monitoring
     CapacitorHttp: {
       enabled: true

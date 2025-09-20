@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback, useMemo } from 'react';
+import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Users, Heart, X, Calendar, MapPin, Shield, ChevronDown, ChevronUp, Briefcase, GraduationCap, Crown, Lock, Clock } from 'lucide-react';
@@ -8,16 +8,47 @@ import { useSubscription } from '@/hooks/useSubscription';
 import BlockDialog from './BlockDialog';
 import PremiumUpgrade from './PremiumUpgrade';
 
+// Global cache for liked me data - persists across component mounts
+const likedMeCache = new Map<string, { 
+  likers: any[], 
+  userImages: { [key: string]: string[] }, 
+  timestamp: number 
+}>();
+const LIKED_ME_CACHE_DURATION = 30000; // 30 seconds
+
+// Make cache globally accessible for preloading
+if (typeof window !== 'undefined') {
+  (window as any).likedMeCache = likedMeCache;
+}
+
 interface LikedMePageProps {
   currentUser: any;
   isPremium?: boolean;
 }
 
 const LikedMePage = ({ currentUser, isPremium = false }: LikedMePageProps) => {
-  const [likers, setLikers] = useState<any[]>([]);
-  const [loading, setLoading] = useState(true);
+  const [likers, setLikers] = useState<any[]>(() => {
+    // Initialize with cached data immediately if available
+    const cached = currentUser?.id ? likedMeCache.get(currentUser.id) : null;
+    if (cached && Date.now() - cached.timestamp < LIKED_ME_CACHE_DURATION) {
+      return cached.likers;
+    }
+    return [];
+  });
+  const [loading, setLoading] = useState(() => {
+    // Don't show loading if we have cached data
+    const cached = currentUser?.id ? likedMeCache.get(currentUser.id) : null;
+    return !(cached && Date.now() - cached.timestamp < LIKED_ME_CACHE_DURATION);
+  });
   const [selectedProfile, setSelectedProfile] = useState<any>(null);
-  const [userImages, setUserImages] = useState<{ [key: string]: string[] }>({});
+  const [userImages, setUserImages] = useState<{ [key: string]: string[] }>(() => {
+    // Initialize with cached images if available
+    const cached = currentUser?.id ? likedMeCache.get(currentUser.id) : null;
+    if (cached && Date.now() - cached.timestamp < LIKED_ME_CACHE_DURATION) {
+      return cached.userImages;
+    }
+    return {};
+  });
   const [blockDialogOpen, setBlockDialogOpen] = useState(false);
   const [imageIndex, setImageIndex] = useState(0);
   const [showMoreInfo, setShowMoreInfo] = useState(false);
@@ -27,6 +58,7 @@ const LikedMePage = ({ currentUser, isPremium = false }: LikedMePageProps) => {
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [pullDistance, setPullDistance] = useState(0);
   const [startY, setStartY] = useState(0);
+  const backgroundFetchingRef = useRef(false);
   const { toast } = useToast();
 
   const { subscription, getLikedMeVisibleCount } = useSubscription(currentUser?.id);
@@ -71,6 +103,134 @@ const LikedMePage = ({ currentUser, isPremium = false }: LikedMePageProps) => {
   }, [currentUser?.id, isPremium]);
 
 
+  // Background fetching function
+  const fetchLikersInBackground = useCallback(async () => {
+    if (!currentUser?.id || backgroundFetchingRef.current) return;
+    backgroundFetchingRef.current = true;
+
+    try {
+      const result = await fetchLikersData(currentUser.id);
+      if (result) {
+        const { likers: newLikers, userImages: newUserImages } = result;
+        
+        // Update cache
+        likedMeCache.set(currentUser.id, {
+          likers: newLikers,
+          userImages: newUserImages,
+          timestamp: Date.now()
+        });
+
+        // Update state with fresh data
+        setLikers(newLikers);
+        setUserImages(newUserImages);
+      }
+    } catch (error) {
+      // Silently handle background fetch errors
+    } finally {
+      backgroundFetchingRef.current = false;
+    }
+  }, [currentUser?.id]);
+
+  // Shared data fetching logic
+  const fetchLikersData = useCallback(async (userId: string) => {
+    // 1. Get all likes for this user
+    const { data: likes, error: likesError } = await supabase
+      .from('likes')
+      .select('liker_id, created_at')
+      .eq('liked_id', userId);
+    
+    if (likesError) throw likesError;
+    if (!likes || likes.length === 0) {
+      return { likers: [], userImages: {} };
+    }
+
+    // 2. Get all matches and blocks in one go
+    const [matchesRes, blocksRes] = await Promise.all([
+      supabase
+        .from('matches')
+        .select('user1_id, user2_id')
+        .or(`user1_id.eq.${userId},user2_id.eq.${userId}`),
+      supabase
+        .from('blocks')
+        .select('blocked_id, blocker_id')
+        .or(`blocker_id.eq.${userId},blocked_id.eq.${userId}`)
+    ]);
+
+    if (matchesRes.error) throw matchesRes.error;
+    if (blocksRes.error) throw blocksRes.error;
+
+    const matches = matchesRes.data || [];
+    const blockedUsers = blocksRes.data || [];
+    const matchedIds = matches.map(match =>
+      match.user1_id === userId ? match.user2_id : match.user1_id
+    );
+    const blockedIds = blockedUsers.map(block =>
+      block.blocker_id === userId ? block.blocked_id : block.blocker_id
+    );
+
+    // 3. Filter likerIds
+    const likerIds = likes
+      .map(like => like.liker_id)
+      .filter(id => !matchedIds.includes(id) && !blockedIds.includes(id));
+
+    if (likerIds.length === 0) {
+      return { likers: [], userImages: {} };
+    }
+
+    // 4. Fetch all profiles in one go
+    const { data: profiles, error: profileError } = await supabase
+      .from('profiles')
+      .select('*')
+      .in('id', likerIds)
+      .neq('is_admin', true);
+
+    if (profileError) throw profileError;
+
+    const likers = profiles || [];
+
+    // 5. Fetch all first images for these profiles in one query
+    let imagesData = null;
+    if (likerIds.length > 0) {
+      try {
+        const { data: approvedImages, error: imagesError } = await supabase
+          .from('user_images')
+          .select('user_id, image_url, image_order')
+          .in('user_id', likerIds)
+          .eq('is_approved', true)
+          .order('image_order', { ascending: true });
+
+        if (imagesError && imagesError.message.includes('does not exist')) {
+          const { data: fallbackImages, error: fallbackError } = await supabase
+            .from('user_images')
+            .select('user_id, image_url, image_order')
+            .in('user_id', likerIds)
+            .order('image_order', { ascending: true });
+
+          if (fallbackError) throw fallbackError;
+          imagesData = fallbackImages;
+        } else if (imagesError) {
+          throw imagesError;
+        } else {
+          imagesData = approvedImages;
+        }
+      } catch (error) {
+        throw error;
+      }
+    }
+
+    // Process images
+    const imageMap: { [key: string]: string[] } = {};
+    if (imagesData) {
+      for (const img of imagesData) {
+        if (!imageMap[img.user_id]) {
+          imageMap[img.user_id] = [img.image_url];
+        }
+      }
+    }
+
+    return { likers, userImages: imageMap };
+  }, []);
+
   // Optimized: batch queries and filter in SQL
   const fetchLikers = useCallback(async (showLoading = false) => {
     if (!currentUser?.id) {
@@ -85,120 +245,25 @@ const LikedMePage = ({ currentUser, isPremium = false }: LikedMePageProps) => {
       } else {
         setLoading(true);
       }
-      
-      // Defensive: clear previous data to avoid UI blinking forever
-      setLikers([]);
-      setUserImages({});
-      // 1. Get all likes for this user
-      const { data: likes, error: likesError } = await supabase
-        .from('likes')
-        .select('liker_id, created_at')
-        .eq('liked_id', currentUser.id);
-      if (likesError) {
-  // ...removed log...
-        throw likesError;
-      }
-      if (!likes || likes.length === 0) {
-        setLikers([]);
-        setUserImages({});
-        setLoading(false);
-        return;
-      }
-      // 2. Get all matches and blocks in one go
-      const [matchesRes, blocksRes] = await Promise.all([
-        supabase
-          .from('matches')
-          .select('user1_id, user2_id')
-          .or(`user1_id.eq.${currentUser.id},user2_id.eq.${currentUser.id}`),
-        supabase
-          .from('blocks')
-          .select('blocked_id, blocker_id')
-          .or(`blocker_id.eq.${currentUser.id},blocked_id.eq.${currentUser.id}`)
-      ]);
-      if (matchesRes.error) {
-  // ...removed log...
-        throw matchesRes.error;
-      }
-      if (blocksRes.error) {
-  // ...removed log...
-        throw blocksRes.error;
-      }
-      const matches = matchesRes.data || [];
-      const blockedUsers = blocksRes.data || [];
-      const matchedIds = matches.map(match =>
-        match.user1_id === currentUser.id ? match.user2_id : match.user1_id
-      );
-      const blockedIds = blockedUsers.map(block =>
-        block.blocker_id === currentUser.id ? block.blocked_id : block.blocker_id
-      );
-      // 3. Filter likerIds in JS (could be done in SQL with a view for even more speed)
-      const likerIds = likes
-        .map(like => like.liker_id)
-        .filter(id => !matchedIds.includes(id) && !blockedIds.includes(id));
-      if (likerIds.length === 0) {
-        setLikers([]);
-        setUserImages({});
-        setLoading(false);
-        return;
-      }
-      // 4. Fetch all profiles in one go
-      const { data: profiles, error: profileError } = await supabase
-        .from('profiles')
-        .select('*')
-        .in('id', likerIds)
-        .neq('is_admin', true);
-      if (profileError) {
-  // ...removed log...
-        throw profileError;
-      }
-      setLikers(profiles || []);
-      // 5. Fetch all first images for these profiles in one query - only approved ones
-      if (likerIds.length > 0) {
-        let imagesData = null;
-        try {
-          // Try to fetch approved images first
-          const { data: approvedImages, error: imagesError } = await supabase
-            .from('user_images')
-            .select('user_id, image_url, image_order')
-            .in('user_id', likerIds)
-            .eq('is_approved', true) // Only show approved images
-            .order('image_order', { ascending: true });
 
-          // If moderation columns don't exist, fall back to basic query
-          if (imagesError && imagesError.message.includes('does not exist')) {
-            const { data: fallbackImages, error: fallbackError } = await supabase
-              .from('user_images')
-              .select('user_id, image_url, image_order')
-              .in('user_id', likerIds)
-              .order('image_order', { ascending: true });
+      const result = await fetchLikersData(currentUser.id);
+      if (result) {
+        const { likers: newLikers, userImages: newUserImages } = result;
+        
+        // Update cache
+        likedMeCache.set(currentUser.id, {
+          likers: newLikers,
+          userImages: newUserImages,
+          timestamp: Date.now()
+        });
 
-            if (fallbackError) throw fallbackError;
-            imagesData = fallbackImages;
-          } else if (imagesError) {
-            throw imagesError;
-          } else {
-            imagesData = approvedImages;
-          }
-        } catch (error) {
-          // ...removed log...
-          throw error;
-        }
-        // Only keep the first image for each user
-        const imageMap: { [key: string]: string[] } = {};
-        if (imagesData) {
-          for (const img of imagesData) {
-            if (!imageMap[img.user_id]) {
-              imageMap[img.user_id] = [img.image_url];
-            }
-          }
-        }
-        setUserImages(imageMap);
+        setLikers(newLikers);
+        setUserImages(newUserImages);
+
         // Preload next profile images in the background
-        if (profiles && profiles.length > 0) {
-          preloadNextProfileImages(profiles, imageMap);
+        if (newLikers && newLikers.length > 0) {
+          preloadNextProfileImages(newLikers, newUserImages);
         }
-      } else {
-        setUserImages({});
       }
     } catch (error) {
   // ...removed log...
@@ -260,29 +325,41 @@ const LikedMePage = ({ currentUser, isPremium = false }: LikedMePageProps) => {
   // Preload images for the next few profiles for smoother UX
   const preloadNextProfileImages = useCallback(
     async (likersList: { id: string }[], alreadyLoaded: { [key: string]: string[] }) => {
-      // Preload for the next 2 profiles (can adjust as needed)
+      // Preload for only the next 1 profile for maximum performance
       const toPreload = likersList
         .filter(liker => !alreadyLoaded[liker.id] || alreadyLoaded[liker.id].length <= 1)
-        .slice(0, 2);
+        .slice(0, 1); // Reduced to 1 for better performance
       for (const liker of toPreload) {
-        // Don't await, fire and forget
-        void loadFullImages(liker.id);
+        // Add delay to reduce server load
+        setTimeout(() => {
+          void loadFullImages(liker.id);
+        }, 1000);
       }
     },
     [loadFullImages]
   );
 
   useEffect(() => {
-    // State persistence - only load if no likers exist
     if (!currentUser?.id) {
       setLoading(false);
       setLikers([]);
       setUserImages({});
       return;
     }
-    if (likers.length === 0) {
+
+    // Check if we have fresh cached data first
+    const cached = likedMeCache.get(currentUser.id);
+    if (cached && Date.now() - cached.timestamp < LIKED_ME_CACHE_DURATION) {
+      setLikers(cached.likers);
+      setUserImages(cached.userImages);
+      setLoading(false);
+      // Still fetch in background to get latest data
+      fetchLikersInBackground();
+    } else if (likers.length === 0) {
+      // No cache or stale cache, fetch immediately
       fetchLikers();
     }
+    
     checkLockoutStatus();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [currentUser?.id]);
@@ -325,6 +402,33 @@ const LikedMePage = ({ currentUser, isPremium = false }: LikedMePageProps) => {
   };
 
   const handleLikeBack = async (profileId: string) => {
+    // Optimistic update - remove profile immediately
+    const profileToRemove = likers.find(liker => liker.id === profileId);
+    setLikers(prev => prev.filter(liker => liker.id !== profileId));
+    setSelectedProfile(null);
+    
+    // Update cache immediately
+    if (currentUser?.id) {
+      const cached = likedMeCache.get(currentUser.id);
+      if (cached) {
+        const updatedLikers = cached.likers.filter(liker => liker.id !== profileId);
+        const updatedImages = { ...cached.userImages };
+        delete updatedImages[profileId];
+        
+        likedMeCache.set(currentUser.id, {
+          likers: updatedLikers,
+          userImages: updatedImages,
+          timestamp: Date.now()
+        });
+      }
+    }
+
+    // Show success message immediately
+    toast({
+      title: "It's a Match! 🎉",
+      description: "You can now start chatting!",
+    });
+
     try {
       const { data: existingLike } = await supabase
         .from('likes')
@@ -334,10 +438,7 @@ const LikedMePage = ({ currentUser, isPremium = false }: LikedMePageProps) => {
         .maybeSingle();
 
       if (existingLike) {
-        toast({
-          title: "Already liked",
-          description: "You've already liked this person back",
-        });
+        // Already liked - this shouldn't happen with optimistic UI, but handle gracefully
         return;
       }
 
@@ -355,25 +456,60 @@ const LikedMePage = ({ currentUser, isPremium = false }: LikedMePageProps) => {
         await setLockoutPeriod();
         setHasInteractedToday(true);
       }
-
-      toast({
-        title: "It's a Match! 🎉",
-        description: "You can now start chatting!",
-      });
-
-      setLikers(prev => prev.filter(liker => liker.id !== profileId));
-      setSelectedProfile(null);
     } catch (error) {
-  // ...removed log...
+      // Revert optimistic update on error
+      if (profileToRemove) {
+        setLikers(prev => [profileToRemove, ...prev]);
+        
+        // Revert cache
+        if (currentUser?.id) {
+          const cached = likedMeCache.get(currentUser.id);
+          if (cached) {
+            likedMeCache.set(currentUser.id, {
+              likers: [profileToRemove, ...cached.likers],
+              userImages: cached.userImages,
+              timestamp: Date.now()
+            });
+          }
+        }
+      }
+      
       toast({
         title: "Error",
-        description: "Failed to like back",
+        description: "Failed to like back. Profile has been restored.",
         variant: "destructive",
       });
     }
   };
 
   const handlePass = async (profileId: string) => {
+    // Optimistic update - remove profile immediately
+    const profileToRemove = likers.find(liker => liker.id === profileId);
+    setLikers(prev => prev.filter(liker => liker.id !== profileId));
+    setSelectedProfile(null);
+    
+    // Update cache immediately
+    if (currentUser?.id) {
+      const cached = likedMeCache.get(currentUser.id);
+      if (cached) {
+        const updatedLikers = cached.likers.filter(liker => liker.id !== profileId);
+        const updatedImages = { ...cached.userImages };
+        delete updatedImages[profileId];
+        
+        likedMeCache.set(currentUser.id, {
+          likers: updatedLikers,
+          userImages: updatedImages,
+          timestamp: Date.now()
+        });
+      }
+    }
+
+    // Show success message immediately
+    toast({
+      title: "Passed",
+      description: "Profile removed from your likes",
+    });
+
     try {
       const { error } = await supabase
         .from('likes')
@@ -388,19 +524,27 @@ const LikedMePage = ({ currentUser, isPremium = false }: LikedMePageProps) => {
         await setLockoutPeriod();
         setHasInteractedToday(true);
       }
-
-      toast({
-        title: "Passed",
-        description: "Profile removed from your likes",
-      });
-
-      setLikers(prev => prev.filter(liker => liker.id !== profileId));
-      setSelectedProfile(null);
     } catch (error) {
-  // ...removed log...
+      // Revert optimistic update on error
+      if (profileToRemove) {
+        setLikers(prev => [profileToRemove, ...prev]);
+        
+        // Revert cache
+        if (currentUser?.id) {
+          const cached = likedMeCache.get(currentUser.id);
+          if (cached) {
+            likedMeCache.set(currentUser.id, {
+              likers: [profileToRemove, ...cached.likers],
+              userImages: cached.userImages,
+              timestamp: Date.now()
+            });
+          }
+        }
+      }
+      
       toast({
         title: "Error",
-        description: "Failed to pass",
+        description: "Failed to pass. Profile has been restored.",
         variant: "destructive",
       });
     }
