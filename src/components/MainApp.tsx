@@ -894,49 +894,69 @@ const MainApp = ({ user, onLogout }: MainAppProps) => {
     }
   };
 
+  // compute fixed header/footer heights (in px)
+  const HEADER_HEIGHT = 65; // px - visible header height requested
+  const FOOTER_HEIGHT = 70; // px - height of bottom nav area
+
+  // compute padding for content so it doesn't go under fixed header/footer
+  const contentPaddingTop = !showTerms && !showPrivacy ? (HEADER_HEIGHT + insets.top) : 0;
+  const contentPaddingBottom = !showTerms && !showPrivacy ? (FOOTER_HEIGHT + insets.bottom) : 0;
+
   return (
     <div className="w-full h-screen bg-gray-100">
       <div className="w-full h-screen flex flex-col bg-white relative shadow-md overflow-hidden">
-        
-        {/* Fixed Header with Professional Safe Area */}
-        {!showTerms && !showPrivacy && (
-          <SafeAreaView edges={['top']} className="fixed top-0 left-0 right-0 w-full bg-white shadow-sm border-b z-50">
-            <div className="px-4 py-2 flex justify-between items-center">
-              <img 
-                src="/driplove-logo.png" 
-                alt="DripLove Logo" 
-                className="h-12"
-              />
-              <div className="text-right">
-                <div className="text-sm font-bold text-black leading-tight">
-                  <div>Find Your</div>
-                  <div>Perfect Match 💖</div>
-                </div>
-              </div>
+
+        {/* Fixed Header (rendered to body via portal for stability) */}
+        { !showTerms && !showPrivacy && typeof document !== 'undefined' && createPortal(
+          <div
+            className="fixed top-0 left-0 right-0 w-full bg-white shadow-sm border-b"
+            style={{
+              height: HEADER_HEIGHT + insets.top,
+              paddingTop: insets.top,
+              position: 'fixed',
+              top: 0,
+              left: 0,
+              right: 0,
+              zIndex: 200000,
+              willChange: 'transform, top',
+              WebkitTransform: 'translateZ(0)',
+              transform: 'translateZ(0)',
+              WebkitBackfaceVisibility: 'hidden',
+              backfaceVisibility: 'hidden'
+            }}
+          >
+            <div className="px-4" style={{ height: HEADER_HEIGHT, display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+              <img src="/driplove-logo.png" alt="DripLove Logo" className="h-10" />
+              <div className="text-sm font-bold text-black leading-tight">Find Your<br/>Perfect Match 💖</div>
             </div>
-          </SafeAreaView>
+          </div>,
+          document.body
         )}
 
-        {/* Main Content */}
-        <div 
-          className={`flex-1 overflow-y-auto ${!showTerms && !showPrivacy ? 'pb-[70px]' : ''}`}
-          style={{ 
-            paddingTop: !showTerms && !showPrivacy ? (60 + insets.top) : 0 
-          }}
-        >
+        {/* Main Content - leave scrollable and unaffected beyond padding */}
+        <div className="flex-1 overflow-y-auto" style={{ paddingTop: contentPaddingTop, paddingBottom: contentPaddingBottom }}>
           {renderContent()}
         </div>
 
-        {/* Fixed Bottom Nav - render via portal so it's outside scroll/transform parents
-            This prevents position:fixed from being affected by ancestor transforms (common iOS issue)
-        */}
+        {/* Fixed Bottom Nav - portal to body to avoid transform/overflow issues */}
         {!showTerms && !showPrivacy && !isKeyboardOpen && (typeof document !== 'undefined') && createPortal(
-          <SafeAreaView
-            edges={['bottom']}
-            className="fixed bottom-0 left-0 right-0 w-full bg-white border-t border-gray-200 px-2 py-2 z-[99999]"
-            style={{ WebkitTransform: 'translateZ(0)', transform: 'translateZ(0)' }}
+          <div
+            className="fixed bottom-0 left-0 right-0 w-full bg-white border-t border-gray-200 px-2"
+            style={{
+              height: FOOTER_HEIGHT,
+              position: 'fixed',
+              bottom: 0,
+              left: 0,
+              right: 0,
+              zIndex: 200000,
+              WebkitTransform: 'translateZ(0)',
+              transform: 'translateZ(0)',
+              willChange: 'transform, bottom',
+              WebkitBackfaceVisibility: 'hidden',
+              backfaceVisibility: 'hidden'
+            }}
           >
-            <div className="flex justify-around items-center">
+            <div className="flex justify-around items-center h-full">
               {[
                 { label: 'DripCheck', icon: DripCoupleIcon },
                 { label: 'Chat', icon: MessageCircle },
@@ -968,7 +988,7 @@ const MainApp = ({ user, onLogout }: MainAppProps) => {
                 </button>
               ))}
             </div>
-          </SafeAreaView>,
+          </div>,
           document.body
         )}
       </div>
