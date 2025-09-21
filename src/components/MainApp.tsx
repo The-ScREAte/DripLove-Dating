@@ -899,9 +899,11 @@ const MainApp = ({ user, onLogout }: MainAppProps) => {
   const FOOTER_HEIGHT = 70; // px - height of bottom nav area
 
   // compute padding for content so it doesn't go under fixed header/footer
+  // Keep the bottom safe-area padding in place for layout stability, but
+  // render the interactive nav above that safe-area so it remains clickable.
   const contentPaddingTop = !showTerms && !showPrivacy ? (HEADER_HEIGHT + insets.top) : 0;
-  // remove bottom safe-area inset per user request; reserve only footer height
-  const contentPaddingBottom = !showTerms && !showPrivacy ? FOOTER_HEIGHT : 0;
+  const footerTotalHeight = FOOTER_HEIGHT + insets.bottom;
+  const contentPaddingBottom = !showTerms && !showPrivacy ? footerTotalHeight : 0;
 
   return (
     <div className="w-full h-screen bg-gray-100">
@@ -944,7 +946,7 @@ const MainApp = ({ user, onLogout }: MainAppProps) => {
           <div
             className="fixed bottom-0 left-0 right-0 w-full bg-white border-t border-gray-200 px-2"
             style={{
-              height: FOOTER_HEIGHT,
+              height: footerTotalHeight,
               position: 'fixed',
               bottom: 0,
               left: 0,
@@ -954,11 +956,11 @@ const MainApp = ({ user, onLogout }: MainAppProps) => {
               transform: 'translateZ(0)',
               willChange: 'transform, bottom',
               WebkitBackfaceVisibility: 'hidden',
-              backfaceVisibility: 'hidden',
-              pointerEvents: 'auto'
+              backfaceVisibility: 'hidden'
             }}
           >
-            <div className="flex justify-around items-center h-full">
+            {/* Interactive nav sits above the safe area so buttons are tappable */}
+            <div style={{ position: 'absolute', left: 0, right: 0, bottom: insets.bottom, height: FOOTER_HEIGHT, zIndex: 1000001, display: 'flex', justifyContent: 'space-around', alignItems: 'center', pointerEvents: 'auto', touchAction: 'manipulation' }}>
               {[
                 { label: 'DripCheck', icon: DripCoupleIcon },
                 { label: 'Chat', icon: MessageCircle },
