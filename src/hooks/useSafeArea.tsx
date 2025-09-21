@@ -87,7 +87,7 @@ export const createSafeAreaStyles = (insets: SafeAreaInsets) => ({
  */
 export interface SafeAreaViewProps {
   children: React.ReactNode;
-  edges?: Array<'top' | 'left' | 'right'>;
+  edges?: Array<'top' | 'bottom' | 'left' | 'right'>;
   style?: React.CSSProperties;
   className?: string;
 }

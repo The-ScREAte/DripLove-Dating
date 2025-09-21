@@ -11,7 +11,7 @@ import DripCoupleIcon from '@/components/DripCoupleIcon';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import { usePushNotifications } from '@/hooks/usePushNotifications';
-
+import { SafeAreaView, useSafeAreaInsets } from '@/hooks/useSafeArea';
 
 interface MainAppProps {
   user: any;
@@ -126,25 +126,7 @@ const MainApp = ({ user, onLogout }: MainAppProps) => {
   const [isPremium, setIsPremium] = useState(false);
   const [unreadCount, setUnreadCount] = useState(0);
   const { toast } = useToast();
-
-
-  // Lock document body scroll while this app shell is mounted so only the inner
-  // scroll container handles scrolling. This prevents the outer scrollbar and
-  // keeps fixed header/footer stable in iOS webviews.
-  useEffect(() => {
-    const prevOverflow = document.body.style.overflowY;
-    // Set to hidden to remove outer scrollbar
-    document.body.style.overflowY = 'hidden';
-    // Also ensure html/root use fill-available (defensive)
-    document.documentElement.style.height = '-webkit-fill-available';
-    document.getElementById('root')?.style.setProperty('height', '-webkit-fill-available');
-
-    return () => {
-      document.body.style.overflowY = prevOverflow || '';
-      document.documentElement.style.height = '';
-      document.getElementById('root')?.style.removeProperty('height');
-    };
-  }, []);
+  const insets = useSafeAreaInsets();
 
   /**
    * PROGRESSIVE LOADING SYSTEM FOR DISCOVER PAGE
@@ -207,8 +189,7 @@ const MainApp = ({ user, onLogout }: MainAppProps) => {
                             currentUserData?.preference === 'women' ? ['female'] : 
                             ['male', 'female', 'other'];
 
-            // Remove bottom padding entirely for now to ensure nav buttons are clickable.
-            const effectiveBottomInset = 0;
+      // Get location-based matches (simplified for preloading)
       const { data: profiles, error } = await supabase
         .from('profiles')
         .select('id, first_name, last_name, bio, city, country, country_code, occupation, education_level, date_of_birth, interests, gender, latitude, longitude, fun_fact, perfect_first_date, last_googled, relationship_intent, smoking, drinking, exercise_level, sleeping_schedule, introvert_extrovert, spontaneous_planner, messy_organized')
@@ -912,58 +893,42 @@ const MainApp = ({ user, onLogout }: MainAppProps) => {
     }
   };
 
-  // compute fixed header/footer heights (in px)
-  const HEADER_HEIGHT = 60; // px - requested header height
-  const FOOTER_HEIGHT = 70; // px - height of bottom nav area (visual)
-
-  // No safe-area logic: only fixed header/footer heights
-  const contentPaddingTop = 0;
-  const contentPaddingBottom = 0;
-
   return (
-    <div className="w-full bg-gray-100" style={{ height: '-webkit-fill-available' }}>
-      <div className="w-full flex flex-col bg-white relative shadow-md overflow-hidden" style={{ height: '-webkit-fill-available' }}>
-
-        {/* Fixed Header (rendered to body via portal for stability) */}
-        { !showTerms && !showPrivacy && typeof document !== 'undefined' && createPortal(
-          <div
-            className="fixed top-0 left-0 right-0 w-full bg-white shadow-sm border-b"
-            style={{
-              height: HEADER_HEIGHT,
-              position: 'fixed',
-              top: 0,
-              left: 0,
-              right: 0,
-              zIndex: 200000,
-              willChange: 'transform, top',
-              WebkitTransform: 'translateZ(0)',
-              transform: 'translateZ(0)',
-              WebkitBackfaceVisibility: 'hidden',
-              backfaceVisibility: 'hidden'
-            }}
-          >
-              <div className="px-4" style={{ height: HEADER_HEIGHT, display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                <img src="/driplove-logo.png" alt="DripLove Logo" className="h-9" />
-                <div className="text-sm font-bold text-black leading-tight">Find Your<br/>Perfect Match 💖</div>
+    <div className="w-full h-screen bg-gray-100">
+      <div className="w-full h-screen flex flex-col bg-white relative shadow-md overflow-hidden">
+        
+        {/* Fixed Header with Professional Safe Area */}
+        {!showTerms && !showPrivacy && (
+          <SafeAreaView edges={['top']} className="fixed top-0 left-0 right-0 w-full bg-white shadow-sm border-b z-50">
+            <div className="px-4 py-2 flex justify-between items-center">
+              <img 
+                src="/driplove-logo.png" 
+                alt="DripLove Logo" 
+                className="h-12"
+              />
+              <div className="text-right">
+                <div className="text-sm font-bold text-black leading-tight">
+                  <div>Find Your</div>
+                  <div>Perfect Match 💖</div>
+                </div>
               </div>
-          </div>,
-          document.body
+            </div>
+          </SafeAreaView>
         )}
 
-        {/* Main Content - leave scrollable and unaffected beyond padding */}
-  <div className="flex-1 min-h-full overflow-y-auto bg-white" style={{ paddingTop: 0, paddingBottom: 0 }}>
+        {/* Main Content */}
+        <div 
+          className={`flex-1 overflow-y-auto ${!showTerms && !showPrivacy ? 'pb-[70px]' : ''}`}
+          style={{ 
+            paddingTop: !showTerms && !showPrivacy ? (60 + insets.top) : 0 
+          }}
+        >
           {renderContent()}
         </div>
 
-        {/* Fixed Bottom Nav - render via portal so it's outside scroll/transform parents
-            This prevents position:fixed from being affected by ancestor transforms (common iOS issue)
-        */}
-        {!showTerms && !showPrivacy && !isKeyboardOpen && (typeof document !== 'undefined') && createPortal(
-          <SafeAreaView
-            edges={['bottom']}
-            className="fixed bottom-0 left-0 right-0 w-full bg-white border-t border-gray-200 px-2 py-2 z-[99999]"
-            style={{ WebkitTransform: 'translateZ(0)', transform: 'translateZ(0)' }}
-          >
+        {/* Fixed Bottom Nav with Professional Safe Area */}
+        {!showTerms && !showPrivacy && !isKeyboardOpen && (
+          <SafeAreaView edges={['bottom']} className="fixed bottom-0 left-0 right-0 w-full bg-white border-t border-gray-200 px-2 py-2 z-50">
             <div className="flex justify-around items-center">
               {[
                 { label: 'DripCheck', icon: DripCoupleIcon }, 
@@ -978,13 +943,11 @@ const MainApp = ({ user, onLogout }: MainAppProps) => {
                     activeTab === label.toLowerCase() ? 'text-pink-600' : 'text-gray-500'
                   }`}
                 >
-                  <span style={{ position: 'relative', zIndex: 200001 }}>
                   {label === 'DripCheck' ? (
                     <Icon className={`w-6 h-6 ${activeTab === label.toLowerCase() ? 'fill-current' : ''}`} />
                   ) : (
                     <Icon className={`w-5 h-5 ${activeTab === label.toLowerCase() ? 'fill-current' : ''}`} />
                   )}
-                  </span>
                   <span className="text-xs font-medium">{label}</span>
                    {label === 'Chat' && unreadCount > 0 && (
                      <div className="absolute -top-1 -right-1 h-5 w-5 rounded-full bg-red-500 border-2 border-white z-10 flex items-center justify-center">
@@ -996,8 +959,7 @@ const MainApp = ({ user, onLogout }: MainAppProps) => {
                 </button>
               ))}
             </div>
-          </SafeAreaView>,
-          document.body
+          </SafeAreaView>
         )}
       </div>
     </div>

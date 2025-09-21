@@ -4,19 +4,6 @@ import ReactDOM from "react-dom/client";
 import App from "./App.tsx";
 import "./index.css";
 
-// Set a CSS variable for the app viewport height to avoid using 100vh directly.
-// We prefer visualViewport when available to handle iOS dynamic toolbars.
-const setAppHeightVar = () => {
-  const height = (window.visualViewport && window.visualViewport.height) ? window.visualViewport.height : window.innerHeight;
-  document.documentElement.style.setProperty('--app-h', `${height}px`);
-};
-
-setAppHeightVar();
-window.addEventListener('resize', setAppHeightVar);
-if (window.visualViewport) {
-  window.visualViewport.addEventListener('resize', setAppHeightVar);
-}
-
 // Create a loading screen component
 const LoadingScreen = () => (
   <div className="w-full h-screen flex items-center justify-center bg-gradient-to-br from-pink-500 to-purple-600">
