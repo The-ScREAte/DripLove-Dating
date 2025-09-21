@@ -129,24 +129,6 @@ const MainApp = ({ user, onLogout }: MainAppProps) => {
   const { toast } = useToast();
   const insets = useSafeAreaInsets();
 
-  // Lock document body scroll while this app shell is mounted so only the inner
-  // scroll container handles scrolling. This prevents the outer scrollbar and
-  // keeps fixed header/footer stable in iOS webviews.
-  useEffect(() => {
-    const prevOverflow = document.body.style.overflowY;
-    // Set to hidden to remove outer scrollbar
-    document.body.style.overflowY = 'hidden';
-    // Also ensure html/root use fill-available (defensive)
-    document.documentElement.style.height = '-webkit-fill-available';
-    document.getElementById('root')?.style.setProperty('height', '-webkit-fill-available');
-
-    return () => {
-      document.body.style.overflowY = prevOverflow || '';
-      document.documentElement.style.height = '';
-      document.getElementById('root')?.style.removeProperty('height');
-    };
-  }, []);
-
   /**
    * PROGRESSIVE LOADING SYSTEM FOR DISCOVER PAGE
    * 
@@ -917,13 +899,13 @@ const MainApp = ({ user, onLogout }: MainAppProps) => {
   const FOOTER_HEIGHT = 70; // px - height of bottom nav area
 
   // compute padding for content so it doesn't go under fixed header/footer
-  // NOTE: user requested removing bottom safe-area inset; only reserve FOOTER_HEIGHT
   const contentPaddingTop = !showTerms && !showPrivacy ? (HEADER_HEIGHT + insets.top) : 0;
+  // remove bottom safe-area inset per user request; reserve only footer height
   const contentPaddingBottom = !showTerms && !showPrivacy ? FOOTER_HEIGHT : 0;
 
   return (
-    <div className="w-full bg-gray-100" style={{ height: '-webkit-fill-available' }}>
-      <div className="w-full flex flex-col bg-white relative shadow-md overflow-hidden" style={{ height: '-webkit-fill-available' }}>
+    <div className="w-full h-screen bg-gray-100">
+      <div className="w-full h-screen flex flex-col bg-white relative shadow-md overflow-hidden">
 
         {/* Fixed Header (rendered to body via portal for stability) */}
         { !showTerms && !showPrivacy && typeof document !== 'undefined' && createPortal(
@@ -953,7 +935,7 @@ const MainApp = ({ user, onLogout }: MainAppProps) => {
         )}
 
         {/* Main Content - leave scrollable and unaffected beyond padding */}
-        <div className="flex-1 overflow-y-auto" style={{ paddingTop: contentPaddingTop, paddingBottom: contentPaddingBottom, zIndex: 0 }}>
+        <div className="flex-1 overflow-y-auto" style={{ paddingTop: contentPaddingTop, paddingBottom: contentPaddingBottom, zIndex: 0, position: 'relative' }}>
           {renderContent()}
         </div>
 
@@ -967,14 +949,13 @@ const MainApp = ({ user, onLogout }: MainAppProps) => {
               bottom: 0,
               left: 0,
               right: 0,
-              zIndex: 999999,
+              zIndex: 1000000,
               WebkitTransform: 'translateZ(0)',
               transform: 'translateZ(0)',
               willChange: 'transform, bottom',
               WebkitBackfaceVisibility: 'hidden',
               backfaceVisibility: 'hidden',
-              pointerEvents: 'auto',
-              touchAction: 'manipulation'
+              pointerEvents: 'auto'
             }}
           >
             <div className="flex justify-around items-center h-full">
