@@ -12,8 +12,8 @@ const AboutUs = ({ onBack }: AboutUsProps) => {
     <div 
       className="min-h-screen bg-white flex flex-col mobile-container"
       style={{
-        paddingTop: `max(env(safe-area-inset-top, 0px), 10px)`,
-        paddingBottom: `max(env(safe-area-inset-bottom, 0px), 5px)`,
+        paddingTop: `max(env(safe-area-inset-top, 0px), 16px)`,
+        paddingBottom: `max(env(safe-area-inset-bottom, 0px), 16px)`,
         paddingLeft: `max(env(safe-area-inset-left, 0px), 0px)`,
         paddingRight: `max(env(safe-area-inset-right, 0px), 0px)`,
         minHeight: '100dvh'

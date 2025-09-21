@@ -1,5 +1,4 @@
 import React, { useState, useEffect } from 'react';
-import { createPortal } from 'react-dom';
 import { Button } from '@/components/ui/button';
 import { Heart, MessageCircle, Users, User } from 'lucide-react';
 import DiscoverPage from '@/components/DiscoverPage';
@@ -956,46 +955,28 @@ const MainApp = ({ user, onLogout }: MainAppProps) => {
           {renderContent()}
         </div>
 
-        {/* Fixed Bottom Nav - portal to body to avoid transform/overflow issues */}
+        {/* Fixed Bottom Nav - render via portal so it's outside scroll/transform parents
+            This prevents position:fixed from being affected by ancestor transforms (common iOS issue)
+        */}
         {!showTerms && !showPrivacy && !isKeyboardOpen && (typeof document !== 'undefined') && createPortal(
-          <div
-            className="fixed bottom-0 left-0 right-0 w-full bg-white border-t border-gray-200 px-2"
-            role="navigation"
-            data-portal="footer"
-            style={{
-              height: FOOTER_HEIGHT,
-              position: 'fixed',
-              bottom: 0,
-              left: 0,
-              right: 0,
-              // Extremely high z-index so the footer sits on top of any overlays
-              zIndex: 2147483647,
-              WebkitTransform: 'translateZ(0)',
-              transform: 'translateZ(0)',
-              willChange: 'transform, bottom',
-              WebkitBackfaceVisibility: 'hidden',
-              backfaceVisibility: 'hidden',
-              // ensure footer is clickable
-              pointerEvents: 'auto'
-            }}
-            onTouchStart={(e) => { e.stopPropagation(); }}
-            onClick={(e) => { e.stopPropagation(); }}
+          <SafeAreaView
+            edges={['bottom']}
+            className="fixed bottom-0 left-0 right-0 w-full bg-white border-t border-gray-200 px-2 py-2 z-[99999]"
+            style={{ WebkitTransform: 'translateZ(0)', transform: 'translateZ(0)' }}
           >
-            <div className="flex justify-around items-center h-full">
+            <div className="flex justify-around items-center">
               {[
-                { label: 'DripCheck', icon: DripCoupleIcon },
-                { label: 'Chat', icon: MessageCircle },
-                { label: 'Liked', icon: Users },
+                { label: 'DripCheck', icon: DripCoupleIcon }, 
+                { label: 'Chat', icon: MessageCircle }, 
+                { label: 'Liked', icon: Users }, 
                 { label: 'Profile', icon: User }
               ].map(({ label, icon: Icon }) => (
                 <button
                   key={label}
                   onClick={() => setActiveTab(label.toLowerCase())}
-                  aria-label={label}
                   className={`flex flex-col items-center space-y-1 py-2 px-2 rounded-lg transition-colors relative ${
                     activeTab === label.toLowerCase() ? 'text-pink-600' : 'text-gray-500'
                   }`}
-                  style={{ WebkitTapHighlightColor: 'transparent' }}
                 >
                   <span style={{ position: 'relative', zIndex: 200001 }}>
                   {label === 'DripCheck' ? (
@@ -1015,7 +996,7 @@ const MainApp = ({ user, onLogout }: MainAppProps) => {
                 </button>
               ))}
             </div>
-          </div>,
+          </SafeAreaView>,
           document.body
         )}
       </div>
