@@ -1,5 +1,4 @@
 import React, { useState, useEffect } from 'react';
-import { createPortal } from 'react-dom';
 import { Button } from '@/components/ui/button';
 import { Heart, MessageCircle, Users, User } from 'lucide-react';
 import DiscoverPage from '@/components/DiscoverPage';
@@ -927,30 +926,22 @@ const MainApp = ({ user, onLogout }: MainAppProps) => {
           {renderContent()}
         </div>
 
-        {/* Fixed Bottom Nav - render via portal so it's outside scroll/transform parents
-            This prevents position:fixed from being affected by ancestor transforms (common iOS issue)
-        */}
-        {!showTerms && !showPrivacy && !isKeyboardOpen && (typeof document !== 'undefined') && createPortal(
-          <SafeAreaView
-            edges={['bottom']}
-            className="fixed bottom-0 left-0 right-0 w-full bg-white border-t border-gray-200 px-2 py-2 z-[99999]"
-            style={{ WebkitTransform: 'translateZ(0)', transform: 'translateZ(0)' }}
-          >
+        {/* Fixed Bottom Nav with Professional Safe Area */}
+        {!showTerms && !showPrivacy && !isKeyboardOpen && (
+          <SafeAreaView edges={['bottom']} className="fixed bottom-0 left-0 right-0 w-full bg-white border-t border-gray-200 px-2 py-2 z-50">
             <div className="flex justify-around items-center">
               {[
-                { label: 'DripCheck', icon: DripCoupleIcon },
-                { label: 'Chat', icon: MessageCircle },
-                { label: 'Liked', icon: Users },
+                { label: 'DripCheck', icon: DripCoupleIcon }, 
+                { label: 'Chat', icon: MessageCircle }, 
+                { label: 'Liked', icon: Users }, 
                 { label: 'Profile', icon: User }
               ].map(({ label, icon: Icon }) => (
                 <button
                   key={label}
                   onClick={() => setActiveTab(label.toLowerCase())}
-                  aria-label={label}
                   className={`flex flex-col items-center space-y-1 py-2 px-2 rounded-lg transition-colors relative ${
                     activeTab === label.toLowerCase() ? 'text-pink-600' : 'text-gray-500'
                   }`}
-                  style={{ WebkitTapHighlightColor: 'transparent' }}
                 >
                   {label === 'DripCheck' ? (
                     <Icon className={`w-6 h-6 ${activeTab === label.toLowerCase() ? 'fill-current' : ''}`} />
@@ -968,8 +959,7 @@ const MainApp = ({ user, onLogout }: MainAppProps) => {
                 </button>
               ))}
             </div>
-          </SafeAreaView>,
-          document.body
+          </SafeAreaView>
         )}
       </div>
     </div>
