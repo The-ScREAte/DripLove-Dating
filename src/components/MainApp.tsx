@@ -917,8 +917,9 @@ const MainApp = ({ user, onLogout }: MainAppProps) => {
   const FOOTER_HEIGHT = 70; // px - height of bottom nav area
 
   // compute padding for content so it doesn't go under fixed header/footer
+  // NOTE: user requested removing bottom safe-area inset; only reserve FOOTER_HEIGHT
   const contentPaddingTop = !showTerms && !showPrivacy ? (HEADER_HEIGHT + insets.top) : 0;
-  const contentPaddingBottom = !showTerms && !showPrivacy ? (FOOTER_HEIGHT + insets.bottom) : 0;
+  const contentPaddingBottom = !showTerms && !showPrivacy ? FOOTER_HEIGHT : 0;
 
   return (
     <div className="w-full bg-gray-100" style={{ height: '-webkit-fill-available' }}>
@@ -952,7 +953,7 @@ const MainApp = ({ user, onLogout }: MainAppProps) => {
         )}
 
         {/* Main Content - leave scrollable and unaffected beyond padding */}
-        <div className="flex-1 overflow-y-auto" style={{ paddingTop: contentPaddingTop, paddingBottom: contentPaddingBottom }}>
+        <div className="flex-1 overflow-y-auto" style={{ paddingTop: contentPaddingTop, paddingBottom: contentPaddingBottom, zIndex: 0 }}>
           {renderContent()}
         </div>
 
@@ -966,12 +967,14 @@ const MainApp = ({ user, onLogout }: MainAppProps) => {
               bottom: 0,
               left: 0,
               right: 0,
-              zIndex: 200000,
+              zIndex: 999999,
               WebkitTransform: 'translateZ(0)',
               transform: 'translateZ(0)',
               willChange: 'transform, bottom',
               WebkitBackfaceVisibility: 'hidden',
-              backfaceVisibility: 'hidden'
+              backfaceVisibility: 'hidden',
+              pointerEvents: 'auto',
+              touchAction: 'manipulation'
             }}
           >
             <div className="flex justify-around items-center h-full">
