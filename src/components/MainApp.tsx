@@ -12,7 +12,7 @@ import DripCoupleIcon from '@/components/DripCoupleIcon';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import { usePushNotifications } from '@/hooks/usePushNotifications';
-import { SafeAreaView, useSafeAreaInsets } from '@/hooks/useSafeArea';
+
 
 interface MainAppProps {
   user: any;
@@ -127,7 +127,25 @@ const MainApp = ({ user, onLogout }: MainAppProps) => {
   const [isPremium, setIsPremium] = useState(false);
   const [unreadCount, setUnreadCount] = useState(0);
   const { toast } = useToast();
-  const insets = useSafeAreaInsets();
+
+
+  // Lock document body scroll while this app shell is mounted so only the inner
+  // scroll container handles scrolling. This prevents the outer scrollbar and
+  // keeps fixed header/footer stable in iOS webviews.
+  useEffect(() => {
+    const prevOverflow = document.body.style.overflowY;
+    // Set to hidden to remove outer scrollbar
+    document.body.style.overflowY = 'hidden';
+    // Also ensure html/root use fill-available (defensive)
+    document.documentElement.style.height = '-webkit-fill-available';
+    document.getElementById('root')?.style.setProperty('height', '-webkit-fill-available');
+
+    return () => {
+      document.body.style.overflowY = prevOverflow || '';
+      document.documentElement.style.height = '';
+      document.getElementById('root')?.style.removeProperty('height');
+    };
+  }, []);
 
   /**
    * PROGRESSIVE LOADING SYSTEM FOR DISCOVER PAGE
@@ -190,7 +208,8 @@ const MainApp = ({ user, onLogout }: MainAppProps) => {
                             currentUserData?.preference === 'women' ? ['female'] : 
                             ['male', 'female', 'other'];
 
-      // Get location-based matches (simplified for preloading)
+            // Remove bottom padding entirely for now to ensure nav buttons are clickable.
+            const effectiveBottomInset = 0;
       const { data: profiles, error } = await supabase
         .from('profiles')
         .select('id, first_name, last_name, bio, city, country, country_code, occupation, education_level, date_of_birth, interests, gender, latitude, longitude, fun_fact, perfect_first_date, last_googled, relationship_intent, smoking, drinking, exercise_level, sleeping_schedule, introvert_extrovert, spontaneous_planner, messy_organized')
@@ -895,27 +914,23 @@ const MainApp = ({ user, onLogout }: MainAppProps) => {
   };
 
   // compute fixed header/footer heights (in px)
-  const HEADER_HEIGHT = 65; // px - visible header height requested
-  const FOOTER_HEIGHT = 70; // px - height of bottom nav area
+  const HEADER_HEIGHT = 60; // px - requested header height
+  const FOOTER_HEIGHT = 70; // px - height of bottom nav area (visual)
 
-  // compute padding for content so it doesn't go under fixed header/footer
-  // Keep the bottom safe-area padding in place for layout stability, but
-  // render the interactive nav above that safe-area so it remains clickable.
-  const contentPaddingTop = !showTerms && !showPrivacy ? (HEADER_HEIGHT + insets.top) : 0;
-  const footerTotalHeight = FOOTER_HEIGHT + insets.bottom;
-  const contentPaddingBottom = !showTerms && !showPrivacy ? footerTotalHeight : 0;
+  // No safe-area logic: only fixed header/footer heights
+  const contentPaddingTop = 0;
+  const contentPaddingBottom = 0;
 
   return (
-    <div className="w-full h-screen bg-gray-100">
-      <div className="w-full h-screen flex flex-col bg-white relative shadow-md overflow-hidden">
+    <div className="w-full bg-gray-100" style={{ height: '-webkit-fill-available' }}>
+      <div className="w-full flex flex-col bg-white relative shadow-md overflow-hidden" style={{ height: '-webkit-fill-available' }}>
 
         {/* Fixed Header (rendered to body via portal for stability) */}
         { !showTerms && !showPrivacy && typeof document !== 'undefined' && createPortal(
           <div
             className="fixed top-0 left-0 right-0 w-full bg-white shadow-sm border-b"
             style={{
-              height: HEADER_HEIGHT + insets.top,
-              paddingTop: insets.top,
+              height: HEADER_HEIGHT,
               position: 'fixed',
               top: 0,
               left: 0,
@@ -928,16 +943,16 @@ const MainApp = ({ user, onLogout }: MainAppProps) => {
               backfaceVisibility: 'hidden'
             }}
           >
-            <div className="px-4" style={{ height: HEADER_HEIGHT, display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-              <img src="/driplove-logo.png" alt="DripLove Logo" className="h-10" />
-              <div className="text-sm font-bold text-black leading-tight">Find Your<br/>Perfect Match 💖</div>
-            </div>
+              <div className="px-4" style={{ height: HEADER_HEIGHT, display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                <img src="/driplove-logo.png" alt="DripLove Logo" className="h-9" />
+                <div className="text-sm font-bold text-black leading-tight">Find Your<br/>Perfect Match 💖</div>
+              </div>
           </div>,
           document.body
         )}
 
         {/* Main Content - leave scrollable and unaffected beyond padding */}
-        <div className="flex-1 overflow-y-auto" style={{ paddingTop: contentPaddingTop, paddingBottom: contentPaddingBottom, zIndex: 0, position: 'relative' }}>
+  <div className="flex-1 min-h-full overflow-y-auto bg-white" style={{ paddingTop: 0, paddingBottom: 0 }}>
           {renderContent()}
         </div>
 
@@ -945,22 +960,28 @@ const MainApp = ({ user, onLogout }: MainAppProps) => {
         {!showTerms && !showPrivacy && !isKeyboardOpen && (typeof document !== 'undefined') && createPortal(
           <div
             className="fixed bottom-0 left-0 right-0 w-full bg-white border-t border-gray-200 px-2"
+            role="navigation"
+            data-portal="footer"
             style={{
-              height: footerTotalHeight,
+              height: FOOTER_HEIGHT,
               position: 'fixed',
               bottom: 0,
               left: 0,
               right: 0,
-              zIndex: 1000000,
+              // Extremely high z-index so the footer sits on top of any overlays
+              zIndex: 2147483647,
               WebkitTransform: 'translateZ(0)',
               transform: 'translateZ(0)',
               willChange: 'transform, bottom',
               WebkitBackfaceVisibility: 'hidden',
-              backfaceVisibility: 'hidden'
+              backfaceVisibility: 'hidden',
+              // ensure footer is clickable
+              pointerEvents: 'auto'
             }}
+            onTouchStart={(e) => { e.stopPropagation(); }}
+            onClick={(e) => { e.stopPropagation(); }}
           >
-            {/* Interactive nav sits above the safe area so buttons are tappable */}
-            <div style={{ position: 'absolute', left: 0, right: 0, bottom: insets.bottom, height: FOOTER_HEIGHT, zIndex: 1000001, display: 'flex', justifyContent: 'space-around', alignItems: 'center', pointerEvents: 'auto', touchAction: 'manipulation' }}>
+            <div className="flex justify-around items-center h-full">
               {[
                 { label: 'DripCheck', icon: DripCoupleIcon },
                 { label: 'Chat', icon: MessageCircle },
@@ -976,11 +997,13 @@ const MainApp = ({ user, onLogout }: MainAppProps) => {
                   }`}
                   style={{ WebkitTapHighlightColor: 'transparent' }}
                 >
+                  <span style={{ position: 'relative', zIndex: 200001 }}>
                   {label === 'DripCheck' ? (
                     <Icon className={`w-6 h-6 ${activeTab === label.toLowerCase() ? 'fill-current' : ''}`} />
                   ) : (
                     <Icon className={`w-5 h-5 ${activeTab === label.toLowerCase() ? 'fill-current' : ''}`} />
                   )}
+                  </span>
                   <span className="text-xs font-medium">{label}</span>
                    {label === 'Chat' && unreadCount > 0 && (
                      <div className="absolute -top-1 -right-1 h-5 w-5 rounded-full bg-red-500 border-2 border-white z-10 flex items-center justify-center">

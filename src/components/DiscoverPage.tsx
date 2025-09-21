@@ -1575,7 +1575,7 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, isPremium }: DiscoverPage
     <div className="h-full w-full fixed left-0 overflow-hidden"
          style={{ 
            top: '60px', // Start below the header instead of top-0
-           height: 'calc(var(--app-h) - 60px)', // Adjust height to account for header using --app-h
+           height: 'calc(100vh - 60px)', // Adjust height to account for header
            touchAction: 'pan-x pan-y',
            userSelect: 'none',
            WebkitUserSelect: 'none',
@@ -1654,7 +1654,7 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, isPremium }: DiscoverPage
         </div>
       )}
       {/* Main Image Area - Card stack */}
-  <div className="flex-1 relative overflow-hidden" style={{ height: 'calc(var(--app-h) - 140px)', display: 'flex', flexDirection: 'column', justifyContent: 'flex-end', paddingBottom: 0 }}>
+  <div className="flex-1 relative overflow-hidden" style={{ height: 'calc(100vh - 140px)', display: 'flex', flexDirection: 'column', justifyContent: 'flex-end', paddingBottom: 0 }}>
         {/* ...existing code... */}
         {nextMatch && (
           <DominantColorImageBg
@@ -1699,7 +1699,7 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, isPremium }: DiscoverPage
           <div
             className="flex-1 cursor-pointer select-none relative transition-all duration-300 overflow-hidden"
             style={{
-              minHeight: showMoreInfo ? 'calc(var(--app-h) - 402px)' : 'calc(var(--app-h) - 302px)' // Adjusted for new expanded height
+              minHeight: showMoreInfo ? 'calc(100vh - 402px)' : 'calc(100vh - 302px)' // Adjusted for new expanded height
             }}
             onTouchStart={handleTouchStart}
             onTouchMove={handleTouchMove}

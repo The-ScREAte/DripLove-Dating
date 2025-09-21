@@ -18,7 +18,7 @@ const LazyAdminPage = lazy(() => import('@/components/AdminPage'));
 
 // Loading component for lazy-loaded pages
 const PageLoader = () => (
-  <div className="min-h-screen bg-gradient-to-br from-pink-50 to-purple-50 flex items-center justify-center">
+  <div className="min-h-0 h-[100dvh] bg-gradient-to-br from-pink-50 to-purple-50 flex items-center justify-center">
     <div className="text-center">
       <div className="w-8 h-8 border-4 border-pink-500 border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
       <p className="text-gray-600">Loading...</p>
@@ -236,7 +236,7 @@ const Index = () => {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-pink-400 via-purple-500 to-indigo-600 flex items-center justify-center">
+  <div className="min-h-0 h-[100dvh] bg-gradient-to-br from-pink-400 via-purple-500 to-indigo-600 flex items-center justify-center">
         <div className="animate-spin rounded-full h-32 w-32 border-b-2 border-white"></div>
       </div>
     );
@@ -252,7 +252,7 @@ const Index = () => {
   
   
   return (
-    <div className="w-full min-h-screen flex justify-center bg-background">
+  <div className="w-full min-h-0 h-[100dvh] flex justify-center bg-background">
       <div className="w-full h-full">
 
         {currentView === 'welcome' && (
