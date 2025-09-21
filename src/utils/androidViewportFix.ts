@@ -30,9 +30,10 @@ export const fixAndroidViewport = () => {
     // Set exact dimensions
     if (html) {
       html.style.width = '100vw';
-      html.style.height = '100vh';
+      // prefer stable fill available or the --app-h variable
+      html.style.height = 'var(--app-h, -webkit-fill-available)';
       html.style.maxWidth = '100vw';
-      html.style.maxHeight = '100vh';
+      html.style.maxHeight = 'var(--app-h, -webkit-fill-available)';
       html.style.overflow = 'hidden';
       html.style.position = 'fixed';
       html.style.top = '0';
@@ -41,9 +42,9 @@ export const fixAndroidViewport = () => {
 
     if (body) {
       body.style.width = '100vw';
-      body.style.height = '100vh';
+      body.style.height = 'var(--app-h, -webkit-fill-available)';
       body.style.maxWidth = '100vw';
-      body.style.maxHeight = '100vh';
+      body.style.maxHeight = 'var(--app-h, -webkit-fill-available)';
       body.style.overflow = 'hidden';
       body.style.position = 'fixed';
       body.style.top = '0';
@@ -52,9 +53,9 @@ export const fixAndroidViewport = () => {
 
     if (root) {
       root.style.width = '100vw';
-      root.style.height = '100vh';
+      root.style.height = 'var(--app-h, -webkit-fill-available)';
       root.style.maxWidth = '100vw';
-      root.style.maxHeight = '100vh';
+      root.style.maxHeight = 'var(--app-h, -webkit-fill-available)';
       root.style.overflow = 'hidden';
       root.style.position = 'relative';
     }

@@ -129,6 +129,24 @@ const MainApp = ({ user, onLogout }: MainAppProps) => {
   const { toast } = useToast();
   const insets = useSafeAreaInsets();
 
+  // Lock document body scroll while this app shell is mounted so only the inner
+  // scroll container handles scrolling. This prevents the outer scrollbar and
+  // keeps fixed header/footer stable in iOS webviews.
+  useEffect(() => {
+    const prevOverflow = document.body.style.overflowY;
+    // Set to hidden to remove outer scrollbar
+    document.body.style.overflowY = 'hidden';
+    // Also ensure html/root use fill-available (defensive)
+    document.documentElement.style.height = '-webkit-fill-available';
+    document.getElementById('root')?.style.setProperty('height', '-webkit-fill-available');
+
+    return () => {
+      document.body.style.overflowY = prevOverflow || '';
+      document.documentElement.style.height = '';
+      document.getElementById('root')?.style.removeProperty('height');
+    };
+  }, []);
+
   /**
    * PROGRESSIVE LOADING SYSTEM FOR DISCOVER PAGE
    * 
@@ -903,8 +921,8 @@ const MainApp = ({ user, onLogout }: MainAppProps) => {
   const contentPaddingBottom = !showTerms && !showPrivacy ? (FOOTER_HEIGHT + insets.bottom) : 0;
 
   return (
-    <div className="w-full h-screen bg-gray-100">
-      <div className="w-full h-screen flex flex-col bg-white relative shadow-md overflow-hidden">
+    <div className="w-full bg-gray-100" style={{ height: '-webkit-fill-available' }}>
+      <div className="w-full flex flex-col bg-white relative shadow-md overflow-hidden" style={{ height: '-webkit-fill-available' }}>
 
         {/* Fixed Header (rendered to body via portal for stability) */}
         { !showTerms && !showPrivacy && typeof document !== 'undefined' && createPortal(
