@@ -32,8 +32,8 @@ export const useSafeAreaInsets = (): SafeAreaInsets => {
           if (Capacitor.getPlatform() === 'ios') {
             // iOS safe areas (includes notch/Dynamic Island)
             setInsets({
-              top: info.visible ? 44 : 20, // Status bar height + safe area
-              bottom: 34, // Home indicator area
+              top: info.visible ? 34 : 20, // Status bar height + safe area
+              bottom: 24, // Home indicator area
               left: 0,
               right: 0,
             });
