@@ -11,7 +11,7 @@ import DripCoupleIcon from '@/components/DripCoupleIcon';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import { usePushNotifications } from '@/hooks/usePushNotifications';
-import { SafeAreaView, useSafeAreaInsets } from '@/hooks/useSafeArea';
+// No SafeArea helpers here; header/nav will be fixed to viewport
 
 interface MainAppProps {
   user: any;
@@ -22,7 +22,7 @@ const MainApp = ({ user, onLogout }: MainAppProps) => {
   // Safety check - if no user data, show error
   if (!user || !user.id) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-pink-50 to-purple-50 p-4">
+      <div className="min-h-fill flex items-center justify-center bg-gradient-to-br from-pink-50 to-purple-50 p-4">
         <div className="text-center bg-white rounded-lg p-8 shadow-lg max-w-md w-full">
           <h2 className="text-xl font-bold text-gray-800 mb-4">No User Data</h2>
           <p className="text-gray-600 mb-6">
@@ -126,7 +126,6 @@ const MainApp = ({ user, onLogout }: MainAppProps) => {
   const [isPremium, setIsPremium] = useState(false);
   const [unreadCount, setUnreadCount] = useState(0);
   const { toast } = useToast();
-  const insets = useSafeAreaInsets();
 
   /**
    * PROGRESSIVE LOADING SYSTEM FOR DISCOVER PAGE
@@ -894,41 +893,36 @@ const MainApp = ({ user, onLogout }: MainAppProps) => {
   };
 
   return (
-    <div className="w-full h-screen bg-gray-100">
-      <div className="w-full h-screen flex flex-col bg-white relative shadow-md overflow-hidden">
+    <div className="w-full h-fill bg-gray-100">
+      {/* Make this parent the scrolling container so sticky children (header/nav) stick relative to it */}
+      <div className="w-full h-fill flex flex-col bg-white relative shadow-md overflow-y-auto">
         
-        {/* Fixed Header with Professional Safe Area */}
-        {!showTerms && !showPrivacy && (
-          <SafeAreaView edges={['top']} className="fixed top-0 left-0 right-0 w-full bg-white shadow-sm border-b z-50">
-            <div className="px-4 py-2 flex justify-between items-center">
-              <img 
-                src="/driplove-logo.png" 
-                alt="DripLove Logo" 
-                className="h-12"
-              />
-              <div className="text-right">
-                <div className="text-sm font-bold text-black leading-tight">
-                  <div>Find Your</div>
-                  <div>Perfect Match 💖</div>
+        {/* Fixed Header - always visible */}
+          {/* Fixed Header - reduced size and includes safe area top padding */}
+          {!showTerms && !showPrivacy && (
+            <div className="fixed top-0 left-0 right-0 w-full bg-white shadow-sm z-50">
+              <div className="px-3 py-1.5 flex justify-between items-center">
+                <img src="/driplove-logo.png" alt="DripLove Logo" className="h-8" />
+                <div className="text-right">
+                  <div className="text-sm font-bold text-black leading-tight">
+                    <div>Find Your</div>
+                    <div>Perfect Match 💖</div>
+                  </div>
                 </div>
               </div>
             </div>
-          </SafeAreaView>
-        )}
+          )}
 
         {/* Main Content */}
         <div 
-          className={`flex-1 overflow-y-auto ${!showTerms && !showPrivacy ? 'pb-[70px]' : ''}`}
-          style={{ 
-            paddingTop: !showTerms && !showPrivacy ? (60 + insets.top) : 0 
-          }}
+          className={`flex-1 overflow-auto ${!showTerms && !showPrivacy ? 'pt-[10px] pb-[10px]' : ''}`}
         >
           {renderContent()}
         </div>
 
-        {/* Fixed Bottom Nav with Professional Safe Area */}
+        {/* Fixed Bottom Nav - always visible */}
         {!showTerms && !showPrivacy && !isKeyboardOpen && (
-          <SafeAreaView edges={['bottom']} className="fixed bottom-0 left-0 right-0 w-full bg-white border-t border-gray-200 px-2 py-2 z-50">
+          <div className="fixed bottom-0 left-0 right-0 w-full bg-white border-t border-gray-200 px-2 py-1 z-50">
             <div className="flex justify-around items-center">
               {[
                 { label: 'DripCheck', icon: DripCoupleIcon }, 
@@ -939,14 +933,14 @@ const MainApp = ({ user, onLogout }: MainAppProps) => {
                 <button
                   key={label}
                   onClick={() => setActiveTab(label.toLowerCase())}
-                  className={`flex flex-col items-center space-y-1 py-2 px-2 rounded-lg transition-colors relative ${
+                  className={`flex flex-col items-center space-y-1 py-1 px-2 rounded-lg transition-colors relative ${
                     activeTab === label.toLowerCase() ? 'text-pink-600' : 'text-gray-500'
                   }`}
                 >
                   {label === 'DripCheck' ? (
-                    <Icon className={`w-6 h-6 ${activeTab === label.toLowerCase() ? 'fill-current' : ''}`} />
-                  ) : (
                     <Icon className={`w-5 h-5 ${activeTab === label.toLowerCase() ? 'fill-current' : ''}`} />
+                  ) : (
+                    <Icon className={`w-4 h-4 ${activeTab === label.toLowerCase() ? 'fill-current' : ''}`} />
                   )}
                   <span className="text-xs font-medium">{label}</span>
                    {label === 'Chat' && unreadCount > 0 && (
@@ -959,7 +953,7 @@ const MainApp = ({ user, onLogout }: MainAppProps) => {
                 </button>
               ))}
             </div>
-          </SafeAreaView>
+          </div>
         )}
       </div>
     </div>

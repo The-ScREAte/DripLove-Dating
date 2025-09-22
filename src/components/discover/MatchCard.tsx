@@ -579,15 +579,18 @@ const MatchCard: React.FC<MatchCardProps> = ({
   if (isDetailsAreaOnly) {
     // Render only the non-swipeable details area
     return (
-      <div className="w-full" style={{ minHeight: '400px' }}>
+      <div 
+        className="w-full pt-2 pb-4 px-2 rounded-xl shadow-md bg-white"
+        style={{ minHeight: '400px', zIndex: 20, position: 'relative' }}
+      >
         {/* Basic Info - Always shown */}
         <div className="flex justify-between items-start">
           <div className="flex-1">
             <div className="flex items-center gap-2 mb-1">
-              <h2 className="text-2xl font-bold text-gray-900">
+              <h2 className="text-1xl font-bold text-gray-900">
                 {match.first_name} {match.last_name}
               </h2>
-              <span className="text-xl text-gray-600">
+              <span className="text-base text-gray-600">
                 {calculateAge(match.date_of_birth)}
               </span>
               {/* Verified badge beside name and age */}

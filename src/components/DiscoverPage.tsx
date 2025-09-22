@@ -1574,7 +1574,7 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, isPremium }: DiscoverPage
   return (
     <div className="h-full w-full fixed left-0 overflow-hidden"
          style={{ 
-           top: '60px', // Start below the header instead of top-0
+           top: '40px', // Start below the header instead of top-0
            height: 'calc(100vh - 60px)', // Adjust height to account for header
            touchAction: 'pan-x pan-y',
            userSelect: 'none',
@@ -1815,7 +1815,8 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, isPremium }: DiscoverPage
           {/* Info section - dynamic height that fits content exactly */}
           <div className={`bg-white border-t border-gray-400 transition-all duration-300 flex-shrink-0 ${
             showMoreInfo ? '' : 'overflow-hidden'
-          }`}>
+          }`} 
+          style={!showMoreInfo ? { marginBottom: '-48px' } : {}}>
             <div 
               ref={contentRef}
               className={`w-full p-1 ${showMoreInfo ? 'overflow-y-scroll' : 'overflow-hidden pb-3'}`} 
@@ -1824,7 +1825,9 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, isPremium }: DiscoverPage
                 overscrollBehavior: 'contain',
                 scrollBehavior: 'smooth',
                 maxHeight: showMoreInfo ? 'calc(50vh - 30%)' : 'auto',
-                paddingBottom: showMoreInfo ? '120px' : '12px'
+                paddingBottom: showMoreInfo 
+                  ? 'calc(80px + env(safe-area-inset-bottom, 0px))' 
+                  : 'calc(12px + env(safe-area-inset-bottom, 0px))'
               }}
             >
             <MatchCard

@@ -27,6 +27,65 @@ const LoadingScreen = () => (
 const AppWrapper = () => {
   const [isInitialized, setIsInitialized] = React.useState(false);
 
+  // Lock body and set root heights so only the inner app scrolls. This prevents mobile browsers
+  // from resizing the viewport (100vh) and causing fixed elements to float during touch/drag.
+  React.useEffect(() => {
+    const html = document.documentElement;
+    const body = document.body;
+    const root = document.getElementById('root');
+
+    const applyFill = () => {
+      // Use fill-available for iOS/modern browsers
+      html.style.height = ' -webkit-fill-available';
+      html.style.minHeight = '-webkit-fill-available';
+      body.style.height = '-webkit-fill-available';
+      body.style.minHeight = '-webkit-fill-available';
+      if (root) {
+        root.style.height = '-webkit-fill-available';
+        root.style.minHeight = '-webkit-fill-available';
+      }
+
+      // Lock body scroll so only the app container scrolls
+      body.style.overflow = 'hidden';
+      body.style.position = 'fixed';
+      body.style.width = '100%';
+    };
+
+    applyFill();
+
+    // Re-apply on viewport changes (visualViewport helps with iOS keyboard/resize)
+    const vv = (window as any).visualViewport;
+    const onViewportChange = () => applyFill();
+    if (vv && vv.addEventListener) {
+      vv.addEventListener('resize', onViewportChange);
+      vv.addEventListener('scroll', onViewportChange);
+    } else {
+      window.addEventListener('resize', onViewportChange);
+    }
+
+    return () => {
+      // Restore body/html on unmount
+      html.style.height = '';
+      html.style.minHeight = '';
+      body.style.height = '';
+      body.style.minHeight = '';
+      if (root) {
+        root.style.height = '';
+        root.style.minHeight = '';
+      }
+      body.style.overflow = '';
+      body.style.position = '';
+      body.style.width = '';
+
+      if (vv && vv.removeEventListener) {
+        vv.removeEventListener('resize', onViewportChange);
+        vv.removeEventListener('scroll', onViewportChange);
+      } else {
+        window.removeEventListener('resize', onViewportChange);
+      }
+    };
+  }, []);
+
   React.useEffect(() => {
     const initializeApp = async () => {
       try {

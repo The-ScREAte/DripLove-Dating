@@ -302,6 +302,22 @@
   }
 }
 
+/* iOS / Mobile viewport helpers
+   Use -webkit-fill-available instead of 100vh to avoid mobile browser viewport resize bugs.
+   These utility classes are intentionally minimal and only used where we want the viewport
+   to match the visible area (not the full 100vh which can change during touch/keyboard).
+*/
+.min-h-fill {
+  /* Keep WebKit fallback for older iOS, use modern 'stretch' token per spec */
+  min-height: -webkit-fill-available;
+  min-height: stretch;
+}
+
+.h-fill {
+  height: -webkit-fill-available;
+  height: stretch;
+}
+
 /* Safe area support for mobile devices */
 @layer base {
   :root {

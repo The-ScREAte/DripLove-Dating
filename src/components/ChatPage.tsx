@@ -3,7 +3,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import { usePushNotifications } from '@/hooks/usePushNotifications';
 import { requestNotificationPermission } from '@/services/pushNotifications';
-import { SafeAreaView } from '@/hooks/useSafeArea';
+// SafeAreaView removed — use plain divs with env(...) padding where necessary
 import UserProfileModal from './UserProfileModal';
 import BlockDialog from './BlockDialog';
 import ChatUserList from './chat/ChatUserList';
@@ -609,8 +609,8 @@ const ChatPage = ({ currentUser, onUnreadChange }: ChatPageProps) => {
   if (!selectedMatch) {
     return (
       <div className="h-full flex flex-col bg-gray-50">
-        {/* Professional Safe Area Header */}
-        <SafeAreaView edges={['top']} className="sticky top-0 z-30 bg-gradient-to-r from-pink-500 to-purple-600 text-white">
+        {/* Header (safe area respected via env padding) */}
+        <div className="sticky top-0 z-30 bg-gradient-to-r from-pink-500 to-purple-600 text-white" style={{ paddingTop: 'env(safe-area-inset-top, 0px)' }}>
           <div className="p-4">
             <h2 className="text-xl font-bold mb-4">Messages</h2>
             <div className="relative">
@@ -626,7 +626,7 @@ const ChatPage = ({ currentUser, onUnreadChange }: ChatPageProps) => {
               </svg>
             </div>
           </div>
-        </SafeAreaView>
+        </div>
 
         {/* Scrollable Chat List */}
         <div className="flex-1 overflow-y-auto pb-20">
@@ -710,8 +710,8 @@ const ChatPage = ({ currentUser, onUnreadChange }: ChatPageProps) => {
 
   return (
     <div className="h-full flex flex-col bg-gray-50">
-      {/* Professional Safe Area Chat Header */}
-      <SafeAreaView edges={['top']} className="sticky top-0 z-30 bg-white border-b border-gray-200 shadow-sm">
+      {/* Chat Header (safe area respected via env padding) */}
+      <div className="sticky top-0 z-30 bg-white border-b border-gray-200 shadow-sm" style={{ paddingTop: 'env(safe-area-inset-top, 0px)' }}>
         <ChatHeader
           selectedMatch={selectedMatch}
           onBack={() => setSelectedMatch(null)}
@@ -721,7 +721,7 @@ const ChatPage = ({ currentUser, onUnreadChange }: ChatPageProps) => {
           isMobile={true}
           currentUserId={currentUser.id}
         />
-      </SafeAreaView>
+      </div>
 
       {/* Scrollable Messages Area */}
       <div 
@@ -751,8 +751,8 @@ const ChatPage = ({ currentUser, onUnreadChange }: ChatPageProps) => {
         <div ref={messagesEndRef} />
       </div>
 
-      {/* Professional Safe Area Message Input */}
-      <SafeAreaView edges={['bottom']} className="sticky bottom-0 z-30 bg-white border-t border-gray-200">
+      {/* Message Input (safe area respected via env padding) */}
+      <div className="sticky bottom-0 z-30 bg-white border-t border-gray-200" style={{ paddingBottom: 'env(safe-area-inset-bottom, 0px)' }}>
         <div className="pb-2">
           <MessageInput
             newMessage={newMessage}
@@ -760,7 +760,7 @@ const ChatPage = ({ currentUser, onUnreadChange }: ChatPageProps) => {
             onSendMessage={sendMessage}
           />
         </div>
-      </SafeAreaView>
+      </div>
 
       <UserProfileModal
         isOpen={isUserProfileOpen}
