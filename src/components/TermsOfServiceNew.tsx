@@ -9,10 +9,10 @@ interface TermsOfServiceNewProps {
 const TermsOfServiceNew = ({ onBack }: TermsOfServiceNewProps) => {
   return (
     <div 
-      className="terms-container min-h-screen bg-gradient-to-br from-pink-400 via-purple-500 to-indigo-600 p-4 mobile-container"
+  className="terms-container min-h-fill bg-gradient-to-br from-pink-400 via-purple-500 to-indigo-600 p-4 mobile-container"
       style={{
-        paddingTop: `max(env(safe-area-inset-top, 0px), 16px)`,
-        paddingBottom: `max(env(safe-area-inset-bottom, 0px), 16px)`,
+        paddingTop: `max(env(safe-area-inset-top, 0px), 8px)`,
+        paddingBottom: `max(env(safe-area-inset-bottom, 0px), 12px)`,
         paddingLeft: `max(env(safe-area-inset-left, 0px), 16px)`,
         paddingRight: `max(env(safe-area-inset-right, 0px), 16px)`,
         minHeight: '100dvh'
@@ -20,12 +20,12 @@ const TermsOfServiceNew = ({ onBack }: TermsOfServiceNewProps) => {
     >
       <div className="max-w-4xl mx-auto bg-white rounded-lg shadow-lg overflow-hidden">
         {/* Header */}
-        <div className="bg-gradient-to-r from-purple-600 to-pink-600 text-white p-6 sticky-header rounded-t-lg" style={{ top: 0, zIndex: 10 }}>
+        <div className="bg-gradient-to-r from-purple-600 to-pink-600 text-white py-2 px-4 sticky-header rounded-t-lg" style={{ top: 0, zIndex: 10 }}>
           <Button
             onClick={onBack}
             variant="ghost"
             size="sm"
-            className="text-white hover:bg-white/20 mb-4"
+            className="text-white hover:bg-white/20"
             style={{ fontSize: '16px' }}
           >
             <ArrowLeft className="w-4 h-4 mr-2" />

@@ -816,7 +816,7 @@ const LikedMePage = ({ currentUser, isPremium = false }: LikedMePageProps) => {
         </div>
       )}
       
-      <div className="flex-shrink-0 bg-white border-b p-4">
+  <div className="flex-shrink-0 bg-white border-b p-4 mt-10">
         <div className="flex items-center justify-between mb-2">
           <div className="flex items-center space-x-2">
             <Users className="w-6 h-6 text-pink-600" />

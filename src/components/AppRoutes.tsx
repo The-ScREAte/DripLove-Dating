@@ -8,7 +8,6 @@ import Unsubscribe from '@/pages/Unsubscribe';
 import OAuthCallback from '@/components/OAuthCallback';
 import ProfileCompletionPage from '@/components/ProfileCompletionPage';
 import ResetPasswordPage from '@/components/ResetPasswordPage';
-import EmailConfirmPage from '@/components/EmailConfirmPage';
 import { useMobileOAuth } from '@/hooks/useMobileOAuth';
 
 const AppRoutes = () => {
@@ -21,8 +20,7 @@ const AppRoutes = () => {
       <Route path="/discover" element={<DiscoverPage currentUser={null} />} />
       <Route path="/payment-success" element={<PaymentSuccess />} />
       <Route path="/unsubscribe" element={<Unsubscribe />} />
-      <Route path="/auth/callback" element={<OAuthCallback />} />
-      <Route path="/auth/confirm" element={<EmailConfirmPage />} />
+  <Route path="/auth/callback" element={<OAuthCallback />} />
       <Route path="/complete-profile" element={<ProfileCompletionPage />} />
       <Route path="/reset-password" element={<ResetPasswordPage />} />
       {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}

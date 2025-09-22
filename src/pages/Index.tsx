@@ -252,7 +252,7 @@ const Index = () => {
   
   
   return (
-    <div className="w-full min-h-fill flex justify-center bg-background">
+    <div className="w-full min-h-fill flex justify-center bg-transparent">
       <div className="w-full h-fill">
 
         {currentView === 'welcome' && (
@@ -278,7 +278,7 @@ const Index = () => {
         )}
 
         {currentView === 'login' && (
-          <div className="min-h-screen bg-gradient-to-br from-pink-400 via-purple-500 to-indigo-600 flex items-center justify-center p-4">
+          <div className="min-h-fill bg-gradient-to-br from-pink-400 via-purple-500 to-indigo-600 flex items-center justify-center p-4">
             <AuthForm 
               isLogin={true}
               onToggle={handleShowRegister}
@@ -287,7 +287,7 @@ const Index = () => {
         )}
 
         {currentView === 'register' && (
-          <div className="min-h-screen bg-gradient-to-br from-pink-400 via-purple-500 to-indigo-600 flex items-center justify-center p-4">
+          <div className="min-h-fill bg-gradient-to-br from-pink-400 via-purple-500 to-indigo-600 flex items-center justify-center p-4">
             <RegistrationForm 
               onSubmit={handleRegister}
               onBackToLogin={handleBackToLogin}
@@ -296,7 +296,7 @@ const Index = () => {
         )}
 
         {currentView === 'profile-completion' && user && (
-          <div className="min-h-screen bg-gradient-to-br from-pink-400 via-purple-500 to-indigo-600 flex items-center justify-center p-4">
+          <div className="min-h-fill bg-gradient-to-br from-pink-400 via-purple-500 to-indigo-600 flex items-center justify-center p-4">
             <ProfileCompletionForm
               user={user}
               onComplete={handleProfileComplete}

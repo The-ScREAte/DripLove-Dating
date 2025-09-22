@@ -580,7 +580,7 @@ const MatchCard: React.FC<MatchCardProps> = ({
     // Render only the non-swipeable details area
     return (
       <div 
-        className="w-full pt-2 pb-4 px-2 rounded-xl shadow-md bg-white"
+        className={`w-full ${showMoreInfo ? 'pt-0' : 'pt-0'} pb-8 px-2 rounded-xl shadow-md bg-white`}
         style={{ minHeight: '400px', zIndex: 20, position: 'relative' }}
       >
         {/* Basic Info - Always shown */}
@@ -728,20 +728,15 @@ const MatchCard: React.FC<MatchCardProps> = ({
                 <h4 className="font-semibold text-pink-600 mb-3">Personality</h4>
                 <div className="space-y-4">
                   {typeof match.introvert_extrovert === 'number' && (
-                    <div>
-                      <div className="flex justify-between items-center mb-1">
-                        <span className="text-xs font-medium text-gray-600">Introvert vs Extrovert: {match.introvert_extrovert}%</span>
+                    <div className="flex items-center space-x-2">
+                      <span className="text-xs text-gray-500">Introvert</span>
+                      <div className="flex-1 bg-gray-200 rounded-full h-2">
+                        <div 
+                          className="bg-gradient-to-r from-blue-400 to-blue-600 h-2 rounded-full transition-all duration-300"
+                          style={{ width: `${match.introvert_extrovert}%` }}
+                        ></div>
                       </div>
-                      <div className="flex items-center space-x-2">
-                        <span className="text-xs text-gray-500">Introvert</span>
-                        <div className="flex-1 bg-gray-200 rounded-full h-2">
-                          <div 
-                            className="bg-gradient-to-r from-blue-400 to-blue-600 h-2 rounded-full transition-all duration-300"
-                            style={{ width: `${match.introvert_extrovert}%` }}
-                          ></div>
-                        </div>
-                        <span className="text-xs text-gray-500">Extrovert</span>
-                      </div>
+                      <span className="text-xs text-gray-500">Extrovert</span>
                     </div>
                   )}
                   {typeof match.spontaneous_planner === 'number' && (

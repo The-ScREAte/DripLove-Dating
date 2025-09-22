@@ -60,7 +60,7 @@ const TermsAcceptance = ({ user, onAccept }: TermsAcceptanceProps) => {
   };
 
   return (
-    <div className="terms-container min-h-screen bg-gradient-to-br from-pink-400 via-purple-500 to-indigo-600 p-4 flex items-center justify-center">
+  <div className="terms-container min-h-fill bg-gradient-to-br from-pink-400 via-purple-500 to-indigo-600 p-4 flex items-center justify-center">
       <Card className="w-full max-w-4xl mx-auto backdrop-blur-sm bg-white/95 shadow-2xl border-0">
         <CardHeader className="text-center pb-6">
           <div className="flex justify-center mb-4">

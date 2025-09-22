@@ -340,7 +340,7 @@ const PaymentSuccess: React.FC = () => {
   // Show loading while checking authentication
   if (isLoading) {
     return (
-      <div className="min-h-screen flex flex-col items-center justify-center bg-gradient-to-br from-pink-400 via-purple-500 to-indigo-600 p-4">
+  <div className="min-h-fill flex flex-col items-center justify-center bg-gradient-to-br from-pink-400 via-purple-500 to-indigo-600 p-4">
         <div className="bg-white rounded-3xl shadow-2xl p-8 max-w-md w-full text-center">
           <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-pink-500 mx-auto mb-4"></div>
           <p className="text-gray-600">Checking authentication...</p>
@@ -357,7 +357,7 @@ const PaymentSuccess: React.FC = () => {
   // Show error state with option to go back
   if (error && !upgrading && !upgradeSuccess) {
     return (
-      <div className="min-h-screen flex flex-col items-center justify-center bg-gradient-to-br from-red-400 via-pink-500 to-purple-600 p-4">
+  <div className="min-h-fill flex flex-col items-center justify-center bg-gradient-to-br from-red-400 via-pink-500 to-purple-600 p-4">
         <div className="bg-white rounded-3xl shadow-2xl p-8 max-w-md w-full text-center border-4 border-red-300/60 relative">
           <div className="absolute -top-10 left-1/2 -translate-x-1/2 bg-gradient-to-br from-red-400 to-red-600 rounded-full p-3 shadow-lg">
             <AlertCircle className="w-14 h-14 text-white" />
@@ -397,7 +397,7 @@ const PaymentSuccess: React.FC = () => {
 
   // Show success state
   return (
-    <div className="min-h-screen flex flex-col items-center justify-center bg-gradient-to-br from-pink-400 via-purple-500 to-indigo-600 p-4">
+  <div className="min-h-fill flex flex-col items-center justify-center bg-gradient-to-br from-pink-400 via-purple-500 to-indigo-600 p-4">
       <div className="bg-white rounded-3xl shadow-2xl p-8 max-w-md w-full text-center border-4 border-yellow-300/60 relative animate-fade-in">
         <div className="absolute -top-10 left-1/2 -translate-x-1/2 bg-gradient-to-br from-yellow-300 to-yellow-500 rounded-full p-3 shadow-lg animate-bounce">
           <Crown className="w-14 h-14 text-yellow-600" />

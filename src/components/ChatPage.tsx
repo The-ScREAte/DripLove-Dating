@@ -611,8 +611,8 @@ const ChatPage = ({ currentUser, onUnreadChange }: ChatPageProps) => {
       <div className="h-full flex flex-col bg-gray-50">
         {/* Header (safe area respected via env padding) */}
         <div className="sticky top-0 z-30 bg-gradient-to-r from-pink-500 to-purple-600 text-white" style={{ paddingTop: 'env(safe-area-inset-top, 0px)' }}>
-          <div className="p-4">
-            <h2 className="text-xl font-bold mb-4">Messages</h2>
+          <div className="p-7 mt-2">
+            <h2 className="text-xl font-bold mb-4">DripChat</h2>
             <div className="relative">
               <input
                 type="text"
@@ -711,7 +711,7 @@ const ChatPage = ({ currentUser, onUnreadChange }: ChatPageProps) => {
   return (
     <div className="h-full flex flex-col bg-gray-50">
       {/* Chat Header (safe area respected via env padding) */}
-      <div className="sticky top-0 z-30 bg-white border-b border-gray-200 shadow-sm" style={{ paddingTop: 'env(safe-area-inset-top, 0px)' }}>
+  <div className="sticky z-20 bg-white border-b border-gray-200 shadow-sm" style={{ top: 'env(safe-area-inset-top, 0px)', paddingTop: 0, position: 'sticky' }}>
         <ChatHeader
           selectedMatch={selectedMatch}
           onBack={() => setSelectedMatch(null)}
@@ -728,8 +728,7 @@ const ChatPage = ({ currentUser, onUnreadChange }: ChatPageProps) => {
         ref={messagesContainerRef}
         className="flex-1 px-4 space-y-2 bg-gray-50 overflow-y-auto"
         style={{ 
-          paddingBottom: '20px',
-          paddingTop: '20px'
+          paddingBottom: '10px'
         }}
       >
         {messages.map((message, index) => {

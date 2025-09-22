@@ -901,8 +901,8 @@ const MainApp = ({ user, onLogout }: MainAppProps) => {
           {/* Fixed Header - reduced size and includes safe area top padding */}
           {!showTerms && !showPrivacy && (
             <div className="fixed top-0 left-0 right-0 w-full bg-white shadow-sm z-50">
-              <div className="px-3 py-1.5 flex justify-between items-center">
-                <img src="/driplove-logo.png" alt="DripLove Logo" className="h-8" />
+              <div className="px-3 py-1.4 flex justify-between items-center">
+                <img src="/driplove-logo.png" alt="DripLove Logo" className="h-7" />
                 <div className="text-right">
                   <div className="text-sm font-bold text-black leading-tight">
                     <div>Find Your</div>
@@ -922,7 +922,7 @@ const MainApp = ({ user, onLogout }: MainAppProps) => {
 
         {/* Fixed Bottom Nav - always visible */}
         {!showTerms && !showPrivacy && !isKeyboardOpen && (
-          <div className="fixed bottom-0 left-0 right-0 w-full bg-white border-t border-gray-200 px-2 py-1 z-50">
+          <div className="fixed bottom-0 left-0 right-0 w-full bg-white z-[99999]">
             <div className="flex justify-around items-center">
               {[
                 { label: 'DripCheck', icon: DripCoupleIcon }, 

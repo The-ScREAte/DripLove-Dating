@@ -8,15 +8,15 @@ interface TermsOfServiceProps {
 
 const TermsOfService = ({ onBack }: TermsOfServiceProps) => {
   return (
-    <div className="min-h-screen bg-gradient-to-br from-pink-400 via-purple-500 to-indigo-600 p-4">
+  <div className="min-h-fill bg-gradient-to-br from-pink-400 via-purple-500 to-indigo-600 p-4">
       <div className="max-w-4xl mx-auto bg-white rounded-lg shadow-lg overflow-hidden">
         {/* Header */}
-        <div className="bg-gradient-to-r from-purple-600 to-pink-600 text-white p-6 sticky top-0 z-10">
+        <div className="bg-gradient-to-r from-purple-600 to-pink-600 text-white py-2 px-4 sticky top-0 z-10">
           <Button
             onClick={onBack}
             variant="ghost"
             size="sm"
-            className="text-white hover:bg-white/20 mb-4"
+            className="text-white hover:bg-white/20"
           >
             <ArrowLeft className="w-4 h-4 mr-2" />
             Back

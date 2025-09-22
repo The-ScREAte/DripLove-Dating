@@ -10,21 +10,22 @@ interface AboutUsProps {
 const AboutUs = ({ onBack }: AboutUsProps) => {
   return (
     <div 
-      className="min-h-screen bg-white flex flex-col mobile-container"
+      className="min-h-fill bg-white flex flex-col mobile-container"
       style={{
-        paddingTop: `max(env(safe-area-inset-top, 0px), 16px)`,
-        paddingBottom: `max(env(safe-area-inset-bottom, 0px), 16px)`,
+        // Use a smaller top padding so the About page doesn't have an oversized gap
+        paddingTop: `max(env(safe-area-inset-top, 0px), 8px)`,
+        paddingBottom: `max(env(safe-area-inset-bottom, 0px), 12px)`,
         paddingLeft: `max(env(safe-area-inset-left, 0px), 0px)`,
         paddingRight: `max(env(safe-area-inset-right, 0px), 0px)`,
         minHeight: '100dvh'
       }}
     >
       {/* Header */}
-      <div className="w-full bg-white border-b p-4 sticky-header" style={{ top: 0, zIndex: 10 }}>
+      <div className="w-full bg-white border-b py-2 px-4 sticky-header" style={{ top: 0, zIndex: 10 }}>
         <Button 
           onClick={onBack}
           variant="ghost"
-          className="text-gray-700 hover:bg-gray-100 mb-4"
+          className="text-gray-700 hover:bg-gray-100"
           style={{ fontSize: '16px' }}
         >
           <ArrowLeft className="w-4 h-4 mr-2" />

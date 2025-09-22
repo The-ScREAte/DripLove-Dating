@@ -422,12 +422,12 @@ const ProfilePage = ({ currentUser, profile, onProfileUpdate, onLogout, onShowTe
       <div 
         className="fixed left-0 right-0 z-40 bg-white border-b border-gray-200 shadow-sm" 
         style={{ 
-          top: '60px', // Increased for better iOS safe area visibility
-          paddingTop: 'max(env(safe-area-inset-top, 0px), 25px)', // Increased padding for extra space
+          top: '20px', // Shift header up
+          paddingTop: 'max(env(safe-area-inset-top, 0px), 30px)',
           width: '100%'
         }}
       >
-        <div className="p-7">
+  <div className="p-2">
           <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
             <div className="flex flex-row gap-3 w-full">
               {!isPremium && (

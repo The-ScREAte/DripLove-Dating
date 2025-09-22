@@ -64,7 +64,7 @@ const ProfileCompletionPage = () => {
 
   if (loading) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-pink-50 to-purple-50">
+  <div className="min-h-fill flex items-center justify-center bg-gradient-to-br from-pink-50 to-purple-50">
         <div className="animate-spin rounded-full h-32 w-32 border-b-2 border-pink-500"></div>
       </div>
     );
@@ -85,7 +85,7 @@ const ProfileCompletionPage = () => {
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-pink-50 to-purple-50 flex items-center justify-center p-4"
+  <div className="min-h-fill bg-gradient-to-br from-pink-50 to-purple-50 flex items-center justify-center p-4"
          style={{ 
            touchAction: 'pan-x pan-y',
            userSelect: 'none',
