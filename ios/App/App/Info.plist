@@ -5,7 +5,7 @@
 	<key>CFBundleDevelopmentRegion</key>
 	<string>en</string>
 	<key>CFBundleDisplayName</key>
-		<string>DripLove</string>
+        <string>DripLove</string>
 	<key>CFBundleExecutable</key>
 	<string>$(EXECUTABLE_NAME)</string>
 	<key>CFBundleIdentifier</key>
@@ -45,22 +45,5 @@
 	</array>
 	<key>UIViewControllerBasedStatusBarAppearance</key>
 	<true/>
-	<key>CFBundleURLTypes</key>
-	<array>
-		<dict>
-			<key>CFBundleURLName</key>
-			<string>driplove</string>
-			<key>CFBundleURLSchemes</key>
-			<array>
-				<string>driplove</string>
-				<string>com.driplove.ios</string>
-				<string>com.driplove.app</string>
-			</array>
-		</dict>
-	</array>
-	<key>NSCameraUsageDescription</key>
-	<string>We use your camera to let you take profile photos.</string>
-	<key>NSPhotoLibraryUsageDescription</key>
-	<string>We need access to your photos so you can upload a profile picture.</string>
 </dict>
 </plist>

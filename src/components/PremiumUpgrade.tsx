@@ -411,8 +411,8 @@ const PremiumUpgrade = ({ currentUser, onClose, preselectedPlan }: PremiumUpgrad
             </button>
             <h2 className="text-xl font-bold mb-4 text-center">Choose Payment Option</h2>
             <div className="space-y-4">
-              {/* Always show Paystack options, but prioritize IAP on iOS */}
-              {(!isIOS() || !isNativeApp() || !canBuy) && (
+              {/* Show Paystack options only when NOT on iOS native. On iOS native we show IAP (or loading message). */}
+              {(!isIOS() || !isNativeApp()) && (
                 <>
                   <button
                     onClick={() => handlePaymentTypeSelection('subscription')}

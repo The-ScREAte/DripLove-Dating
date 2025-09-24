@@ -9,7 +9,7 @@
       }
     ]
   },
-  "identifier" : "ABFBB0DF",
+  "identifier" : "CF0A80BD",
   "nonRenewingSubscriptions" : [
 
   ],
@@ -68,11 +68,11 @@
   },
   "subscriptionGroups" : [
     {
-      "id" : "5A408EF1",
+      "id" : "D6764023",
       "localizations" : [
 
       ],
-      "name" : "DRIPLOVE SUBSCRPTION",
+      "name" : "DripLove Premium Subscription",
       "subscriptions" : [
         {
           "adHocOffers" : [
@@ -81,22 +81,22 @@
           "codeOffers" : [
 
           ],
-          "displayPrice" : "4.99",
+          "displayPrice" : "1.99",
           "familyShareable" : false,
           "groupNumber" : 1,
-          "internalID" : "9972BE13",
+          "internalID" : "0387B296",
           "introductoryOffer" : null,
           "localizations" : [
             {
-              "description" : "Get unlimited swipes, see who liked you, and reverse dislikes with our premium monthly subscription",
-              "displayName" : "Premium Monthly Subscription",
+              "description" : "",
+              "displayName" : "",
               "locale" : "en_US"
             }
           ],
           "productID" : "com.driplove.dating.premium.monthlysub",
           "recurringSubscriptionPeriod" : "P1M",
-          "referenceName" : "Monthly Subscription",
-          "subscriptionGroupID" : "5A408EF1",
+          "referenceName" : "DripLove Subscription",
+          "subscriptionGroupID" : "D6764023",
           "type" : "RecurringSubscription",
           "winbackOffers" : [
 

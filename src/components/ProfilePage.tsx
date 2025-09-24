@@ -411,9 +411,9 @@ const ProfilePage = ({ currentUser, profile, onProfileUpdate, onLogout, onShowTe
   }
 
   return (
-    <div className="min-h-screen bg-gray-50 overflow-x-hidden w-full max-w-full"
+      <div className="min-h-screen bg-gray-50 overflow-x-hidden w-full max-w-full"
          style={{ 
-           touchAction: 'pan-x pan-y',
+           touchAction: 'pan-y', // allow horizontal gestures (e.g. slider drags) to be handled by child controls
            userSelect: 'none',
            WebkitUserSelect: 'none',
            WebkitTouchCallout: 'none'

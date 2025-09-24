@@ -12,19 +12,21 @@ function DominantColorImageBg({ imageUrl, children }) {
         style={{ background: edgeColor, zIndex: 0 }}
         aria-hidden="true"
       />
-      {/* Blurred image overlays the color for a soft effect */}
+      {/* Low-res thumbnail as background (cheap to decode). We intentionally request a tiny optimized image and lightly blur it. */}
       {imageUrl && (
         <img
-          src={imageUrl}
+          src={`${imageUrl}?width=40&quality=20&format=webp`}
           aria-hidden="true"
           className="absolute inset-0 w-full h-full object-cover"
           style={{
-            filter: 'blur(48px) brightness(1.08)',
+            // Use a lighter blur for performance; thumbnail provides most of the blur effect
+            filter: 'blur(6px) brightness(1.04)',
             zIndex: 1,
             objectFit: 'cover',
             width: '100%',
             height: '100%',
-            transform: 'scale(1.25)'
+            transform: 'scale(1.4)',
+            imageRendering: 'auto'
           }}
           draggable={false}
         />
@@ -140,6 +142,7 @@ import { checkAndTriggerRefill } from '@/utils/performanceOptimizer';
 import { debounce, optimizeImageUrl, createPagination, userDataCache } from '@/utils/performanceOptimizer';
 import { locationService } from '@/services/locationService';
 import { calculateProfileCompletion, getTodaySwipeCount, checkSwipeRestrictions } from '@/utils/profileCompletion';
+import { enqueue } from '@/lib/queue';
 import PremiumUpgrade from './PremiumUpgrade';
 import MatchAnimation from './MatchAnimation';
 import MatchCard from './discover/MatchCard';
@@ -223,7 +226,9 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, isPremium }: DiscoverPage
   const [matchedUser, setMatchedUser] = useState<PotentialMatch | null>(null);
   // New: Store images by userId for instant access
   const [userImages, setUserImages] = useState<{ [key: string]: string[] }>({});
-  const [preloadedImages, setPreloadedImages] = useState<{ [key: string]: HTMLImageElement[] }>({});
+  // We avoid storing HTMLImageElement objects in state to prevent GC pressure
+  // and rely on useImagePreloader for actual image loading status.
+  const [preloadedImages, setPreloadedImages] = useState<{ [key: string]: string[] }>({});
   // Store distances from location service
   const [userDistances, setUserDistances] = useState<{ [key: string]: number }>({});
   const [reverseUsageToday, setReverseUsageToday] = useState(0);
@@ -240,11 +245,14 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, isPremium }: DiscoverPage
   
   const { toast } = useToast();
   const { subscription, checkUsageLimit, refetchSubscription } = useSubscription(currentUser?.id);
-  const { preloadImages, getOptimizedUrl, isImageLoaded } = useImagePreloader({
-    maxConcurrent: 8, // Reduced for better performance with more users
-    quality: 50, // Ultra-low quality for maximum speed
-    width: 280 // Much smaller for instant loading
+  const { preloadImages, preloadImage, getOptimizedUrl, isImageLoaded, imageStatus } = useImagePreloader({
+    maxConcurrent: 4, // Cap concurrency to 4
+    quality: 50,
+    width: 280
   });
+
+  // Track in-flight image load requests to avoid duplicate DB calls
+  const requestedImageProfileIds = useRef<Set<string>>(new Set());
 
   // --- BEGIN: Swipe Guide Popup State ---
   const [showSwipeGuide, setShowSwipeGuide] = useState(false);
@@ -349,15 +357,23 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, isPremium }: DiscoverPage
     }
   }, [currentUser?.id]);
   const [lastShuffleTime, setLastShuffleTime] = useState<number>(0);
-  const [startX, setStartX] = useState(0);
-  const [startY, setStartY] = useState(0);
-  const [currentX, setCurrentX] = useState(0);
-  const [currentY, setCurrentY] = useState(0);
-  const [isDragging, setIsDragging] = useState(false);
-  const [swipeDirection, setSwipeDirection] = useState<'left' | 'right' | null>(null);
-  const [swipeDistance, setSwipeDistance] = useState(0);
+  // Use refs for raw pointer coordinates to avoid async state race conditions
+  const startXRef = useRef(0);
+  const startYRef = useRef(0);
+  const currentXRef = useRef(0);
+  const currentYRef = useRef(0);
+  // Batch swipe-related UI into one object to reduce re-renders
+  const [swipeUI, setSwipeUI] = useState<{
+    isDragging: boolean;
+    swipeDirection: 'left' | 'right' | null;
+    swipeDistance: number;
+    dragOffset: number;
+  }>({ isDragging: false, swipeDirection: null, swipeDistance: 0, dragOffset: 0 });
   const [exitingCard, setExitingCard] = useState(false);
   const [exitDirection, setExitDirection] = useState<'left' | 'right' | null>(null);
+  // RAF throttling refs: store latest delta and whether an rAF is scheduled
+  const latestDeltaRef = useRef(0);
+  const rafScheduledRef = useRef(false);
 
   // Memoize expensive calculations
   const getGenderFilter = useCallback((userPreference: string) => {
@@ -653,32 +669,23 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, isPremium }: DiscoverPage
   // Enhanced image preloading with actual image objects
   const preloadUserImages = useCallback(async (imageUrls: string[], userId: string) => {
     if (preloadedImages[userId]?.length > 0) return; // Already preloaded
-    
-    const imagePromises = imageUrls.map((url) => {
-      return new Promise<HTMLImageElement>((resolve, reject) => {
-        const img = new Image();
-        img.onload = () => resolve(img);
-        img.onerror = () => reject(new Error(`Failed to load image: ${url}`));
-        // Add optimized image URL with compression
-        img.src = url.includes('supabase') ? `${url}?width=800&quality=85&format=webp` : url;
-      });
-    });
-
+    // Rely on the shared preloader to fetch and dedupe actual image loads
     try {
-      const loadedImages = await Promise.all(imagePromises);
-      setPreloadedImages(prev => ({
-        ...prev,
-        [userId]: loadedImages
-      }));
+      const optimized = imageUrls.map(u => u.includes('supabase') ? `${u}?width=800&quality=85&format=webp` : u);
+  // Preload only the primary image for this profile
+  if (optimized[0]) preloadImage(optimized[0]);
+      setPreloadedImages(prev => ({ ...prev, [userId]: optimized }));
     } catch (error) {
-  // ...removed log...
+      // ignore individual preload failure
     }
   }, [preloadedImages]);
 
   // Preload images for the next N profiles for smoother UX
   const loadFullImages = useCallback(async (profileId: string) => {
     if (userImages[profileId]?.length > 0) return; // Already loaded
-    
+    // Prevent duplicate in-flight requests
+    if (requestedImageProfileIds.current.has(profileId)) return;
+    requestedImageProfileIds.current.add(profileId);
     try {
       // Only load approved images for discover page
       const { data: images, error } = await supabase
@@ -688,38 +695,35 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, isPremium }: DiscoverPage
         .eq('is_approved', true)
         .order('image_order', { ascending: true });
 
-      if (error) throw error;
-
-      if (images?.length) {
+      if (!error && images?.length) {
         const imageUrls = images.map(img => img.image_url);
         setUserImages(prev => ({
           ...prev,
           [profileId]: imageUrls
         }));
-        
-        // Load only first image immediately for speed
+        // Preload only the first image via shared preloader
         if (imageUrls.length > 0) {
-          preloadImages([imageUrls[0]]); // Only preload first image
+          preloadImage(imageUrls[0]);
         }
       }
     } catch (error) {
-  // ...removed log...
+      // ignore individual image fetch errors
+    } finally {
+      requestedImageProfileIds.current.delete(profileId);
     }
   }, [userImages, preloadImages]);
 
   // Ultra-optimized preloading strategy - minimal images for maximum speed
   const preloadNextProfileImages = useCallback(async (matches: PotentialMatch[], alreadyLoaded: { [key: string]: string[] }, startIdx: number) => {
-    // Drastically reduced preload count for maximum concurrent users
-    const PRELOAD_COUNT = 2; // Only 2 profiles ahead - ultra-aggressive optimization
-    
+    // Only preload the immediate next profile for minimal network work
+    const PRELOAD_COUNT = 1;
     const toPreload = matches.slice(startIdx, startIdx + PRELOAD_COUNT)
       .filter(match => !alreadyLoaded[match.id] || alreadyLoaded[match.id]?.length === 0);
-    
-    // Load profiles in background with longer delays to reduce server load
+
     toPreload.forEach((match, index) => {
       setTimeout(() => {
         loadFullImages(match.id);
-      }, index * 200); // Longer delays to reduce concurrent requests
+      }, index * 150);
     });
   }, [loadFullImages]);
 
@@ -820,49 +824,57 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, isPremium }: DiscoverPage
 
   const handleTouchStart = (e: React.TouchEvent) => {
     const touch = e.touches[0];
-    setStartX(touch.clientX);
-    setStartY(touch.clientY);
-    setCurrentX(touch.clientX);
-    setCurrentY(touch.clientY);
-    setIsDragging(true);
-    setSwipeDirection(null);
-    setSwipeDistance(0);
+  startXRef.current = touch.clientX;
+  startYRef.current = touch.clientY;
+  currentXRef.current = touch.clientX;
+  currentYRef.current = touch.clientY;
+  setSwipeUI(prev => ({ ...prev, isDragging: true, swipeDirection: null, swipeDistance: 0, dragOffset: 0 }));
   };
 
   const handleTouchMove = (e: React.TouchEvent) => {
-    if (!isDragging) return;
+  if (!swipeUI.isDragging) return;
     const touch = e.touches[0];
-    setCurrentX(touch.clientX);
-    setCurrentY(touch.clientY);
-    
-    const deltaX = touch.clientX - startX;
-    const deltaY = Math.abs(touch.clientY - startY);
-    
+    currentXRef.current = touch.clientX;
+    currentYRef.current = touch.clientY;
+
+    const deltaX = currentXRef.current - startXRef.current;
+    const deltaY = Math.abs(currentYRef.current - startYRef.current);
+
     // Only show swipe feedback if horizontal movement is greater than vertical
     if (Math.abs(deltaX) > deltaY) {
-      setSwipeDistance(Math.abs(deltaX));
-      setSwipeDirection(deltaX > 0 ? 'right' : 'left');
+      // write latest delta and schedule an rAF update
+      latestDeltaRef.current = deltaX;
+      if (!rafScheduledRef.current) {
+        rafScheduledRef.current = true;
+        requestAnimationFrame(() => {
+          const d = latestDeltaRef.current;
+          setSwipeUI(prev => ({ ...prev, dragOffset: d, swipeDistance: Math.abs(d), swipeDirection: d > 0 ? 'right' : 'left' }));
+          rafScheduledRef.current = false;
+        });
+      }
     }
   };
 
   const handleTouchEnd = (e: React.TouchEvent) => {
-    if (!isDragging) return;
-    setIsDragging(false);
-  
-    const deltaX = currentX - startX;
-    const deltaY = Math.abs(currentY - startY);
+    if (!swipeUI.isDragging) return;
+  setSwipeUI(prev => ({ ...prev, isDragging: false }));
+
+    const changedTouch = e.changedTouches && e.changedTouches[0];
+    const endX = changedTouch ? changedTouch.clientX : currentXRef.current;
+    const endY = changedTouch ? changedTouch.clientY : currentYRef.current;
+
+    const deltaX = endX - startXRef.current;
+    const deltaY = Math.abs(endY - startYRef.current);
     const screenWidth = window.innerWidth;
     const minSwipeDistance = screenWidth * 0.25; // Reduced from 0.4 to 0.25 for faster swipes
-  
+
+    // Reset visual smear (flush any pending rAF)
+    latestDeltaRef.current = 0;
+    if (rafScheduledRef.current) rafScheduledRef.current = false;
+    setSwipeUI(prev => ({ ...prev, dragOffset: 0, swipeDistance: 0 }));
+
     if (Math.abs(deltaX) > minSwipeDistance && Math.abs(deltaX) > deltaY) {
-      // Reset swipe state immediately for next card
-      setStartX(0);
-      setStartY(0);
-      setCurrentX(0);
-      setCurrentY(0);
-      setSwipeDirection(null);
-      setSwipeDistance(0);
-      
+      setSwipeUI(prev => ({ ...prev, swipeDirection: null }));
       // Immediate swipe action without delays
       if (deltaX > 0) {
         handleLike();
@@ -870,85 +882,70 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, isPremium }: DiscoverPage
         handlePass();
       }
     } else {
-      // Reset values if swipe wasn't far enough
-      setStartX(0);
-      setStartY(0);
-      setCurrentX(0);
-      setCurrentY(0);
-      setSwipeDirection(null);
-      setSwipeDistance(0);
+      setSwipeUI(prev => ({ ...prev, swipeDirection: null }));
     }
   };
 
   // Mouse event handlers for swipe on desktop
   const handleMouseDown = (e: React.MouseEvent) => {
-    setStartX(e.clientX);
-    setStartY(e.clientY);
-    setCurrentX(e.clientX);
-    setCurrentY(e.clientY);
-    setIsDragging(true);
-    setSwipeDirection(null);
-    setSwipeDistance(0);
-  };
+  startXRef.current = e.clientX;
+  startYRef.current = e.clientY;
+  currentXRef.current = e.clientX;
+  currentYRef.current = e.clientY;
+  setSwipeUI(prev => ({ ...prev, isDragging: true, swipeDirection: null, swipeDistance: 0, dragOffset: 0 }));
 
-  const handleMouseMove = (e: React.MouseEvent) => {
-    if (!isDragging) return;
-    setCurrentX(e.clientX);
-    setCurrentY(e.clientY);
-    
-    const deltaX = e.clientX - startX;
-    const deltaY = Math.abs(e.clientY - startY);
-    
-    // Only show swipe feedback if horizontal movement is greater than vertical
-    if (Math.abs(deltaX) > deltaY) {
-      setSwipeDistance(Math.abs(deltaX));
-      setSwipeDirection(deltaX > 0 ? 'right' : 'left');
-    }
-  };
-
-  const handleMouseUp = (e: React.MouseEvent) => {
-    if (!isDragging) return;
-    setIsDragging(false);
-
-    const deltaX = currentX - startX;
-    const deltaY = Math.abs(e.clientY - startY);
-    const minSwipeDistance = 50; // Reduced from 80 to 50 for faster mouse swipes
-
-    // Only trigger swipe if horizontal movement is greater than vertical
-    if (Math.abs(deltaX) > minSwipeDistance && Math.abs(deltaX) > deltaY) {
-      // Reset swipe state immediately for next card
-      setStartX(0);
-      setStartY(0);
-      setCurrentX(0);
-      setCurrentY(0);
-      setSwipeDirection(null);
-      setSwipeDistance(0);
-      
-      // Immediate swipe action without delays
-      if (deltaX > 0) {
-        // Swipe right - like
-        handleLike();
-      } else {
-        // Swipe left - dislike
-        handlePass();
+    // Attach global mouse listeners to ensure we capture mouseup/move even if pointer leaves the element
+    const onWindowMouseMove = (ev: MouseEvent) => {
+  if (!swipeUI.isDragging) return;
+      currentXRef.current = ev.clientX;
+      currentYRef.current = ev.clientY;
+      const deltaX = currentXRef.current - startXRef.current;
+      const deltaY = Math.abs(currentYRef.current - startYRef.current);
+      if (Math.abs(deltaX) > deltaY) {
+        // rAF throttle visual updates
+        latestDeltaRef.current = deltaX;
+        if (!rafScheduledRef.current) {
+          rafScheduledRef.current = true;
+          requestAnimationFrame(() => {
+            const d = latestDeltaRef.current;
+            setSwipeUI(prev => ({ ...prev, dragOffset: d, swipeDistance: Math.abs(d), swipeDirection: d > 0 ? 'right' : 'left' }));
+            rafScheduledRef.current = false;
+          });
+        }
+        // Prevent default to avoid text selection during dragging
+        ev.preventDefault();
       }
-    } else {
-      // Reset values if swipe wasn't far enough
-      setStartX(0);
-      setStartY(0);
-      setCurrentX(0);
-      setCurrentY(0);
-      setSwipeDirection(null);
-      setSwipeDistance(0);
-    }
+    };
+
+    const onWindowMouseUp = (ev: MouseEvent) => {
+    if (!swipeUI.isDragging) return;
+  setSwipeUI(prev => ({ ...prev, isDragging: false }));
+      // compute final deltas
+      const deltaX = ev.clientX - startXRef.current;
+      const deltaY = Math.abs(ev.clientY - startYRef.current);
+      const minSwipeDistance = 50; // Reduced from 80 to 50 for faster mouse swipes
+      // Reset visual smear (flush any pending rAF)
+      latestDeltaRef.current = 0;
+      if (rafScheduledRef.current) rafScheduledRef.current = false;
+      setSwipeUI(prev => ({ ...prev, dragOffset: 0, swipeDistance: 0, swipeDirection: null }));
+      if (Math.abs(deltaX) > minSwipeDistance && Math.abs(deltaX) > deltaY) {
+        if (deltaX > 0) handleLike(); else handlePass();
+      }
+      window.removeEventListener('mousemove', onWindowMouseMove);
+      window.removeEventListener('mouseup', onWindowMouseUp);
+    };
+
+    window.addEventListener('mousemove', onWindowMouseMove);
+    window.addEventListener('mouseup', onWindowMouseUp);
   };
+  
+  // Note: mousemove/mouseup handling is wired globally from mouseDown to ensure robust behavior
 
   const handleImageAreaClick = (e: React.MouseEvent<HTMLDivElement>) => {
     // Prevent swipe action if dragging occurred
-    if (Math.abs(currentX - startX) > 10) return;
+    if (Math.abs(swipeUI.dragOffset) > 10) return;
 
-    // This function is now mainly used for compatibility
-    // The actual image/slide navigation is handled within MatchCard
+    // This function is mainly a compatibility shim - slide navigation lives inside MatchCard
   };
 
   // Function to load more matches when running low - optimized for 5 at a time
@@ -1168,61 +1165,60 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, isPremium }: DiscoverPage
       }
     }
 
-    try {
-      // First check if like already exists to prevent duplicate key error
-      const { data: existingLike, error: checkError } = await supabase
-        .from('likes')
-        .select('id')
-        .match({ liker_id: currentUser.id, liked_id: currentMatch.id })
-        .maybeSingle();
+    // Optimistically move to next profile immediately
+    moveToNext();
 
-      if (checkError && checkError.code !== 'PGRST116') {
-        throw checkError;
-      }
+    // Enqueue a single batched RPC job to perform usage enforcement, upsert like, and check mutual
+    enqueue(async () => {
+      try {
+        // Call a batched RPC (needs to be created server-side). If it doesn't exist or fails,
+        // fall back to the existing behavior.
+        const rpcName = 'like_and_usage_batched';
+  const { data: rpcData, error: rpcError } = await supabase.rpc((rpcName as any), {
+          liker_id_param: currentUser.id,
+          liked_id_param: currentMatch.id,
+          premium_param: !!isPremium
+        } as any);
 
-      // Only insert if like doesn't already exist
-      if (!existingLike) {
-        const { error: insertError } = await supabase
-          .from('likes')
-          .insert({ liker_id: currentUser.id, liked_id: currentMatch.id });
+        if (rpcError) {
+          // Fallback: perform original like flow to ensure data persistence
+          try {
+            const { data: existingLike } = await supabase
+              .from('likes')
+              .select('id')
+              .match({ liker_id: currentUser.id, liked_id: currentMatch.id })
+              .maybeSingle();
 
-        if (insertError) {
-          // Handle specific duplicate key error gracefully
-          if (insertError.code === '23505') {
-            // Like already exists, skipping insert
-          } else {
-            throw insertError;
+            if (!existingLike) {
+              await supabase.from('likes').insert({ liker_id: currentUser.id, liked_id: currentMatch.id });
+            }
+
+            const { data: mutualLike } = await supabase
+              .from('likes')
+              .select('*')
+              .match({ liker_id: currentMatch.id, liked_id: currentUser.id })
+              .maybeSingle();
+
+            if (mutualLike) {
+              // Show match animation if still relevant
+              setMatchedUser(currentMatch);
+              setShowMatchAnimation(true);
+            }
+          } catch (fallbackErr) {
+            // If fallback also fails, show a toast (non-blocking)
+            toast({ title: 'Error', description: 'Failed to record like.', variant: 'destructive' });
+          }
+        } else {
+          // RPC succeeded — if server reports a match, show animation
+          if ((rpcData as any)?.match) {
+            setMatchedUser(currentMatch);
+            setShowMatchAnimation(true);
           }
         }
+      } catch (jobErr) {
+        // Non-fatal background job error
       }
-
-      // Check for mutual like
-      const { data: mutualLike, error: mutualError } = await supabase
-        .from('likes')
-        .select('*')
-        .match({ liker_id: currentMatch.id, liked_id: currentUser.id })
-        .maybeSingle();
-
-      if (mutualError) {
-  // ...removed log...
-      }
-
-      // Always move to next profile immediately for instant feel
-      moveToNext();
-      
-      if (mutualLike) {
-        // It's a match! Show animation on top of the new profile
-        setMatchedUser(currentMatch);
-        setShowMatchAnimation(true);
-      }
-    } catch (error) {
-  // ...removed log...
-      toast({
-        title: 'Error',
-        description: 'Failed to like user. Please try again.',
-        variant: 'destructive'
-      });
-    }
+    });
   };
 
   // Optimistic UI: move to next card instantly, then process pass in background
@@ -1286,49 +1282,41 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, isPremium }: DiscoverPage
     }
 
     // Add to passed users list for potential reverse
-    setPassedUsers(prev => [{
-      user_id: currentMatch.id,
-      passed_at: new Date()
-    }, ...prev.slice(0, 9)]); // Keep only last 10 passed users
+    setPassedUsers(prev => [{ user_id: currentMatch.id, passed_at: new Date() }, ...prev.slice(0, 9)]);
 
-    moveToNext(); // Move UI only after all checks pass
+    // Optimistically move UI to next
+    moveToNext();
 
-    try {
-      // Check if pass already exists to prevent duplicate key error
-      const { data: existingPass, error: checkError } = await supabase
-        .from('passes')
-        .select('id')
-        .match({ passer_id: currentUser.id, passed_id: currentMatch.id })
-        .maybeSingle();
+    // Enqueue a batched RPC job for pass + usage increment to avoid multiple round trips
+    enqueue(async () => {
+      try {
+        const rpcName = 'pass_and_usage_batched';
+        const { data: rpcData, error: rpcError } = await supabase.rpc((rpcName as any), {
+          passer_id_param: currentUser.id,
+          passed_id_param: currentMatch.id,
+          premium_param: !!isPremium
+        } as any);
 
-      if (checkError && checkError.code !== 'PGRST116') {
-        throw checkError;
-      }
+        if (rpcError) {
+          // Fallback: insert a pass directly
+          try {
+            const { data: existingPass } = await supabase
+              .from('passes')
+              .select('id')
+              .match({ passer_id: currentUser.id, passed_id: currentMatch.id })
+              .maybeSingle();
 
-      // Only insert if pass doesn't already exist
-      if (!existingPass) {
-        const { error: insertError } = await supabase.from('passes').insert({
-          passer_id: currentUser.id,
-          passed_id: currentMatch.id
-        });
-
-        if (insertError) {
-          // Handle specific duplicate key error gracefully
-          if (insertError.code === '23505') {
-            // Pass already exists, skipping insert
-          } else {
-            throw insertError;
+            if (!existingPass) {
+              await supabase.from('passes').insert({ passer_id: currentUser.id, passed_id: currentMatch.id });
+            }
+          } catch (fallbackErr) {
+            toast({ title: 'Error', description: 'Could not skip this profile.', variant: 'destructive' });
           }
         }
+      } catch (jobErr) {
+        // Background job failed silently
       }
-    } catch (err) {
-  // ...removed log...
-      toast({
-        title: 'Error',
-        description: 'Could not skip this profile.',
-        variant: 'destructive'
-      });
-    }
+    });
   };
 
   const handleReverse = async () => {
@@ -1564,10 +1552,11 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, isPremium }: DiscoverPage
   }
 
   // Calculate swipe overlay opacity and transform
-  const swipeOpacity = Math.min(swipeDistance / 100, 0.8);
-  
-  // Simple card transform for smooth dragging only
-  const cardTransform = isDragging ? `translateX(${currentX - startX}px) rotate(${(currentX - startX) * 0.1}deg)` : '';
+  const swipeOpacity = Math.min(swipeUI.swipeDistance / 100, 0.8);
+
+  // Simple card transform for smooth dragging only - use dragOffset (signed) to avoid stale state
+  // Use translate3d to ensure GPU compositing and avoid expensive layout
+  const cardTransform = swipeUI.isDragging ? `translate3d(${swipeUI.dragOffset}px, 0, 0) rotate(${swipeUI.dragOffset * 0.08}deg)` : '';
 
 
 
@@ -1576,7 +1565,8 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, isPremium }: DiscoverPage
          style={{ 
            top: '25px', // Move up to top
            height: 'calc(100vh - 60px)', // Adjust height to account for header
-           touchAction: 'pan-x pan-y',
+           touchAction: 'pan-y', // allow vertical scrolling, prevent horizontal scroll-from-browser during horizontal swipes
+           overscrollBehavior: 'contain',
            userSelect: 'none',
            WebkitUserSelect: 'none',
            WebkitTouchCallout: 'none'
@@ -1691,8 +1681,9 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, isPremium }: DiscoverPage
           className="h-full w-full relative z-10 flex flex-col"
           style={{
             transform: cardTransform,
-            transition: isDragging ? 'none' : 'transform 0.2s ease-out', // Faster snap-back
-            boxShadow: isDragging ? '0 8px 32px 0 rgba(0,0,0,0.25)' : '0 4px 16px 0 rgba(0,0,0,0.10)'
+            transition: swipeUI.isDragging ? 'none' : 'transform 0.2s ease-out', // Faster snap-back
+            willChange: 'transform',
+            boxShadow: swipeUI.isDragging ? '0 6px 18px rgba(0,0,0,0.18)' : '0 2px 8px rgba(0,0,0,0.08)'
           }}
         >
           {/* Image area - flexible height that fills remaining space */}
@@ -1705,15 +1696,13 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, isPremium }: DiscoverPage
             onTouchMove={handleTouchMove}
             onTouchEnd={handleTouchEnd}
             onMouseDown={handleMouseDown}
-            onMouseMove={handleMouseMove}
-            onMouseUp={handleMouseUp}
             onClick={handleImageAreaClick}
           >
             {/* ...existing code... */}
-            {isDragging && swipeDirection && (
+            {swipeUI.isDragging && swipeUI.swipeDirection && (
               <>
                 {/* Like Overlay - Right Swipe */}
-                {swipeDirection === 'right' && (
+                {swipeUI.swipeDirection === 'right' && (
                   <div 
                     className="absolute inset-0 z-20 flex items-center justify-center pointer-events-none"
                     style={{ 
@@ -1732,7 +1721,7 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, isPremium }: DiscoverPage
                         className="w-12 h-12 text-white fill-current" 
                         style={{ 
                           filter: `drop-shadow(0 4px 8px rgba(0,0,0,0.3))`,
-                          transform: `rotate(${swipeDistance * 0.1}deg)`
+                          transform: `rotate(${swipeUI.swipeDistance * 0.1}deg)`
                         }}
                       />
                     </div>
@@ -1740,7 +1729,7 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, isPremium }: DiscoverPage
                       className="absolute bottom-32 bg-green-500/95 backdrop-blur-sm px-8 py-3 rounded-full shadow-xl"
                       style={{ 
                         opacity: Math.min(swipeOpacity + 0.2, 1),
-                        transform: `translateY(${-swipeDistance * 0.1}px)`,
+                        transform: `translateY(${-swipeUI.swipeDistance * 0.1}px)`,
                         transition: 'none'
                       }}
                     >
@@ -1750,7 +1739,7 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, isPremium }: DiscoverPage
                 )}
 
                 {/* Pass Overlay - Left Swipe */}
-                {swipeDirection === 'left' && (
+                {swipeUI.swipeDirection === 'left' && (
                   <div 
                     className="absolute inset-0 z-20 flex items-center justify-center pointer-events-none"
                     style={{ 
@@ -1769,7 +1758,7 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, isPremium }: DiscoverPage
                         className="w-12 h-12 text-white" 
                         style={{ 
                           filter: `drop-shadow(0 4px 8px rgba(0,0,0,0.3))`,
-                          transform: `rotate(${-swipeDistance * 0.1}deg)`
+                          transform: `rotate(${-swipeUI.swipeDistance * 0.1}deg)`
                         }}
                       />
                     </div>
@@ -1777,7 +1766,7 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, isPremium }: DiscoverPage
                       className="absolute bottom-32 bg-red-500/95 backdrop-blur-sm px-8 py-3 rounded-full shadow-xl"
                       style={{ 
                         opacity: Math.min(swipeOpacity + 0.2, 1),
-                        transform: `translateY(${-swipeDistance * 0.1}px)`,
+                        transform: `translateY(${-swipeUI.swipeDistance * 0.1}px)`,
                         transition: 'none'
                       }}
                     >
@@ -1800,12 +1789,13 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, isPremium }: DiscoverPage
               onToggleInfo={() => setShowMoreInfo(!showMoreInfo)}
               calculateAge={calculateAge}
               calculateDistance={calculateDistance}
-              swipeDirection={swipeDirection}
-              swipeDistance={swipeDistance}
+              swipeDirection={swipeUI.swipeDirection}
+              swipeDistance={swipeUI.swipeDistance}
               isVerified={calculateProfileVerification(currentMatch)}
               isSwipeAreaOnly={true}
               getOptimizedUrl={getOptimizedUrl}
               preCalculatedDistance={userDistances[currentMatch.id]}
+              imageStatus={imageStatus}
             />
           </div>
           {/* ...existing code... */}
@@ -1842,10 +1832,11 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, isPremium }: DiscoverPage
               onToggleInfo={() => setShowMoreInfo(!showMoreInfo)}
               calculateAge={calculateAge}
               calculateDistance={calculateDistance}
-              swipeDirection={swipeDirection}
-              swipeDistance={swipeDistance}
+              swipeDirection={swipeUI.swipeDirection}
+              swipeDistance={swipeUI.swipeDistance}
               isVerified={calculateProfileVerification(currentMatch)}
               isDetailsAreaOnly={true}
+              imageStatus={imageStatus}
               getOptimizedUrl={getOptimizedUrl}
               preCalculatedDistance={userDistances[currentMatch.id]}
             />

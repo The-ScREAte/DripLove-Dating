@@ -23,6 +23,7 @@ interface MatchCardProps {
   isDetailsAreaOnly?: boolean; // New prop to render only details area
   getOptimizedUrl?: (url: string) => string; // New prop for image optimization
   preCalculatedDistance?: number; // Distance already calculated by location service
+  imageStatus?: Record<string, 'idle'|'loading'|'loaded'|'error'>;
 }
 
 const MatchCard: React.FC<MatchCardProps> = ({
@@ -44,7 +45,11 @@ const MatchCard: React.FC<MatchCardProps> = ({
   isDetailsAreaOnly = false,
   getOptimizedUrl = (url: string) => url.includes('supabase') ? `${url}?width=800&quality=85&format=webp` : url,
   preCalculatedDistance
+  , imageStatus
 }) => {
+  // imageStatus: map of url => 'idle' | 'loading' | 'loaded' | 'error'
+  // (passed from parent component)
+  // ...existing code...
   const [currentSlide, setCurrentSlide] = useState(0);
   const [imageLoading, setImageLoading] = useState(false);
   
@@ -307,16 +312,17 @@ const MatchCard: React.FC<MatchCardProps> = ({
               {slides[currentSlide]?.type === 'image' && (
                 <div className="absolute right-3 top-16 sm:top-8 z-50">
                   <button
-                    className="bg-white/95 hover:bg-red-100 text-red-600 rounded-full shadow-lg transition-colors duration-200 border border-red-200 focus:outline-none focus:ring-2 focus:ring-red-300"
+                    className="bg-white/95 hover:bg-red-100 text-red-600 rounded-full transition-colors duration-200 border border-red-200 focus:outline-none focus:ring-2 focus:ring-red-300"
                     style={{
-                      backdropFilter: 'blur(8px)', 
-                      width: '24px', 
-                      height: '24px', 
-                      display: 'flex', 
-                      alignItems: 'center', 
+                      // Avoid backdrop-filter for performance; use semi-transparent background and border
+                      backgroundColor: 'rgba(255,255,255,0.95)',
+                      width: '24px',
+                      height: '24px',
+                      display: 'flex',
+                      alignItems: 'center',
                       justifyContent: 'center',
                       flexShrink: 0
-                    }} 
+                    }}
                     onClick={e => { e.stopPropagation(); setShowReportModal(true); }}
                     aria-label="Report image"
                   >
@@ -333,22 +339,43 @@ const MatchCard: React.FC<MatchCardProps> = ({
                       <Loader2 className="h-8 w-8 animate-spin text-pink-500" />
                     </div>
                   )}
-                  <img
-                    src={getOptimizedUrl(slides[currentSlide].content)}
-                    alt={`${match.first_name} ${match.last_name}`}
-                    className="w-full h-full object-contain transition-opacity duration-300"
-                    draggable={false}
-                    onLoadStart={() => setImageLoading(true)}
-                    onLoad={() => setImageLoading(false)}
-                    onError={() => setImageLoading(false)}
-                    style={{
-                      backgroundColor: edgeColor,
-                      touchAction: 'manipulation',
-                      userSelect: 'none',
-                      WebkitUserSelect: 'none',
-                      WebkitTouchCallout: 'none'
-                    }}
-                  />
+                  {(() => {
+                    const url = slides[currentSlide].content;
+                    // Build LQIP placeholder URL (tiny)
+                    const placeholder = url.includes('supabase') ? `${url}?width=40&quality=20&format=webp` : url;
+                    const full = getOptimizedUrl(url);
+                    const status = imageStatus?.[url] || 'idle';
+
+                    return (
+                      <>
+                        <img
+                          src={placeholder}
+                          aria-hidden
+                          className="absolute inset-0 w-full h-full object-cover"
+                          style={{ filter: 'none', transform: 'scale(1.2)' }}
+                          draggable={false}
+                        />
+                        {status === 'loaded' && (
+                          <img
+                            src={full}
+                            alt={`${match.first_name} ${match.last_name}`}
+                            className="w-full h-full object-contain transition-opacity duration-300 relative z-10"
+                            draggable={false}
+                            onLoadStart={() => setImageLoading(true)}
+                            onLoad={() => setImageLoading(false)}
+                            onError={() => setImageLoading(false)}
+                            style={{
+                              backgroundColor: edgeColor,
+                              touchAction: 'manipulation',
+                              userSelect: 'none',
+                              WebkitUserSelect: 'none',
+                              WebkitTouchCallout: 'none'
+                            }}
+                          />
+                        )}
+                      </>
+                    );
+                  })()}
                 </div>
               ) : slides[currentSlide]?.type === 'bio' ? (
                 <div className={`w-full h-full ${userBackgroundColor} flex items-center justify-center p-8`}>

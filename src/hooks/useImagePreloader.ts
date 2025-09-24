@@ -17,15 +17,16 @@ interface PreloadedImageData {
 
 export const useImagePreloader = (options: ImagePreloaderOptions = {}) => {
   const {
-    maxConcurrent = 3,
+    maxConcurrent = 4,
     quality = 85,
     width = 800,
     format = 'webp'
   } = options;
 
-  const [preloadedImages, setPreloadedImages] = useState<Map<string, PreloadedImageData>>(new Map());
+  // imageStatus stores simple status for each URL: 'idle' | 'loading' | 'loaded' | 'error'
+  const [imageStatus, setImageStatus] = useState<Record<string, 'idle'|'loading'|'loaded'|'error'>>({});
   const loadingQueue = useRef<string[]>([]);
-  const isProcessing = useRef(false);
+  const inFlight = useRef(0);
 
   const optimizeImageUrl = useCallback((url: string): string => {
     if (url.includes('supabase')) {
@@ -37,122 +38,82 @@ export const useImagePreloader = (options: ImagePreloaderOptions = {}) => {
   const preloadImage = useCallback((url: string): Promise<void> => {
     return new Promise((resolve, reject) => {
       const optimizedUrl = optimizeImageUrl(url);
-      
-      // Check if already loaded or loading
-      const existing = preloadedImages.get(url);
-      if (existing?.loaded) {
+
+      const status = imageStatus[url];
+      if (status === 'loaded') {
         resolve();
         return;
       }
-      if (existing?.loading) {
-        // Wait for existing load to complete with immediate checking
-        const checkLoaded = () => {
-          const current = preloadedImages.get(url);
-          if (current?.loaded) {
-            resolve();
-          } else if (current?.error) {
-            reject(new Error('Image failed to load'));
-          } else {
-            setTimeout(checkLoaded, 10); // Much faster checking
-          }
+      if (status === 'loading') {
+        // Poll until loaded or error
+        const check = () => {
+          const s = (imageStatus as any)[url];
+          if (s === 'loaded') return resolve();
+          if (s === 'error') return reject(new Error('Image failed to load'));
+          setTimeout(check, 50);
         };
-        checkLoaded();
+        check();
         return;
       }
 
-      // Mark as loading
-      setPreloadedImages(prev => new Map(prev.set(url, {
-        url,
-        loaded: false,
-        loading: true,
-        error: false,
-        optimizedUrl
-      })));
+      // Mark loading
+      setImageStatus(prev => ({ ...prev, [url]: 'loading' }));
+      inFlight.current++;
 
       const img = new Image();
-      
-      // Set loading priority for faster loading
       img.loading = 'eager';
-      
+      img.src = optimizedUrl;
+
       img.onload = () => {
-        setPreloadedImages(prev => new Map(prev.set(url, {
-          url,
-          loaded: true,
-          loading: false,
-          error: false,
-          optimizedUrl
-        })));
+        setImageStatus(prev => ({ ...prev, [url]: 'loaded' }));
+        inFlight.current = Math.max(0, inFlight.current - 1);
         resolve();
       };
-      
+
       img.onerror = () => {
-        setPreloadedImages(prev => new Map(prev.set(url, {
-          url,
-          loaded: false,
-          loading: false,
-          error: true,
-          optimizedUrl
-        })));
+        setImageStatus(prev => ({ ...prev, [url]: 'error' }));
+        inFlight.current = Math.max(0, inFlight.current - 1);
         reject(new Error('Image failed to load'));
       };
-      
-      img.src = optimizedUrl;
     });
-  }, [optimizeImageUrl, preloadedImages]);
+  }, [optimizeImageUrl, imageStatus]);
 
   const processQueue = useCallback(async () => {
-    if (isProcessing.current || loadingQueue.current.length === 0) return;
-    
-    isProcessing.current = true;
-    
-    while (loadingQueue.current.length > 0) {
-      const batch = loadingQueue.current.splice(0, maxConcurrent);
-      const promises = batch.map(url => preloadImage(url).catch(error => {
-      }));
-      
-      await Promise.all(promises);
-      
-      // No delay between batches for maximum speed
-      // Removed delay for faster image loading
+    // Process queue respecting maxConcurrent and current inFlight
+    while (loadingQueue.current.length > 0 && inFlight.current < maxConcurrent) {
+      const next = loadingQueue.current.shift();
+      if (!next) break;
+      // Start preload but don't await serially here
+      preloadImage(next).catch(() => {});
     }
-    
-    isProcessing.current = false;
   }, [maxConcurrent, preloadImage]);
 
   const preloadImages = useCallback((urls: string[]) => {
-    // Add new URLs to queue (avoid duplicates)
-    const newUrls = urls.filter(url => 
-      !loadingQueue.current.includes(url) && 
-      !preloadedImages.get(url)?.loaded
-    );
-    
+    const newUrls = urls.filter(url => !loadingQueue.current.includes(url) && (imageStatus[url] !== 'loaded' && imageStatus[url] !== 'loading'));
     loadingQueue.current.push(...newUrls);
     processQueue();
-  }, [processQueue, preloadedImages]);
+  }, [processQueue, imageStatus]);
 
   const getOptimizedUrl = useCallback((url: string): string => {
-    const imageData = preloadedImages.get(url);
-    return imageData?.optimizedUrl || optimizeImageUrl(url);
-  }, [preloadedImages, optimizeImageUrl]);
+    return optimizeImageUrl(url);
+  }, [optimizeImageUrl]);
 
-  const isImageLoaded = useCallback((url: string): boolean => {
-    return preloadedImages.get(url)?.loaded || false;
-  }, [preloadedImages]);
-
-  const isImageLoading = useCallback((url: string): boolean => {
-    return preloadedImages.get(url)?.loading || false;
-  }, [preloadedImages]);
+  const isImageLoaded = useCallback((url: string): boolean => imageStatus[url] === 'loaded', [imageStatus]);
+  const isImageLoading = useCallback((url: string): boolean => imageStatus[url] === 'loading', [imageStatus]);
 
   const clearCache = useCallback(() => {
-    setPreloadedImages(new Map());
+    setImageStatus({});
     loadingQueue.current = [];
+    inFlight.current = 0;
   }, []);
 
   return {
     preloadImages,
+    preloadImage,
     getOptimizedUrl,
     isImageLoaded,
     isImageLoading,
+    imageStatus,
     clearCache
   };
 };
