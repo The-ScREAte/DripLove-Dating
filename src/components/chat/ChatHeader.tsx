@@ -34,7 +34,7 @@ const ChatHeader: React.FC<ChatHeaderProps> = ({
                    (selectedMatch.user1_id === currentUserId ? selectedMatch.user2_id : selectedMatch.user1_id);
 
   return (
-    <div className="p-4 border-b bg-white flex items-center justify-between">
+  <div className="px-4 py-3 border-b bg-white flex items-center justify-between">
       <div className="flex items-center space-x-3">
         {isMobile && (
           <Button 

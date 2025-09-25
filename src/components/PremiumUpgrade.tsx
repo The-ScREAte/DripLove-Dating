@@ -249,7 +249,7 @@ const PremiumUpgrade = ({ currentUser, onClose, preselectedPlan }: PremiumUpgrad
   ];
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-pink-500 via-purple-600 to-indigo-700 p-2 sm:p-4 md:p-6 lg:p-8 overflow-y-auto">
+  <div className="min-h-screen bg-gradient-to-br from-pink-500 via-purple-600 to-indigo-700 p-0 sm:p-2 md:p-4 lg:p-6 overflow-y-auto">
       <div className="max-w-3xl md:max-w-4xl lg:max-w-5xl mx-auto">
         {onClose && (
           <Button

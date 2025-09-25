@@ -45,6 +45,7 @@ const ChatPage = ({ currentUser, onUnreadChange }: ChatPageProps) => {
   const [selectedMatch, setSelectedMatch] = useState<ChatMatch | null>(null);
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [newMessage, setNewMessage] = useState('');
+  const [isSending, setIsSending] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
   const [isUserProfileOpen, setIsUserProfileOpen] = useState(false);
   const [selectedUserId, setSelectedUserId] = useState<string>('');
@@ -126,15 +127,19 @@ const ChatPage = ({ currentUser, onUnreadChange }: ChatPageProps) => {
             const newMsg = payload.new as ChatMessage;
             
             // Update messages state
-            setMessages((prev) => {
-              const updated = [...prev, newMsg];
-              // Update cache with new message
-              chatMessagesCache.set(selectedMatch.id, {
-                messages: updated,
-                timestamp: Date.now()
+              setMessages((prev) => {
+                // Dedupe: if message id already exists, ignore (prevents duplicates from optimistic + realtime)
+                if (prev.some(m => m.id === newMsg.id)) {
+                  return prev;
+                }
+                const updated = [...prev, newMsg];
+                // Update cache with new message
+                chatMessagesCache.set(selectedMatch.id, {
+                  messages: updated,
+                  timestamp: Date.now()
+                });
+                return updated;
               });
-              return updated;
-            });
             
             if (newMsg.sender_id !== currentUser.id) {
               markMessagesAsRead();
@@ -379,7 +384,8 @@ const ChatPage = ({ currentUser, onUnreadChange }: ChatPageProps) => {
   };
 
   const sendMessage = async () => {
-    if (!newMessage.trim() || !selectedMatch) return;
+    if (!newMessage.trim() || !selectedMatch || isSending) return;
+    setIsSending(true);
 
     if (selectedMatch.partner?.is_admin) {
       toast({
@@ -516,6 +522,9 @@ const ChatPage = ({ currentUser, onUnreadChange }: ChatPageProps) => {
         variant: 'destructive'
       });
     }
+    finally {
+      setIsSending(false);
+    }
   };
 
   const testNotification = async () => {
@@ -608,7 +617,7 @@ const ChatPage = ({ currentUser, onUnreadChange }: ChatPageProps) => {
 
   if (!selectedMatch) {
     return (
-      <div className="h-full flex flex-col bg-gray-50">
+      <div className="fixed inset-0 flex flex-col bg-gray-50" style={{ paddingTop: 'calc(env(safe-area-inset-top, 0px) + 32px)' }}>
         {/* Header (safe area respected via env padding) */}
         <div className="sticky top-0 z-30 bg-gradient-to-r from-pink-500 to-purple-600 text-white" style={{ paddingTop: 'env(safe-area-inset-top, 0px)' }}>
           <div className="p-7 mt-2">
@@ -628,8 +637,8 @@ const ChatPage = ({ currentUser, onUnreadChange }: ChatPageProps) => {
           </div>
         </div>
 
-        {/* Scrollable Chat List */}
-        <div className="flex-1 overflow-y-auto pb-20">
+  {/* Scrollable Chat List (only this area scrolls) */}
+  <div className="flex-1 overflow-y-auto pb-28" style={{ WebkitOverflowScrolling: 'touch' }}>
           {filteredMatches.length === 0 ? (
             <div className="p-4 text-center text-gray-500">
               {searchTerm ? 'No matches found' : 'No conversations yet'}
@@ -709,9 +718,9 @@ const ChatPage = ({ currentUser, onUnreadChange }: ChatPageProps) => {
   }
 
   return (
-    <div className="h-full flex flex-col bg-gray-50">
-      {/* Chat Header (safe area respected via env padding) */}
-  <div className="sticky z-20 bg-white border-b border-gray-200 shadow-sm" style={{ top: 'env(safe-area-inset-top, 0px)', paddingTop: 0, position: 'sticky' }}>
+  <div className="fixed inset-0 flex flex-col bg-gray-50" style={{ paddingTop: 'calc(env(safe-area-inset-top, 0px) + 56px)' }}>
+      {/* Chat Header (below global header) */}
+  <div className="shrink-0 bg-white border-b border-gray-200 shadow-sm z-20">
         <ChatHeader
           selectedMatch={selectedMatch}
           onBack={() => setSelectedMatch(null)}
@@ -723,19 +732,17 @@ const ChatPage = ({ currentUser, onUnreadChange }: ChatPageProps) => {
         />
       </div>
 
-      {/* Scrollable Messages Area */}
-      <div 
+      {/* Scrollable Messages Area (only this area scrolls) */}
+      <div
         ref={messagesContainerRef}
-        className="flex-1 px-4 space-y-2 bg-gray-50 overflow-y-auto"
-        style={{ 
-          paddingBottom: '10px'
-        }}
+        className="flex-1 overflow-y-auto px-4 space-y-2 bg-gray-50 pb-28"
+        style={{ WebkitOverflowScrolling: 'touch' }}
       >
         {messages.map((message, index) => {
           const prevMessage = messages[index - 1];
-          const isConsecutive = prevMessage && 
+          const isConsecutive = prevMessage &&
             prevMessage.sender_id === message.sender_id &&
-            new Date(message.created_at || message.sent_at || '').getTime() - 
+            new Date(message.created_at || message.sent_at || '').getTime() -
             new Date(prevMessage.created_at || prevMessage.sent_at || '').getTime() < 300000;
 
           return (
@@ -750,17 +757,17 @@ const ChatPage = ({ currentUser, onUnreadChange }: ChatPageProps) => {
         <div ref={messagesEndRef} />
       </div>
 
-      {/* Message Input (safe area respected via env padding) */}
-      <div className="sticky bottom-0 z-30 bg-white border-t border-gray-200" style={{ paddingBottom: 'env(safe-area-inset-bottom, 0px)' }}>
-        <div className="pb-2">
-          <MessageInput
-            newMessage={newMessage}
-            onMessageChange={setNewMessage}
-            onSendMessage={sendMessage}
-          />
-        </div>
+      {/* Message Input (fixed, non-scrolling). MessageInput now owns its container so it can control safe-area and stacking */}
+      <div className="shrink-0 z-20">
+        <MessageInput
+          newMessage={newMessage}
+          onMessageChange={setNewMessage}
+          onSendMessage={sendMessage}
+          disabled={isSending}
+        />
       </div>
 
+      {/* Modals */}
       <UserProfileModal
         isOpen={isUserProfileOpen}
         onClose={() => setIsUserProfileOpen(false)}
