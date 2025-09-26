@@ -19,11 +19,10 @@ interface ReportModalProps {
   onClose: () => void;
   reporterId: string;
   reportedUserId: string;
-  contentType: 'profile' | 'message' | 'image';
   contentId?: string;
 }
 
-const ReportModal: React.FC<ReportModalProps> = ({ open, onClose, reporterId, reportedUserId, contentType, contentId }) => {
+const ReportModal: React.FC<ReportModalProps> = ({ open, onClose, reporterId, reportedUserId, contentId }) => {
   const [reason, setReason] = useState('');
   const [description, setDescription] = useState('');
   const [loading, setLoading] = useState(false);
@@ -40,86 +39,46 @@ const ReportModal: React.FC<ReportModalProps> = ({ open, onClose, reporterId, re
 
   const handleSubmit = async () => {
     if (!reason) return;
+
+    if (!reporterId) {
+      toast({ title: 'Error', description: 'Reporter id missing. Please sign in.', variant: 'destructive' });
+      return;
+    }
+
+    if (!reportedUserId) {
+      toast({ title: 'Error', description: 'Reported user id missing.', variant: 'destructive' });
+      return;
+    }
+
+    if (!contentId) {
+      toast({ title: 'Error', description: 'Message id missing. Cannot report.', variant: 'destructive' });
+      return;
+    }
+
     setLoading(true);
-    let error: any = null;
-    if (contentType === 'message') {
-      // Basic validation to avoid bad inserts
-      if (!contentId) {
-        setLoading(false);
-        toast({ title: 'Error', description: 'Message id missing. Cannot report.', variant: 'destructive' });
-        return;
-      }
-      if (!reporterId) {
-        setLoading(false);
-        toast({ title: 'Error', description: 'Reporter id missing. Please sign in.', variant: 'destructive' });
-        return;
-      }
-      // Save chat reports to the new reported_chats table
-      const insertRes = await supabase.from('reported_chats').insert({
+
+    try {
+      const { error } = await supabase.from('reported_chats').insert({
         reporter_id: reporterId,
         reported_user_id: reportedUserId,
         chat_id: contentId,
-        reason,
-        description
+        reason: reason.trim(),
+        description: description.trim() ? description.trim() : null,
       });
-      console.debug('reported_chats insert response:', insertRes);
-      error = insertRes.error;
 
-      // Immediately verify the row exists (helpful for debugging RLS/type issues)
-      if (!error) {
-        try {
-          const { data: verifyRows, error: verifyErr } = await supabase
-            .from('reported_chats')
-            .select('*')
-            .eq('reporter_id', reporterId)
-            .eq('chat_id', contentId)
-            .order('created_at', { ascending: false })
-            .limit(1);
-
-          console.debug('reported_chats verify response:', { verifyRows, verifyErr });
-          if (verifyErr) {
-            console.error('Error verifying reported_chats row:', verifyErr);
-            toast({ title: 'Warning', description: 'Report may not have been saved: verification query failed.', variant: 'destructive' });
-            alert('Report submitted but verification query failed. Check console for details.');
-          } else if (!verifyRows || verifyRows.length === 0) {
-            console.error('Insert returned OK but no row found for reported_chats');
-            toast({ title: 'Warning', description: 'Report submitted but not found in DB. Check policies/IDs.', variant: 'destructive' });
-            alert('Report submitted, but no row found in reported_chats. Please check DB policies or console logs.');
-          } else {
-            // Successful insert + verify
-            const saved = verifyRows[0];
-            alert('Report saved successfully. Report id: ' + (saved.id || '(no id)'));
-          }
-        } catch (vErr) {
-          console.error('Verification query threw error:', vErr);
-          alert('Report submitted but verification threw an error. Check console.');
-        }
+      if (error) {
+        throw error;
       }
-    } else {
-      // Fallback for profile/image reports — keep existing behavior
-      const res = await supabase.from('admin_actions').insert({
-        action_type: 'report',
-        target_user_id: reportedUserId,
-        details: {
-          reporter_id: reporterId,
-          content_type: contentType,
-          content_id: contentId,
-          reason,
-          description,
-        }
-      });
-      console.debug('admin_actions insert response:', res);
-      error = res.error;
-    }
-    setLoading(false);
-    if (error) {
-      console.error('Report insert error:', error);
-      toast({ title: 'Error', description: error.message || 'Failed to submit report', variant: 'destructive' });
-    } else {
+
       toast({ title: 'Report submitted', description: 'Thank you for helping keep the community safe.' });
       setReason('');
       setDescription('');
       onClose();
+    } catch (error: any) {
+      console.error('Error submitting report:', error);
+      toast({ title: 'Error', description: error.message || 'Failed to submit report', variant: 'destructive' });
+    } finally {
+      setLoading(false);
     }
   };
 
