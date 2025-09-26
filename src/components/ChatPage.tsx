@@ -445,15 +445,36 @@ const ChatPage = ({ currentUser, onUnreadChange }: ChatPageProps) => {
       // Replace optimistic message with real one
       if (data) {
         setMessages(prev => {
-          const updated = prev.map(msg => 
-            msg.id === tempId ? { ...data, sent_at: data.created_at, receiver_id: optimisticMessage.receiver_id } as ChatMessage : msg
-          );
-          // Update cache
-          chatMessagesCache.set(selectedMatch.id, {
-            messages: updated,
-            timestamp: Date.now()
-          });
-          return updated;
+          const serverMsg: ChatMessage = { ...data, sent_at: data.created_at, receiver_id: optimisticMessage.receiver_id } as ChatMessage;
+
+          const hasServer = prev.some(m => m.id === data.id);
+          const hasTemp = prev.some(m => m.id === tempId);
+
+          // If temp exists, replace it with server message
+          if (hasTemp) {
+            const replaced = prev.map(m => (m.id === tempId ? serverMsg : m));
+            // Ensure uniqueness by id (in case server message was already appended by realtime)
+            const unique: ChatMessage[] = [];
+            const seen = new Set<string>();
+            for (const m of replaced) {
+              if (!seen.has(m.id)) {
+                unique.push(m);
+                seen.add(m.id);
+              }
+            }
+            chatMessagesCache.set(selectedMatch.id, { messages: unique, timestamp: Date.now() });
+            return unique;
+          }
+
+          // If temp doesn't exist and server message not present, append server message
+          if (!hasServer) {
+            const updated = [...prev, serverMsg];
+            chatMessagesCache.set(selectedMatch.id, { messages: updated, timestamp: Date.now() });
+            return updated;
+          }
+
+          // Server message already present and no temp to replace — keep as-is
+          return prev;
         });
       }
     } catch (error) {
@@ -617,11 +638,11 @@ const ChatPage = ({ currentUser, onUnreadChange }: ChatPageProps) => {
 
   if (!selectedMatch) {
     return (
-      <div className="fixed inset-0 flex flex-col bg-gray-50" style={{ paddingTop: 'calc(env(safe-area-inset-top, 0px) + 32px)' }}>
+  <div className="fixed inset-0 flex flex-col bg-gray-50">
         {/* Header (safe area respected via env padding) */}
-        <div className="sticky top-0 z-30 bg-gradient-to-r from-pink-500 to-purple-600 text-white" style={{ paddingTop: 'env(safe-area-inset-top, 0px)' }}>
-          <div className="p-7 mt-2">
-            <h2 className="text-xl font-bold mb-4">DripChat</h2>
+        <div className="sticky top-0 z-30 bg-gradient-to-r from-pink-500 to-purple-600 text-white" style={{ paddingTop: 'clamp(26px, env(safe-area-inset-top, 0px), 24px)' }}>
+          <div className="p-4 mt-4">
+            <h2 className="text-xl font-bold mb-0">DripChat</h2>
             <div className="relative">
               <input
                 type="text"
@@ -718,9 +739,9 @@ const ChatPage = ({ currentUser, onUnreadChange }: ChatPageProps) => {
   }
 
   return (
-  <div className="fixed inset-0 flex flex-col bg-gray-50" style={{ paddingTop: 'calc(env(safe-area-inset-top, 0px) + 56px)' }}>
+  <div className="fixed inset-0 flex flex-col bg-gray-50">
       {/* Chat Header (below global header) */}
-  <div className="shrink-0 bg-white border-b border-gray-200 shadow-sm z-20">
+  <div className="shrink-0 bg-white border-b border-gray-200 shadow-sm z-20 m-0 p-0">
         <ChatHeader
           selectedMatch={selectedMatch}
           onBack={() => setSelectedMatch(null)}
@@ -735,8 +756,8 @@ const ChatPage = ({ currentUser, onUnreadChange }: ChatPageProps) => {
       {/* Scrollable Messages Area (only this area scrolls) */}
       <div
         ref={messagesContainerRef}
-        className="flex-1 overflow-y-auto px-4 space-y-2 bg-gray-50 pb-28"
-        style={{ WebkitOverflowScrolling: 'touch' }}
+        className="flex-1 overflow-y-auto px-4 space-y-2 bg-gray-50 pb-1"
+        style={{ WebkitOverflowScrolling: 'touch', paddingTop: '90px' }}
       >
         {messages.map((message, index) => {
           const prevMessage = messages[index - 1];

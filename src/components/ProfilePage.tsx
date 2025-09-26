@@ -419,12 +419,14 @@ const ProfilePage = ({ currentUser, profile, onProfileUpdate, onLogout, onShowTe
            WebkitTouchCallout: 'none'
          }}> 
       {/* Fixed Header with Progress Bar - completely fixed below main header */}
-      <div 
-        className="fixed left-0 right-0 z-40 bg-white border-b border-gray-200 shadow-sm" 
-        style={{ 
-          top: '20px', // Shift header up
-          paddingTop: 'max(env(safe-area-inset-top, 0px), 30px)',
-          width: '100%'
+      <div
+        className="fixed left-0 right-0 z-40 bg-white border-b border-gray-200 shadow-sm"
+        style={{
+          // Use clamp to provide a reasonable min and max around the
+          // device's safe-area inset so the header feels consistent.
+          top: 'clamp(26px, env(safe-area-inset-top, 0px), 24px)',
+          paddingTop: 'clamp(26px, env(safe-area-inset-top, 0px), 24px)',
+          width: '100%',
         }}
       >
   <div className="p-2">
@@ -531,7 +533,7 @@ const ProfilePage = ({ currentUser, profile, onProfileUpdate, onLogout, onShowTe
       </div>
 
       {/* Scrollable Content - with padding to account for fixed header */}
-      <div className="max-w-4xl mx-auto p-6 pb-12 space-y-8 overflow-x-hidden w-full" style={{ paddingTop: '180px', paddingBottom: '40px' }}>
+      <div className="max-w-4xl mx-auto p-4 pb-12 space-y-8 overflow-x-hidden w-full" style={{ paddingTop: '160px', paddingBottom: '40px' }}>
         <div className="w-full max-w-full overflow-hidden">
           <div className="flex flex-col sm:flex-row sm:items-center gap-2 mb-2">
             <ProfileSummaryCard currentUser={currentUser} />

@@ -553,6 +553,48 @@ export type Database = {
         }
         Relationships: []
       }
+      reported_chats: {
+        Row: {
+          id: string
+          reporter_id: string
+          reported_user_id: string
+          chat_id: string
+          reason: string | null
+          description: string | null
+          status: string | null
+          admin_id: string | null
+          admin_notes: string | null
+          created_at: string | null
+          resolved_at: string | null
+        }
+        Insert: {
+          id?: string
+          reporter_id: string
+          reported_user_id: string
+          chat_id: string
+          reason?: string | null
+          description?: string | null
+          status?: string | null
+          admin_id?: string | null
+          admin_notes?: string | null
+          created_at?: string | null
+          resolved_at?: string | null
+        }
+        Update: {
+          id?: string
+          reporter_id?: string
+          reported_user_id?: string
+          chat_id?: string
+          reason?: string | null
+          description?: string | null
+          status?: string | null
+          admin_id?: string | null
+          admin_notes?: string | null
+          created_at?: string | null
+          resolved_at?: string | null
+        }
+        Relationships: []
+      }
       subscription_plans: {
         Row: {
           created_at: string

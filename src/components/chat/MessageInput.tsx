@@ -43,7 +43,7 @@ const MessageInput: React.FC<MessageInputProps> = ({
     <div 
       ref={containerRef}
       className="p-2 border-t bg-white relative z-30"
-      style={{ paddingBottom: 'env(safe-area-inset-bottom, 0px)', marginBottom: '40px' }}
+      style={{ paddingBottom: 'clamp(16px, env(safe-area-inset-bottom, 0px), 24px)', marginBottom: '40px' }}
     >
       <div className="flex items-center space-x-2">
         <div className="flex-1 flex items-center space-x-2 bg-gray-100 rounded-full px-4 py-2">

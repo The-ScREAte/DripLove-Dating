@@ -1,6 +1,5 @@
 import React from 'react';
 import { ChatMessage, CurrentUser } from '@/types';
-import ReportButton from '../ReportButton';
 
 interface MessageBubbleProps {
   message: ChatMessage;
@@ -36,18 +35,7 @@ const MessageBubble: React.FC<MessageBubbleProps> = ({
             </span>
           )}
         </div>
-        {/* Only allow reporting messages from others */}
-        {!isOwnMessage && (
-          <div className="absolute top-1 right-1">
-            <ReportButton
-              reporterId={currentUser.id}
-              reportedUserId={message.sender_id}
-              contentType="message"
-              contentId={message.id}
-              className="z-10"
-            />
-          </div>
-        )}
+        {/* Reporting moved to header menu; no inline report on messages */}
       </div>
     </div>
   );

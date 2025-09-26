@@ -1,4 +1,5 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
+import { createPortal } from 'react-dom';
 import { Button } from '@/components/ui/button';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
@@ -34,20 +35,56 @@ const ReportButton: React.FC<ReportButtonProps> = ({
   const [loading, setLoading] = useState(false);
   const { toast } = useToast();
 
+  useEffect(() => {
+    if (open) {
+      const prev = document.body.style.overflow;
+      document.body.style.overflow = 'hidden';
+      return () => {
+        document.body.style.overflow = prev;
+      };
+    }
+    return;
+  }, [open]);
+
   const handleSubmit = async () => {
     if (!reason) return;
     setLoading(true);
-    const { error } = await supabase.from('admin_actions').insert({
-      action_type: 'report',
-      target_user_id: reportedUserId,
-      details: {
-        reporter_id: reporterId,
-        content_type: contentType,
-        content_id: contentId,
-        reason,
-        description,
+    let error: any = null;
+    if (contentType === 'message') {
+      if (!contentId) {
+        setLoading(false);
+        toast({ title: 'Error', description: 'Message id missing. Cannot report.', variant: 'destructive' });
+        return;
       }
-    });
+      if (!reporterId) {
+        setLoading(false);
+        toast({ title: 'Error', description: 'Reporter id missing. Please sign in.', variant: 'destructive' });
+        return;
+      }
+      const res = await supabase.from('reported_chats').insert({
+        reporter_id: reporterId,
+        reported_user_id: reportedUserId,
+        chat_id: contentId,
+        reason,
+        description
+      });
+      console.debug('reported_chats insert response:', res);
+      error = res.error;
+    } else {
+      const res = await supabase.from('admin_actions').insert({
+        action_type: 'report',
+        target_user_id: reportedUserId,
+        details: {
+          reporter_id: reporterId,
+          content_type: contentType,
+          content_id: contentId,
+          reason,
+          description,
+        }
+      });
+      console.debug('admin_actions insert response:', res);
+      error = res.error;
+    }
     setLoading(false);
     setOpen(false);
     setReason('');
@@ -64,7 +101,7 @@ const ReportButton: React.FC<ReportButtonProps> = ({
       <Button size="sm" variant="outline" onClick={() => setOpen(true)}>
         Report
       </Button>
-      {open && (
+      {open && createPortal(
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-40">
           <div className="bg-white rounded-lg shadow-lg p-6 w-full max-w-xs">
             <h3 className="font-semibold mb-2">Report</h3>
@@ -94,7 +131,8 @@ const ReportButton: React.FC<ReportButtonProps> = ({
               </Button>
             </div>
           </div>
-        </div>
+        </div>,
+        document.body
       )}
     </div>
   );

@@ -672,9 +672,9 @@ const MatchCard: React.FC<MatchCardProps> = ({
             aria-label={showMoreInfo ? "Hide details" : "Show details"}
           >
             {showMoreInfo ? (
-              <ChevronUp className="w-5 h-5" />
+              <ChevronUp className="w-5 h-4" />
             ) : (
-              <ChevronDown className="w-5 h-5" />
+              <ChevronDown className="w-5 h-4" />
             )}
           </button>
         </div>

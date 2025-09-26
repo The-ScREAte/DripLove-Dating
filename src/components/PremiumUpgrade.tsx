@@ -249,13 +249,29 @@ const PremiumUpgrade = ({ currentUser, onClose, preselectedPlan }: PremiumUpgrad
   ];
 
   return (
-  <div className="min-h-screen bg-gradient-to-br from-pink-500 via-purple-600 to-indigo-700 p-0 sm:p-2 md:p-4 lg:p-6 overflow-y-auto">
-      <div className="max-w-3xl md:max-w-4xl lg:max-w-5xl mx-auto">
+  <div
+    className="min-h-screen bg-gradient-to-br from-pink-500 via-purple-600 to-indigo-700 overflow-y-auto"
+    style={{
+      // Use clamp to respect the device safe-area inset while keeping
+      // a reasonable minimum and maximum top padding for notched devices.
+      paddingTop: 'clamp(16px, env(safe-area-inset-top, 0px), 28px)',
+      // Keep the responsive horizontal padding via remaining classes on inner container
+      paddingLeft: 'env(safe-area-inset-left, 0px)',
+      paddingRight: 'env(safe-area-inset-right, 0px)'
+    }}
+  >
+      <div
+        className="max-w-3xl md:max-w-4xl lg:max-w-5xl mx-auto px-0 sm:px-2 md:px-4 lg:px-6"
+        style={{
+          // Ensure there is enough bottom padding on devices with a home indicator
+          paddingBottom: 'clamp(36px, env(safe-area-inset-bottom, 0px), 244px)'
+        }}
+      >
         {onClose && (
           <Button
             onClick={onClose}
             variant="ghost"
-            className="mb-4 text-white hover:bg-white/20 transition-colors"
+            className="mb-8=0 text-white hover:bg-white/20 transition-colors"
           >
             <X className="w-4 h-4 mr-2" />
             Back

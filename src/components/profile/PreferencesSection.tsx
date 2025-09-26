@@ -64,18 +64,20 @@ const PreferencesSection = ({ editedProfile, isEditing, onSliderChange, onSelect
                   disabled={!isEditing}
                 />
                 {/* Visual enhancement for better UX */}
-                <div className="absolute -top-8 left-0 right-0 flex justify-between">
+                <div className="absolute -top-8 left-0 right-0 flex justify-between pointer-events-none">
                   <div className="bg-gray-800 text-white text-xs px-2 py-1 rounded" style={{ 
                     left: `${((editedProfile.min_age || 18) - 18) / (99 - 18) * 100}%`,
                     position: 'absolute',
-                    transform: 'translateX(-50%)'
+                    transform: 'translateX(-50%)',
+                    pointerEvents: 'none'
                   }}>
                     {editedProfile.min_age || 18}
                   </div>
                   <div className="bg-gray-800 text-white text-xs px-2 py-1 rounded" style={{ 
                     left: `${((editedProfile.max_age || 99) - 18) / (99 - 18) * 100}%`,
                     position: 'absolute',
-                    transform: 'translateX(-50%)'
+                    transform: 'translateX(-50%)',
+                    pointerEvents: 'none'
                   }}>
                     {editedProfile.max_age || 99}
                   </div>

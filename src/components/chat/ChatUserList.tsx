@@ -37,7 +37,10 @@ const ChatUserList: React.FC<ChatUserListProps> = ({
   return (
     <div className="w-full h-full flex flex-col">
       {/* Sticky Header with gradient background */}
-      <div className="sticky top-0 z-10 p-4 bg-gradient-to-r from-pink-500 to-purple-600 text-white flex-shrink-0">
+      <div
+        className="sticky top-0 z-10 p-4 bg-gradient-to-r from-pink-500 to-purple-600 text-white flex-shrink-0"
+        style={{ paddingTop: 'clamp(16px, env(safe-area-inset-top, 0px), 24px)' }}
+      >
         <h2 className="text-xl font-bold mb-4">Messages</h2>
         <div className="relative">
           <Input

@@ -866,7 +866,7 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, isPremium }: DiscoverPage
     const deltaX = endX - startXRef.current;
     const deltaY = Math.abs(endY - startYRef.current);
     const screenWidth = window.innerWidth;
-    const minSwipeDistance = screenWidth * 0.25; // Reduced from 0.4 to 0.25 for faster swipes
+  const minSwipeDistance = screenWidth * 0.60; // Increased to 0.75 for much longer swipes
 
     // Reset visual smear (flush any pending rAF)
     latestDeltaRef.current = 0;

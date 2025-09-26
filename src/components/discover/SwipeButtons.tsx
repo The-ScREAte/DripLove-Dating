@@ -22,14 +22,14 @@ const SwipeButtons: React.FC<SwipeButtonsProps> = ({
   const showCount = !isPremium && reversesLeft !== undefined && reversesLeft > 0;
   
   return (
-  <div className="absolute bottom-6 right-4 z-30 ios:bottom-6">
+  <div className="absolute bottom-9 right-4 z-30 ios:bottom-9">
       <div className="relative">
         <Button
           onClick={onReverse}
           variant="outline"
           disabled={!canReverse}
           className="rounded-full border-2 border-yellow-500 bg-yellow-500/20 hover:bg-yellow-500/30 disabled:opacity-30 backdrop-blur-sm shadow-lg hover:border-yellow-400 transition-all duration-200"
-          style={{ width: 20, height: 32, minWidth: 32, minHeight: 32 }}
+          style={{ width: 10, height: 22, minWidth: 22, minHeight: 22 }}
           aria-label="Undo last action"
         >
           <Undo2 style={{ width: 14, height: 16 }} className="text-yellow-500" />

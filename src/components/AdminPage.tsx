@@ -104,6 +104,9 @@ const AdminPageComponent = ({ currentUser, onLogout }: AdminPageProps) => {
   const [loadingPendingImages, setLoadingPendingImages] = useState(false);
   const [approvingImages, setApprovingImages] = useState<Record<string, boolean>>({});
   const [rejectingImages, setRejectingImages] = useState<Record<string, boolean>>({});
+  const [reportedChats, setReportedChats] = useState<any[]>([]);
+  const [loadingReportedChats, setLoadingReportedChats] = useState(false);
+  const [processingReportIds, setProcessingReportIds] = useState<Record<string, boolean>>({});
   const [isAdmin, setIsAdmin] = useState<boolean | null>(null);
   
   // Constants
@@ -496,6 +499,154 @@ const AdminPageComponent = ({ currentUser, onLogout }: AdminPageProps) => {
     }
   }, [toast]);
 
+  const fetchReportedChats = useCallback(async (force = false) => {
+    try {
+      setLoadingReportedChats(true);
+      const cacheKey = 'reported_chats';
+      const cached = userDataCache.get(cacheKey);
+      // If we have a cached value and force isn't set, use cache to avoid refetching
+      if (cached && !force) {
+        setReportedChats(cached as any[]);
+        setLoadingReportedChats(false);
+        return;
+      }
+
+      // Fetch reported chat rows from reported_chats
+      const { data: actions, error } = await supabase
+        .from('reported_chats')
+        .select('*')
+        .order('created_at', { ascending: false })
+        .limit(100);
+
+      if (error) throw error;
+      if (!actions || actions.length === 0) {
+        setReportedChats([]);
+        userDataCache.set(cacheKey, []);
+        return;
+      }
+
+      // Collect message ids and user ids to batch fetch
+      // reported_chats already has reporter_id, reported_user_id and chat_id fields
+      const messageIds = actions.map((a: any) => a.chat_id).filter(Boolean);
+      const userIds = [
+        ...new Set(actions.map((a: any) => a.reporter_id).filter(Boolean).concat(actions.map((a: any) => a.reported_user_id).filter(Boolean)))
+      ];
+
+      // Fetch chats/messages
+      const { data: chats } = await supabase.from('chats').select('id, message, sender_id, match_id, created_at').in('id', messageIds || []);
+
+      // Fetch profiles for reporter and reported users
+      const { data: profiles } = await supabase.from('profiles').select('id, first_name, last_name, email').in('id', userIds || []);
+
+      const transformed = actions.map((a: any) => {
+        const msg = (chats || []).find((c: any) => c.id === a.chat_id) || null;
+        const reporter = (profiles || []).find((p: any) => p.id === a.reporter_id) || null;
+        const reportedUser = (profiles || []).find((p: any) => p.id === a.reported_user_id) || null;
+
+        return {
+          id: a.id,
+          created_at: a.created_at,
+          admin_id: a.admin_id,
+          details: {
+            reporter_id: a.reporter_id,
+            content_type: 'message',
+            content_id: a.chat_id,
+            reason: a.reason,
+            description: a.description
+          },
+          message: msg,
+          reporter,
+          reportedUser,
+        };
+      });
+
+      setReportedChats(transformed);
+      userDataCache.set(cacheKey, transformed);
+    } catch (error) {
+      console.error('Error fetching reported chats:', error);
+      toast({ title: 'Error', description: 'Failed to load reported chats', variant: 'destructive' });
+      setReportedChats([]);
+    } finally {
+      setLoadingReportedChats(false);
+    }
+  }, [toast]);
+
+  const ignoreReport = async (reportId: string) => {
+    try {
+      if (!confirm('Ignore this report? This will remove it from the admin queue.')) return;
+      setProcessingReportIds(prev => ({ ...prev, [reportId]: true }));
+  const { error } = await supabase.from('reported_chats').delete().eq('id', reportId);
+      if (error) throw error;
+      setReportedChats(prev => prev.filter(r => r.id !== reportId));
+      userDataCache.clear();
+      toast({ title: 'Ignored', description: 'Report removed.' });
+    } catch (error) {
+      console.error('Error ignoring report:', error);
+      toast({ title: 'Error', description: 'Failed to ignore report', variant: 'destructive' });
+    } finally {
+      setProcessingReportIds(prev => ({ ...prev, [reportId]: false }));
+    }
+  };
+
+  const deleteReportedMessage = async (reportId: string, messageId?: string) => {
+    try {
+      if (!messageId) {
+        toast({ title: 'Error', description: 'Message id missing', variant: 'destructive' });
+        return;
+      }
+      if (!confirm('Permanently delete this message from the database?')) return;
+      setProcessingReportIds(prev => ({ ...prev, [reportId]: true }));
+
+  const { error: delErr } = await supabase.from('chats').delete().eq('id', messageId);
+      if (delErr) throw delErr;
+
+      // Remove the report after deleting the message
+  const { error: repErr } = await supabase.from('reported_chats').delete().eq('id', reportId);
+      if (repErr) throw repErr;
+
+      setReportedChats(prev => prev.filter(r => r.id !== reportId));
+      userDataCache.clear();
+      toast({ title: 'Deleted', description: 'Message removed and report cleared.' });
+    } catch (error) {
+      console.error('Error deleting reported message:', error);
+      toast({ title: 'Error', description: 'Failed to delete message', variant: 'destructive' });
+    } finally {
+      setProcessingReportIds(prev => ({ ...prev, [reportId]: false }));
+    }
+  };
+
+  const blockUserFromReport = async (reportId: string, reportedUserId?: string) => {
+    try {
+      if (!reportedUserId) {
+        toast({ title: 'Error', description: 'Reported user id missing', variant: 'destructive' });
+        return;
+      }
+      if (!confirm('Block this user? This will set their account status to BLOCKED.')) return;
+      setProcessingReportIds(prev => ({ ...prev, [reportId]: true }));
+
+      // Use existing RPC to update account status
+      const { error } = await supabase.rpc('admin_update_account_status', {
+        target_user_id: reportedUserId,
+        new_status: 'blocked'
+      });
+      if (error) throw error;
+
+      // Optionally remove the report after blocking
+  const { error: repErr } = await supabase.from('reported_chats').delete().eq('id', reportId);
+      if (repErr) throw repErr;
+
+      setReportedChats(prev => prev.filter(r => r.id !== reportId));
+      userDataCache.clear();
+      fetchAppStats();
+      toast({ title: 'User Blocked', description: 'User has been blocked and report cleared.' });
+    } catch (error) {
+      console.error('Error blocking user from report:', error);
+      toast({ title: 'Error', description: 'Failed to block user', variant: 'destructive' });
+    } finally {
+      setProcessingReportIds(prev => ({ ...prev, [reportId]: false }));
+    }
+  };
+
   const approveImage = async (imageId: string) => {
     try {
       setApprovingImages(prev => ({ ...prev, [imageId]: true }));
@@ -686,6 +837,7 @@ const AdminPageComponent = ({ currentUser, onLogout }: AdminPageProps) => {
       fetchAppStats();
       fetchUsers();
       fetchPendingImages();
+      fetchReportedChats();
     }
   }, [isAdmin, fetchAppStats, fetchUsers, fetchPendingImages]);
 
@@ -1281,6 +1433,54 @@ const AdminPageComponent = ({ currentUser, onLogout }: AdminPageProps) => {
             {/* Content Tab - Image Moderation */}
             <TabsContent value="content" className="space-y-4">
               <ImageModerationPanel />
+
+              {/* Reported Chats Section */}
+              <div className="bg-white border rounded-lg p-3">
+                <div className="flex items-center justify-between mb-3">
+                  <h3 className="text-lg font-medium">Reported Chats</h3>
+                  <div className="text-sm text-gray-500">{loadingReportedChats ? 'Loading...' : `${reportedChats.length} reports`}</div>
+                </div>
+
+                {loadingReportedChats ? (
+                  <div className="flex justify-center py-6">
+                    <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-pink-600"></div>
+                  </div>
+                ) : reportedChats.length === 0 ? (
+                  <div className="text-center py-6 text-gray-500">No reported chats.</div>
+                ) : (
+                  <div className="space-y-2 max-h-72 overflow-y-auto">
+                    {reportedChats.map((r) => (
+                      <div key={r.id} className="p-3 border rounded-lg flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+                        <div className="flex-1 min-w-0">
+                          <p className="text-sm font-medium truncate">{r.message?.message || '[message deleted]'}</p>
+                          <p className="text-xs text-gray-600 truncate">
+                            Reported by: {r.reporter ? `${r.reporter.first_name} ${r.reporter.last_name}` : r.details?.reporter_id}
+                            {' • '}
+                            Reported user: {r.reportedUser ? `${r.reportedUser.first_name} ${r.reportedUser.last_name}` : r.details?.reported_user_id || r.details?.reportedUser}
+                          </p>
+                          <p className="text-xs text-gray-500 mt-1">Reason: {r.details?.reason || '—'}</p>
+                          {r.details?.description && <p className="text-xs text-gray-500 mt-1">Notes: {r.details.description}</p>}
+                        </div>
+
+                        <div className="flex gap-2">
+                          <Button size="sm" variant="outline" onClick={() => ignoreReport(r.id)} disabled={processingReportIds[r.id]}>
+                            Ignore
+                          </Button>
+                          <Button size="sm" variant="destructive" onClick={() => blockUserFromReport(r.id, r.reportedUser?.id || r.details?.reported_user_id)} disabled={processingReportIds[r.id]}>
+                            Block
+                          </Button>
+                          <Button size="sm" variant="ghost" onClick={() => deleteReportedMessage(r.id, r.message?.id)} disabled={processingReportIds[r.id]}>
+                            Delete
+                          </Button>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+                <div className="mt-3">
+                  <Button size="sm" variant="outline" onClick={() => fetchReportedChats(true)}>Refresh</Button>
+                </div>
+              </div>
             </TabsContent>
 
             {/* Debugger Tab */}
