@@ -84,103 +84,113 @@ const MatchCard: React.FC<MatchCardProps> = ({
   const userBackgroundColor = getUserColor();
   
   // Create slides: mix images with bio and fun questions
+  // Use a seeded RNG based on match.id so ordering is deterministic per-profile
   const slides = React.useMemo(() => {
+    // Seeded RNG (mulberry32)
+    const seedFromString = (s: string | number | undefined) => {
+      const str = s == null ? '' : String(s);
+      let h = 2166136261 >>> 0;
+      for (let i = 0; i < str.length; i++) {
+        h ^= str.charCodeAt(i);
+        h = Math.imul(h, 16777619);
+      }
+      return h >>> 0;
+    };
+    const mulberry32 = (a: number) => () => {
+      let t = a += 0x6D2B79F5;
+      t = Math.imul(t ^ t >>> 15, t | 1);
+      t ^= t + Math.imul(t ^ t >>> 7, t | 61);
+      return ((t ^ t >>> 14) >>> 0) / 4294967296;
+    };
+
+    const seed = seedFromString(match.id || match.first_name || 0);
+    const rand = mulberry32(seed);
+
+    const seededShuffle = <T,>(arr: T[]) => {
+      const a = arr.slice();
+      for (let i = a.length - 1; i > 0; i--) {
+        const j = Math.floor(rand() * (i + 1));
+        [a[i], a[j]] = [a[j], a[i]];
+      }
+      return a;
+    };
+
     const imageSlides = userImages.map((image, index) => ({
       type: 'image' as const,
       content: image,
       index
     }));
-    
+
     // Collect all non-image content
-    const nonImageContent = [];
-    
+    const nonImageContent: Array<any> = [];
+
     if (match.bio?.trim()) {
-      nonImageContent.push({
-        type: 'bio' as const,
-        content: match.bio,
-        index: -1
-      });
+      nonImageContent.push({ type: 'bio' as const, content: match.bio, index: -1 });
     }
-    
-    // Select only one random fun question
-    const funQuestions = [
-      match.fun_fact?.trim() && {
-        type: 'fun_fact' as const,
-        content: match.fun_fact,
-        index: -1
-      },
-      match.perfect_first_date?.trim() && {
-        type: 'perfect_first_date' as const,
-        content: match.perfect_first_date,
-        index: -1
-      },
-      match.last_googled?.trim() && {
-        type: 'last_googled' as const,
-        content: match.last_googled,
-        index: -1
-      }
-    ].filter(Boolean);
-    
-    // Add only one random fun question if any exist
+
+    // Choose one fun question deterministically
+    const funQuestions = [] as Array<any>;
+    if (match.fun_fact?.trim()) funQuestions.push({ type: 'fun_fact' as const, content: match.fun_fact, index: -1 });
+    if (match.perfect_first_date?.trim()) funQuestions.push({ type: 'perfect_first_date' as const, content: match.perfect_first_date, index: -1 });
+    if (match.last_googled?.trim()) funQuestions.push({ type: 'last_googled' as const, content: match.last_googled, index: -1 });
+
     if (funQuestions.length > 0) {
-      const randomIndex = Math.floor(Math.random() * funQuestions.length);
-      nonImageContent.push(funQuestions[randomIndex]);
+      const idx = Math.floor(rand() * funQuestions.length);
+      nonImageContent.push(funQuestions[idx]);
     }
-    
+
     // If no images, show non-image content first, then placeholder
     if (imageSlides.length === 0) {
       if (nonImageContent.length > 0) {
-        const shuffled = nonImageContent.sort(() => Math.random() - 0.5);
-        return [...shuffled, {
-          type: 'placeholder' as const,
-          content: '',
-          index: -1
-        }];
+        const shuffled = seededShuffle(nonImageContent);
+        return [ ...shuffled, { type: 'placeholder' as const, content: '', index: -1 } ];
       }
-      return [{
-        type: 'placeholder' as const,
-        content: '',
-        index: -1
-      }];
+      return [{ type: 'placeholder' as const, content: '', index: -1 }];
     }
-    
-    // Mix images with non-image content
-    const mixedSlides = [];
-    
-    // Always start with first image
-    mixedSlides.push(imageSlides[0]);
-    
-    // Shuffle non-image content
-    const shuffledNonImage = nonImageContent.sort(() => Math.random() - 0.5);
-    
-    // Interleave remaining images with non-image content
+
+    // Mix images with non-image content deterministically
+    const mixedSlides: Array<any> = [];
+    mixedSlides.push(imageSlides[0]); // always start with first image
+
+    const shuffledNonImage = seededShuffle(nonImageContent);
     let nonImageIndex = 0;
-    
+
     for (let i = 1; i < imageSlides.length; i++) {
-      // Add non-image content between images if available
-      if (nonImageIndex < shuffledNonImage.length && Math.random() > 0.3) {
+      // Decide deterministically whether to insert non-image content (30% chance)
+      if (nonImageIndex < shuffledNonImage.length && rand() > 0.3) {
         mixedSlides.push(shuffledNonImage[nonImageIndex]);
         nonImageIndex++;
       }
-      
-      // Add the image
       mixedSlides.push(imageSlides[i]);
     }
-    
-    // Add any remaining non-image content at the end
+
+    // Append any remaining non-image content
     while (nonImageIndex < shuffledNonImage.length) {
       mixedSlides.push(shuffledNonImage[nonImageIndex]);
       nonImageIndex++;
     }
-    
+
     return mixedSlides;
-  }, [userImages, match.bio, match.fun_fact, match.perfect_first_date, match.last_googled]);
+  }, [match.id, userImages, match.bio, match.fun_fact, match.perfect_first_date, match.last_googled]);
 
   // Get edge color for current image - must be after slides are defined
   const currentImageUrl = slides.length > 0 && slides[currentSlide]?.type === 'image' 
     ? getOptimizedUrl(slides[currentSlide].content) 
     : '';
   const { edgeColor } = useImageEdgeColor(currentImageUrl);
+
+  // Ensure each new card starts at the first slide.
+  // Reset currentSlide whenever the match changes (use match.id for stability).
+  useEffect(() => {
+    setCurrentSlide(0);
+  }, [match.id]);
+
+  // If slides array shrinks (images load/unload), clamp currentSlide to valid range.
+  useEffect(() => {
+    if (currentSlide > Math.max(0, slides.length - 1)) {
+      setCurrentSlide(Math.max(0, slides.length - 1));
+    }
+  }, [slides.length]);
 
   const handleSlideClick = (e: React.MouseEvent<HTMLDivElement>) => {
     e.stopPropagation();

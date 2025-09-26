@@ -160,6 +160,19 @@ const discoverCache = new Map<string, {
   timestamp: number 
 }>();
 const DISCOVER_CACHE_DURATION = 60000; // 1 minute
+const DISCOVER_CACHE_MAX_ENTRIES = 60; // keep cache bounded
+
+const trimDiscoverCacheIfNeeded = () => {
+  try {
+    if (discoverCache.size <= DISCOVER_CACHE_MAX_ENTRIES) return;
+    // delete oldest entries
+    const entries = Array.from(discoverCache.entries()).sort((a, b) => a[1].timestamp - b[1].timestamp);
+    const toDelete = entries.slice(0, discoverCache.size - DISCOVER_CACHE_MAX_ENTRIES);
+    toDelete.forEach(([key]) => discoverCache.delete(key));
+  } catch (e) {
+    // ignore
+  }
+};
 
 // Make cache globally accessible for preloading
 if (typeof window !== 'undefined') {
@@ -242,6 +255,10 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, isPremium }: DiscoverPage
   const contentRef = useRef<HTMLDivElement>(null);
   const [contentHeight, setContentHeight] = useState(0);
   const backgroundFetchingRef = useRef(false);
+  // Suppress immediate full fetch when we have fresh cached data and the component remounts
+  const suppressFetchRef = useRef(false);
+  // Track optimistic/pending swipes to avoid local overshoot while background RPCs complete
+  const pendingSwipesRef = useRef(0);
   
   const { toast } = useToast();
   const { subscription, checkUsageLimit, refetchSubscription } = useSubscription(currentUser?.id);
@@ -440,6 +457,8 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, isPremium }: DiscoverPage
       // Silently handle background fetch errors
     } finally {
       backgroundFetchingRef.current = false;
+      // Allow full fetches again after background refresh completes
+      suppressFetchRef.current = false;
     }
   }, [currentUser?.id]);
 
@@ -591,6 +610,9 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, isPremium }: DiscoverPage
 
   const fetchPotentialMatches = useCallback(async () => {
     if (!currentUser?.id) return;
+    // If we are currently suppressing full fetch because cache is fresh and
+    // a background refresh is already in-flight, don't trigger another full fetch.
+    if (suppressFetchRef.current) return;
   
     try {
       // Background loading - don't block UI
@@ -637,18 +659,70 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, isPremium }: DiscoverPage
         // Start continuous loading immediately after initial load
         setTimeout(() => {
           loadMoreMatches(); // Load first batch of additional profiles
-          
-          // Set up continuous loading every 30 seconds to reduce server load
-          const continuousLoadingInterval = setInterval(() => {
-            const remainingProfiles = potentialMatches.length - currentIndex;
-            if (remainingProfiles < 10 && !isLoadingMore) { // Reduced buffer
-              loadMoreMatches();
+
+          // Visibility-aware chained loader instead of setInterval
+          const continuousLoaderActive = { running: true };
+          const CONTINUOUS_INTERVAL_MS = 30000; // base interval
+          const continuousLoaderTimerRef = { current: null as any };
+          const currentFetchController = { current: null as AbortController | null };
+
+          const stopLoader = () => {
+            continuousLoaderActive.running = false;
+            if (continuousLoaderTimerRef.current) {
+              clearTimeout(continuousLoaderTimerRef.current);
+              continuousLoaderTimerRef.current = null;
             }
-          }, 30000); // Reduced frequency for better performance
-          
-          // Store interval reference for cleanup
+            if (currentFetchController.current) {
+              currentFetchController.current.abort();
+              currentFetchController.current = null;
+            }
+          };
+
+          const scheduleNext = (delay = CONTINUOUS_INTERVAL_MS) => {
+            if (!continuousLoaderActive.running) return;
+            continuousLoaderTimerRef.current = setTimeout(runOnce, delay);
+          };
+
+          const runOnce = async () => {
+            if (!continuousLoaderActive.running) return;
+
+            // Pause if tab is hidden
+            if (typeof document !== 'undefined' && document.hidden) {
+              scheduleNext(CONTINUOUS_INTERVAL_MS);
+              return;
+            }
+
+            try {
+              if (!backgroundFetchingRef.current && !isLoadingMore) {
+                const remainingProfiles = potentialMatches.length - currentIndex;
+                if (remainingProfiles < 10) {
+                  // Use AbortController to allow cancellation
+                  currentFetchController.current = new AbortController();
+                  const signal = currentFetchController.current.signal;
+                  // If loadMoreMatches supports abort via signal, pass it; otherwise, just use fetchPotentialMatchesInBackground
+                  // We'll call fetchPotentialMatchesInBackground which internally uses supabase (no signal), so we just guard with backgroundFetchingRef
+                  await fetchPotentialMatchesInBackground();
+                  // Trim cache if needed after refresh
+                  trimDiscoverCacheIfNeeded();
+                }
+              }
+            } catch (err) {
+              // ignore background errors
+            } finally {
+              if (currentFetchController.current) {
+                currentFetchController.current = null;
+              }
+              // schedule next run
+              scheduleNext();
+            }
+          };
+
+          // Start the loop
+          scheduleNext(CONTINUOUS_INTERVAL_MS);
+
+          // Expose stop function for cleanup
           if (typeof window !== 'undefined') {
-            (window as any).continuousLoadingInterval = continuousLoadingInterval;
+            (window as any).stopDiscoverContinuousLoader = stopLoader;
           }
         }, 2000); // Start 2 seconds after initial load
       }
@@ -741,7 +815,8 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, isPremium }: DiscoverPage
         setUserDistances(cached.userDistances);
         setCurrentIndex(cached.currentIndex);
         setIsLoading(false);
-        // Still fetch in background to get latest data
+        // Use the cached data immediately and suppress full fetch until background refresh completes
+        suppressFetchRef.current = true;
         setTimeout(() => fetchPotentialMatchesInBackground(), 100);
       } else if (potentialMatches.length === 0) {
         // No cache or stale cache, fetch immediately
@@ -763,9 +838,18 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, isPremium }: DiscoverPage
   // Cleanup continuous loading interval on unmount
   useEffect(() => {
     return () => {
-      if (typeof window !== 'undefined' && (window as any).continuousLoadingInterval) {
-        clearInterval((window as any).continuousLoadingInterval);
-        (window as any).continuousLoadingInterval = null;
+      // Stop any continuous loader we started
+      try {
+        if (typeof window !== 'undefined' && (window as any).stopDiscoverContinuousLoader) {
+          (window as any).stopDiscoverContinuousLoader();
+          (window as any).stopDiscoverContinuousLoader = null;
+        }
+        if (typeof window !== 'undefined' && (window as any).continuousLoadingInterval) {
+          clearInterval((window as any).continuousLoadingInterval);
+          (window as any).continuousLoadingInterval = null;
+        }
+      } catch (e) {
+        // ignore cleanup errors
       }
     };
   }, []);
@@ -1061,12 +1145,8 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, isPremium }: DiscoverPage
     }
   }, [currentIndex, potentialMatches.length, loadMoreMatches, isLoadingMore]);
 
-  // Background loading - preload next batch every swipe for instant experience
-  useEffect(() => {
-    if (currentIndex > 0 && !isLoadingMore) {
-      loadMoreMatches(); // Load more profiles on every swipe for instant access
-    }
-  }, [currentIndex, loadMoreMatches, isLoadingMore]);
+  // Background loading: rely on threshold-based triggers (see effect above) instead of
+  // loading on every swipe. This prevents excessive server calls and keeps the UI smooth.
   // Function to check if a profile is verified (90%+ completion with photos and basic info)
   const calculateProfileVerification = useCallback((profile: PotentialMatch) => {
     if (!profile) return false;
@@ -1108,115 +1188,97 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, isPremium }: DiscoverPage
   const handleLike = async () => {
     const currentMatch = potentialMatches[currentIndex];
     if (!currentMatch) return;
+    // Optimistic path: advance UI immediately, then persist the action in background.
+    const prevIndex = currentIndex;
+    const prevMatch = currentMatch;
 
-    // FIRST: Update database swipe count (for both free and premium users)
-    let usageResult;
-    if (!isPremium) {
-      usageResult = await checkUsageLimit('swipe');
-      if (!usageResult.success) {
-        setIsOutOfSwipes(true);
-        toast({
-          title: 'Daily Limit Reached',
-          description: usageResult.message + ' Upgrade to Premium for unlimited swipes.',
-          variant: 'destructive'
-        });
-        return;
-      }
-    } else {
-      // For premium users, we still need to track swipes for profile completion restrictions
-      try {
-        await supabase.rpc('update_user_usage', {
-          user_id_param: currentUser.id,
-          usage_type: 'swipe',
-          increment_by: 1
-        });
-      } catch (error) {
-  // ...removed log...
-      }
-    }
-
-    // Update today's swipe count for UI
+    // Increment local/pending counters immediately for a snappy feel
+    pendingSwipesRef.current += 1;
     setTodaySwipeCount(prev => prev + 1);
 
-    // SECOND: Check profile completion restrictions AFTER updating database
-    const restrictionCheck = await checkSwipeRestrictions(
-      currentUser.id,
-      profileCompletion,
-      isPremium
-    );
-
-    if (!restrictionCheck.canSwipe) {
-      if (restrictionCheck.reason === 'Profile completion required') {
-        setShowProfileCompletionModal(true);
-        toast({
-          title: '✨ Complete Your Profile!',
-          description: 'Help others see the real you so you can connect with genuine people who share your interests! Go to your profile and update your profile to more than 75% to continue swiping.',
-          variant: 'default',
-        });
-        return;
-      } else if (restrictionCheck.reason === 'Daily limit reached') {
-        setIsOutOfSwipes(true);
-        toast({
-          title: 'Daily Limit Reached',
-          description: 'You\'ve reached your daily swipe limit. Come back tomorrow or upgrade to Premium!',
-          variant: 'destructive'
-        });
-        return;
-      }
-    }
-
-    // Optimistically move to next profile immediately
+    // Immediately advance the UI
     moveToNext();
 
-    // Enqueue a single batched RPC job to perform usage enforcement, upsert like, and check mutual
+    // Background job: persist usage and like, then show match animation if appropriate.
     enqueue(async () => {
       try {
-        // Call a batched RPC (needs to be created server-side). If it doesn't exist or fails,
-        // fall back to the existing behavior.
+        // First, increment usage on server (guard against limits)
+        const usageResult = await checkUsageLimit('swipe');
+        if (!usageResult.success) {
+          // rollback: restore the previous card and counters
+          setPotentialMatches(prev => {
+            const copy = [...prev];
+            copy.splice(prevIndex, 0, prevMatch);
+            return copy;
+          });
+          setCurrentIndex(prevIndex);
+          setTodaySwipeCount(prev => Math.max(0, prev - 1));
+          setIsOutOfSwipes(true);
+          toast({ title: 'Daily Limit Reached', description: usageResult.message || 'You have reached your swipe limit.', variant: 'destructive' });
+          return;
+        }
+
+        // Then attempt the batched RPC to record the like and detect mutual
         const rpcName = 'like_and_usage_batched';
-  const { data: rpcData, error: rpcError } = await supabase.rpc((rpcName as any), {
+        const { data: rpcData, error: rpcError } = await supabase.rpc((rpcName as any), {
           liker_id_param: currentUser.id,
-          liked_id_param: currentMatch.id,
+          liked_id_param: prevMatch.id,
           premium_param: !!isPremium
         } as any);
 
         if (rpcError) {
-          // Fallback: perform original like flow to ensure data persistence
+          // Fallback: attempt to insert like and check mutual
           try {
             const { data: existingLike } = await supabase
               .from('likes')
               .select('id')
-              .match({ liker_id: currentUser.id, liked_id: currentMatch.id })
+              .match({ liker_id: currentUser.id, liked_id: prevMatch.id })
               .maybeSingle();
 
             if (!existingLike) {
-              await supabase.from('likes').insert({ liker_id: currentUser.id, liked_id: currentMatch.id });
+              await supabase.from('likes').insert({ liker_id: currentUser.id, liked_id: prevMatch.id });
             }
 
             const { data: mutualLike } = await supabase
               .from('likes')
               .select('*')
-              .match({ liker_id: currentMatch.id, liked_id: currentUser.id })
+              .match({ liker_id: prevMatch.id, liked_id: currentUser.id })
               .maybeSingle();
 
             if (mutualLike) {
-              // Show match animation if still relevant
-              setMatchedUser(currentMatch);
+              setMatchedUser(prevMatch);
               setShowMatchAnimation(true);
             }
           } catch (fallbackErr) {
-            // If fallback also fails, show a toast (non-blocking)
+            // If even fallback fails, rollback to keep UI consistent
+            setPotentialMatches(prev => {
+              const copy = [...prev];
+              copy.splice(prevIndex, 0, prevMatch);
+              return copy;
+            });
+            setCurrentIndex(prevIndex);
+            setTodaySwipeCount(prev => Math.max(0, prev - 1));
             toast({ title: 'Error', description: 'Failed to record like.', variant: 'destructive' });
+            return;
           }
         } else {
           // RPC succeeded — if server reports a match, show animation
           if ((rpcData as any)?.match) {
-            setMatchedUser(currentMatch);
+            setMatchedUser(prevMatch);
             setShowMatchAnimation(true);
           }
         }
       } catch (jobErr) {
-        // Non-fatal background job error
+        // On unexpected errors, attempt a rollback to keep UX consistent
+        setPotentialMatches(prev => {
+          const copy = [...prev];
+          copy.splice(prevIndex, 0, prevMatch);
+          return copy;
+        });
+        setCurrentIndex(prevIndex);
+        setTodaySwipeCount(prev => Math.max(0, prev - 1));
+      } finally {
+        pendingSwipesRef.current = Math.max(0, pendingSwipesRef.current - 1);
       }
     });
   };
@@ -1225,96 +1287,82 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, isPremium }: DiscoverPage
   const handlePass = async () => {
     const currentMatch = potentialMatches[currentIndex];
     if (!currentMatch) return;
+    // Optimistic path for pass: add to passed list locally, advance UI, persist in background and rollback on error
+    const prevIndex = currentIndex;
+    const prevMatch = currentMatch;
 
-    // FIRST: Update database swipe count (for both free and premium users)
-    if (!isPremium) {
-      const usageResult = await checkUsageLimit('swipe');
-      if (!usageResult.success) {
-        setIsOutOfSwipes(true);
-        toast({
-          title: 'Daily Limit Reached',
-          description: usageResult.message + ' Upgrade to Premium for unlimited swipes.',
-          variant: 'destructive'
-        });
-        return;
-      }
-    } else {
-      // For premium users, we still need to track swipes for profile completion restrictions
-      try {
-        await supabase.rpc('update_user_usage', {
-          user_id_param: currentUser.id,
-          usage_type: 'swipe',
-          increment_by: 1
-        });
-      } catch (error) {
-  // ...removed log...
-      }
-    }
-
-    // Update today's swipe count for UI
+    // Optimistically add to passed list and increment counters
+    setPassedUsers(prev => [{ user_id: prevMatch.id, passed_at: new Date() }, ...prev.slice(0, 9)]);
+    pendingSwipesRef.current += 1;
     setTodaySwipeCount(prev => prev + 1);
 
-    // SECOND: Check profile completion restrictions AFTER updating database
-    const restrictionCheck = await checkSwipeRestrictions(
-      currentUser.id,
-      profileCompletion,
-      isPremium
-    );
-
-    if (!restrictionCheck.canSwipe) {
-      if (restrictionCheck.reason === 'Profile completion required') {
-        setShowProfileCompletionModal(true);
-        toast({
-          title: '✨ Complete Your Profile!',
-          description: 'Help others see the real you so you can connect with genuine people who share your interests!',
-          variant: 'default',
-        });
-        return;
-      } else if (restrictionCheck.reason === 'Daily limit reached') {
-        setIsOutOfSwipes(true);
-        toast({
-          title: 'Daily Limit Reached',
-          description: 'You\'ve reached your daily swipe limit. Come back tomorrow or upgrade to Premium!',
-          variant: 'destructive'
-        });
-        return;
-      }
-    }
-
-    // Add to passed users list for potential reverse
-    setPassedUsers(prev => [{ user_id: currentMatch.id, passed_at: new Date() }, ...prev.slice(0, 9)]);
-
-    // Optimistically move UI to next
+    // Immediately advance UI
     moveToNext();
 
-    // Enqueue a batched RPC job for pass + usage increment to avoid multiple round trips
+    // Background job to persist the pass and usage increment
     enqueue(async () => {
       try {
+        const usageResult = await checkUsageLimit('swipe');
+        if (!usageResult.success) {
+          // rollback: restore the previous card and counters, remove from passedUsers
+          setPotentialMatches(prev => {
+            const copy = [...prev];
+            copy.splice(prevIndex, 0, prevMatch);
+            return copy;
+          });
+          setCurrentIndex(prevIndex);
+          setPassedUsers(prev => prev.filter(p => p.user_id !== prevMatch.id));
+          setTodaySwipeCount(prev => Math.max(0, prev - 1));
+          setIsOutOfSwipes(true);
+          toast({ title: 'Daily Limit Reached', description: usageResult.message || 'You have reached your swipe limit.', variant: 'destructive' });
+          return;
+        }
+
         const rpcName = 'pass_and_usage_batched';
         const { data: rpcData, error: rpcError } = await supabase.rpc((rpcName as any), {
           passer_id_param: currentUser.id,
-          passed_id_param: currentMatch.id,
+          passed_id_param: prevMatch.id,
           premium_param: !!isPremium
         } as any);
 
         if (rpcError) {
-          // Fallback: insert a pass directly
+          // Fallback: insert pass directly
           try {
             const { data: existingPass } = await supabase
               .from('passes')
               .select('id')
-              .match({ passer_id: currentUser.id, passed_id: currentMatch.id })
+              .match({ passer_id: currentUser.id, passed_id: prevMatch.id })
               .maybeSingle();
 
             if (!existingPass) {
-              await supabase.from('passes').insert({ passer_id: currentUser.id, passed_id: currentMatch.id });
+              await supabase.from('passes').insert({ passer_id: currentUser.id, passed_id: prevMatch.id });
             }
           } catch (fallbackErr) {
+            // On fallback failure, rollback
+            setPotentialMatches(prev => {
+              const copy = [...prev];
+              copy.splice(prevIndex, 0, prevMatch);
+              return copy;
+            });
+            setCurrentIndex(prevIndex);
+            setPassedUsers(prev => prev.filter(p => p.user_id !== prevMatch.id));
+            setTodaySwipeCount(prev => Math.max(0, prev - 1));
             toast({ title: 'Error', description: 'Could not skip this profile.', variant: 'destructive' });
+            return;
           }
         }
       } catch (jobErr) {
-        // Background job failed silently
+        // Unexpected error: rollback
+        setPotentialMatches(prev => {
+          const copy = [...prev];
+          copy.splice(prevIndex, 0, prevMatch);
+          return copy;
+        });
+        setCurrentIndex(prevIndex);
+        setPassedUsers(prev => prev.filter(p => p.user_id !== prevMatch.id));
+        setTodaySwipeCount(prev => Math.max(0, prev - 1));
+      } finally {
+        pendingSwipesRef.current = Math.max(0, pendingSwipesRef.current - 1);
       }
     });
   };

@@ -425,24 +425,33 @@ const MainApp = ({ user, onLogout }: MainAppProps) => {
           // Add to existing cache
           cache.potentialMatches.push(...shuffledNew);
           
-          // Preload first images for new profiles immediately
+          // Preload first images for new profiles in a single batched query for fewer round-trips
           setTimeout(async () => {
-            for (const profile of shuffledNew.slice(0, 5)) {
-              try {
-                const { data: images } = await supabase
-                  .from('user_images')
-                  .select('user_id, image_url, image_order')
-                  .eq('user_id', profile.id)
-                  .eq('is_approved', true)
-                  .order('image_order', { ascending: true })
-                  .limit(1);
+            try {
+              const profileIds = shuffledNew.slice(0, 5).map(p => p.id);
+              if (profileIds.length === 0) return;
 
-                if (images?.length) {
-                  cache.userImages[profile.id] = images.map(img => img.image_url);
-                }
-              } catch (error) {
-                // Silently handle errors
+              const { data: imagesBatch } = await supabase
+                .from('user_images')
+                .select('user_id, image_url, image_order')
+                .in('user_id', profileIds)
+                .eq('is_approved', true)
+                .order('image_order', { ascending: true });
+
+              if (imagesBatch && imagesBatch.length) {
+                // Group by user_id and set first image for each profile
+                const grouped: { [key: string]: string[] } = {};
+                imagesBatch.forEach((row: any) => {
+                  if (!grouped[row.user_id]) grouped[row.user_id] = [];
+                  grouped[row.user_id].push(row.image_url);
+                });
+
+                Object.keys(grouped).forEach(uid => {
+                  cache.userImages[uid] = grouped[uid];
+                });
               }
+            } catch (err) {
+              // Silently handle errors
             }
           }, 100);
 

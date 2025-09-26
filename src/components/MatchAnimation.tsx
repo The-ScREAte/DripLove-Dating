@@ -13,102 +13,168 @@ interface MatchAnimationProps {
   onStartChat: (userId: string) => void;
 }
 
-const MatchAnimation = ({ 
-  currentUserName, 
-  matchedUserName, 
+const ENTER_DURATION = 400; // ms
+const EXIT_DURATION = 300; // ms
+
+const MatchAnimation = ({
+  currentUserName,
+  matchedUserName,
   matchedUserImage,
   matchedUserId,
-  onClose, 
-  onStartChat 
+  onClose,
+  onStartChat,
 }: MatchAnimationProps) => {
-  const [showAnimation, setShowAnimation] = useState(false);
+  const [isVisible, setIsVisible] = useState(false);
+  const [isClosing, setIsClosing] = useState(false);
 
   useEffect(() => {
-    // Trigger animation immediately
-    setShowAnimation(true);
+    // Trigger enter animation on mount
+    const t = setTimeout(() => setIsVisible(true), 10);
+    return () => clearTimeout(t);
   }, []);
 
-  const handleStartChat = () => {
-    if (matchedUserId) {
-      onStartChat(matchedUserId);
+  const safeOptimizeImage = (url?: string) => {
+    if (!url) return url;
+    try {
+      // If the image is served from Supabase, request a reasonably small optimized size
+      if (url.includes('supabase')) {
+        const sep = url.includes('?') ? '&' : '?';
+        return `${url}${sep}width=400&quality=80&format=webp`;
+      }
+      return url;
+    } catch (e) {
+      return url;
     }
   };
 
+  const handleStartChat = () => {
+    if (matchedUserId) onStartChat(matchedUserId);
+  };
+
+  // Close with exit animation, then call onClose
+  const handleClose = () => {
+    setIsClosing(true);
+    setIsVisible(false);
+    setTimeout(() => {
+      onClose();
+    }, EXIT_DURATION);
+  };
+
+  // If user never interacts, auto-close after a reasonable time to free DOM (optional)
+  useEffect(() => {
+    const AUTO_CLOSE_MS = 10_000; // 10s
+    const timer = setTimeout(() => {
+      if (!isClosing) handleClose();
+    }, AUTO_CLOSE_MS);
+    return () => clearTimeout(timer);
+  }, [isClosing]);
+
+  const imgSrc = safeOptimizeImage(matchedUserImage);
+
   return (
-    <div className="fixed inset-0 bg-black/80 flex items-center justify-center z-50 p-4">
-      <Card className={`max-w-md w-full transform transition-all duration-200 ${showAnimation ? 'scale-100 opacity-100' : 'scale-95 opacity-0'}`}>
-        <CardContent className="p-8 text-center">
-          {/* Hearts Animation */}
-          <div className="relative mb-6">
-            <div className="flex justify-center items-center space-x-4">
-              <div className={`transform transition-all duration-300 ${showAnimation ? 'scale-110 rotate-12' : 'scale-100'}`}>
-                <Heart className="w-12 h-12 text-pink-500 fill-pink-500" />
-              </div>
-              <div className={`transform transition-all duration-300 ${showAnimation ? 'scale-125' : 'scale-100'}`}>
-                <Heart className="w-16 h-16 text-red-500 fill-red-500" />
-              </div>
-              <div className={`transform transition-all duration-300 ${showAnimation ? 'scale-110 -rotate-12' : 'scale-100'}`}>
-                <Heart className="w-12 h-12 text-pink-500 fill-pink-500" />
-              </div>
+    <div
+      aria-live="polite"
+      className={`fixed inset-0 flex items-center justify-center z-50 p-4 ${
+        isVisible ? 'pointer-events-auto' : 'pointer-events-none'
+      }`}
+    >
+      {/* Backdrop */}
+      <div
+        onClick={handleClose}
+        className={`absolute inset-0 bg-black/75 transition-opacity ${
+          isVisible ? 'opacity-100' : 'opacity-0'
+        }`}
+        style={{ willChange: 'opacity' }}
+      />
+
+      <Card
+        role="dialog"
+        aria-modal
+        className={`max-w-md w-full relative z-10 transform ${
+          isVisible ? 'animate-enter' : 'animate-exit'
+        }`}
+        style={{
+          // Hint browser to promote to its own layer for smoother transforms
+          willChange: 'transform, opacity',
+        }}
+      >
+        <CardContent className="p-6 text-center">
+          <div className="mb-4">
+            <div className="flex justify-center items-center gap-3">
+              {/* Central hearts - lightweight and only transform/opacity */}
+              <Heart className="w-10 h-10 text-pink-400" style={{ transformOrigin: 'center', willChange: 'transform, opacity' }} />
+              <Heart className="w-14 h-14 text-red-500 animate-pulse-slow" style={{ transformOrigin: 'center', willChange: 'transform, opacity' }} />
+              <Heart className="w-10 h-10 text-pink-400" style={{ transformOrigin: 'center', willChange: 'transform, opacity' }} />
             </div>
-            
-            {/* Floating hearts */}
-            {[...Array(6)].map((_, i) => (
-              <div
-                key={i}
-                className={`absolute w-4 h-4 text-pink-400 transform transition-all duration-500 ${
-                  showAnimation ? 'opacity-0 -translate-y-20' : 'opacity-100'
-                }`}
-                style={{
-                  left: `${20 + i * 12}%`,
-                  top: '50%',
-                }}
-              >
-                <Heart className="w-full h-full fill-current" />
-              </div>
-            ))}
+
+            {/* Floating hearts (reduced count) - CSS keyframes only animate transform & opacity */}
+            <div className="relative mt-3 h-0 pointer-events-none">
+              {[0, 1, 2].map(i => (
+                <div
+                  key={i}
+                  className={`absolute top-[-6px] w-4 h-4 text-pink-300 animate-float-up-${i}`}
+                  style={{ left: `${30 + i * 18}%`, willChange: 'transform, opacity' as any }}
+                >
+                  <Heart className="w-full h-full fill-current" />
+                </div>
+              ))}
+            </div>
           </div>
 
-          {/* Match Text */}
-          <div className={`mb-6 transform transition-all duration-200 ${showAnimation ? 'translate-y-0 opacity-100' : 'translate-y-4 opacity-0'}`}>
-            <h1 className="text-3xl font-bold text-pink-600 mb-2">It's a Match! 🎉</h1>
-            <p className="text-gray-600 text-lg">
+          <div className="mb-4">
+            <h1 className="text-2xl font-bold text-pink-600 mb-1">It's a Match! 🎉</h1>
+            <p className="text-gray-600 text-base">
               You and <span className="font-semibold text-pink-600">{matchedUserName}</span> liked each other!
             </p>
           </div>
 
-          {/* Profile Image */}
-          {matchedUserImage && (
-            <div className={`mb-6 flex justify-center transform transition-all duration-200 ${showAnimation ? 'scale-100 opacity-100' : 'scale-95 opacity-0'}`}>
-              <div className="w-24 h-24 rounded-full overflow-hidden border-4 border-pink-200">
-                <img
-                  src={matchedUserImage}
-                  alt={matchedUserName}
-                  className="w-full h-full object-cover"
-                />
+          {imgSrc && (
+            <div className="mb-4 flex justify-center">
+              <div className="w-20 h-20 rounded-full overflow-hidden border-4 border-pink-100 shadow-sm" style={{ willChange: 'transform, opacity' }}>
+                <img src={imgSrc} alt={matchedUserName} className="w-full h-full object-cover" />
               </div>
             </div>
           )}
 
-          {/* Action Buttons */}
-          <div className={`space-y-3 transform transition-all duration-200 ${showAnimation ? 'translate-y-0 opacity-100' : 'translate-y-4 opacity-0'}`}>
-            <Button 
+          <div className="space-y-3">
+            <Button
               onClick={handleStartChat}
-              className="w-full bg-gradient-to-r from-pink-500 to-purple-600 hover:from-pink-600 hover:to-purple-700 text-white font-semibold py-3"
+              className="w-full bg-gradient-to-r from-pink-500 to-purple-600 text-white font-semibold py-3"
             >
-              <MessageCircle className="w-5 h-5 mr-2" />
-              Start Chatting
+              <MessageCircle className="w-5 h-5 mr-2 inline-block" /> Start Chatting
             </Button>
-            <Button 
-              onClick={onClose}
-              variant="outline"
-              className="w-full"
-            >
+            <Button onClick={handleClose} variant="outline" className="w-full">
               Keep Swiping
             </Button>
           </div>
         </CardContent>
       </Card>
+
+      {/* Inline CSS keyframes and utility animations kept minimal and GPU-friendly */}
+      <style>{`
+        @keyframes match-enter {
+          0% { transform: translateY(16px) scale(.98); opacity: 0 }
+          100% { transform: translateY(0) scale(1); opacity: 1 }
+        }
+        @keyframes match-exit {
+          0% { transform: translateY(0) scale(1); opacity: 1 }
+          100% { transform: translateY(8px) scale(.995); opacity: 0 }
+        }
+        .animate-enter { animation: match-enter ${ENTER_DURATION}ms ease-out both; }
+        .animate-exit { animation: match-exit ${EXIT_DURATION}ms ease-in both; }
+
+        @keyframes float-up-0 { 0% { transform: translateY(0) scale(1); opacity: .0 } 40% { opacity: .9 } 100% { transform: translateY(-40px) scale(.7); opacity: 0 } }
+        @keyframes float-up-1 { 0% { transform: translateY(0) scale(1); opacity: .0 } 30% { opacity: .95 } 100% { transform: translateY(-48px) scale(.65); opacity: 0 } }
+        @keyframes float-up-2 { 0% { transform: translateY(0) scale(1); opacity: .0 } 35% { opacity: .9 } 100% { transform: translateY(-44px) scale(.68); opacity: 0 } }
+
+        .animate-float-up-0 { animation: float-up-0 1200ms cubic-bezier(.2,.8,.2,1) both; }
+        .animate-float-up-1 { animation: float-up-1 1400ms cubic-bezier(.2,.8,.2,1) 120ms both; }
+        .animate-float-up-2 { animation: float-up-2 1300ms cubic-bezier(.2,.8,.2,1) 60ms both; }
+
+        /* slow pulse for central heart (scale + opacity) */
+        @keyframes pulse-slow { 0% { transform: scale(1); opacity: 1 } 50% { transform: scale(1.06); opacity: .95 } 100% { transform: scale(1); opacity: 1 } }
+        .animate-pulse-slow { animation: pulse-slow 1100ms ease-in-out infinite both; }
+      `}</style>
     </div>
   );
 };
