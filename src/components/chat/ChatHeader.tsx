@@ -6,6 +6,7 @@ import ChatUserAvatar from '../ChatUserAvatar';
 import { createPortal } from 'react-dom';
 import ReportModal from '@/components/ReportModal';
 import { useState } from 'react';
+import { useToast } from '@/hooks/use-toast';
 
 interface ChatHeaderProps {
   selectedMatch: ChatMatch;
@@ -27,10 +28,11 @@ const ChatHeader: React.FC<ChatHeaderProps> = ({
   currentUserId
 }) => {
   // Determine partner ID correctly
-  const partnerId = selectedMatch.partner?.id || 
+  const partnerId = selectedMatch.partner?.id ||
                    (selectedMatch.user1_id === currentUserId ? selectedMatch.user2_id : selectedMatch.user1_id);
   const [openReport, setOpenReport] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
+  const { toast } = useToast();
   // Globally clamp the safe-area inset so we have a sensible minimum and
   // maximum across platforms. This gives a minimum breathing room on
   // Android/web and prevents extremely tall headers on devices with very
@@ -91,7 +93,19 @@ const ChatHeader: React.FC<ChatHeaderProps> = ({
               <div className="min-w-[160px] overflow-hidden rounded-md border bg-white p-4 shadow-lg space-y-1">
                 <button
                   className="w-full text-left px-4 py-3 text-sm"
-                  onClick={() => { setOpenReport(true); setMenuOpen(false); }}
+                  onClick={() => {
+                    if (!selectedMatch.last_message_obj?.id) {
+                      toast({
+                        title: 'Cannot report yet',
+                        description: 'Please report a specific message once it appears in the chat.',
+                        variant: 'destructive'
+                      });
+                      setMenuOpen(false);
+                      return;
+                    }
+                    setOpenReport(true);
+                    setMenuOpen(false);
+                  }}
                 >
                   Report
                 </button>
@@ -111,7 +125,7 @@ const ChatHeader: React.FC<ChatHeaderProps> = ({
           onClose={() => setOpenReport(false)}
           reporterId={currentUserId || ''}
           reportedUserId={partnerId || ''}
-          contentType="profile"
+          contentId={selectedMatch.last_message_obj?.id}
         />
       </div>
       </div>
