@@ -108,6 +108,11 @@ const AdminPageComponent = ({ currentUser, onLogout }: AdminPageProps) => {
   const [loadingReportedChats, setLoadingReportedChats] = useState(false);
   const [processingReportIds, setProcessingReportIds] = useState<Record<string, boolean>>({});
   const [isAdmin, setIsAdmin] = useState<boolean | null>(null);
+  const [isEmailModalOpen, setIsEmailModalOpen] = useState(false);
+  const [emailReport, setEmailReport] = useState<any | null>(null);
+  const [emailRecipient, setEmailRecipient] = useState<'reported' | 'reporter'>('reported');
+  const [emailSubject, setEmailSubject] = useState('');
+  const [emailBody, setEmailBody] = useState('');
   
   // Constants
   const usersPerPage = 20;
@@ -302,13 +307,6 @@ const AdminPageComponent = ({ currentUser, onLogout }: AdminPageProps) => {
                         <Input
                           value={method.details}
                           onChange={e => handlePaymentMethodChange(idx, 'details', e.target.value)}
-                          placeholder="MoMo Number"
-                          className="w-full border-2 border-yellow-200 rounded-lg focus:border-yellow-400"
-                        />
-                        <Input
-                          value={method.name || ''}
-                          onChange={e => handlePaymentMethodChange(idx, 'name', e.target.value)}
-                          placeholder="MoMo Name"
                           className="w-full border-2 border-yellow-200 rounded-lg focus:border-yellow-400"
                         />
                         <Input
@@ -645,6 +643,64 @@ const AdminPageComponent = ({ currentUser, onLogout }: AdminPageProps) => {
     } finally {
       setProcessingReportIds(prev => ({ ...prev, [reportId]: false }));
     }
+  };
+
+  const openEmailModal = (report: any) => {
+    setEmailReport(report);
+    // default to emailing the reported user if present, otherwise the reporter
+    setEmailRecipient(report.reportedUser ? 'reported' : 'reporter');
+    const reason = report?.details?.reason || '';
+  setEmailSubject(`Urgent: Report #${report.id}${reason ? ` — ${reason}` : ''}`);
+
+    // prepare a polite, neutral template depending on recipient
+    const reportedName = report.reportedUser ? `${report.reportedUser.first_name || ''} ${report.reportedUser.last_name || ''}`.trim() : '';
+    const reporterName = report.reporter ? `${report.reporter.first_name || ''} ${report.reporter.last_name || ''}`.trim() : '';
+
+    if (report.reportedUser) {
+      setEmailBody(
+        `Hello ${reportedName || 'User'},\n\n` +
+        `This is an official notice from the DripLove moderation team regarding a report (ID: ${report.id}) alleging: ${reason || '—'}. We request that you provide any relevant context or explanation within 3 days of receiving this message. ` +
+        `Failure to respond within 3 days may result in temporary suspension or permanent blocking of your account while we complete our review.\n\n` +
+        `If you believe this report was made in error, please reply with supporting details immediately so we can resolve the matter promptly.\n\n` +
+        `Regards,\nDripLove Support`
+      );
+    } else {
+      setEmailBody(
+        `Hello ${reporterName || 'User'},\n\n` +
+        `Thank you for submitting a report (ID: ${report.id}) regarding: ${reason || '—'}. Our moderation team is reviewing this matter. If you have any additional information, evidence, or context that would assist our investigation, please reply to this message.\n\n` +
+        `We appreciate your help keeping the DripLove community safe.\n\nRegards,\nDripLove Support`
+      );
+    }
+
+    setIsEmailModalOpen(true);
+  };
+
+  const closeEmailModal = () => {
+    setIsEmailModalOpen(false);
+    setEmailReport(null);
+    setEmailSubject('');
+    setEmailBody('');
+  };
+
+  const sendEmailToSelected = () => {
+    if (!emailReport) return;
+
+    const recipientEmail = emailRecipient === 'reported'
+      ? emailReport.reportedUser?.email || emailReport.details?.reported_user_id
+      : emailReport.reporter?.email || emailReport.details?.reporter_id;
+
+    if (!recipientEmail) {
+      toast({ title: 'Error', description: 'Recipient email not available', variant: 'destructive' });
+      return;
+    }
+
+    const subject = encodeURIComponent(emailSubject || `Regarding report #${emailReport.id}`);
+    const body = encodeURIComponent(emailBody || '');
+    const mailto = `mailto:${recipientEmail}?subject=${subject}&body=${body}`;
+
+    // open user's default mail client
+    window.open(mailto, '_blank');
+    closeEmailModal();
   };
 
   const approveImage = async (imageId: string) => {
@@ -1368,6 +1424,16 @@ const AdminPageComponent = ({ currentUser, onLogout }: AdminPageProps) => {
                                   <Play className="w-3 h-3 mr-1" />
                                   Activate
                                 </Button>
+                              ) : user.account_status === 'blocked' ? (
+                                <Button
+                                  size="sm"
+                                  variant="outline"
+                                  onClick={() => updateUserStatus(user.id, 'active')}
+                                  className="text-green-600 hover:text-green-700 text-xs px-2 py-1 h-7"
+                                >
+                                  <Play className="w-3 h-3 mr-1" />
+                                  Unblock
+                                </Button>
                               ) : (
                                 <Button
                                   size="sm"
@@ -1472,6 +1538,9 @@ const AdminPageComponent = ({ currentUser, onLogout }: AdminPageProps) => {
                           <Button size="sm" variant="ghost" onClick={() => deleteReportedMessage(r.id, r.message?.id)} disabled={processingReportIds[r.id]}>
                             Delete
                           </Button>
+                          <Button size="sm" variant="secondary" onClick={() => openEmailModal(r)}>
+                            Email
+                          </Button>
                         </div>
                       </div>
                     ))}
@@ -1528,6 +1597,68 @@ const AdminPageComponent = ({ currentUser, onLogout }: AdminPageProps) => {
             userId={selectedUserId}
             isAdmin={true}
           />
+        )}
+
+        {/* Email Report Modal */}
+        {isEmailModalOpen && emailReport && (
+          <div className="fixed inset-0 z-60 flex items-center justify-center bg-black/40">
+            <div className="bg-white rounded-2xl shadow-2xl p-6 w-full max-w-lg relative border">
+              <button onClick={closeEmailModal} className="absolute top-3 right-3 text-gray-400 hover:text-gray-700">✕</button>
+              <h2 className="text-lg font-semibold mb-2">Email User about Report #{emailReport.id}</h2>
+              <p className="text-sm text-gray-600 mb-4">Choose who to email about this report. The emails below are shown for convenience.</p>
+
+              <div className="space-y-3 mb-4">
+                <div className="flex items-start gap-3">
+                  <input
+                    type="radio"
+                    id="email-reported"
+                    name="email-target"
+                    checked={emailRecipient === 'reported'}
+                    onChange={() => setEmailRecipient('reported')}
+                    className="mt-1"
+                  />
+                  <div>
+                    <div className="text-sm font-medium">Reported user</div>
+                    <div className="text-xs text-gray-600">
+                      {emailReport.reportedUser ? `${emailReport.reportedUser.first_name} ${emailReport.reportedUser.last_name} — ${emailReport.reportedUser.email}` : (emailReport.details?.reported_user_id || 'Unknown')}
+                    </div>
+                  </div>
+                </div>
+
+                <div className="flex items-start gap-3">
+                  <input
+                    type="radio"
+                    id="email-reporter"
+                    name="email-target"
+                    checked={emailRecipient === 'reporter'}
+                    onChange={() => setEmailRecipient('reporter')}
+                    className="mt-1"
+                  />
+                  <div>
+                    <div className="text-sm font-medium">Reporter</div>
+                    <div className="text-xs text-gray-600">
+                      {emailReport.reporter ? `${emailReport.reporter.first_name} ${emailReport.reporter.last_name} — ${emailReport.reporter.email}` : (emailReport.details?.reporter_id || 'Unknown')}
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <div className="mb-3">
+                <label className="block text-xs font-medium text-gray-700 mb-1">Subject</label>
+                <input value={emailSubject} onChange={(e) => setEmailSubject(e.target.value)} className="w-full border rounded px-3 py-2 text-sm" />
+              </div>
+
+              <div className="mb-4">
+                <label className="block text-xs font-medium text-gray-700 mb-1">Message</label>
+                <textarea value={emailBody} onChange={(e) => setEmailBody(e.target.value)} rows={6} className="w-full border rounded px-3 py-2 text-sm" />
+              </div>
+
+              <div className="flex justify-end gap-2">
+                <Button size="sm" variant="ghost" onClick={closeEmailModal}>Cancel</Button>
+                <Button size="sm" onClick={sendEmailToSelected}>Send Email</Button>
+              </div>
+            </div>
+          </div>
         )}
       </div>
     </div>

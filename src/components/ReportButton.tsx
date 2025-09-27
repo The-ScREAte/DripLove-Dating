@@ -51,11 +51,6 @@ const ReportButton: React.FC<ReportButtonProps> = ({
     setLoading(true);
     let error: any = null;
     if (contentType === 'message') {
-      if (!contentId) {
-        setLoading(false);
-        toast({ title: 'Error', description: 'Message id missing. Cannot report.', variant: 'destructive' });
-        return;
-      }
       if (!reporterId) {
         setLoading(false);
         toast({ title: 'Error', description: 'Reporter id missing. Please sign in.', variant: 'destructive' });
@@ -64,7 +59,7 @@ const ReportButton: React.FC<ReportButtonProps> = ({
       const res = await supabase.from('reported_chats').insert({
         reporter_id: reporterId,
         reported_user_id: reportedUserId,
-        chat_id: contentId,
+        chat_id: contentId || null,
         reason,
         description
       });

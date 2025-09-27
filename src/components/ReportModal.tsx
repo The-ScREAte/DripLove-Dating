@@ -50,10 +50,7 @@ const ReportModal: React.FC<ReportModalProps> = ({ open, onClose, reporterId, re
       return;
     }
 
-    if (!contentId) {
-      toast({ title: 'Error', description: 'Message id missing. Cannot report.', variant: 'destructive' });
-      return;
-    }
+    // allow reporting even if there's no specific message id (chat_id will be null)
 
     setLoading(true);
 
@@ -61,7 +58,7 @@ const ReportModal: React.FC<ReportModalProps> = ({ open, onClose, reporterId, re
       const { error } = await supabase.from('reported_chats').insert({
         reporter_id: reporterId,
         reported_user_id: reportedUserId,
-        chat_id: contentId,
+        chat_id: contentId || null,
         reason: reason.trim(),
         description: description.trim() ? description.trim() : null,
       });

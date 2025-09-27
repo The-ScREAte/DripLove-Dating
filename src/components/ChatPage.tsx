@@ -6,6 +6,7 @@ import { requestNotificationPermission } from '@/services/pushNotifications';
 // SafeAreaView removed — use plain divs with env(...) padding where necessary
 import UserProfileModal from './UserProfileModal';
 import BlockDialog from './BlockDialog';
+import ReportDialog from '@/components/ReportDialog';
 import ChatUserList from './chat/ChatUserList';
 import MessageBubble from './chat/MessageBubble';
 import MessageInput from './chat/MessageInput';
@@ -51,6 +52,8 @@ const ChatPage = ({ currentUser, onUnreadChange }: ChatPageProps) => {
   const [selectedUserId, setSelectedUserId] = useState<string>('');
   const [isBlockDialogOpen, setIsBlockDialogOpen] = useState(false);
   const [userToBlock, setUserToBlock] = useState<ChatMatch | null>(null);
+  const [isReportDialogOpen, setIsReportDialogOpen] = useState(false);
+  const [reportMessageId, setReportMessageId] = useState<string | undefined>(undefined);
   const { toast } = useToast();
   const { sendMessageNotification, isInitialized, isSupported } = usePushNotifications(currentUser.id);
   const messagesEndRef = useRef<HTMLDivElement>(null);
@@ -747,6 +750,10 @@ const ChatPage = ({ currentUser, onUnreadChange }: ChatPageProps) => {
           onBack={() => setSelectedMatch(null)}
           onUserProfileOpen={handleUserProfileClick}
           onBlockUser={handleBlockClick}
+          onReport={(messageId?: string) => {
+            setReportMessageId(messageId);
+            setIsReportDialogOpen(true);
+          }}
           onTestNotification={testNotification}
           isMobile={true}
           currentUserId={currentUser.id}
@@ -801,6 +808,17 @@ const ChatPage = ({ currentUser, onUnreadChange }: ChatPageProps) => {
         userToBlock={userToBlock}
         currentUserId={currentUser?.id}
         onBlockSuccess={handleBlockSuccess}
+      />
+
+      <ReportDialog
+        isOpen={isReportDialogOpen}
+        onClose={() => { setIsReportDialogOpen(false); setReportMessageId(undefined); }}
+        reporterId={currentUser.id}
+        reportedUserId={selectedMatch?.partner?.id || (selectedMatch?.user1_id === currentUser.id ? selectedMatch?.user2_id : selectedMatch?.user1_id) || ''}
+        messageId={reportMessageId}
+        onReportSuccess={() => {
+          // optional: any post-report actions
+        }}
       />
     </div>
   );

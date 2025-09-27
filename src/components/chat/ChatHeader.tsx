@@ -13,6 +13,7 @@ interface ChatHeaderProps {
   onBack: () => void;
   onUserProfileOpen: (userId: string) => void;
   onBlockUser: (user: ChatMatch) => void;
+  onReport?: (messageId?: string) => void;
   onTestNotification?: () => void;
   isMobile?: boolean;
   currentUserId?: string;
@@ -23,6 +24,7 @@ const ChatHeader: React.FC<ChatHeaderProps> = ({
   onBack,
   onUserProfileOpen,
   onBlockUser,
+  onReport,
   onTestNotification,
   isMobile = false,
   currentUserId
@@ -94,17 +96,9 @@ const ChatHeader: React.FC<ChatHeaderProps> = ({
                 <button
                   className="w-full text-left px-4 py-3 text-sm"
                   onClick={() => {
-                    if (!selectedMatch.last_message_obj?.id) {
-                      toast({
-                        title: 'Cannot report yet',
-                        description: 'Please report a specific message once it appears in the chat.',
-                        variant: 'destructive'
-                      });
-                      setMenuOpen(false);
-                      return;
-                    }
-                    setOpenReport(true);
                     setMenuOpen(false);
+                    // delegate to parent to open the report dialog; allow undefined message id
+                    onReport?.(selectedMatch.last_message_obj?.id);
                   }}
                 >
                   Report
