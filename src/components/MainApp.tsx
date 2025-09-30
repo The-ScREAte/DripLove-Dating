@@ -927,7 +927,30 @@ const MainApp = ({ user, onLogout }: MainAppProps) => {
         <div 
           className={`flex-1 overflow-auto ${!showTerms && !showPrivacy ? 'pt-[10px] pb-[10px]' : ''}`}
         >
-          {renderContent()}
+          {/* Keep pages mounted to avoid reloading when switching tabs. Show/hide via classes. */}
+          <div className={`${activeTab === 'dripcheck' ? 'block' : 'hidden'} w-full h-full`}> 
+            <DiscoverPage currentUser={profile} onNavigateToChat={handleNavigateToChat} isPremium={isPremium} />
+          </div>
+
+          <div className={`${activeTab === 'chat' ? 'block' : 'hidden'} w-full h-full`}> 
+            <ChatPage currentUser={profile} onUnreadChange={fetchUnreadCount} onDetailViewChange={setIsChatDetailOpen} />
+          </div>
+
+          <div className={`${activeTab === 'liked' ? 'block' : 'hidden'} w-full h-full`}> 
+            <LikedMePage currentUser={profile} isPremium={isPremium} />
+          </div>
+
+          <div className={`${activeTab === 'profile' ? 'block' : 'hidden'} w-full h-full`}> 
+            <ProfilePage 
+              currentUser={profile} 
+              profile={profile} 
+              onProfileUpdate={fetchUserProfile} 
+              onLogout={onLogout}
+              onShowTerms={handleShowTerms}
+              onShowPrivacy={handleShowPrivacy}
+              isPremium={isPremium}
+            />
+          </div>
         </div>
 
         {/* Fixed Bottom Nav - always visible */}

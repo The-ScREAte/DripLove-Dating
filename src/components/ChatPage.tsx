@@ -60,6 +60,10 @@ const ChatPage = ({ currentUser, onUnreadChange, onDetailViewChange }: ChatPageP
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const messagesContainerRef = useRef<HTMLDivElement>(null);
   const backgroundFetchingRef = useRef(false);
+  const [isRefreshing, setIsRefreshing] = useState(false);
+  const [pullDistance, setPullDistance] = useState(0);
+  const [startY, setStartY] = useState(0);
+  const matchesNeedsRefreshRef = useRef(false);
 
   useEffect(() => {
     // Check if we have fresh cached data first
@@ -92,9 +96,11 @@ const ChatPage = ({ currentUser, onUnreadChange, onDetailViewChange }: ChatPageP
           table: 'matches',
         },
         (payload) => {
-          // Background update without showing loading
-          fetchMatchesInBackground();
-        }
+            // Mark that matches have changed. We'll refresh the UI only when appropriate.
+            matchesNeedsRefreshRef.current = true;
+            // Still update cache in background so data is fresh when the user returns
+            fetchMatchesInBackground();
+          }
       )
       .subscribe();
 
@@ -111,6 +117,10 @@ const ChatPage = ({ currentUser, onUnreadChange, onDetailViewChange }: ChatPageP
     }
     else {
       onDetailViewChange?.(false);
+      // Only refresh the matches list when there were changes while inside the conversation.
+      if (matchesNeedsRefreshRef.current) {
+        void fetchMatches();
+      }
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selectedMatch]);
@@ -222,8 +232,10 @@ const ChatPage = ({ currentUser, onUnreadChange, onDetailViewChange }: ChatPageP
         timestamp: Date.now()
       });
 
-      // Update state with fresh data
-      setMatches(processedMatches);
+  // Update state with fresh data
+  setMatches(processedMatches);
+  // We've refreshed matches in the background; clear the "needs refresh" flag
+  matchesNeedsRefreshRef.current = false;
     } catch (error) {
       // Silently handle background fetch errors
     } finally {
@@ -231,7 +243,8 @@ const ChatPage = ({ currentUser, onUnreadChange, onDetailViewChange }: ChatPageP
     }
   };
 
-  const fetchMatches = async () => {
+  const fetchMatches = async (showLoading = false) => {
+    if (showLoading) setIsRefreshing(true);
     try {
       const { data: matches, error } = await supabase
         .from('matches')
@@ -255,12 +268,20 @@ const ChatPage = ({ currentUser, onUnreadChange, onDetailViewChange }: ChatPageP
       });
 
       setMatches(processedMatches);
+      // Clear the refresh flag when we've just fetched
+      matchesNeedsRefreshRef.current = false;
     } catch (error) {
       toast({
         title: 'Error',
         description: 'Failed to load conversations.',
         variant: 'destructive'
       });
+    }
+    finally {
+      if (showLoading) {
+        setIsRefreshing(false);
+        setPullDistance(0);
+      }
     }
   };
 
@@ -616,6 +637,33 @@ const ChatPage = ({ currentUser, onUnreadChange, onDetailViewChange }: ChatPageP
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   };
 
+  // Pull to refresh handlers for the matches list
+  const handleTouchStart = (e: React.TouchEvent) => {
+    // Only start pull when at top of scroll and not currently in a conversation
+    const container = e.currentTarget as HTMLElement;
+    if (container.scrollTop === 0) {
+      setStartY(e.touches[0].clientY);
+    }
+  };
+
+  const handleTouchMove = (e: React.TouchEvent) => {
+    if (startY > 0 && !isRefreshing) {
+      const currentY = e.touches[0].clientY;
+      const distance = Math.max(0, Math.min(100, currentY - startY));
+      setPullDistance(distance);
+    }
+  };
+
+  const handleTouchEnd = () => {
+    if (pullDistance > 50 && !isRefreshing) {
+      // Trigger a user-visible refresh
+      void fetchMatches(true);
+    } else {
+      setPullDistance(0);
+    }
+    setStartY(0);
+  };
+
   const handleUserProfileClick = (userId?: string) => {
     if (userId) {
       setSelectedUserId(userId);
@@ -667,7 +715,24 @@ const ChatPage = ({ currentUser, onUnreadChange, onDetailViewChange }: ChatPageP
         </div>
 
   {/* Scrollable Chat List (only this area scrolls) */}
-  <div className="flex-1 overflow-y-auto pb-28" style={{ WebkitOverflowScrolling: 'touch' }}>
+  <div
+    className="flex-1 overflow-y-auto pb-28"
+    style={{ WebkitOverflowScrolling: 'touch' }}
+    onTouchStart={handleTouchStart}
+    onTouchMove={handleTouchMove}
+    onTouchEnd={handleTouchEnd}
+  >
+    {/* Pull to refresh indicator */}
+    {pullDistance > 0 && (
+      <div
+        className="flex items-center justify-center bg-pink-50 transition-all duration-200"
+        style={{ height: `${pullDistance}px` }}
+      >
+        <div className="text-pink-600 text-sm">
+          {pullDistance > 50 ? (isRefreshing ? '🔄 Refreshing...' : '↓ Release to refresh') : '↓ Pull to refresh'}
+        </div>
+      </div>
+    )}
           {filteredMatches.length === 0 ? (
             <div className="p-4 text-center text-gray-500">
               {searchTerm ? 'No matches found' : 'No conversations yet'}
