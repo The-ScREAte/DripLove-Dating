@@ -36,6 +36,8 @@ if (typeof window !== 'undefined') {
 
 const ChatPage = ({ currentUser, onUnreadChange, onDetailViewChange }: ChatPageProps) => {
   const [matches, setMatches] = useState<ChatMatch[]>(() => {
+    // If there's no current user yet (e.g. during app bootstrap), don't try to access id
+    if (!currentUser || !currentUser.id) return [];
     // Initialize with cached data immediately if available
     const cached = chatMatchesCache.get(currentUser.id);
     if (cached && Date.now() - cached.timestamp < CACHE_DURATION) {
@@ -56,7 +58,7 @@ const ChatPage = ({ currentUser, onUnreadChange, onDetailViewChange }: ChatPageP
   const [isReportDialogOpen, setIsReportDialogOpen] = useState(false);
   const [reportMessageId, setReportMessageId] = useState<string | undefined>(undefined);
   const { toast } = useToast();
-  const { sendMessageNotification, isInitialized, isSupported } = usePushNotifications(currentUser.id);
+  const { sendMessageNotification, isInitialized, isSupported } = usePushNotifications(currentUser?.id);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const messagesContainerRef = useRef<HTMLDivElement>(null);
   const backgroundFetchingRef = useRef(false);
@@ -66,6 +68,7 @@ const ChatPage = ({ currentUser, onUnreadChange, onDetailViewChange }: ChatPageP
   const matchesNeedsRefreshRef = useRef(false);
 
   useEffect(() => {
+    if (!currentUser || !currentUser.id) return;
     // Check if we have fresh cached data first
     const cached = chatMatchesCache.get(currentUser.id);
     if (cached && Date.now() - cached.timestamp < CACHE_DURATION) {
@@ -86,6 +89,7 @@ const ChatPage = ({ currentUser, onUnreadChange, onDetailViewChange }: ChatPageP
 
   // Real-time subscription for matches table
   useEffect(() => {
+    if (!currentUser || !currentUser.id) return;
     const channel = supabase
       .channel('chat-matches')
       .on(
@@ -107,9 +111,10 @@ const ChatPage = ({ currentUser, onUnreadChange, onDetailViewChange }: ChatPageP
     return () => {
       supabase.removeChannel(channel);
     };
-  }, [currentUser.id]);
+  }, [currentUser?.id]);
 
   useEffect(() => {
+    if (!currentUser || !currentUser.id) return;
     if (selectedMatch) {
       fetchMessages();
       markMessagesAsRead();
@@ -130,6 +135,7 @@ const ChatPage = ({ currentUser, onUnreadChange, onDetailViewChange }: ChatPageP
   }, [messages]);
 
   useEffect(() => {
+    if (!currentUser || !currentUser.id) return;
     if (selectedMatch) {
       const channel = supabase
         .channel(`chats:${selectedMatch.id}`)
@@ -173,7 +179,7 @@ const ChatPage = ({ currentUser, onUnreadChange, onDetailViewChange }: ChatPageP
       };
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [selectedMatch, currentUser.id, onUnreadChange]);
+  }, [selectedMatch, currentUser?.id, onUnreadChange]);
 
   const processMatchesData = (matches: any[]) => {
     const matchesWithPartner = (matches?.map(match => {
@@ -208,6 +214,7 @@ const ChatPage = ({ currentUser, onUnreadChange, onDetailViewChange }: ChatPageP
 
   const fetchMatchesInBackground = async () => {
     if (backgroundFetchingRef.current) return;
+    if (!currentUser || !currentUser.id) return;
     backgroundFetchingRef.current = true;
 
     try {
@@ -245,6 +252,10 @@ const ChatPage = ({ currentUser, onUnreadChange, onDetailViewChange }: ChatPageP
 
   const fetchMatches = async (showLoading = false) => {
     if (showLoading) setIsRefreshing(true);
+    if (!currentUser || !currentUser.id) {
+      if (showLoading) setIsRefreshing(false);
+      return;
+    }
     try {
       const { data: matches, error } = await supabase
         .from('matches')
@@ -676,6 +687,20 @@ const ChatPage = ({ currentUser, onUnreadChange, onDetailViewChange }: ChatPageP
     return partnerName.includes(searchTerm.toLowerCase());
   });
 
+  // If there's no authenticated user yet, render a light loading state to avoid
+  // dereferencing `currentUser.id` in JSX/handlers. Hooks above must remain
+  // unconditionally called (so don't early-return before them).
+  if (!currentUser || !currentUser.id) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-gray-50">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-pink-500 mx-auto mb-4" />
+          <p className="text-gray-600">Loading chats...</p>
+        </div>
+      </div>
+    );
+  }
+
   const handleBlockClick = () => {
     if (selectedMatch?.partner) {
       setUserToBlock(selectedMatch as ChatMatch);
@@ -826,7 +851,7 @@ const ChatPage = ({ currentUser, onUnreadChange, onDetailViewChange }: ChatPageP
           }}
           onTestNotification={testNotification}
           isMobile={true}
-          currentUserId={currentUser.id}
+          currentUserId={currentUser?.id ?? ''}
         />
       </div>
 
@@ -883,8 +908,12 @@ const ChatPage = ({ currentUser, onUnreadChange, onDetailViewChange }: ChatPageP
       <ReportDialog
         isOpen={isReportDialogOpen}
         onClose={() => { setIsReportDialogOpen(false); setReportMessageId(undefined); }}
-        reporterId={currentUser.id}
-        reportedUserId={selectedMatch?.partner?.id || (selectedMatch?.user1_id === currentUser.id ? selectedMatch?.user2_id : selectedMatch?.user1_id) || ''}
+        reporterId={currentUser?.id ?? ''}
+        reportedUserId={
+          selectedMatch?.partner?.id ||
+          (selectedMatch?.user1_id === currentUser?.id ? selectedMatch?.user2_id : selectedMatch?.user1_id) ||
+          ''
+        }
         messageId={reportMessageId}
         onReportSuccess={() => {
           // optional: any post-report actions
