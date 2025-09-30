@@ -40,6 +40,7 @@ const MainApp = ({ user, onLogout }: MainAppProps) => {
   }
 
   const [activeTab, setActiveTab] = useState('dripcheck');
+  const [isChatDetailOpen, setIsChatDetailOpen] = useState(false);
   const [isKeyboardOpen, setIsKeyboardOpen] = useState(false);
 
   // Simple keyboard detection for mobile
@@ -881,7 +882,7 @@ const MainApp = ({ user, onLogout }: MainAppProps) => {
       case 'dripcheck':
         return <DiscoverPage currentUser={profile} onNavigateToChat={handleNavigateToChat} isPremium={isPremium} />;
       case 'chat':
-        return <ChatPage currentUser={profile} onUnreadChange={fetchUnreadCount} />;
+        return <ChatPage currentUser={profile} onUnreadChange={fetchUnreadCount} onDetailViewChange={setIsChatDetailOpen} />;
       case 'liked':
         return <LikedMePage currentUser={profile} isPremium={isPremium} />;
       case 'profile':
@@ -910,8 +911,8 @@ const MainApp = ({ user, onLogout }: MainAppProps) => {
           {/* Fixed Header - reduced size and includes safe area top padding */}
           {!showTerms && !showPrivacy && (
             <div className="fixed top-0 left-0 right-0 w-full bg-white shadow-sm z-50">
-              <div className="px-2 py-1.49 flex justify-between items-center">
-                <img src="/driplove-logo.png" alt="DripLove Logo" className="h-8" />
+              <div className="px-2 py-2 flex justify-between items-center">
+                <img src="/driplove-logo.png" alt="DripLove Logo" className="h-10" />
                 <div className="text-right">
                   <div className="text-sm font-bold text-black leading-tight">
                     <div>Find Your</div>
@@ -930,7 +931,7 @@ const MainApp = ({ user, onLogout }: MainAppProps) => {
         </div>
 
         {/* Fixed Bottom Nav - always visible */}
-        {!showTerms && !showPrivacy && !isKeyboardOpen && (
+  {!showTerms && !showPrivacy && !isKeyboardOpen && !isChatDetailOpen && (
           <div
             className="fixed bottom-0 left-0 right-0 w-full bg-white z-[99999]"
             style={{ paddingBottom: 'clamp(4px, env(safe-area-inset-bottom, 0px), 6px)' }}

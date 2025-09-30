@@ -264,14 +264,15 @@ const PremiumUpgrade = ({ currentUser, onClose, preselectedPlan }: PremiumUpgrad
         className="max-w-3xl md:max-w-4xl lg:max-w-5xl mx-auto px-0 sm:px-2 md:px-4 lg:px-6"
         style={{
           // Ensure there is enough bottom padding on devices with a home indicator
-          paddingBottom: 'clamp(36px, env(safe-area-inset-bottom, 0px), 244px)'
+          paddingBottom: 'clamp(56px, env(safe-area-inset-bottom, 0px), 24px)'
         }}
       >
         {onClose && (
           <Button
             onClick={onClose}
             variant="ghost"
-            className="mb-8=0 text-white hover:bg-white/20 transition-colors"
+            // push down a bit and remove malformed class
+            className="mt-6 text-white hover:bg-white/20 transition-colors"
           >
             <X className="w-4 h-4 mr-2" />
             Back

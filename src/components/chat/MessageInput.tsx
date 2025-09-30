@@ -22,6 +22,7 @@ const MessageInput: React.FC<MessageInputProps> = ({
   const [showEmojiPicker, setShowEmojiPicker] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
+  const [keyboardOffset, setKeyboardOffset] = useState(0);
 
   const handleEmojiSelect = (emoji: string) => {
     onMessageChange(newMessage + emoji);
@@ -39,11 +40,45 @@ const MessageInput: React.FC<MessageInputProps> = ({
     }
   };
 
+  React.useEffect(() => {
+    const viewport = (window as any).visualViewport;
+    if (!viewport) {
+      // Fallback: no visualViewport support
+      return;
+    }
+
+    const handleResize = () => {
+      // When the virtual keyboard opens, visualViewport.height becomes smaller than window.innerHeight
+      const offset = window.innerHeight - viewport.height;
+      setKeyboardOffset(offset > 0 ? offset : 0);
+    };
+
+    // Also handle scroll within visualViewport (some browsers change offsetTop)
+    const handleScroll = () => {
+      const offset = window.innerHeight - viewport.height - (viewport.offsetTop || 0);
+      setKeyboardOffset(offset > 0 ? offset : 0);
+    };
+
+    viewport.addEventListener('resize', handleResize);
+    viewport.addEventListener('scroll', handleScroll);
+
+    // Initial measurement
+    handleResize();
+
+    return () => {
+      viewport.removeEventListener('resize', handleResize);
+      viewport.removeEventListener('scroll', handleScroll);
+      setKeyboardOffset(0);
+    };
+  }, []);
+
   return (
     <div 
       ref={containerRef}
       className="p-2 border-t bg-white relative z-30"
-      style={{ paddingBottom: 'clamp(16px, env(safe-area-inset-bottom, 0px), 24px)', marginBottom: '40px' }}
+style={{
+  paddingBottom: `calc(env(safe-area-inset-bottom, 0px) + ${keyboardOffset}px)`
+}}
     >
       <div className="flex items-center space-x-2">
         <div className="flex-1 flex items-center space-x-2 bg-gray-100 rounded-full px-4 py-2">

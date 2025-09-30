@@ -369,7 +369,7 @@ const MatchCard: React.FC<MatchCardProps> = ({
                           <img
                             src={full}
                             alt={`${match.first_name} ${match.last_name}`}
-                            className="w-full h-full object-contain transition-opacity duration-300 relative z-10"
+                            className="w-full h-full object-contain transition-opacity duration-300 relative z-10 mt-2"
                             draggable={false}
                             onLoadStart={() => setImageLoading(true)}
                             onLoad={() => setImageLoading(false)}
@@ -480,7 +480,7 @@ const MatchCard: React.FC<MatchCardProps> = ({
           
           {/* Slide indicators */}
           {slides.length > 1 && (
-            <div className="absolute top-4 left-4 right-4 flex space-x-1 z-10">
+            <div className="absolute top-9 left-4 right-4 flex space-x-1 z-10">
               {slides.map((_, index) => (
                 <div
                   key={index}

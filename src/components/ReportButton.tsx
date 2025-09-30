@@ -59,7 +59,8 @@ const ReportButton: React.FC<ReportButtonProps> = ({
       const res = await supabase.from('reported_chats').insert({
         reporter_id: reporterId,
         reported_user_id: reportedUserId,
-        chat_id: contentId || null,
+        // Schema requires non-null chat_id; use empty string when contentId is not a message id
+        chat_id: contentId || '',
         reason,
         description
       });

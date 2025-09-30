@@ -48,7 +48,8 @@ const ReportDialog: React.FC<ReportDialogProps> = ({ isOpen, onClose, reporterId
       const { error } = await supabase.from('reported_chats').insert({
         reporter_id: reporterId,
         reported_user_id: reportedUserId,
-        chat_id: messageId || null,
+        // DB requires a non-null chat_id (schema enforces NOT NULL). Use empty string when messageId is absent.
+        chat_id: messageId || '',
         reason: reason.trim(),
         description: description.trim() || null,
       });

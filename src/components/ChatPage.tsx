@@ -17,6 +17,7 @@ import { CurrentUser, ChatMatch, ChatMessage } from '@/types';
 interface ChatPageProps {
   currentUser: CurrentUser;
   onUnreadChange?: () => void;
+  onDetailViewChange?: (inDetail: boolean) => void;
 }
 
 // Global cache for chat matches - persists across component mounts
@@ -33,7 +34,7 @@ if (typeof window !== 'undefined') {
   (window as any).chatMessagesCache = chatMessagesCache;
 }
 
-const ChatPage = ({ currentUser, onUnreadChange }: ChatPageProps) => {
+const ChatPage = ({ currentUser, onUnreadChange, onDetailViewChange }: ChatPageProps) => {
   const [matches, setMatches] = useState<ChatMatch[]>(() => {
     // Initialize with cached data immediately if available
     const cached = chatMatchesCache.get(currentUser.id);
@@ -106,6 +107,10 @@ const ChatPage = ({ currentUser, onUnreadChange }: ChatPageProps) => {
     if (selectedMatch) {
       fetchMessages();
       markMessagesAsRead();
+      onDetailViewChange?.(true);
+    }
+    else {
+      onDetailViewChange?.(false);
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selectedMatch]);
@@ -764,7 +769,7 @@ const ChatPage = ({ currentUser, onUnreadChange }: ChatPageProps) => {
       <div
         ref={messagesContainerRef}
         className="flex-1 overflow-y-auto px-4 space-y-2 bg-gray-50 pb-1"
-        style={{ WebkitOverflowScrolling: 'touch', paddingTop: '90px' }}
+        style={{ WebkitOverflowScrolling: 'touch', paddingTop: '110px' }}
       >
         {messages.map((message, index) => {
           const prevMessage = messages[index - 1];

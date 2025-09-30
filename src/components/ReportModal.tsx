@@ -58,7 +58,8 @@ const ReportModal: React.FC<ReportModalProps> = ({ open, onClose, reporterId, re
       const { error } = await supabase.from('reported_chats').insert({
         reporter_id: reporterId,
         reported_user_id: reportedUserId,
-        chat_id: contentId || null,
+        // DB requires chat_id to be non-null; supply empty string when none provided
+        chat_id: contentId || '',
         reason: reason.trim(),
         description: description.trim() ? description.trim() : null,
       });
