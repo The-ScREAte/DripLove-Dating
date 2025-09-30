@@ -45,6 +45,18 @@ export const OAUTH_CONFIG = {
   
   // Supabase redirect configuration
   supabaseRedirectUri: 'driplove://auth/callback',
+
+  // Services / Client IDs for native OAuth flows (e.g. Apple Services ID)
+  // These are the "Client ID" values you create in Apple Developer (Service IDs)
+  // and must match what Supabase has configured for Apple.
+  servicesClientIds: {
+    // Prefer a Vite env var for flexible per-environment configuration.
+    // Set VITE_APPLE_SERVICES_ID in your .env for local/staging/prod as needed.
+    apple:
+      (typeof import.meta !== 'undefined' && (import.meta as any).env?.VITE_APPLE_SERVICES_ID) ||
+      process.env?.VITE_APPLE_SERVICES_ID ||
+      'com.driplove.dating.signin',
+  },
   
   // Web fallback for development/testing
   webRedirectUri: typeof window !== 'undefined' && window.location.origin 
@@ -71,6 +83,10 @@ export const getRedirectUri = (provider: 'google' | 'apple' = 'google') => {
   
   // Use provider-specific web redirect
   return OAUTH_CONFIG.webRedirectUris[provider] || OAUTH_CONFIG.webRedirectUri;
+};
+
+export const getAppleClientId = () => {
+  return OAUTH_CONFIG.servicesClientIds.apple;
 };
 
 /**

@@ -10,7 +10,9 @@ import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import { handleInputFocus, handleInputBlur, getInputStyles } from '@/utils/inputUtils';
 import { getPasswordResetRedirectUri, getEmailConfirmRedirectUri } from '@/config/oauth';
-import { openAppleSignInWithSafariViewController, cleanupSafariViewController } from '@/utils/safariViewController';
+import { cleanupSafariViewController } from '@/utils/safariViewController';
+import { signInWithAppleNative } from '@/utils/appleNativeAuth';
+import AppleAuthDebug from '@/components/AppleAuthDebug';
 
 interface AuthFormProps {
   isLogin: boolean;
@@ -137,40 +139,30 @@ const AuthForm = ({ isLogin, onToggle, onOAuthSuccess }: AuthFormProps) => {
       
       console.log(`Starting ${provider} OAuth with redirectTo: ${redirectTo}`);
       
-      // For Apple provider, always use the dedicated Safari View Controller helper.
+      // For Apple provider, prefer the native Apple modal (Capacitor) instead of Safari VC.
       if (provider === 'apple') {
-        console.log('🍎 Using Safari VC flow for Apple Sign In (delegated to helper)');
-        const { data, error } = await openAppleSignInWithSafariViewController(redirectTo, {
-          onSuccess: async () => {
-            try {
-              const { data: sessionData } = await supabase.auth.getSession();
-              if (sessionData?.session?.user) {
-                await ensureProfileExists(sessionData.session.user);
-              }
-              toast({ title: 'Welcome!', description: "You've been successfully signed in." });
-              navigate('/');
-            } catch (err) {
-              console.error('Error after Apple OAuth success:', err);
-            }
-            setOauthLoading(null);
-          },
-          onError: (err) => {
-            console.error('[Apple OAuth Error]:', err);
-            toast({
-              title: 'Authentication Error',
-              description: err?.message || 'Failed to sign in with Apple',
-              variant: 'destructive',
-            });
-            setOauthLoading(null);
-          },
-          onComplete: () => setOauthLoading(null),
-        });
+        console.log('🍎 Using Native Sign in with Apple (Capacitor)');
+        try {
+          const data = await signInWithAppleNative();
 
-        if (error) {
-          console.error('Apple OAuth error:', error);
-          toast({ title: 'Authentication Error', description: error?.message || 'Failed to sign in with Apple', variant: 'destructive' });
+          // After successful native sign-in, ensure profile exists and navigate
+          const user = data?.user || (data?.session?.user ?? null);
+          if (user) {
+            await ensureProfileExists(user);
+            toast({ title: 'Welcome!', description: "You've been successfully signed in." });
+            navigate('/');
+          }
+        } catch (err: any) {
+          console.error('[Apple OAuth Error]:', err);
+          toast({
+            title: 'Authentication Error',
+            description: err?.message || 'Failed to sign in with Apple',
+            variant: 'destructive',
+          });
+        } finally {
           setOauthLoading(null);
         }
+        return;
       } else {
         console.log(`Using standard OAuth flow for ${provider} on web/Android`);
         // Standard OAuth flow for web and Android
@@ -591,7 +583,7 @@ const AuthForm = ({ isLogin, onToggle, onOAuthSuccess }: AuthFormProps) => {
       </CardHeader>
 
       <CardContent>
-        {/* Show OAuth buttons only when not in forgot password mode */}
+  {/* Show OAuth buttons only when not in forgot password mode */}
         {!showForgotPassword && (
           <>
             {/* OAuth Buttons */}
@@ -824,6 +816,8 @@ const AuthForm = ({ isLogin, onToggle, onOAuthSuccess }: AuthFormProps) => {
           </div>
         )}
       </CardContent>
+      {/* Dev-only Apple auth debug overlay */}
+      {process.env.NODE_ENV !== 'production' && <AppleAuthDebug />}
     </Card>
   );
 };

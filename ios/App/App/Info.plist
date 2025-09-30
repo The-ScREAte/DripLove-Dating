@@ -45,5 +45,19 @@
 	</array>
 	<key>UIViewControllerBasedStatusBarAppearance</key>
 	<true/>
+	<!-- Custom URL scheme for deep linking (e.g. driplove://auth/callback) -->
+	<key>CFBundleURLTypes</key>
+	<array>
+		<dict>
+			<key>CFBundleTypeRole</key>
+			<string>Editor</string>
+			<key>CFBundleURLName</key>
+			<string>driplove</string>
+			<key>CFBundleURLSchemes</key>
+			<array>
+				<string>driplove</string>
+			</array>
+		</dict>
+	</array>
 </dict>
 </plist>
