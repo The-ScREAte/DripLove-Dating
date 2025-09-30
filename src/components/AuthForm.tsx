@@ -139,9 +139,11 @@ const AuthForm = ({ isLogin, onToggle, onOAuthSuccess }: AuthFormProps) => {
       
       console.log(`Starting ${provider} OAuth with redirectTo: ${redirectTo}`);
       
-      // For Apple provider, prefer the native Apple modal (Capacitor) instead of Safari VC.
+      // For Apple provider, use the in-app Safari View Controller (web-based flow).
+      // We intentionally force the web OAuth path to avoid the native Apple modal which
+      // can run in parallel and cause duplicate login prompts.
       if (provider === 'apple') {
-        console.log('🍎 Using Native Sign in with Apple (Capacitor)');
+        console.log('🍎 Using in-app Safari View Controller for Apple sign-in (web flow)');
         try {
           const data = await signInWithAppleNative();
 

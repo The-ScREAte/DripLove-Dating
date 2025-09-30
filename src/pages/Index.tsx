@@ -77,11 +77,35 @@ const Index = () => {
 
   const checkUserTypeAndRedirect = async (userId: string) => {
     try {
-      const { data: profile, error } = await supabase
-        .from('profiles')
-        .select('is_admin, account_status, first_name, last_name, date_of_birth, country, city, gender, preference, relationship_intent, occupation, industry, education_level, terms_accepted')
-        .eq('id', userId)
-        .single();
+      // Fast-path: if the OAuth handler just created a minimal profile it will
+      // stash it in sessionStorage under 'oauth_profile'. Use that to avoid a
+      // short timing window where the DB read may not yet return the new row.
+      let profile: any = null;
+      let error: any = null;
+
+      try {
+        if (typeof window !== 'undefined') {
+          const raw = sessionStorage.getItem('oauth_profile');
+          if (raw) {
+            profile = JSON.parse(raw);
+            // Clear it so subsequent checks rely on the DB
+            try { sessionStorage.removeItem('oauth_profile'); } catch {}
+          }
+        }
+      } catch (e) {
+        // If sessionStorage is unavailable, fall back to DB
+        profile = null;
+      }
+
+      if (!profile) {
+        const result = await supabase
+          .from('profiles')
+          .select('is_admin, account_status, first_name, last_name, date_of_birth, country, city, gender, preference, relationship_intent, occupation, industry, education_level, terms_accepted')
+          .eq('id', userId)
+          .single();
+        profile = result.data;
+        error = result.error;
+      }
       
       if (error || !profile) {
         console.error('Profile not found for user:', userId);
@@ -131,8 +155,9 @@ const Index = () => {
 
       if (isIncomplete) {
         // Check if this is an OAuth user by looking at the auth provider
-        const { data: { user } } = await supabase.auth.getUser();
-        const isOAuthUser = user?.app_metadata?.provider === 'google';
+  const { data: { user } } = await supabase.auth.getUser();
+  const provider = user?.app_metadata?.provider;
+  const isOAuthUser = provider === 'google' || provider === 'apple';
         
         if (isOAuthUser) {
           setCurrentView('profile-completion');

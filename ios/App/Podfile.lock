@@ -1,70 +1,64 @@
 PODS:
-  - Capacitor (7.4.3):
+  - Capacitor (7.4.2):
     - CapacitorCordova
-  - CapacitorApp (7.1.0):
+  - CapacitorApp (7.0.1):
     - Capacitor
   - CapacitorBrowser (7.0.2):
     - Capacitor
   - CapacitorCamera (7.0.2):
     - Capacitor
-  - CapacitorCommunityAppleSignIn (7.0.1):
+  - CapacitorCordova (7.4.2)
+  - CapacitorKeyboard (7.0.1):
     - Capacitor
-  - CapacitorCordova (7.4.3)
-  - CapacitorKeyboard (7.0.3):
+  - CapacitorPushNotifications (7.0.1):
     - Capacitor
-  - CapacitorPushNotifications (7.0.3):
+  - CapacitorStatusBar (7.0.1):
     - Capacitor
-  - CapacitorStatusBar (7.0.3):
-    - Capacitor
-  - CordovaPlugins (7.4.3):
+  - CordovaPlugins (7.4.2):
     - CapacitorCordova
 
 DEPENDENCIES:
-  - "Capacitor (from `../../node_modules/.pnpm/@capacitor+ios@7.4.3_@capacitor+core@7.4.3/node_modules/@capacitor/ios`)"
-  - "CapacitorApp (from `../../node_modules/.pnpm/@capacitor+app@7.1.0_@capacitor+core@7.4.3/node_modules/@capacitor/app`)"
-  - "CapacitorBrowser (from `../../node_modules/.pnpm/@capacitor+browser@7.0.2_@capacitor+core@7.4.3/node_modules/@capacitor/browser`)"
-  - "CapacitorCamera (from `../../node_modules/.pnpm/@capacitor+camera@7.0.2_@capacitor+core@7.4.3/node_modules/@capacitor/camera`)"
-  - "CapacitorCommunityAppleSignIn (from `../../node_modules/.pnpm/@capacitor-community+apple-sign-in@7.0.1_@capacitor+core@7.4.3/node_modules/@capacitor-community/apple-sign-in`)"
-  - "CapacitorCordova (from `../../node_modules/.pnpm/@capacitor+ios@7.4.3_@capacitor+core@7.4.3/node_modules/@capacitor/ios`)"
-  - "CapacitorKeyboard (from `../../node_modules/.pnpm/@capacitor+keyboard@7.0.3_@capacitor+core@7.4.3/node_modules/@capacitor/keyboard`)"
-  - "CapacitorPushNotifications (from `../../node_modules/.pnpm/@capacitor+push-notifications@7.0.3_@capacitor+core@7.4.3/node_modules/@capacitor/push-notifications`)"
-  - "CapacitorStatusBar (from `../../node_modules/.pnpm/@capacitor+status-bar@7.0.3_@capacitor+core@7.4.3/node_modules/@capacitor/status-bar`)"
+  - "Capacitor (from `../../node_modules/@capacitor/ios`)"
+  - "CapacitorApp (from `../../node_modules/@capacitor/app`)"
+  - "CapacitorBrowser (from `../../node_modules/@capacitor/browser`)"
+  - "CapacitorCamera (from `../../node_modules/@capacitor/camera`)"
+  - "CapacitorCordova (from `../../node_modules/@capacitor/ios`)"
+  - "CapacitorKeyboard (from `../../node_modules/@capacitor/keyboard`)"
+  - "CapacitorPushNotifications (from `../../node_modules/@capacitor/push-notifications`)"
+  - "CapacitorStatusBar (from `../../node_modules/@capacitor/status-bar`)"
   - CordovaPlugins (from `../capacitor-cordova-ios-plugins`)
 
 EXTERNAL SOURCES:
   Capacitor:
-    :path: "../../node_modules/.pnpm/@capacitor+ios@7.4.3_@capacitor+core@7.4.3/node_modules/@capacitor/ios"
+    :path: "../../node_modules/@capacitor/ios"
   CapacitorApp:
-    :path: "../../node_modules/.pnpm/@capacitor+app@7.1.0_@capacitor+core@7.4.3/node_modules/@capacitor/app"
+    :path: "../../node_modules/@capacitor/app"
   CapacitorBrowser:
-    :path: "../../node_modules/.pnpm/@capacitor+browser@7.0.2_@capacitor+core@7.4.3/node_modules/@capacitor/browser"
+    :path: "../../node_modules/@capacitor/browser"
   CapacitorCamera:
-    :path: "../../node_modules/.pnpm/@capacitor+camera@7.0.2_@capacitor+core@7.4.3/node_modules/@capacitor/camera"
-  CapacitorCommunityAppleSignIn:
-    :path: "../../node_modules/.pnpm/@capacitor-community+apple-sign-in@7.0.1_@capacitor+core@7.4.3/node_modules/@capacitor-community/apple-sign-in"
+    :path: "../../node_modules/@capacitor/camera"
   CapacitorCordova:
-    :path: "../../node_modules/.pnpm/@capacitor+ios@7.4.3_@capacitor+core@7.4.3/node_modules/@capacitor/ios"
+    :path: "../../node_modules/@capacitor/ios"
   CapacitorKeyboard:
-    :path: "../../node_modules/.pnpm/@capacitor+keyboard@7.0.3_@capacitor+core@7.4.3/node_modules/@capacitor/keyboard"
+    :path: "../../node_modules/@capacitor/keyboard"
   CapacitorPushNotifications:
-    :path: "../../node_modules/.pnpm/@capacitor+push-notifications@7.0.3_@capacitor+core@7.4.3/node_modules/@capacitor/push-notifications"
+    :path: "../../node_modules/@capacitor/push-notifications"
   CapacitorStatusBar:
-    :path: "../../node_modules/.pnpm/@capacitor+status-bar@7.0.3_@capacitor+core@7.4.3/node_modules/@capacitor/status-bar"
+    :path: "../../node_modules/@capacitor/status-bar"
   CordovaPlugins:
     :path: "../capacitor-cordova-ios-plugins"
 
 SPEC CHECKSUMS:
-  Capacitor: 28d6c01026a9a3f7156529498ec1f389a2a28dbc
-  CapacitorApp: 26587c2ce485d88ddb39adb21cac64f8e481afe3
+  Capacitor: 9d9e481b79ffaeacaf7a85d6a11adec32bd33b59
+  CapacitorApp: febecbb9582cb353aed037e18ec765141f880fe9
   CapacitorBrowser: 22541e48442de44dc629c214388290d6eecc6ae9
   CapacitorCamera: f9e54db0a18bb218a8dc360907d63aaefe9209ff
-  CapacitorCommunityAppleSignIn: 9a69d5f1d9c0a071da3a35a42f90da85c7ea054e
-  CapacitorCordova: 435121e81a2df4d0034f0fb11fcefab5104cfdb5
-  CapacitorKeyboard: 62f36104f26d53d8b3a2a43f2a69fe714f1777d5
-  CapacitorPushNotifications: bdd621fbd562be34a41f4a7b1750efa000447d5a
-  CapacitorStatusBar: 0659ddc7b1713764a05831463d215b177a15d054
-  CordovaPlugins: 32fa8833e41de121e3f185b0c033815b1be91a13
+  CapacitorCordova: 5e58d04631bc5094894ac106e2bf1da18a9e6151
+  CapacitorKeyboard: 09fd91dcde4f8a37313e7f11bde553ad1ed52036
+  CapacitorPushNotifications: 6a2794788c583dd89215f1805ca4bced1b13dbdf
+  CapacitorStatusBar: 6e7af040d8fc4dd655999819625cae9c2d74c36f
+  CordovaPlugins: b2618e17f8dd580d2354710b7b52b0af9d6f03f2
 
-PODFILE CHECKSUM: 61a449da89ec6872f8dcb0150ba6ba68e2f3112c
+PODFILE CHECKSUM: 0fe13aa6a06f15f1e48892cbbd8bbee6bf7266ff
 
 COCOAPODS: 1.16.2

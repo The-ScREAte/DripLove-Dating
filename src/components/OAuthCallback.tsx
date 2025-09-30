@@ -39,107 +39,68 @@ const OAuthCallback = () => {
       try {
         setStatus('Checking authentication...');
 
-        // ✅ Step 1: Parse access_token and refresh_token from URL fragment if present
-        const hash = window.location.hash.substring(1); // remove #
-        const params = new URLSearchParams(hash);
-        const access_token = params.get('access_token');
-        const refresh_token = params.get('refresh_token');
+        // Use shared handler so Google web flow and Apple in-app SVC both behave the same
+        const { handleOAuthRedirect } = await import('@/utils/oauthCallbackHandler');
 
-        if (access_token && refresh_token) {
-          setStatus('Setting Supabase session...');
-            // If running inside the native iOS app, the deep-link is handled by the
-            // App.addListener('appUrlOpen') handler. Avoid processing the WebView
-            // /auth/callback page there — it will still be capacitor://localhost.
-            try {
-              const { Capacitor } = await import('@capacitor/core');
-              if (Capacitor && Capacitor.isNativePlatform && Capacitor.getPlatform && Capacitor.isNativePlatform() && Capacitor.getPlatform() === 'ios') {
-                console.log('Skipping OAuthCallback inside WebView on native iOS; handled via App.appUrlOpen');
-                navigate('/');
-                return;
-              }
-            } catch (e) {
-              // Capacitor not available or import failed -> continue with web flow
-            }
-          const { data: setData, error: setError } = await supabase.auth.setSession({
-            access_token,
-            refresh_token,
-          } as any);
-
-          if (setError) throw setError;
-          console.log('[OAuthCallback] Supabase session set from URL fragment:', setData);
+        // If this page is inside the native iOS WebView, skip — native handler will process
+        try {
+          const { Capacitor } = await import('@capacitor/core');
+          if (Capacitor && Capacitor.isNativePlatform && Capacitor.getPlatform && Capacitor.isNativePlatform() && Capacitor.getPlatform() === 'ios') {
+            console.log('OAuthCallback: Skipping on native iOS; handled via appUrlOpen');
+            navigate('/');
+            return;
+          }
+        } catch (e) {
+          // Continue with web flow
         }
 
-        // ✅ Step 2: Always check session (covers cookie/session cases too)
-        setStatus('Getting session...');
-        const { data: sessionData, error: sessionError } = await supabase.auth.getSession();
+        // The web callback will have the fragment in window.location.href
+        const currentUrl = typeof window !== 'undefined' ? window.location.href : undefined;
+        const result = await handleOAuthRedirect(currentUrl);
 
         clearTimeout(timeout);
 
-        if (sessionError) throw sessionError;
-        if (!sessionData.session?.user) throw new Error('No user session found');
+        // Validate returned result
+        const user = result?.user;
+        const profile = result?.profile;
 
-        const user = sessionData.session.user;
-        setStatus('Checking account status...');
-
-        // ✅ Step 3: Ensure profile exists
-        const { data: profile, error: profileError } = await supabase
-          .from('profiles')
-          .select('id, is_admin, account_status, first_name, last_name')
-          .eq('id', user.id)
-          .maybeSingle();
-
-        if (profileError) throw profileError;
+        if (!user) throw new Error('No user session found');
 
         if (!profile) {
-          // No profile yet → go to complete profile page
           navigate('/complete-profile');
           return;
         }
 
         if (profile.account_status === 'blocked') {
           await supabase.auth.signOut();
-          toast({
-            title: "Account Blocked",
-            description: "Your account has been blocked.",
-            variant: "destructive",
-          });
+          toast({ title: 'Account Blocked', description: 'Your account has been blocked.', variant: 'destructive' });
           navigate('/');
           return;
         }
 
         if (profile.account_status === 'on_hold') {
           await supabase.auth.signOut();
-          toast({
-            title: "Account On Hold",
-            description: "Your account is on hold. Please contact support.",
-            variant: "destructive",
-          });
+          toast({ title: 'Account On Hold', description: 'Your account is on hold. Please contact support.', variant: 'destructive' });
           navigate('/');
           return;
         }
 
-        // Save profile ID to session
         sessionStorage.setItem('profile_id', profile.id);
 
-        // Check if profile is complete
         const isProfileComplete = profile.first_name && profile.last_name;
         if (!isProfileComplete) {
           navigate('/complete-profile');
           return;
         }
 
-        toast({
-          title: "Welcome back!",
-          description: "You've been successfully logged in.",
-        });
+        toast({ title: 'Welcome back!', description: "You've been successfully logged in." });
         navigate('/');
-
       } catch (error: any) {
         clearTimeout(timeout);
         toast({
-          title: "Authentication Error",
-          description: error.message || "An error occurred during authentication. Please try again.",
-          variant: "destructive",
+          title: 'Authentication Error',
+          description: error.message || 'An error occurred during authentication. Please try again.',
+          variant: 'destructive',
         });
         navigate('/');
       } finally {
