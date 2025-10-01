@@ -489,15 +489,18 @@ const ProfilePage = ({ currentUser, profile, onProfileUpdate, onLogout, onShowTe
                   style={{ width: `${completion}%` }}
                 />
               </div>
-              <span className="text-sm font-semibold text-gray-700 min-w-[45px] text-right">
-                {completion}%
+              <span className="text-sm font-semibold text-gray-700 min-w-[45px] text-right flex items-center justify-end gap-2">
+                <span>{completion}%</span>
+                {showVerifiedBadge && (
+                  <img
+                    src="/images/verified.svg"
+                    alt="Verified profile"
+                    title="Verified profile"
+                    className="w-6 h-6"
+                    aria-hidden="false"
+                  />
+                )}
               </span>
-              {showVerifiedBadge && (
-                <div className="flex items-center bg-emerald-100 text-emerald-800 text-xs px-3 py-1 rounded-full">
-                  <span className="mr-1">✓</span>
-                  Verified
-                </div>
-              )}
             </div>
             
             {/* Profile completion notice */}

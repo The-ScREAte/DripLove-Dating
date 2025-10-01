@@ -158,10 +158,9 @@ export const calculateProfileCompletion = (
 
   const completion = Math.round((completedWeight / totalWeight) * 100);
 
-  // Show verified badge at 90% if photos and basic info are complete
-  const showVerifiedBadge = completion >= 90 && 
-                           completionCriteria.photos.completed && 
-                           completionCriteria.basicInfo.completed;
+  // Show verified badge at or above 85% completion
+  // NOTE: requirement changed: any user who reaches >=85% gets the verified badge
+  const showVerifiedBadge = completion >= 85;
 
   return { completion, missingFields, showVerifiedBadge, completionCriteria };
 };

@@ -66,11 +66,11 @@ const MainApp = ({ user, onLogout }: MainAppProps) => {
       try {
         const { Capacitor } = await import('@capacitor/core');
         if (!Capacitor.isNativePlatform() || !user?.id) {
-          console.log('[MainApp] Skipping push notifications - not native platform or no user');
+    console.debug('[MainApp] Skipping push notifications - not native platform or no user');
           return;
         }
 
-        console.log('[MainApp] Attempting to setup push notifications...');
+  console.debug('[MainApp] Attempting to setup push notifications...');
         const { PushNotifications } = await import('@capacitor/push-notifications');
         
         // Add error listener first to catch Firebase initialization errors
@@ -79,17 +79,17 @@ const MainApp = ({ user, onLogout }: MainAppProps) => {
         });
         
         // Request permission first to prevent crashes
-        console.log('[MainApp] Requesting push notification permissions...');
+  console.debug('[MainApp] Requesting push notification permissions...');
         const permissionResult = await PushNotifications.requestPermissions();
         
         if (permissionResult.receive === 'granted') {
-          console.log('[MainApp] Permission granted, attempting to register...');
+          console.debug('[MainApp] Permission granted, attempting to register...');
           
           // Use setTimeout to prevent blocking the main thread
           setTimeout(async () => {
             try {
               await PushNotifications.register();
-              console.log('[MainApp] Push notification registration successful');
+              console.debug('[MainApp] Push notification registration successful');
               
               PushNotifications.addListener('registration', async (token) => {
                 try {
@@ -99,7 +99,7 @@ const MainApp = ({ user, onLogout }: MainAppProps) => {
                     token: token.value,
                     platform: Capacitor.getPlatform()
                   });
-                  console.log('[MainApp] Push token saved successfully');
+                  console.debug('[MainApp] Push token saved successfully');
                 } catch (error) {
                   console.error('[MainApp] Failed to save push token:', error);
                 }
@@ -110,7 +110,7 @@ const MainApp = ({ user, onLogout }: MainAppProps) => {
             }
           }, 500);
         } else {
-          console.log('[MainApp] Push notification permission not granted');
+          console.debug('[MainApp] Push notification permission not granted');
         }
       } catch (err) {
         console.error('[MainApp] Push notification setup error:', err);
@@ -357,7 +357,7 @@ const MainApp = ({ user, onLogout }: MainAppProps) => {
       
       // If less than 5 profiles remaining, load more
       if (remainingProfiles <= 5) {
-        console.log('🔄 Refilling profiles - running low on matches');
+  console.debug('🔄 Refilling profiles - running low on matches');
         
         // Get current exclusions
         const existingIds = cache.potentialMatches.map((p: any) => p.id);
@@ -456,7 +456,7 @@ const MainApp = ({ user, onLogout }: MainAppProps) => {
             }
           }, 100);
 
-          console.log(`✅ Added ${shuffledNew.length} new profiles. Total: ${cache.potentialMatches.length}`);
+          console.debug(`✅ Added ${shuffledNew.length} new profiles. Total: ${cache.potentialMatches.length}`);
         }
       }
     } catch (error) {
@@ -789,7 +789,7 @@ const MainApp = ({ user, onLogout }: MainAppProps) => {
         return;
       }
 
-      console.log('[MainApp] Profile fetched successfully');
+  console.debug('[MainApp] Profile fetched successfully');
       setProfile(data);
       
       // Check premium status from user_subscriptions
@@ -808,7 +808,7 @@ const MainApp = ({ user, onLogout }: MainAppProps) => {
           }
           
           setIsPremium(!!subData);
-          console.log('[MainApp] Subscription status checked');
+          console.debug('[MainApp] Subscription status checked');
         } catch (subErr) {
           console.error('[MainApp] Subscription check failed:', subErr);
           setIsPremium(false); // Default to free

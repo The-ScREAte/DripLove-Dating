@@ -1,0 +1,21 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Scalloped verified badge SVG (text SVG) -->
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="24" height="24" role="img" aria-labelledby="verifiedTitle">
+  <title id="verifiedTitle">Verified profile</title>
+  <!-- Scalloped magenta badge -->
+  <g fill="#FF00CC">
+    <circle cx="18.5" cy="12" r="3.2" />
+    <circle cx="16.3" cy="16.3" r="3.2" />
+    <circle cx="12" cy="18.5" r="3.2" />
+    <circle cx="7.7" cy="16.3" r="3.2" />
+    <circle cx="5.5" cy="12" r="3.2" />
+    <circle cx="7.7" cy="7.7" r="3.2" />
+    <circle cx="12" cy="5.5" r="3.2" />
+    <circle cx="16.3" cy="7.7" r="3.2" />
+    <!-- center to smooth overlaps -->
+    <circle cx="12" cy="12" r="4.6" fill="#FF00CC" />
+  </g>
+
+  <!-- Check mark -->
+  <path d="M7.6 12.3l2.3 2.3L16.3 8.2" fill="none" stroke="#000" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" />
+</svg>
