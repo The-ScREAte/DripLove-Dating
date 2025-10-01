@@ -630,12 +630,15 @@ const MatchCard: React.FC<MatchCardProps> = ({
               <span className="text-base text-gray-600">
                 {calculateAge(match.date_of_birth)}
               </span>
-              {/* Verified badge beside name and age */}
+              {/* Verified badge beside name and age - exact same as ProfilePage */}
               {isVerified && (
-                <div className="bg-green-5 text-white px-2 py-1 rounded-full flex items-center text-xs font-semibold">
-                  <Shield className="w-3 h-3 mr-1" />
-                  Verified
-                </div>
+                <img
+                  src="/images/verified.svg"
+                  alt="Verified profile"
+                  title="Verified profile"
+                  className="w-6 h-6"
+                  aria-hidden="false"
+                />
               )}
             </div>
             

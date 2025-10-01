@@ -4,16 +4,6 @@ import ReactDOM from "react-dom/client";
 import App from "./App.tsx";
 import "./index.css";
 
-// Silence verbose console logs across the app when true.
-// Set to `false` to restore console.log/debug output.
-const SILENCE_APP_LOGS = true;
-if (SILENCE_APP_LOGS) {
-  // Preserve error/warn but silence regular logs and debug statements
-  console.log = () => {};
-  console.debug = () => {};
-  console.info = () => {};
-}
-
 // Create a loading screen component
 const LoadingScreen = () => (
   <div className="w-full h-screen flex items-center justify-center bg-gradient-to-br from-pink-500 to-purple-600">

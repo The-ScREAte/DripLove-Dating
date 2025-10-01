@@ -6,10 +6,13 @@
 /* Mobile optimizations and safe areas */
 @layer base {
   html, body, #root {
-    margin: 0;
-    padding: 0;
+    margin: 0 !important;
+    padding: 0 !important;
     width: 100%;
     height: 100%;
+    position: relative;
+    top: 0;
+    left: 0;
     /* Disable double-tap zoom */
     touch-action: manipulation;
     -webkit-touch-callout: none;
@@ -20,25 +23,19 @@
     user-select: none;
   }
 
-  /* Safe area top only */
-  .safe-area-top {
-    padding-top: env(safe-area-inset-top);
-  }
-
-  /* Safe area bottom only */
-  .safe-area-bottom {
-    padding-bottom: env(safe-area-inset-bottom);
-  }
-
-  /* Safe area sides only */
-  .safe-area-sides {
-    padding-left: env(safe-area-inset-left);
-    padding-right: env(safe-area-inset-right);
-  }
-
   /* Prevent zoom on double tap for mobile */
   * {
     -webkit-tap-highlight-color: transparent;
+  }
+
+  /* Remove bottom spacing for auth forms */
+  .no-bottom-space {
+    margin-bottom: 0 !important;
+    padding-bottom: 0 !important;
+  }
+
+  .no-bottom-space * {
+    margin-bottom: 0 !important;
   }
 
   /* Allow pinch zoom but return to natural position */
@@ -318,34 +315,7 @@
   height: stretch;
 }
 
-/* Safe area support for mobile devices */
-@layer base {
-  :root {
-    --safe-area-inset-top: env(safe-area-inset-top, 0px);
-    --safe-area-inset-bottom: env(safe-area-inset-bottom, 0px);
-    --safe-area-inset-left: env(safe-area-inset-left, 0px);
-    --safe-area-inset-right: env(safe-area-inset-right, 0px);
-  }
 
-  /* Admin page safe area */
-  .admin-page-container {
-    padding-top: max(var(--safe-area-inset-top), 20px);
-    padding-bottom: max(var(--safe-area-inset-bottom), 20px);
-    padding-left: max(var(--safe-area-inset-left), 16px);
-    padding-right: max(var(--safe-area-inset-right), 16px);
-    min-height: 100vh;
-    box-sizing: border-box;
-  }
-
-  /* Privacy/Terms pages safe area */
-  .terms-container {
-    padding-top: max(var(--safe-area-inset-top), 20px);
-    padding-bottom: max(var(--safe-area-inset-bottom), 20px);
-    padding-left: max(var(--safe-area-inset-left), 16px);
-    padding-right: max(var(--safe-area-inset-right), 16px);
-    min-height: 100vh;
-    box-sizing: border-box;
-  }
 
   /* Toast and notification safe positioning */
   @media screen and (max-width: 768px) {
@@ -368,12 +338,12 @@
 
     /* Admin page mobile adjustments */
     .admin-page-container {
-      padding-top: max(var(--safe-area-inset-top), 44px) !important;
+      padding-top: 44px !important;
     }
 
     /* Privacy/Terms mobile adjustments */
     .terms-container {
-      padding-top: max(var(--safe-area-inset-top), 44px) !important;
+      padding-top: 44px !important;
     }
   }
 
@@ -393,8 +363,7 @@
 
       .admin-page-container,
       .terms-container {
-        padding-top: max(env(safe-area-inset-top), 47px) !important;
+        padding-top: 47px !important;
       }
     }
   }
-}

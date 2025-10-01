@@ -277,8 +277,8 @@ const Index = () => {
   
   
   return (
-    <div className="w-full min-h-fill flex justify-center bg-transparent">
-      <div className="w-full h-fill">
+    <div className="w-full h-fill flex justify-center bg-transparent" style={{ margin: 0, padding: 0 }}>
+      <div className="w-full h-fill" style={{ margin: 0, padding: 0 }}>
 
         {currentView === 'welcome' && (
           <WelcomeScreen
@@ -303,7 +303,7 @@ const Index = () => {
         )}
 
         {currentView === 'login' && (
-          <div className="min-h-fill bg-gradient-to-br from-pink-400 via-purple-500 to-indigo-600 flex items-center justify-center p-4">
+          <div className="h-fill bg-gradient-to-br from-pink-400 via-purple-500 to-indigo-600 flex items-center justify-center px-4 pt-4" style={{ paddingBottom: 0, marginBottom: 0 }}>
             <AuthForm 
               isLogin={true}
               onToggle={handleShowRegister}
@@ -312,7 +312,7 @@ const Index = () => {
         )}
 
         {currentView === 'register' && (
-          <div className="min-h-fill bg-gradient-to-br from-pink-400 via-purple-500 to-indigo-600 flex items-center justify-center p-4">
+          <div className="h-fill bg-gradient-to-br from-pink-400 via-purple-500 to-indigo-600 flex items-center justify-center px-4 pt-4" style={{ paddingBottom: 0, marginBottom: 0 }}>
             <RegistrationForm 
               onSubmit={handleRegister}
               onBackToLogin={handleBackToLogin}
@@ -321,7 +321,7 @@ const Index = () => {
         )}
 
         {currentView === 'profile-completion' && user && (
-          <div className="min-h-fill bg-gradient-to-br from-pink-400 via-purple-500 to-indigo-600 flex items-center justify-center p-4">
+          <div className="h-fill bg-gradient-to-br from-pink-400 via-purple-500 to-indigo-600 flex items-center justify-center px-4 pt-4" style={{ paddingBottom: 0, marginBottom: 0 }}>
             <ProfileCompletionForm
               user={user}
               onComplete={handleProfileComplete}

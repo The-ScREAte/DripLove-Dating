@@ -16,7 +16,6 @@ const config: CapacitorConfig = {
   },
   ios: {
     scheme: 'driplove',
-    contentInset: 'automatic',
     scrollEnabled: true,
     // Performance optimizations for iOS
     preferredContentMode: 'mobile'
@@ -32,7 +31,6 @@ const config: CapacitorConfig = {
     },
     StatusBar: {
       style: 'default',
-      backgroundColor: '#ffffff',
       overlaysWebView: true
     },
     Keyboard: {

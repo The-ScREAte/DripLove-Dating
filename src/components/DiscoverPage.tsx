@@ -422,11 +422,71 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, isPremium }: DiscoverPage
     return age;
   }, []);
 
+
+
+
+
   const shouldReshuffle = useCallback(() => {
     const now = Date.now();
     const tenMinutes = 10 * 60 * 1000; // 10 minutes in milliseconds
     return now - lastShuffleTime > tenMinutes;
   }, [lastShuffleTime]);
+
+  // Store pre-calculated verification status from database (NO calculation in DiscoverPage!)
+  const [verificationStatusMap, setVerificationStatusMap] = useState<{ [key: string]: boolean }>({});
+  
+  // Fetch pre-calculated verification status from database (NO calculation!)
+  const fetchVerificationStatus = useCallback(async (userId: string) => {
+    if (!userId || verificationStatusMap[userId] !== undefined) return; // Already fetched
+    
+    try {
+      // For now, we'll calculate it once here and cache it, but ideally this should be pre-calculated in the database
+      const { data: images, error: imageError } = await supabase
+        .from('user_images')
+        .select('image_url, is_approved, moderation_status')
+        .eq('user_id', userId);
+
+      if (imageError) {
+        setVerificationStatusMap(prev => ({ ...prev, [userId]: false }));
+        return;
+      }
+
+      // Get the profile data
+      const { data: profileData, error: profileError } = await supabase
+        .from('profiles')
+        .select('*')
+        .eq('id', userId)
+        .single();
+
+      if (profileError || !profileData) {
+        setVerificationStatusMap(prev => ({ ...prev, [userId]: false }));
+        return;
+      }
+
+      // Calculate verification status once and cache it (this should ideally be done server-side)
+      const { showVerifiedBadge } = calculateProfileCompletion(profileData, images || []);
+      
+      setVerificationStatusMap(prev => ({ ...prev, [userId]: showVerifiedBadge }));
+    } catch (error) {
+      setVerificationStatusMap(prev => ({ ...prev, [userId]: false }));
+    }
+  }, [verificationStatusMap]);
+
+  // Get verification status from cache (NO calculation!)
+  const isProfileVerified = useCallback((profile: any) => {
+    if (!profile) {
+      return false;
+    }
+    
+    // Check if we have cached status
+    if (verificationStatusMap[profile.id] === undefined) {
+      // Start fetching if not cached
+      fetchVerificationStatus(profile.id);
+      return false;
+    }
+
+    return verificationStatusMap[profile.id];
+  }, [verificationStatusMap, fetchVerificationStatus]);
 
   // Background fetching function
   const fetchPotentialMatchesInBackground = useCallback(async () => {
@@ -452,6 +512,14 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, isPremium }: DiscoverPage
         setUserImages(images);
         setUserDistances(distances);
         setCurrentIndex(index);
+
+        // Fetch verification status for each profile (NO calculation!)
+        matches.forEach(profile => {
+          if (profile?.id) {
+            fetchVerificationStatus(profile.id);
+          }
+        });
+
       }
     } catch (error) {
       // Silently handle background fetch errors
@@ -636,6 +704,13 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, isPremium }: DiscoverPage
         setUserDistances(distances);
         setCurrentIndex(index);
         setLastShuffleTime(Date.now());
+
+        // Fetch verification status for each profile (NO calculation!)
+        matches.forEach(profile => {
+          if (profile?.id) {
+            fetchVerificationStatus(profile.id);
+          }
+        });
 
         // Immediately load images for current profile and preload next ones
         if (matches.length > 0) {
@@ -1147,42 +1222,6 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, isPremium }: DiscoverPage
 
   // Background loading: rely on threshold-based triggers (see effect above) instead of
   // loading on every swipe. This prevents excessive server calls and keeps the UI smooth.
-  // Function to check if a profile is verified (90%+ completion with photos and basic info)
-  const calculateProfileVerification = useCallback((profile: PotentialMatch) => {
-    if (!profile) return false;
-
-    // Check if profile has at least 3 images (similar to ProfilePage logic)
-    const profileImages = userImages[profile.id] || [];
-    const hasEnoughPhotos = profileImages.length >= 3;
-
-    // Check basic info completion (fields available in PotentialMatch)
-    const hasBasicInfo = !!(
-      profile.first_name?.trim() &&
-      profile.last_name?.trim() &&
-      profile.bio?.trim() &&
-      profile.date_of_birth
-    );
-
-    // Check other available completion criteria
-    const hasLocation = !!(profile.city?.trim() && profile.country?.trim());
-    const hasWork = !!(profile.occupation?.trim() && profile.education_level);
-    const hasInterests = (profile.interests || []).length >= 3;
-
-    // Simplified completion check - count completed sections out of 5 key areas
-    let completedSections = 0;
-    const totalSections = 5;
-
-    if (hasEnoughPhotos) completedSections += 1; // Photos
-    if (hasBasicInfo) completedSections += 1; // Basic info 
-    if (hasLocation) completedSections += 1; // Location
-    if (hasWork) completedSections += 1; // Work & Education
-    if (hasInterests) completedSections += 1; // Interests
-
-    const completionPercentage = Math.round((completedSections / totalSections) * 100);
-
-    // Return verified if 80%+ (4/5 sections) AND has photos + basic info
-    return completionPercentage >= 80 && hasEnoughPhotos && hasBasicInfo;
-  }, [userImages]);
 
   // Optimistic UI: move to next card instantly, then process like in background
   const handleLike = async () => {
@@ -1581,7 +1620,7 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, isPremium }: DiscoverPage
   if (!currentMatch) {
     // Only show no profiles message when we actually have no profiles
     return (
-      <div className="h-full w-full flex items-center justify-center">
+      <div className="min-h-screen w-full flex items-center justify-center" style={{ minHeight: 'calc(100vh - 152px)' }}>
         <Card className="max-w-md w-full mx-4">
           <CardContent className="p-8 text-center">
             <Heart className="w-16 h-16 mx-auto mb-4 text-gray-300" />
@@ -1839,7 +1878,7 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, isPremium }: DiscoverPage
               calculateDistance={calculateDistance}
               swipeDirection={swipeUI.swipeDirection}
               swipeDistance={swipeUI.swipeDistance}
-              isVerified={calculateProfileVerification(currentMatch)}
+              isVerified={isProfileVerified(currentMatch)}
               isSwipeAreaOnly={true}
               getOptimizedUrl={getOptimizedUrl}
               preCalculatedDistance={userDistances[currentMatch.id]}
@@ -1882,7 +1921,7 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, isPremium }: DiscoverPage
               calculateDistance={calculateDistance}
               swipeDirection={swipeUI.swipeDirection}
               swipeDistance={swipeUI.swipeDistance}
-              isVerified={calculateProfileVerification(currentMatch)}
+              isVerified={isProfileVerified(currentMatch)}
               isDetailsAreaOnly={true}
               imageStatus={imageStatus}
               getOptimizedUrl={getOptimizedUrl}

@@ -643,7 +643,7 @@ const RegistrationForm = ({ onSubmit, onBackToLogin }: RegistrationFormProps) =>
   };
 
   return (
-    <Card className="w-full max-w-md mx-auto backdrop-blur-sm bg-white/90 shadow-2xl border-0 animate-fade-in">
+    <Card className="w-full max-w-md mx-auto backdrop-blur-sm bg-white/90 shadow-2xl border-0 animate-fade-in no-bottom-space" style={{ marginBottom: 0, paddingBottom: 0 }}>
       <CardHeader className="text-center pb-6">
         <div className="flex justify-center mb-4">
           <div className="p-3 bg-gradient-to-r from-pink-500 to-purple-600 rounded-full hover-scale">
@@ -662,7 +662,7 @@ const RegistrationForm = ({ onSubmit, onBackToLogin }: RegistrationFormProps) =>
           }
         </CardDescription>
       </CardHeader>
-      <CardContent className="animate-fade-in">
+      <CardContent className="animate-fade-in" style={{ paddingBottom: 0, marginBottom: 0 }}>
         <form onSubmit={handleSubmit} className="space-y-8">
           {currentStep === 1 && (
             <div className="space-y-6 animate-fade-in">

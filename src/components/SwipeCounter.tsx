@@ -19,8 +19,8 @@ const SwipeCounter: React.FC<SwipeCounterProps> = ({
   if (isPremium) return null; // Premium users don't have restrictions
 
   const remainingSwipes = swipeLimit - swipesUsedToday;
-  const showWarning = swipesUsedToday >= 3 && profileCompletion < 70;
-  const isRestricted = swipesUsedToday >= 5 && profileCompletion < 70;
+  const showWarning = swipesUsedToday >= 4 && profileCompletion < 70;
+  const isRestricted = swipesUsedToday >= 7 && profileCompletion < 70;
 
   if (swipesUsedToday === 0) return null; // Don't show until user starts swiping
 

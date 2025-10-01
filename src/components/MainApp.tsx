@@ -66,11 +66,11 @@ const MainApp = ({ user, onLogout }: MainAppProps) => {
       try {
         const { Capacitor } = await import('@capacitor/core');
         if (!Capacitor.isNativePlatform() || !user?.id) {
-    console.debug('[MainApp] Skipping push notifications - not native platform or no user');
+          console.log('[MainApp] Skipping push notifications - not native platform or no user');
           return;
         }
 
-  console.debug('[MainApp] Attempting to setup push notifications...');
+        console.log('[MainApp] Attempting to setup push notifications...');
         const { PushNotifications } = await import('@capacitor/push-notifications');
         
         // Add error listener first to catch Firebase initialization errors
@@ -79,17 +79,17 @@ const MainApp = ({ user, onLogout }: MainAppProps) => {
         });
         
         // Request permission first to prevent crashes
-  console.debug('[MainApp] Requesting push notification permissions...');
+        console.log('[MainApp] Requesting push notification permissions...');
         const permissionResult = await PushNotifications.requestPermissions();
         
         if (permissionResult.receive === 'granted') {
-          console.debug('[MainApp] Permission granted, attempting to register...');
+          console.log('[MainApp] Permission granted, attempting to register...');
           
           // Use setTimeout to prevent blocking the main thread
           setTimeout(async () => {
             try {
               await PushNotifications.register();
-              console.debug('[MainApp] Push notification registration successful');
+              console.log('[MainApp] Push notification registration successful');
               
               PushNotifications.addListener('registration', async (token) => {
                 try {
@@ -99,7 +99,7 @@ const MainApp = ({ user, onLogout }: MainAppProps) => {
                     token: token.value,
                     platform: Capacitor.getPlatform()
                   });
-                  console.debug('[MainApp] Push token saved successfully');
+                  console.log('[MainApp] Push token saved successfully');
                 } catch (error) {
                   console.error('[MainApp] Failed to save push token:', error);
                 }
@@ -110,7 +110,7 @@ const MainApp = ({ user, onLogout }: MainAppProps) => {
             }
           }, 500);
         } else {
-          console.debug('[MainApp] Push notification permission not granted');
+          console.log('[MainApp] Push notification permission not granted');
         }
       } catch (err) {
         console.error('[MainApp] Push notification setup error:', err);
@@ -357,7 +357,7 @@ const MainApp = ({ user, onLogout }: MainAppProps) => {
       
       // If less than 5 profiles remaining, load more
       if (remainingProfiles <= 5) {
-  console.debug('🔄 Refilling profiles - running low on matches');
+        console.log('🔄 Refilling profiles - running low on matches');
         
         // Get current exclusions
         const existingIds = cache.potentialMatches.map((p: any) => p.id);
@@ -456,7 +456,7 @@ const MainApp = ({ user, onLogout }: MainAppProps) => {
             }
           }, 100);
 
-          console.debug(`✅ Added ${shuffledNew.length} new profiles. Total: ${cache.potentialMatches.length}`);
+          console.log(`✅ Added ${shuffledNew.length} new profiles. Total: ${cache.potentialMatches.length}`);
         }
       }
     } catch (error) {
@@ -789,7 +789,7 @@ const MainApp = ({ user, onLogout }: MainAppProps) => {
         return;
       }
 
-  console.debug('[MainApp] Profile fetched successfully');
+      console.log('[MainApp] Profile fetched successfully');
       setProfile(data);
       
       // Check premium status from user_subscriptions
@@ -808,7 +808,7 @@ const MainApp = ({ user, onLogout }: MainAppProps) => {
           }
           
           setIsPremium(!!subData);
-          console.debug('[MainApp] Subscription status checked');
+          console.log('[MainApp] Subscription status checked');
         } catch (subErr) {
           console.error('[MainApp] Subscription check failed:', subErr);
           setIsPremium(false); // Default to free
@@ -903,14 +903,14 @@ const MainApp = ({ user, onLogout }: MainAppProps) => {
   };
 
   return (
-    <div className="w-full h-fill bg-gray-100">
+    <div className="w-full h-fill bg-gray-100" style={{ margin: 0, padding: 0, position: 'absolute', top: 0, left: 0, right: 0, bottom: 0 }}>
       {/* Make this parent the scrolling container so sticky children (header/nav) stick relative to it */}
-      <div className="w-full h-fill flex flex-col bg-white relative shadow-md overflow-y-auto">
+      <div className="w-full h-fill flex flex-col bg-white relative shadow-md overflow-y-auto" style={{ margin: 0, padding: 0 }}>
         
         {/* Fixed Header - always visible */}
-          {/* Fixed Header - reduced size and includes safe area top padding */}
+          {/* Fixed Header */}
           {!showTerms && !showPrivacy && (
-            <div className="fixed top-0 left-0 right-0 w-full bg-white shadow-sm z-50">
+            <div className="fixed top-0 left-0 right-0 w-full bg-white shadow-sm z-50" style={{ margin: 0, padding: 0 }}>
               <div className="px-2 py-2 flex justify-between items-center">
                 <img src="/driplove-logo.png" alt="DripLove Logo" className="h-10" />
                 <div className="text-right">
@@ -925,7 +925,7 @@ const MainApp = ({ user, onLogout }: MainAppProps) => {
 
         {/* Main Content */}
         <div 
-          className={`flex-1 overflow-auto ${!showTerms && !showPrivacy ? 'pt-[10px] pb-[10px]' : ''}`}
+          className={`flex-1 overflow-auto ${!showTerms && !showPrivacy ? 'pt-[50px] pb-[10px]' : ''}`}
         >
           {/* Keep pages mounted to avoid reloading when switching tabs. Show/hide via classes. */}
           <div className={`${activeTab === 'dripcheck' ? 'block' : 'hidden'} w-full h-full`}> 

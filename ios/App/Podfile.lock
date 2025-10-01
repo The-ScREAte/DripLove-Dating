@@ -1,5 +1,5 @@
 PODS:
-  - Capacitor (7.4.2):
+  - Capacitor (7.4.3):
     - CapacitorCordova
   - CapacitorApp (7.0.1):
     - Capacitor
@@ -7,10 +7,10 @@ PODS:
     - Capacitor
   - CapacitorCamera (7.0.2):
     - Capacitor
-  - CapacitorCordova (7.4.2)
-  - CapacitorKeyboard (7.0.1):
+  - CapacitorCordova (7.4.3)
+  - CapacitorKeyboard (7.0.3):
     - Capacitor
-  - CapacitorPushNotifications (7.0.1):
+  - CapacitorPushNotifications (7.0.3):
     - Capacitor
   - CapacitorStatusBar (7.0.1):
     - Capacitor
@@ -49,13 +49,13 @@ EXTERNAL SOURCES:
     :path: "../capacitor-cordova-ios-plugins"
 
 SPEC CHECKSUMS:
-  Capacitor: 9d9e481b79ffaeacaf7a85d6a11adec32bd33b59
+  Capacitor: 28d6c01026a9a3f7156529498ec1f389a2a28dbc
   CapacitorApp: febecbb9582cb353aed037e18ec765141f880fe9
   CapacitorBrowser: 22541e48442de44dc629c214388290d6eecc6ae9
   CapacitorCamera: f9e54db0a18bb218a8dc360907d63aaefe9209ff
-  CapacitorCordova: 5e58d04631bc5094894ac106e2bf1da18a9e6151
-  CapacitorKeyboard: 09fd91dcde4f8a37313e7f11bde553ad1ed52036
-  CapacitorPushNotifications: 6a2794788c583dd89215f1805ca4bced1b13dbdf
+  CapacitorCordova: 435121e81a2df4d0034f0fb11fcefab5104cfdb5
+  CapacitorKeyboard: 62f36104f26d53d8b3a2a43f2a69fe714f1777d5
+  CapacitorPushNotifications: bdd621fbd562be34a41f4a7b1750efa000447d5a
   CapacitorStatusBar: 6e7af040d8fc4dd655999819625cae9c2d74c36f
   CordovaPlugins: b2618e17f8dd580d2354710b7b52b0af9d6f03f2
 

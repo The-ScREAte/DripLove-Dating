@@ -18,9 +18,10 @@ interface AuthFormProps {
   isLogin: boolean;
   onToggle: () => void;
   onOAuthSuccess?: (needsCompletion: boolean) => void;
+  onBack?: () => void;
 }
 
-const AuthForm = ({ isLogin, onToggle, onOAuthSuccess }: AuthFormProps) => {
+const AuthForm = ({ isLogin, onToggle, onOAuthSuccess, onBack }: AuthFormProps) => {
   const navigate = useNavigate();
   const { toast } = useToast();
 
@@ -569,41 +570,61 @@ const AuthForm = ({ isLogin, onToggle, onOAuthSuccess }: AuthFormProps) => {
   };
 
   return (
-    <Card className="w-full max-w-md mx-auto backdrop-blur-sm bg-white/90 shadow-2xl border-0">
-      <CardHeader className="text-center pb-6">
-        <div className="flex justify-center mb-4">
-          <div className="p-3 bg-gradient-to-r from-pink-500 to-purple-600 rounded-full">
-            <Heart className="w-8 h-8 text-white" />
-          </div>
+    <Card className="w-full max-w-md mx-auto backdrop-blur-sm bg-white/90 shadow-2xl border-0 relative no-bottom-space" style={{ marginBottom: 0, paddingBottom: 0 }}>
+      <CardHeader className="text-center pb-4 pt-8 relative">
+        {/* Back Button - Inside the white card */}
+        {onBack && (
+          <button
+            onClick={onBack}
+            className="absolute top-4 left-4 z-10 p-2 rounded-full bg-gray-100 hover:bg-gray-200 transition-all duration-200 shadow-sm hover:shadow-md"
+            aria-label="Go back"
+          >
+            <svg className="w-4 h-4 text-gray-700" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M15 19l-7-7 7-7" />
+            </svg>
+          </button>
+        )}
+        {/* App Logo */}
+        <div className="flex justify-center mb-6">
+          <img src="/driplove-logo.png" alt="DripLove Logo" className="h-16 w-auto" />
         </div>
-        <CardTitle className="text-2xl font-bold bg-gradient-to-r from-pink-600 to-purple-600 bg-clip-text text-transparent">
-          {showForgotPassword ? 'Reset Password' : isLogin ? 'Welcome Back' : 'Create Account'}
-        </CardTitle>
-        <CardDescription className="text-gray-600">
-          {showForgotPassword ? 'Enter your email to receive reset instructions' : isLogin ? 'Sign in to your account' : 'Join LoveConnect today'}
-        </CardDescription>
+        
+        {/* Only show title for forgot password or account creation */}
+        {(showForgotPassword || !isLogin) && (
+          <>
+            <CardTitle className="text-xl font-bold bg-gradient-to-r from-pink-600 to-purple-600 bg-clip-text text-transparent mb-2">
+              {showForgotPassword ? 'Reset Password' : 'Create Account'}
+            </CardTitle>
+            <CardDescription className="text-gray-600 text-sm">
+              {showForgotPassword ? 'Enter your email to receive reset instructions' : 'Join DripLove today'}
+            </CardDescription>
+          </>
+        )}
       </CardHeader>
 
-      <CardContent>
+      <CardContent style={{ paddingBottom: 0, marginBottom: 0 }}>
   {/* Show OAuth buttons only when not in forgot password mode */}
         {!showForgotPassword && (
           <>
-            {/* OAuth Buttons */}
-            <div className="space-y-3 mb-6">
+            {/* OAuth Buttons - Cute and Simple */}
+            <div className="space-y-3 mb-6 flex flex-col items-center">
               <Button
                 type="button"
                 variant="outline"
-                className="w-full bg-black hover:bg-gray-900 text-white font-medium border-2 border-black hover:border-gray-800 py-3 rounded-lg transition-all duration-200 flex items-center justify-center"
+                className="w-64 bg-black hover:bg-gray-800 text-white font-medium border-0 py-3 rounded-full transition-all duration-200 flex items-center justify-center shadow-md hover:shadow-lg"
                 onClick={() => handleOAuthSignIn('apple')}
                 disabled={oauthLoading !== null || loading}
                 aria-label="Sign in with Apple"
               >
                 {oauthLoading === 'apple' ? (
-                  'Connecting...'
+                  <div className="flex items-center">
+                    <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin mr-2"></div>
+                    Connecting...
+                  </div>
                 ) : (
                   <>
-                    <svg className="w-5 h-5 mr-2" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
-                      <path d="M16.365 1.43c0 1.14-.93 2.06-2.07 2.06-.02-1.18.95-2.06 2.07-2.06zm3.98 17.45c-.24.55-.5 1.08-.8 1.59-.53.87-1.08 1.7-1.95 1.72-.84.02-1.11-.56-2.07-.56-.96 0-1.25.54-2.04.58-.82.03-1.45-.93-1.98-1.8-1.08-1.7-1.91-4.8-.8-6.9.56-1.04 1.56-1.7 2.66-1.72.83-.02 1.62.58 2.07.58.44 0 1.32-.71 2.23-.6.38.02 1.45.16 2.14 1.23-.06.04-1.28.75-1.27 2.23.01 1.77 1.56 2.36 1.57 2.36-.02.07-.25.87-.82 1.72zm-3.47-13.6c.38-.46.64-1.1.57-1.75-.55.02-1.21.37-1.6.83-.35.41-.66 1.07-.54 1.7.6.05 1.19-.31 1.57-.78z" />
+                    <svg className="w-5 h-5 mr-2.5 fill-white" viewBox="0 0 814 1000" aria-hidden="true">
+                      <path d="M788.1 340.9c-5.8 4.5-108.2 62.2-108.2 190.5 0 148.4 130.3 200.9 134.2 202.2-.6 3.2-20.7 71.9-68.7 141.9-42.8 61.6-87.5 123.1-155.5 123.1s-85.5-39.5-164-39.5c-76.5 0-103.7 40.8-165.9 40.8s-105.6-57-155.5-127c-52.5-73.8-94.5-189.9-94.5-297.5 0-174.2 113.8-266.6 225.3-266.6 59.3 0 108.9 41.1 146.5 41.1s94.5-44.1 160.8-44.1c26.4 0 121.2 2.6 183.5 93.1zm-234.4-553.1c35.4-42.4 58-101.7 58-160.1 0-8.3-1.2-16.6-2.6-24.2-55.6 2.2-121.2 37.5-159.5 83.8-33.2 38.3-55.6 101.1-55.6 160.1 0 9.6 1.9 19.1 2.6 22.2 1.3.6 3.9.6 6.4.6 50.7 0 113.2-33.8 150.7-82.4z" />
                     </svg>
                     Sign in with Apple
                   </>
@@ -613,15 +634,18 @@ const AuthForm = ({ isLogin, onToggle, onOAuthSuccess }: AuthFormProps) => {
               <Button
                 type="button"
                 variant="outline"
-                className="w-full bg-white hover:bg-gray-50 text-gray-700 font-medium border-2 border-gray-200 hover:border-gray-300 py-3 rounded-lg transition-all duration-200"
+                className="w-64 bg-white hover:bg-gray-50 text-gray-700 font-medium border border-gray-300 hover:border-gray-400 py-3 rounded-full transition-all duration-200 shadow-md hover:shadow-lg"
                 onClick={() => handleOAuthSignIn('google')}
                 disabled={oauthLoading !== null || loading}
               >
                 {oauthLoading === 'google' ? (
-                  'Connecting...'
+                  <div className="flex items-center">
+                    <div className="w-4 h-4 border-2 border-gray-400 border-t-transparent rounded-full animate-spin mr-2"></div>
+                    Connecting...
+                  </div>
                 ) : (
                   <>
-                    <svg className="w-5 h-5 mr-2" viewBox="0 0 24 24">
+                    <svg className="w-5 h-5 mr-2.5" viewBox="0 0 24 24">
                       <path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"/>
                       <path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"/>
                       <path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z"/>
@@ -633,12 +657,11 @@ const AuthForm = ({ isLogin, onToggle, onOAuthSuccess }: AuthFormProps) => {
               </Button>
             </div>
 
-            <div className="relative my-6">
+            <div className="relative my-8">
               <div className="absolute inset-0 flex items-center">
-                <span className="w-full border-t border-gray-200" />
+                <span className="w-full border-t border-gray-300" />
               </div>
               <div className="relative flex justify-center text-sm">
-                <span className="px-4 bg-white text-gray-500">or continue with email</span>
               </div>
             </div>
           </>
@@ -672,14 +695,16 @@ const AuthForm = ({ isLogin, onToggle, onOAuthSuccess }: AuthFormProps) => {
               </div>
             </div>
 
-            <Button
-              type="button"
-              onClick={handleForgotPassword}
-              disabled={loading}
-              className="w-full bg-gradient-to-r from-pink-500 to-purple-600 hover:from-pink-600 hover:to-purple-700 text-white font-semibold py-3 rounded-lg transition-all duration-200"
-            >
-              {loading ? 'Sending Reset Email...' : 'Send Reset Email'}
-            </Button>
+            <div className="flex justify-center">
+              <Button
+                type="button"
+                onClick={handleForgotPassword}
+                disabled={loading}
+                className="w-64 bg-gradient-to-r from-pink-500 to-purple-600 hover:from-pink-600 hover:to-purple-700 text-white font-medium py-3 rounded-full transition-all duration-200 shadow-md hover:shadow-lg"
+              >
+                {loading ? 'Sending Reset Email...' : 'Send Reset Email'}
+              </Button>
+            </div>
 
             <div className="mt-6 text-center">
               <button
@@ -693,10 +718,9 @@ const AuthForm = ({ isLogin, onToggle, onOAuthSuccess }: AuthFormProps) => {
         ) : (
           <div>
             <form onSubmit={handleSubmit} className="space-y-4">
-              <div className="space-y-2">
-                <Label htmlFor="email" className="text-sm font-medium">Email</Label>
+              <div className="space-y-3">
+                <Label htmlFor="email" className="text-sm font-semibold text-gray-700">Email</Label>
                 <div className="relative">
-                  <Mail className="absolute left-3 top-3 h-4 w-4 text-gray-400" />
                   <Input
                     id="email"
                     name="email"
@@ -705,7 +729,7 @@ const AuthForm = ({ isLogin, onToggle, onOAuthSuccess }: AuthFormProps) => {
                     onChange={handleInputChange}
                     onFocus={handleInputFocus}
                     onBlur={handleInputBlur}
-                    className={`pl-10 border-gray-200 focus:border-pink-400 focus:ring-pink-400 ${
+                    className={`py-4 px-4 border-gray-300 focus:border-pink-400 focus:ring-pink-400 rounded-xl text-base ${
                       errors.email ? 'border-red-500 focus:border-red-500' : ''
                     }`}
                     style={getInputStyles()}
@@ -718,21 +742,20 @@ const AuthForm = ({ isLogin, onToggle, onOAuthSuccess }: AuthFormProps) => {
                 </div>
               </div>
 
-              <div className="space-y-2">
+              <div className="space-y-3">
                 <div className="flex justify-between items-center">
-                  <Label htmlFor="password" className="text-sm font-medium">Password</Label>
+                  <Label htmlFor="password" className="text-sm font-semibold text-gray-700">Password</Label>
                   {isLogin && (
                     <button
                       type="button"
                       onClick={() => setShowForgotPassword(true)}
-                      className="text-sm text-pink-600 hover:text-pink-700 transition-colors"
+                      className="text-sm text-pink-600 hover:text-pink-700 font-medium transition-colors"
                     >
                       Forgot password?
                     </button>
                   )}
                 </div>
                 <div className="relative">
-                  <Lock className="absolute left-3 top-3 h-4 w-4 text-gray-400" />
                   <Input
                     id="password"
                     name="password"
@@ -741,7 +764,7 @@ const AuthForm = ({ isLogin, onToggle, onOAuthSuccess }: AuthFormProps) => {
                     onChange={handleInputChange}
                     onFocus={handleInputFocus}
                     onBlur={handleInputBlur}
-                    className={`pl-10 pr-10 border-gray-200 focus:border-pink-400 focus:ring-pink-400 ${
+                    className={`py-4 px-4 pr-12 border-gray-300 focus:border-pink-400 focus:ring-pink-400 rounded-xl text-base ${
                       errors.password ? 'border-red-500 focus:border-red-500' : ''
                     }`}
                     style={getInputStyles()}
@@ -751,9 +774,9 @@ const AuthForm = ({ isLogin, onToggle, onOAuthSuccess }: AuthFormProps) => {
                   <button
                     type="button"
                     onClick={() => setShowPassword(!showPassword)}
-                    className="absolute right-3 top-3 text-gray-400 hover:text-gray-600"
+                    className="absolute right-4 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-gray-600"
                   >
-                    {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                    {showPassword ? <EyeOff className="h-5 w-5" /> : <Eye className="h-5 w-5" />}
                   </button>
                   {errors.password && (
                     <p className="text-red-500 text-xs mt-1">{errors.password}</p>
@@ -795,21 +818,28 @@ const AuthForm = ({ isLogin, onToggle, onOAuthSuccess }: AuthFormProps) => {
                 </div>
               )}
 
-              <Button
-                type="submit"
-                disabled={loading}
-                className="w-full bg-gradient-to-r from-pink-500 to-purple-600 hover:from-pink-600 hover:to-purple-700 text-white font-semibold py-3 rounded-lg transition-all duration-200"
-              >
-                {loading ? 'Processing...' : isLogin ? 'Sign In' : 'Create Account'}
-              </Button>
+              <div className="flex justify-center mt-6">
+                <Button
+                  type="submit"
+                  disabled={loading}
+                  className="w-64 bg-gradient-to-r from-pink-500 to-purple-600 hover:from-pink-600 hover:to-purple-700 text-white font-medium py-3 rounded-full transition-all duration-200 shadow-md hover:shadow-lg"
+                >
+                  {loading ? (
+                    <div className="flex items-center">
+                      <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin mr-2"></div>
+                      Processing...
+                    </div>
+                  ) : isLogin ? 'Sign In' : 'Create Account'}
+                </Button>
+              </div>
             </form>
 
-            <div className="mt-6 text-center">
-              <p className="text-sm text-gray-600">
+            <div className="mt-8 text-center">
+              <p className="text-base text-gray-600">
                 {isLogin ? "Don't have an account?" : "Already have an account?"}
                 <button
                   onClick={onToggle}
-                  className="ml-2 text-pink-600 hover:text-pink-700 font-semibold transition-colors"
+                  className="ml-2 text-pink-600 hover:text-pink-700 font-bold transition-colors"
                 >
                   {isLogin ? 'Sign Up' : 'Sign In'}
                 </button>
