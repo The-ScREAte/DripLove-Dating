@@ -303,20 +303,25 @@ const Index = () => {
         )}
 
         {currentView === 'login' && (
-          <div className="h-fill bg-gradient-to-br from-pink-400 via-purple-500 to-indigo-600 flex items-center justify-center px-4 pt-4" style={{ paddingBottom: 0, marginBottom: 0 }}>
-            <AuthForm 
-              isLogin={true}
-              onToggle={handleShowRegister}
-            />
+          <div className="h-fill bg-gradient-to-br from-pink-400 via-purple-500 to-indigo-600 flex items-center justify-center px-4 py-8 overflow-y-auto" style={{ minHeight: '100vh' }}>
+            <div className="w-full max-w-md">
+              <AuthForm 
+                isLogin={true}
+                onToggle={handleShowRegister}
+                onBack={handleBackToWelcome}
+              />
+            </div>
           </div>
         )}
 
         {currentView === 'register' && (
-          <div className="h-fill bg-gradient-to-br from-pink-400 via-purple-500 to-indigo-600 flex items-center justify-center px-4 pt-4" style={{ paddingBottom: 0, marginBottom: 0 }}>
-            <RegistrationForm 
-              onSubmit={handleRegister}
-              onBackToLogin={handleBackToLogin}
-            />
+          <div className="h-fill bg-gradient-to-br from-pink-400 via-purple-500 to-indigo-600 flex items-start justify-center px-4 py-8 overflow-y-auto" style={{ minHeight: '100vh' }}>
+            <div className="w-full max-w-md">
+              <RegistrationForm 
+                onSubmit={handleRegister}
+                onBackToLogin={handleBackToLogin}
+              />
+            </div>
           </div>
         )}
 

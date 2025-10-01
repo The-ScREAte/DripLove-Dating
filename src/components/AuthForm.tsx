@@ -848,8 +848,6 @@ const AuthForm = ({ isLogin, onToggle, onOAuthSuccess, onBack }: AuthFormProps) 
           </div>
         )}
       </CardContent>
-      {/* Dev-only Apple auth debug overlay */}
-      {process.env.NODE_ENV !== 'production' && <AppleAuthDebug />}
     </Card>
   );
 };
