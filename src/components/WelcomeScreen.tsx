@@ -21,7 +21,7 @@ const WelcomeScreen: React.FC<WelcomeScreenProps> = ({ onLogin, onAbout, onTerms
       </div>
 
       {/* Logo and Tagline */}
-      <div className="mb-12 flex flex-col items-center relative z-10 mt-12">
+      <div className="mb-12 flex flex-col items-center relative z-10 mt-32">
         <img src="/driplove-logo.png" alt="DripLove Logo" className="w-50 h-40 mb-4" />
         <p className="text-lg text-white">Feel the Spark. Drip in Love</p>
         <p className="text-sm text-white/80">Real Vibes. Real People. Real Love.</p>
@@ -37,31 +37,27 @@ const WelcomeScreen: React.FC<WelcomeScreenProps> = ({ onLogin, onAbout, onTerms
         </Button>
       </div>
 
-      {/* About Us Link */}
-      <div className="relative z-10 mb-auto">
+      {/* Footer Section */}
+      <div className="absolute bottom-0 left-0 right-0 flex flex-col items-center space-y-1 z-10 pb-8">
+        <div className="text-sm text-white/80 text-center">
+          Join thousands finding love across continents
+        </div>
         <button
           onClick={onAbout}
-          className="text-white text-sm font-bold hover:text-white/80"
+          className="text-white text-sm font-bold hover:text-white/80 transition-colors duration-200 bg-transparent border-none cursor-pointer"
         >
           About DripLove
         </button>
-      </div>
-
-      {/* Footer Section */}
-      <div className="absolute bottom-10 flex flex-col items-center space-y-4 relative z-10">
-        <div className="text-sm text-white/80">
-          Join thousands finding love across continents
-        </div>
         <div className="flex justify-center space-x-4 text-sm">
           <button
             onClick={onTerms}
-            className="text-white font-bold hover:text-white/80"
+            className="text-white font-bold hover:text-white/80 transition-colors duration-200 bg-transparent border-none cursor-pointer"
           >
             Terms of Service
           </button>
           <button
             onClick={onPrivacy}
-            className="text-white font-bold hover:text-white/80"
+            className="text-white font-bold hover:text-white/80 transition-colors duration-200 bg-transparent border-none cursor-pointer"
           >
             Privacy Policy
           </button>

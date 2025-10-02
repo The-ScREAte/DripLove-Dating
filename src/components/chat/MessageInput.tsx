@@ -42,43 +42,101 @@ const MessageInput: React.FC<MessageInputProps> = ({
 
   React.useEffect(() => {
     const viewport = (window as any).visualViewport;
-    if (!viewport) {
-      // Fallback: no visualViewport support
-      return;
-    }
-
-    const handleResize = () => {
-      // When the virtual keyboard opens, visualViewport.height becomes smaller than window.innerHeight
-      const offset = window.innerHeight - viewport.height;
-      setKeyboardOffset(offset > 0 ? offset : 0);
+    const isMobile = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
+    
+    // Fallback for mobile when visualViewport isn't working properly
+    const handleFocus = () => {
+      if (isMobile) {
+        // More precise keyboard height estimation based on device type
+        const isIOS = /iPhone|iPad|iPod/i.test(navigator.userAgent);
+        const isAndroid = /Android/i.test(navigator.userAgent);
+        
+        let estimatedKeyboardHeight;
+        if (isIOS) {
+          // iOS keyboards are typically 60-70% of screen height on portrait
+          estimatedKeyboardHeight = Math.min(window.innerHeight * 0.65, 350);
+        } else if (isAndroid) {
+          // Android keyboards vary more, but typically 55-65%
+          estimatedKeyboardHeight = Math.min(window.innerHeight * 0.60, 320);
+        } else {
+          // Generic mobile fallback
+          estimatedKeyboardHeight = window.innerHeight * 0.55;
+        }
+        
+        // Subtract a bit to ensure the input sits right on top of keyboard
+        setKeyboardOffset(estimatedKeyboardHeight - 10);
+      }
     };
 
-    // Also handle scroll within visualViewport (some browsers change offsetTop)
-    const handleScroll = () => {
-      const offset = window.innerHeight - viewport.height - (viewport.offsetTop || 0);
-      setKeyboardOffset(offset > 0 ? offset : 0);
-    };
-
-    viewport.addEventListener('resize', handleResize);
-    viewport.addEventListener('scroll', handleScroll);
-
-    // Initial measurement
-    handleResize();
-
-    return () => {
-      viewport.removeEventListener('resize', handleResize);
-      viewport.removeEventListener('scroll', handleScroll);
+    const handleBlur = () => {
       setKeyboardOffset(0);
     };
+
+    if (viewport) {
+      const handleResize = () => {
+        // When the virtual keyboard opens, visualViewport.height becomes smaller than window.innerHeight  
+        const rawOffset = window.innerHeight - viewport.height;
+        // Subtract a small amount to sit directly on top of keyboard with minimal gap
+        const adjustedOffset = rawOffset > 0 ? rawOffset - 5 : 0;
+        console.log('Viewport resize - raw offset:', rawOffset, 'adjusted:', adjustedOffset, 'viewport.height:', viewport.height, 'window.innerHeight:', window.innerHeight);
+        setKeyboardOffset(adjustedOffset);
+      };
+
+      const handleScroll = () => {
+        const rawOffset = window.innerHeight - viewport.height - (viewport.offsetTop || 0);
+        // Subtract a small amount to sit directly on top of keyboard with minimal gap
+        const adjustedOffset = rawOffset > 0 ? rawOffset - 5 : 0;
+        console.log('Viewport scroll - raw offset:', rawOffset, 'adjusted:', adjustedOffset);
+        setKeyboardOffset(adjustedOffset);
+      };
+
+      viewport.addEventListener('resize', handleResize);
+      viewport.addEventListener('scroll', handleScroll);
+      
+      // Initial measurement
+      handleResize();
+      
+      // Also add focus/blur as backup
+      if (inputRef.current) {
+        inputRef.current.addEventListener('focus', handleFocus);
+        inputRef.current.addEventListener('blur', handleBlur);
+      }
+
+      return () => {
+        viewport.removeEventListener('resize', handleResize);
+        viewport.removeEventListener('scroll', handleScroll);
+        if (inputRef.current) {
+          inputRef.current.removeEventListener('focus', handleFocus);
+          inputRef.current.removeEventListener('blur', handleBlur);
+        }
+        setKeyboardOffset(0);
+      };
+    } else {
+      // Fallback: no visualViewport support, use focus/blur only
+      if (inputRef.current) {
+        inputRef.current.addEventListener('focus', handleFocus);
+        inputRef.current.addEventListener('blur', handleBlur);
+      }
+
+      return () => {
+        if (inputRef.current) {
+          inputRef.current.removeEventListener('focus', handleFocus);
+          inputRef.current.removeEventListener('blur', handleBlur);
+        }
+        setKeyboardOffset(0);
+      };
+    }
   }, []);
 
   return (
     <div 
       ref={containerRef}
       className="p-2 border-t bg-white relative z-30"
-style={{
-  paddingBottom: `calc(env(safe-area-inset-bottom, 0px) + ${keyboardOffset}px)`
-}}
+      style={{
+        paddingBottom: `calc(env(safe-area-inset-bottom, 0px) + 0px)`,
+        transform: keyboardOffset > 0 ? `translateY(-${keyboardOffset}px)` : 'translateY(0px)',
+        transition: 'transform 0.3s ease-out'
+      }}
     >
       <div className="flex items-center space-x-2">
         <div className="flex-1 flex items-center space-x-2 bg-gray-100 rounded-full px-4 py-2">

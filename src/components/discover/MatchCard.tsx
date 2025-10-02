@@ -320,7 +320,7 @@ const MatchCard: React.FC<MatchCardProps> = ({
             <div className="w-full h-full transition-all duration-300 ease-in-out">
               {/* Report button for image slides - positioned closer to top edge */}
               {slides[currentSlide]?.type === 'image' && (
-                <div className="absolute right-3 top-16 sm:top-8 z-50">
+                <div className="absolute right-3 top-9 sm:top-6 z-50">
                   <button
                     className="bg-white/95 hover:bg-red-100 text-red-600 rounded-full transition-colors duration-200 border border-red-200 focus:outline-none focus:ring-2 focus:ring-red-300"
                     style={{
@@ -343,7 +343,7 @@ const MatchCard: React.FC<MatchCardProps> = ({
                 </div>
               )}
               {slides[currentSlide]?.type === 'image' ? (
-                <div className="relative w-full h-full">
+                <div className="relative w-full h-full ">
                   {imageLoading && (
                     <div className="absolute inset-0 bg-gray-100 flex items-center justify-center z-10">
                       <Loader2 className="h-8 w-8 animate-spin text-pink-500" />
@@ -369,7 +369,7 @@ const MatchCard: React.FC<MatchCardProps> = ({
                           <img
                             src={full}
                             alt={`${match.first_name} ${match.last_name}`}
-                            className="w-full h-full object-contain transition-opacity duration-300 relative z-10 mt-2"
+                            className="w-full h-full object-contain transition-opacity duration-300 relative z-10"
                             draggable={false}
                             onLoadStart={() => setImageLoading(true)}
                             onLoad={() => setImageLoading(false)}
@@ -480,11 +480,11 @@ const MatchCard: React.FC<MatchCardProps> = ({
           
           {/* Slide indicators */}
           {slides.length > 1 && (
-            <div className="absolute top-9 left-4 right-4 flex space-x-1 z-10">
+            <div className="absolute top-9 left-4 flex space-x-2 z-10">
               {slides.map((_, index) => (
                 <div
                   key={index}
-                  className={`flex-1 h-1 rounded-full transition-all duration-300 ${
+                  className={`w-3 h-2 rounded-full transition-all duration-300 ${
                     index === currentSlide 
                       ? 'bg-white shadow-lg' 
                       : 'bg-white/30'
@@ -617,17 +617,17 @@ const MatchCard: React.FC<MatchCardProps> = ({
     // Render only the non-swipeable details area
     return (
       <div 
-        className={`w-full ${showMoreInfo ? 'pt-0' : 'pt-0'} pb-8 px-2 rounded-xl shadow-md bg-white`}
-        style={{ minHeight: '400px', zIndex: 20, position: 'relative' }}
+        className={`w-full ${showMoreInfo ? 'pt-0' : 'pt-0'} px-4 rounded-xl shadow-md bg-white`}
+        style={{ minHeight: '300px', zIndex: 20, position: 'relative' }}
       >
         {/* Basic Info - Always shown */}
         <div className="flex justify-between items-start">
           <div className="flex-1">
             <div className="flex items-center gap-2 mb-1">
-              <h2 className="text-1xl font-bold text-gray-900">
+              <h2 className="text-1.9xl font-bold text-gray-900">
                 {match.first_name} {match.last_name}
               </h2>
-              <span className="text-base text-gray-600">
+              <span className="text-lg text-gray-500">
                 {calculateAge(match.date_of_birth)}
               </span>
               {/* Verified badge beside name and age - exact same as ProfilePage */}
@@ -645,7 +645,7 @@ const MatchCard: React.FC<MatchCardProps> = ({
             {match.city && (
               <div className="flex items-center mt-1 text-gray-600">
                 <MapPin className="w-4 h-4 mr-1" />
-                <span className="text-sm">
+                <span className="text-base">
                   {match.city}, {match.country}
                   {preCalculatedDistance !== undefined ? (
                     <span className="ml-2">
@@ -668,7 +668,7 @@ const MatchCard: React.FC<MatchCardProps> = ({
             {match.relationship_intent && (
               <div className="flex items-center mt-1 text-gray-600">
                 <Heart className="w-4 h-4 mr-1" />
-                <span className="text-sm capitalize">
+                <span className="text-base capitalize">
                   {match.relationship_intent === 'open_to_anything' ? 'Open to anything' : match.relationship_intent}
                 </span>
               </div>
@@ -681,7 +681,7 @@ const MatchCard: React.FC<MatchCardProps> = ({
               e.stopPropagation();
               onToggleInfo();
             }}
-            className="bg-pink-500 hover:bg-pink-600 text-white rounded-full p-3 transition-colors shadow-lg"
+            className="bg-pink-500 hover:bg-pink-600 text-white rounded-full p-3 mt-3 transition-colors shadow-lg"
             aria-label={showMoreInfo ? "Hide details" : "Show details"}
           >
             {showMoreInfo ? (
@@ -694,12 +694,12 @@ const MatchCard: React.FC<MatchCardProps> = ({
 
         {/* Expandable details - appears below basic info */}
         {showMoreInfo && (
-          <div className="mt-4 space-y-3 text-sm">
+          <div className="mt-4 space-y-3 text-base">
             {/* About (Bio) */}
             {match.bio && (
               <div className="bg-gray-50 rounded-lg p-3">
                 <h4 className="font-semibold text-pink-600 mb-1">About</h4>
-                <p className="text-gray-700 text-xs leading-relaxed">{match.bio}</p>
+                <p className="text-gray-700 text-sm leading-relaxed">{match.bio}</p>
               </div>
             )}
 
@@ -714,25 +714,25 @@ const MatchCard: React.FC<MatchCardProps> = ({
                 <h4 className="font-semibold text-pink-600 mb-2">Lifestyle</h4>
                 <div className="space-y-2">
                   {match.smoking && match.smoking !== 'not_specified' && (
-                    <div className="flex items-center text-xs">
+                    <div className="flex items-center text-sm">
                       <span className="font-semibold mr-2">Smoking:</span>
                       <span className="text-gray-700">{match.smoking}</span>
                     </div>
                   )}
                   {match.drinking && match.drinking !== 'not_specified' && (
-                    <div className="flex items-center text-xs">
+                    <div className="flex items-center text-sm">
                       <span className="font-semibold mr-2">Drinking:</span>
                       <span className="text-gray-700">{match.drinking}</span>
                     </div>
                   )}
                   {match.exercise_level && match.exercise_level !== 'not_specified' && (
-                    <div className="flex items-center text-xs">
+                    <div className="flex items-center text-sm">
                       <span className="font-semibold mr-2">Exercise:</span>
                       <span className="text-gray-700">{match.exercise_level}</span>
                     </div>
                   )}
                   {match.sleeping_schedule && match.sleeping_schedule !== 'not_specified' && (
-                    <div className="flex items-center text-xs">
+                    <div className="flex items-center text-sm">
                       <span className="font-semibold mr-2">Sleep:</span>
                       <span className="text-gray-700">{match.sleeping_schedule}</span>
                     </div>
@@ -747,13 +747,13 @@ const MatchCard: React.FC<MatchCardProps> = ({
                 <h4 className="font-semibold text-pink-600 mb-2">Work & Education</h4>
                 <div className="space-y-2">
                   {match.occupation && (
-                    <div className="flex items-center text-xs">
+                    <div className="flex items-center text-sm">
                       <Briefcase className="w-3 h-3 mr-2 flex-shrink-0 text-pink-500" />
                       <span className="text-gray-700">{match.occupation}</span>
                     </div>
                   )}
                   {match.education_level && (
-                    <div className="flex items-center text-xs">
+                    <div className="flex items-center text-sm">
                       <GraduationCap className="w-3 h-3 mr-2 flex-shrink-0 text-pink-500" />
                       <span className="text-gray-700">{match.education_level}</span>
                     </div>
@@ -769,47 +769,47 @@ const MatchCard: React.FC<MatchCardProps> = ({
                 <div className="space-y-4">
                   {typeof match.introvert_extrovert === 'number' && (
                     <div className="flex items-center space-x-2">
-                      <span className="text-xs text-gray-500">Introvert</span>
+                      <span className="text-sm text-gray-500">Introvert</span>
                       <div className="flex-1 bg-gray-200 rounded-full h-2">
                         <div 
                           className="bg-gradient-to-r from-blue-400 to-blue-600 h-2 rounded-full transition-all duration-300"
                           style={{ width: `${match.introvert_extrovert}%` }}
                         ></div>
                       </div>
-                      <span className="text-xs text-gray-500">Extrovert</span>
+                      <span className="text-sm text-gray-500">Extrovert</span>
                     </div>
                   )}
                   {typeof match.spontaneous_planner === 'number' && (
                     <div>
                       <div className="flex justify-between items-center mb-1">
-                        <span className="text-xs font-medium text-gray-600">Spontaneous vs Planner: {match.spontaneous_planner}%</span>
+                        <span className="text-sm font-medium text-gray-600">Spontaneous vs Planner: {match.spontaneous_planner}%</span>
                       </div>
                       <div className="flex items-center space-x-2">
-                        <span className="text-xs text-gray-500">Spontaneous</span>
+                        <span className="text-sm text-gray-500">Spontaneous</span>
                         <div className="flex-1 bg-gray-200 rounded-full h-2">
                           <div 
                             className="bg-gradient-to-r from-green-400 to-green-600 h-2 rounded-full transition-all duration-300"
                             style={{ width: `${match.spontaneous_planner}%` }}
                           ></div>
                         </div>
-                        <span className="text-xs text-gray-500">Planner</span>
+                        <span className="text-sm text-gray-500">Planner</span>
                       </div>
                     </div>
                   )}
                   {typeof match.messy_organized === 'number' && (
                     <div>
                       <div className="flex justify-between items-center mb-1">
-                        <span className="text-xs font-medium text-gray-600">Messy vs Organized: {match.messy_organized}%</span>
+                        <span className="text-sm font-medium text-gray-600">Messy vs Organized: {match.messy_organized}%</span>
                       </div>
                       <div className="flex items-center space-x-2">
-                        <span className="text-xs text-gray-500">Messy</span>
+                        <span className="text-sm text-gray-500">Messy</span>
                         <div className="flex-1 bg-gray-200 rounded-full h-2">
                           <div 
                             className="bg-gradient-to-r from-purple-400 to-purple-600 h-2 rounded-full transition-all duration-300"
                             style={{ width: `${match.messy_organized}%` }}
                           ></div>
                         </div>
-                        <span className="text-xs text-gray-500">Organized</span>
+                        <span className="text-sm text-gray-500">Organized</span>
                       </div>
                     </div>
                   )}
@@ -825,7 +825,7 @@ const MatchCard: React.FC<MatchCardProps> = ({
                   {match.interests.map((interest, index) => (
                     <span
                       key={index}
-                      className="px-2 py-1 bg-pink-100 text-pink-700 rounded-full text-xs"
+                      className="px-2 py-1 bg-pink-100 text-pink-700 rounded-full text-sm"
                     >
                       {interest}
                     </span>

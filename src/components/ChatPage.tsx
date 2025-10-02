@@ -3,6 +3,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import { usePushNotifications } from '@/hooks/usePushNotifications';
 import { requestNotificationPermission } from '@/services/pushNotifications';
+import { Capacitor } from '@capacitor/core';
 // SafeAreaView removed — use plain divs with env(...) padding where necessary
 import UserProfileModal from './UserProfileModal';
 import BlockDialog from './BlockDialog';
@@ -721,9 +722,16 @@ const ChatPage = ({ currentUser, onUnreadChange, onDetailViewChange }: ChatPageP
     return (
   <div className="fixed inset-0 flex flex-col bg-gray-50">
         {/* Header (safe area respected via env padding) */}
-        <div className="sticky top-0 z-30 bg-gradient-to-r from-pink-500 to-purple-600 text-white" style={{ paddingTop: 'clamp(26px, env(safe-area-inset-top, 0px), 24px)' }}>
-          <div className="p-4 mt-4">
-            <h2 className="text-xl font-bold mb-0">DripChat</h2>
+        <div 
+          className="sticky top-0 z-30 bg-gradient-to-r from-pink-500 to-purple-600 text-white" 
+          style={{ 
+            paddingTop: Capacitor.getPlatform() === 'ios' 
+              ? 'clamp(30px, calc(env(safe-area-inset-top, 10px) + 15px), 40px)' 
+              : '40px' 
+          }}
+        >
+          <div className="px-4 pb-4 pt-2">
+            <h2 className="text-xl font-bold m-2">DripChat</h2>
             <div className="relative">
               <input
                 type="text"
@@ -742,7 +750,12 @@ const ChatPage = ({ currentUser, onUnreadChange, onDetailViewChange }: ChatPageP
   {/* Scrollable Chat List (only this area scrolls) */}
   <div
     className="flex-1 overflow-y-auto pb-28"
-    style={{ WebkitOverflowScrolling: 'touch' }}
+    style={{ 
+      WebkitOverflowScrolling: 'touch',
+      marginTop: Capacitor.getPlatform() === 'ios' 
+        ? '80px' // Fixed margin for iOS
+        : '0px' // Smaller margin for non-iOS platforms (accounts for reduced header padding)
+    }}
     onTouchStart={handleTouchStart}
     onTouchMove={handleTouchMove}
     onTouchEnd={handleTouchEnd}
@@ -859,7 +872,12 @@ const ChatPage = ({ currentUser, onUnreadChange, onDetailViewChange }: ChatPageP
       <div
         ref={messagesContainerRef}
         className="flex-1 overflow-y-auto px-4 space-y-2 bg-gray-50 pb-1"
-        style={{ WebkitOverflowScrolling: 'touch', paddingTop: '110px' }}
+        style={{ 
+          WebkitOverflowScrolling: 'touch', 
+          paddingTop: Capacitor.getPlatform() === 'ios' 
+            ? 'clamp(130px, calc(env(safe-area-inset-top, 10px) + 100px), 140px)'
+            : '130px'
+        }}
       >
         {messages.map((message, index) => {
           const prevMessage = messages[index - 1];

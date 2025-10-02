@@ -2,6 +2,7 @@ import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Users, Heart, X, Calendar, MapPin, Shield, ChevronDown, ChevronUp, Briefcase, GraduationCap, Crown, Lock, Clock } from 'lucide-react';
+import { Capacitor } from '@capacitor/core';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import { useSubscription } from '@/hooks/useSubscription';
@@ -663,7 +664,12 @@ const LikedMePage = ({ currentUser, isPremium = false }: LikedMePageProps) => {
           <Button
             onClick={() => setSelectedProfile(null)}
             variant="outline"
-            className="absolute top-4 left-4 bg-white/80 hover:bg-white z-10 h-10 px-3"
+            className="absolute left-4 bg-white/80 hover:bg-white z-10 h-10 px-3"
+            style={{
+              top: Capacitor.getPlatform() === 'ios' 
+                ? 'clamp(50px, calc(env(safe-area-inset-top, 10px) + 35px), 70px)'
+                : '16px'
+            }}
           >
             ← Back
           </Button>
@@ -672,7 +678,12 @@ const LikedMePage = ({ currentUser, isPremium = false }: LikedMePageProps) => {
             onClick={handleBlock}
             variant="outline"
             size="sm"
-            className="absolute top-4 right-4 bg-white/80 hover:bg-white z-10 h-10 w-10 p-0"
+            className="absolute right-4 bg-white/80 hover:bg-white z-10 h-10 w-10 p-0"
+            style={{
+              top: Capacitor.getPlatform() === 'ios' 
+                ? 'clamp(50px, calc(env(safe-area-inset-top, 10px) + 35px), 70px)'
+                : '16px'
+            }}
           >
             <Shield className="w-4 h-4" />
           </Button>
@@ -681,7 +692,14 @@ const LikedMePage = ({ currentUser, isPremium = false }: LikedMePageProps) => {
           <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-transparent to-transparent pointer-events-none" />
 
           {/* Profile Info Overlay - Fixed at bottom with proper spacing for mobile nav */}
-          <div className="absolute bottom-0 left-0 right-0 text-white pb-24">
+          <div 
+            className="absolute bottom-0 left-0 right-0 text-white"
+            style={{
+              paddingBottom: Capacitor.getPlatform() === 'ios' 
+                ? 'clamp(90px, calc(env(safe-area-inset-bottom, 10px) + 80px), 110px)'
+                : '96px'
+            }}
+          >
             {/* Main info section */}
             <div className="px-6 pb-4">
               <div className="mb-3">
@@ -816,7 +834,14 @@ const LikedMePage = ({ currentUser, isPremium = false }: LikedMePageProps) => {
         </div>
       )}
       
-  <div className="flex-shrink-0 bg-white border-b p-4 mt-10">
+  <div 
+    className="flex-shrink-0 bg-white border-b px-4 py-4 mx-4"
+    style={{
+      marginTop: Capacitor.getPlatform() === 'ios' 
+        ? 'clamp(20px, calc(env(safe-area-inset-top, 10px) + 23px), 50px)'
+        : '0'
+    }}
+  >
         <div className="flex items-center justify-between mb-2">
           <div className="flex items-center space-x-2">
             <Users className="w-6 h-6 text-pink-600" />

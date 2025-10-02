@@ -5,7 +5,7 @@ import { useImageEdgeColor } from '@/hooks/useImageEdgeColor';
 function DominantColorImageBg({ imageUrl, children }) {
   const { edgeColor } = useImageEdgeColor(imageUrl);
   return (
-    <div className="absolute inset-0 z-0 pointer-events-none">
+    <div className="absolute inset-0 z-0 pointer-events-none pt-4">
       {/* Solid color overlay fills all space */}
       <div
         className="absolute inset-0"
@@ -97,11 +97,12 @@ const AdinkraBar: React.FC = () => {
   const visibleSymbols = adinkraSymbols.slice(start, start + SYMBOLS_PER_SET);
   return (
     <div
-      className="w-full flex justify-center items-center gap-3 py-0.2 relative select-none -mt-3 sm:-mt-2 z-40"
+      className="w-full flex justify-center items-center gap-2 relative select-none z-40 leading-none"
       style={{
         backgroundImage: `url('data:image/svg+xml;utf8,<svg width=\"240\" height=\"36\" viewBox=\"0 0 240 36\" fill=\"none\" xmlns=\"http://www.w3.org/2000/svg\"><rect width=\"240\" height=\"36\" fill=\"%23007bdb\"/><g><rect x=\"0\" y=\"0\" width=\"24\" height=\"36\" fill=\"%23ffc72c\"/><rect x=\"24\" y=\"0\" width=\"24\" height=\"36\" fill=\"%23007bdb\"/><rect x=\"48\" y=\"0\" width=\"24\" height=\"36\" fill=\"%23ffc72c\"/><rect x=\"72\" y=\"0\" width=\"24\" height=\"36\" fill=\"%23007bdb\"/><rect x=\"96\" y=\"0\" width=\"24\" height=\"36\" fill=\"%23ffc72c\"/><rect x=\"120\" y=\"0\" width=\"24\" height=\"36\" fill=\"%23007bdb\"/><rect x=\"144\" y=\"0\" width=\"24\" height=\"36\" fill=\"%23ffc72c\"/><rect x=\"168\" y=\"0\" width=\"24\" height=\"36\" fill=\"%23007bdb\"/><rect x=\"192\" y=\"0\" width=\"24\" height=\"36\" fill=\"%23ffc72c\"/><rect x=\"216\" y=\"0\" width=\"24\" height=\"36\" fill=\"%23007bdb\"/></g><g><polygon points=\"24,0 36,18 24,36 48,36 36,18 48,0\" fill=\"%23e63946\"/><polygon points=\"72,0 84,18 72,36 96,36 84,18 96,0\" fill=\"%2300b159\"/><polygon points=\"120,0 132,18 120,36 144,36 132,18 144,0\" fill=\"%23e63946\"/><polygon points=\"168,0 180,18 168,36 192,36 180,18 192,0\" fill=\"%2300b159\"/></g><g><rect x=\"0\" y=\"0\" width=\"240\" height=\"6\" fill=\"%23fff\" fill-opacity=\"0.15\"/><rect x=\"0\" y=\"30\" width=\"240\" height=\"6\" fill=\"%23fff\" fill-opacity=\"0.15\"/></g><g><rect x=\"23\" y=\"0\" width=\"2\" height=\"36\" fill=\"%23fff\"/><rect x=\"47\" y=\"0\" width=\"2\" height=\"36\" fill=\"%23fff\"/><rect x=\"71\" y=\"0\" width=\"2\" height=\"36\" fill=\"%23fff\"/><rect x=\"95\" y=\"0\" width=\"2\" height=\"36\" fill=\"%23fff\"/><rect x=\"119\" y=\"0\" width=\"2\" height=\"36\" fill=\"%23fff\"/><rect x=\"143\" y=\"0\" width=\"2\" height=\"36\" fill=\"%23fff\"/><rect x=\"167\" y=\"0\" width=\"2\" height=\"36\" fill=\"%23fff\"/><rect x=\"191\" y=\"0\" width=\"2\" height=\"36\" fill=\"%23fff\"/><rect x=\"215\" y=\"0\" width=\"2\" height=\"36\" fill=\"%23fff\"/></g></svg>')`,
         backgroundRepeat: 'repeat',
         backgroundSize: '240px 36px',
+        transform: 'translateY(-1px)',
       }}
     >
       {visibleSymbols.map((symbol, idx) => (
@@ -118,7 +119,7 @@ const AdinkraBar: React.FC = () => {
       ))}
       {tooltipIdx !== null && (
         <div
-          className="fixed left-1/2 top-1/2 z-50 px-4 py-3 rounded-lg shadow-lg bg-white border border-gray-300 text-xs text-gray-800 animate-fade-in flex flex-col items-center"
+          className="fixed left-1/2 top-1/12 z-50 px-4 py-3 rounded-lg shadow-lg bg-white border border-gray-300 text-xs text-gray-800 animate-fade-in flex flex-col items-center"
           style={{ transform: 'translate(-50%, -50%)', minWidth: 180, maxWidth: 260 }}
           onClick={() => setTooltipIdx(null)}
         >
@@ -1650,8 +1651,8 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, isPremium }: DiscoverPage
   return (
     <div className="h-full w-full fixed left-0 overflow-hidden"
          style={{ 
-           top: '25px', // Move up to top
-           height: 'calc(100vh - 60px)', // Adjust height to account for header
+           top: '65px', // Move down further from top
+           height: 'calc(100vh - 120px)', // Adjust height to account for header and extra spacing
            touchAction: 'pan-y', // allow vertical scrolling, prevent horizontal scroll-from-browser during horizontal swipes
            overscrollBehavior: 'contain',
            userSelect: 'none',
@@ -1731,7 +1732,7 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, isPremium }: DiscoverPage
         </div>
       )}
       {/* Main Image Area - Card stack */}
-  <div className="flex-1 relative overflow-hidden" style={{ height: 'calc(100vh - 140px)', display: 'flex', flexDirection: 'column', justifyContent: 'flex-end', paddingBottom: 0 }}>
+  <div className="flex-1 relative overflow-hidden" style={{ height: 'calc(100vh - 100px)', display: 'flex', flexDirection: 'column', justifyContent: 'flex-end', paddingBottom: 0 }}>
         {/* ...existing code... */}
         {nextMatch && (
           <DominantColorImageBg
@@ -1759,9 +1760,7 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, isPremium }: DiscoverPage
 
 // Helper component to extract and apply dominant color as background
 
-// Helper component to extract and apply dominant color as background
         )}
-// Helper component to extract and apply dominant color as background
 
         {/* ...existing code... */}
         <div
@@ -1890,13 +1889,12 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, isPremium }: DiscoverPage
           <AdinkraBar />
 
           {/* Info section - dynamic height that fits content exactly */}
-          <div className={`bg-white transition-all duration-300 flex-shrink-0 ${
+          <div className={`bg-white transition-all duration-300 flex-shrink-0 -mt-0.1 ${
             showMoreInfo ? '' : 'overflow-hidden'
-          }`} 
-          style={!showMoreInfo ? { marginBottom: '-48px' } : {}}>
+          }`}>
             <div 
               ref={contentRef}
-              className={`w-full p-1 ${showMoreInfo ? 'overflow-y-scroll' : 'overflow-hidden pb-3'}`} 
+              className={`w-full ${showMoreInfo ? 'overflow-y-scroll px-1' : 'overflow-hidden'}`} 
               style={{
                 WebkitOverflowScrolling: 'touch',
                 overscrollBehavior: 'contain',
@@ -1904,7 +1902,7 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, isPremium }: DiscoverPage
                 maxHeight: showMoreInfo ? 'calc(50vh - 30%)' : 'auto',
                 paddingBottom: showMoreInfo 
                   ? 'calc(15px + env(safe-area-inset-bottom, 0px))' 
-                  : 'calc(12px + env(safe-area-inset-bottom, 0px))'
+                  : '0px'
               }}
             >
             <MatchCard

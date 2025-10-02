@@ -39,8 +39,8 @@ const ChatHeader: React.FC<ChatHeaderProps> = ({
   // maximum across platforms. This gives a minimum breathing room on
   // Android/web and prevents extremely tall headers on devices with very
   // large safe insets.
-  // Use reasonable min/max for the top inset
-  const paddingTopValue = 'clamp(50px, env(safe-area-inset-top, 0px), 24px)';
+  // Use reasonable min/max for the top inset, starting from where main header ends
+  const paddingTopValue = 'clamp(70px, calc(env(safe-area-inset-top, 10px) + 50px), 90px)';
 
   return (
     <div

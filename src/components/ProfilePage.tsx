@@ -422,10 +422,9 @@ const ProfilePage = ({ currentUser, profile, onProfileUpdate, onLogout, onShowTe
       <div
         className="fixed left-0 right-0 z-40 bg-white border-b border-gray-200 shadow-sm"
         style={{
-          // Use clamp to provide a reasonable min and max around the
-          // device's safe-area inset so the header feels consistent.
-          top: 'clamp(26px, env(safe-area-inset-top, 0px), 24px)',
-          paddingTop: 'clamp(26px, env(safe-area-inset-top, 0px), 24px)',
+          // Start from where main header ends
+          top: 'clamp(70px, calc(env(safe-area-inset-top, 10px) + 50px), 90px)',
+          paddingTop: '8px',
           width: '100%',
         }}
       >

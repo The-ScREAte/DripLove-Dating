@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Heart, MessageCircle, Users, User } from 'lucide-react';
+import { Capacitor } from '@capacitor/core';
 import DiscoverPage from '@/components/DiscoverPage';
 import ChatPage from '@/components/ChatPage';
 import LikedMePage from '@/components/LikedMePage';
@@ -911,7 +912,14 @@ const MainApp = ({ user, onLogout }: MainAppProps) => {
           {/* Fixed Header */}
           {!showTerms && !showPrivacy && (
             <div className="fixed top-0 left-0 right-0 w-full bg-white shadow-sm z-50" style={{ margin: 0, padding: 0 }}>
-              <div className="px-2 py-2 flex justify-between items-center">
+              <div 
+                className="px-2 py-2 flex justify-between items-center"
+                style={{
+                  paddingTop: Capacitor.getPlatform() === 'ios' 
+                    ? 'clamp(10px, env(safe-area-inset-top, 10px), 40px)' 
+                    : '8px'
+                }}
+              >
                 <img src="/driplove-logo.png" alt="DripLove Logo" className="h-10" />
                 <div className="text-right">
                   <div className="text-sm font-bold text-black leading-tight">
@@ -925,7 +933,7 @@ const MainApp = ({ user, onLogout }: MainAppProps) => {
 
         {/* Main Content */}
         <div 
-          className={`flex-1 overflow-auto ${!showTerms && !showPrivacy ? 'pt-[50px] pb-[10px]' : ''}`}
+          className={`flex-1 overflow-auto ${!showTerms && !showPrivacy ? 'pt-[50px]' : ''}`}
         >
           {/* Keep pages mounted to avoid reloading when switching tabs. Show/hide via classes. */}
           <div className={`${activeTab === 'dripcheck' ? 'block' : 'hidden'} w-full h-full`}> 
@@ -959,7 +967,7 @@ const MainApp = ({ user, onLogout }: MainAppProps) => {
             className="fixed bottom-0 left-0 right-0 w-full bg-white z-[99999]"
             style={{ paddingBottom: 'clamp(4px, env(safe-area-inset-bottom, 0px), 6px)' }}
           >
-            <div className="flex justify-around items-center">
+            <div className={`flex justify-around items-center ${Capacitor.getPlatform() === 'ios' ? 'pb-5' : ''}`}>
               {[
                 { label: 'DripCheck', icon: DripCoupleIcon }, 
                 { label: 'Chat', icon: MessageCircle }, 
@@ -974,9 +982,9 @@ const MainApp = ({ user, onLogout }: MainAppProps) => {
                   }`}
                 >
                   {label === 'DripCheck' ? (
-                    <Icon className={`w-5 h-5 ${activeTab === label.toLowerCase() ? 'fill-current' : ''}`} />
+                    <Icon className={`w-7 h-7 ${activeTab === label.toLowerCase() ? 'fill-current' : ''}`} />
                   ) : (
-                    <Icon className={`w-4 h-4 ${activeTab === label.toLowerCase() ? 'fill-current' : ''}`} />
+                    <Icon className={`w-6 h-6 ${activeTab === label.toLowerCase() ? 'fill-current' : ''}`} />
                   )}
                   <span className="text-xs font-medium">{label}</span>
                    {label === 'Chat' && unreadCount > 0 && (
