@@ -50,12 +50,11 @@ export const OAUTH_CONFIG = {
   // These are the "Client ID" values you create in Apple Developer (Service IDs)
   // and must match what Supabase has configured for Apple.
   servicesClientIds: {
-    // Prefer a Vite env var for flexible per-environment configuration.
-    // Set VITE_APPLE_SERVICES_ID in your .env for local/staging/prod as needed.
-    apple:
-      (typeof import.meta !== 'undefined' && (import.meta as any).env?.VITE_APPLE_SERVICES_ID) ||
-      process.env?.VITE_APPLE_SERVICES_ID ||
-      'com.driplove.dating.signin',
+    // NOTE: Capacitor Apple Sign-In plugin forces use of App ID (Bundle Identifier)
+    // So we configure Supabase to expect the App ID, not the Services ID
+    // App ID (Bundle): com.driplove.dating (FORCED by Capacitor plugin)
+    // Services ID: com.driplove.dating.signin (Cannot be used with native plugin)
+    apple: 'com.driplove.dating',
   },
   
   // Web fallback for development/testing

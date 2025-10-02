@@ -326,12 +326,14 @@ const Index = () => {
         )}
 
         {currentView === 'profile-completion' && user && (
-          <div className="h-fill bg-gradient-to-br from-pink-400 via-purple-500 to-indigo-600 flex items-center justify-center px-4 pt-4" style={{ paddingBottom: 0, marginBottom: 0 }}>
-            <ProfileCompletionForm
-              user={user}
-              onComplete={handleProfileComplete}
-              onCancel={handleProfileCancel}
-            />
+          <div className="h-fill bg-gradient-to-br from-pink-400 via-purple-500 to-indigo-600 flex items-start justify-center px-4 py-8 overflow-y-auto" style={{ minHeight: '100vh' }}>
+            <div className="w-full max-w-md">
+              <ProfileCompletionForm
+                user={user}
+                onComplete={handleProfileComplete}
+                onCancel={handleProfileCancel}
+              />
+            </div>
           </div>
         )}
 

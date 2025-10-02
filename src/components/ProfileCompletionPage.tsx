@@ -64,8 +64,8 @@ const ProfileCompletionPage = () => {
 
   if (loading) {
     return (
-  <div className="min-h-fill flex items-center justify-center bg-gradient-to-br from-pink-50 to-purple-50">
-        <div className="animate-spin rounded-full h-32 w-32 border-b-2 border-pink-500"></div>
+      <div className="h-fill bg-gradient-to-br from-pink-400 via-purple-500 to-indigo-600 flex items-center justify-center" style={{ minHeight: '100vh' }}>
+        <div className="animate-spin rounded-full h-32 w-32 border-b-2 border-white"></div>
       </div>
     );
   }
@@ -85,18 +85,21 @@ const ProfileCompletionPage = () => {
   }
 
   return (
-  <div className="min-h-fill bg-gradient-to-br from-pink-50 to-purple-50 flex items-center justify-center p-4"
+    <div className="h-fill bg-gradient-to-br from-pink-400 via-purple-500 to-indigo-600 flex items-start justify-center px-4 py-8 overflow-y-auto"
          style={{ 
+           minHeight: '100vh',
            touchAction: 'pan-x pan-y',
            userSelect: 'none',
            WebkitUserSelect: 'none',
            WebkitTouchCallout: 'none'
          }}>
-      <ProfileCompletionForm
-        user={user}
-        onComplete={handleProfileComplete}
-        onCancel={handleCancel}
-      />
+      <div className="w-full max-w-md">
+        <ProfileCompletionForm
+          user={user}
+          onComplete={handleProfileComplete}
+          onCancel={handleCancel}
+        />
+      </div>
     </div>
   );
 };

@@ -11,7 +11,7 @@ import { useToast } from '@/hooks/use-toast';
 import { handleInputFocus, handleInputBlur, getInputStyles } from '@/utils/inputUtils';
 import { getPasswordResetRedirectUri, getEmailConfirmRedirectUri } from '@/config/oauth';
 import { cleanupSafariViewController } from '@/utils/safariViewController';
-import { signInWithAppleNative } from '@/utils/appleNativeAuth';
+import { signInWithAppleNativeModal, signInWithAppleFallback, isAppleSignInAvailable } from '@/utils/appleNativeModal';
 import AppleAuthDebug from '@/components/AppleAuthDebug';
 
 interface AuthFormProps {
@@ -140,28 +140,48 @@ const AuthForm = ({ isLogin, onToggle, onOAuthSuccess, onBack }: AuthFormProps) 
       
       console.log(`Starting ${provider} OAuth with redirectTo: ${redirectTo}`);
       
-      // For Apple provider, use the in-app Safari View Controller (web-based flow).
-      // We intentionally force the web OAuth path to avoid the native Apple modal which
-      // can run in parallel and cause duplicate login prompts.
+      // For Apple provider, use NATIVE MODAL (no Safari, no browser)
       if (provider === 'apple') {
-        console.log('🍎 Using in-app Safari View Controller for Apple sign-in (web flow)');
         try {
-          const data = await signInWithAppleNative();
-
-          // After successful native sign-in, ensure profile exists and navigate
-          const user = data?.user || (data?.session?.user ?? null);
-          if (user) {
-            await ensureProfileExists(user);
-            toast({ title: 'Welcome!', description: "You've been successfully signed in." });
-            navigate('/');
+          if (isAppleSignInAvailable()) {
+            console.log('🍎 Using NATIVE Apple Sign-In Modal (iOS)');
+            const result = await signInWithAppleNativeModal();
+            
+            // Handle the result like Google OAuth does
+            if (result.needsProfileCompletion) {
+              toast({
+                title: "Welcome!",
+                description: "Please complete your profile to continue.",
+              });
+              navigate('/complete-profile');
+            } else {
+              toast({
+                title: "Welcome back!",
+                description: "You've been successfully signed in.",
+              });
+              navigate('/');
+            }
+          } else {
+            console.log('🍎 Using fallback Apple Sign-In (non-iOS)');
+            await signInWithAppleFallback();
+            // For non-iOS, the redirect happens automatically
           }
-        } catch (err: any) {
-          console.error('[Apple OAuth Error]:', err);
-          toast({
-            title: 'Authentication Error',
-            description: err?.message || 'Failed to sign in with Apple',
-            variant: 'destructive',
-          });
+        } catch (error: any) {
+          console.error(`Apple OAuth error:`, error);
+          
+          // Handle user cancellation gracefully
+          if (error.message?.includes('canceled') || error.message?.includes('cancelled')) {
+            toast({
+              title: "Sign-In Cancelled",
+              description: "Apple Sign-In was cancelled.",
+            });
+          } else {
+            toast({
+              title: "Authentication Error",
+              description: error.message || 'Failed to sign in with Apple. Please try again.',
+              variant: "destructive",
+            });
+          }
         } finally {
           setOauthLoading(null);
         }
