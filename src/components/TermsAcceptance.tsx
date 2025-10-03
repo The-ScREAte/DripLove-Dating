@@ -42,8 +42,8 @@ const TermsAcceptance = ({ user, onAccept }: TermsAcceptanceProps) => {
       }
 
       toast({
-        title: "Welcome to DripLove!",
-        description: "Thank you for accepting our terms. You can now start connecting with amazing people!",
+        title: "Terms Accepted",
+        description: "Thank you for accepting our terms of service. You may now proceed to use our platform.",
       });
 
       onAccept();
@@ -63,46 +63,19 @@ const TermsAcceptance = ({ user, onAccept }: TermsAcceptanceProps) => {
   <div className="terms-container min-h-fill bg-gradient-to-br from-pink-400 via-purple-500 to-indigo-600 p-4 flex items-center justify-center">
       <Card className="w-full max-w-4xl mx-auto backdrop-blur-sm bg-white/95 shadow-2xl border-0">
         <CardHeader className="text-center pb-6">
-          <div className="flex justify-center mb-4">
-            <div className="p-4 bg-gradient-to-r from-pink-500 to-purple-600 rounded-full">
-              <Heart className="w-10 h-10 text-white" />
-            </div>
-          </div>
-                    <CardTitle className="text-3xl font-bold text-center text-purple-700 mb-2">
-            Welcome to DripLove!
+          <CardTitle className="text-3xl font-bold text-center text-gray-800 mb-2">
+            Terms and Conditions
           </CardTitle>
           <CardDescription className="text-gray-600 text-lg">
-            Before you begin your journey, please review and accept our terms and conditions
+            Please review and accept our terms and conditions to continue using our service
           </CardDescription>
         </CardHeader>
 
         <CardContent className="space-y-6">
-          {/* App Features Highlight */}
-          <div className="bg-gradient-to-r from-pink-50 to-purple-50 rounded-lg p-6 mb-6">
-            <h3 className="text-lg font-semibold text-gray-800 mb-4 flex items-center">
-              <Star className="w-5 h-5 mr-2 text-pink-500" />
-              What awaits you on DripLove
-            </h3>
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-              <div className="flex items-center space-x-3">
-                <Users className="w-6 h-6 text-purple-500" />
-                <span className="text-sm text-gray-700">Connect with amazing people</span>
-              </div>
-              <div className="flex items-center space-x-3">
-                <MessageCircle className="w-6 h-6 text-pink-500" />
-                <span className="text-sm text-gray-700">Chat and build connections</span>
-              </div>
-              <div className="flex items-center space-x-3">
-                <Shield className="w-6 h-6 text-indigo-500" />
-                <span className="text-sm text-gray-700">Safe and secure platform</span>
-              </div>
-            </div>
-          </div>
-
           {/* Terms and Conditions Content */}
           <div className="bg-white rounded-lg border border-gray-200 p-6 max-h-96 overflow-y-auto">
-                        <h3 className="text-xl font-semibold text-purple-700 mb-3">
-              What awaits you on DripLove
+            <h3 className="text-xl font-semibold text-gray-800 mb-3">
+              Terms of Service
             </h3>
             
             <div className="space-y-4 text-sm text-gray-600">
@@ -229,9 +202,9 @@ const TermsAcceptance = ({ user, onAccept }: TermsAcceptanceProps) => {
             <Button
               onClick={handleAccept}
               disabled={loading || !termsAccepted}
-              className="w-full bg-gradient-to-r from-pink-500 to-purple-600 hover:from-pink-600 hover:to-purple-700 text-white font-semibold py-3 rounded-lg transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed"
+              className="w-full bg-gray-900 hover:bg-gray-800 text-white font-semibold py-3 rounded-lg transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed"
             >
-              {loading ? 'Processing...' : 'Accept Terms & Continue to DripLove'}
+              {loading ? 'Processing...' : 'Accept Terms & Continue'}
             </Button>
             
             <p className="text-xs text-gray-500 text-center">

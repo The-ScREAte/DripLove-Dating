@@ -151,29 +151,50 @@ const AppWrapper = () => {
                 // Check if this is an OAuth callback
                 if (event.url.includes('#access_token=') || event.url.includes('?code=')) {
                   try {
-                    // Import Supabase and handle the OAuth session
-                    const { supabase } = await import('./integrations/supabase/client');
+                    // Use the shared OAuth handler for consistency
+                    const { handleOAuthRedirect } = await import('./utils/oauthCallbackHandler');
+                    const result = await handleOAuthRedirect(event.url);
                     
-                    // Parse the URL to extract tokens
-                    const url = new URL(event.url);
-                    const fragment = url.hash.substring(1); // Remove the #
-                    const params = new URLSearchParams(fragment);
-                    
-                    const access_token = params.get('access_token');
-                    const refresh_token = params.get('refresh_token');
-                    
-                    if (access_token && refresh_token) {
-                      // Set the session in Supabase
-                      await supabase.auth.setSession({
-                        access_token,
-                        refresh_token
-                      });
+                    if (result?.session && result?.user) {
+                      console.log('Deep link: OAuth session established for user:', result.user.id);
                       
-                      // Navigate to appropriate page
-                      window.location.href = '/auth/callback';
+                      const profile = result.profile;
+                      
+                      // Check if profile completion is needed
+                      if (!profile || !profile.first_name || !profile.last_name) {
+                        console.log('Deep link: Redirecting to profile completion');
+                        window.location.href = '/complete-profile';
+                        return;
+                      }
+                      
+                      // Check account status
+                      if (profile.account_status === 'blocked') {
+                        const { supabase } = await import('./integrations/supabase/client');
+                        await supabase.auth.signOut();
+                        console.log('Deep link: Account blocked, redirecting to home');
+                        window.location.href = '/';
+                        return;
+                      }
+
+                      if (profile.account_status === 'on_hold') {
+                        const { supabase } = await import('./integrations/supabase/client');
+                        await supabase.auth.signOut();
+                        console.log('Deep link: Account on hold, redirecting to home');
+                        window.location.href = '/';
+                        return;
+                      }
+                      
+                      // Store profile info and redirect to main app
+                      sessionStorage.setItem('profile_id', profile.id);
+                      console.log('Deep link: Redirecting to main app');
+                      window.location.href = '/';
+                    } else {
+                      console.error('Deep link: No session established');
+                      window.location.href = '/';
                     }
                   } catch (error) {
                     console.error('Deep link OAuth handling error:', error);
+                    window.location.href = '/';
                   }
                 }
               });
