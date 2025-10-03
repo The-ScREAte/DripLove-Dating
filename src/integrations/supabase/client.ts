@@ -13,7 +13,6 @@ import { isMobileApp } from '@/utils/platformUtils';
 const authOptions = {
   auth: {
     // Don't set a global redirectTo - let each operation specify its own
-    // redirectTo: getRedirectUri(), // Removed - this was causing the issue!
     // Auto detect redirect for web only
     detectSessionInUrl: !isMobileApp(),
     // For mobile apps, we need to handle deep links manually
@@ -21,7 +20,9 @@ const authOptions = {
     autoRefreshToken: true,
     // Storage options
     storage: typeof window !== 'undefined' ? window.localStorage : undefined,
-    storageKey: 'supabase.auth.token'
+    storageKey: 'supabase.auth.token',
+    // Additional debug options
+    debug: process.env.NODE_ENV === 'development'
   }
 };
 

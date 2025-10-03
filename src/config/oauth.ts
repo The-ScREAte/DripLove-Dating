@@ -50,11 +50,12 @@ export const OAUTH_CONFIG = {
   // These are the "Client ID" values you create in Apple Developer (Service IDs)
   // and must match what Supabase has configured for Apple.
   servicesClientIds: {
-    // NOTE: Capacitor Apple Sign-In plugin forces use of App ID (Bundle Identifier)
-    // So we configure Supabase to expect the App ID, not the Services ID
-    // App ID (Bundle): com.driplove.dating (FORCED by Capacitor plugin)
-    // Services ID: com.driplove.dating.signin (Cannot be used with native plugin)
-    apple: 'com.driplove.dating',
+    // Prefer a Vite env var for flexible per-environment configuration.
+    // Set VITE_APPLE_SERVICES_ID in your .env for local/staging/prod as needed.
+    apple:
+      (typeof import.meta !== 'undefined' && (import.meta as any).env?.VITE_APPLE_SERVICES_ID) ||
+      process.env?.VITE_APPLE_SERVICES_ID ||
+      'com.driplove.dating.signin',
   },
   
   // Web fallback for development/testing
@@ -65,19 +66,29 @@ export const OAUTH_CONFIG = {
   // Localhost development override (will be dynamically determined)
   localhostRedirectUri: typeof window !== 'undefined' && window.location.origin
     ? `${window.location.origin}/auth/callback`
-    : 'http://localhost:8080/auth/callback'
+    : 'http://localhost:8081/auth/callback' // Updated to match current dev server port
 };
 
 /**
  * Get the appropriate redirect URI based on platform
  */
 export const getRedirectUri = (provider: 'google' | 'apple' = 'google') => {
-  if (isMobileApp()) {
+  // Check if we're actually running in a native mobile app context
+  // vs running in a mobile browser or Capacitor WebView
+  const isActualNativeApp = typeof window !== 'undefined' && 
+    (window as any).Capacitor && 
+    (window as any).Capacitor.isNativePlatform &&
+    (window as any).Capacitor.isNativePlatform();
+  
+  if (isActualNativeApp) {
     return OAUTH_CONFIG.redirectUris[provider];
   }
   
   if (isLocalhost()) {
-    return OAUTH_CONFIG.localhostRedirectUri;
+    // Use current origin dynamically for localhost to handle port changes
+    return typeof window !== 'undefined' && window.location.origin
+      ? `${window.location.origin}/auth/callback`
+      : OAUTH_CONFIG.localhostRedirectUri;
   }
   
   // Use provider-specific web redirect

@@ -80,7 +80,7 @@ export const trackPerformance = (metricName: string, value: number) => {
 export const lazyLoadComponents = {
   // Components that should be lazy loaded
   AdminPage: () => import('../components/AdminPage'),
-  ProfileCompletionForm: () => import('../components/ProfileCompletionForm'),
+  ProfileCompletionPage: () => import('../components/ProfileCompletionPage'),
   PremiumUpgrade: () => import('../components/PremiumUpgrade'),
   UserProfileModal: () => import('../components/UserProfileModal'),
 };

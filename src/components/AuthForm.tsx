@@ -139,49 +139,45 @@ const AuthForm = ({ isLogin, onToggle, onOAuthSuccess, onBack }: AuthFormProps) 
       const redirectTo = getRedirectUri(provider);
       
       console.log(`Starting ${provider} OAuth with redirectTo: ${redirectTo}`);
+      console.log('Current location:', {
+        origin: window.location.origin,
+        href: window.location.href,
+        port: window.location.port
+      });
+      console.log('Current platform detection:', {
+        isNative: (window as any).Capacitor?.isNativePlatform?.(),
+        platform: (window as any).Capacitor?.getPlatform?.(),
+        userAgent: navigator.userAgent
+      });
       
-      // For Apple provider, use NATIVE MODAL (no Safari, no browser)
+      // For Apple provider, use the in-app Safari View Controller (web-based flow).
+      // We intentionally force the web OAuth path to avoid the native Apple modal which
+      // can run in parallel and cause duplicate login prompts.
       if (provider === 'apple') {
+        console.log('🍎 Using NATIVE Apple Sign-In Modal (iOS)');
         try {
-          if (isAppleSignInAvailable()) {
-            console.log('🍎 Using NATIVE Apple Sign-In Modal (iOS)');
-            const result = await signInWithAppleNativeModal();
-            
-            // Handle the result like Google OAuth does
-            if (result.needsProfileCompletion) {
-              toast({
-                title: "Welcome!",
-                description: "Please complete your profile to continue.",
-              });
+          const data = await signInWithAppleNativeModal();
+
+          // Handle profile completion flow (same as Google OAuth)
+          const user = data?.user;
+          if (user) {
+            if (data.needsProfileCompletion) {
+              // User needs to complete profile - redirect to completion
+              toast({ title: 'Welcome!', description: "Please complete your profile to continue." });
               navigate('/complete-profile');
             } else {
-              toast({
-                title: "Welcome back!",
-                description: "You've been successfully signed in.",
-              });
+              // User has complete profile - go to main app
+              toast({ title: 'Welcome back!', description: "You've been successfully signed in." });
               navigate('/');
             }
-          } else {
-            console.log('🍎 Using fallback Apple Sign-In (non-iOS)');
-            await signInWithAppleFallback();
-            // For non-iOS, the redirect happens automatically
           }
-        } catch (error: any) {
-          console.error(`Apple OAuth error:`, error);
-          
-          // Handle user cancellation gracefully
-          if (error.message?.includes('canceled') || error.message?.includes('cancelled')) {
-            toast({
-              title: "Sign-In Cancelled",
-              description: "Apple Sign-In was cancelled.",
-            });
-          } else {
-            toast({
-              title: "Authentication Error",
-              description: error.message || 'Failed to sign in with Apple. Please try again.',
-              variant: "destructive",
-            });
-          }
+        } catch (err: any) {
+          console.error('[Apple OAuth Error]:', err);
+          toast({
+            title: 'Authentication Error',
+            description: err?.message || 'Failed to sign in with Apple',
+            variant: 'destructive',
+          });
         } finally {
           setOauthLoading(null);
         }
@@ -189,12 +185,19 @@ const AuthForm = ({ isLogin, onToggle, onOAuthSuccess, onBack }: AuthFormProps) 
       } else {
         console.log(`Using standard OAuth flow for ${provider} on web/Android`);
         // Standard OAuth flow for web and Android
+        console.log(`[OAuth] Starting ${provider} OAuth with config:`, {
+          redirectTo,
+          currentOrigin: window.location.origin,
+          currentUrl: window.location.href
+        });
+        
         const { data, error } = await supabase.auth.signInWithOAuth({
           provider: provider,
           options: {
             redirectTo,
             queryParams: {
               prompt: 'select_account',
+              access_type: 'offline', // Request refresh token
             }
           }
         });

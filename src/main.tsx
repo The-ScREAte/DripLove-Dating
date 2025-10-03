@@ -90,10 +90,21 @@ const AppWrapper = () => {
     const initializeApp = async () => {
       try {
         // Quick OAuth redirect check (non-blocking)
+        // If we detect an OAuth fragment or error in the URL, ensure the app
+        // navigates to `/auth/callback` (preserving the fragment) so the
+        // OAuth callback page can parse and hydrate the session. Previously
+        // this redirected to the site root which dropped the fragment and
+        // caused `No session available after OAuth redirect` errors.
         const currentUrl = window.location.href;
-        if (currentUrl.includes('#access_token=') || currentUrl.includes('#error=')) {
-          window.location.href = window.location.origin + window.location.pathname;
-          return;
+        const hasOAuthFragment = currentUrl.includes('#access_token=') || currentUrl.includes('#error=') || currentUrl.includes('?code=');
+        if (hasOAuthFragment) {
+          const loc = window.location;
+          // If we're already on /auth/callback, don't change anything
+          if (!loc.pathname.startsWith('/auth/callback')) {
+            const target = window.location.origin + '/auth/callback' + (loc.hash || loc.search || '');
+            window.location.href = target;
+            return;
+          }
         }
 
         // Show the app immediately for faster perceived performance
@@ -115,9 +126,10 @@ const AppWrapper = () => {
           const { Capacitor } = await import('@capacitor/core');
           if (Capacitor.isNativePlatform()) {
             try {
-              const [{ Keyboard }, { StatusBar, Style }] = await Promise.all([
+              const [{ Keyboard }, { StatusBar, Style }, { App }] = await Promise.all([
                 import('@capacitor/keyboard'),
-                import('@capacitor/status-bar')
+                import('@capacitor/status-bar'),
+                import('@capacitor/app')
               ]);
 
               // Configure status bar
@@ -130,6 +142,40 @@ const AppWrapper = () => {
               
               Keyboard.addListener('keyboardWillHide', () => {
                 document.body.style.paddingBottom = '0px';
+              });
+
+              // Handle deep links for OAuth callbacks
+              App.addListener('appUrlOpen', async (event) => {
+                console.log('Deep link received:', event.url);
+                
+                // Check if this is an OAuth callback
+                if (event.url.includes('#access_token=') || event.url.includes('?code=')) {
+                  try {
+                    // Import Supabase and handle the OAuth session
+                    const { supabase } = await import('./integrations/supabase/client');
+                    
+                    // Parse the URL to extract tokens
+                    const url = new URL(event.url);
+                    const fragment = url.hash.substring(1); // Remove the #
+                    const params = new URLSearchParams(fragment);
+                    
+                    const access_token = params.get('access_token');
+                    const refresh_token = params.get('refresh_token');
+                    
+                    if (access_token && refresh_token) {
+                      // Set the session in Supabase
+                      await supabase.auth.setSession({
+                        access_token,
+                        refresh_token
+                      });
+                      
+                      // Navigate to appropriate page
+                      window.location.href = '/auth/callback';
+                    }
+                  } catch (error) {
+                    console.error('Deep link OAuth handling error:', error);
+                  }
+                }
               });
               
               // Set up safe area CSS variables (using environment variables)

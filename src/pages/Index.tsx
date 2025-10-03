@@ -2,7 +2,7 @@ import React, { useState, useEffect, Suspense, lazy } from 'react';
 import WelcomeScreen from '@/components/WelcomeScreen';
 import AuthForm from '@/components/AuthForm';
 import RegistrationForm from '@/components/RegistrationForm';
-import ProfileCompletionForm from '@/components/ProfileCompletionForm';
+import ProfileCompletionPage from '@/components/ProfileCompletionPage';
 import TermsAcceptance from '@/components/TermsAcceptance';
 import MainApp from '@/components/MainApp';
 import AboutUs from '@/components/AboutUs';
@@ -326,15 +326,7 @@ const Index = () => {
         )}
 
         {currentView === 'profile-completion' && user && (
-          <div className="h-fill bg-gradient-to-br from-pink-400 via-purple-500 to-indigo-600 flex items-start justify-center px-4 py-8 overflow-y-auto" style={{ minHeight: '100vh' }}>
-            <div className="w-full max-w-md">
-              <ProfileCompletionForm
-                user={user}
-                onComplete={handleProfileComplete}
-                onCancel={handleProfileCancel}
-              />
-            </div>
-          </div>
+          <ProfileCompletionPage />
         )}
 
         {currentView === 'terms-acceptance' && user && (

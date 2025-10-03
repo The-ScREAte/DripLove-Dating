@@ -47,11 +47,6 @@ const config: CapacitorConfig = {
     // Performance monitoring
     CapacitorHttp: {
       enabled: true
-    },
-    // Apple Sign-In configuration - FORCE use of Services ID instead of App ID
-    SignInWithApple: {
-      // This should force the plugin to use Services ID instead of App ID
-      clientId: 'com.driplove.dating.signin'
     }
   },
   cordova: {

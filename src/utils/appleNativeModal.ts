@@ -46,7 +46,6 @@ export async function signInWithAppleNativeModal() {
 
     const { identityToken } = result.response;
 
-    // Since token has App ID audience, we need to tell Supabase to accept App ID
     // Use signInWithIdToken with the App ID token
     const { data, error } = await supabase.auth.signInWithIdToken({
       provider: 'apple',
@@ -64,75 +63,45 @@ export async function signInWithAppleNativeModal() {
 
     console.log('[Apple Native Modal] Successfully authenticated with Supabase:', data.user.id);
 
-    // Handle profile logic (same as Google OAuth flow)
+    // Check if user profile exists (same as Google OAuth flow)
     const { data: profile, error: profileError } = await supabase
       .from('profiles')
       .select('id, is_admin, account_status, first_name, last_name')
       .eq('id', data.user.id)
       .single();
 
-    let needsCompletion = false;
-    let userProfile = profile;
-    
     if (profileError || !profile) {
-      // Create basic profile for new user (same as Google)
-      const fullName = data.user.user_metadata?.full_name || data.user.user_metadata?.name || '';
-      const firstName = fullName.split(' ')[0] || '';
-      const lastName = fullName.split(' ').slice(1).join(' ') || '';
-      
-      const { data: newProfile, error: insertError } = await supabase
-        .from('profiles')
-        .insert({
-          id: data.user.id,
-          email: data.user.email,
-          first_name: firstName || null,
-          last_name: lastName || null,
-          date_of_birth: '1990-01-01',
-          country: 'US', // Default to US to avoid null constraint violation
-          city: null,
-          gender: null,
-          preference: 'both',
-          relationship_intent: 'not-sure',
-          occupation: null,
-          industry: null,
-          education_level: null,
-          account_status: 'active',
-          is_admin: false,
-          terms_accepted: false
-        })
-        .select()
-        .single();
-
-      if (insertError) {
-        console.error('[Apple Native Modal] Profile creation error:', insertError);
-        throw insertError;
-      }
-      
-      userProfile = newProfile;
-      needsCompletion = true;
-    } else {
-      // Check account status (same as Google)
-      if (profile.account_status === 'blocked') {
-        await supabase.auth.signOut();
-        throw new Error('Account is blocked');
-      }
-
-      if (profile.account_status === 'on_hold') {
-        await supabase.auth.signOut();
-        throw new Error('Account is on hold');
-      }
-
-      // Save profile ID to session
-      sessionStorage.setItem('profile_id', profile.id);
-
-      // Check if profile needs completion
-      needsCompletion = !profile.first_name || !profile.last_name;
+      // User doesn't have a profile - they need to complete profile creation
+      // DO NOT create profile here - let them complete the form first
+      console.log('[Apple Native Modal] No profile found - needs completion');
+      return { 
+        user: data.user, 
+        profile: null,
+        needsProfileCompletion: true 
+      };
     }
 
-    // Return the same format as expected by the AuthForm
+    // User has existing profile - check account status
+    if (profile.account_status === 'blocked') {
+      await supabase.auth.signOut();
+      throw new Error('Account is blocked');
+    }
+
+    if (profile.account_status === 'on_hold') {
+      await supabase.auth.signOut();
+      throw new Error('Account is on hold');
+    }
+
+    // Save profile ID to session
+    sessionStorage.setItem('profile_id', profile.id);
+
+    // Check if profile needs completion
+    const needsCompletion = !profile.first_name || !profile.last_name;
+
+    // Return existing profile
     return { 
       user: data.user, 
-      profile: userProfile,
+      profile: profile,
       needsProfileCompletion: needsCompletion 
     };
 
@@ -147,8 +116,6 @@ export async function signInWithAppleNativeModal() {
     throw err;
   }
 }
-
-
 
 /**
  * Check if native Apple Sign-In is available

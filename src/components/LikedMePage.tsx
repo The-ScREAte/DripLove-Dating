@@ -631,13 +631,31 @@ const LikedMePage = ({ currentUser, isPremium = false }: LikedMePageProps) => {
     return (
       <div className="h-full w-full relative flex flex-col bg-white">
         {/* Main Image Area - takes full available height */}
-        <div className="flex-1 relative" onTouchEnd={handleTouch}>
+        <div 
+          className="flex-1 relative" 
+          onTouchEnd={handleTouch}
+          style={{
+            height: 'calc(100vh - 120px)', // Fixed height minus nav space
+            minHeight: 'calc(100vh - 120px)',
+            maxHeight: 'calc(100vh - 120px)',
+            overflow: 'hidden'
+          }}
+        >
           {profileImages.length > 0 ? (
             <>
               <img
                 src={profileImages[imageIndex]}
                 alt={`${selectedProfile.first_name}'s photo`}
                 className="w-full h-full object-cover"
+                style={{
+                  height: '100%',
+                  width: '100%',
+                  objectFit: 'cover',
+                  objectPosition: 'center',
+                  display: 'block',
+                  WebkitTransform: 'translateZ(0)', // Force hardware acceleration
+                  transform: 'translateZ(0)'
+                }}
                 loading="lazy"
               />
               {/* Image indicators */}
@@ -898,6 +916,18 @@ const LikedMePage = ({ currentUser, isPremium = false }: LikedMePageProps) => {
                         src={profileImages[0]}
                         alt={`${liker.first_name}'s photo`}
                         className={`w-full h-full object-cover ${isLocked ? 'blur-md' : ''}`}
+                        style={{
+                          height: '100%',
+                          width: '100%',
+                          objectFit: 'cover',
+                          objectPosition: 'center',
+                          display: 'block',
+                          // iOS-specific fixes for proper image scaling
+                          minHeight: '100%',
+                          minWidth: '100%',
+                          WebkitTransform: 'translateZ(0)', // Force hardware acceleration
+                          transform: 'translateZ(0)'
+                        }}
                         loading="lazy"
                       />
                     ) : (
