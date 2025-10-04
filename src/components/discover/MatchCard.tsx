@@ -343,47 +343,34 @@ const MatchCard: React.FC<MatchCardProps> = ({
                 </div>
               )}
               {slides[currentSlide]?.type === 'image' ? (
-                <div className="relative w-full h-full ">
+                <div className="relative w-full h-full bg-gray-900">
                   {imageLoading && (
-                    <div className="absolute inset-0 bg-gray-100 flex items-center justify-center z-10">
+                    <div className="absolute inset-0 bg-gray-900 flex items-center justify-center z-10">
                       <Loader2 className="h-8 w-8 animate-spin text-pink-500" />
                     </div>
                   )}
                   {(() => {
                     const url = slides[currentSlide].content;
-                    // Build LQIP placeholder URL (tiny)
-                    const placeholder = url.includes('supabase') ? `${url}?width=40&quality=20&format=webp` : url;
                     const full = getOptimizedUrl(url);
                     const status = imageStatus?.[url] || 'idle';
 
                     return (
-                      <>
-                        <img
-                          src={placeholder}
-                          aria-hidden
-                          className="absolute inset-0 w-full h-full object-cover"
-                          style={{ filter: 'none', transform: 'scale(1.2)' }}
-                          draggable={false}
-                        />
-                        {status === 'loaded' && (
-                          <img
-                            src={full}
-                            alt={`${match.first_name} ${match.last_name}`}
-                            className="w-full h-full object-contain transition-opacity duration-300 relative z-10"
-                            draggable={false}
-                            onLoadStart={() => setImageLoading(true)}
-                            onLoad={() => setImageLoading(false)}
-                            onError={() => setImageLoading(false)}
-                            style={{
-                              backgroundColor: edgeColor,
-                              touchAction: 'manipulation',
-                              userSelect: 'none',
-                              WebkitUserSelect: 'none',
-                              WebkitTouchCallout: 'none'
-                            }}
-                          />
-                        )}
-                      </>
+                      <img
+                        src={full}
+                        alt={`${match.first_name} ${match.last_name}`}
+                        className="w-full h-full object-contain transition-opacity duration-300 relative z-10"
+                        draggable={false}
+                        onLoadStart={() => setImageLoading(true)}
+                        onLoad={() => setImageLoading(false)}
+                        onError={() => setImageLoading(false)}
+                        style={{
+                          backgroundColor: '#111827',
+                          touchAction: 'manipulation',
+                          userSelect: 'none',
+                          WebkitUserSelect: 'none',
+                          WebkitTouchCallout: 'none'
+                        }}
+                      />
                     );
                   })()}
                 </div>
