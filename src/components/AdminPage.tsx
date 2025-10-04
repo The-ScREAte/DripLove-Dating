@@ -16,9 +16,9 @@ import AdminErrorBoundary from './admin/AdminErrorBoundary';
 import UserPoolDebugger from './admin/UserPoolDebugger';
 import CountryManagement from './admin/CountryManagement';
 import ImageModerationPanel from './admin/ImageModerationPanel';
-import SafeAreaDebug from './SafeAreaDebug';
 import NotificationTester from './NotificationTester';
 import ManualPremiumManager from './admin/ManualPremiumManager';
+import AdsManagement from './admin/AdsManagement';
 import { debounce, userDataCache, createPagination } from '@/utils/performanceOptimizer';
 import { useSupabaseSubscription, useMemoryMonitor } from '@/hooks/usePerformance';
 import { CurrentUser, AdminStats } from '@/types';
@@ -41,7 +41,8 @@ import {
   Image,
   CreditCard,
   BarChart3,
-  Crown
+  Crown,
+  Megaphone
 } from 'lucide-react';
 
 interface AdminPageProps {
@@ -1102,9 +1103,6 @@ const AdminPageComponent = ({ currentUser, onLogout }: AdminPageProps) => {
            WebkitUserSelect: 'none',
            WebkitTouchCallout: 'none'
          }}>
-      {/* Safe Area Debug Component - Remove in production */}
-      <SafeAreaDebug />
-      
       {/* Notification Tester - Remove in production */}
       <NotificationTester currentUser={currentUser} />
       
@@ -1139,7 +1137,7 @@ const AdminPageComponent = ({ currentUser, onLogout }: AdminPageProps) => {
           {/* Tabbed Interface with Error Boundaries for 1000+ users */}
           <AdminErrorBoundary>
             <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-              <TabsList className="grid w-full grid-cols-5 mb-4 h-11">
+              <TabsList className="grid w-full grid-cols-6 mb-4 h-11">
                 <TabsTrigger value="dashboard" className="text-xs flex flex-col gap-1 py-2">
                   <BarChart3 className="w-4 h-4" />
                   <span>Dashboard</span>
@@ -1151,6 +1149,10 @@ const AdminPageComponent = ({ currentUser, onLogout }: AdminPageProps) => {
                 <TabsTrigger value="content" className="text-xs flex flex-col gap-1 py-2">
                   <Image className="w-4 h-4" />
                   <span>Content</span>
+                </TabsTrigger>
+                <TabsTrigger value="ads" className="text-xs flex flex-col gap-1 py-2">
+                  <Megaphone className="w-4 h-4" />
+                  <span>Ads</span>
                 </TabsTrigger>
                 <TabsTrigger value="debugger" className="text-xs flex flex-col gap-1 py-2">
                   <Search className="w-4 h-4" />
@@ -1550,6 +1552,21 @@ const AdminPageComponent = ({ currentUser, onLogout }: AdminPageProps) => {
                   <Button size="sm" variant="outline" onClick={() => fetchReportedChats(true)}>Refresh</Button>
                 </div>
               </div>
+            </TabsContent>
+
+            {/* Ads Tab */}
+            <TabsContent value="ads" className="space-y-4">
+              <Card>
+                <CardHeader className="pb-3">
+                  <CardTitle className="flex items-center gap-2 text-lg">
+                    <Megaphone className="w-5 h-5" />
+                    Ads Management
+                  </CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <AdsManagement />
+                </CardContent>
+              </Card>
             </TabsContent>
 
             {/* Debugger Tab */}

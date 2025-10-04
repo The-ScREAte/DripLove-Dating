@@ -44,6 +44,30 @@ export type Database = {
         }
         Relationships: []
       }
+      ads: {
+        Row: {
+          about: string
+          created_at: string
+          id: string
+          image_url: string
+          name: string
+        }
+        Insert: {
+          about: string
+          created_at?: string
+          id?: string
+          image_url: string
+          name: string
+        }
+        Update: {
+          about?: string
+          created_at?: string
+          id?: string
+          image_url?: string
+          name?: string
+        }
+        Relationships: []
+      }
       blocks: {
         Row: {
           blocked_id: string
@@ -508,6 +532,70 @@ export type Database = {
           },
         ]
       }
+      reported_chats: {
+        Row: {
+          admin_id: string | null
+          admin_notes: string | null
+          chat_id: string
+          created_at: string | null
+          description: string | null
+          id: string
+          reason: string | null
+          reported_user_id: string | null
+          reporter_id: string | null
+          resolved_at: string | null
+          status: string | null
+        }
+        Insert: {
+          admin_id?: string | null
+          admin_notes?: string | null
+          chat_id: string
+          created_at?: string | null
+          description?: string | null
+          id?: string
+          reason?: string | null
+          reported_user_id?: string | null
+          reporter_id?: string | null
+          resolved_at?: string | null
+          status?: string | null
+        }
+        Update: {
+          admin_id?: string | null
+          admin_notes?: string | null
+          chat_id?: string
+          created_at?: string | null
+          description?: string | null
+          id?: string
+          reason?: string | null
+          reported_user_id?: string | null
+          reporter_id?: string | null
+          resolved_at?: string | null
+          status?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "reported_chats_admin_id_fkey"
+            columns: ["admin_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "reported_chats_reported_user_id_fkey"
+            columns: ["reported_user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "reported_chats_reporter_id_fkey"
+            columns: ["reporter_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       reported_images: {
         Row: {
           admin_notes: string | null
@@ -550,48 +638,6 @@ export type Database = {
           reviewed_by?: string | null
           status?: string
           updated_at?: string
-        }
-        Relationships: []
-      }
-      reported_chats: {
-        Row: {
-          id: string
-          reporter_id: string
-          reported_user_id: string
-          chat_id: string
-          reason: string | null
-          description: string | null
-          status: string | null
-          admin_id: string | null
-          admin_notes: string | null
-          created_at: string | null
-          resolved_at: string | null
-        }
-        Insert: {
-          id?: string
-          reporter_id: string
-          reported_user_id: string
-          chat_id: string
-          reason?: string | null
-          description?: string | null
-          status?: string | null
-          admin_id?: string | null
-          admin_notes?: string | null
-          created_at?: string | null
-          resolved_at?: string | null
-        }
-        Update: {
-          id?: string
-          reporter_id?: string
-          reported_user_id?: string
-          chat_id?: string
-          reason?: string | null
-          description?: string | null
-          status?: string | null
-          admin_id?: string | null
-          admin_notes?: string | null
-          created_at?: string | null
-          resolved_at?: string | null
         }
         Relationships: []
       }
@@ -912,6 +958,22 @@ export type Database = {
       increment_unread_count: {
         Args: { field_name: string; match_id_input: string }
         Returns: undefined
+      }
+      like_and_usage_batched: {
+        Args: {
+          liked_id_param: string
+          liker_id_param: string
+          premium_param: boolean
+        }
+        Returns: Json
+      }
+      pass_and_usage_batched: {
+        Args: {
+          passed_id_param: string
+          passer_id_param: string
+          premium_param: boolean
+        }
+        Returns: Json
       }
       reject_image: {
         Args: { admin_notes?: string; image_id: string }
