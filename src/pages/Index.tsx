@@ -243,10 +243,7 @@ const Index = () => {
     await supabase.auth.signOut();
     setUser(null);
     setCurrentView('welcome');
-    toast({
-      title: "Profile completion cancelled",
-      description: "You need to complete your profile to use the app.",
-    });
+    // Removed: Profile completion cancelled toast
   };
 
   const handleLogout = async () => {

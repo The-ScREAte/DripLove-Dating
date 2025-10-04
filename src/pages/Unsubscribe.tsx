@@ -72,10 +72,7 @@ const Unsubscribe: React.FC = () => {
       // For now, we'll just mark it as canceled in our database
       // You might want to implement a server-side webhook or Edge Function for this
 
-      toast({
-        title: 'Subscription Cancelled',
-        description: 'Your premium subscription has been cancelled. You will retain access until the end of your billing period.',
-      });
+      // Removed: Subscription cancelled toast
       navigate('/');
     } catch (err: any) {
       setError(err.message || 'Failed to cancel subscription.');

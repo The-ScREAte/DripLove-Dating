@@ -425,10 +425,7 @@ const LikedMePage = ({ currentUser, isPremium = false }: LikedMePageProps) => {
     }
 
     // Show success message immediately
-    toast({
-      title: "It's a Match! 🎉",
-      description: "You can now start chatting!",
-    });
+    // Removed: Match success toast
 
     try {
       const { data: existingLike } = await supabase

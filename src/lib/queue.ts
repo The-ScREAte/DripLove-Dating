@@ -1,26 +1,36 @@
-// Lightweight async job queue used for background RPCs (enqueue jobs to run sequentially)
-type Job = () => Promise<void>;
-const q: Job[] = [];
-let running = false;
+// Simple queue system for background tasks
+class TaskQueue {
+  private queue: (() => Promise<void>)[] = [];
+  private isProcessing = false;
 
-export function enqueue(job: Job) {
-  q.push(job);
-  if (!running) drain();
-}
-
-async function drain() {
-  running = true;
-  while (q.length) {
-    const job = q.shift()!;
-    try {
-      await job();
-    } catch (e) {
-      // Swallow errors - jobs should handle their own error reporting
+  async enqueue(task: () => Promise<void>): Promise<void> {
+    this.queue.push(task);
+    if (!this.isProcessing) {
+      this.processQueue();
     }
-    // yield to event loop briefly
-    await new Promise(res => setTimeout(res, 10));
   }
-  running = false;
+
+  private async processQueue(): Promise<void> {
+    this.isProcessing = true;
+    
+    while (this.queue.length > 0) {
+      const task = this.queue.shift();
+      if (task) {
+        try {
+          await task();
+        } catch (error) {
+          console.error('Task failed:', error);
+          // Continue processing other tasks even if one fails
+        }
+      }
+    }
+    
+    this.isProcessing = false;
+  }
 }
 
-export default { enqueue };
+const taskQueue = new TaskQueue();
+
+export const enqueue = (task: () => Promise<void>) => {
+  return taskQueue.enqueue(task);
+};

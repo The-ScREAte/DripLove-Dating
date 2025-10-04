@@ -127,10 +127,7 @@ const PaymentSuccess: React.FC = () => {
             setError(`Could not activate premium: ${subscriptionError.message || subscriptionError.details || 'Unknown database error'}. Please contact support.`);
           } else {
             setUpgradeSuccess(true);
-            toast({
-              title: 'Premium Activated!',
-              description: 'Your account has been upgraded to premium. You now have unlimited access!'
-            });
+            // Removed: Premium Activated toast
           }
         } catch (err) {
           setError('An unexpected error occurred. Please contact support.');
@@ -310,10 +307,7 @@ const PaymentSuccess: React.FC = () => {
                 console.error('❌ Subscription fetch test ERROR:', testErr);
               }
               
-              toast({ 
-                title: 'Premium Activated!', 
-                description: 'Your account has been upgraded to premium. You now have unlimited access!' 
-              });
+              // Removed: Premium Activated toast
               
               // Force a small delay to ensure database consistency before redirect
               setTimeout(() => {

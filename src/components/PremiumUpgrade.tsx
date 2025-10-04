@@ -47,10 +47,6 @@ const PremiumUpgrade = ({ currentUser, onClose, preselectedPlan }: PremiumUpgrad
       if (r?.productId === 'com.driplove.dating.premium.monthlysub') {
         setIapLoading(false);
         setShowPaymentOptions(false);
-        toast({
-          title: 'Purchase Successful!',
-          description: 'Your premium subscription has been activated.',
-        });
       }
     }
     
@@ -178,11 +174,7 @@ const PremiumUpgrade = ({ currentUser, onClose, preselectedPlan }: PremiumUpgrad
       debugIAPState();
       
       if (!canBuy) {
-        toast({
-          title: 'Product Not Ready',
-          description: 'The subscription product is not available yet. Please wait and try again.',
-          variant: 'destructive',
-        });
+        // Removed: Product Not Ready toast
         return;
       }
       
@@ -191,10 +183,7 @@ const PremiumUpgrade = ({ currentUser, onClose, preselectedPlan }: PremiumUpgrad
         console.log('[UI] Starting IAP purchase...');
         await buyMonthly();
         
-        toast({
-          title: 'Purchase Started',
-          description: 'Please complete the payment in the Apple purchase dialog.',
-        });
+        // Removed: Purchase Started toast
         
         // Don't close the modal immediately - let the purchase flow complete
       } catch (err: any) {
@@ -227,10 +216,7 @@ const PremiumUpgrade = ({ currentUser, onClose, preselectedPlan }: PremiumUpgrad
   };
 
   const handlePaymentSuccess = () => {
-    toast({
-      title: 'Premium Activated!',
-      description: 'Your account has been upgraded to premium.',
-    });
+    // Removed: Premium activated toast
     setShowPaymentModal(false);
     
     // Refetch subscription status to update UI
@@ -264,7 +250,7 @@ const PremiumUpgrade = ({ currentUser, onClose, preselectedPlan }: PremiumUpgrad
         className="max-w-3xl md:max-w-4xl lg:max-w-5xl mx-auto px-0 sm:px-2 md:px-4 lg:px-6"
         style={{
           // Ensure there is enough bottom padding on devices with a home indicator
-          paddingBottom: 'clamp(56px, env(safe-area-inset-bottom, 0px), 24px)'
+          paddingBottom: 'clamp(56px, env(safe-area-inset-bottom, 10px), 24px)'
         }}
       >
         {onClose && (

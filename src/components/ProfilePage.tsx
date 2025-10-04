@@ -292,12 +292,10 @@ const ProfilePage = ({ currentUser, profile, onProfileUpdate, onLogout, onShowTe
         result = data;
       }
 
-      setIsEditing(false);
-      onProfileUpdate();
-      toast({ title: 'Profile updated', description: 'Your DripLove profile has been saved successfully.' });
+  setIsEditing(false);
+  onProfileUpdate();
     } catch (error: any) {
       console.error('🚨 Save failed:', error);
-      toast({ title: 'Error', description: error.message || 'Failed to update profile.', variant: 'destructive' });
     } finally {
       setIsSaving(false);
     }
@@ -423,7 +421,7 @@ const ProfilePage = ({ currentUser, profile, onProfileUpdate, onLogout, onShowTe
         className="fixed left-0 right-0 z-40 bg-white border-b border-gray-200 shadow-sm"
         style={{
           // Start from where main header ends - pushed up
-          top: 'clamp(55px, calc(env(safe-area-inset-top,20px) + 30px), 60px)',
+          top: 'clamp(66px, calc(env(safe-area-inset-top, 10px) + 46px), 96px)',
           paddingTop: '4px',
           width: '100%',
         }}
@@ -535,7 +533,7 @@ const ProfilePage = ({ currentUser, profile, onProfileUpdate, onLogout, onShowTe
       </div>
 
       {/* Scrollable Content - with padding to account for fixed header */}
-      <div className="max-w-4xl mx-auto p-4 pb-12 space-y-8 overflow-x-hidden w-full" style={{ paddingTop: '160px', paddingBottom: '40px' }}>
+      <div className="max-w-4xl mx-auto p-4 pb-12 space-y-8 overflow-x-hidden w-full" style={{ paddingTop: '160px', paddingBottom: '60px' }}>
         <div className="w-full max-w-full overflow-hidden">
           <div className="flex flex-col sm:flex-row sm:items-center gap-2 mb-2">
             <ProfileSummaryCard currentUser={currentUser} />
@@ -670,11 +668,7 @@ const ProfilePage = ({ currentUser, profile, onProfileUpdate, onLogout, onShowTe
         {/* Move Logout, Terms of Service, and Privacy Policy to the bottom of the page */}
         <div className="mt-2 flex flex-col items-center gap-4">
           <Button
-            onClick={() => {
-              if (window.confirm('Are you sure you want to log out?')) {
-                onLogout();
-              }
-            }}
+            onClick={onLogout}
             className="w-full max-w-xs bg-gray-900 hover:bg-gray-800 text-white font-medium"
           >
             Log Out
