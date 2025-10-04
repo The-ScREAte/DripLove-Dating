@@ -280,7 +280,6 @@ const Index = () => {
         {currentView === 'welcome' && (
           <WelcomeScreen
             onLogin={handleShowLogin}
-            onRegister={handleShowRegister}
             onAbout={handleShowAbout}
             onTerms={handleShowTerms}
             onPrivacy={handleShowPrivacy}

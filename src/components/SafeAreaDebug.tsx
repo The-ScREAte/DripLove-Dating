@@ -29,7 +29,16 @@ export const SafeAreaDebug: React.FC<SafeAreaDebugProps> = ({ className = '' }) 
     };
   }, []);
 
-
+  return (
+    <div className={`fixed bottom-4 left-4 bg-black/80 text-white text-xs p-3 rounded-lg z-50 ${className}`}>
+      <div>Supports Env: {supportsEnv ? 'Yes' : 'No'}</div>
+      <div>Has Notch: {hasNotchDetected ? 'Yes' : 'No'}</div>
+      <div>Top: {insets.top}px</div>
+      <div>Right: {insets.right}px</div>
+      <div>Bottom: {insets.bottom}px</div>
+      <div>Left: {insets.left}px</div>
+    </div>
+  );
 };
 
 export default SafeAreaDebug;
