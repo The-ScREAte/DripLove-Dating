@@ -150,7 +150,18 @@ import MatchCard from './discover/MatchCard';
 import SwipeButtons from './discover/SwipeButtons';
 import ProfileCompletionModal from './ProfileCompletionModal';
 import SwipeCounter from './SwipeCounter';
+import AdCard from './discover/AdCard';
 import { CurrentUser, PotentialMatch } from '@/types';
+
+interface AdData {
+  id: string;
+  image_url: string;
+  name: string;
+  about: string;
+  link: string | null;
+  link_as: string | null;
+  isAd: true; // Mark this as an ad
+}
 
 // Global cache for discover page data - persists across component mounts
 const discoverCache = new Map<string, { 
@@ -227,7 +238,7 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, isPremium }: DiscoverPage
   // Example: Add Buy/Restore buttons to your UI (place where appropriate)
   // <button onClick={buyMonthly} disabled={!canBuy}>Buy Premium</button>
   // <button onClick={restorePurchases}>Restore Purchases</button>
-  const [potentialMatches, setPotentialMatches] = useState<PotentialMatch[]>([]);
+  const [potentialMatches, setPotentialMatches] = useState<(PotentialMatch | AdData)[]>([]);
   const [currentIndex, setCurrentIndex] = useState(0);
   const [imageIndex, setImageIndex] = useState(0);
   const [isLoading, setIsLoading] = useState(true);
@@ -238,6 +249,8 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, isPremium }: DiscoverPage
   const [isOutOfSwipes, setIsOutOfSwipes] = useState(false);
   const [showMatchAnimation, setShowMatchAnimation] = useState(false);
   const [matchedUser, setMatchedUser] = useState<PotentialMatch | null>(null);
+  const [ads, setAds] = useState<AdData[]>([]);
+  const [realSwipeCount, setRealSwipeCount] = useState(0); // Track actual user swipes (excluding ads)
   // New: Store images by userId for instant access
   const [userImages, setUserImages] = useState<{ [key: string]: string[] }>({});
   // We avoid storing HTMLImageElement objects in state to prevent GC pressure
@@ -271,6 +284,57 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, isPremium }: DiscoverPage
 
   // Track in-flight image load requests to avoid duplicate DB calls
   const requestedImageProfileIds = useRef<Set<string>>(new Set());
+
+  // Fetch ads from database
+  useEffect(() => {
+    const fetchAds = async () => {
+      try {
+        const { data, error } = await supabase
+          .from('ads')
+          .select('*')
+          .order('created_at', { ascending: false });
+
+        if (error) throw error;
+
+        // Mark ads with isAd property
+        const adsWithMarker: AdData[] = (data || []).map(ad => ({
+          ...ad,
+          isAd: true as const
+        }));
+
+        setAds(adsWithMarker);
+      } catch (error) {
+        console.error('Error fetching ads:', error);
+      }
+    };
+
+    fetchAds();
+  }, []);
+
+  // Helper function to check if current match is an ad
+  const isAd = (match: PotentialMatch | AdData): match is AdData => {
+    return (match as AdData).isAd === true;
+  };
+
+  // Helper function to inject ads into matches array
+  const injectAds = useCallback((matches: PotentialMatch[]): (PotentialMatch | AdData)[] => {
+    if (ads.length === 0) return matches;
+    
+    const result: (PotentialMatch | AdData)[] = [];
+    let adIndex = 0;
+    
+    for (let i = 0; i < matches.length; i++) {
+      result.push(matches[i]);
+      
+      // Insert ad every 10 profiles
+      if ((i + 1) % 10 === 0 && ads.length > 0) {
+        result.push(ads[adIndex % ads.length]);
+        adIndex++;
+      }
+    }
+    
+    return result;
+  }, [ads]);
 
   // --- BEGIN: Swipe Guide Popup State ---
   const [showSwipeGuide, setShowSwipeGuide] = useState(false);
@@ -700,7 +764,7 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, isPremium }: DiscoverPage
           timestamp: Date.now()
         });
 
-        setPotentialMatches(matches);
+        setPotentialMatches(injectAds(matches));
         setUserImages(images);
         setUserDistances(distances);
         setCurrentIndex(index);
@@ -947,7 +1011,8 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, isPremium }: DiscoverPage
     }
     
     // Ultra-aggressive preloading: preload many profiles ahead
-    preloadNextProfileImages(potentialMatches, userImages, currentIndex + 1);
+    const realMatches = potentialMatches.filter((m): m is PotentialMatch => !isAd(m));
+    preloadNextProfileImages(realMatches, userImages, currentIndex + 1);
   }, [currentIndex, potentialMatches, userImages, preloadNextProfileImages, loadFullImages]);
 
   // Dynamic content height measurement
@@ -1228,6 +1293,13 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, isPremium }: DiscoverPage
   const handleLike = async () => {
     const currentMatch = potentialMatches[currentIndex];
     if (!currentMatch) return;
+
+    // Skip likes on ads - just move to next
+    if (isAd(currentMatch)) {
+      moveToNext();
+      return;
+    }
+
     // Optimistic path: advance UI immediately, then persist the action in background.
     const prevIndex = currentIndex;
     const prevMatch = currentMatch;
@@ -1327,6 +1399,13 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, isPremium }: DiscoverPage
   const handlePass = async () => {
     const currentMatch = potentialMatches[currentIndex];
     if (!currentMatch) return;
+
+    // Skip passes on ads - just move to next
+    if (isAd(currentMatch)) {
+      moveToNext();
+      return;
+    }
+
     // Optimistic path for pass: add to passed list locally, advance UI, persist in background and rollback on error
     const prevIndex = currentIndex;
     const prevMatch = currentMatch;
@@ -1614,9 +1693,49 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, isPremium }: DiscoverPage
 
   const currentMatch = potentialMatches[currentIndex];
   // Use preloaded images for current and next card
-  const currentMatchImages = currentMatch ? (userImages[currentMatch.id] || []) : [];
+  const currentMatchImages = currentMatch && !isAd(currentMatch) ? (userImages[currentMatch.id] || []) : [];
   const nextMatch = potentialMatches[currentIndex + 1];
-  const nextMatchImages = nextMatch ? (userImages[nextMatch.id] || []) : [];
+  const nextMatchImages = nextMatch && !isAd(nextMatch) ? (userImages[nextMatch.id] || []) : [];
+
+  // Handle ads separately
+  if (currentMatch && isAd(currentMatch)) {
+    const adCardTransform = swipeUI.isDragging ? `translate3d(${swipeUI.dragOffset}px, 0, 0) rotate(${swipeUI.dragOffset * 0.08}deg)` : '';
+    
+    return (
+      <div className="h-full w-full fixed left-0 overflow-hidden"
+           style={{ 
+             top: '65px',
+             height: 'calc(100vh - 120px)',
+             touchAction: 'pan-y',
+             overscrollBehavior: 'contain',
+             userSelect: 'none',
+             WebkitUserSelect: 'none',
+             WebkitTouchCallout: 'none'
+           }}>
+        <div className="h-full w-full relative z-10 flex flex-col"
+             style={{
+               transform: adCardTransform,
+               transition: swipeUI.isDragging ? 'none' : 'transform 0.2s ease-out',
+               willChange: 'transform',
+               boxShadow: swipeUI.isDragging ? '0 6px 18px rgba(0,0,0,0.18)' : '0 2px 8px rgba(0,0,0,0.08)'
+             }}
+             onTouchStart={handleTouchStart}
+             onTouchMove={handleTouchMove}
+             onTouchEnd={handleTouchEnd}
+             onMouseDown={handleMouseDown}>
+          <AdCard ad={currentMatch} onSwipe={moveToNext} />
+          <AdinkraBar />
+          <SwipeButtons
+            onPass={handlePass}
+            onReverse={handleReverse}
+            onLike={handleLike}
+            canReverse={false}
+            isPremium={isPremium}
+          />
+        </div>
+      </div>
+    );
+  }
 
   if (!currentMatch) {
     // Only show no profiles message when we actually have no profiles
@@ -1739,7 +1858,7 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, isPremium }: DiscoverPage
             imageUrl={nextMatchImages[0] ? getOptimizedUrl(nextMatchImages[0]) : undefined}
           >
             {/* ...existing code for overlays, etc... */}
-            {nextMatchImages.length > 0 ? (
+            {nextMatchImages.length > 0 && !isAd(nextMatch) ? (
               <img
                 src={getOptimizedUrl(nextMatchImages[0])}
                 alt={`${nextMatch.first_name}'s photo`}
@@ -1748,13 +1867,13 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, isPremium }: DiscoverPage
                 draggable={false}
                 loading="eager"
               />
-            ) : (
+            ) : nextMatch && !isAd(nextMatch) ? (
               <div className="w-full h-full bg-gradient-to-br from-pink-200 to-purple-200 flex items-center justify-center">
                 <span className="text-6xl font-bold text-gray-700">
                   {nextMatch.first_name?.[0]}{nextMatch.last_name?.[0]}
                 </span>
               </div>
-            )}
+            ) : null}
             <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-transparent to-transparent pointer-events-none" />
           </DominantColorImageBg>
 
@@ -1863,26 +1982,28 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, isPremium }: DiscoverPage
               </>
             )}
             {/* ...existing code... */}
-            <MatchCard
-              match={currentMatch}
-              imageIndex={imageIndex}
-              showMoreInfo={showMoreInfo}
-              isPremium={isPremium}
-              userImages={currentMatchImages}
-              currentUserLatitude={currentUser.latitude}
-              currentUserLongitude={currentUser.longitude}
-              onImageClick={() => handleImageAreaClick({} as React.MouseEvent<HTMLDivElement>)}
-              onToggleInfo={() => setShowMoreInfo(!showMoreInfo)}
-              calculateAge={calculateAge}
-              calculateDistance={calculateDistance}
-              swipeDirection={swipeUI.swipeDirection}
-              swipeDistance={swipeUI.swipeDistance}
-              isVerified={isProfileVerified(currentMatch)}
-              isSwipeAreaOnly={true}
-              getOptimizedUrl={getOptimizedUrl}
-              preCalculatedDistance={userDistances[currentMatch.id]}
-              imageStatus={imageStatus}
-            />
+            {!isAd(currentMatch) && (
+              <MatchCard
+                match={currentMatch}
+                imageIndex={imageIndex}
+                showMoreInfo={showMoreInfo}
+                isPremium={isPremium}
+                userImages={currentMatchImages}
+                currentUserLatitude={currentUser.latitude}
+                currentUserLongitude={currentUser.longitude}
+                onImageClick={() => handleImageAreaClick({} as React.MouseEvent<HTMLDivElement>)}
+                onToggleInfo={() => setShowMoreInfo(!showMoreInfo)}
+                calculateAge={calculateAge}
+                calculateDistance={calculateDistance}
+                swipeDirection={swipeUI.swipeDirection}
+                swipeDistance={swipeUI.swipeDistance}
+                isVerified={isProfileVerified(currentMatch)}
+                isSwipeAreaOnly={true}
+                getOptimizedUrl={getOptimizedUrl}
+                preCalculatedDistance={userDistances[currentMatch.id]}
+                imageStatus={imageStatus}
+              />
+            )}
           </div>
           {/* ...existing code... */}
           {/* African Adinkra symbols bar - fixed height */}
@@ -1905,26 +2026,28 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, isPremium }: DiscoverPage
                   : '0px'
               }}
             >
-            <MatchCard
-              match={currentMatch}
-              imageIndex={imageIndex}
-              showMoreInfo={showMoreInfo}
-              isPremium={isPremium}
-              userImages={currentMatchImages}
-              currentUserLatitude={currentUser.latitude}
-              currentUserLongitude={currentUser.longitude}
-              onImageClick={() => handleImageAreaClick({} as React.MouseEvent<HTMLDivElement>)}
-              onToggleInfo={() => setShowMoreInfo(!showMoreInfo)}
-              calculateAge={calculateAge}
-              calculateDistance={calculateDistance}
-              swipeDirection={swipeUI.swipeDirection}
-              swipeDistance={swipeUI.swipeDistance}
-              isVerified={isProfileVerified(currentMatch)}
-              isDetailsAreaOnly={true}
-              imageStatus={imageStatus}
-              getOptimizedUrl={getOptimizedUrl}
-              preCalculatedDistance={userDistances[currentMatch.id]}
-            />
+            {!isAd(currentMatch) && (
+              <MatchCard
+                match={currentMatch}
+                imageIndex={imageIndex}
+                showMoreInfo={showMoreInfo}
+                isPremium={isPremium}
+                userImages={currentMatchImages}
+                currentUserLatitude={currentUser.latitude}
+                currentUserLongitude={currentUser.longitude}
+                onImageClick={() => handleImageAreaClick({} as React.MouseEvent<HTMLDivElement>)}
+                onToggleInfo={() => setShowMoreInfo(!showMoreInfo)}
+                calculateAge={calculateAge}
+                calculateDistance={calculateDistance}
+                swipeDirection={swipeUI.swipeDirection}
+                swipeDistance={swipeUI.swipeDistance}
+                isVerified={isProfileVerified(currentMatch)}
+                isDetailsAreaOnly={true}
+                imageStatus={imageStatus}
+                getOptimizedUrl={getOptimizedUrl}
+                preCalculatedDistance={userDistances[currentMatch.id]}
+              />
+            )}
             </div>
           </div>
         </div>

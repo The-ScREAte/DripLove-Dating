@@ -12,6 +12,8 @@ interface Ad {
   image_url: string;
   name: string;
   about: string;
+  link: string | null;
+  link_as: string | null;
   created_at: string;
 }
 
@@ -22,7 +24,9 @@ const AdsManagement = () => {
   const [formData, setFormData] = useState({
     name: '',
     about: '',
-    image_url: ''
+    image_url: '',
+    link: '',
+    link_as: 'Click here'
   });
   const { toast } = useToast();
 
@@ -108,7 +112,9 @@ const AdsManagement = () => {
         .insert({
           name: formData.name,
           about: formData.about,
-          image_url: formData.image_url
+          image_url: formData.image_url,
+          link: formData.link || null,
+          link_as: formData.link_as || 'Click here'
         });
 
       if (error) throw error;
@@ -118,7 +124,7 @@ const AdsManagement = () => {
         description: 'Ad created successfully'
       });
 
-      setFormData({ name: '', about: '', image_url: '' });
+      setFormData({ name: '', about: '', image_url: '', link: '', link_as: 'Click here' });
       fetchAds();
     } catch (error) {
       console.error('Error creating ad:', error);
@@ -206,6 +212,25 @@ const AdsManagement = () => {
               </div>
             </div>
 
+            <div>
+              <label className="block text-sm font-medium mb-2">Link (Optional)</label>
+              <Input
+                value={formData.link}
+                onChange={(e) => setFormData(prev => ({ ...prev, link: e.target.value }))}
+                placeholder="Enter link URL"
+                type="url"
+              />
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium mb-2">Link Display Text</label>
+              <Input
+                value={formData.link_as}
+                onChange={(e) => setFormData(prev => ({ ...prev, link_as: e.target.value }))}
+                placeholder="e.g., Click here"
+              />
+            </div>
+
             <Button 
               type="submit" 
               disabled={loading || uploading}
@@ -237,6 +262,16 @@ const AdsManagement = () => {
                     <div className="flex-1">
                       <h4 className="font-semibold">{ad.name}</h4>
                       <p className="text-sm text-gray-600 mt-1">{ad.about}</p>
+                      {ad.link && (
+                        <a 
+                          href={ad.link} 
+                          target="_blank" 
+                          rel="noopener noreferrer"
+                          className="text-xs text-blue-600 hover:underline mt-1 block"
+                        >
+                          {ad.link_as || 'Click here'}
+                        </a>
+                      )}
                       <p className="text-xs text-gray-400 mt-2">
                         {new Date(ad.created_at).toLocaleDateString()}
                       </p>
