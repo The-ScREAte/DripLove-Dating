@@ -320,15 +320,18 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, isPremium }: DiscoverPage
   const injectAds = useCallback((matches: PotentialMatch[]): (PotentialMatch | AdData)[] => {
     if (ads.length === 0) return matches;
     
+    // Shuffle ads to randomize their order
+    const shuffledAds = [...ads].sort(() => Math.random() - 0.5);
+    
     const result: (PotentialMatch | AdData)[] = [];
     let adIndex = 0;
     
     for (let i = 0; i < matches.length; i++) {
       result.push(matches[i]);
       
-      // Insert ad every 10 profiles
-      if ((i + 1) % 10 === 0 && ads.length > 0) {
-        result.push(ads[adIndex % ads.length]);
+      // Insert ad every 2 profiles
+      if ((i + 1) % 2 === 0 && shuffledAds.length > 0) {
+        result.push(shuffledAds[adIndex % shuffledAds.length]);
         adIndex++;
       }
     }
