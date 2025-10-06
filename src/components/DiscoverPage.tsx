@@ -303,6 +303,7 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, isPremium }: DiscoverPage
         }));
 
         setAds(adsWithMarker);
+        console.log(`🎯 Loaded ${adsWithMarker.length} ads from database:`, adsWithMarker.map(ad => ad.name));
       } catch (error) {
         console.error('Error fetching ads:', error);
       }
@@ -318,10 +319,14 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, isPremium }: DiscoverPage
 
   // Helper function to inject ads into matches array
   const injectAds = useCallback((matches: PotentialMatch[]): (PotentialMatch | AdData)[] => {
-    if (ads.length === 0) return matches;
+    if (ads.length === 0) {
+      console.log('🚫 No ads available for injection');
+      return matches;
+    }
     
-    // Shuffle ads to randomize their order
+    // Shuffle ads to randomize their order each time
     const shuffledAds = [...ads].sort(() => Math.random() - 0.5);
+    console.log(`🎯 Injecting ads into ${matches.length} profiles. Available ads:`, shuffledAds.map(ad => ad.name));
     
     const result: (PotentialMatch | AdData)[] = [];
     let adIndex = 0;
@@ -329,13 +334,16 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, isPremium }: DiscoverPage
     for (let i = 0; i < matches.length; i++) {
       result.push(matches[i]);
       
-      // Insert ad every 2 profiles
+      // Insert ad every 2 profiles, ensuring we cycle through ALL ads
       if ((i + 1) % 2 === 0 && shuffledAds.length > 0) {
-        result.push(shuffledAds[adIndex % shuffledAds.length]);
+        const selectedAd = shuffledAds[adIndex % shuffledAds.length];
+        console.log(`📍 Position ${result.length}: Inserting ad "${selectedAd.name}"`);
+        result.push(selectedAd);
         adIndex++;
       }
     }
     
+    console.log(`✅ Final array length: ${result.length} (${matches.length} profiles + ${result.length - matches.length} ads)`);
     return result;
   }, [ads]);
 
@@ -575,8 +583,8 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, isPremium }: DiscoverPage
           timestamp: Date.now()
         });
 
-        // Update state with fresh data
-        setPotentialMatches(matches);
+        // Update state with fresh data and inject ads
+        setPotentialMatches(injectAds(matches));
         setUserImages(images);
         setUserDistances(distances);
         setCurrentIndex(index);
@@ -953,7 +961,7 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, isPremium }: DiscoverPage
       // Check if we have fresh cached data first
       const cached = discoverCache.get(currentUser.id);
       if (cached && Date.now() - cached.timestamp < DISCOVER_CACHE_DURATION) {
-        setPotentialMatches(cached.potentialMatches);
+        setPotentialMatches(injectAds(cached.potentialMatches));
         setUserImages(cached.userImages);
         setUserDistances(cached.userDistances);
         setCurrentIndex(cached.currentIndex);
@@ -1268,8 +1276,9 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, isPremium }: DiscoverPage
 
       const shuffled = profilesWithImages.sort(() => 0.5 - Math.random());
       
-      // Add new profiles to the end of existing ones
-      setPotentialMatches(prev => [...prev, ...shuffled]);
+      // Add new profiles with ads injected to the end of existing ones
+      const newProfilesWithAds = injectAds(shuffled);
+      setPotentialMatches(prev => [...prev, ...newProfilesWithAds]);
       
       // Preload images for the new profiles
       if (shuffled.length > 0) {
