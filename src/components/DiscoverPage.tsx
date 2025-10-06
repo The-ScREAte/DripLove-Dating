@@ -1276,9 +1276,12 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, isPremium }: DiscoverPage
 
       const shuffled = profilesWithImages.sort(() => 0.5 - Math.random());
       
-      // Add new profiles with ads injected to the end of existing ones
-      const newProfilesWithAds = injectAds(shuffled);
-      setPotentialMatches(prev => [...prev, ...newProfilesWithAds]);
+      // Filter out ads from existing array, combine with new profiles, then re-inject ads
+      setPotentialMatches(prev => {
+        const existingProfiles = prev.filter((m): m is PotentialMatch => !isAd(m));
+        const combined = [...existingProfiles, ...shuffled];
+        return injectAds(combined);
+      });
       
       // Preload images for the new profiles
       if (shuffled.length > 0) {
