@@ -1312,6 +1312,12 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, isPremium }: DiscoverPage
       return;
     }
 
+    // Check profile completion restriction (70% after 5 swipes)
+    if (profileCompletion < 70 && todaySwipeCount >= 5) {
+      setShowProfileCompletionModal(true);
+      return;
+    }
+
     // Optimistic path: advance UI immediately, then persist the action in background.
     const prevIndex = currentIndex;
     const prevMatch = currentMatch;
@@ -1415,6 +1421,12 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, isPremium }: DiscoverPage
     // Skip passes on ads - just move to next
     if (isAd(currentMatch)) {
       moveToNext();
+      return;
+    }
+
+    // Check profile completion restriction (70% after 5 swipes)
+    if (profileCompletion < 70 && todaySwipeCount >= 5) {
+      setShowProfileCompletionModal(true);
       return;
     }
 
