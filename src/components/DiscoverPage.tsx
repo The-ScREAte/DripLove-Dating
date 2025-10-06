@@ -1317,6 +1317,11 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, isPremium }: DiscoverPage
 
     // Check profile completion restriction (70% after 5 swipes)
     if (profileCompletion < 70 && todaySwipeCount >= 5) {
+      toast({
+        title: 'Complete Your Profile',
+        description: `You need ${70 - profileCompletion}% more to continue swiping. Complete your profile to unlock unlimited swipes!`,
+        variant: 'destructive'
+      });
       setShowProfileCompletionModal(true);
       return;
     }
@@ -1429,6 +1434,11 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, isPremium }: DiscoverPage
 
     // Check profile completion restriction (70% after 5 swipes)
     if (profileCompletion < 70 && todaySwipeCount >= 5) {
+      toast({
+        title: 'Complete Your Profile',
+        description: `You need ${70 - profileCompletion}% more to continue swiping. Complete your profile to unlock unlimited swipes!`,
+        variant: 'destructive'
+      });
       setShowProfileCompletionModal(true);
       return;
     }
