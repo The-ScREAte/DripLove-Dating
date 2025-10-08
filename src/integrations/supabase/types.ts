@@ -374,6 +374,7 @@ export type Database = {
       profiles: {
         Row: {
           account_status: string | null
+          adinkra_symbols: string[] | null
           bio: string | null
           city: string | null
           country: string
@@ -417,6 +418,7 @@ export type Database = {
         }
         Insert: {
           account_status?: string | null
+          adinkra_symbols?: string[] | null
           bio?: string | null
           city?: string | null
           country: string
@@ -460,6 +462,7 @@ export type Database = {
         }
         Update: {
           account_status?: string | null
+          adinkra_symbols?: string[] | null
           bio?: string | null
           city?: string | null
           country?: string

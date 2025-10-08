@@ -11,6 +11,7 @@ import { initialFormData } from '@/constants/formData';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { occupationOptions, industryOptions } from '@/constants/professionOptions';
 import LocationInput from '@/components/forms/LocationInput';
+import AdinkraSymbolSelector from '@/components/forms/AdinkraSymbolSelector';
 import { moderateImage, ModerationResult } from '@/utils/photoModeration';
 import { compressImage } from '@/utils/imageCompression';
 import TermsAcceptance from './TermsAcceptance';
@@ -418,7 +419,8 @@ const ProfileCompletionPage = () => {
         longitude: formData.longitude,
         is_custom_city: formData.isCustomCity || false,
         max_distance: formData.maxDistance || 50,
-        country_code: formData.countryCode || ''
+        country_code: formData.countryCode || '',
+        adinkra_symbols: formData.adinkraSymbols || []
       };
 
       const { error } = await supabase
@@ -733,6 +735,14 @@ const ProfileCompletionPage = () => {
                       </SelectContent>
                     </Select>
                     {errors.educationLevel && <p className="text-sm text-red-500">{errors.educationLevel}</p>}
+                  </div>
+
+                  {/* Adinkra Symbols Selector */}
+                  <div className="space-y-4">
+                    <AdinkraSymbolSelector
+                      selectedSymbols={formData.adinkraSymbols}
+                      onChange={(symbols) => setFormData({ ...formData, adinkraSymbols: symbols })}
+                    />
                   </div>
 
                   <div className="space-y-4">

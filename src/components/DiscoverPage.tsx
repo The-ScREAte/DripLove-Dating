@@ -163,9 +163,12 @@ interface AdData {
   isAd: true; // Mark this as an ad
 }
 
+// Union type for matches and ads
+type MatchOrAd = PotentialMatch | AdData;
+
 // Global cache for discover page data - persists across component mounts
 const discoverCache = new Map<string, { 
-  potentialMatches: PotentialMatch[], 
+  potentialMatches: MatchOrAd[], 
   userImages: { [key: string]: string[] },
   userDistances: { [key: string]: number },
   currentIndex: number,
@@ -238,7 +241,7 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, isPremium }: DiscoverPage
   // Example: Add Buy/Restore buttons to your UI (place where appropriate)
   // <button onClick={buyMonthly} disabled={!canBuy}>Buy Premium</button>
   // <button onClick={restorePurchases}>Restore Purchases</button>
-  const [potentialMatches, setPotentialMatches] = useState<(PotentialMatch | AdData)[]>([]);
+  const [potentialMatches, setPotentialMatches] = useState<MatchOrAd[]>([]);
   const [currentIndex, setCurrentIndex] = useState(0);
   const [imageIndex, setImageIndex] = useState(0);
   const [isLoading, setIsLoading] = useState(true);
@@ -672,7 +675,7 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, isPremium }: DiscoverPage
     if (locationProfileIds.length > 0) {
       const { data: profiles, error } = await supabase
         .from('profiles')
-        .select('id, first_name, last_name, bio, city, country, country_code, occupation, education_level, date_of_birth, interests, gender, latitude, longitude, fun_fact, perfect_first_date, last_googled, relationship_intent, smoking, drinking, exercise_level, sleeping_schedule, introvert_extrovert, spontaneous_planner, messy_organized')
+        .select('id, first_name, last_name, bio, city, country, country_code, occupation, education_level, date_of_birth, interests, gender, latitude, longitude, fun_fact, perfect_first_date, last_googled, relationship_intent, smoking, drinking, exercise_level, sleeping_schedule, introvert_extrovert, spontaneous_planner, messy_organized, adinkra_symbols')
         .in('id', locationProfileIds)
         .not('id', 'in', `(${excludedIds.join(',')})`)
         .in('gender', allowedGenders)
@@ -686,7 +689,7 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, isPremium }: DiscoverPage
       // Fallback: get profiles from same country
       const { data: profiles, error } = await supabase
         .from('profiles')
-        .select('id, first_name, last_name, bio, city, country, country_code, occupation, education_level, date_of_birth, interests, gender, latitude, longitude, fun_fact, perfect_first_date, last_googled, relationship_intent, smoking, drinking, exercise_level, sleeping_schedule, introvert_extrovert, spontaneous_planner, messy_organized')
+        .select('id, first_name, last_name, bio, city, country, country_code, occupation, education_level, date_of_birth, interests, gender, latitude, longitude, fun_fact, perfect_first_date, last_googled, relationship_intent, smoking, drinking, exercise_level, sleeping_schedule, introvert_extrovert, spontaneous_planner, messy_organized, adinkra_symbols')
         .not('id', 'in', `(${excludedIds.join(',')})`)
         .in('gender', allowedGenders)
         .eq('account_status', 'active')
@@ -1239,7 +1242,7 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, isPremium }: DiscoverPage
       
       const { data: newProfiles, error } = await supabase
         .from('profiles')
-        .select('id, first_name, last_name, bio, city, country, country_code, occupation, education_level, date_of_birth, interests, gender, latitude, longitude, fun_fact, perfect_first_date, last_googled, relationship_intent, smoking, drinking, exercise_level, sleeping_schedule, introvert_extrovert, spontaneous_planner, messy_organized')
+        .select('id, first_name, last_name, bio, city, country, country_code, occupation, education_level, date_of_birth, interests, gender, latitude, longitude, fun_fact, perfect_first_date, last_googled, relationship_intent, smoking, drinking, exercise_level, sleeping_schedule, introvert_extrovert, spontaneous_planner, messy_organized, adinkra_symbols')
         .not('id', 'in', `(${excludedIds.join(',')})`)
         .in('gender', allowedGenders)
         .eq('account_status', 'active')
@@ -1606,7 +1609,7 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, isPremium }: DiscoverPage
         // If not in current matches, try to fetch their profile data
         const { data: profileData, error: profileError } = await supabase
           .from('profiles')
-          .select('id, first_name, last_name, bio, city, country, country_code, occupation, education_level, date_of_birth, interests, gender, latitude, longitude, fun_fact, perfect_first_date, last_googled, relationship_intent, smoking, drinking, exercise_level, sleeping_schedule, introvert_extrovert, spontaneous_planner, messy_organized')
+          .select('id, first_name, last_name, bio, city, country, country_code, occupation, education_level, date_of_birth, interests, gender, latitude, longitude, fun_fact, perfect_first_date, last_googled, relationship_intent, smoking, drinking, exercise_level, sleeping_schedule, introvert_extrovert, spontaneous_planner, messy_organized, adinkra_symbols')
           .eq('id', lastPassedUser.user_id)
           .eq('account_status', 'active')
           .single();

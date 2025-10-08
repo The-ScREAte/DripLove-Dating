@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import ReportButton from '../ReportButton';
+import UserAdinkraDisplay from './UserAdinkraDisplay';
 import { MapPin, Briefcase, GraduationCap, Calendar, Crown, Shield, ChevronDown, ChevronUp, User, Quote, Heart, Coffee, Search, Loader2 } from 'lucide-react';
 import { PotentialMatch } from '@/types';
 import { useImageEdgeColor } from '@/hooks/useImageEdgeColor';
@@ -628,7 +629,12 @@ const MatchCard: React.FC<MatchCardProps> = ({
                 />
               )}
             </div>
-            
+
+            {/* Adinkra Symbols Display - Show user's selected symbols */}
+            {match.adinkra_symbols && match.adinkra_symbols.length > 0 && (
+              <UserAdinkraDisplay adinkraSymbols={match.adinkra_symbols} />
+            )}
+
             {match.city && (
               <div className="flex items-center mt-1 text-gray-600">
                 <MapPin className="w-4 h-4 mr-1" />

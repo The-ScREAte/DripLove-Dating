@@ -11,6 +11,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { Heart, MapPin, Briefcase, GraduationCap, Upload, Shield, CheckCircle, AlertTriangle } from 'lucide-react';
 import BasicInfoSection from '@/components/forms/BasicInfoSection';
 import LocationInput from '@/components/forms/LocationInput';
+import AdinkraSymbolSelector from '@/components/forms/AdinkraSymbolSelector';
 import { validateRegistrationForm, transformFormDataForSubmission } from '@/utils/formValidation';
 import { initialFormData } from '@/constants/formData';
 import { occupationOptions, industryOptions } from '@/constants/professionOptions';
@@ -509,7 +510,8 @@ const RegistrationForm = ({ onSubmit, onBackToLogin }: RegistrationFormProps) =>
         longitude: formData.longitude,
         is_custom_city: formData.isCustomCity || false,
         max_distance: formData.maxDistance || 50,
-        country_code: formData.countryCode || ''
+        country_code: formData.countryCode || '',
+        adinkra_symbols: formData.adinkraSymbols || []
       };
 
       if (existingProfile) {
@@ -796,6 +798,14 @@ const RegistrationForm = ({ onSubmit, onBackToLogin }: RegistrationFormProps) =>
                 </SelectContent>
               </Select>
               {errors.educationLevel && <p className="text-red-500 text-xs mt-1">{errors.educationLevel}</p>}
+            </div>
+
+            {/* Adinkra Symbols Selector */}
+            <div className="animate-scale-in">
+              <AdinkraSymbolSelector
+                selectedSymbols={formData.adinkraSymbols}
+                onChange={(symbols) => setFormData({ ...formData, adinkraSymbols: symbols })}
+              />
             </div>
           </div>
           </div>

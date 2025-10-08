@@ -47,7 +47,7 @@ serve(async (req) => {
     const { user_id } = await req.json()
     if (!user_id) return json(400, { error: 'Missing user_id' })
 
-    const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY)
+    const supabase = createClient(SUPABASE_URL!, SUPABASE_SERVICE_ROLE_KEY!)
     // Get active subscription from user_subscriptions
     const { data: sub, error } = await supabase
       .from('user_subscriptions')
@@ -74,7 +74,7 @@ serve(async (req) => {
     if (updateErr) return json(500, { error: updateErr.message })
 
     return json(200, { message: 'Subscription canceled. You will remain premium until the end of your period.' })
-  } catch (err) {
+  } catch (err: any) {
     return json(500, { error: err.message || 'Unknown error' })
   }
 })

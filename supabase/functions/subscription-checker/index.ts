@@ -27,7 +27,7 @@ serve(async (req) => {
   try {
     console.log('[SUBSCRIPTION-CHECKER] Starting subscription status check')
     
-    const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY)
+    const supabase = createClient(SUPABASE_URL!, SUPABASE_SERVICE_ROLE_KEY!)
     
     // Run the subscription expiry handler
     const { error: expiryError } = await supabase.rpc('handle_subscription_expiry')

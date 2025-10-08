@@ -35,6 +35,7 @@ export interface PotentialMatch {
   introvert_extrovert?: number;
   spontaneous_planner?: number;
   messy_organized?: number;
+  adinkra_symbols?: string[];
 }
 
 export interface ChatMatch {

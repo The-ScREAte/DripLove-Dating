@@ -90,7 +90,7 @@ serve(async (req) => {
     const event = JSON.parse(body)
     console.log('[PAYSTACK-WEBHOOK] Event type:', event.event)
     
-    const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY)
+    const supabase = createClient(SUPABASE_URL!, SUPABASE_SERVICE_ROLE_KEY!)
     
     switch (event.event) {
       case 'subscription.disable':

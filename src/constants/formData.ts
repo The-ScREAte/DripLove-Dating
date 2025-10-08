@@ -45,5 +45,6 @@ export const initialFormData = {
   messyOrganized: [50],
   funFact: '',
   perfectFirstDate: '',
-  lastGoogled: ''
+  lastGoogled: '',
+  adinkraSymbols: [] as string[]
 };
