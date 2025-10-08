@@ -115,11 +115,9 @@ const AppWrapper = () => {
           try {
             // Initialize in-app purchase system (background)
             const { initIAP } = await import('./iap');
-            console.log('Initializing IAP...');
             await initIAP();
-            console.log('IAP initialization complete');
           } catch (error) {
-            console.log('IAP initialization failed:', error);
+            // Silent error handling
           }
 
           // Initialize Capacitor plugins (background)
@@ -215,13 +213,13 @@ const AppWrapper = () => {
             const { supabase } = await import('./integrations/supabase/client');
             const { data: { user } } = await supabase.auth.getUser();
             if (user) {
-              console.log('User session found:', user.id);
+              // Silent session handling
             }
           } catch (error) {
             console.log('Auth check error:', error);
           }
 
-          console.log('Background initialization complete');
+          // Background initialization complete
         }, 100); // Small delay to ensure app renders first
 
       } catch (error) {

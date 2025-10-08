@@ -171,7 +171,7 @@ const discoverCache = new Map<string, {
   currentIndex: number,
   timestamp: number 
 }>();
-const DISCOVER_CACHE_DURATION = 60000; // 1 minute
+const DISCOVER_CACHE_DURATION = 3 * 60 * 60 * 1000; // 3 hours
 const DISCOVER_CACHE_MAX_ENTRIES = 60; // keep cache bounded
 
 const trimDiscoverCacheIfNeeded = () => {
@@ -285,7 +285,9 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, isPremium }: DiscoverPage
   // Track in-flight image load requests to avoid duplicate DB calls
   const requestedImageProfileIds = useRef<Set<string>>(new Set());
 
-  // Fetch ads from database
+  // Fetch ads from database - load them BEFORE fetching profiles
+  const [adsLoaded, setAdsLoaded] = useState(false);
+  
   useEffect(() => {
     const fetchAds = async () => {
       try {
@@ -303,30 +305,39 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, isPremium }: DiscoverPage
         }));
 
         setAds(adsWithMarker);
-        console.log(`🎯 Loaded ${adsWithMarker.length} ads from database:`, adsWithMarker.map(ad => ad.name));
+        setAdsLoaded(true);
       } catch (error) {
-        console.error('Error fetching ads:', error);
+        // Silently handle ad fetch errors
+        setAdsLoaded(true); // Still allow profiles to load
       }
     };
 
     fetchAds();
   }, []);
 
+  // Ensure currentIndex stays valid when potentialMatches array changes
+  useEffect(() => {
+    if (potentialMatches.length > 0 && currentIndex >= potentialMatches.length) {
+      setCurrentIndex(Math.max(0, potentialMatches.length - 1));
+    }
+  }, [potentialMatches.length, currentIndex]);
+
   // Helper function to check if current match is an ad
   const isAd = (match: PotentialMatch | AdData): match is AdData => {
     return (match as AdData).isAd === true;
   };
 
+  // Stable ad shuffle - only shuffle when ads actually change
+  const stableShuffledAds = useMemo(() => {
+    if (ads.length === 0) return [];
+    return [...ads].sort(() => Math.random() - 0.5);
+  }, [ads]);
+
   // Helper function to inject ads into matches array
   const injectAds = useCallback((matches: PotentialMatch[]): (PotentialMatch | AdData)[] => {
-    if (ads.length === 0) {
-      console.log('🚫 No ads available for injection');
+    if (stableShuffledAds.length === 0) {
       return matches;
     }
-    
-    // Shuffle ads to randomize their order each time
-    const shuffledAds = [...ads].sort(() => Math.random() - 0.5);
-    console.log(`🎯 Injecting ads into ${matches.length} profiles. Available ads:`, shuffledAds.map(ad => ad.name));
     
     const result: (PotentialMatch | AdData)[] = [];
     let adIndex = 0;
@@ -335,17 +346,15 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, isPremium }: DiscoverPage
       result.push(matches[i]);
       
       // Insert ad every 2 profiles, ensuring we cycle through ALL ads
-      if ((i + 1) % 2 === 0 && shuffledAds.length > 0) {
-        const selectedAd = shuffledAds[adIndex % shuffledAds.length];
-        console.log(`📍 Position ${result.length}: Inserting ad "${selectedAd.name}"`);
+      if ((i + 1) % 2 === 0) {
+        const selectedAd = stableShuffledAds[adIndex % stableShuffledAds.length];
         result.push(selectedAd);
         adIndex++;
       }
     }
     
-    console.log(`✅ Final array length: ${result.length} (${matches.length} profiles + ${result.length - matches.length} ads)`);
     return result;
-  }, [ads]);
+  }, [stableShuffledAds]);
 
   // --- BEGIN: Swipe Guide Popup State ---
   const [showSwipeGuide, setShowSwipeGuide] = useState(false);
@@ -574,17 +583,19 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, isPremium }: DiscoverPage
       if (result) {
         const { matches, images, distances, index } = result;
         
-        // Update cache
+        const matchesWithAds = injectAds(matches);
+        
+        // Update cache with ads already injected
         discoverCache.set(currentUser.id, {
-          potentialMatches: matches,
+          potentialMatches: matchesWithAds,
           userImages: images,
           userDistances: distances,
           currentIndex: index,
           timestamp: Date.now()
         });
 
-        // Update state with fresh data and inject ads
-        setPotentialMatches(injectAds(matches));
+        // Update state with fresh data
+        setPotentialMatches(matchesWithAds);
         setUserImages(images);
         setUserDistances(distances);
         setCurrentIndex(index);
@@ -766,16 +777,18 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, isPremium }: DiscoverPage
       if (result) {
         const { matches, images, distances, index } = result;
         
-        // Update cache
+        const matchesWithAds = injectAds(matches);
+        
+        // Update cache with ads already injected
         discoverCache.set(currentUser.id, {
-          potentialMatches: matches,
+          potentialMatches: matchesWithAds,
           userImages: images,
           userDistances: distances,
           currentIndex: index,
           timestamp: Date.now()
         });
 
-        setPotentialMatches(injectAds(matches));
+        setPotentialMatches(matchesWithAds);
         setUserImages(images);
         setUserDistances(distances);
         setCurrentIndex(index);
@@ -952,19 +965,22 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, isPremium }: DiscoverPage
     });
   }, [loadFullImages]);
 
-  // Main effect to fetch data - check cache first but don't block render
+  // Main effect to fetch data - wait for ads to load first
   useEffect(() => {
-    if (!currentUser?.id) return;
+    if (!currentUser?.id || !adsLoaded) return;
 
     // Use setTimeout to avoid blocking the initial render
     setTimeout(() => {
       // Check if we have fresh cached data first
       const cached = discoverCache.get(currentUser.id);
       if (cached && Date.now() - cached.timestamp < DISCOVER_CACHE_DURATION) {
-        setPotentialMatches(injectAds(cached.potentialMatches));
+        // Cache already has ads injected, use directly
+        setPotentialMatches(cached.potentialMatches);
         setUserImages(cached.userImages);
         setUserDistances(cached.userDistances);
-        setCurrentIndex(cached.currentIndex);
+        // Adjust currentIndex if it's beyond the array length
+        const adjustedIndex = Math.min(cached.currentIndex, cached.potentialMatches.length - 1);
+        setCurrentIndex(adjustedIndex);
         setIsLoading(false);
         // Use the cached data immediately and suppress full fetch until background refresh completes
         suppressFetchRef.current = true;
@@ -976,7 +992,7 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, isPremium }: DiscoverPage
     }, 0);
     
     fetchReverseUsage();
-  }, [currentUser?.id]); // Only depend on user ID, not the functions
+  }, [currentUser?.id, adsLoaded]); // Wait for both user and ads
 
   // Save current match state
   useEffect(() => {
@@ -1276,12 +1292,8 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, isPremium }: DiscoverPage
 
       const shuffled = profilesWithImages.sort(() => 0.5 - Math.random());
       
-      // Filter out ads from existing array, combine with new profiles, then re-inject ads
-      setPotentialMatches(prev => {
-        const existingProfiles = prev.filter((m): m is PotentialMatch => !isAd(m));
-        const combined = [...existingProfiles, ...shuffled];
-        return injectAds(combined);
-      });
+      // Simply add new profiles with ads to existing array (don't re-inject into existing)
+      setPotentialMatches(prev => [...prev, ...injectAds(shuffled)]);
       
       // Preload images for the new profiles
       if (shuffled.length > 0) {
@@ -1292,7 +1304,7 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, isPremium }: DiscoverPage
     } finally {
       setIsLoadingMore(false);
     }
-  }, [currentUser, allowedGenders, potentialMatches, calculateAge, calculateDistance, isLoadingMore, userImages, preloadNextProfileImages, loadFullImages]);
+  }, [currentUser, allowedGenders, potentialMatches, calculateAge, calculateDistance, isLoadingMore, userImages, preloadNextProfileImages, loadFullImages, injectAds, isAd]);
 
   // Auto-load more matches when getting low (5 profiles left) - reduced for performance
   useEffect(() => {
@@ -1315,11 +1327,11 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, isPremium }: DiscoverPage
       return;
     }
 
-    // Check profile completion restriction (70% after 5 swipes)
-    if (profileCompletion < 70 && todaySwipeCount >= 5) {
+    // Check profile completion restriction (75% after 5 swipes)
+    if (profileCompletion < 75 && realSwipeCount >= 5) {
       toast({
         title: 'Complete Your Profile',
-        description: `You need ${70 - profileCompletion}% more to continue swiping. Complete your profile to unlock unlimited swipes!`,
+        description: `You need ${75 - profileCompletion}% more to continue swiping. Complete your profile to unlock unlimited swipes!`,
         variant: 'destructive'
       });
       setShowProfileCompletionModal(true);
@@ -1352,6 +1364,8 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, isPremium }: DiscoverPage
           setCurrentIndex(prevIndex);
           setTodaySwipeCount(prev => Math.max(0, prev - 1));
           setIsOutOfSwipes(true);
+          updateCacheAfterRollback(prevIndex);
+          
           toast({ title: 'Daily Limit Reached', description: usageResult.message || 'You have reached your swipe limit.', variant: 'destructive' });
           return;
         }
@@ -1432,11 +1446,11 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, isPremium }: DiscoverPage
       return;
     }
 
-    // Check profile completion restriction (70% after 5 swipes)
-    if (profileCompletion < 70 && todaySwipeCount >= 5) {
+    // Check profile completion restriction (75% after 5 swipes)
+    if (profileCompletion < 75 && realSwipeCount >= 5) {
       toast({
         title: 'Complete Your Profile',
-        description: `You need ${70 - profileCompletion}% more to continue swiping. Complete your profile to unlock unlimited swipes!`,
+        description: `You need ${75 - profileCompletion}% more to continue swiping. Complete your profile to unlock unlimited swipes!`,
         variant: 'destructive'
       });
       setShowProfileCompletionModal(true);
@@ -1470,6 +1484,25 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, isPremium }: DiscoverPage
           setPassedUsers(prev => prev.filter(p => p.user_id !== prevMatch.id));
           setTodaySwipeCount(prev => Math.max(0, prev - 1));
           setIsOutOfSwipes(true);
+          
+          // Update cache with restored state
+          setTimeout(() => {
+            if (currentUser?.id) {
+              const cached = discoverCache.get(currentUser.id);
+              if (cached) {
+                setPotentialMatches(current => {
+                  discoverCache.set(currentUser.id, {
+                    ...cached,
+                    potentialMatches: current,
+                    currentIndex: prevIndex,
+                    timestamp: Date.now()
+                  });
+                  return current;
+                });
+              }
+            }
+          }, 0);
+          
           toast({ title: 'Daily Limit Reached', description: usageResult.message || 'You have reached your swipe limit.', variant: 'destructive' });
           return;
         }
@@ -1611,6 +1644,26 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, isPremium }: DiscoverPage
     }
   };
 
+  // Helper to update cache after rollback
+  const updateCacheAfterRollback = (restoredIndex: number) => {
+    setTimeout(() => {
+      if (currentUser?.id) {
+        const cached = discoverCache.get(currentUser.id);
+        if (cached) {
+          setPotentialMatches(current => {
+            discoverCache.set(currentUser.id, {
+              ...cached,
+              potentialMatches: current,
+              currentIndex: restoredIndex,
+              timestamp: Date.now()
+            });
+            return current;
+          });
+        }
+      }
+    }, 0);
+  };
+
   const moveToNext = () => {
     if (currentIndex < potentialMatches.length - 1) {
       setCurrentIndex(currentIndex + 1);
@@ -1637,6 +1690,7 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, isPremium }: DiscoverPage
         if (cached) {
           discoverCache.set(currentUser.id, {
             ...cached,
+            potentialMatches: potentialMatches,
             currentIndex: currentIndex + 1,
             timestamp: Date.now()
           });
@@ -1774,8 +1828,43 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, isPremium }: DiscoverPage
     );
   }
 
+  // Show loading state while data is being fetched
+  if (isLoading) {
+    return (
+      <>
+        <style>
+          {`
+            @keyframes float {
+              0%, 100% {
+                transform: translateY(0px);
+              }
+              50% {
+                transform: translateY(-12px);
+              }
+            }
+            .float-animation {
+              animation: float 1.8s ease-in-out infinite;
+            }
+          `}
+        </style>
+        <div className="min-h-screen w-full flex items-center justify-center" style={{ minHeight: 'calc(100vh - 152px)' }}>
+          <div className="flex flex-col items-center">
+            <div className="mb-4 float-animation">
+              <img 
+                src="/driplove-logo.png" 
+                alt="DripLove" 
+                className="w-20 h-20"
+              />
+            </div>
+            <p className="text-gray-600">Finding your matches...</p>
+          </div>
+        </div>
+      </>
+    );
+  }
+
+  // Show no profiles message only when not loading and no current match
   if (!currentMatch) {
-    // Only show no profiles message when we actually have no profiles
     return (
       <div className="min-h-screen w-full flex items-center justify-center" style={{ minHeight: 'calc(100vh - 152px)' }}>
         <Card className="max-w-md w-full mx-4">
@@ -1785,7 +1874,6 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, isPremium }: DiscoverPage
             <p className="text-gray-600 mb-4">
               You've seen all available profiles. Check back later for new matches!
             </p>
-
             <Button onClick={fetchPotentialMatches} className="w-full">
               Refresh
             </Button>

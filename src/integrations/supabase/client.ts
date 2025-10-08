@@ -21,8 +21,8 @@ const authOptions = {
     // Storage options
     storage: typeof window !== 'undefined' ? window.localStorage : undefined,
     storageKey: 'supabase.auth.token',
-    // Additional debug options
-    debug: process.env.NODE_ENV === 'development'
+    // Disable debug logging to keep console clean
+    debug: false
   }
 };
 

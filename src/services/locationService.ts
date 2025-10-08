@@ -49,7 +49,6 @@ class LocationService {
       return await this.getFallbackLocationMatches(userId, maxDistance);
       
     } catch (error) {
-      console.error('❌ Error getting location matches:', error);
       return await this.getFallbackLocationMatches(userId, maxDistance);
     }
   }
@@ -70,7 +69,7 @@ class LocationService {
         .single();
 
       if (userError || !currentUser) {
-        console.error('❌ Error getting user location:', userError);
+              // Silent error handling
         return [];
       }
 
@@ -83,7 +82,7 @@ class LocationService {
         .neq('id', userId);
 
       if (profilesError || !profiles) {
-        console.error('❌ Error getting profiles:', profilesError);
+        // Silent error handling
         return [];
       }
 
@@ -174,7 +173,7 @@ class LocationService {
       return matches;
 
     } catch (error) {
-      console.error('❌ Error in fallback location matching:', error);
+      // Silent error handling
       return [];
     }
   }
@@ -217,14 +216,14 @@ class LocationService {
         .eq('id', userId);
 
       if (error) {
-        console.error('❌ Error updating user location:', error);
+        // Silent error handling
         return false;
       }
 
       return true;
 
     } catch (error) {
-      console.error('❌ Error updating user location:', error);
+      // Silent error handling
       return false;
     }
   }
@@ -241,7 +240,7 @@ class LocationService {
         .single();
 
       if (error || !data) {
-        console.error('❌ Error getting user location:', error);
+        // Silent error handling
         return null;
       }
 
@@ -255,7 +254,7 @@ class LocationService {
       };
 
     } catch (error) {
-      console.error('❌ Error getting user location:', error);
+      // Silent error handling
       return null;
     }
   }
@@ -319,7 +318,7 @@ class LocationService {
       return { totalWithLocation, totalWithCoordinates, countryCounts };
 
     } catch (error) {
-      console.error('❌ Error getting location stats:', error);
+      // Silent error handling
       return { totalWithLocation: 0, totalWithCoordinates: 0, countryCounts: {} };
     }
   }

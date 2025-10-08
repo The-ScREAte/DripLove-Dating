@@ -54,7 +54,7 @@ class SupabasePushNotificationService {
       return true;
 
     } catch (error) {
-      console.error('❌ Error initializing push notifications:', error);
+      // Silent error handling
       return false;
     }
   }
@@ -142,10 +142,10 @@ class SupabasePushNotificationService {
         });
 
       if (error) {
-        console.error('❌ Failed to save push token:', error);
+        // Silent error handling
       }
     } catch (error) {
-      console.error('❌ Error saving push token:', error);
+      // Silent error handling
     }
   }
 
@@ -255,7 +255,7 @@ class SupabasePushNotificationService {
       }
 
     } catch (error) {
-      console.error('❌ Notification service error:', error);
+      // Silent error handling
       // Even if push fails, real-time notifications should still work
       return false;
     }
@@ -286,13 +286,13 @@ class SupabasePushNotificationService {
         .eq('id', notificationId);
 
       if (error) {
-        console.error('❌ Error marking notification as read:', error);
+        // Silent error handling
         return false;
       }
 
       return true;
     } catch (error) {
-      console.error('❌ Error marking notification as read:', error);
+      // Silent error handling
       return false;
     }
   }
@@ -307,13 +307,13 @@ class SupabasePushNotificationService {
         .order('created_at', { ascending: false });
 
       if (error) {
-        console.error('❌ Error fetching unread notifications:', error);
+        // Silent error handling
         return [];
       }
 
       return data || [];
     } catch (error) {
-      console.error('❌ Error fetching unread notifications:', error);
+      // Silent error handling
       return [];
     }
   }

@@ -58,7 +58,7 @@ export const useMobileOAuth = () => {
               });
               
               if (error) {
-                console.error('[Mobile OAuth] Session error:', error);
+                // Silent error handling
                 toast({
                   title: "Authentication Error",
                   description: error.message,
@@ -125,7 +125,7 @@ export const useMobileOAuth = () => {
                 navigate('/');
               }
             } else {
-              console.error('[Mobile OAuth] Missing tokens in callback');
+              // Silent error handling
               toast({
                 title: "Authentication Error",
                 description: "Failed to get authentication tokens.",
@@ -139,7 +139,7 @@ export const useMobileOAuth = () => {
             const error = params.get('error');
             const error_description = params.get('error_description');
             
-            console.error('[Mobile OAuth] OAuth error:', error, error_description);
+            // Silent error handling
             toast({
               title: "Authentication Error",
               description: error_description || error || "OAuth failed",
@@ -148,7 +148,7 @@ export const useMobileOAuth = () => {
             navigate('/');
           }
         } catch (error) {
-          console.error('[Mobile OAuth] Error processing callback:', error);
+          // Silent error handling
           toast({
             title: "Authentication Error",
             description: "Failed to process authentication callback.",

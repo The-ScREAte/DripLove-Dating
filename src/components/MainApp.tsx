@@ -67,7 +67,7 @@ const MainApp = ({ user, onLogout }: MainAppProps) => {
       try {
         const { Capacitor } = await import('@capacitor/core');
         if (!Capacitor.isNativePlatform() || !user?.id) {
-          console.log('[MainApp] Skipping push notifications - not native platform or no user');
+          // Silent notification handling
           return;
         }
 
@@ -358,7 +358,7 @@ const MainApp = ({ user, onLogout }: MainAppProps) => {
       
       // If less than 5 profiles remaining, load more
       if (remainingProfiles <= 5) {
-        console.log('🔄 Refilling profiles - running low on matches');
+        // Refilling profiles
         
         // Get current exclusions
         const existingIds = cache.potentialMatches.map((p: any) => p.id);
@@ -457,7 +457,7 @@ const MainApp = ({ user, onLogout }: MainAppProps) => {
             }
           }, 100);
 
-          console.log(`✅ Added ${shuffledNew.length} new profiles. Total: ${cache.potentialMatches.length}`);
+          // Profiles added
         }
       }
     } catch (error) {
@@ -790,7 +790,7 @@ const MainApp = ({ user, onLogout }: MainAppProps) => {
         return;
       }
 
-      console.log('[MainApp] Profile fetched successfully');
+      // Profile fetch complete
       setProfile(data);
       
       // Check premium status from user_subscriptions
@@ -809,7 +809,7 @@ const MainApp = ({ user, onLogout }: MainAppProps) => {
           }
           
           setIsPremium(!!subData);
-          console.log('[MainApp] Subscription status checked');
+          // Subscription status updated
         } catch (subErr) {
           console.error('[MainApp] Subscription check failed:', subErr);
           setIsPremium(false); // Default to free
