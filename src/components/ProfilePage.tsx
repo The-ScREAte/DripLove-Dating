@@ -15,6 +15,7 @@ import WorkEducationSection from './profile/WorkEducationSection';
 import PersonalitySection from './profile/PersonalitySection';
 import FunQuestionsSection from './profile/FunQuestionsSection';
 import InterestsSection from './profile/InterestsSection';
+import AdinkraSection from './profile/AdinkraSection';
 import ImageManagement from './profile/ImageManagement';
 import AccountActions from './profile/AccountActions';
 import ProfileSummaryCard from './ProfileSummaryCard';
@@ -47,6 +48,7 @@ const ProfilePage = ({ currentUser, profile, onProfileUpdate, onLogout, onShowTe
   const [showPersonalitySection, setShowPersonalitySection] = useState(false);
   const [showFunQuestionsSection, setShowFunQuestionsSection] = useState(false);
   const [showInterestsSection, setShowInterestsSection] = useState(false);
+  const [showAdinkraSection, setShowAdinkraSection] = useState(false);
   const [showAccountActionsSection, setShowAccountActionsSection] = useState(false);
   const [showPhotoSection, setShowPhotoSection] = useState(false);
   
@@ -84,6 +86,7 @@ const ProfilePage = ({ currentUser, profile, onProfileUpdate, onLogout, onShowTe
     perfect_first_date: '',
     last_googled: '',
     interests: [] as string[],
+    adinkra_symbols: [] as string[],
   });
 
   // Initialize userImages state
@@ -123,6 +126,7 @@ const ProfilePage = ({ currentUser, profile, onProfileUpdate, onLogout, onShowTe
           perfect_first_date: profile.perfect_first_date || '',
           last_googled: profile.last_googled || '',
           interests: Array.isArray(profile.interests) ? profile.interests : [],
+          adinkra_symbols: Array.isArray(profile.adinkra_symbols) ? profile.adinkra_symbols : [],
         });
       } catch (error) {
         console.error('Error initializing profile data:', error);
@@ -158,6 +162,7 @@ const ProfilePage = ({ currentUser, profile, onProfileUpdate, onLogout, onShowTe
           perfect_first_date: '',
           last_googled: '',
           interests: [],
+          adinkra_symbols: [],
         });
       }
     }
@@ -208,6 +213,12 @@ const ProfilePage = ({ currentUser, profile, onProfileUpdate, onLogout, onShowTe
   const handleInterestsChange = (interests: string[]) => {
     if (isEditing) {
       setEditedProfile(prev => ({ ...prev, interests }));
+    }
+  };
+
+  const handleAdinkraChange = (adinkra_symbols: string[]) => {
+    if (isEditing) {
+      setEditedProfile(prev => ({ ...prev, adinkra_symbols }));
     }
   };
 
@@ -264,6 +275,7 @@ const ProfilePage = ({ currentUser, profile, onProfileUpdate, onLogout, onShowTe
         perfect_first_date: editedProfile.perfect_first_date?.trim() || null,
         last_googled: editedProfile.last_googled?.trim() || null,
         interests: Array.isArray(editedProfile.interests) ? editedProfile.interests : [],
+        adinkra_symbols: Array.isArray(editedProfile.adinkra_symbols) ? editedProfile.adinkra_symbols : [],
         updated_at: new Date().toISOString(),
       };
 
@@ -334,6 +346,7 @@ const ProfilePage = ({ currentUser, profile, onProfileUpdate, onLogout, onShowTe
         perfect_first_date: profile.perfect_first_date || '',
         last_googled: profile.last_googled || '',
         interests: profile.interests || [],
+        adinkra_symbols: profile.adinkra_symbols || [],
       });
     }
     setIsEditing(false);
@@ -649,6 +662,19 @@ const ProfilePage = ({ currentUser, profile, onProfileUpdate, onLogout, onShowTe
               profile={profile} 
               isEditing={isEditing} 
               onInterestsChange={handleInterestsChange} 
+            />
+          </CollapsibleSection>
+          <div className="mb-2" />
+          <CollapsibleSection
+            title="My Adinkra"
+            isOpen={showAdinkraSection}
+            onToggle={() => setShowAdinkraSection(!showAdinkraSection)}
+          >
+            <AdinkraSection 
+              editedProfile={editedProfile} 
+              profile={profile} 
+              isEditing={isEditing} 
+              onAdinkraChange={handleAdinkraChange} 
             />
           </CollapsibleSection>
           <div className="mb-2" />
