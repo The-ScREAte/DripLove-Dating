@@ -1,9 +1,9 @@
 // Use shared IAP actions
 import { buyMonthly, restorePurchases } from '../iap';
 
-import { useImageEdgeColor } from '@/hooks/useImageEdgeColor';
 function DominantColorImageBg({ imageUrl, children }) {
-  const { edgeColor } = useImageEdgeColor(imageUrl);
+  // Use lightweight static background color instead of expensive pixel scanning
+  const edgeColor = '#f6f6f6';
   return (
     <div className="absolute inset-0 z-0 pointer-events-none pt-4">
       {/* Solid color overlay fills all space */}
@@ -219,6 +219,33 @@ interface PassedUser {
   passed_at: Date;
 }
 
+// Deterministic shuffle function to ensure consistent profile order
+const createDeterministicShuffle = (array: any[], seed: string) => {
+  const arr = [...array];
+  
+  // Simple hash function to convert seed string to number
+  let hash = 0;
+  for (let i = 0; i < seed.length; i++) {
+    const char = seed.charCodeAt(i);
+    hash = ((hash << 5) - hash) + char;
+    hash = hash & hash; // Convert to 32bit integer
+  }
+  
+  // Use seeded random for Fisher-Yates shuffle
+  const seededRandom = (seed: number) => {
+    const x = Math.sin(seed) * 10000;
+    return x - Math.floor(x);
+  };
+  
+  for (let i = arr.length - 1; i > 0; i--) {
+    hash = (hash * 9301 + 49297) % 233280; // Linear congruential generator
+    const j = Math.floor(seededRandom(hash) * (i + 1));
+    [arr[i], arr[j]] = [arr[j], arr[i]];
+  }
+  
+  return arr;
+};
+
 const DiscoverPage = ({ currentUser, onNavigateToChat, isPremium }: DiscoverPageProps) => {
   // IAP: Track if buy is enabled
   const [canBuy, setCanBuy] = useState(false);
@@ -330,11 +357,15 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, isPremium }: DiscoverPage
     return (match as AdData).isAd === true;
   };
 
-  // Stable ad shuffle - only shuffle when ads actually change
+  // Stable ad shuffle - deterministic based on user ID and date
   const stableShuffledAds = useMemo(() => {
     if (ads.length === 0) return [];
-    return [...ads].sort(() => Math.random() - 0.5);
-  }, [ads]);
+    
+    // Use deterministic shuffle for ads as well to maintain consistency
+    const today = new Date().toISOString().split('T')[0]; // Use same stable date format
+    const adSeed = `${currentUser?.id}_ads_${today}`;
+    return createDeterministicShuffle(ads, adSeed);
+  }, [ads, currentUser?.id]);
 
   // Helper function to inject ads into matches array
   const injectAds = useCallback((matches: PotentialMatch[]): (PotentialMatch | AdData)[] => {
@@ -588,20 +619,20 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, isPremium }: DiscoverPage
         
         const matchesWithAds = injectAds(matches);
         
-        // Update cache with ads already injected
-        discoverCache.set(currentUser.id, {
+        // ONLY update cache in background fetch - DON'T change UI state!
+        // This prevents profiles from changing automatically
+        const today = new Date().toISOString().split('T')[0];
+        const cacheKey = `${currentUser.id}_${today}`;
+        discoverCache.set(cacheKey, {
           potentialMatches: matchesWithAds,
           userImages: images,
           userDistances: distances,
-          currentIndex: index,
+          currentIndex: currentIndex, // Keep current UI index, don't reset!
           timestamp: Date.now()
         });
 
-        // Update state with fresh data
-        setPotentialMatches(matchesWithAds);
-        setUserImages(images);
-        setUserDistances(distances);
-        setCurrentIndex(index);
+        // DON'T update state in background fetch - this causes unwanted profile changes
+        // The cache will be used when user manually refreshes or navigates
 
         // Fetch verification status for each profile (NO calculation!)
         matches.forEach(profile => {
@@ -711,7 +742,7 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, isPremium }: DiscoverPage
       return age >= userMinAge && age <= userMaxAge;
     });
 
-    // Add empty images array and shuffle
+    // Add empty images array and deterministic shuffle
     const profilesWithImages = filteredProfiles
       .filter(profile => profile.id !== userId)
       .map(profile => ({
@@ -719,7 +750,13 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, isPremium }: DiscoverPage
         images: []
       }));
 
-    const shuffled = profilesWithImages.sort(() => 0.5 - Math.random());
+    // Deterministic shuffle function to ensure consistent profile order
+
+    // Create seed using user ID and today's date to maintain consistent order per day
+    // Use ISO date string for consistency across timezones
+    const today = new Date().toISOString().split('T')[0]; // e.g., "2025-10-08"
+    const shuffleSeed = `${userId}_${today}`;
+    const shuffled = createDeterministicShuffle(profilesWithImages, shuffleSeed);
 
     // Load last profile ID and time from localStorage
     const savedId = localStorage.getItem('driplove_last_profile_id');
@@ -768,9 +805,9 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, isPremium }: DiscoverPage
 
   const fetchPotentialMatches = useCallback(async () => {
     if (!currentUser?.id) return;
-    // If we are currently suppressing full fetch because cache is fresh and
-    // a background refresh is already in-flight, don't trigger another full fetch.
-    if (suppressFetchRef.current) return;
+    // Allow manual fetches to override suppress flag - user explicitly wants fresh data
+    // Reset suppress flag when user manually refreshes
+    suppressFetchRef.current = false;
   
     try {
       // Background loading - don't block UI
@@ -782,8 +819,10 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, isPremium }: DiscoverPage
         
         const matchesWithAds = injectAds(matches);
         
-        // Update cache with ads already injected
-        discoverCache.set(currentUser.id, {
+        // Update cache with ads already injected (use date-based key for consistency)
+        const today = new Date().toISOString().split('T')[0];
+        const cacheKey = `${currentUser.id}_${today}`;
+        discoverCache.set(cacheKey, {
           potentialMatches: matchesWithAds,
           userImages: images,
           userDistances: distances,
@@ -968,14 +1007,26 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, isPremium }: DiscoverPage
     });
   }, [loadFullImages]);
 
-  // Main effect to fetch data - wait for ads to load first
+  // Track if we've already initialized for this user to prevent re-fetching
+  const initializedUserRef = useRef<string | null>(null);
+
+  // Main effect to fetch data - wait for ads to load first  
   useEffect(() => {
     if (!currentUser?.id || !adsLoaded) return;
 
+    // Create cache key that includes date to ensure daily consistency
+    const today = new Date().toISOString().split('T')[0]; // "2025-10-08"
+    const cacheKey = `${currentUser.id}_${today}`;
+
+    // Prevent re-initialization for the same user+date
+    if (initializedUserRef.current === cacheKey) {
+      return; // Already initialized for this user today
+    }
+
     // Use setTimeout to avoid blocking the initial render
     setTimeout(() => {
-      // Check if we have fresh cached data first
-      const cached = discoverCache.get(currentUser.id);
+      // Check if we have fresh cached data first (with date-based key)
+      const cached = discoverCache.get(cacheKey);
       if (cached && Date.now() - cached.timestamp < DISCOVER_CACHE_DURATION) {
         // Cache already has ads injected, use directly
         setPotentialMatches(cached.potentialMatches);
@@ -985,12 +1036,20 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, isPremium }: DiscoverPage
         const adjustedIndex = Math.min(cached.currentIndex, cached.potentialMatches.length - 1);
         setCurrentIndex(adjustedIndex);
         setIsLoading(false);
-        // Use the cached data immediately and suppress full fetch until background refresh completes
+        // DON'T do background refresh for fresh cache - this causes profile shuffling!
         suppressFetchRef.current = true;
-        setTimeout(() => fetchPotentialMatchesInBackground(), 100);
+        // Only do background refresh if cache is getting stale (older than 2 hours)
+        const twoHours = 2 * 60 * 60 * 1000;
+        if (Date.now() - cached.timestamp > twoHours) {
+          setTimeout(() => fetchPotentialMatchesInBackground(), 5000); // Much longer delay
+        }
+        // Mark this user+date as initialized
+        initializedUserRef.current = cacheKey;
       } else if (potentialMatches.length === 0) {
         // No cache or stale cache, fetch immediately
         fetchPotentialMatches();
+        // Mark this user+date as initialized
+        initializedUserRef.current = cacheKey;
       }
     }, 0);
     
@@ -1293,7 +1352,10 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, isPremium }: DiscoverPage
         images: []
       }));
 
-      const shuffled = profilesWithImages.sort(() => 0.5 - Math.random());
+      // Use a different seed for additional profiles to avoid exact duplicates but maintain consistency
+      const today = new Date().toDateString();
+      const loadMoreSeed = `${currentUser.id}_${today}_batch_${Math.floor(Date.now() / (1000 * 60 * 60))}`; // Changes every hour
+      const shuffled = createDeterministicShuffle(profilesWithImages, loadMoreSeed);
       
       // Simply add new profiles with ads to existing array (don't re-inject into existing)
       setPotentialMatches(prev => [...prev, ...injectAds(shuffled)]);
@@ -1491,10 +1553,12 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, isPremium }: DiscoverPage
           // Update cache with restored state
           setTimeout(() => {
             if (currentUser?.id) {
-              const cached = discoverCache.get(currentUser.id);
+              const today = new Date().toISOString().split('T')[0];
+              const cacheKey = `${currentUser.id}_${today}`;
+              const cached = discoverCache.get(cacheKey);
               if (cached) {
                 setPotentialMatches(current => {
-                  discoverCache.set(currentUser.id, {
+                  discoverCache.set(cacheKey, {
                     ...cached,
                     potentialMatches: current,
                     currentIndex: prevIndex,
@@ -1651,10 +1715,12 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, isPremium }: DiscoverPage
   const updateCacheAfterRollback = (restoredIndex: number) => {
     setTimeout(() => {
       if (currentUser?.id) {
-        const cached = discoverCache.get(currentUser.id);
+        const today = new Date().toISOString().split('T')[0];
+        const cacheKey = `${currentUser.id}_${today}`;
+        const cached = discoverCache.get(cacheKey);
         if (cached) {
           setPotentialMatches(current => {
-            discoverCache.set(currentUser.id, {
+            discoverCache.set(cacheKey, {
               ...cached,
               potentialMatches: current,
               currentIndex: restoredIndex,
@@ -1689,9 +1755,11 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, isPremium }: DiscoverPage
     // Update cache in background without blocking UI
     setTimeout(() => {
       if (currentUser?.id) {
-        const cached = discoverCache.get(currentUser.id);
+        const today = new Date().toISOString().split('T')[0];
+        const cacheKey = `${currentUser.id}_${today}`;
+        const cached = discoverCache.get(cacheKey);
         if (cached) {
-          discoverCache.set(currentUser.id, {
+          discoverCache.set(cacheKey, {
             ...cached,
             potentialMatches: potentialMatches,
             currentIndex: currentIndex + 1,
@@ -2133,8 +2201,8 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, isPremium }: DiscoverPage
               />
             )}
           </div>
-          {/* ...existing code... */}
-          {/* African Adinkra symbols bar - fixed height */}
+          
+          {/* AdinkraBar - between image and info sections */}
           <AdinkraBar />
 
           {/* Info section - dynamic height that fits content exactly */}

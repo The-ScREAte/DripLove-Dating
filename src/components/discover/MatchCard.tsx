@@ -3,7 +3,6 @@ import ReportButton from '../ReportButton';
 import UserAdinkraDisplay from './UserAdinkraDisplay';
 import { MapPin, Briefcase, GraduationCap, Calendar, Crown, Shield, ChevronDown, ChevronUp, User, Quote, Heart, Coffee, Search, Loader2 } from 'lucide-react';
 import { PotentialMatch } from '@/types';
-import { useImageEdgeColor } from '@/hooks/useImageEdgeColor';
 
 interface MatchCardProps {
   match: PotentialMatch;
@@ -172,13 +171,10 @@ const MatchCard: React.FC<MatchCardProps> = ({
     }
 
     return mixedSlides;
-  }, [match.id, userImages, match.bio, match.fun_fact, match.perfect_first_date, match.last_googled]);
+  }, [JSON.stringify(match), userImages]);
 
-  // Get edge color for current image - must be after slides are defined
-  const currentImageUrl = slides.length > 0 && slides[currentSlide]?.type === 'image' 
-    ? getOptimizedUrl(slides[currentSlide].content) 
-    : '';
-  const { edgeColor } = useImageEdgeColor(currentImageUrl);
+  // Use lightweight static edge color instead of expensive pixel scanning
+  const edgeColor = '#f6f6f6';
 
   // Ensure each new card starts at the first slide.
   // Reset currentSlide whenever the match changes (use match.id for stability).
@@ -482,6 +478,30 @@ const MatchCard: React.FC<MatchCardProps> = ({
             </div>
           )}
 
+          {/* Optimized Adinkra glow effect */}
+          {match.adinkra_symbols && match.adinkra_symbols.length > 0 && (
+            <div className="absolute top-0 left-1/2 transform -translate-x-1/2 z-10">
+              <div className="relative flex flex-col items-center">
+                {/* Single optimized glow layer */}
+                <div className="relative w-24 h-24 flex items-center justify-center overflow-visible">
+                  {/* Single efficient gradient layer */}
+                  <div
+                    className="absolute inset-0 w-full h-full"
+                    style={{
+                      background: 'radial-gradient(circle at center, rgba(247, 144, 80, 0.25), transparent 90%)',
+                      filter: 'blur(10px)',
+                    }}
+                  ></div>
+
+                  {/* Adinkra Symbol */}
+                  <div className="relative z-10">
+                    <UserAdinkraDisplay adinkraSymbols={match.adinkra_symbols} />
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
+
           {/* Report Modal */}
           {showReportModal && (
             <>
@@ -629,11 +649,6 @@ const MatchCard: React.FC<MatchCardProps> = ({
                 />
               )}
             </div>
-
-            {/* Adinkra Symbols Display - Show user's selected symbols */}
-            {match.adinkra_symbols && match.adinkra_symbols.length > 0 && (
-              <UserAdinkraDisplay adinkraSymbols={match.adinkra_symbols} />
-            )}
 
             {match.city && (
               <div className="flex items-center mt-1 text-gray-600">
