@@ -1,0 +1,94 @@
+/* MatchCard Performance Optimized Styles */
+
+/* Report button styles - combining all inline styles into one class */
+.reportButton {
+  background-color: rgba(255,255,255,0.95);
+  width: 24px;
+  height: 24px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  border-radius: 9999px;
+  border: 1px solid rgb(252 165 165);
+  color: rgb(220 38 38);
+  transition: colors 200ms;
+}
+
+.reportButton:hover {
+  background-color: rgb(254 226 226);
+}
+
+.reportButton:focus {
+  outline: none;
+  box-shadow: 0 0 0 2px rgb(252 165 165);
+}
+
+/* Image touch optimization styles */
+.optimizedImage {
+  background-color: #111827;
+  touch-action: manipulation;
+  user-select: none;
+  -webkit-user-select: none;
+  -webkit-touch-callout: none;
+}
+
+/* Adinkra glow gradient - static class for better performance */
+.adinkraGlow {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  background: radial-gradient(circle at center, rgba(255,160,100,0.25), transparent 80%);
+  filter: blur(10px);
+}
+
+/* Details area container - consolidated styles */
+.detailsContainer {
+  width: 100%;
+  padding: 0 1rem;
+  border-radius: 0.75rem;
+  box-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.1), 0 2px 4px -2px rgb(0 0 0 / 0.1);
+  background-color: white;
+  position: relative;
+  min-height: 300px;
+  z-index: 20;
+}
+
+/* Performance optimized progress bar with percentage width */
+.progressBar {
+  height: 0.5rem;
+  background-color: rgb(229 231 235);
+  border-radius: 9999px;
+  overflow: hidden;
+  position: relative;
+}
+
+.progressBarFill {
+  height: 100%;
+  background: linear-gradient(to right, rgb(168 85 247), rgb(236 72 153));
+  border-radius: 9999px;
+  transition: width 500ms ease-in-out;
+}
+
+/* Swipe transform - using CSS custom properties for dynamic values */
+.swipeTransform {
+  transition: transform 300ms ease-out;
+  transform-style: preserve-3d;
+  backface-visibility: hidden;
+}
+
+/* No transition during active swiping */
+.swipeTransformActive {
+  transition: none;
+}
+
+/* Memory efficient classes for common transform values */
+.transformNone {
+  transform: translateX(0) rotate(0deg);
+}
+
+/* Dynamic width helper for progress bars - keeps inline style but optimizes the rest */
+.dynamicWidth {
+  transition: width 300ms ease-in-out;
+}

@@ -1,6 +1,8 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import ReportButton from '../ReportButton';
 import UserAdinkraDisplay from './UserAdinkraDisplay';
+import ReportModal from '../modals/ReportModal';
+import styles from './MatchCard.module.css';
 import { MapPin, Briefcase, GraduationCap, Calendar, Crown, Shield, ChevronDown, ChevronUp, User, Quote, Heart, Coffee, Search, Loader2 } from 'lucide-react';
 import { PotentialMatch } from '@/types';
 
@@ -52,6 +54,14 @@ const MatchCard: React.FC<MatchCardProps> = ({
   // ...existing code...
   const [currentSlide, setCurrentSlide] = useState(0);
   const [imageLoading, setImageLoading] = useState(false);
+  
+  // Use ref for internal state that doesn't need to trigger re-renders
+  const lastSlideInteraction = useRef<number>(0);
+  const slideTransitionInProgress = useRef<boolean>(false);
+  
+  // Memoize image loading callbacks to prevent unnecessary re-renders
+  const handleImageLoadStart = useCallback(() => setImageLoading(true), []);
+  const handleImageLoadEnd = useCallback(() => setImageLoading(false), []);
   
   // Random background colors for fun questions and about - ensuring good contrast
   const backgroundColors = [
@@ -319,17 +329,7 @@ const MatchCard: React.FC<MatchCardProps> = ({
               {slides[currentSlide]?.type === 'image' && (
                 <div className="absolute right-3 top-9 sm:top-6 z-50">
                   <button
-                    className="bg-white/95 hover:bg-red-100 text-red-600 rounded-full transition-colors duration-200 border border-red-200 focus:outline-none focus:ring-2 focus:ring-red-300"
-                    style={{
-                      // Avoid backdrop-filter for performance; use semi-transparent background and border
-                      backgroundColor: 'rgba(255,255,255,0.95)',
-                      width: '24px',
-                      height: '24px',
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                      flexShrink: 0
-                    }}
+                    className={styles.reportButton}
                     onClick={e => { e.stopPropagation(); setShowReportModal(true); }}
                     aria-label="Report image"
                   >
@@ -355,18 +355,11 @@ const MatchCard: React.FC<MatchCardProps> = ({
                       <img
                         src={full}
                         alt={`${match.first_name} ${match.last_name}`}
-                        className="w-full h-full object-contain transition-opacity duration-300 relative z-10"
+                        className={`w-full h-full object-contain transition-opacity duration-300 relative z-10 ${styles.optimizedImage}`}
                         draggable={false}
                         onLoadStart={() => setImageLoading(true)}
                         onLoad={() => setImageLoading(false)}
                         onError={() => setImageLoading(false)}
-                        style={{
-                          backgroundColor: '#111827',
-                          touchAction: 'manipulation',
-                          userSelect: 'none',
-                          WebkitUserSelect: 'none',
-                          WebkitTouchCallout: 'none'
-                        }}
                       />
                     );
                   })()}
@@ -625,8 +618,7 @@ const MatchCard: React.FC<MatchCardProps> = ({
     // Render only the non-swipeable details area
     return (
       <div 
-        className={`w-full ${showMoreInfo ? 'pt-0' : 'pt-0'} px-4 rounded-xl shadow-md bg-white`}
-        style={{ minHeight: '300px', zIndex: 20, position: 'relative' }}
+        className={`w-full ${showMoreInfo ? 'pt-0' : 'pt-0'} px-4 ${styles.detailsContainer}`}
       >
         {/* Basic Info - Always shown */}
         <div className="flex justify-between items-start">
@@ -780,7 +772,7 @@ const MatchCard: React.FC<MatchCardProps> = ({
                       <span className="text-sm text-gray-500">Introvert</span>
                       <div className="flex-1 bg-gray-200 rounded-full h-2">
                         <div 
-                          className="bg-gradient-to-r from-blue-400 to-blue-600 h-2 rounded-full transition-all duration-300"
+                          className={`bg-gradient-to-r from-blue-400 to-blue-600 h-2 rounded-full ${styles.dynamicWidth}`}
                           style={{ width: `${match.introvert_extrovert}%` }}
                         ></div>
                       </div>
@@ -796,7 +788,7 @@ const MatchCard: React.FC<MatchCardProps> = ({
                         <span className="text-sm text-gray-500">Spontaneous</span>
                         <div className="flex-1 bg-gray-200 rounded-full h-2">
                           <div 
-                            className="bg-gradient-to-r from-green-400 to-green-600 h-2 rounded-full transition-all duration-300"
+                            className={`bg-gradient-to-r from-green-400 to-green-600 h-2 rounded-full ${styles.dynamicWidth}`}
                             style={{ width: `${match.spontaneous_planner}%` }}
                           ></div>
                         </div>
@@ -813,7 +805,7 @@ const MatchCard: React.FC<MatchCardProps> = ({
                         <span className="text-sm text-gray-500">Messy</span>
                         <div className="flex-1 bg-gray-200 rounded-full h-2">
                           <div 
-                            className="bg-gradient-to-r from-purple-400 to-purple-600 h-2 rounded-full transition-all duration-300"
+                            className={`bg-gradient-to-r from-purple-400 to-purple-600 h-2 rounded-full ${styles.dynamicWidth}`}
                             style={{ width: `${match.messy_organized}%` }}
                           ></div>
                         </div>

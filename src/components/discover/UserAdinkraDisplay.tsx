@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { SELECTABLE_ADINKRA_SYMBOLS } from '@/constants/adinkraSymbols';
+import { AdinkraSvgComponents, type AdinkraSymbolName } from '@/components/adinkra/AdinkraSvgs';
 
 interface UserAdinkraDisplayProps {
   adinkraSymbols: string[];
@@ -57,8 +58,9 @@ const UserAdinkraDisplay: React.FC<UserAdinkraDisplayProps> = React.memo(({ adin
 
   const currentSymbolName = adinkraSymbols[currentIndex];
   const currentSymbol = SELECTABLE_ADINKRA_SYMBOLS.find(s => s.name === currentSymbolName);
+  const SvgComponent = AdinkraSvgComponents[currentSymbolName as AdinkraSymbolName];
 
-  if (!currentSymbol) {
+  if (!currentSymbol || !SvgComponent) {
     return null;
   }
 
@@ -89,8 +91,9 @@ const UserAdinkraDisplay: React.FC<UserAdinkraDisplayProps> = React.memo(({ adin
           filter: 'drop-shadow(0 2px 4px rgba(0,0,0,0.3))',
           transform: `scale(${isTransitioning ? '0.95' : '1'}) rotate(${isTransitioning ? '5deg' : '0deg'})`
         }}
-        dangerouslySetInnerHTML={{ __html: currentSymbol.svg }}
-      />
+      >
+        <SvgComponent className="w-10 h-10" />
+      </div>
     </div>
   );
 });
