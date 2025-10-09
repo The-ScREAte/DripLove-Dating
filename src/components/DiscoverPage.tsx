@@ -619,20 +619,8 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, isPremium }: DiscoverPage
         
         const matchesWithAds = injectAds(matches);
         
-        // ONLY update cache in background fetch - DON'T change UI state!
-        // This prevents profiles from changing automatically
-        const today = new Date().toISOString().split('T')[0];
-        const cacheKey = `${currentUser.id}_${today}`;
-        discoverCache.set(cacheKey, {
-          potentialMatches: matchesWithAds,
-          userImages: images,
-          userDistances: distances,
-          currentIndex: currentIndex, // Keep current UI index, don't reset!
-          timestamp: Date.now()
-        });
-
-        // DON'T update state in background fetch - this causes unwanted profile changes
-        // The cache will be used when user manually refreshes or navigates
+        // DISABLED: Background fetch no longer updates cache to prevent profile shuffling
+        // The cache will only be updated on manual refresh or navigation
 
         // Fetch verification status for each profile (NO calculation!)
         matches.forEach(profile => {
@@ -756,8 +744,21 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, isPremium }: DiscoverPage
     // Create seed using user ID and today's date to maintain consistent order per day
     // Use ISO date string for consistency across timezones
     const today = new Date().toISOString().split('T')[0]; // e.g., "2025-10-08"
-    const shuffleSeed = `${userId}_${today}`;
+    // Include profile count in seed for extra stability
+    const profileHash = profilesWithImages.map(p => p.id).sort().join('');
+    const shuffleSeed = `${userId}_${today}_${profileHash.slice(0, 10)}`;
+    console.log('🔀 Creating deterministic shuffle:', {
+      userId,
+      today,
+      profileCount: profilesWithImages.length,
+      profileHash: profileHash.slice(0, 20),
+      shuffleSeed,
+      firstThreeProfiles: profilesWithImages.slice(0, 3).map(p => ({ id: p.id, name: p.first_name }))
+    });
     const shuffled = createDeterministicShuffle(profilesWithImages, shuffleSeed);
+    console.log('🎯 Shuffled result:', {
+      firstThreeShuffled: shuffled.slice(0, 3).map(p => ({ id: p.id, name: p.first_name }))
+    });
 
     // Load last profile ID and time from localStorage
     const savedId = localStorage.getItem('driplove_last_profile_id');
@@ -1018,6 +1019,7 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, isPremium }: DiscoverPage
     // Create cache key that includes date to ensure daily consistency
     const today = new Date().toISOString().split('T')[0]; // "2025-10-08"
     const cacheKey = `${currentUser.id}_${today}`;
+    console.log('🔑 Cache key generated:', cacheKey, 'Cache size:', discoverCache.size);
 
     // Prevent re-initialization for the same user+date
     if (initializedUserRef.current === cacheKey) {
@@ -1028,7 +1030,16 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, isPremium }: DiscoverPage
     setTimeout(() => {
       // Check if we have fresh cached data first (with date-based key)
       const cached = discoverCache.get(cacheKey);
+      console.log(`🔍 Cache check for ${cacheKey}:`, {
+        hasCached: !!cached,
+        cacheAge: cached ? Date.now() - cached.timestamp : 'N/A',
+        cacheDuration: DISCOVER_CACHE_DURATION,
+        cacheValid: cached && Date.now() - cached.timestamp < DISCOVER_CACHE_DURATION,
+        currentProfilesLength: potentialMatches.length
+      });
+
       if (cached && Date.now() - cached.timestamp < DISCOVER_CACHE_DURATION) {
+        console.log('✅ Using cached profiles for consistent experience');
         // Cache already has ads injected, use directly
         setPotentialMatches(cached.potentialMatches);
         setUserImages(cached.userImages);
@@ -1037,16 +1048,12 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, isPremium }: DiscoverPage
         const adjustedIndex = Math.min(cached.currentIndex, cached.potentialMatches.length - 1);
         setCurrentIndex(adjustedIndex);
         setIsLoading(false);
-        // DON'T do background refresh for fresh cache - this causes profile shuffling!
+        // COMPLETELY DISABLE background refresh to prevent profile changes
         suppressFetchRef.current = true;
-        // Only do background refresh if cache is getting stale (older than 2 hours)
-        const twoHours = 2 * 60 * 60 * 1000;
-        if (Date.now() - cached.timestamp > twoHours) {
-          setTimeout(() => fetchPotentialMatchesInBackground(), 5000); // Much longer delay
-        }
         // Mark this user+date as initialized
         initializedUserRef.current = cacheKey;
-      } else if (potentialMatches.length === 0) {
+      } else {
+        console.log('🔄 No valid cache, fetching fresh profiles');
         // No cache or stale cache, fetch immediately
         fetchPotentialMatches();
         // Mark this user+date as initialized
@@ -1367,12 +1374,13 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, isPremium }: DiscoverPage
     }
   }, [currentUser, allowedGenders, potentialMatches, calculateAge, isLoadingMore, userImages, preloadNextProfileImages, loadFullImages, injectAds, isAd]);
 
-  // Auto-load more matches when getting low (5 profiles left) - reduced for performance
-  useEffect(() => {
-    if (potentialMatches.length - currentIndex <= 5 && !isLoadingMore) {
-      setTimeout(() => loadMoreMatches(), 2000); // Add delay to reduce server load
-    }
-  }, [currentIndex, potentialMatches.length, loadMoreMatches, isLoadingMore]);
+  // Auto-load more matches DISABLED to prevent profile shuffling issues
+  // TODO: Re-enable with better stability once caching is fully working
+  // useEffect(() => {
+  //   if (potentialMatches.length - currentIndex <= 5 && !isLoadingMore) {
+  //     setTimeout(() => loadMoreMatches(), 2000);
+  //   }
+  // }, [currentIndex, potentialMatches.length, loadMoreMatches, isLoadingMore]);
 
   // Background loading: rely on threshold-based triggers (see effect above) instead of
   // loading on every swipe. This prevents excessive server calls and keeps the UI smooth.

@@ -473,7 +473,7 @@ const MatchCard: React.FC<MatchCardProps> = ({
 
           {/* Optimized Adinkra glow effect */}
           {match.adinkra_symbols && match.adinkra_symbols.length > 0 && (
-            <div className="absolute top-0 left-1/2 transform -translate-x-1/2 z-10">
+            <div className="absolute top-0.5 left-1/2 transform -translate-x-1/2 z-10">
               <div className="relative flex flex-col items-center">
                 {/* Single optimized glow layer */}
                 <div className="relative w-24 h-24 flex items-center justify-center overflow-visible">
@@ -481,8 +481,8 @@ const MatchCard: React.FC<MatchCardProps> = ({
                   <div
                     className="absolute inset-0 w-full h-full"
                     style={{
-                      background: 'radial-gradient(circle at center, rgba(247, 144, 80, 0.25), transparent 90%)',
-                      filter: 'blur(10px)',
+                      background: 'radial-gradient(circle at center, rgba(255, 98, 0, 0.25), transparent 80%)',
+                      filter: 'blur(0px)',
                     }}
                   ></div>
 

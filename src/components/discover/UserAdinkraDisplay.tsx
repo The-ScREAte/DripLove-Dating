@@ -65,7 +65,7 @@ const UserAdinkraDisplay: React.FC<UserAdinkraDisplayProps> = React.memo(({ adin
   }
 
   return (
-    <div className="flex flex-col items-center gap-2 bg-transparent p-2 rounded-lg">
+    <div className="flex flex-col items-center gap-1 bg-transparent p-2 rounded-lg">
       {adinkraSymbols.length > 1 && (
         <div className="flex gap-1">
           {adinkraSymbols.map((_, idx) => (
