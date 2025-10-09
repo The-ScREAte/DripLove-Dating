@@ -15,10 +15,15 @@ class KeyboardHandler {
   private scrollContainer: HTMLElement | null = null;
   private originalScrollTop = 0;
   private originalBodyPaddingBottom = '';
+  private hasUserInteracted = false;
 
   constructor() {
     this.initialViewportHeight = window.innerHeight;
-    this.setupEventListeners();
+    
+    // Longer delay to prevent immediate activation on page load
+    setTimeout(() => {
+      this.setupEventListeners();
+    }, 2000);
   }
 
   private setupEventListeners() {
@@ -38,6 +43,9 @@ class KeyboardHandler {
   }
 
   private handleViewportChange() {
+    // Only handle viewport changes if there's an active input and user has interacted
+    if (!this.activeInput || !this.hasUserInteracted) return;
+    
     const currentHeight = window.innerHeight;
     const heightDifference = this.initialViewportHeight - currentHeight;
     
@@ -53,15 +61,16 @@ class KeyboardHandler {
   }
 
   private handleVisualViewportChange() {
-    if (window.visualViewport) {
-      const keyboardHeight = window.innerHeight - window.visualViewport.height;
-      
-      if (keyboardHeight > 150 && !this.isKeyboardVisible) {
-        this.keyboardHeight = keyboardHeight;
-        this.onKeyboardShow();
-      } else if (keyboardHeight <= 150 && this.isKeyboardVisible) {
-        this.onKeyboardHide();
-      }
+    // Only handle visual viewport changes if there's an active input and user has interacted
+    if (!this.activeInput || !this.hasUserInteracted || !window.visualViewport) return;
+    
+    const keyboardHeight = window.innerHeight - window.visualViewport.height;
+    
+    if (keyboardHeight > 150 && !this.isKeyboardVisible) {
+      this.keyboardHeight = keyboardHeight;
+      this.onKeyboardShow();
+    } else if (keyboardHeight <= 150 && this.isKeyboardVisible) {
+      this.onKeyboardHide();
     }
   }
 
@@ -69,11 +78,10 @@ class KeyboardHandler {
     const target = event.target as HTMLElement;
     if (target && (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA')) {
       this.activeInput = target as HTMLInputElement | HTMLTextAreaElement;
+      this.hasUserInteracted = true;
       
-      // Small delay to ensure keyboard is shown
-      setTimeout(() => {
-        this.scrollInputIntoView(this.activeInput, { paddingBottom: 20 });
-      }, 300);
+      // Don't automatically scroll - let the keyboard show first
+      // The scrolling will happen in onKeyboardShow if needed
     }
   }
 
@@ -83,6 +91,11 @@ class KeyboardHandler {
           (document.activeElement.tagName !== 'INPUT' && 
            document.activeElement.tagName !== 'TEXTAREA')) {
         this.activeInput = null;
+        
+        // If keyboard is still visible but no input is active, hide it
+        if (this.isKeyboardVisible) {
+          this.onKeyboardHide();
+        }
       }
     }, 100);
   }
@@ -94,11 +107,12 @@ class KeyboardHandler {
     // Store original body padding
     this.originalBodyPaddingBottom = document.body.style.paddingBottom;
     
-    // Add padding to body to prevent content from being hidden
-    document.body.style.paddingBottom = `${Math.max(this.keyboardHeight - 50, 0)}px`;
-    
-    // Scroll active input into view if exists
+    // Only adjust layout if there's an active input that needs it
     if (this.activeInput) {
+      // Add padding to body to prevent content from being hidden
+      document.body.style.paddingBottom = `${Math.max(this.keyboardHeight - 50, 0)}px`;
+      
+      // Scroll active input into view
       setTimeout(() => {
         this.scrollInputIntoView(this.activeInput, { paddingBottom: 20 });
       }, 100);
@@ -179,11 +193,10 @@ class KeyboardHandler {
 
   public handleInputFocus = (e: React.FocusEvent<HTMLInputElement | HTMLTextAreaElement>) => {
     this.activeInput = e.target;
+    this.hasUserInteracted = true;
     
-    // Small delay to ensure keyboard state is updated
-    setTimeout(() => {
-      this.scrollInputIntoView(this.activeInput, { paddingBottom: 20 });
-    }, 300);
+    // Don't immediately scroll - wait for keyboard to actually appear
+    // The scrolling will happen automatically when keyboard is detected
   };
 
   public handleInputBlur = () => {

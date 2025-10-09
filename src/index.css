@@ -57,6 +57,10 @@
   .keyboard-safe-form {
     min-height: 100vh;
     position: relative;
+    /* Prevent automatic adjustments on page load */
+    transform: none;
+    margin: 0;
+    padding: 0;
   }
 
   /* Input field enhancements for mobile */

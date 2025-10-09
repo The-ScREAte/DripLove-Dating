@@ -299,7 +299,7 @@ const Index = () => {
         )}
 
         {currentView === 'login' && (
-          <div className="h-fill bg-gradient-to-br from-pink-400 via-purple-500 to-indigo-600 flex items-center justify-center px-4 py-8 overflow-y-auto" style={{ minHeight: '100vh' }}>
+          <div className="h-fill bg-gradient-to-br from-pink-400 via-purple-500 to-indigo-600 flex justify-center px-4 py-8 overflow-y-auto" style={{ minHeight: '100vh', paddingTop: '10vh' }}>
             <div className="w-full max-w-md">
               <AuthForm 
                 isLogin={true}
@@ -311,7 +311,7 @@ const Index = () => {
         )}
 
         {currentView === 'register' && (
-          <div className="h-fill bg-gradient-to-br from-pink-400 via-purple-500 to-indigo-600 flex items-start justify-center px-4 py-8 overflow-y-auto" style={{ minHeight: '100vh' }}>
+          <div className="h-fill bg-gradient-to-br from-pink-400 via-purple-500 to-indigo-600 flex justify-center px-4 py-8 overflow-y-auto" style={{ minHeight: '100vh', paddingTop: '5vh' }}>
             <div className="w-full max-w-md">
               <RegistrationForm 
                 onSubmit={handleRegister}
