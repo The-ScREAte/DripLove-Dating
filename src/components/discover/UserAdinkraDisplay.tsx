@@ -8,6 +8,7 @@ interface UserAdinkraDisplayProps {
 
 const UserAdinkraDisplay: React.FC<UserAdinkraDisplayProps> = React.memo(({ adinkraSymbols }) => {
   const [currentIndex, setCurrentIndex] = useState(0);
+  const [nextIndex, setNextIndex] = useState(0);
   const [isTransitioning, setIsTransitioning] = useState(false);
   const animationFrameRef = useRef<number>();
   const lastUpdateRef = useRef<number>(Date.now());
@@ -23,16 +24,28 @@ const UserAdinkraDisplay: React.FC<UserAdinkraDisplayProps> = React.memo(({ adin
       // Use 6 seconds interval for better performance
       if (now - lastUpdateRef.current >= 6000) {
         if (isActive) {
+          const next = (currentIndex + 1) % adinkraSymbols.length;
+          setNextIndex(next);
           setIsTransitioning(true);
           
-          // Start fade out
+          // After crossfade completes, smoothly update current index
           setTimeout(() => {
             if (isActive) {
-              setCurrentIndex((prev) => (prev + 1) % adinkraSymbols.length);
-              setIsTransitioning(false);
-              lastUpdateRef.current = now;
+              // Use requestAnimationFrame to ensure smooth state update
+              requestAnimationFrame(() => {
+                if (isActive) {
+                  setCurrentIndex(next);
+                  // Small delay to prevent flash, then end transition
+                  setTimeout(() => {
+                    if (isActive) {
+                      setIsTransitioning(false);
+                      lastUpdateRef.current = now;
+                    }
+                  }, 50);
+                }
+              });
             }
-          }, 200);
+          }, 4000); // Slightly before CSS transition ends
         }
       }
       
@@ -50,7 +63,7 @@ const UserAdinkraDisplay: React.FC<UserAdinkraDisplayProps> = React.memo(({ adin
         cancelAnimationFrame(animationFrameRef.current);
       }
     };
-  }, [adinkraSymbols]); // Proper dependency guard
+  }, [adinkraSymbols, currentIndex]); // Include currentIndex in dependencies
 
   if (!adinkraSymbols || adinkraSymbols.length === 0) {
     return null;
@@ -58,9 +71,13 @@ const UserAdinkraDisplay: React.FC<UserAdinkraDisplayProps> = React.memo(({ adin
 
   const currentSymbolName = adinkraSymbols[currentIndex];
   const currentSymbol = SELECTABLE_ADINKRA_SYMBOLS.find(s => s.name === currentSymbolName);
-  const SvgComponent = AdinkraSvgComponents[currentSymbolName as AdinkraSymbolName];
+  const CurrentSvgComponent = AdinkraSvgComponents[currentSymbolName as AdinkraSymbolName];
 
-  if (!currentSymbol || !SvgComponent) {
+  const nextSymbolName = adinkraSymbols[nextIndex];
+  const nextSymbol = SELECTABLE_ADINKRA_SYMBOLS.find(s => s.name === nextSymbolName);
+  const NextSvgComponent = AdinkraSvgComponents[nextSymbolName as AdinkraSymbolName];
+
+  if (!currentSymbol || !CurrentSvgComponent) {
     return null;
   }
 
@@ -83,16 +100,34 @@ const UserAdinkraDisplay: React.FC<UserAdinkraDisplayProps> = React.memo(({ adin
           ))}
         </div>
       )}
-      <div 
-        className={`w-10 h-10 flex items-center justify-center transition-all duration-500 ease-in-out ${
-          isTransitioning ? 'opacity-0 scale-95' : 'opacity-100 scale-100'
-        }`}
-        style={{ 
-          filter: 'drop-shadow(0 2px 4px rgba(0,0,0,0.3))',
-          transform: `scale(${isTransitioning ? '0.95' : '1'}) rotate(${isTransitioning ? '5deg' : '0deg'})`
-        }}
-      >
-        <SvgComponent className="w-10 h-10" />
+      <div className="relative w-10 h-10 flex items-center justify-center">
+        {/* Current Symbol - always rendered */}
+        <div 
+          className="absolute inset-0 w-10 h-10 flex items-center justify-center transition-opacity duration-500 ease-in-out"
+          style={{ 
+            filter: 'drop-shadow(0 2px 4px rgba(0,0,0,0.3))',
+            opacity: isTransitioning ? 0 : 1,
+            transform: 'scale(1) rotate(0deg)',
+            zIndex: isTransitioning ? 1 : 2
+          }}
+        >
+          <CurrentSvgComponent className="w-10 h-10" />
+        </div>
+        
+        {/* Next Symbol - rendered during transition and becomes visible */}
+        {NextSvgComponent && (
+          <div 
+            className="absolute inset-0 w-10 h-10 flex items-center justify-center transition-opacity duration-500 ease-in-out"
+            style={{ 
+              filter: 'drop-shadow(0 2px 4px rgba(0,0,0,0.3))',
+              opacity: isTransitioning ? 1 : 0,
+              transform: 'scale(1) rotate(0deg)',
+              zIndex: isTransitioning ? 2 : 1
+            }}
+          >
+            <NextSvgComponent className="w-10 h-10" />
+          </div>
+        )}
       </div>
     </div>
   );
