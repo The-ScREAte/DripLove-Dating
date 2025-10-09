@@ -647,7 +647,11 @@ const MatchCard: React.FC<MatchCardProps> = ({
                 <MapPin className="w-4 h-4 mr-1" />
                 <span className="text-base">
                   {match.city}, {match.country}
-                  {preCalculatedDistance !== undefined ? (
+                  {match.distance !== undefined ? (
+                    <span className="ml-2">
+                      • {Math.max(1, Math.round(match.distance))} km away
+                    </span>
+                  ) : preCalculatedDistance !== undefined ? (
                     <span className="ml-2">
                       • {Math.max(1, Math.round(preCalculatedDistance))} km away
                     </span>

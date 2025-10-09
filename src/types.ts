@@ -36,6 +36,7 @@ export interface PotentialMatch {
   spontaneous_planner?: number;
   messy_organized?: number;
   adinkra_symbols?: string[];
+  distance?: number; // Precomputed distance in km
 }
 
 export interface ChatMatch {

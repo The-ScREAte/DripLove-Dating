@@ -742,12 +742,13 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, isPremium }: DiscoverPage
       return age >= userMinAge && age <= userMaxAge;
     });
 
-    // Add empty images array and deterministic shuffle
+    // Add empty images array and precomputed distance
     const profilesWithImages = filteredProfiles
       .filter(profile => profile.id !== userId)
       .map(profile => ({
         ...profile,
-        images: []
+        images: [],
+        distance: distanceMap[profile.id] // Precomputed distance from locationService
       }));
 
     // Deterministic shuffle function to ensure consistent profile order
@@ -1310,31 +1311,25 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, isPremium }: DiscoverPage
 
       if (error) throw error;
 
-      // Apply same filtering logic as original fetch with distance caching
+      // Apply same filtering logic as original fetch using location service
       let filteredProfiles = newProfiles || [];
       const userMaxDistance = currentUser.max_distance || currentUser.distance_preference || 50;
       
+      // Get location-based matches for distance filtering (same as fetchPotentialMatchesData)
+      const locationMatches = await locationService.getLocationBasedMatches(currentUser.id, userMaxDistance * 2);
+      const locationProfileIds = locationMatches.map(match => match.profile_id);
+      const distanceMap: { [key: string]: number } = {};
+      locationMatches.forEach(match => {
+        distanceMap[match.profile_id] = match.distance_km;
+      });
+      
+      // Filter profiles to only those within distance range
       if (currentUser.latitude && currentUser.longitude) {
-        // Create distance cache for new profiles too
-        const profileDistances = new Map();
-        
         filteredProfiles = filteredProfiles.filter(profile => {
           if (!profile.latitude || !profile.longitude) {
             return profile.country === currentUser.country;
           }
-          
-          let distance = profileDistances.get(profile.id);
-          if (!distance) {
-            distance = calculateDistance(
-              currentUser.latitude,
-              currentUser.longitude,
-              profile.latitude,
-              profile.longitude
-            );
-            profileDistances.set(profile.id, distance);
-          }
-          
-          return distance <= (userMaxDistance * 2); // Reduced from 3x to 2x for performance
+          return locationProfileIds.includes(profile.id);
         });
       }
 
@@ -1349,7 +1344,8 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, isPremium }: DiscoverPage
 
       const profilesWithImages = filteredProfiles.map(profile => ({
         ...profile,
-        images: []
+        images: [],
+        distance: distanceMap[profile.id] // Precomputed distance from locationService
       }));
 
       // Use a different seed for additional profiles to avoid exact duplicates but maintain consistency
@@ -1369,7 +1365,7 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, isPremium }: DiscoverPage
     } finally {
       setIsLoadingMore(false);
     }
-  }, [currentUser, allowedGenders, potentialMatches, calculateAge, calculateDistance, isLoadingMore, userImages, preloadNextProfileImages, loadFullImages, injectAds, isAd]);
+  }, [currentUser, allowedGenders, potentialMatches, calculateAge, isLoadingMore, userImages, preloadNextProfileImages, loadFullImages, injectAds, isAd]);
 
   // Auto-load more matches when getting low (5 profiles left) - reduced for performance
   useEffect(() => {
