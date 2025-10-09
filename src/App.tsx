@@ -5,12 +5,22 @@ import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter } from "react-router-dom";
 import AppRoutes from "@/components/AppRoutes";
+import { initKeyboardHandler, destroyKeyboardHandler } from "@/utils/keyboardHandler";
 
 const queryClient = new QueryClient();
 
 const App = () => {
   // Add error boundary to prevent crashes
   const [hasError, setHasError] = React.useState(false);
+  
+  // Initialize keyboard handler for mobile devices
+  React.useEffect(() => {
+    const keyboardHandler = initKeyboardHandler();
+    
+    return () => {
+      destroyKeyboardHandler();
+    };
+  }, []);
   
   const handleError = (error: Error) => {
     console.error('App error:', error);

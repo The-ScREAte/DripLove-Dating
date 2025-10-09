@@ -516,13 +516,14 @@ const ProfileCompletionPage = () => {
   }
 
   return (
-    <div 
-      className="min-h-screen bg-gradient-to-br from-pink-400 via-purple-500 to-indigo-600"
-      style={{
-        paddingTop: "calc(env(safe-area-inset-top, 0px) + 8px)",
-        paddingBottom: "calc(env(safe-area-inset-bottom, 0px) + 8px)"
-      }}
-    >
+    <div className="keyboard-safe-form input-scroll-container">
+      <div 
+        className="min-h-screen bg-gradient-to-br from-pink-400 via-purple-500 to-indigo-600"
+        style={{
+          paddingTop: "calc(env(safe-area-inset-top, 0px) + 8px)",
+          paddingBottom: "calc(env(safe-area-inset-bottom, 0px) + 8px)"
+        }}
+      >
       {/* Header - stays visible */}
       <div className="text-center py-4 px-4">
         <h1 className="text-3xl font-bold text-white mb-2">
@@ -817,6 +818,7 @@ const ProfileCompletionPage = () => {
           </div>
         </div>
       </div>
+    </div>
     </div>
   );
 };

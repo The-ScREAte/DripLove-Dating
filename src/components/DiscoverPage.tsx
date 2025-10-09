@@ -1870,7 +1870,7 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, isPremium }: DiscoverPage
     return (
       <div className="h-full w-full fixed left-0 overflow-hidden"
            style={{ 
-             top: '50px', // Align with header end (matches pt-[50px] in MainApp)
+             top: '70px', // Align with header end (matches pt-[50px] in MainApp)
              bottom: '70px', // Reserve space for bottom navigation (approximately 70px)
              height: 'auto', // Let top and bottom constraints define the height
              touchAction: 'pan-y',

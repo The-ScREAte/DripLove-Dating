@@ -593,7 +593,8 @@ const AuthForm = ({ isLogin, onToggle, onOAuthSuccess, onBack }: AuthFormProps) 
   };
 
   return (
-    <Card className="w-full max-w-md mx-auto backdrop-blur-sm bg-white/90 shadow-2xl border-0 relative no-bottom-space" style={{ marginBottom: 0, paddingBottom: 0 }}>
+    <div className="keyboard-safe-form input-scroll-container">
+      <Card className="w-full max-w-md mx-auto backdrop-blur-sm bg-white/90 shadow-2xl border-0 relative no-bottom-space" style={{ marginBottom: 0, paddingBottom: 0 }}>
       <CardHeader className="text-center pb-4 pt-8 relative">
         {/* Back Button - Inside the white card */}
         {onBack && (
@@ -705,7 +706,7 @@ const AuthForm = ({ isLogin, onToggle, onOAuthSuccess, onBack }: AuthFormProps) 
                   onChange={handleInputChange}
                   onFocus={handleInputFocus}
                   onBlur={handleInputBlur}
-                  className={`pl-10 border-gray-200 focus:border-pink-400 focus:ring-pink-400 ${
+                  className={`mobile-input-field pl-10 border-gray-200 focus:border-pink-400 focus:ring-pink-400 ${
                     errors.email ? 'border-red-500 focus:border-red-500' : ''
                   }`}
                   style={getInputStyles()}
@@ -752,7 +753,7 @@ const AuthForm = ({ isLogin, onToggle, onOAuthSuccess, onBack }: AuthFormProps) 
                     onChange={handleInputChange}
                     onFocus={handleInputFocus}
                     onBlur={handleInputBlur}
-                    className={`py-4 px-4 border-gray-300 focus:border-pink-400 focus:ring-pink-400 rounded-xl text-base ${
+                    className={`mobile-input-field py-4 px-4 border-gray-300 focus:border-pink-400 focus:ring-pink-400 rounded-xl text-base ${
                       errors.email ? 'border-red-500 focus:border-red-500' : ''
                     }`}
                     style={getInputStyles()}
@@ -787,7 +788,7 @@ const AuthForm = ({ isLogin, onToggle, onOAuthSuccess, onBack }: AuthFormProps) 
                     onChange={handleInputChange}
                     onFocus={handleInputFocus}
                     onBlur={handleInputBlur}
-                    className={`py-4 px-4 pr-12 border-gray-300 focus:border-pink-400 focus:ring-pink-400 rounded-xl text-base ${
+                    className={`mobile-input-field py-4 px-4 pr-12 border-gray-300 focus:border-pink-400 focus:ring-pink-400 rounded-xl text-base ${
                       errors.password ? 'border-red-500 focus:border-red-500' : ''
                     }`}
                     style={getInputStyles()}
@@ -820,7 +821,7 @@ const AuthForm = ({ isLogin, onToggle, onOAuthSuccess, onBack }: AuthFormProps) 
                       onChange={handleInputChange}
                       onFocus={handleInputFocus}
                       onBlur={handleInputBlur}
-                      className={`pl-10 pr-10 border-gray-200 focus:border-pink-400 focus:ring-pink-400 ${
+                      className={`mobile-input-field pl-10 pr-10 border-gray-200 focus:border-pink-400 focus:ring-pink-400 ${
                         errors.confirmPassword ? 'border-red-500 focus:border-red-500' : ''
                       }`}
                       style={getInputStyles()}
@@ -872,6 +873,7 @@ const AuthForm = ({ isLogin, onToggle, onOAuthSuccess, onBack }: AuthFormProps) 
         )}
       </CardContent>
     </Card>
+    </div>
   );
 };
 

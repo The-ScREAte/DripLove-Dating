@@ -43,9 +43,36 @@
     touch-action: pinch-zoom;
   }
 
-  /* Keyboard-aware styles for chat */
+  /* Keyboard-aware styles for forms */
   .keyboard-open {
     transition: height 0.3s ease;
+  }
+
+  /* Enhanced keyboard visibility handling */
+  body.keyboard-visible {
+    transition: padding-bottom 0.3s ease-in-out;
+  }
+
+  /* Ensure forms are properly scrollable when keyboard is visible */
+  .keyboard-safe-form {
+    min-height: 100vh;
+    position: relative;
+  }
+
+  /* Input field enhancements for mobile */
+  .mobile-input-field {
+    -webkit-appearance: none;
+    appearance: none;
+    border-radius: 0.75rem;
+    font-size: 16px; /* Prevents zoom on iOS */
+    line-height: 1.5;
+    touch-action: manipulation;
+  }
+
+  /* Smooth scrolling for input areas */
+  .input-scroll-container {
+    scroll-behavior: smooth;
+    -webkit-overflow-scrolling: touch;
   }
 
   /* Profile completion page specific styles */

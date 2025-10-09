@@ -5,6 +5,7 @@ import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { User, Mail, Lock, Calendar, MapPin, Globe, Eye, EyeOff } from 'lucide-react';
 import { countries } from '@/constants/formData';
+import { handleInputFocus, handleInputBlur, getInputStyles } from '@/utils/inputUtils';
 
 interface BasicInfoSectionProps {
   formData: any;
@@ -42,7 +43,10 @@ const BasicInfoSection = ({
               type="text"
               value={formData.firstName}
               onChange={onInputChange}
-              className={`pl-10 border-gray-200 focus:border-pink-400 focus:ring-pink-400 ${errors.firstName ? 'border-red-500' : ''}`}
+              onFocus={handleInputFocus}
+              onBlur={handleInputBlur}
+              className={`mobile-input-field pl-10 border-gray-200 focus:border-pink-400 focus:ring-pink-400 ${errors.firstName ? 'border-red-500' : ''}`}
+              style={getInputStyles()}
               placeholder="Enter your first name"
             />
             {errors.firstName && <p className="text-red-500 text-xs mt-1">{errors.firstName}</p>}
@@ -59,7 +63,10 @@ const BasicInfoSection = ({
               type="text"
               value={formData.lastName}
               onChange={onInputChange}
-              className={`pl-10 border-gray-200 focus:border-pink-400 focus:ring-pink-400 ${errors.lastName ? 'border-red-500' : ''}`}
+              onFocus={handleInputFocus}
+              onBlur={handleInputBlur}
+              className={`mobile-input-field pl-10 border-gray-200 focus:border-pink-400 focus:ring-pink-400 ${errors.lastName ? 'border-red-500' : ''}`}
+              style={getInputStyles()}
               placeholder="Enter your last name"
             />
             {errors.lastName && <p className="text-red-500 text-xs mt-1">{errors.lastName}</p>}
@@ -77,7 +84,10 @@ const BasicInfoSection = ({
             type="email"
             value={formData.email}
             onChange={onInputChange}
-            className={`pl-10 border-gray-200 focus:border-pink-400 focus:ring-pink-400 ${errors.email ? 'border-red-500' : ''}`}
+            onFocus={handleInputFocus}
+            onBlur={handleInputBlur}
+            className={`mobile-input-field pl-10 border-gray-200 focus:border-pink-400 focus:ring-pink-400 ${errors.email ? 'border-red-500' : ''}`}
+            style={getInputStyles()}
             placeholder="Enter your email"
           />
           {errors.email && <p className="text-red-500 text-xs mt-1">{errors.email}</p>}
@@ -95,7 +105,10 @@ const BasicInfoSection = ({
               type={showPassword ? "text" : "password"}
               value={formData.password}
               onChange={onInputChange}
-              className={`pl-10 pr-10 border-gray-200 focus:border-pink-400 focus:ring-pink-400 ${errors.password ? 'border-red-500' : ''}`}
+              onFocus={handleInputFocus}
+              onBlur={handleInputBlur}
+              className={`mobile-input-field pl-10 pr-10 border-gray-200 focus:border-pink-400 focus:ring-pink-400 ${errors.password ? 'border-red-500' : ''}`}
+              style={getInputStyles()}
               placeholder="Enter your password"
             />
             <button
