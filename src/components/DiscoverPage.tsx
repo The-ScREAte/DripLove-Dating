@@ -659,7 +659,7 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, isPremium }: DiscoverPage
     const [
       { data: likedUsers },
       { data: blockedUsers },
-      { data: recentPasses }
+      { data: allPasses }
     ] = await Promise.all([
       supabase
         .from('likes')
@@ -671,15 +671,14 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, isPremium }: DiscoverPage
         .or(`blocker_id.eq.${userId},blocked_id.eq.${userId}`),
       supabase
         .from('passes')
-        .select('passed_id, passed_at')
-        .match({ passer_id: userId })
-        .gte('passed_at', new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString())
+        .select('passed_id')
+        .eq('passer_id', userId)
     ]);
 
     const likedUserIds = likedUsers?.map(like => like.liked_id) || [];
     const blockedUserIds = blockedUsers?.flatMap(block => [block.blocked_id, block.blocker_id]) || [];
-    const hiddenPassedIds = recentPasses?.map(p => p.passed_id) || [];
-    const excludedIds = [...likedUserIds, ...blockedUserIds, ...hiddenPassedIds, userId];
+    const passedUserIds = allPasses?.map(p => p.passed_id) || [];
+    const excludedIds = [...likedUserIds, ...blockedUserIds, ...passedUserIds, userId];
     
     // Get user data for location and preferences
     const { data: currentUserData } = await supabase
