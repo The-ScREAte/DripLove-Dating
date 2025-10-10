@@ -463,13 +463,27 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, isPremium }: DiscoverPage
         // Get today's swipe count
         const swipeCount = await getTodaySwipeCount(currentUser.id);
         setTodaySwipeCount(swipeCount);
+
+        // CRITICAL: Check swipe restrictions on mount/reload
+        const restrictions = await checkSwipeRestrictions(currentUser.id, completionResult.completion, isPremium || false);
+        
+        // If user can't swipe, block them immediately
+        if (!restrictions.canSwipe) {
+          if (restrictions.requiresProfileCompletion) {
+            // Show profile completion modal if they need to complete profile
+            setShowProfileCompletionModal(true);
+          } else if (restrictions.reason === 'Daily limit reached') {
+            // Show out of swipes screen if they've hit daily limit
+            setIsOutOfSwipes(true);
+          }
+        }
       } catch (error) {
   // ...removed log...
       }
     };
 
     fetchUserProfileCompletion();
-  }, [currentUser?.id]);
+  }, [currentUser?.id, isPremium]);
 
   const fetchReverseUsage = useCallback(async () => {
     if (!currentUser?.id) return;
@@ -1044,9 +1058,10 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, isPremium }: DiscoverPage
         setPotentialMatches(cached.potentialMatches);
         setUserImages(cached.userImages);
         setUserDistances(cached.userDistances);
-        // Adjust currentIndex if it's beyond the array length
-        const adjustedIndex = Math.min(cached.currentIndex, cached.potentialMatches.length - 1);
-        setCurrentIndex(adjustedIndex);
+        // CRITICAL: Always use the cached currentIndex to maintain position
+        // This ensures the user sees the same profile even after refresh
+        const savedIndex = Math.max(0, Math.min(cached.currentIndex, cached.potentialMatches.length - 1));
+        setCurrentIndex(savedIndex);
         setIsLoading(false);
         // COMPLETELY DISABLE background refresh to prevent profile changes
         suppressFetchRef.current = true;
@@ -1064,13 +1079,28 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, isPremium }: DiscoverPage
     fetchReverseUsage();
   }, [currentUser?.id, adsLoaded]); // Wait for both user and ads
 
-  // Save current match state
+  // Save current match state AND update cache whenever currentIndex changes
   useEffect(() => {
-    if (potentialMatches.length > 0) {
-      localStorage.setItem('driplove_last_profile_id', potentialMatches[currentIndex]?.id || '');
-      localStorage.setItem('driplove_last_profile_time', Date.now().toString());
+    if (potentialMatches.length > 0 && currentUser?.id) {
+      const currentProfile = potentialMatches[currentIndex];
+      if (currentProfile?.id) {
+        localStorage.setItem('driplove_last_profile_id', currentProfile.id);
+        localStorage.setItem('driplove_last_profile_time', Date.now().toString());
+        
+        // CRITICAL: Update cache with current index to ensure persistence across refreshes
+        const today = new Date().toISOString().split('T')[0];
+        const cacheKey = `${currentUser.id}_${today}`;
+        const cached = discoverCache.get(cacheKey);
+        if (cached) {
+          discoverCache.set(cacheKey, {
+            ...cached,
+            currentIndex: currentIndex,
+            timestamp: Date.now()
+          });
+        }
+      }
     }
-  }, [currentIndex, potentialMatches]);
+  }, [currentIndex, potentialMatches, currentUser?.id]);
 
   // Cleanup continuous loading interval on unmount
   useEffect(() => {
@@ -1396,11 +1426,11 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, isPremium }: DiscoverPage
       return;
     }
 
-    // Check profile completion restriction (75% after 5 swipes)
-    if (profileCompletion < 75 && realSwipeCount >= 5) {
+    // Check profile completion restriction (70% after 5 swipes)
+    if (profileCompletion < 70 && todaySwipeCount >= 5) {
       toast({
         title: 'Complete Your Profile',
-        description: `You need ${75 - profileCompletion}% more to continue swiping. Complete your profile to unlock unlimited swipes!`,
+        description: `You need ${70 - profileCompletion}% more to continue swiping. Complete your profile to unlock unlimited swipes!`,
         variant: 'destructive'
       });
       setShowProfileCompletionModal(true);
@@ -1515,11 +1545,11 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, isPremium }: DiscoverPage
       return;
     }
 
-    // Check profile completion restriction (75% after 5 swipes)
-    if (profileCompletion < 75 && realSwipeCount >= 5) {
+    // Check profile completion restriction (70% after 5 swipes)
+    if (profileCompletion < 70 && todaySwipeCount >= 5) {
       toast({
         title: 'Complete Your Profile',
-        description: `You need ${75 - profileCompletion}% more to continue swiping. Complete your profile to unlock unlimited swipes!`,
+        description: `You need ${70 - profileCompletion}% more to continue swiping. Complete your profile to unlock unlimited swipes!`,
         variant: 'destructive'
       });
       setShowProfileCompletionModal(true);
@@ -1842,13 +1872,14 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, isPremium }: DiscoverPage
             )}
               <Button 
                 onClick={() => {
+                  // Just close the modal - don't fetch new profiles
+                  // This keeps the user on the same profile they tried to swipe
                   setIsOutOfSwipes(false);
-                  fetchPotentialMatches();
                 }} 
                 variant="outline" 
                 className="w-full"
               >
-                Check Again Tomorrow
+                OK
               </Button>
             </div>
           </CardContent>
