@@ -120,7 +120,7 @@ const AdinkraBar: React.FC = () => {
       {tooltipIdx !== null && (
         <div
           className="fixed left-1/2 top-1/12 z-50 px-4 py-3 rounded-lg shadow-lg bg-white border border-gray-300 text-xs text-gray-800 animate-fade-in flex flex-col items-center"
-          style={{ transform: 'translate(-50%, -50%)', minWidth: 180, maxWidth: 260 }}
+          style={{ transform: 'translate(-50%, -75%)', minWidth: 180, maxWidth: 260 }}
           onClick={() => setTooltipIdx(null)}
         >
           <strong className="text-base mb-1">{adinkraSymbols[tooltipIdx].name}</strong>
@@ -1430,7 +1430,7 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, isPremium }: DiscoverPage
     if (profileCompletion < 70 && todaySwipeCount >= 5) {
       toast({
         title: 'Complete Your Profile',
-        description: `You need ${70 - profileCompletion}% more to continue swiping. Complete your profile to unlock unlimited swipes!`,
+        description: `You need ${70 - profileCompletion}% more to continue swiping. Complete your profile to unlock unlimited swipes! `,
         variant: 'destructive'
       });
       setShowProfileCompletionModal(true);
