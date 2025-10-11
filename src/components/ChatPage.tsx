@@ -720,10 +720,21 @@ const ChatPage = ({ currentUser, onUnreadChange, onDetailViewChange }: ChatPageP
 
   if (!selectedMatch) {
     return (
-  <div className="fixed inset-0 flex flex-col bg-gray-50">
+      <>
+        {/* Mobile browser specific CSS - reduce chat header padding */}
+        <style>{`
+          /* Only apply to mobile browsers, not iOS native */
+          @media screen and (max-width: 768px) and (hover: none) and (pointer: coarse) {
+            html:not(.ios-native) .chat-header-mobile {
+              padding-top: 20px !important;
+            }
+          }
+        `}</style>
+        
+        <div className="fixed inset-0 flex flex-col bg-gray-50">
         {/* Header (safe area respected via env padding) */}
         <div 
-          className="sticky top-0 z-30 bg-gradient-to-r from-pink-500 to-purple-600 text-white" 
+          className="sticky top-0 z-30 bg-gradient-to-r from-pink-500 to-purple-600 text-white chat-header-mobile" 
           style={{ 
             paddingTop: Capacitor.getPlatform() === 'ios' 
               ? 'clamp(30px, calc(env(safe-area-inset-top, 10px) + 15px), 40px)' 
@@ -937,8 +948,10 @@ const ChatPage = ({ currentUser, onUnreadChange, onDetailViewChange }: ChatPageP
           // optional: any post-report actions
         }}
       />
-    </div>
-  );
+        </div>
+      </>
+    );
+  }
 };
 
 export default ChatPage;
