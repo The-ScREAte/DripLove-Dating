@@ -2003,8 +2003,8 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, isPremium }: DiscoverPage
     <>
       {/* Mobile browser viewport fix styles */}
       <style>{`
-        /* Fix for mobile browser viewport height issues */
-        @media screen and (max-width: 768px) {
+        /* Fix for mobile browser viewport height issues - only on actual mobile devices */
+        @media screen and (max-width: 768px) and (hover: none) and (pointer: coarse) {
           .discover-container {
             /* Use dynamic viewport height for mobile browsers */
             height: 100dvh !important;
@@ -2014,19 +2014,23 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, isPremium }: DiscoverPage
           
           .discover-image-area {
             /* Ensure image area doesn't get stuck at fixed heights on mobile */
-            min-height: 50vh !important;
-            max-height: 70vh !important;
-            height: auto !important;
+            min-height: 45vh !important;
+            max-height: 65vh !important;
           }
           
           .discover-info-area {
-            /* Ensure info area is always visible and scrollable */
-            min-height: 30vh !important;
-            max-height: 50vh !important;
-            flex-shrink: 0 !important;
+            /* Ensure info area is always visible but don't override expansion behavior */
+            min-height: 25vh !important;
           }
           
-          /* Specifically target mobile Safari */
+          /* Specifically target mobile Safari - but preserve expansion functionality */
+          .discover-info-area:not(.expanded) {
+            max-height: 45vh !important;
+          }
+        }
+        
+        /* Additional mobile Safari specific fix */
+        @media screen and (max-width: 768px) and (hover: none) and (pointer: coarse) {
           @supports (-webkit-touch-callout: none) {
             .discover-container {
               height: -webkit-fill-available !important;
@@ -2172,8 +2176,8 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, isPremium }: DiscoverPage
             className="discover-image-area flex-1 cursor-pointer select-none relative transition-all duration-300 overflow-hidden"
             style={{
               // Use flexible height calculation that works better on mobile browsers
-              minHeight: showMoreInfo ? 'max(50vh, 350px)' : 'max(60vh, 400px)',
-              maxHeight: showMoreInfo ? '65vh' : '75vh'
+              minHeight: showMoreInfo ? 'max(40vh, 300px)' : 'max(50vh, 350px)',
+              maxHeight: showMoreInfo ? '60vh' : '70vh'
             }}
             onTouchStart={handleTouchStart}
             onTouchMove={handleTouchMove}
@@ -2289,7 +2293,7 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, isPremium }: DiscoverPage
 
           {/* Info section - dynamic height that fits content exactly */}
           <div className={`discover-info-area bg-white transition-all duration-300 flex-shrink-0 -mt-0.1 ${
-            showMoreInfo ? '' : 'overflow-hidden'
+            showMoreInfo ? 'expanded' : 'overflow-hidden'
           }`}>
             <div 
               ref={contentRef}
