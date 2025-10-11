@@ -489,3 +489,11 @@
       }
     }
   }
+
+  /* Mobile browser specific fixes - reduce chat header padding */
+  @media screen and (max-width: 768px) and (hover: none) and (pointer: coarse) {
+    /* Only apply to mobile browsers, not iOS native */
+    html:not(.ios-native) .chat-header-mobile {
+      padding-top: 20px !important;
+    }
+  }
