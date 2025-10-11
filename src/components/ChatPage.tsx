@@ -730,8 +730,8 @@ const ChatPage = ({ currentUser, onUnreadChange, onDetailViewChange }: ChatPageP
               : '40px' 
           }}
         >
-          <div className="px-4 pb-4 pt-2">
-            <h2 className="text-xl font-bold m-2">DripChat</h2>
+          <div className="px-2 pb-1 pt-2">
+            <h2 className="text-xl font-bold m-1">DripChat</h2>
             <div className="relative">
               <input
                 type="text"
