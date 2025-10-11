@@ -1,11 +1,12 @@
 services:
-  - type: static
+  - type: web
     name: driplove-dating-app
-    env: static
+    env: node
     region: oregon
     plan: free
     buildCommand: npm install && npm run build
-    staticPublishPath: ./dist
+    startCommand: npm start
+    healthCheckPath: /
     envVars:
       - key: NODE_ENV
         value: production
@@ -17,7 +18,3 @@ services:
         value: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InRnanN5eWloYWJzb3Zpcm9uZXN3Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTAxMTQxMzYsImV4cCI6MjA2NTY5MDEzNn0.UFy_dLD3etnw34UdqMyn97soapS1ZaAP54rZAG1laR8
       - key: VITE_APPLE_SERVICES_ID
         value: com.driplove.dating.signin
-      - key: VITE_PAYSTACK_PUBLIC_KEY
-        value: pk_test_44216f70d964991e1b200b527be2e4d234096dda
-      - key: VITE_PAYSTACK_PLAN_CODE
-        value: PLN_anuee0xs8qpvj98
