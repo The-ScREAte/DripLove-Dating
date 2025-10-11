@@ -2000,16 +2000,53 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, isPremium }: DiscoverPage
 
 
   return (
-    <div className="h-full w-full fixed left-0 overflow-hidden"
-         style={{ 
-           top: '65px', // Move down further from top
-           height: 'calc(100vh - 120px)', // Adjust height to account for header and extra spacing
-           touchAction: 'pan-y', // allow vertical scrolling, prevent horizontal scroll-from-browser during horizontal swipes
-           overscrollBehavior: 'contain',
-           userSelect: 'none',
-           WebkitUserSelect: 'none',
-           WebkitTouchCallout: 'none'
-         }}>
+    <>
+      {/* Mobile browser viewport fix styles */}
+      <style>{`
+        /* Fix for mobile browser viewport height issues */
+        @media screen and (max-width: 768px) {
+          .discover-container {
+            /* Use dynamic viewport height for mobile browsers */
+            height: 100dvh !important;
+            min-height: 100svh !important;
+            max-height: 100lvh !important;
+          }
+          
+          .discover-image-area {
+            /* Ensure image area doesn't get stuck at fixed heights on mobile */
+            min-height: 50vh !important;
+            max-height: 70vh !important;
+            height: auto !important;
+          }
+          
+          .discover-info-area {
+            /* Ensure info area is always visible and scrollable */
+            min-height: 30vh !important;
+            max-height: 50vh !important;
+            flex-shrink: 0 !important;
+          }
+          
+          /* Specifically target mobile Safari */
+          @supports (-webkit-touch-callout: none) {
+            .discover-container {
+              height: -webkit-fill-available !important;
+            }
+          }
+        }
+      `}</style>
+      
+      <div className="discover-container h-full w-full fixed left-0 overflow-hidden"
+           style={{ 
+             top: '65px', // Move down further from top
+             height: 'calc(100vh - 120px)', // Adjust height to account for header and extra spacing
+             // Mobile browser viewport fix
+             minHeight: 'calc(100vh - 120px)',
+             touchAction: 'pan-y', // allow vertical scrolling, prevent horizontal scroll-from-browser during horizontal swipes
+             overscrollBehavior: 'contain',
+             userSelect: 'none',
+             WebkitUserSelect: 'none',
+             WebkitTouchCallout: 'none'
+           }}>
       {/* --- Swipe Guide Popup for New Users --- */}
       {showSwipeGuide && (
         <div
@@ -2083,7 +2120,14 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, isPremium }: DiscoverPage
         </div>
       )}
       {/* Main Image Area - Card stack */}
-  <div className="flex-1 relative overflow-hidden" style={{ height: 'calc(100vh - 100px)', display: 'flex', flexDirection: 'column', justifyContent: 'flex-end', paddingBottom: 0 }}>
+  <div className="flex-1 relative overflow-hidden" style={{ 
+    height: '100%', 
+    minHeight: 'calc(100vh - 100px)', 
+    display: 'flex', 
+    flexDirection: 'column', 
+    justifyContent: 'flex-end', 
+    paddingBottom: 0 
+  }}>
         {/* ...existing code... */}
         {nextMatch && (
           <DominantColorImageBg
@@ -2125,9 +2169,11 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, isPremium }: DiscoverPage
         >
           {/* Image area - flexible height that fills remaining space */}
           <div
-            className="flex-1 cursor-pointer select-none relative transition-all duration-300 overflow-hidden"
+            className="discover-image-area flex-1 cursor-pointer select-none relative transition-all duration-300 overflow-hidden"
             style={{
-              minHeight: showMoreInfo ? 'calc(100vh - 402px)' : 'calc(100vh - 302px)' // Adjusted for new expanded height
+              // Use flexible height calculation that works better on mobile browsers
+              minHeight: showMoreInfo ? 'max(50vh, 350px)' : 'max(60vh, 400px)',
+              maxHeight: showMoreInfo ? '65vh' : '75vh'
             }}
             onTouchStart={handleTouchStart}
             onTouchMove={handleTouchMove}
@@ -2242,7 +2288,7 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, isPremium }: DiscoverPage
           <AdinkraBar />
 
           {/* Info section - dynamic height that fits content exactly */}
-          <div className={`bg-white transition-all duration-300 flex-shrink-0 -mt-0.1 ${
+          <div className={`discover-info-area bg-white transition-all duration-300 flex-shrink-0 -mt-0.1 ${
             showMoreInfo ? '' : 'overflow-hidden'
           }`}>
             <div 
@@ -2252,7 +2298,9 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, isPremium }: DiscoverPage
                 WebkitOverflowScrolling: 'touch',
                 overscrollBehavior: 'contain',
                 scrollBehavior: 'smooth',
-                maxHeight: showMoreInfo ? 'calc(50vh - 30%)' : 'auto',
+                // Use min/max approach that works better on mobile browsers
+                maxHeight: showMoreInfo ? 'min(45vh, 400px)' : 'auto',
+                minHeight: showMoreInfo ? 'min(20vh, 200px)' : 'auto',
                 paddingBottom: showMoreInfo 
                   ? 'calc(15px + env(safe-area-inset-bottom, 0px))' 
                   : '0px'
@@ -2295,7 +2343,8 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, isPremium }: DiscoverPage
           isPremium={isPremium}
         />
       </div>
-    </div>
+      </div>
+    </>
   );
 }
 
