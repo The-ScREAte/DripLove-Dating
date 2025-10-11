@@ -433,8 +433,8 @@ const ProfilePage = ({ currentUser, profile, onProfileUpdate, onLogout, onShowTe
       <div
         className="fixed left-0 right-0 z-40 bg-white border-b border-gray-200 shadow-sm"
         style={{
-          // Start from where main header ends - pushed up
-          top: 'clamp(66px, calc(env(safe-area-inset-top, 10px) + 46px), 96px)',
+          // Start from where main header ends - pushed up higher
+          top: 'clamp(56px, calc(env(safe-area-inset-top, 10px) + 36px), 86px)',
           paddingTop: '4px',
           width: '100%',
         }}

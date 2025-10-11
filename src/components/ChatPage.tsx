@@ -754,7 +754,7 @@ const ChatPage = ({ currentUser, onUnreadChange, onDetailViewChange }: ChatPageP
       WebkitOverflowScrolling: 'touch',
       marginTop: Capacitor.getPlatform() === 'ios' 
         ? '80px' // Fixed margin for iOS
-        : '20px' // Pull down a bit more for non-iOS platforms (web browsers)
+        : '0px' // Pull down a bit more for non-iOS platforms (web browsers)
     }}
     onTouchStart={handleTouchStart}
     onTouchMove={handleTouchMove}
