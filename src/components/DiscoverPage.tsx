@@ -379,8 +379,8 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, isPremium }: DiscoverPage
     for (let i = 0; i < matches.length; i++) {
       result.push(matches[i]);
       
-      // Insert ad every 2 profiles, ensuring we cycle through ALL ads
-      if ((i + 1) % 2 === 0) {
+      // Insert ad every 10 profiles, ensuring we cycle through ALL ads
+      if ((i + 1) % 10 === 0) {
         const selectedAd = stableShuffledAds[adIndex % stableShuffledAds.length];
         result.push(selectedAd);
         adIndex++;
