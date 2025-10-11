@@ -21,3 +21,5 @@ services:
         value: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InRnanN5eWloYWJzb3Zpcm9uZXN3Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTAxMTQxMzYsImV4cCI6MjA2NTY5MDEzNn0.UFy_dLD3etnw34UdqMyn97soapS1ZaAP54rZAG1laR8
       - key: VITE_APPLE_SERVICES_ID
         value: com.driplove.dating.signin
+      - key: VITE_PAYSTACK_PUBLIC_KEY
+        value: pk_live_48a5156dda6e56d0b62c2a528181fd780eb2a034
