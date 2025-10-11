@@ -7,7 +7,7 @@
  * 
  * REQUIRED URLS TO ADD IN APPLE DEVELOPER CONSOLE:
  * 1. https://tgjsyyihabsovironesw.supabase.co/auth/v1/callback (Supabase Auth - CRITICAL)
- * 2. https://www.driplove.love/auth/callback (Production domain)
+ * 2. https://fef6ab36-77bc-4046-b6f5-fc5b2ad8c182.lovableproject.com/auth/callback (Lovable hosting)
  * 3. http://localhost:5173/auth/callback (Development)
  * 4. http://localhost:8080/auth/callback (Alternative dev port)
  * 
@@ -31,10 +31,10 @@ export const OAUTH_CONFIG = {
   webRedirectUris: {
     google: typeof window !== 'undefined' && window.location.origin 
       ? `${window.location.origin}/auth/callback`
-      : 'https://www.driplove.love/auth/callback',
+      : 'https://fef6ab36-77bc-4046-b6f5-fc5b2ad8c182.lovableproject.com/auth/callback',
     apple: typeof window !== 'undefined' && window.location.origin 
       ? `${window.location.origin}/auth/callback`  
-      : 'https://www.driplove.love/auth/callback'
+      : 'https://fef6ab36-77bc-4046-b6f5-fc5b2ad8c182.lovableproject.com/auth/callback'
   },
   
   // Password reset redirect URI for mobile
@@ -61,7 +61,7 @@ export const OAUTH_CONFIG = {
   // Web fallback for development/testing
   webRedirectUri: typeof window !== 'undefined' && window.location.origin 
     ? `${window.location.origin}/auth/callback`
-    : 'https://www.driplove.love/auth/callback',
+    : 'https://fef6ab36-77bc-4046-b6f5-fc5b2ad8c182.lovableproject.com/auth/callback',
     
   // Localhost development override (will be dynamically determined)
   localhostRedirectUri: typeof window !== 'undefined' && window.location.origin

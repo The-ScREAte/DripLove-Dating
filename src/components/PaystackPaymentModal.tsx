@@ -111,29 +111,10 @@ const PaystackPaymentModal: React.FC<PaystackPaymentModalProps> = ({ isOpen, onC
           { display_name: 'Payment Type', variable_name: 'payment_type', value: isOneTime ? 'one-time' : 'subscription' },
         ],
       };
-      // Determine callback URL based on environment
-      const getCallbackUrl = () => {
-        const currentOrigin = window.location.origin;
-        const productionDomain = import.meta.env.VITE_PRODUCTION_DOMAIN || 'https://www.driplove.love';
-        
-        // If we're on localhost, use localhost
-        if (currentOrigin.includes('localhost') || currentOrigin.includes('127.0.0.1')) {
-          return `${currentOrigin}/payment-success?status=successful&payment_type=${isOneTime ? 'one-time' : 'subscription'}`;
-        }
-        
-        // If we're on driplove.love domain, use that
-        if (currentOrigin.includes('driplove.love')) {
-          return `${currentOrigin}/payment-success?status=successful&payment_type=${isOneTime ? 'one-time' : 'subscription'}`;
-        }
-        
-        // For any other domain (including production), use the configured production domain
-        return `${productionDomain}/payment-success?status=successful&payment_type=${isOneTime ? 'one-time' : 'subscription'}`;
-      };
-
       const payload: any = {
         email: email.trim(),
         metadata,
-        callback_url: getCallbackUrl(),
+        callback_url: `${window.location.origin}/payment-success?status=successful&payment_type=${isOneTime ? 'one-time' : 'subscription'}`,
       };
       if (isOneTime) {
         payload.amount = Number(amount);

@@ -18,11 +18,3 @@ services:
         value: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InRnanN5eWloYWJzb3Zpcm9uZXN3Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTAxMTQxMzYsImV4cCI6MjA2NTY5MDEzNn0.UFy_dLD3etnw34UdqMyn97soapS1ZaAP54rZAG1laR8
       - key: VITE_APPLE_SERVICES_ID
         value: com.driplove.dating.signin
-      - key: VITE_PAYSTACK_PUBLIC_KEY
-        value: pk_live_48a5156dda6e56d0b62c2a528181fd780eb2a034
-      - key: VITE_PAYSTACK_PLAN_CODE
-        value: PLN_anuee0xs8qpvj98
-      - key: PAYSTACK_SECRET_KEY
-        value: sk_live_ca637b9956102911537e6825ac23f1a5af6c8c3e
-      - key: VITE_PRODUCTION_DOMAIN
-        value: https://www.driplove.love
