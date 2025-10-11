@@ -24,3 +24,5 @@ services:
         value: PLN_anuee0xs8qpvj98
       - key: PAYSTACK_SECRET_KEY
         value: sk_live_ca637b9956102911537e6825ac23f1a5af6c8c3e
+      - key: VITE_PRODUCTION_DOMAIN
+        value: https://www.driplove.love
