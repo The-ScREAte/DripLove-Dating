@@ -5,7 +5,7 @@ function DominantColorImageBg({ imageUrl, children }) {
   // Use lightweight static background color instead of expensive pixel scanning
   const edgeColor = '#f6f6f6';
   return (
-    <div className="absolute inset-0 z-0 pointer-events-none pt-4">
+    <div className="absolute inset-0 z-0 pointer-events-none">
       {/* Solid color overlay fills all space */}
       <div
         className="absolute inset-0"
@@ -2041,10 +2041,10 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, isPremium }: DiscoverPage
       
       <div className="discover-container h-full w-full fixed left-0 overflow-hidden"
            style={{ 
-             top: '65px', // Move down further from top
-             height: 'calc(100vh - 120px)', // Adjust height to account for header and extra spacing
+             top: '60px', // Reduced from 65px to eliminate gap
+             height: 'calc(100vh - 110px)', // Adjusted to match new top value
              // Mobile browser viewport fix
-             minHeight: 'calc(100vh - 120px)',
+             minHeight: 'calc(100vh - 110px)',
              touchAction: 'pan-y', // allow vertical scrolling, prevent horizontal scroll-from-browser during horizontal swipes
              overscrollBehavior: 'contain',
              userSelect: 'none',
