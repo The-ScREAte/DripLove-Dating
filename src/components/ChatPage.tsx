@@ -720,7 +720,7 @@ const ChatPage = ({ currentUser, onUnreadChange, onDetailViewChange }: ChatPageP
 
   if (!selectedMatch) {
     return (
-      <div className="fixed inset-0 flex flex-col bg-gray-50">
+  <div className="fixed inset-0 flex flex-col bg-gray-50">
         {/* Header (safe area respected via env padding) */}
         <div 
           className="sticky top-0 z-30 bg-gradient-to-r from-pink-500 to-purple-600 text-white chat-header-mobile" 
@@ -850,7 +850,7 @@ const ChatPage = ({ currentUser, onUnreadChange, onDetailViewChange }: ChatPageP
   }
 
   return (
-    <div className="fixed inset-0 flex flex-col bg-gray-50">
+  <div className="fixed inset-0 flex flex-col bg-gray-50">
       {/* Chat Header (below global header) */}
   <div className="shrink-0 bg-white border-b border-gray-200 shadow-sm z-20 m-0 p-0">
         <ChatHeader
