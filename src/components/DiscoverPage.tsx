@@ -2302,8 +2302,8 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, isPremium }: DiscoverPage
                 WebkitOverflowScrolling: 'touch',
                 overscrollBehavior: 'contain',
                 scrollBehavior: 'smooth',
-                // Use min/max approach that works better on mobile browsers
-                maxHeight: showMoreInfo ? 'min(45vh, 400px)' : 'auto',
+                // Restore fixed heights for collapsed/expanded states
+                maxHeight: showMoreInfo ? 'min(45vh, 400px)' : '200px', // Fixed max height when collapsed
                 minHeight: showMoreInfo ? 'min(20vh, 200px)' : 'auto',
                 paddingBottom: showMoreInfo 
                   ? 'calc(15px + env(safe-area-inset-bottom, 0px))' 
