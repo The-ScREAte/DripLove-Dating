@@ -11,7 +11,9 @@ const config: CapacitorConfig = {
       'https://*.supabase.co',
       'https://*.supabase.io',
       'https://accounts.google.com',
-      'https://oauth.googleusercontent.com'
+      'https://oauth.googleusercontent.com',
+      'https://www.driplove.love',
+      'https://driplove.love'
     ]
   },
   ios: {
