@@ -2303,7 +2303,7 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, isPremium }: DiscoverPage
                 overscrollBehavior: 'contain',
                 scrollBehavior: 'smooth',
                 // Restore fixed heights for collapsed/expanded states
-                maxHeight: showMoreInfo ? 'min(45vh, 400px)' : '300px', // Fixed max height when collapsed
+                maxHeight: showMoreInfo ? 'min(45vh, 400px)' : '230px', // Fixed max height when collapsed
                 minHeight: showMoreInfo ? 'min(20vh, 200px)' : 'auto',
                 paddingBottom: showMoreInfo 
                   ? 'calc(15px + env(safe-area-inset-bottom, 0px))' 
