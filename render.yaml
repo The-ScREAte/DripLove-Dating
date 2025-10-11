@@ -1,12 +1,11 @@
 services:
-  - type: web
+  - type: static
     name: driplove-dating-app
-    env: node
+    env: static
     region: oregon
     plan: free
     buildCommand: npm install && npm run build
-    startCommand: npm start
-    healthCheckPath: /
+    staticPublishPath: ./dist
     envVars:
       - key: NODE_ENV
         value: production
