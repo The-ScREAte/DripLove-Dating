@@ -327,7 +327,10 @@ const MatchCard: React.FC<MatchCardProps> = ({
             <div className="w-full h-full transition-all duration-300 ease-in-out">
               {/* Report button for image slides - positioned closer to top edge */}
               {slides[currentSlide]?.type === 'image' && (
-                <div className="absolute right-3 top-9 sm:top-6 z-50">
+                <div 
+                  className="absolute right-3 z-50"
+                  style={{ top: 'clamp(1rem, env(safe-area-inset-top, 1rem) + 0.5rem, 2.25rem)' }}
+                >
                   <button
                     className={styles.reportButton}
                     onClick={e => { e.stopPropagation(); setShowReportModal(true); }}
@@ -457,7 +460,10 @@ const MatchCard: React.FC<MatchCardProps> = ({
           
           {/* Slide indicators */}
           {slides.length > 1 && (
-            <div className="absolute top-9 left-4 flex space-x-2 z-10">
+            <div 
+              className="absolute left-4 flex space-x-2 z-10"
+              style={{ top: 'clamp(1rem, env(safe-area-inset-top, 1rem) + 0.5rem, 2.25rem)' }}
+            >
               {slides.map((_, index) => (
                 <div
                   key={index}
@@ -473,7 +479,10 @@ const MatchCard: React.FC<MatchCardProps> = ({
 
           {/* Optimized Adinkra glow effect */}
           {match.adinkra_symbols && match.adinkra_symbols.length > 0 && (
-            <div className="absolute top-0.5 left-1/2 transform -translate-x-1/2 z-10">
+            <div 
+              className="absolute left-1/2 transform -translate-x-1/2 z-10"
+              style={{ top: 'clamp(-0.25rem, env(safe-area-inset-top, -0.25rem) + 0.125rem, 1rem)' }}
+            >
               <div className="relative flex flex-col items-center">
                 {/* Single optimized glow layer */}
                 <div className="relative w-24 h-24 flex items-center justify-center overflow-visible">

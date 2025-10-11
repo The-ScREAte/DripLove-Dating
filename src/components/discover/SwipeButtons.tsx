@@ -22,20 +22,19 @@ const SwipeButtons: React.FC<SwipeButtonsProps> = ({
   const showCount = !isPremium && reversesLeft !== undefined && reversesLeft > 0;
   
   return (
-  <div className="absolute bottom-14 right-5 z-30 ios:bottom-14">
+    <div className="fixed bottom-20 right-4 z-30 sm:absolute sm:bottom-14 sm:right-4 ios:bottom-20 sm:ios:bottom-14">
       <div className="relative">
         <Button
           onClick={onReverse}
           variant="outline"
           disabled={!canReverse}
-          className="rounded-full border-2 border-yellow-500 bg-yellow-500/20 hover:bg-yellow-500/30 disabled:opacity-30 backdrop-blur-sm shadow-lg hover:border-yellow-400 transition-all duration-200"
-          style={{ width: 10, height: 32, minWidth: 32, minHeight: 22 }}
+          className="rounded-full border-2 border-yellow-500 bg-yellow-500/20 hover:bg-yellow-500/30 disabled:opacity-30 backdrop-blur-sm shadow-lg hover:border-yellow-400 transition-all duration-200 w-8 h-8 sm:w-10 sm:h-8 min-w-8 min-h-8 sm:min-w-10 sm:min-h-8 p-0"
           aria-label="Undo last action"
         >
-          <Undo2 style={{ width: 14, height: 16 }} className="text-yellow-500" />
+          <Undo2 className="w-4 h-4 sm:w-5 sm:h-4 text-yellow-500" />
         </Button>
         {showCount && (
-          <div className="absolute -top-2 -right-3 w-6 h-6 bg-yellow-500 text-black text-xs font-bold rounded-full flex items-center justify-center shadow-lg">
+          <div className="absolute -top-2 -right-4 w-6 h-6 bg-yellow-500 text-black text-xs font-bold rounded-full flex items-center justify-center shadow-lg">
             {reversesLeft}
           </div>
         )}
