@@ -723,7 +723,7 @@ const ChatPage = ({ currentUser, onUnreadChange, onDetailViewChange }: ChatPageP
   <div className="fixed inset-0 flex flex-col bg-gray-50">
         {/* Header (safe area respected via env padding) */}
         <div 
-          className="sticky top-0 z-30 bg-gradient-to-r from-pink-500 to-purple-600 text-white chat-header-mobile" 
+          className="sticky top-0 z-30 bg-gradient-to-r from-pink-500 to-purple-600 text-white" 
           style={{ 
             paddingTop: Capacitor.getPlatform() === 'ios' 
               ? 'clamp(30px, calc(env(safe-area-inset-top, 10px) + 15px), 40px)' 
@@ -754,7 +754,7 @@ const ChatPage = ({ currentUser, onUnreadChange, onDetailViewChange }: ChatPageP
       WebkitOverflowScrolling: 'touch',
       marginTop: Capacitor.getPlatform() === 'ios' 
         ? '80px' // Fixed margin for iOS
-        : '0px' // Smaller margin for non-iOS platforms (accounts for reduced header padding)
+        : '20px' // Pull down a bit more for non-iOS platforms (web browsers)
     }}
     onTouchStart={handleTouchStart}
     onTouchMove={handleTouchMove}

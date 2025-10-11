@@ -418,7 +418,7 @@
     .hover\:scale-\[1\.02\]:hover {
       transform: none !important;
     }
-
+  }
 }
 
 /* iOS / Mobile viewport helpers
@@ -489,13 +489,3 @@
       }
     }
   }
-
-  /* Chat header mobile browser adjustments - reduce padding on mobile browsers only */
-  @media screen and (max-width: 768px) and (hover: none) and (pointer: coarse) {
-    /* Only apply to non-native mobile browsers (exclude iOS native app) */
-    html:not(.ios-native) .chat-header-mobile {
-      padding-top: 10px !important;
-    }
-  }
-
-}
