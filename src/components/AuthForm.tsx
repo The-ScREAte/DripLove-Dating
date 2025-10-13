@@ -197,25 +197,12 @@ const AuthForm = ({ isLogin, onToggle, onOAuthSuccess, onBack }: AuthFormProps) 
           // Use web OAuth fallback for non-iOS platforms (browser, Android)
           console.log('🍎 Using WEB Apple OAuth fallback (Browser/Android)');
           try {
-            // This will either complete with JS SDK (returns result) or redirect (never returns)
-            const result = await signInWithAppleFallback();
+            // This function redirects and never returns
+            // The callback will be handled by AppleOAuthCallback component
+            await signInWithAppleFallback();
             
-            console.log('🍎 Apple OAuth completed successfully with JS SDK:', result);
-            
-            // If we get here, JS SDK worked - handle navigation based on result
-            if (result.needsProfileCompletion) {
-              toast({ 
-                title: 'Welcome!', 
-                description: "Please complete your profile to continue." 
-              });
-              navigate('/complete-profile');
-            } else {
-              toast({ 
-                title: 'Welcome back!', 
-                description: "You've been successfully signed in with Apple." 
-              });
-              navigate('/');
-            }
+            // This code never executes since signInWithAppleFallback redirects
+            console.log('🍎 Apple OAuth redirect initiated');
           } catch (err: any) {
             console.error('[Apple Web OAuth Error]:', err);
             

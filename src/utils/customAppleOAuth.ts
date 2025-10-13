@@ -130,7 +130,7 @@ export async function startCustomAppleOAuth(): Promise<never> {
   // Use production URL for Apple OAuth (Apple doesn't allow localhost)
   const isLocalhost = origin.includes('localhost');
   const redirectUri = isLocalhost 
-    ? 'https://fef6ab36-77bc-4046-b6f5-fc5b2ad8c182.lovableproject.com/auth/apple-callback'
+    ? 'https://www.driplove.love/auth/apple-callback'
     : `${origin}/auth/apple-callback`;
   
   // Create Apple OAuth URL without name/email scopes (avoids form_post requirement)

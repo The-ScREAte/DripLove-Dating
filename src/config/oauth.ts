@@ -31,10 +31,10 @@ export const OAUTH_CONFIG = {
   webRedirectUris: {
     google: typeof window !== 'undefined' && window.location.origin 
       ? `${window.location.origin}/auth/callback`
-      : 'https://fef6ab36-77bc-4046-b6f5-fc5b2ad8c182.lovableproject.com/auth/callback',
+      : 'https://www.driplove.love/auth/callback',
     apple: typeof window !== 'undefined' && window.location.origin 
       ? `${window.location.origin}/auth/callback`  
-      : 'https://fef6ab36-77bc-4046-b6f5-fc5b2ad8c182.lovableproject.com/auth/callback'
+      : 'https://www.driplove.love/auth/callback'
   },
   
   // Password reset redirect URI for mobile
@@ -61,7 +61,7 @@ export const OAUTH_CONFIG = {
   // Web fallback for development/testing
   webRedirectUri: typeof window !== 'undefined' && window.location.origin 
     ? `${window.location.origin}/auth/callback`
-    : 'https://fef6ab36-77bc-4046-b6f5-fc5b2ad8c182.lovableproject.com/auth/callback',
+    : 'https://www.driplove.love/auth/callback',
     
   // Localhost development override (will be dynamically determined)
   localhostRedirectUri: typeof window !== 'undefined' && window.location.origin
