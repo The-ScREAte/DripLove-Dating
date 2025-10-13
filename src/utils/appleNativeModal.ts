@@ -125,25 +125,14 @@ export function isAppleSignInAvailable(): boolean {
 }
 
 /**
- * Fallback for non-iOS platforms - use Google OAuth style
+ * Fallback for non-iOS platforms - use custom Apple OAuth with Services ID
  */
-export async function signInWithAppleFallback() {
-  const { getRedirectUri } = await import('@/config/oauth');
-  const redirectTo = getRedirectUri('apple');
+export async function signInWithAppleFallback(): Promise<never> {
+  console.log('🍎 Starting Custom Apple OAuth for Web (Services ID)');
   
-  const { data, error } = await supabase.auth.signInWithOAuth({
-    provider: 'apple',
-    options: {
-      redirectTo,
-      queryParams: {
-        prompt: 'select_account',
-      }
-    }
-  });
-
-  if (error) {
-    throw error;
-  }
-
-  return { data, error: null };
+  // Use our custom Apple OAuth flow that uses the Services ID
+  const { startCustomAppleOAuth } = await import('@/utils/customAppleOAuth');
+  
+  // This will redirect to Apple OAuth (never returns)
+  return await startCustomAppleOAuth();
 }

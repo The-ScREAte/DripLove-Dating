@@ -147,41 +147,103 @@ const AuthForm = ({ isLogin, onToggle, onOAuthSuccess, onBack }: AuthFormProps) 
       console.log('Current platform detection:', {
         isNative: (window as any).Capacitor?.isNativePlatform?.(),
         platform: (window as any).Capacitor?.getPlatform?.(),
-        userAgent: navigator.userAgent
+        userAgent: navigator.userAgent,
+        appleSignInAvailable: isAppleSignInAvailable()
       });
       
-      // For Apple provider, use the in-app Safari View Controller (web-based flow).
-      // We intentionally force the web OAuth path to avoid the native Apple modal which
-      // can run in parallel and cause duplicate login prompts.
+      // For Apple provider, use native modal on iOS and fallback to web OAuth on other platforms
       if (provider === 'apple') {
-        console.log('🍎 Using NATIVE Apple Sign-In Modal (iOS)');
-        try {
-          const data = await signInWithAppleNativeModal();
+        // Check if native Apple Sign-In is available (iOS native only)
+        if (isAppleSignInAvailable()) {
+          console.log('🍎 Using NATIVE Apple Sign-In Modal (iOS)');
+          try {
+            const data = await signInWithAppleNativeModal();
 
-          // Handle profile completion flow (same as Google OAuth)
-          const user = data?.user;
-          if (user) {
-            if (data.needsProfileCompletion) {
-              // User needs to complete profile - redirect to completion
-              toast({ title: 'Welcome!', description: "Please complete your profile to continue." });
+            // Handle profile completion flow (same as Google OAuth)
+            const user = data?.user;
+            if (user) {
+              if (data.needsProfileCompletion) {
+                // User needs to complete profile - redirect to completion
+                toast({ title: 'Welcome!', description: "Please complete your profile to continue." });
+                navigate('/complete-profile');
+              } else {
+                // User has complete profile - go to main app
+                toast({ title: 'Welcome back!', description: "You've been successfully signed in." });
+                navigate('/');
+              }
+            }
+          } catch (err: any) {
+            console.error('[Apple Native OAuth Error]:', err);
+            
+            // Handle user cancellation gracefully
+            if (err.message?.includes('canceled') || err.message?.includes('cancelled')) {
+              toast({
+                title: 'Sign-in Cancelled',
+                description: 'Apple Sign-In was cancelled.',
+                variant: 'default',
+              });
+            } else {
+              toast({
+                title: 'Authentication Error',
+                description: err?.message || 'Failed to sign in with Apple',
+                variant: 'destructive',
+              });
+            }
+          } finally {
+            setOauthLoading(null);
+          }
+          return;
+        } else {
+          // Use web OAuth fallback for non-iOS platforms (browser, Android)
+          console.log('🍎 Using WEB Apple OAuth fallback (Browser/Android)');
+          try {
+            // This will either complete with JS SDK (returns result) or redirect (never returns)
+            const result = await signInWithAppleFallback();
+            
+            console.log('🍎 Apple OAuth completed successfully with JS SDK:', result);
+            
+            // If we get here, JS SDK worked - handle navigation based on result
+            if (result.needsProfileCompletion) {
+              toast({ 
+                title: 'Welcome!', 
+                description: "Please complete your profile to continue." 
+              });
               navigate('/complete-profile');
             } else {
-              // User has complete profile - go to main app
-              toast({ title: 'Welcome back!', description: "You've been successfully signed in." });
+              toast({ 
+                title: 'Welcome back!', 
+                description: "You've been successfully signed in with Apple." 
+              });
               navigate('/');
             }
+          } catch (err: any) {
+            console.error('[Apple Web OAuth Error]:', err);
+            
+            // Check if this is a redirect (not really an error)
+            if (err.message?.includes('Redirect should have happened')) {
+              console.log('🍎 Apple OAuth redirect initiated - waiting for callback');
+              // Don't show error, user will be redirected back
+              return;
+            }
+            
+            // Handle real errors
+            if (err.message?.includes('canceled') || err.message?.includes('cancelled') || err.message?.includes('popup')) {
+              toast({
+                title: 'Sign-in Cancelled',
+                description: 'Apple Sign-In was cancelled.',
+                variant: 'default',
+              });
+            } else {
+              toast({
+                title: 'Authentication Error',
+                description: err?.message || 'Failed to sign in with Apple',
+                variant: 'destructive',
+              });
+            }
+            setOauthLoading(null);
           }
-        } catch (err: any) {
-          console.error('[Apple OAuth Error]:', err);
-          toast({
-            title: 'Authentication Error',
-            description: err?.message || 'Failed to sign in with Apple',
-            variant: 'destructive',
-          });
-        } finally {
-          setOauthLoading(null);
+          return;
         }
-        return;
       } else {
         console.log(`Using standard OAuth flow for ${provider} on web/Android`);
         // Standard OAuth flow for web and Android

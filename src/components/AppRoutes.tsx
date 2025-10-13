@@ -9,6 +9,8 @@ import OAuthCallback from '@/components/OAuthCallback';
 import OAuthDebug from '@/components/OAuthDebug';
 import ProfileCompletionPage from '@/components/ProfileCompletionPage';
 import ResetPasswordPage from '@/components/ResetPasswordPage';
+import AppleOAuthCallback from '@/components/AppleOAuthCallback';
+import AppleOAuthTest from '@/components/AppleOAuthTest';
 import { useMobileOAuth } from '@/hooks/useMobileOAuth';
 
 const AppRoutes = () => {
@@ -22,7 +24,9 @@ const AppRoutes = () => {
       <Route path="/payment-success" element={<PaymentSuccess />} />
       <Route path="/unsubscribe" element={<Unsubscribe />} />
       <Route path="/auth/callback" element={<OAuthCallback />} />
+      <Route path="/auth/apple-callback" element={<AppleOAuthCallback />} />
       <Route path="/auth/debug" element={<OAuthDebug />} />
+      <Route path="/auth/apple-test" element={<AppleOAuthTest />} />
       <Route path="/complete-profile" element={<ProfileCompletionPage />} />
       <Route path="/reset-password" element={<ResetPasswordPage />} />
       {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
