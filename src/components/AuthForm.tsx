@@ -194,9 +194,42 @@ const AuthForm = ({ isLogin, onToggle, onOAuthSuccess, onBack }: AuthFormProps) 
           }
           return;
         } else {
-          // Use standard Supabase OAuth for Apple web (same as Google)
-          console.log('🍎 Using Supabase OAuth for Apple web (Browser/Android)');
-          // Fall through to standard OAuth flow below
+          // Use web OAuth fallback for non-iOS platforms (browser, Android)
+          console.log('🍎 Using WEB Apple OAuth fallback (Browser/Android)');
+          try {
+            // This function redirects and never returns
+            // The callback will be handled by AppleOAuthCallback component
+            await signInWithAppleFallback();
+            
+            // This code never executes since signInWithAppleFallback redirects
+            console.log('🍎 Apple OAuth redirect initiated');
+          } catch (err: any) {
+            console.error('[Apple Web OAuth Error]:', err);
+            
+            // Check if this is a redirect (not really an error)
+            if (err.message?.includes('Redirect should have happened')) {
+              console.log('🍎 Apple OAuth redirect initiated - waiting for callback');
+              // Don't show error, user will be redirected back
+              return;
+            }
+            
+            // Handle real errors
+            if (err.message?.includes('canceled') || err.message?.includes('cancelled') || err.message?.includes('popup')) {
+              toast({
+                title: 'Sign-in Cancelled',
+                description: 'Apple Sign-In was cancelled.',
+                variant: 'default',
+              });
+            } else {
+              toast({
+                title: 'Authentication Error',
+                description: err?.message || 'Failed to sign in with Apple',
+                variant: 'destructive',
+              });
+            }
+            setOauthLoading(null);
+          }
+          return;
         }
       } else {
         console.log(`Using standard OAuth flow for ${provider} on web/Android`);

@@ -3,14 +3,14 @@
  * Handles Google OAuth redirects for iOS and Android
  * 
  * IMPORTANT FOR APPLE SIGN IN:
- * You MUST add these URLs to Apple Developer Console > Services ID (com.driplove.dating) > Website URLs:
+ * You MUST add these URLs to Apple Developer Console > Sign In with Apple > Website URLs:
  * 
  * REQUIRED URLS TO ADD IN APPLE DEVELOPER CONSOLE:
- * 1. https://www.driplove.love/auth/apple-callback (Your domain - PRIMARY)
- * 2. https://tgjsyyihabsovironesw.supabase.co/auth/v1/callback (Supabase Auth - CRITICAL)
- * 3. http://localhost:8080/auth/apple-callback (Development)
+ * 1. https://tgjsyyihabsovironesw.supabase.co/auth/v1/callback (Supabase Auth - CRITICAL)
+ * 2. https://fef6ab36-77bc-4046-b6f5-fc5b2ad8c182.lovableproject.com/auth/callback (Lovable hosting)
+ * 3. http://localhost:5173/auth/callback (Development)
+ * 4. http://localhost:8080/auth/callback (Alternative dev port)
  * 
- * Services ID MUST match Supabase Apple provider: com.driplove.dating
  * WITHOUT THESE URLs IN APPLE DEVELOPER CONSOLE, APPLE SIGN IN WILL FAIL!
  */
 
@@ -55,7 +55,7 @@ export const OAUTH_CONFIG = {
     apple:
       (typeof import.meta !== 'undefined' && (import.meta as any).env?.VITE_APPLE_SERVICES_ID) ||
       process.env?.VITE_APPLE_SERVICES_ID ||
-      'com.driplove.dating',
+      'com.driplove.dating.signin',
   },
   
   // Web fallback for development/testing

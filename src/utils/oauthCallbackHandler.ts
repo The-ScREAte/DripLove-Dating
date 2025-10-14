@@ -9,40 +9,9 @@ import { supabase } from '@/integrations/supabase/client';
  * 4. Query the profiles table and return profile/user/session info
  */
 export async function handleOAuthRedirect(url?: string) {
-  let sessionData: any = null;
-  
   try {
-    // Step A: Check for authorization code flow (Apple OAuth) first
+    // Step A: If a URL with fragment was provided, try setting session from fragment
     if (url) {
-      const urlObj = new URL(url);
-      const code = urlObj.searchParams.get('code');
-      const error = urlObj.searchParams.get('error');
-      
-      if (error) {
-        console.error('[OAuthHandler] OAuth provider returned error:', error);
-        throw new Error(`OAuth error: ${error}`);
-      }
-
-      if (code) {
-        console.log('[OAuthHandler] Found authorization code, letting Supabase exchange it');
-        try {
-          // Let Supabase handle the authorization code exchange
-          const { data, error: exchangeError } = await supabase.auth.exchangeCodeForSession(code);
-          if (exchangeError) {
-            console.warn('[OAuthHandler] Code exchange error:', exchangeError);
-            // Continue to other methods if this fails
-          } else if (data?.session) {
-            console.log('[OAuthHandler] Successfully exchanged code for session:', data.session.user.id);
-            // Continue processing with the new session
-            sessionData = { session: data.session };
-          }
-        } catch (e) {
-          console.warn('[OAuthHandler] Code exchange failed:', e);
-          // Continue to other methods
-        }
-      }
-
-      // Step B: Try token-based flow (fragment)
       try {
         const fragment = url.split('#')[1] || '';
         const params = new URLSearchParams(fragment);
@@ -62,7 +31,7 @@ export async function handleOAuthRedirect(url?: string) {
         console.warn('[OAuthHandler] Failed to set session from fragment:', e);
       }
 
-      // Step C: If getSessionFromUrl is provided by the client, try it as it can
+      // Step B: If getSessionFromUrl is provided by the client, try it as it can
       // parse provider callback fragments/queries that setSession may not handle.
       try {
         if ((supabase.auth as any).getSessionFromUrl) {
@@ -125,11 +94,7 @@ export async function handleOAuthRedirect(url?: string) {
       }
     }
 
-    // Try to get session if we don't already have it from code exchange
-    if (!sessionData) {
-      sessionData = await tryGetSession(4, 500);
-    }
-    
+    const sessionData = await tryGetSession(4, 500);
     if (!sessionData?.session) {
       throw new Error('No session available after OAuth redirect');
     }
