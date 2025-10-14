@@ -13,6 +13,7 @@ import { getPasswordResetRedirectUri, getEmailConfirmRedirectUri } from '@/confi
 import { cleanupSafariViewController } from '@/utils/safariViewController';
 import { signInWithAppleNativeModal, signInWithAppleFallback, isAppleSignInAvailable } from '@/utils/appleNativeModal';
 import AppleAuthDebug from '@/components/AppleAuthDebug';
+import { Capacitor } from '@capacitor/core';
 
 interface AuthFormProps {
   isLogin: boolean;
@@ -24,6 +25,9 @@ interface AuthFormProps {
 const AuthForm = ({ isLogin, onToggle, onOAuthSuccess, onBack }: AuthFormProps) => {
   const navigate = useNavigate();
   const { toast } = useToast();
+  
+  // Check if running on native platform
+  const isNative = Capacitor.isNativePlatform();
 
   const [formData, setFormData] = useState({
     email: '',
@@ -680,28 +684,31 @@ const AuthForm = ({ isLogin, onToggle, onOAuthSuccess, onBack }: AuthFormProps) 
           <>
             {/* OAuth Buttons - Cute and Simple */}
             <div className="space-y-3 mb-6 flex flex-col items-center">
-              <Button
-                type="button"
-                variant="outline"
-                className="w-64 bg-black hover:bg-gray-800 text-white font-medium border-0 py-3 rounded-full transition-all duration-200 flex items-center justify-center shadow-md hover:shadow-lg"
-                onClick={() => handleOAuthSignIn('apple')}
-                disabled={oauthLoading !== null || loading}
-                aria-label="Sign in with Apple"
-              >
-                {oauthLoading === 'apple' ? (
-                  <div className="flex items-center">
-                    <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin mr-2"></div>
-                    Connecting...
-                  </div>
-                ) : (
-                  <>
-                    <svg className="w-5 h-5 mr-2.5 fill-white" viewBox="0 0 814 1000" aria-hidden="true">
-                      <path d="M788.1 340.9c-5.8 4.5-108.2 62.2-108.2 190.5 0 148.4 130.3 200.9 134.2 202.2-.6 3.2-20.7 71.9-68.7 141.9-42.8 61.6-87.5 123.1-155.5 123.1s-85.5-39.5-164-39.5c-76.5 0-103.7 40.8-165.9 40.8s-105.6-57-155.5-127c-52.5-73.8-94.5-189.9-94.5-297.5 0-174.2 113.8-266.6 225.3-266.6 59.3 0 108.9 41.1 146.5 41.1s94.5-44.1 160.8-44.1c26.4 0 121.2 2.6 183.5 93.1zm-234.4-553.1c35.4-42.4 58-101.7 58-160.1 0-8.3-1.2-16.6-2.6-24.2-55.6 2.2-121.2 37.5-159.5 83.8-33.2 38.3-55.6 101.1-55.6 160.1 0 9.6 1.9 19.1 2.6 22.2 1.3.6 3.9.6 6.4.6 50.7 0 113.2-33.8 150.7-82.4z" />
-                    </svg>
-                    Sign in with Apple
-                  </>
-                )}
-              </Button>
+              {/* Apple Sign-In - Only show on native platforms (iOS/Android) */}
+              {isNative && (
+                <Button
+                  type="button"
+                  variant="outline"
+                  className="w-64 bg-black hover:bg-gray-800 text-white font-medium border-0 py-3 rounded-full transition-all duration-200 flex items-center justify-center shadow-md hover:shadow-lg"
+                  onClick={() => handleOAuthSignIn('apple')}
+                  disabled={oauthLoading !== null || loading}
+                  aria-label="Sign in with Apple"
+                >
+                  {oauthLoading === 'apple' ? (
+                    <div className="flex items-center">
+                      <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin mr-2"></div>
+                      Connecting...
+                    </div>
+                  ) : (
+                    <>
+                      <svg className="w-5 h-5 mr-2.5 fill-white" viewBox="0 0 814 1000" aria-hidden="true">
+                        <path d="M788.1 340.9c-5.8 4.5-108.2 62.2-108.2 190.5 0 148.4 130.3 200.9 134.2 202.2-.6 3.2-20.7 71.9-68.7 141.9-42.8 61.6-87.5 123.1-155.5 123.1s-85.5-39.5-164-39.5c-76.5 0-103.7 40.8-165.9 40.8s-105.6-57-155.5-127c-52.5-73.8-94.5-189.9-94.5-297.5 0-174.2 113.8-266.6 225.3-266.6 59.3 0 108.9 41.1 146.5 41.1s94.5-44.1 160.8-44.1c26.4 0 121.2 2.6 183.5 93.1zm-234.4-553.1c35.4-42.4 58-101.7 58-160.1 0-8.3-1.2-16.6-2.6-24.2-55.6 2.2-121.2 37.5-159.5 83.8-33.2 38.3-55.6 101.1-55.6 160.1 0 9.6 1.9 19.1 2.6 22.2 1.3.6 3.9.6 6.4.6 50.7 0 113.2-33.8 150.7-82.4z" />
+                      </svg>
+                      Sign in with Apple
+                    </>
+                  )}
+                </Button>
+              )}
 
               <Button
                 type="button"
