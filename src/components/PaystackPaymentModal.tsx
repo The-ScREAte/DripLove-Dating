@@ -291,7 +291,7 @@ const PaystackPaymentModal: React.FC<PaystackPaymentModalProps> = ({ isOpen, onC
           {isLoading
             ? 'Processing...'
             : selectedPaymentMethod === 'iap'
-              ? `Pay with Apple (${currency} ${amount})`
+              ? `Subscribe Now (${currency} ${amount})`
               : `Pay with Card (${currency} ${amount})`}
         </button>
       </div>

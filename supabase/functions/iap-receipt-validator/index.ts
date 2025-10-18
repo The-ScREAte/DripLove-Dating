@@ -25,6 +25,10 @@ async function validateReceiptWithApple(receiptData: string, isProduction: boole
     : 'https://sandbox.itunes.apple.com/verifyReceipt'
   
   try {
+    // Add timeout protection (30 seconds)
+    const controller = new AbortController()
+    const timeoutId = setTimeout(() => controller.abort(), 30000)
+    
     const response = await fetch(url, {
       method: 'POST',
       headers: {
@@ -32,21 +36,41 @@ async function validateReceiptWithApple(receiptData: string, isProduction: boole
       },
       body: JSON.stringify({
         'receipt-data': receiptData,
-        'password': '', // App-specific shared secret if needed
+        // Use environment variable for shared secret or empty string
+        'password': Deno.env.get('APPLE_SHARED_SECRET') || '',
         'exclude-old-transactions': true
-      })
+      }),
+      signal: controller.signal
     })
+    
+    clearTimeout(timeoutId)
     
     const result = await response.json()
     
+    console.log('[IAP-RECEIPT-VALIDATOR] Apple validation response:', {
+      status: result.status,
+      environment: isProduction ? 'production' : 'sandbox'
+    })
+    
     // If sandbox receipt sent to production, try sandbox
     if (result.status === 21007 && isProduction) {
+      console.log('[IAP-RECEIPT-VALIDATOR] Sandbox receipt detected, retrying with sandbox endpoint')
       return await validateReceiptWithApple(receiptData, false)
+    }
+    
+    // If production receipt sent to sandbox, try production
+    if (result.status === 21008 && !isProduction) {
+      console.log('[IAP-RECEIPT-VALIDATOR] Production receipt detected, retrying with production endpoint')
+      return await validateReceiptWithApple(receiptData, true)
     }
     
     return result
   } catch (error) {
-    console.error('Apple receipt validation error:', error)
+    if (error.name === 'AbortError') {
+      console.error('[IAP-RECEIPT-VALIDATOR] Receipt validation timeout after 30 seconds')
+      throw new Error('Receipt validation timeout')
+    }
+    console.error('[IAP-RECEIPT-VALIDATOR] Apple receipt validation error:', error)
     throw error
   }
 }

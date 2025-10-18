@@ -12,6 +12,7 @@ export const validateRegistrationForm = (formData: any) => {
   if (!formData.country) newErrors.country = 'Country is required';
   if (!formData.gender) newErrors.gender = 'Gender is required';
   if (!formData.preference) newErrors.preference = 'Preference is required';
+  if (!formData.adinkraSymbols || formData.adinkraSymbols.length === 0) newErrors.adinkraSymbols = 'Please select at least 1 Adinkra symbol';
 
   // Email validation
   const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;

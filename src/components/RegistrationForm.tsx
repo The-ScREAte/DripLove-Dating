@@ -807,6 +807,7 @@ const RegistrationForm = ({ onSubmit, onBackToLogin }: RegistrationFormProps) =>
                 selectedSymbols={formData.adinkraSymbols}
                 onChange={(symbols) => setFormData({ ...formData, adinkraSymbols: symbols })}
               />
+              {errors.adinkraSymbols && <p className="text-red-500 text-xs mt-1">{errors.adinkraSymbols}</p>}
             </div>
           </div>
           </div>

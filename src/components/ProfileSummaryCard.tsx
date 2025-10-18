@@ -64,41 +64,43 @@ const ProfileSummaryCard = ({ currentUser }: ProfileSummaryCardProps) => {
   };
 
   return (
-    <Card className="shadow-lg border-pink-200">
-      <CardHeader>
-        <CardTitle className="flex items-center space-x-2">
-          <Users className="w-5 h-5 text-pink-600" />
-          <span>Your DripLove Summary</span>
-        </CardTitle>
-      </CardHeader> 
-      <CardContent>
-        <div className="grid grid-cols-3 gap-4 text-center">
-          <div className="space-y-2">
-            <div className="flex justify-center">
-              <Heart className="w-6 h-6 text-red-500" />
+    <div className="mx-auto w-full max-w-3xl px-4">
+      <Card className="shadow-lg border-pink-200 w-full">
+        <CardHeader>
+          <CardTitle className="flex items-center space-x-2">
+            <Users className="w-5 h-5 text-pink-600" />
+            <span>Your DripLove Summary</span>
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div className="grid grid-cols-3 gap-4 text-center">
+            <div className="space-y-2">
+              <div className="flex justify-center">
+                <Heart className="w-6 h-6 text-red-500" />
+              </div>
+              <div className="text-2xl font-bold text-red-500">{stats.totalMatches}</div>
+              <p className="text-xs text-gray-600">Total Matches</p>
             </div>
-            <div className="text-2xl font-bold text-red-500">{stats.totalMatches}</div>
-            <p className="text-xs text-gray-600">Total Matches</p>
-          </div>
-          
-          <div className="space-y-2">
-            <div className="flex justify-center">
-              <MessageCircle className="w-6 h-6 text-blue-500" />
+
+            <div className="space-y-2">
+              <div className="flex justify-center">
+                <MessageCircle className="w-6 h-6 text-blue-500" />
+              </div>
+              <div className="text-2xl font-bold text-blue-500">{stats.activeChats}</div>
+              <p className="text-xs text-gray-600">Active Chats</p>
             </div>
-            <div className="text-2xl font-bold text-blue-500">{stats.activeChats}</div>
-            <p className="text-xs text-gray-600">Active Chats</p>
-          </div>
-          
-          <div className="space-y-2">
-            <div className="flex justify-center">
-              <Users className="w-6 h-6 text-purple-500" />
+
+            <div className="space-y-2">
+              <div className="flex justify-center">
+                <Users className="w-6 h-6 text-purple-500" />
+              </div>
+              <div className="text-2xl font-bold text-purple-500">{stats.totalLikes}</div>
+              <p className="text-xs text-gray-600">Likes Given</p>
             </div>
-            <div className="text-2xl font-bold text-purple-500">{stats.totalLikes}</div>
-            <p className="text-xs text-gray-600">Likes Given</p>
           </div>
-        </div>
-      </CardContent>
-    </Card>
+        </CardContent>
+      </Card>
+    </div>
   );
 };
 

@@ -20,8 +20,8 @@ const AdinkraSymbolSelector: React.FC<AdinkraSymbolSelectorProps> = ({ selectedS
   return (
     <div className="space-y-4">
       <div>
-        <Label className="text-base font-medium">Favorite Adinkra Symbols (Optional)</Label>
-        <p className="text-sm text-muted-foreground mt-1">Select up to 10 symbols that resonate with you</p>
+        <Label className="text-base font-medium">Select Your Favorite ADINKRA/AFRICAN Symbols *</Label>
+        <p className="text-sm text-muted-foreground mt-1">Choose at least 1 symbol that resonates with you (up to 10)</p>
       </div>
       
       <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-4">
@@ -50,11 +50,9 @@ const AdinkraSymbolSelector: React.FC<AdinkraSymbolSelectorProps> = ({ selectedS
         })}
       </div>
       
-      {selectedSymbols.length > 0 && (
-        <p className="text-sm text-muted-foreground">
-          Selected: {selectedSymbols.length} / 10
-        </p>
-      )}
+      <p className="text-sm text-muted-foreground">
+        Selected: {selectedSymbols.length} / 10 {selectedSymbols.length === 0 && <span className="text-red-500">(Required - select at least 1)</span>}
+      </p>
     </div>
   );
 };

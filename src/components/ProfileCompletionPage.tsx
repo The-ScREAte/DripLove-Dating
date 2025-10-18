@@ -342,6 +342,7 @@ const ProfileCompletionPage = () => {
     if (!formData.occupation) validationErrors.occupation = 'Occupation is required';
     if (!formData.industry) validationErrors.industry = 'Industry is required';
     if (!formData.educationLevel) validationErrors.educationLevel = 'Education level is required';
+    if (!formData.adinkraSymbols || formData.adinkraSymbols.length === 0) validationErrors.adinkraSymbols = 'Please select at least 1 Adinkra symbol';
 
     // Validate images
     const approvedImages = images.filter(img => img.status === 'approved' || img.status === 'pending');
@@ -744,6 +745,7 @@ const ProfileCompletionPage = () => {
                       selectedSymbols={formData.adinkraSymbols}
                       onChange={(symbols) => setFormData({ ...formData, adinkraSymbols: symbols })}
                     />
+                    {errors.adinkraSymbols && <p className="text-sm text-red-500">{errors.adinkraSymbols}</p>}
                   </div>
 
                   <div className="space-y-4">

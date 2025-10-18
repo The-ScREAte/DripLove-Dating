@@ -236,6 +236,9 @@ const MatchCard: React.FC<MatchCardProps> = ({
   const [reportSuccess, setReportSuccess] = useState(false);
   const [reportError, setReportError] = useState("");
   const [selectedReason, setSelectedReason] = useState("");
+  const [isBlocking, setIsBlocking] = useState(false);
+  const [blockReason, setBlockReason] = useState("");
+  const [isBlockSuccess, setIsBlockSuccess] = useState(false);
 
   const reportReasons = [
     "Inappropriate content",
@@ -313,6 +316,46 @@ const MatchCard: React.FC<MatchCardProps> = ({
     setShowReportModal(false);
     setSelectedReason("");
     setReportError("");
+    setBlockReason("");
+    setIsBlockSuccess(false);
+  };
+
+  // Handle block user
+  const handleBlockUser = async () => {
+    if (!match.id) return;
+
+    setIsBlocking(true);
+    try {
+      const { supabase } = await import("@/integrations/supabase/client");
+      
+      // Get current user ID
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) throw new Error("User not authenticated");
+
+      // Insert block record
+      const { error } = await supabase
+        .from('blocks')
+        .insert({
+          blocker_id: user.id,
+          blocked_id: match.id,
+          reason: blockReason.trim() || null
+        });
+
+      if (error) throw error;
+
+      setIsBlockSuccess(true);
+      setTimeout(() => {
+        setShowReportModal(false);
+        setReportSuccess(false);
+        setIsBlockSuccess(false);
+        setSelectedReason("");
+        setBlockReason("");
+      }, 3000); // Give more time to read the block message
+    } catch (err: any) {
+      setReportError(err.message || "Failed to block user");
+    } finally {
+      setIsBlocking(false);
+    }
   };
 
   // Handle split rendering modes
@@ -555,7 +598,13 @@ const MatchCard: React.FC<MatchCardProps> = ({
 
                   {/* Modal content */}
                   <div className="px-6 pb-6 max-h-96 overflow-y-auto">
-                    {reportSuccess ? (
+                    {isBlockSuccess ? (
+                      <div className="text-green-600 font-semibold text-center py-8">
+                        <div className="mb-2 text-3xl">🚫</div>
+                        <div className="text-lg mb-2">Blocked!</div>
+                        <div className="text-sm text-gray-600">Now swipe away and they won't show again.</div>
+                      </div>
+                    ) : reportSuccess ? (
                       <div className="text-green-600 font-semibold text-center py-8">
                         <div className="mb-2 text-2xl">✓</div>
                         <div>Reported! Thank you.</div>
@@ -570,12 +619,12 @@ const MatchCard: React.FC<MatchCardProps> = ({
                             <button
                               key={reason}
                               onClick={() => setSelectedReason(reason)}
-                              disabled={reporting}
+                              disabled={reporting || isBlocking}
                               className={`w-full h-12 px-4 text-left rounded-lg border-2 transition-all duration-200 flex items-center justify-between ${
                                 selectedReason === reason
                                   ? 'border-red-500 bg-red-50 text-red-700'
                                   : 'border-gray-200 bg-gray-50 text-gray-700 hover:border-gray-300 hover:bg-gray-100'
-                              } ${reporting ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer'}`}
+                              } ${(reporting || isBlocking) ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer'}`}
                             >
                               <span className="text-sm font-medium flex-1 pr-2">{reason}</span>
                               {selectedReason === reason && (
@@ -587,12 +636,32 @@ const MatchCard: React.FC<MatchCardProps> = ({
                           ))}
                         </div>
 
+                        {/* Block section */}
+                        <div className="mb-6 p-4 bg-gray-50 rounded-lg border border-gray-200">
+                          <p className="text-gray-700 mb-3 text-sm font-semibold">Block this user (optional):</p>
+                          <textarea
+                            placeholder="Reason for blocking (optional)"
+                            value={blockReason}
+                            onChange={(e) => setBlockReason(e.target.value)}
+                            disabled={reporting || isBlocking}
+                            className="w-full p-3 border border-gray-300 rounded-lg text-sm resize-none focus:ring-2 focus:ring-red-500 focus:border-red-500 disabled:opacity-50 disabled:cursor-not-allowed"
+                            rows={3}
+                          />
+                          <button
+                            className="w-full mt-3 h-10 bg-gray-800 hover:bg-gray-900 text-white font-semibold rounded-lg disabled:opacity-50 disabled:cursor-not-allowed transition-colors duration-200 text-sm"
+                            onClick={handleBlockUser}
+                            disabled={isBlocking || reporting}
+                          >
+                            {isBlocking ? 'Blocking...' : 'Block User'}
+                          </button>
+                        </div>
+
                         {/* Action buttons with stable height */}
                         <div className="space-y-3">
                           <button
                             className="w-full h-12 bg-red-500 hover:bg-red-600 text-white font-semibold rounded-lg disabled:opacity-50 disabled:cursor-not-allowed transition-colors duration-200"
                             onClick={handleReportImage}
-                            disabled={reporting || !selectedReason}
+                            disabled={reporting || !selectedReason || isBlocking}
                           >
                             {reporting ? 'Reporting...' : 'Report Image'}
                           </button>
@@ -600,7 +669,7 @@ const MatchCard: React.FC<MatchCardProps> = ({
                           <button
                             className="w-full h-12 bg-gray-200 hover:bg-gray-300 text-gray-800 font-semibold rounded-lg disabled:opacity-50 disabled:cursor-not-allowed transition-colors duration-200"
                             onClick={closeReportModal}
-                            disabled={reporting}
+                            disabled={reporting || isBlocking}
                           >
                             Cancel
                           </button>

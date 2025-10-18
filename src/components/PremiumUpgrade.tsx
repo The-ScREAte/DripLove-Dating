@@ -31,7 +31,7 @@ const PremiumUpgrade = ({ currentUser, onClose, preselectedPlan }: PremiumUpgrad
   const { subscriptionStatus, isPremium, loading: subscriptionLoading, refetch: refetchSubscription } = useEnhancedSubscription();
 
   React.useEffect(() => {
-    // Listen for productUpdated to enable the Apple Pay button
+    // Listen for productUpdated to enable the in-app purchase button
     function onProductUpdated(p?: any) {
       console.log('[UI] Product updated:', p?.id, p?.state);
       // @ts-ignore
@@ -179,14 +179,29 @@ const PremiumUpgrade = ({ currentUser, onClose, preselectedPlan }: PremiumUpgrad
       }
       
       setIapLoading(true);
+      
+      // Add timeout protection (30 seconds)
+      const timeoutId = setTimeout(() => {
+        console.error('[UI] IAP purchase timeout after 30 seconds');
+        setIapLoading(false);
+        toast({
+          title: 'Purchase Timeout',
+          description: 'The purchase is taking too long. Please try again or contact support.',
+          variant: 'destructive',
+        });
+      }, 30000);
+      
       try {
         console.log('[UI] Starting IAP purchase...');
         await buyMonthly();
+        
+        clearTimeout(timeoutId);
         
         // Removed: Purchase Started toast
         
         // Don't close the modal immediately - let the purchase flow complete
       } catch (err: any) {
+        clearTimeout(timeoutId);
         console.error('[UI] IAP purchase failed:', err);
         
         let errorMessage = 'Purchase failed. Please try again.';
@@ -195,6 +210,8 @@ const PremiumUpgrade = ({ currentUser, onClose, preselectedPlan }: PremiumUpgrad
           errorMessage = 'Product not loaded yet. Please wait and try again.';
         } else if (err?.message?.includes('No purchasable offer')) {
           errorMessage = 'Product not ready for purchase. Please wait and try again.';
+        } else if (err?.message?.includes('timeout') || err?.message?.includes('Timeout')) {
+          errorMessage = 'Purchase timeout. Please check your connection and try again.';
         } else if (err?.message) {
           errorMessage = err.message;
         }
@@ -441,7 +458,7 @@ const PremiumUpgrade = ({ currentUser, onClose, preselectedPlan }: PremiumUpgrad
                   disabled={iapLoading}
                   className="w-full p-4 bg-gradient-to-r from-gray-800 to-black text-white rounded-lg hover:from-gray-700 hover:to-gray-900 transition-all duration-200 font-semibold disabled:opacity-50"
                 >
-                  <div className="text-lg">🍎 {iapLoading ? 'Processing...' : 'Pay with Apple'}</div>
+                  <div className="text-lg">🍎 {iapLoading ? 'Processing...' : 'Subscribe Now'}</div>
                   <div className="text-sm opacity-90">In-App Purchase • Secure & Fast</div>
                 </button>
               )}
@@ -449,8 +466,8 @@ const PremiumUpgrade = ({ currentUser, onClose, preselectedPlan }: PremiumUpgrad
               {/* Loading message when IAP is not ready on iOS */}
               {isIOS() && isNativeApp() && !canBuy && !iapLoading && (
                 <div className="text-center p-4 bg-blue-50 rounded-lg border border-blue-200">
-                  <div className="text-blue-600 mb-2">⏳ Apple Pay is loading...</div>
-                  <div className="text-sm text-blue-500">You can use the payment options above, or wait for Apple Pay to become available.</div>
+                  <div className="text-blue-600 mb-2">⏳ In-App Purchase is loading...</div>
+                  <div className="text-sm text-blue-500">You can use the payment options above, or wait for In-App Purchase to become available.</div>
                 </div>
               )}
             </div>
