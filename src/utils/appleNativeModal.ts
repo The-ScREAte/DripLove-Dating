@@ -63,21 +63,75 @@ export async function signInWithAppleNativeModal() {
 
     console.log('[Apple Native Modal] Successfully authenticated with Supabase:', data.user.id);
 
+    // Extract name from Apple response if available (only on first sign up)
+    let firstName = '';
+    let lastName = '';
+    if (result.response.givenName || result.response.familyName) {
+      firstName = result.response.givenName || '';
+      lastName = result.response.familyName || '';
+      console.log('[Apple Native Modal] Extracted name from Apple:', { firstName, lastName });
+    }
+
     // Check if user profile exists (same as Google OAuth flow)
-    const { data: profile, error: profileError } = await supabase
+    let { data: profile, error: profileError } = await supabase
       .from('profiles')
       .select('id, is_admin, account_status, first_name, last_name')
       .eq('id', data.user.id)
       .single();
 
     if (profileError || !profile) {
-      // User doesn't have a profile - they need to complete profile creation
-      // DO NOT create profile here - let them complete the form first
-      console.log('[Apple Native Modal] No profile found - needs completion');
-      return { 
-        user: data.user, 
-        profile: null,
-        needsProfileCompletion: true 
+      // User doesn't have a profile - create one with Apple name if available
+      console.log('[Apple Native Modal] No profile found - creating with Apple name');
+      
+      const { data: inserted, error: insertError } = await supabase
+        .from('profiles')
+        .insert({
+          id: data.user.id,
+          email: data.user.email,
+          first_name: firstName || null,
+          last_name: lastName || null,
+          date_of_birth: '1990-01-01',
+          country: null,
+          city: null,
+          gender: null,
+          preference: 'both',
+          relationship_intent: 'not-sure',
+          occupation: null,
+          industry: null,
+          education_level: null,
+          account_status: 'active',
+          is_admin: false,
+          terms_accepted: false
+        })
+        .select()
+        .single();
+      
+      if (insertError) {
+        console.error('[Apple Native Modal] Failed to create profile:', insertError);
+        return {
+          user: data.user,
+          profile: null,
+          needsProfileCompletion: true
+        };
+      }
+      
+      // Also update user_metadata with the name
+      if (firstName || lastName) {
+        await supabase.auth.updateUser({
+          data: {
+            first_name: firstName,
+            last_name: lastName,
+          }
+        });
+      }
+      
+      profile = inserted;
+      console.log('[Apple Native Modal] Created profile with Apple name');
+      
+      return {
+        user: { ...data.user, user_metadata: { ...data.user.user_metadata, first_name: firstName, last_name: lastName } },
+        profile,
+        needsProfileCompletion: !firstName || !lastName
       };
     }
 

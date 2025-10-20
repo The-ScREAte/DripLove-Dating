@@ -22,7 +22,7 @@ const SwipeButtons: React.FC<SwipeButtonsProps> = ({
   const showCount = !isPremium && reversesLeft !== undefined && reversesLeft > 0;
   
   return (
-  <div className="fixed bottom-20 right-6 z-30 sm:absolute sm:bottom-20 sm:right-6 ios:bottom-24 sm:ios:bottom-24">
+  <div className="fixed bottom-20 right-6 z-30 sm:absolute sm:bottom-18 sm:right-6 ios:bottom-24 sm:ios:bottom-24">
       <div className="relative">
         <Button
           onClick={onReverse}
