@@ -238,7 +238,8 @@ async function processAppleSignInResponse(response: any): Promise<{
     .eq('id', data.user.id)
     .single();
 
-  // If profile doesn't exist, try to get name from Apple response and save it
+  // If profile doesn't exist, extract name from Apple and save to user_metadata
+  // DO NOT create profile here - let user complete the full profile completion form
   if (profileError || !profile) {
     let firstName = '';
     let lastName = '';
@@ -253,40 +254,7 @@ async function processAppleSignInResponse(response: any): Promise<{
       } catch {}
     }
     
-    // Create minimal profile with Apple name if available
-    const { data: inserted, error: insertError } = await supabase
-      .from('profiles')
-      .insert({
-        id: data.user.id,
-        email: data.user.email,
-        first_name: firstName || null,
-        last_name: lastName || null,
-        date_of_birth: '1990-01-01',
-        country: null,
-        city: null,
-        gender: null,
-        preference: 'both',
-        relationship_intent: 'not-sure',
-        occupation: null,
-        industry: null,
-        education_level: null,
-        account_status: 'active',
-        is_admin: false,
-        terms_accepted: false
-      })
-      .select()
-      .single();
-    
-    if (insertError) {
-      console.error('🍎 Failed to create profile:', insertError);
-      return {
-        user: data.user,
-        profile: null,
-        needsProfileCompletion: true
-      };
-    }
-    
-    // Also update user_metadata with the name for easier access
+    // Save name to user_metadata so it can be pre-filled in profile completion form
     if (firstName || lastName) {
       await supabase.auth.updateUser({
         data: {
@@ -294,15 +262,14 @@ async function processAppleSignInResponse(response: any): Promise<{
           last_name: lastName,
         }
       });
+      console.log('🍎 Saved Apple name to user_metadata:', { firstName, lastName });
     }
     
-    profile = inserted;
-    console.log('🍎 Created profile with Apple name:', { firstName, lastName });
-    
+    console.log('🍎 No profile found - user needs to complete profile with moderation');
     return {
       user: { ...data.user, user_metadata: { ...data.user.user_metadata, first_name: firstName, last_name: lastName } },
-      profile,
-      needsProfileCompletion: !firstName || !lastName,
+      profile: null,
+      needsProfileCompletion: true
     };
   }
   
