@@ -21,8 +21,14 @@ const SwipeButtons: React.FC<SwipeButtonsProps> = ({
 }) => {
   const showCount = !isPremium && reversesLeft !== undefined && reversesLeft > 0;
   
+  // Detect iOS
+  const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) || 
+                (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+  
   return (
-  <div className="fixed bottom-16 right-6 z-30 sm:absolute sm:bottom-18 sm:right-6 ios:bottom-32 sm:ios:bottom-32">
+  <div className={`fixed right-6 z-30 sm:absolute sm:right-6 ${
+    isIOS ? 'bottom-24 sm:bottom-36' : 'bottom-24 sm:bottom-24'
+  }`}>
       <div className="relative">
         <Button
           onClick={onReverse}
