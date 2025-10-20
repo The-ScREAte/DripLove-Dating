@@ -26,6 +26,7 @@ const PremiumUpgrade = ({ currentUser, onClose, preselectedPlan }: PremiumUpgrad
   const [paymentType, setPaymentType] = useState<'subscription' | 'one-time' | 'iap' | null>(null);
   const [iapLoading, setIapLoading] = useState(false);
   const [canBuy, setCanBuy] = useState(false);
+  const [iapLoadingTimeout, setIapLoadingTimeout] = useState(false);
   
   // Enhanced subscription status monitoring
   const { subscriptionStatus, isPremium, loading: subscriptionLoading, refetch: refetchSubscription } = useEnhancedSubscription();
@@ -39,6 +40,11 @@ const PremiumUpgrade = ({ currentUser, onClose, preselectedPlan }: PremiumUpgrad
       const hasOffer = !!product?.getOffer?.();
       console.log('[UI] Product check:', { product: !!product, hasOffer, state: product?.state });
       setCanBuy(hasOffer);
+      
+      // If product becomes available, clear the timeout flag
+      if (hasOffer) {
+        setIapLoadingTimeout(false);
+      }
     }
     
     // Listen for verified purchases to reset loading state
@@ -106,8 +112,24 @@ const PremiumUpgrade = ({ currentUser, onClose, preselectedPlan }: PremiumUpgrad
       onProductUpdated();
     }, 1000);
     
+    // Set a timeout for IAP loading - if not loaded after 10 seconds, show Paystack options
+    const loadingTimeout = setTimeout(() => {
+      if (!canBuy) {
+        console.log('[UI] IAP loading timeout - enabling fallback payment options');
+        setIapLoadingTimeout(true);
+        toast({
+          title: 'In-App Purchase Unavailable',
+          description: 'In-App Purchase is taking too long to load. Please use the alternative payment options below.',
+        });
+      }
+    }, 10000); // 10 seconds timeout
+    
+    // Cleanup
+    return () => {
+      clearTimeout(loadingTimeout);
+    };
     // No off/unsubscribe in plugin
-  }, [toast]);
+  }, [toast, canBuy]);
   const [price, setPrice] = useState<string | null>(null);
   const [monthlyPrice, setMonthlyPrice] = useState<string | null>(null);
   const [paymentMethods, setPaymentMethods] = useState<any[]>([]);
@@ -431,9 +453,40 @@ const PremiumUpgrade = ({ currentUser, onClose, preselectedPlan }: PremiumUpgrad
             </button>
             <h2 className="text-xl font-bold mb-4 text-center">Choose Payment Option</h2>
             <div className="space-y-4">
-              {/* Show Paystack options only when NOT on iOS native. On iOS native we show IAP (or loading message). */}
-              {(!isIOS() || !isNativeApp()) && (
+              {/* Apple IAP - show on iOS native when available */}
+              {isIOS() && isNativeApp() && canBuy && (
+                <button
+                  onClick={() => handlePaymentTypeSelection('iap')}
+                  disabled={iapLoading}
+                  className="w-full p-4 bg-gradient-to-r from-gray-800 to-black text-white rounded-lg hover:from-gray-700 hover:to-gray-900 transition-all duration-200 font-semibold disabled:opacity-50"
+                >
+                  <div className="text-lg">🍎 {iapLoading ? 'Processing...' : 'Subscribe Now'}</div>
+                  <div className="text-sm opacity-90">In-App Purchase • Secure & Fast</div>
+                </button>
+              )}
+              
+              {/* Loading message when IAP is not ready on iOS (but only if timeout hasn't occurred) */}
+              {isIOS() && isNativeApp() && !canBuy && !iapLoadingTimeout && (
+                <div className="text-center p-4 bg-blue-50 rounded-lg border border-blue-200">
+                  <div className="text-blue-600 mb-2">⏳ In-App Purchase is loading...</div>
+                  <div className="text-sm text-blue-500">Please wait a moment...</div>
+                </div>
+              )}
+              
+              {/* Show Paystack options when:
+                  1. NOT on iOS native, OR
+                  2. On iOS native but IAP is NOT available (canBuy is false)
+                  Note: Once IAP becomes available (canBuy is true), Paystack options are hidden
+              */}
+              {((!isIOS() || !isNativeApp()) || (isIOS() && isNativeApp() && !canBuy)) && (
                 <>
+                  {/* Show message if on iOS but falling back to Paystack */}
+                  {isIOS() && isNativeApp() && iapLoadingTimeout && (
+                    <div className="text-center p-3 bg-yellow-50 rounded-lg border border-yellow-200 mb-2">
+                      <div className="text-sm text-yellow-700">In-App Purchase is unavailable. Please use the options below:</div>
+                    </div>
+                  )}
+                  
                   <button
                     onClick={() => handlePaymentTypeSelection('subscription')}
                     className="w-full p-4 bg-gradient-to-r from-green-500 to-green-600 text-white rounded-lg hover:from-green-600 hover:to-green-700 transition-all duration-200 font-semibold"
@@ -449,26 +502,6 @@ const PremiumUpgrade = ({ currentUser, onClose, preselectedPlan }: PremiumUpgrad
                     <div className="text-sm opacity-90">{price !== null ? `${currency} ${price}` : 'Loading...'} • 1 month access • No auto-renewal</div>
                   </button>
                 </>
-              )}
-              
-              {/* Apple IAP - show on iOS native when available */}
-              {isIOS() && isNativeApp() && canBuy && (
-                <button
-                  onClick={() => handlePaymentTypeSelection('iap')}
-                  disabled={iapLoading}
-                  className="w-full p-4 bg-gradient-to-r from-gray-800 to-black text-white rounded-lg hover:from-gray-700 hover:to-gray-900 transition-all duration-200 font-semibold disabled:opacity-50"
-                >
-                  <div className="text-lg">🍎 {iapLoading ? 'Processing...' : 'Subscribe Now'}</div>
-                  <div className="text-sm opacity-90">In-App Purchase • Secure & Fast</div>
-                </button>
-              )}
-              
-              {/* Loading message when IAP is not ready on iOS */}
-              {isIOS() && isNativeApp() && !canBuy && !iapLoading && (
-                <div className="text-center p-4 bg-blue-50 rounded-lg border border-blue-200">
-                  <div className="text-blue-600 mb-2">⏳ In-App Purchase is loading...</div>
-                  <div className="text-sm text-blue-500">You can use the payment options above, or wait for In-App Purchase to become available.</div>
-                </div>
               )}
             </div>
           </div>
