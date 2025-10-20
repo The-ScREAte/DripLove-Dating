@@ -94,15 +94,30 @@ const ProfileCompletionPage = () => {
   }, [images]);
 
   useEffect(() => {
-    // Pre-fill form with user data from OAuth if available
-    if (user) {
-      setFormData(prev => ({
-        ...prev,
-        email: user.email || '',
-        firstName: user.user_metadata?.first_name || user.user_metadata?.name?.split(' ')[0] || '',
-        lastName: user.user_metadata?.last_name || user.user_metadata?.name?.split(' ').slice(1).join(' ') || '',
-      }));
-    }
+    // Pre-fill form with user data from OAuth and Supabase profile if available
+    const prefill = async () => {
+      if (user) {
+        // Try to get profile from Supabase
+        const { data: profile } = await supabase
+          .from('profiles')
+          .select('first_name, last_name')
+          .eq('id', user.id)
+          .single();
+        setFormData(prev => ({
+          ...prev,
+          email: user.email || '',
+          firstName:
+            profile?.first_name ||
+            user.user_metadata?.first_name ||
+            user.user_metadata?.name?.split(' ')[0] || '',
+          lastName:
+            profile?.last_name ||
+            user.user_metadata?.last_name ||
+            user.user_metadata?.name?.split(' ').slice(1).join(' ') || '',
+        }));
+      }
+    };
+    prefill();
   }, [user]);
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {

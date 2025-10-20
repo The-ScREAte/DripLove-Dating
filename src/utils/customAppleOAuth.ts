@@ -232,18 +232,77 @@ async function processAppleSignInResponse(response: any): Promise<{
   console.log('🍎 Successfully authenticated with Supabase:', data.user.id);
   
   // Check if user profile exists
-  const { data: profile, error: profileError } = await supabase
+  let { data: profile, error: profileError } = await supabase
     .from('profiles')
     .select('id, is_admin, account_status, first_name, last_name')
     .eq('id', data.user.id)
     .single();
-  
+
+  // If profile doesn't exist, try to get name from Apple response and save it
   if (profileError || !profile) {
-    console.log('🍎 No profile found - needs completion');
-    return { 
-      user: data.user, 
-      profile: null,
-      needsProfileCompletion: true 
+    let firstName = '';
+    let lastName = '';
+    // Try to get name from response.authorization.user (Apple only sends on first sign up)
+    if (response.authorization && response.authorization.user) {
+      try {
+        const userObj = JSON.parse(response.authorization.user);
+        if (userObj.name) {
+          firstName = userObj.name.firstName || '';
+          lastName = userObj.name.lastName || '';
+        }
+      } catch {}
+    }
+    
+    // Create minimal profile with Apple name if available
+    const { data: inserted, error: insertError } = await supabase
+      .from('profiles')
+      .insert({
+        id: data.user.id,
+        email: data.user.email,
+        first_name: firstName || null,
+        last_name: lastName || null,
+        date_of_birth: '1990-01-01',
+        country: null,
+        city: null,
+        gender: null,
+        preference: 'both',
+        relationship_intent: 'not-sure',
+        occupation: null,
+        industry: null,
+        education_level: null,
+        account_status: 'active',
+        is_admin: false,
+        terms_accepted: false
+      })
+      .select()
+      .single();
+    
+    if (insertError) {
+      console.error('🍎 Failed to create profile:', insertError);
+      return {
+        user: data.user,
+        profile: null,
+        needsProfileCompletion: true
+      };
+    }
+    
+    // Also update user_metadata with the name for easier access
+    if (firstName || lastName) {
+      await supabase.auth.updateUser({
+        data: {
+          first_name: firstName,
+          last_name: lastName,
+        }
+      });
+    }
+    
+    profile = inserted;
+    console.log('🍎 Created profile with Apple name:', { firstName, lastName });
+    
+    return {
+      user: { ...data.user, user_metadata: { ...data.user.user_metadata, first_name: firstName, last_name: lastName } },
+      profile,
+      needsProfileCompletion: !firstName || !lastName,
     };
   }
   
