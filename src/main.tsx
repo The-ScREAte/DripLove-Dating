@@ -117,7 +117,8 @@ const AppWrapper = () => {
             const { initIAP } = await import('./iap');
             await initIAP();
           } catch (error) {
-            // Silent error handling
+            console.error('[App] Failed to initialize In-App Purchase:', error);
+            // Log but don't crash - IAP is optional feature
           }
 
           // Initialize Capacitor plugins (background)

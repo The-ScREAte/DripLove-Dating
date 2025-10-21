@@ -5,7 +5,7 @@ export function initIAP() {
     // @ts-ignore
     const { store, LogLevel, Platform, ProductType, log } = window.CdvPurchase || {};
     if (!store) {
-      console.error('CdvPurchase.store not available!');
+      console.error('[IAP] CdvPurchase.store not available! StoreKit not loaded.');
       return;
     }
     if (log && LogLevel && typeof log.setLevel === 'function') {
@@ -19,11 +19,6 @@ export function initIAP() {
           id: 'com.driplove.dating.premium.monthlysub',
           platform: Platform.APPLE_APPSTORE,
           type: ProductType.PAID_SUBSCRIPTION
-        },
-        {
-          id: 'com.driplove.dating.premium.lifetime',
-          platform: Platform.APPLE_APPSTORE,
-          type: ProductType.NON_CONSUMABLE
         }
       ]);
     } else {
@@ -43,29 +38,21 @@ export function initIAP() {
     if (store.when && typeof store.when === 'function') {
       store.when()
         .productUpdated(p => {
-          console.log('[IAP] productUpdated:', p?.id, p?.title, p?.pricing?.price, 'state:', p?.state);
-          const offer = p?.getOffer?.();
-          console.log('[IAP] offer available:', !!offer, offer);
+          // Product updated - no logging
         })
         .approved(t => {
-          console.log('[IAP] approved:', t.productId);
-          console.log('[IAP] Purchase initiated by user:', !!window.iapPurchaseInitiated);
-          
           // Only verify if user explicitly initiated the purchase
           if (window.iapPurchaseInitiated) {
-            console.log('[IAP] Verifying transaction...');
             if (t.verify && typeof t.verify === 'function') {
               t.verify();
             }
           } else {
-            console.log('[IAP] Skipping auto-verification - purchase not initiated by user');
             if (t.finish && typeof t.finish === 'function') {
               t.finish();
             }
           }
         })
         .verified(async (r) => {
-          console.log('[IAP] verified (granting):', r.productId);
           
           // Reset the purchase flag
           window.iapPurchaseInitiated = false;
@@ -80,8 +67,6 @@ export function initIAP() {
               const receiptData = r.receipt || r.payload || r.transactionReceipt;
               
               if (receiptData) {
-                console.log('[IAP] Validating receipt with server');
-                
                 // Add timeout protection for receipt validation (25 seconds)
                 const validationTimeout = new Promise((_, reject) => {
                   setTimeout(() => reject(new Error('Receipt validation timeout')), 25000);
@@ -110,8 +95,6 @@ export function initIAP() {
                   console.error('[IAP] Receipt validation failed, using fallback:', validationError || validation);
                   
                   // Fallback: Direct database update if validation fails/times out
-                  console.log('[IAP] Using fallback method to activate subscription');
-                  
                   const expiryDate = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000);
                   const subscriptionData = {
                     user_id: user.id,
@@ -131,13 +114,11 @@ export function initIAP() {
                     .from('user_subscriptions')
                     .upsert(subscriptionData, { onConflict: 'user_id' });
 
-                  console.log('[IAP] Subscription activated via fallback method');
                   window.location.href = '/payment-success?status=successful&payment_type=iap';
                   return;
                 }
 
                 if (validation.active) {
-                  console.log('[IAP] Receipt validated successfully');
                   
                   // Reset payment attempts on successful validation
                   await supabase
@@ -151,12 +132,10 @@ export function initIAP() {
                   // Redirect to success page
                   window.location.href = '/payment-success?status=successful&payment_type=iap';
                 } else {
-                  console.log('[IAP] Receipt valid but subscription inactive');
                   alert('Your subscription has expired. Please renew your subscription.');
                 }
               } else {
                 // Fallback: Direct database update if no receipt data available
-                console.log('[IAP] No receipt data available, using fallback method');
                 
                 const expiryDate = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000);
                 const subscriptionData = {
@@ -178,7 +157,6 @@ export function initIAP() {
                   .from('user_subscriptions')
                   .upsert(subscriptionData, { onConflict: 'user_id' });
 
-                console.log('[IAP] Subscription updated successfully (fallback)');
                 window.location.href = '/payment-success?status=successful&payment_type=iap';
               }
             }
@@ -234,10 +212,14 @@ export function initIAP() {
     // 4) Initialize AFTER register, then refresh
     if (store.initialize && typeof store.initialize === 'function') {
       store.initialize([{ platform: Platform.APPLE_APPSTORE, options: { needAppReceipt: true } }]);
+    } else {
+      console.error('[IAP] store.initialize not available');
     }
     
     if (store.refresh && typeof store.refresh === 'function') {
       store.refresh();
+    } else {
+      console.error('[IAP] store.refresh not available');
     }
   });
 }
@@ -270,15 +252,6 @@ export async function buyMonthly() {
     throw new Error('[IAP] No purchasable offer available. Product state: ' + p?.state);
   }
 
-  console.log('[IAP] Starting purchase for:', p.id);
-  console.log('[IAP] Product details:', { 
-    id: p.id, 
-    title: p.title, 
-    price: p.pricing?.price, 
-    state: p.state,
-    offerAvailable: !!offer 
-  });
-  
   // Set flag to indicate user initiated this purchase
   window.iapPurchaseInitiated = true;
   

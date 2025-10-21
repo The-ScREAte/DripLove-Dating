@@ -34,11 +34,9 @@ const PremiumUpgrade = ({ currentUser, onClose, preselectedPlan }: PremiumUpgrad
   React.useEffect(() => {
     // Listen for productUpdated to enable the in-app purchase button
     function onProductUpdated(p?: any) {
-      console.log('[UI] Product updated:', p?.id, p?.state);
       // @ts-ignore
       const product = window.CdvPurchase?.store?.get?.('com.driplove.dating.premium.monthlysub');
       const hasOffer = !!product?.getOffer?.();
-      console.log('[UI] Product check:', { product: !!product, hasOffer, state: product?.state });
       setCanBuy(hasOffer);
       
       // If product becomes available, clear the timeout flag
@@ -49,7 +47,6 @@ const PremiumUpgrade = ({ currentUser, onClose, preselectedPlan }: PremiumUpgrad
     
     // Listen for verified purchases to reset loading state
     function onVerified(r?: any) {
-      console.log('[UI] Purchase verified:', r?.productId);
       if (r?.productId === 'com.driplove.dating.premium.monthlysub') {
         setIapLoading(false);
         setShowPaymentOptions(false);
@@ -58,7 +55,6 @@ const PremiumUpgrade = ({ currentUser, onClose, preselectedPlan }: PremiumUpgrad
     
     // Listen for unverified purchases (includes cancellations)
     function onUnverified(r?: any, err?: any) {
-      console.log('[UI] Purchase unverified/cancelled:', r?.productId, err?.message);
       if (r?.productId === 'com.driplove.dating.premium.monthlysub') {
         setIapLoading(false);
         toast({
@@ -70,7 +66,6 @@ const PremiumUpgrade = ({ currentUser, onClose, preselectedPlan }: PremiumUpgrad
     
     // Listen for errors (includes user cancellations)
     function onError(e?: any) {
-      console.log('[UI] IAP Error:', e?.code, e?.message);
       // User cancellation typically has specific error codes
       if (e?.code === 'UserCancel' || e?.code === 2 || e?.message?.toLowerCase()?.includes('cancel')) {
         setIapLoading(false);
@@ -112,21 +107,27 @@ const PremiumUpgrade = ({ currentUser, onClose, preselectedPlan }: PremiumUpgrad
       onProductUpdated();
     }, 1000);
     
-    // Set a timeout for IAP loading - if not loaded after 10 seconds, show Paystack options
-    const loadingTimeout = setTimeout(() => {
-      if (!canBuy) {
-        console.log('[UI] IAP loading timeout - enabling fallback payment options');
-        setIapLoadingTimeout(true);
-        toast({
-          title: 'In-App Purchase Unavailable',
-          description: 'In-App Purchase is taking too long to load. Please use the alternative payment options below.',
-        });
-      }
-    }, 10000); // 10 seconds timeout
+    // On iOS, don't set timeout or show Paystack fallback - only IAP is allowed
+    let loadingTimeout: NodeJS.Timeout | undefined;
+    
+    if (!isIOS() || !isNativeApp()) {
+      // Set timeout for IAP loading on non-iOS platforms
+      loadingTimeout = setTimeout(() => {
+        if (!canBuy) {
+          setIapLoadingTimeout(true);
+          toast({
+            title: 'In-App Purchase Unavailable',
+            description: 'In-App Purchase is taking too long to load. Please use the alternative payment options below.',
+          });
+        }
+      }, 10000); // 10 seconds timeout
+    }
     
     // Cleanup
     return () => {
-      clearTimeout(loadingTimeout);
+      if (loadingTimeout) {
+        clearTimeout(loadingTimeout);
+      }
     };
     // No off/unsubscribe in plugin
   }, [toast, canBuy]);
@@ -214,7 +215,6 @@ const PremiumUpgrade = ({ currentUser, onClose, preselectedPlan }: PremiumUpgrad
       }, 30000);
       
       try {
-        console.log('[UI] Starting IAP purchase...');
         await buyMonthly();
         
         clearTimeout(timeoutId);
@@ -451,7 +451,9 @@ const PremiumUpgrade = ({ currentUser, onClose, preselectedPlan }: PremiumUpgrad
             >
               ✕
             </button>
-            <h2 className="text-xl font-bold mb-4 text-center">Choose Payment Option</h2>
+            <h2 className="text-xl font-bold mb-4 text-center">
+              {isIOS() && isNativeApp() ? 'Subscribe via In-App Purchase' : 'Choose Payment Option'}
+            </h2>
             <div className="space-y-4">
               {/* Apple IAP - show on iOS native when available */}
               {isIOS() && isNativeApp() && canBuy && (
@@ -465,28 +467,18 @@ const PremiumUpgrade = ({ currentUser, onClose, preselectedPlan }: PremiumUpgrad
                 </button>
               )}
               
-              {/* Loading message when IAP is not ready on iOS (but only if timeout hasn't occurred) */}
-              {isIOS() && isNativeApp() && !canBuy && !iapLoadingTimeout && (
+              {/* Loading message when IAP is not ready on iOS */}
+              {isIOS() && isNativeApp() && !canBuy && (
                 <div className="text-center p-4 bg-blue-50 rounded-lg border border-blue-200">
                   <div className="text-blue-600 mb-2">⏳ In-App Purchase is loading...</div>
-                  <div className="text-sm text-blue-500">Please wait a moment...</div>
+                  <div className="text-sm text-blue-500">Please wait a moment while we connect to the App Store.</div>
+                  <div className="text-xs text-gray-500 mt-2">If this takes too long, please restart the app.</div>
                 </div>
               )}
               
-              {/* Show Paystack options when:
-                  1. NOT on iOS native, OR
-                  2. On iOS native but IAP is NOT available (canBuy is false)
-                  Note: Once IAP becomes available (canBuy is true), Paystack options are hidden
-              */}
-              {((!isIOS() || !isNativeApp()) || (isIOS() && isNativeApp() && !canBuy)) && (
+              {/* Show Paystack options ONLY on non-iOS platforms */}
+              {!isIOS() && !isNativeApp() && (
                 <>
-                  {/* Show message if on iOS but falling back to Paystack */}
-                  {isIOS() && isNativeApp() && iapLoadingTimeout && (
-                    <div className="text-center p-3 bg-yellow-50 rounded-lg border border-yellow-200 mb-2">
-                      <div className="text-sm text-yellow-700">In-App Purchase is unavailable. Please use the options below:</div>
-                    </div>
-                  )}
-                  
                   <button
                     onClick={() => handlePaymentTypeSelection('subscription')}
                     className="w-full p-4 bg-gradient-to-r from-green-500 to-green-600 text-white rounded-lg hover:from-green-600 hover:to-green-700 transition-all duration-200 font-semibold"
@@ -508,17 +500,19 @@ const PremiumUpgrade = ({ currentUser, onClose, preselectedPlan }: PremiumUpgrad
         </div>
       )}
 
-      {/* Payment Modals */}
-      <PaystackPaymentModal
-        isOpen={showPaymentModal}
-        onClose={() => setShowPaymentModal(false)}
-        amount={parseFloat(paymentType === 'one-time' ? (price || '0') : (monthlyPrice || price || '0'))}
-        currency={currency}
-        email={currentUser?.email || ''}
-        onSuccess={handlePaymentSuccess}
-        paymentMethod={paymentMethods[0]?.type || 'card'}
-        isOneTime={paymentType === 'one-time'}
-      />
+      {/* Payment Modals - Only render on non-iOS platforms */}
+      {!isIOS() && !isNativeApp() && (
+        <PaystackPaymentModal
+          isOpen={showPaymentModal}
+          onClose={() => setShowPaymentModal(false)}
+          amount={parseFloat(paymentType === 'one-time' ? (price || '0') : (monthlyPrice || price || '0'))}
+          currency={currency}
+          email={currentUser?.email || ''}
+          onSuccess={handlePaymentSuccess}
+          paymentMethod={paymentMethods[0]?.type || 'card'}
+          isOneTime={paymentType === 'one-time'}
+        />
+      )}
     </div>
   );
 };
