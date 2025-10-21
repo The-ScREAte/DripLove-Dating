@@ -2,30 +2,35 @@ import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Heart, Loader2 } from 'lucide-react';
 
 const OAuthCallback = () => {
   const navigate = useNavigate();
   const { toast } = useToast();
   const [loading, setLoading] = useState(true);
-  const [status, setStatus] = useState<string>('Processing authentication...');
+  const [isNativeMobile, setIsNativeMobile] = useState(false);
 
   useEffect(() => {
-    const handleAuthCallback = async () => {
-      // Short-circuit early on native iOS: the deep-link is handled by
-      // App.addListener('appUrlOpen') in the native layer. Avoid running the
-      // WebView /auth/callback logic when inside the iOS Capacitor WebView.
+    // Check if we're on native mobile first
+    const checkPlatform = async () => {
       try {
         const { Capacitor } = await import('@capacitor/core');
-        if (Capacitor && Capacitor.isNativePlatform && Capacitor.getPlatform && Capacitor.isNativePlatform() && Capacitor.getPlatform() === 'ios') {
-          console.log('OAuthCallback: Skipping on native iOS; handled via appUrlOpen');
-          navigate('/');
-          return;
+        if (Capacitor && Capacitor.isNativePlatform && Capacitor.isNativePlatform()) {
+          console.log('OAuthCallback: Native mobile detected, skipping web callback');
+          setIsNativeMobile(true);
+          // Immediately navigate to Index - useMobileOAuth will handle auth
+          navigate('/', { replace: true });
+          return true;
         }
       } catch (e) {
-        // Capacitor not available or import failed -> continue with web flow
+        // Capacitor not available -> web flow
       }
+      return false;
+    };
+
+    const handleAuthCallback = async () => {
+      // Check platform first and skip if native mobile
+      const isNative = await checkPlatform();
+      if (isNative) return;
 
       const timeout = setTimeout(() => {
         toast({
@@ -37,7 +42,6 @@ const OAuthCallback = () => {
       }, 10000);
 
       try {
-        setStatus('Checking authentication...');
         console.log('OAuthCallback: Current URL:', window.location.href);
         console.log('OAuthCallback: Search params:', window.location.search);
         console.log('OAuthCallback: Hash:', window.location.hash);
@@ -69,7 +73,6 @@ const OAuthCallback = () => {
         // Handle direct token in fragment (some OAuth providers use this)
         if (accessToken && refreshToken) {
           console.log('OAuthCallback: Found tokens in URL fragment, setting session directly');
-          setStatus('Setting up session...');
           
           const { data, error } = await supabase.auth.setSession({
             access_token: accessToken,
@@ -87,7 +90,6 @@ const OAuthCallback = () => {
 
         if (code) {
           console.log('OAuthCallback: Found authorization code, letting Supabase handle it');
-          setStatus('Processing authorization code...');
           
           // For authorization code flow, try to exchange the code
           try {
@@ -284,32 +286,9 @@ const OAuthCallback = () => {
     handleAuthCallback();
   }, [navigate, toast]);
 
-  if (loading) {
-    return (
-  <div className="min-h-fill flex items-center justify-center bg-gradient-to-br from-pink-50 to-purple-50">
-        <Card className="w-full max-w-md mx-auto backdrop-blur-sm bg-white/90 shadow-2xl border-0">
-          <CardHeader className="text-center pb-6">
-            <div className="flex justify-center mb-4">
-              <div className="p-3 bg-gradient-to-r from-pink-500 to-purple-600 rounded-full">
-                <Heart className="w-8 h-8 text-white" />
-              </div>
-            </div>
-            <CardTitle className="text-2xl font-bold bg-gradient-to-r from-pink-600 to-purple-600 bg-clip-text text-transparent">
-              Authentication
-            </CardTitle>
-            <CardDescription className="text-gray-600">
-              {status}
-            </CardDescription>
-          </CardHeader>
-          <CardContent className="text-center">
-            <div className="flex items-center justify-center space-x-2">
-              <Loader2 className="w-6 h-6 animate-spin text-pink-500" />
-              <span className="text-gray-600">Please wait...</span>
-            </div>
-          </CardContent>
-        </Card>
-      </div>
-    );
+  // Don't show any loading UI for native mobile - just redirect immediately
+  if (isNativeMobile || loading) {
+    return null;
   }
 
   return null;

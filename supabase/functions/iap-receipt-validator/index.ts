@@ -66,7 +66,7 @@ async function validateReceiptWithApple(receiptData: string, isProduction: boole
     
     return result
   } catch (error) {
-    if (error.name === 'AbortError') {
+    if (error instanceof Error && error.name === 'AbortError') {
       console.error('[IAP-RECEIPT-VALIDATOR] Receipt validation timeout after 30 seconds')
       throw new Error('Receipt validation timeout')
     }
