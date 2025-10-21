@@ -39,9 +39,10 @@ const config: CapacitorConfig = {
       resizeOnFullScreen: true
     },
     Browser: {
-      // Safari View Controller configuration for iOS
+      // Safari View Controller configuration for iOS (for in-app OAuth)
+      // This satisfies Apple's Guideline 4.0 by keeping users in-app during authentication
       toolbarColor: '#000000',
-      // Enable Safari View Controller on iOS
+      // Enable Safari View Controller on iOS (in-app browser)
       presentationStyle: 'popover'
     },
     // Performance monitoring

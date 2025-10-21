@@ -107,12 +107,14 @@ serve(async (req) => {
 
     console.log('[IAP-RECEIPT-VALIDATOR] Validating receipt with Apple')
     
-    // Validate with Apple (try production first, then sandbox)
-    let appleResponse
-    try {
-      appleResponse = await validateReceiptWithApple(receiptData, true)
-    } catch (error) {
-      console.log('[IAP-RECEIPT-VALIDATOR] Production validation failed, trying sandbox')
+    // Apple's recommended approach: Always validate against production first
+    // If you get a 21007 status (sandbox receipt used in production), validate against sandbox
+    let appleResponse = await validateReceiptWithApple(receiptData, true)
+    
+    // Status 21007 means this is a sandbox receipt sent to production
+    // Apple recommends handling this by retrying with sandbox
+    if (appleResponse.status === 21007) {
+      console.log('[IAP-RECEIPT-VALIDATOR] Sandbox receipt detected (21007), retrying with sandbox endpoint')
       appleResponse = await validateReceiptWithApple(receiptData, false)
     }
 

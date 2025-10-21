@@ -108,11 +108,24 @@ const Index = () => {
       }
       
       if (error || !profile) {
-        console.error('Profile not found for user:', userId);
-        // For OAuth users, they might not have a profile yet, redirect to profile completion
-        setCurrentView('profile-completion');
-        setLoading(false);
-        return;
+        console.error('Profile not found for user:', userId, 'Error:', error);
+        // For OAuth users, profile might not be ready yet, wait and retry once
+        await new Promise(resolve => setTimeout(resolve, 500));
+        
+        const retryResult = await supabase
+          .from('profiles')
+          .select('is_admin, account_status, first_name, last_name, date_of_birth, country, city, gender, preference, relationship_intent, occupation, industry, education_level, terms_accepted')
+          .eq('id', userId)
+          .single();
+          
+        if (retryResult.error || !retryResult.data) {
+          console.error('Profile still not found after retry, redirecting to profile completion');
+          setLoading(false);
+          setCurrentView('profile-completion');
+          return;
+        }
+        
+        profile = retryResult.data;
       }
 
       // Check account status

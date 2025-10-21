@@ -236,8 +236,184 @@ const AuthForm = ({ isLogin, onToggle, onOAuthSuccess, onBack }: AuthFormProps) 
           return;
         }
       } else {
-        console.log(`Using standard OAuth flow for ${provider} on web/Android`);
+        // For Google OAuth on iOS native: use Safari View Controller (in-app browser)
+        // This keeps the user in-app and satisfies Apple's review guidelines
+        if (provider === 'google' && isNative && (window as any).Capacitor?.getPlatform?.() === 'ios') {
+          console.log('🔐 Using Safari View Controller for Google OAuth (iOS native)');
+          
+          try {
+            // Generate the OAuth URL
+            const { data: oauthData, error: oauthError } = await supabase.auth.signInWithOAuth({
+              provider: 'google',
+              options: {
+                redirectTo,
+                queryParams: {
+                  prompt: 'select_account',
+                  access_type: 'offline',
+                },
+                skipBrowserRedirect: true, // Get URL without auto-redirect
+              }
+            });
+
+            if (oauthError || !oauthData?.url) {
+              throw new Error(oauthError?.message || 'Failed to generate OAuth URL');
+            }
+
+            // Open OAuth URL in Safari View Controller (in-app browser)
+            const { Browser } = await import('@capacitor/browser');
+            await Browser.open({ 
+              url: oauthData.url,
+              presentationStyle: 'popover', // iOS native presentation
+              toolbarColor: '#000000',
+            });
+
+            // Poll for session in the background while browser is open
+            let sessionCheckInterval: NodeJS.Timeout | null = null;
+            let hasProcessedSession = false;
+
+            const checkForSession = async () => {
+              if (hasProcessedSession) return;
+              
+              const { data: { session } } = await supabase.auth.getSession();
+              
+              if (session) {
+                hasProcessedSession = true;
+                console.log('✅ Google OAuth successful, session detected');
+                
+                // Clear the polling interval
+                if (sessionCheckInterval) {
+                  clearInterval(sessionCheckInterval);
+                  sessionCheckInterval = null;
+                }
+                
+                // Close the browser immediately
+                try {
+                  await Browser.close();
+                } catch (e) {
+                  console.log('Browser already closed');
+                }
+                
+                try {
+                  // Ensure profile exists - CRITICAL for new users
+                  await ensureProfileExists(session.user);
+                  
+                  // Wait a moment for profile to be created
+                  await new Promise(resolve => setTimeout(resolve, 300));
+                  
+                  // Check if profile is complete
+                  const { data: profile, error: profileError } = await supabase
+                    .from('profiles')
+                    .select('first_name, last_name, bio, date_of_birth, city, country')
+                    .eq('id', session.user.id)
+                    .maybeSingle();
+
+                  if (profileError) {
+                    console.error('Error fetching profile:', profileError);
+                  }
+
+                  // For new users, profile will have default values, so they need completion
+                  const needsCompletion = !profile || 
+                    !profile.first_name || 
+                    profile.first_name === 'User' ||
+                    !profile.bio || 
+                    profile.date_of_birth === '1990-01-01' ||
+                    !profile.city || 
+                    profile.city === 'Unknown' ||
+                    !profile.country;
+
+                  // Show success toast
+                  if (needsCompletion) {
+                    toast({ 
+                      title: '✅ Login Successful!', 
+                      description: "Please complete your profile to continue.",
+                      duration: 2000,
+                    });
+                  } else {
+                    toast({ 
+                      title: '✅ Login Successful!', 
+                      description: "Welcome back to DripLove!",
+                      duration: 2000,
+                    });
+                  }
+
+                  // Small delay to show toast before navigation
+                  await new Promise(resolve => setTimeout(resolve, 500));
+
+                  // Clear loading state before navigation
+                  setOauthLoading(null);
+                  Browser.removeAllListeners();
+
+                  // Navigate to appropriate page
+                  if (needsCompletion) {
+                    console.log('Navigating to profile completion...');
+                    navigate('/complete-profile');
+                  } else {
+                    console.log('Navigating to main app...');
+                    navigate('/');
+                  }
+                } catch (error) {
+                  console.error('Error during post-login processing:', error);
+                  setOauthLoading(null);
+                  Browser.removeAllListeners();
+                  toast({
+                    title: 'Login Successful',
+                    description: 'Please complete your profile.',
+                  });
+                  navigate('/complete-profile');
+                }
+              }
+            };
+
+            // Start polling for session every 500ms
+            sessionCheckInterval = setInterval(checkForSession, 500);
+
+            const handleBrowserFinish = async () => {
+              console.log('🔐 Safari View Controller closed');
+              
+              // Clear polling interval
+              if (sessionCheckInterval) {
+                clearInterval(sessionCheckInterval);
+                sessionCheckInterval = null;
+              }
+
+              // Do one final check for session
+              if (!hasProcessedSession) {
+                await checkForSession();
+              }
+              
+              // If still no session, show error
+              if (!hasProcessedSession) {
+                toast({
+                  title: 'Authentication Cancelled',
+                  description: 'Google sign-in was cancelled.',
+                  variant: 'default',
+                });
+              }
+              
+              setOauthLoading(null);
+              Browser.removeAllListeners();
+            };
+            
+            // Listen for browser close
+            Browser.addListener('browserFinished', handleBrowserFinish);
+
+            // Don't set loading to null here - wait for callback
+            return;
+
+          } catch (err: any) {
+            console.error('❌ Safari View Controller error:', err);
+            toast({
+              title: 'Authentication Error',
+              description: err?.message || 'Failed to open Google Sign-In',
+              variant: 'destructive',
+            });
+            setOauthLoading(null);
+          }
+          return;
+        }
+        
         // Standard OAuth flow for web and Android
+        console.log(`Using standard OAuth flow for ${provider} on web/Android`);
         console.log(`[OAuth] Starting ${provider} OAuth with config:`, {
           redirectTo,
           currentOrigin: window.location.origin,

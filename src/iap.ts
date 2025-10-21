@@ -12,6 +12,12 @@ export function initIAP() {
       log.setLevel(LogLevel.DEBUG);
     }
     
+    // Add timeout protection for initialization (8 seconds)
+    let initializationTimeout = setTimeout(() => {
+      console.error('[IAP] Store initialization timeout after 8 seconds');
+      window.iapInitializationFailed = true;
+    }, 8000);
+    
     // 1) Register EXACT product IDs (must match your .storekit file)
     if (store.register && typeof store.register === 'function') {
       store.register([
@@ -21,8 +27,12 @@ export function initIAP() {
           type: ProductType.PAID_SUBSCRIPTION
         }
       ]);
+      console.log('[IAP] Product registered successfully');
     } else {
       console.error('[IAP] store.register not available');
+      clearTimeout(initializationTimeout);
+      window.iapInitializationFailed = true;
+      return;
     }
 
     // 2) Global error handler (covers user cancel + other errors)
@@ -38,7 +48,16 @@ export function initIAP() {
     if (store.when && typeof store.when === 'function') {
       store.when()
         .productUpdated(p => {
-          // Product updated - no logging
+          // Product updated successfully - clear initialization timeout
+          if (p && p.id === 'com.driplove.dating.premium.monthlysub') {
+            clearTimeout(initializationTimeout);
+            window.iapInitializationFailed = false;
+            console.log('[IAP] Product loaded successfully:', {
+              id: p.id,
+              state: p.state,
+              hasOffer: !!p.getOffer?.()
+            });
+          }
         })
         .approved(t => {
           // Only verify if user explicitly initiated the purchase
@@ -211,13 +230,37 @@ export function initIAP() {
 
     // 4) Initialize AFTER register, then refresh
     if (store.initialize && typeof store.initialize === 'function') {
-      store.initialize([{ platform: Platform.APPLE_APPSTORE, options: { needAppReceipt: true } }]);
+      try {
+        store.initialize([{ platform: Platform.APPLE_APPSTORE, options: { needAppReceipt: true } }]);
+        console.log('[IAP] Store initialized successfully');
+        
+        // Add a ready state handler to clear timeout
+        if (store.ready && typeof store.ready === 'function') {
+          store.ready(() => {
+            clearTimeout(initializationTimeout);
+            console.log('[IAP] Store ready');
+          });
+        }
+      } catch (error) {
+        console.error('[IAP] Store initialization error:', error);
+        clearTimeout(initializationTimeout);
+        window.iapInitializationFailed = true;
+        return;
+      }
     } else {
       console.error('[IAP] store.initialize not available');
+      clearTimeout(initializationTimeout);
+      window.iapInitializationFailed = true;
+      return;
     }
     
     if (store.refresh && typeof store.refresh === 'function') {
-      store.refresh();
+      try {
+        store.refresh();
+        console.log('[IAP] Store refresh initiated');
+      } catch (error) {
+        console.error('[IAP] Store refresh error:', error);
+      }
     } else {
       console.error('[IAP] store.refresh not available');
     }

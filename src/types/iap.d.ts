@@ -2,6 +2,7 @@
 declare global {
   interface Window {
     iapPurchaseInitiated?: boolean;
+    iapInitializationFailed?: boolean;
     CdvPurchase?: {
       store?: any;
     };

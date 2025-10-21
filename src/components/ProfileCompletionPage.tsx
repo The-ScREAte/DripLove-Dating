@@ -103,17 +103,17 @@ const ProfileCompletionPage = () => {
           .select('first_name, last_name')
           .eq('id', user.id)
           .single();
+        
+        // Extract name from user metadata (supports both Google and Apple OAuth)
+        const fullName = user.user_metadata?.full_name || user.user_metadata?.name || '';
+        const firstName = user.user_metadata?.first_name || fullName.split(' ')[0] || '';
+        const lastName = user.user_metadata?.last_name || fullName.split(' ').slice(1).join(' ') || '';
+        
         setFormData(prev => ({
           ...prev,
           email: user.email || '',
-          firstName:
-            profile?.first_name ||
-            user.user_metadata?.first_name ||
-            user.user_metadata?.name?.split(' ')[0] || '',
-          lastName:
-            profile?.last_name ||
-            user.user_metadata?.last_name ||
-            user.user_metadata?.name?.split(' ').slice(1).join(' ') || '',
+          firstName: profile?.first_name || firstName,
+          lastName: profile?.last_name || lastName,
         }));
       }
     };

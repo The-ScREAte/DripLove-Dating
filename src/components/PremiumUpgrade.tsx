@@ -43,6 +43,13 @@ const PremiumUpgrade = ({ currentUser, onClose, preselectedPlan }: PremiumUpgrad
       if (hasOffer) {
         setIapLoadingTimeout(false);
       }
+      
+      // Check if initialization failed
+      // @ts-ignore
+      if (window.iapInitializationFailed && !hasOffer) {
+        setIapLoadingTimeout(true);
+        setCanBuy(false);
+      }
     }
     
     // Listen for verified purchases to reset loading state
@@ -107,21 +114,29 @@ const PremiumUpgrade = ({ currentUser, onClose, preselectedPlan }: PremiumUpgrad
       onProductUpdated();
     }, 1000);
     
-    // On iOS, don't set timeout or show Paystack fallback - only IAP is allowed
+    // Set timeout for IAP loading - applies to ALL platforms including iOS
     let loadingTimeout: NodeJS.Timeout | undefined;
     
-    if (!isIOS() || !isNativeApp()) {
-      // Set timeout for IAP loading on non-iOS platforms
-      loadingTimeout = setTimeout(() => {
-        if (!canBuy) {
-          setIapLoadingTimeout(true);
+    loadingTimeout = setTimeout(() => {
+      if (!canBuy) {
+        console.warn('[UI] IAP loading timeout - products not available after 8 seconds');
+        setIapLoadingTimeout(true);
+        
+        // Different messages for iOS vs other platforms
+        if (isIOS() && isNativeApp()) {
+          toast({
+            title: 'Connection Issue',
+            description: 'Unable to connect to the App Store. Please check your internet connection and try again.',
+            variant: 'destructive',
+          });
+        } else {
           toast({
             title: 'In-App Purchase Unavailable',
             description: 'In-App Purchase is taking too long to load. Please use the alternative payment options below.',
           });
         }
-      }, 10000); // 10 seconds timeout
-    }
+      }
+    }, 8000); // 8 seconds timeout for better UX
     
     // Cleanup
     return () => {
@@ -187,6 +202,16 @@ const PremiumUpgrade = ({ currentUser, onClose, preselectedPlan }: PremiumUpgrad
       return;
     }
     
+    // Check if we're on iOS and IAP initialization has failed
+    if (isIOS() && isNativeApp() && window.iapInitializationFailed) {
+      toast({
+        title: 'Connection Issue',
+        description: 'Unable to connect to the App Store. Please restart the app and try again.',
+        variant: 'destructive',
+      });
+      return;
+    }
+    
     // Always show payment options - let user choose
     setShowPaymentOptions(true);
   };
@@ -197,7 +222,20 @@ const PremiumUpgrade = ({ currentUser, onClose, preselectedPlan }: PremiumUpgrad
       debugIAPState();
       
       if (!canBuy) {
-        // Removed: Product Not Ready toast
+        // Check if initialization failed
+        // @ts-ignore
+        if (window.iapInitializationFailed) {
+          toast({
+            title: 'In-App Purchase Unavailable',
+            description: 'The App Store connection failed to initialize. Please restart the app or use alternative payment options.',
+            variant: 'destructive',
+          });
+        } else {
+          toast({
+            title: 'Loading...',
+            description: 'Products are still loading. Please wait a moment and try again.',
+          });
+        }
         return;
       }
       
@@ -468,11 +506,41 @@ const PremiumUpgrade = ({ currentUser, onClose, preselectedPlan }: PremiumUpgrad
               )}
               
               {/* Loading message when IAP is not ready on iOS */}
-              {isIOS() && isNativeApp() && !canBuy && (
+              {isIOS() && isNativeApp() && !canBuy && !iapLoadingTimeout && (
                 <div className="text-center p-4 bg-blue-50 rounded-lg border border-blue-200">
                   <div className="text-blue-600 mb-2">⏳ In-App Purchase is loading...</div>
                   <div className="text-sm text-blue-500">Please wait a moment while we connect to the App Store.</div>
-                  <div className="text-xs text-gray-500 mt-2">If this takes too long, please restart the app.</div>
+                  <div className="text-xs text-gray-500 mt-2">This usually takes 2-5 seconds...</div>
+                </div>
+              )}
+              
+              {/* Error message when IAP failed to load on iOS */}
+              {isIOS() && isNativeApp() && !canBuy && iapLoadingTimeout && (
+                <div className="text-center p-4 bg-red-50 rounded-lg border border-red-200">
+                  <div className="text-red-600 mb-2 font-semibold">⚠️ App Store Connection Failed</div>
+                  <div className="text-sm text-red-500 mb-3">
+                    Unable to load in-app purchases. This usually happens when:
+                  </div>
+                  <div className="text-xs text-left text-gray-600 mb-3 space-y-1">
+                    <div>• Running on a real device without sandbox tester</div>
+                    <div>• No internet connection to App Store</div>
+                    <div>• Product not set up in App Store Connect</div>
+                    <div>• Using a production build in testing</div>
+                  </div>
+                  <div className="text-xs text-blue-600 mb-3 bg-blue-50 p-2 rounded border border-blue-200">
+                    💡 <strong>Real Device Testing:</strong><br/>
+                    Sign out of Apple ID → Settings → App Store → Sandbox Account
+                  </div>
+                  <button
+                    onClick={() => {
+                      setIapLoadingTimeout(false);
+                      setShowPaymentOptions(false);
+                      window.location.reload();
+                    }}
+                    className="w-full p-3 bg-blue-500 text-white rounded-lg hover:bg-blue-600 transition-all duration-200 font-semibold"
+                  >
+                    🔄 Retry Connection
+                  </button>
                 </div>
               )}
               
