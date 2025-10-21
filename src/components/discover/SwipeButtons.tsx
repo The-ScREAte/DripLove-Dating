@@ -27,7 +27,7 @@ const SwipeButtons: React.FC<SwipeButtonsProps> = ({
   
   return (
   <div className={`fixed right-6 z-30 sm:absolute sm:right-6 ${
-    isIOS ? 'bottom-24 sm:bottom-24' : 'bottom-20 sm:bottom-20'
+    isIOS ? 'bottom-24 sm:bottom-24' : 'bottom-16 sm:bottom-16'
   }`}>
       <div className="relative">
         <Button
