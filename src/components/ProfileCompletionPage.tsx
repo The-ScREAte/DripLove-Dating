@@ -511,8 +511,9 @@ const ProfileCompletionPage = () => {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-gray-100 flex items-center justify-center">
-        <div className="animate-spin rounded-full h-32 w-32 border-b-2 border-pink-500"></div>
+      <div className="min-h-screen bg-gradient-to-br from-pink-400 via-purple-500 to-indigo-600 flex flex-col items-center justify-center">
+        <img src="/driplove-logo.png" alt="DripLove Logo" className="w-32 h-32 mb-8 animate-bounce" />
+        <p className="text-white text-lg font-semibold tracking-wide">Loading DripLove...</p>
       </div>
     );
   }

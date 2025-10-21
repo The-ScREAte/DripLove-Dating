@@ -296,33 +296,29 @@ const AuthForm = ({ isLogin, onToggle, onOAuthSuccess, onBack }: AuthFormProps) 
                 try {
                   // Ensure profile exists - CRITICAL for new users
                   await ensureProfileExists(session.user);
-                  
-                  // Wait a moment for profile to be created
                   await new Promise(resolve => setTimeout(resolve, 300));
-                  
                   // Check if profile is complete
                   const { data: profile, error: profileError } = await supabase
                     .from('profiles')
                     .select('first_name, last_name, bio, date_of_birth, city, country')
                     .eq('id', session.user.id)
                     .maybeSingle();
-
+                  let needsProfileCompletion = false;
                   if (profileError) {
                     console.error('Error fetching profile:', profileError);
+                    needsProfileCompletion = true;
+                  } else {
+                    needsProfileCompletion = !profile || 
+                      !profile.first_name || 
+                      profile.first_name === 'User' ||
+                      !profile.bio || 
+                      profile.date_of_birth === '1990-01-01' ||
+                      !profile.city || 
+                      profile.city === 'Unknown' ||
+                      !profile.country;
                   }
-
-                  // For new users, profile will have default values, so they need completion
-                  const needsCompletion = !profile || 
-                    !profile.first_name || 
-                    profile.first_name === 'User' ||
-                    !profile.bio || 
-                    profile.date_of_birth === '1990-01-01' ||
-                    !profile.city || 
-                    profile.city === 'Unknown' ||
-                    !profile.country;
-
                   // Show success toast
-                  if (needsCompletion) {
+                  if (needsProfileCompletion) {
                     toast({ 
                       title: '✅ Login Successful!', 
                       description: "Please complete your profile to continue.",
@@ -335,21 +331,16 @@ const AuthForm = ({ isLogin, onToggle, onOAuthSuccess, onBack }: AuthFormProps) 
                       duration: 2000,
                     });
                   }
-
-                  // Small delay to show toast before navigation
                   await new Promise(resolve => setTimeout(resolve, 500));
-
-                  // Clear loading state before navigation
                   setOauthLoading(null);
                   Browser.removeAllListeners();
-
-                  // Navigate to appropriate page
-                  if (needsCompletion) {
-                    console.log('Navigating to profile completion...');
-                    navigate('/complete-profile');
+                  // Unified navigation logic
+                  if (needsProfileCompletion) {
+          setOauthLoading(null);
+          navigate('/complete-profile');
                   } else {
-                    console.log('Navigating to main app...');
-                    navigate('/');
+          setOauthLoading(null);
+          navigate('/');
                   }
                 } catch (error) {
                   console.error('Error during post-login processing:', error);
