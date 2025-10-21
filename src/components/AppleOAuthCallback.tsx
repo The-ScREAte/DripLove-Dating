@@ -1,8 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useToast } from '@/hooks/use-toast';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Loader2, Heart } from 'lucide-react';
 import { handleCustomAppleCallback } from '@/utils/customAppleOAuth';
 
 /**
@@ -12,25 +10,42 @@ import { handleCustomAppleCallback } from '@/utils/customAppleOAuth';
 const AppleOAuthCallback = () => {
   const navigate = useNavigate();
   const { toast } = useToast();
-  const [status, setStatus] = useState<string>('Processing Apple Sign-In...');
+  const [isNativeMobile, setIsNativeMobile] = useState(false);
 
   useEffect(() => {
-    const processAppleCallback = async () => {
+    // Check if we're on native mobile first
+    const checkPlatform = async () => {
       try {
-        setStatus('Processing Apple authorization...');
-        
+        const { Capacitor } = await import('@capacitor/core');
+        if (Capacitor && Capacitor.isNativePlatform && Capacitor.isNativePlatform()) {
+          console.log('AppleOAuthCallback: Native mobile detected, skipping web callback');
+          setIsNativeMobile(true);
+          // Immediately navigate to Index - useMobileOAuth will handle auth
+          navigate('/', { replace: true });
+          return true;
+        }
+      } catch (e) {
+        // Capacitor not available -> web flow
+      }
+      return false;
+    };
+
+    const processAppleCallback = async () => {
+      // Check platform first and skip if native mobile
+      const isNative = await checkPlatform();
+      if (isNative) return;
+
+      try {
         // The callback handler might redirect to Supabase callback
         const result = await handleCustomAppleCallback();
         
         if (result.needsProfileCompletion) {
-          setStatus('Redirecting to profile completion...');
           toast({ 
             title: 'Welcome!', 
             description: "Please complete your profile to continue." 
           });
           navigate('/complete-profile');
         } else {
-          setStatus('Welcome back! Redirecting...');
           toast({ 
             title: 'Welcome back!', 
             description: "You've been successfully signed in with Apple." 
@@ -75,31 +90,8 @@ const AppleOAuthCallback = () => {
     processAppleCallback();
   }, [navigate, toast]);
 
-  return (
-    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-pink-50 to-purple-50 px-4">
-      <Card className="w-full max-w-md shadow-lg border-0 bg-white/80 backdrop-blur-sm">
-        <CardHeader className="text-center">
-          <div className="flex justify-center mb-4">
-            <div className="p-3 bg-gradient-to-br from-pink-500 to-purple-600 rounded-full">
-              <Heart className="h-8 w-8 text-white" />
-            </div>
-          </div>
-          <CardTitle className="text-xl font-bold bg-gradient-to-r from-pink-600 to-purple-600 bg-clip-text text-transparent">
-            Apple Sign-In
-          </CardTitle>
-          <CardDescription className="text-gray-600">
-            {status}
-          </CardDescription>
-        </CardHeader>
-        <CardContent className="flex justify-center">
-          <div className="flex items-center space-x-3 text-gray-600">
-            <Loader2 className="h-5 w-5 animate-spin text-pink-500" />
-            <span className="text-sm font-medium">Processing...</span>
-          </div>
-        </CardContent>
-      </Card>
-    </div>
-  );
+  // Don't show any UI for native mobile - just redirect immediately and use main app loading screen
+  return null;
 };
 
 export default AppleOAuthCallback;
