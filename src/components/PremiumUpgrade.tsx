@@ -65,8 +65,8 @@ const PremiumUpgrade = ({ currentUser, onClose, preselectedPlan }: PremiumUpgrad
       if (r?.productId === 'com.driplove.dating.premium.monthlysub') {
         setIapLoading(false);
         toast({
-          title: 'Purchase Cancelled',
-          description: 'The purchase was cancelled or could not be verified.',
+          title: 'Purchase cancelled',
+          description: '',
         });
       }
     }
@@ -77,8 +77,8 @@ const PremiumUpgrade = ({ currentUser, onClose, preselectedPlan }: PremiumUpgrad
       if (e?.code === 'UserCancel' || e?.code === 2 || e?.message?.toLowerCase()?.includes('cancel')) {
         setIapLoading(false);
         toast({
-          title: 'Purchase Cancelled',
-          description: 'The purchase was cancelled.',
+          title: 'Purchase cancelled',
+          description: '',
         });
       }
     }
@@ -218,72 +218,35 @@ const PremiumUpgrade = ({ currentUser, onClose, preselectedPlan }: PremiumUpgrad
 
   const handlePaymentTypeSelection = async (type: 'subscription' | 'one-time' | 'iap') => {
     if (type === 'iap') {
-      // Debug current state
-      debugIAPState();
-      
       if (!canBuy) {
-        // Check if initialization failed
-        // @ts-ignore
-        if (window.iapInitializationFailed) {
-          toast({
-            title: 'In-App Purchase Unavailable',
-            description: 'The App Store connection failed to initialize. Please restart the app or use alternative payment options.',
-            variant: 'destructive',
-          });
-        } else {
-          toast({
-            title: 'Loading...',
-            description: 'Products are still loading. Please wait a moment and try again.',
-          });
-        }
+        toast({
+          title: 'Purchase unavailable',
+          description: 'Please try again later.',
+          variant: 'destructive',
+        });
         return;
       }
-      
       setIapLoading(true);
-      
-      // Add timeout protection (30 seconds)
       const timeoutId = setTimeout(() => {
-        console.error('[UI] IAP purchase timeout after 30 seconds');
         setIapLoading(false);
         toast({
-          title: 'Purchase Timeout',
-          description: 'The purchase is taking too long. Please try again or contact support.',
+          title: 'Connection Failed',
+          description: 'Please try again later.',
           variant: 'destructive',
         });
       }, 30000);
-      
       try {
         await buyMonthly();
-        
         clearTimeout(timeoutId);
-        
-        // Removed: Purchase Started toast
-        
-        // Don't close the modal immediately - let the purchase flow complete
+        // Success: let the purchase flow complete
       } catch (err: any) {
         clearTimeout(timeoutId);
-        console.error('[UI] IAP purchase failed:', err);
-        
-        let errorMessage = 'Purchase failed. Please try again.';
-        
-        if (err?.message?.includes('not loaded')) {
-          errorMessage = 'Product not loaded yet. Please wait and try again.';
-        } else if (err?.message?.includes('No purchasable offer')) {
-          errorMessage = 'Product not ready for purchase. Please wait and try again.';
-        } else if (err?.message?.includes('timeout') || err?.message?.includes('Timeout')) {
-          errorMessage = 'Purchase timeout. Please check your connection and try again.';
-        } else if (err?.message) {
-          errorMessage = err.message;
-        }
-        
+        setIapLoading(false);
         toast({
-          title: 'Purchase Failed',
-          description: errorMessage,
+          title: 'Purchase failed',
+          description: 'Please try again.',
           variant: 'destructive',
         });
-        
-        setIapLoading(false);
-        // Don't close payment options to allow retry
       }
     } else {
       setPaymentType(type);
@@ -517,30 +480,8 @@ const PremiumUpgrade = ({ currentUser, onClose, preselectedPlan }: PremiumUpgrad
               {/* Error message when IAP failed to load on iOS */}
               {isIOS() && isNativeApp() && !canBuy && iapLoadingTimeout && (
                 <div className="text-center p-4 bg-red-50 rounded-lg border border-red-200">
-                  <div className="text-red-600 mb-2 font-semibold">⚠️ App Store Connection Failed</div>
-                  <div className="text-sm text-red-500 mb-3">
-                    Unable to load in-app purchases. This usually happens when:
-                  </div>
-                  <div className="text-xs text-left text-gray-600 mb-3 space-y-1">
-                    <div>• Running on a real device without sandbox tester</div>
-                    <div>• No internet connection to App Store</div>
-                    <div>• Product not set up in App Store Connect</div>
-                    <div>• Using a production build in testing</div>
-                  </div>
-                  <div className="text-xs text-blue-600 mb-3 bg-blue-50 p-2 rounded border border-blue-200">
-                    💡 <strong>Real Device Testing:</strong><br/>
-                    Sign out of Apple ID → Settings → App Store → Sandbox Account
-                  </div>
-                  <button
-                    onClick={() => {
-                      setIapLoadingTimeout(false);
-                      setShowPaymentOptions(false);
-                      window.location.reload();
-                    }}
-                    className="w-full p-3 bg-blue-500 text-white rounded-lg hover:bg-blue-600 transition-all duration-200 font-semibold"
-                  >
-                    🔄 Retry Connection
-                  </button>
+                  <div className="text-red-600 mb-2 font-semibold">In-App Purchase unavailable.</div>
+                  <div className="text-sm text-red-500">Please try again later.</div>
                 </div>
               )}
               
