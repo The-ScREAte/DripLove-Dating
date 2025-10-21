@@ -25,17 +25,10 @@ const SwipeButtons: React.FC<SwipeButtonsProps> = ({
   const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) || 
                 (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
   
-  // iOS: clamp between 96px and 144px (bottom-24 to bottom-36)
-  // Non-iOS: clamp between 80px and 96px (bottom-20 to bottom-24)
-  const bottomPosition = isIOS 
-    ? 'clamp(96px, calc(env(safe-area-inset-bottom, 0px) + 96px), 144px)'
-    : 'clamp(80px, calc(env(safe-area-inset-bottom, 0px) + 80px), 96px)';
-  
   return (
-  <div 
-    className="fixed right-6 z-30 sm:absolute sm:right-6"
-    style={{ bottom: bottomPosition }}
-  >
+  <div className={`fixed right-6 z-30 sm:absolute sm:right-6 ${
+    isIOS ? 'bottom-24 sm:bottom-24' : 'bottom-20 sm:bottom-20'
+  }`}>
       <div className="relative">
         <Button
           onClick={onReverse}
