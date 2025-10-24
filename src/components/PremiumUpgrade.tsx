@@ -3,7 +3,7 @@ import React, { useState } from 'react';
 import PaystackPaymentModal from './PaystackPaymentModal';
 import { getPremiumPaymentConfig } from '@/utils/paymentConfig';
 import { isIOS, isNativeApp } from '@/utils/iap';
-import { buyMonthly, debugIAPState } from '../iap';
+import { buyMonthly, debugIAPState, restorePurchases } from '../iap';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Crown, Heart, RotateCcw, Users, Check, X } from 'lucide-react';
@@ -27,6 +27,7 @@ const PremiumUpgrade = ({ currentUser, onClose, preselectedPlan }: PremiumUpgrad
   const [iapLoading, setIapLoading] = useState(false);
   const [canBuy, setCanBuy] = useState(false);
   const [iapLoadingTimeout, setIapLoadingTimeout] = useState(false);
+  const [restoreLoading, setRestoreLoading] = useState(false);
   
   // Enhanced subscription status monitoring
   const { subscriptionStatus, isPremium, loading: subscriptionLoading, refetch: refetchSubscription } = useEnhancedSubscription();
@@ -35,7 +36,19 @@ const PremiumUpgrade = ({ currentUser, onClose, preselectedPlan }: PremiumUpgrad
     // Listen for productUpdated to enable the in-app purchase button
     function onProductUpdated(p?: any) {
       // @ts-ignore
-      const product = window.CdvPurchase?.store?.get?.('com.driplove.dating.premium.monthlysub');
+      const store = window.CdvPurchase?.store;
+      
+      // Check for both possible product IDs
+      const product2 = store?.get?.('com.driplove.dating.premium.monthlysub2');
+      const product3 = store?.get?.('com.driplove.dating.premium.monthlysub3');
+      const product = product3 || product2; // Prefer monthlysub3, fallback to monthlysub2
+      
+      console.log('[PremiumUpgrade] Products from store:', {
+        monthlysub2: product2,
+        monthlysub3: product3,
+        selected: product?.id
+      });
+      
       const hasOffer = !!product?.getOffer?.();
       setCanBuy(hasOffer);
       
@@ -54,7 +67,10 @@ const PremiumUpgrade = ({ currentUser, onClose, preselectedPlan }: PremiumUpgrad
     
     // Listen for verified purchases to reset loading state
     function onVerified(r?: any) {
-      if (r?.productId === 'com.driplove.dating.premium.monthlysub') {
+      // Check for both product IDs
+      const isOurProduct = r?.productId === 'com.driplove.dating.premium.monthlysub2' || 
+                           r?.productId === 'com.driplove.dating.premium.monthlysub3';
+      if (isOurProduct) {
         setIapLoading(false);
         setShowPaymentOptions(false);
       }
@@ -62,7 +78,10 @@ const PremiumUpgrade = ({ currentUser, onClose, preselectedPlan }: PremiumUpgrad
     
     // Listen for unverified purchases (includes cancellations)
     function onUnverified(r?: any, err?: any) {
-      if (r?.productId === 'com.driplove.dating.premium.monthlysub') {
+      // Check for both product IDs
+      const isOurProduct = r?.productId === 'com.driplove.dating.premium.monthlysub2' || 
+                           r?.productId === 'com.driplove.dating.premium.monthlysub3';
+      if (isOurProduct) {
         setIapLoading(false);
         toast({
           title: 'Purchase cancelled',
@@ -122,17 +141,16 @@ const PremiumUpgrade = ({ currentUser, onClose, preselectedPlan }: PremiumUpgrad
         console.warn('[UI] IAP loading timeout - products not available after 8 seconds');
         setIapLoadingTimeout(true);
         
-        // Different messages for iOS vs other platforms
+        // Show a subtle message without technical details
         if (isIOS() && isNativeApp()) {
           toast({
-            title: 'Connection Issue',
-            description: 'Unable to connect to the App Store. Please check your internet connection and try again.',
-            variant: 'destructive',
+            title: 'Taking longer than usual',
+            description: 'Still connecting to payment service...',
           });
         } else {
           toast({
-            title: 'In-App Purchase Unavailable',
-            description: 'In-App Purchase is taking too long to load. Please use the alternative payment options below.',
+            title: 'Loading payment options',
+            description: 'Please wait a moment or try alternative payment methods below.',
           });
         }
       }
@@ -205,8 +223,8 @@ const PremiumUpgrade = ({ currentUser, onClose, preselectedPlan }: PremiumUpgrad
     // Check if we're on iOS and IAP initialization has failed
     if (isIOS() && isNativeApp() && window.iapInitializationFailed) {
       toast({
-        title: 'Connection Issue',
-        description: 'Unable to connect to the App Store. Please restart the app and try again.',
+        title: 'Connection Failed',
+        description: 'Please try again later.',
         variant: 'destructive',
       });
       return;
@@ -220,9 +238,8 @@ const PremiumUpgrade = ({ currentUser, onClose, preselectedPlan }: PremiumUpgrad
     if (type === 'iap') {
       if (!canBuy) {
         toast({
-          title: 'Purchase unavailable',
-          description: 'Please try again later.',
-          variant: 'destructive',
+          title: 'Please wait',
+          description: 'Payment service is still loading. Try again in a moment.',
         });
         return;
       }
@@ -230,9 +247,8 @@ const PremiumUpgrade = ({ currentUser, onClose, preselectedPlan }: PremiumUpgrad
       const timeoutId = setTimeout(() => {
         setIapLoading(false);
         toast({
-          title: 'Connection Failed',
-          description: 'Please try again later.',
-          variant: 'destructive',
+          title: 'Request timeout',
+          description: 'The payment request is taking longer than expected. Please try again.',
         });
       }, 30000);
       try {
@@ -242,11 +258,18 @@ const PremiumUpgrade = ({ currentUser, onClose, preselectedPlan }: PremiumUpgrad
       } catch (err: any) {
         clearTimeout(timeoutId);
         setIapLoading(false);
-        toast({
-          title: 'Purchase failed',
-          description: 'Please try again.',
-          variant: 'destructive',
-        });
+        
+        // Check if it's a user cancellation (don't show error for that)
+        const isCancellation = err?.message?.toLowerCase().includes('cancel') || 
+                              err?.code === 'UserCancel' || 
+                              err?.code === 2;
+        
+        if (!isCancellation) {
+          toast({
+            title: 'Unable to complete purchase',
+            description: 'Please check your connection and try again.',
+          });
+        }
       }
     } else {
       setPaymentType(type);
@@ -265,6 +288,40 @@ const PremiumUpgrade = ({ currentUser, onClose, preselectedPlan }: PremiumUpgrad
     if (onClose) onClose();
     // Optionally, trigger a refetch of subscription status here
     window.location.href = '/discover?upgraded=1';
+  };
+
+  const handleRestorePurchases = async () => {
+    setRestoreLoading(true);
+    try {
+      console.log('[PremiumUpgrade] Starting restore purchases...');
+      
+      // Call the restore function and wait for it to complete
+      await restorePurchases();
+      
+      // Give it an additional moment to process any receipt validations
+      await new Promise(resolve => setTimeout(resolve, 2000));
+      
+      console.log('[PremiumUpgrade] Restore completed, refreshing subscription status...');
+      
+      // Refetch subscription status
+      await refetchSubscription();
+      
+      console.log('[PremiumUpgrade] Subscription status refreshed');
+      
+      toast({
+        title: 'Restore Complete',
+        description: 'If you had an active subscription, it has been restored.',
+      });
+    } catch (error) {
+      console.error('[PremiumUpgrade] Restore error:', error);
+      toast({
+        title: 'Restore Failed',
+        description: 'Unable to restore purchases. Please ensure you have an active subscription and try again.',
+        variant: 'destructive',
+      });
+    } finally {
+      setRestoreLoading(false);
+    }
   };
 
   const features = [
@@ -391,6 +448,17 @@ const PremiumUpgrade = ({ currentUser, onClose, preselectedPlan }: PremiumUpgrad
                     <Crown className="w-5 h-5 md:w-6 md:h-6 mr-2 md:mr-3" />
                     Upgrade to Premium Now
                   </Button>
+                  
+                  {/* Restore Purchases Link for iOS */}
+                  {isIOS() && isNativeApp() && (
+                    <button
+                      onClick={handleRestorePurchases}
+                      disabled={restoreLoading}
+                      className="mt-3 text-xs md:text-sm text-gray-600 hover:text-gray-800 underline disabled:opacity-50 transition-colors"
+                    >
+                      {restoreLoading ? 'Restoring purchases...' : 'Already purchased? Restore'}
+                    </button>
+                  )}
                 </div>
               </CardContent>
             </Card>
@@ -458,51 +526,37 @@ const PremiumUpgrade = ({ currentUser, onClose, preselectedPlan }: PremiumUpgrad
             <div className="space-y-4">
               {/* Apple IAP - show on iOS native when available */}
               {isIOS() && isNativeApp() && canBuy && (
-                <button
-                  onClick={() => handlePaymentTypeSelection('iap')}
-                  disabled={iapLoading}
-                  className="w-full p-4 bg-gradient-to-r from-gray-800 to-black text-white rounded-lg hover:from-gray-700 hover:to-gray-900 transition-all duration-200 font-semibold disabled:opacity-50"
-                >
-                  <div className="text-lg">🍎 {iapLoading ? 'Processing...' : 'Subscribe Now'}</div>
-                  <div className="text-sm opacity-90">In-App Purchase • Secure & Fast</div>
-                </button>
+                <>
+                  <button
+                    onClick={() => handlePaymentTypeSelection('iap')}
+                    disabled={iapLoading}
+                    className="w-full p-4 bg-gradient-to-r from-gray-800 to-black text-white rounded-lg hover:from-gray-700 hover:to-gray-900 transition-all duration-200 font-semibold disabled:opacity-50"
+                  >
+                    <div className="text-lg">🍎 {iapLoading ? 'Processing...' : 'Subscribe Now'}</div>
+                    <div className="text-sm opacity-90">In-App Purchase • Secure & Fast</div>
+                  </button>
+                  
+                  {/* Auto-renewal disclosure */}
+                  <div className="text-xs text-gray-600 text-center px-2 -mt-2">
+                    Subscription automatically renews unless auto-renew is turned off at least 24 hours before the end of the current period. Payment will be charged to your Apple ID account at confirmation of purchase. You can manage and cancel your subscription in your account settings on the App Store after purchase.
+                  </div>
+                </>
               )}
               
               {/* Loading message when IAP is not ready on iOS */}
               {isIOS() && isNativeApp() && !canBuy && !iapLoadingTimeout && (
                 <div className="text-center p-4 bg-blue-50 rounded-lg border border-blue-200">
-                  <div className="text-blue-600 mb-2">⏳ In-App Purchase is loading...</div>
-                  <div className="text-sm text-blue-500">Please wait a moment while we connect to the App Store.</div>
-                  <div className="text-xs text-gray-500 mt-2">This usually takes 2-5 seconds...</div>
+                  <div className="text-blue-600 mb-2 font-semibold">Connecting to App Store...</div>
+                  <div className="text-sm text-blue-500">Please wait while we check for in-app purchases.</div>
                 </div>
               )}
-              
-              {/* Error message when IAP failed to load on iOS */}
               {isIOS() && isNativeApp() && !canBuy && iapLoadingTimeout && (
-                <div className="text-center p-4 bg-red-50 rounded-lg border border-red-200">
-                  <div className="text-red-600 mb-2 font-semibold">In-App Purchase unavailable.</div>
-                  <div className="text-sm text-red-500">Please try again later.</div>
+                <div className="text-center p-4 bg-amber-50 rounded-lg border border-amber-200">
+                  <div className="text-amber-800 mb-2 font-semibold">In-App Purchase Temporarily Unavailable</div>
+                  <div className="text-sm text-amber-700">
+                    We're having trouble connecting right now. Please try again in a moment, or contact support if the issue persists.
+                  </div>
                 </div>
-              )}
-              
-              {/* Show Paystack options ONLY on non-iOS platforms */}
-              {!isIOS() && !isNativeApp() && (
-                <>
-                  <button
-                    onClick={() => handlePaymentTypeSelection('subscription')}
-                    className="w-full p-4 bg-gradient-to-r from-green-500 to-green-600 text-white rounded-lg hover:from-green-600 hover:to-green-700 transition-all duration-200 font-semibold"
-                  >
-                    <div className="text-lg">💳 Subscribe Monthly</div>
-                    <div className="text-sm opacity-90">{currency} {monthlyPrice || price}/month • Cancel anytime</div>
-                  </button>
-                  <button
-                    onClick={() => handlePaymentTypeSelection('one-time')}
-                    className="w-full p-4 bg-gradient-to-r from-blue-500 to-blue-600 text-white rounded-lg hover:from-blue-600 hover:to-blue-700 transition-all duration-200 font-semibold"
-                  >
-                    <div className="text-lg">📱 One-Time Payment</div>
-                    <div className="text-sm opacity-90">{price !== null ? `${currency} ${price}` : 'Loading...'} • 1 month access • No auto-renewal</div>
-                  </button>
-                </>
               )}
             </div>
           </div>

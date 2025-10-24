@@ -66,8 +66,12 @@ const waitForStore = (): Promise<void> => {
 export async function fetchIAPProducts(productIds: string[]): Promise<any[]> {
   try {
     await waitForStore();
-    // Use the correct App Store Connect product ID for monthly premium by default if none provided
-    const ids = productIds && productIds.length > 0 ? productIds : ['com.driplove.dating.premium.monthly'];
+    // Support both possible product IDs if none provided
+    const defaultIds = [
+      'com.driplove.dating.premium.monthlysub2',
+      'com.driplove.dating.premium.monthlysub3'
+    ];
+    const ids = productIds && productIds.length > 0 ? productIds : defaultIds;
     console.log('[IAP] Fetching products:', ids);
     
     return new Promise((resolve, reject) => {
@@ -103,31 +107,55 @@ export async function fetchIAPProducts(productIds: string[]): Promise<any[]> {
 export async function buyIAPProduct(productId: string): Promise<any> {
   try {
     await waitForStore();
-    // Use the correct App Store Connect product ID for monthly premium by default if not provided
-    const id = productId || 'com.driplove.dating.premium.monthly';
+    // Support both possible product IDs - try to find which one is available
+    const possibleIds = [
+      'com.driplove.dating.premium.monthlysub2',
+      'com.driplove.dating.premium.monthlysub3'
+    ];
+    
+    // If specific productId provided, use it; otherwise try to find available one
+    const idsToTry = productId ? [productId] : possibleIds;
+    
     return new Promise((resolve, reject) => {
-      const existingProduct = window.store.get(id);
-      if (!existingProduct) {
-        window.store.register([{ id, type: window.store.PAID_SUBSCRIPTION }]);
-      }
+      // Register all possible products
+      possibleIds.forEach(id => {
+        const existingProduct = window.store.get(id);
+        if (!existingProduct) {
+          window.store.register([{ id, type: window.store.PAID_SUBSCRIPTION }]);
+        }
+      });
+      
       window.store.ready(() => {
-        const product = window.store.get(id);
-        if (!product) {
-          reject(new Error('Product not found after registration'));
+        // Find first available product
+        let product = null;
+        let selectedId = null;
+        
+        for (const id of idsToTry) {
+          const p = window.store.get(id);
+          if (p && p.canPurchase) {
+            product = p;
+            selectedId = id;
+            console.log('[IAP] Using available product:', id);
+            break;
+          }
+        }
+        
+        if (!product || !selectedId) {
+          reject(new Error('No valid subscription product available'));
           return;
         }
         if (typeof window.store.order !== 'function') {
           reject(new Error('IAP order function not available'));
           return;
         }
-        window.store.when(id).approved((product: any) => {
+        window.store.when(selectedId).approved((product: any) => {
           product.finish();
           resolve(product);
         });
-        window.store.when(id).error((error: any) => {
+        window.store.when(selectedId).error((error: any) => {
           reject(error);
         });
-        window.store.order(id);
+        window.store.order(selectedId);
       });
       window.store.error((err: any) => reject(err));
       window.store.refresh();

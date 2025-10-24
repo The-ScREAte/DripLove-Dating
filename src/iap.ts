@@ -1,33 +1,64 @@
 import 'cordova-plugin-purchase';
 
 export function initIAP() {
-  document.addEventListener('deviceready', () => {
-    // @ts-ignore
-    const { store, LogLevel, Platform, ProductType, log } = window.CdvPurchase || {};
-    if (!store) {
-      console.error('[IAP] CdvPurchase.store not available! StoreKit not loaded.');
+  return new Promise<void>((resolve, reject) => {
+    console.log('[IAP] initIAP called');
+    
+    // If not a Cordova app, resolve immediately
+    if (typeof window.cordova === 'undefined') {
+      console.log('[IAP] Not a Cordova app (no window.cordova), skipping IAP initialization');
+      resolve();
       return;
     }
-    if (log && LogLevel && typeof log.setLevel === 'function') {
-      log.setLevel(LogLevel.DEBUG);
-    }
+
+    // Function to initialize the store
+    const initializeStore = () => {
+      console.log('[IAP] Initializing store...');
+      
+      // @ts-ignore
+      const { store, LogLevel, Platform, ProductType, log } = window.CdvPurchase || {};
+      if (!store) {
+        console.error('[IAP] CdvPurchase.store not available! StoreKit not loaded.');
+        window.iapInitializationFailed = true;
+        resolve(); // Resolve to not block app
+        return;
+      }
+      
+      console.log('[IAP] CdvPurchase.store found, configuring...');
+      
+      // Set log level to ERROR in production to hide technical messages from users
+      if (log && LogLevel && typeof log.setLevel === 'function') {
+        // Use ERROR level in production, DEBUG only in development
+        const isDevelopment = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
+        log.setLevel(isDevelopment ? LogLevel.DEBUG : LogLevel.ERROR);
+      }
+
+      // Disable automatic error popups from the plugin
+      if (store.autoFinishTransactions !== undefined) {
+        store.autoFinishTransactions = false;
+      }
+      
+      // Add timeout protection for initialization (15 seconds)
+      let initializationTimeout = setTimeout(() => {
+        console.error('[IAP] Store initialization timeout after 15 seconds');
+        window.iapInitializationFailed = true;
+        resolve(); // Resolve to not block app
+      }, 15000);
     
-    // Add timeout protection for initialization (8 seconds)
-    let initializationTimeout = setTimeout(() => {
-      console.error('[IAP] Store initialization timeout after 8 seconds');
-      window.iapInitializationFailed = true;
-    }, 8000);
-    
-    // 1) Register EXACT product IDs (must match your .storekit file)
+    // 1️⃣ Define possible product IDs
+    const PRODUCT_IDS = [
+      'com.driplove.dating.premium.monthlysub2', // older one
+      'com.driplove.dating.premium.monthlysub3'  // new one linked to this build
+    ];
+
+    // 2️⃣ Register all of them with the store
     if (store.register && typeof store.register === 'function') {
-      store.register([
-        {
-          id: 'com.driplove.dating.premium.monthlysub',
-          platform: Platform.APPLE_APPSTORE,
-          type: ProductType.PAID_SUBSCRIPTION
-        }
-      ]);
-      console.log('[IAP] Product registered successfully');
+      store.register(PRODUCT_IDS.map(id => ({
+        id,
+        platform: Platform.APPLE_APPSTORE,
+        type: ProductType.PAID_SUBSCRIPTION
+      })));
+      console.log('[IAP] Registered products:', PRODUCT_IDS);
     } else {
       console.error('[IAP] store.register not available');
       clearTimeout(initializationTimeout);
@@ -38,9 +69,17 @@ export function initIAP() {
     // 2) Global error handler (covers user cancel + other errors)
     if (store.error && typeof store.error === 'function') {
       store.error(e => {
-        console.warn('[IAP] error:', e?.code, e?.message, e);
+        // Only log to console, don't show user-facing errors here
+        // User-facing errors will be handled in the UI layer
+        console.warn('[IAP] Store error:', e?.code, e?.message);
+        
         // Reset loading state on error
         window.iapPurchaseInitiated = false;
+        
+        // Set flag to indicate connection failed (for UI to handle)
+        if (e?.code === 'SETUP' || e?.code === 'COMMUNICATION') {
+          window.iapInitializationFailed = true;
+        }
       });
     }
     
@@ -49,7 +88,9 @@ export function initIAP() {
       store.when()
         .productUpdated(p => {
           // Product updated successfully - clear initialization timeout
-          if (p && p.id === 'com.driplove.dating.premium.monthlysub') {
+          // Check if it's one of our registered products
+          const isOurProduct = PRODUCT_IDS.includes(p?.id);
+          if (p && isOurProduct) {
             clearTimeout(initializationTimeout);
             window.iapInitializationFailed = false;
             console.log('[IAP] Product loaded successfully:', {
@@ -234,23 +275,33 @@ export function initIAP() {
         store.initialize([{ platform: Platform.APPLE_APPSTORE, options: { needAppReceipt: true } }]);
         console.log('[IAP] Store initialized successfully');
         
-        // Add a ready state handler to clear timeout
+        // Add a ready state handler to clear timeout and resolve promise
         if (store.ready && typeof store.ready === 'function') {
           store.ready(() => {
             clearTimeout(initializationTimeout);
             console.log('[IAP] Store ready');
+            window.iapInitializationFailed = false;
+            resolve(); // Resolve when store is ready
           });
+        } else {
+          // If no ready handler, resolve after a short delay
+          setTimeout(() => {
+            clearTimeout(initializationTimeout);
+            resolve();
+          }, 2000);
         }
       } catch (error) {
         console.error('[IAP] Store initialization error:', error);
         clearTimeout(initializationTimeout);
         window.iapInitializationFailed = true;
+        resolve(); // Resolve to not block app
         return;
       }
     } else {
       console.error('[IAP] store.initialize not available');
       clearTimeout(initializationTimeout);
       window.iapInitializationFailed = true;
+      resolve(); // Resolve to not block app
       return;
     }
     
@@ -264,63 +315,159 @@ export function initIAP() {
     } else {
       console.error('[IAP] store.refresh not available');
     }
+    };
+
+    // Check if deviceready already fired
+    // @ts-ignore
+    if (window.cordova && window.cordova.platformId) {
+      console.log('[IAP] Device already ready, initializing immediately');
+      initializeStore();
+    } else {
+      console.log('[IAP] Waiting for deviceready event...');
+      // Set a timeout for deviceready event (10 seconds)
+      const deviceReadyTimeout = setTimeout(() => {
+        console.error('[IAP] deviceready event timeout after 10 seconds');
+        window.iapInitializationFailed = true;
+        resolve(); // Resolve anyway to not block app initialization
+      }, 10000);
+
+      document.addEventListener('deviceready', () => {
+        clearTimeout(deviceReadyTimeout);
+        console.log('[IAP] deviceready event fired');
+        initializeStore();
+      }, { once: true });
+    }
   });
 }
 
-// Call to purchase from your UI:
-export async function buyMonthly() {
-  // @ts-ignore
-  const { store } = window.CdvPurchase || {};
-  const id = 'com.driplove.dating.premium.monthlysub';
+// 🛍 Call to purchase from your UI - auto-selects the valid product
+export const buyMonthly = async () => {
+  // List all possible IDs (same as in initIAP)
+  const PRODUCT_IDS = [
+    'com.driplove.dating.premium.monthlysub2',
+    'com.driplove.dating.premium.monthlysub3'
+  ];
 
-  if (!store) {
-    console.warn('[IAP] CdvPurchase.store not available');
-    throw new Error('[IAP] CdvPurchase.store not available');
-  }
-
-  if (!store.get || typeof store.get !== 'function') {
-    console.warn('[IAP] store.get method not available');
-    throw new Error('[IAP] store.get method not available');
-  }
-
-  const p = store.get(id);
-  if (!p) {
-    console.warn('[IAP] product not loaded yet');
-    throw new Error('[IAP] Product not loaded yet. Please wait for products to load.');
-  }
-
-  const offer = p.getOffer?.();
-  if (!offer) {
-    console.warn('[IAP] no purchasable offer yet (wait for productUpdated). p.state=', p?.state);
-    throw new Error('[IAP] No purchasable offer available. Product state: ' + p?.state);
-  }
-
-  // Set flag to indicate user initiated this purchase
-  window.iapPurchaseInitiated = true;
+  console.log('[IAP] buyMonthly called. Checking available product...');
   
-  try {
-    await offer.order();
-  } catch (e: any) {
-    console.error('[IAP] order() failed:', {
-      code: e?.code,
-      message: e?.message,
-      error: e
-    });
-    // Reset flag on error
-    window.iapPurchaseInitiated = false;
-    throw e;
-  }
-}
-
-// Call to restore:
-export function restorePurchases() {
   // @ts-ignore
   const store = window.CdvPurchase?.store;
-  if (store && store.refresh && typeof store.refresh === 'function') {
-    store.refresh();
-  } else {
-    console.warn('[IAP] Cannot restore purchases - store.refresh not available');
+  if (!store) {
+    console.error('[IAP] Store not available');
+    throw new Error('Store not initialized');
   }
+  
+  window.iapPurchaseInitiated = true;
+  console.log('[IAP] Purchase initiated by user');
+
+  // Try to find the first valid product that can be purchased
+  let product;
+  for (const id of PRODUCT_IDS) {
+    try {
+      console.log(`[IAP] Checking product ${id}...`);
+      const p = store.get ? store.get(id) : null;
+      if (p && p.canPurchase) {
+        product = p;
+        console.log('[IAP] Using available product:', id);
+        break;
+      } else {
+        console.log(`[IAP] Product ${id} not available or can't purchase`, { exists: !!p, canPurchase: p?.canPurchase });
+      }
+    } catch (err) {
+      console.warn(`[IAP] Could not load product ${id}:`, err);
+    }
+  }
+
+  if (!product) {
+    console.error('[IAP] No valid product found among:', PRODUCT_IDS);
+    window.iapPurchaseInitiated = false;
+    throw new Error('No valid subscription product available');
+  }
+
+  // Continue with existing order logic
+  console.log('[IAP] Initiating order for product:', product.id);
+  try {
+    const offer = product.getOffer?.();
+    if (offer && typeof offer.order === 'function') {
+      await offer.order();
+      console.log('[IAP] Order initiated successfully');
+    } else {
+      console.error('[IAP] No valid offer found');
+      window.iapPurchaseInitiated = false;
+      throw new Error('No valid offer available');
+    }
+  } catch (error) {
+    console.error('[IAP] Order failed:', error);
+    window.iapPurchaseInitiated = false;
+    throw error;
+  }
+};
+
+// Call to restore purchases - returns a Promise
+export function restorePurchases(): Promise<void> {
+  return new Promise((resolve, reject) => {
+    // @ts-ignore
+    const store = window.CdvPurchase?.store;
+    
+    if (!store) {
+      console.error('[IAP] Cannot restore purchases - store not available');
+      reject(new Error('Store not available'));
+      return;
+    }
+    
+    console.log('[IAP] Starting restore purchases...');
+    
+    // Set a timeout for the restore operation
+    const timeoutId = setTimeout(() => {
+      console.log('[IAP] Restore completed (timeout reached)');
+      resolve();
+    }, 5000);
+    
+    // Listen for product updates during restore
+    let restoredCount = 0;
+    const onProductUpdated = (product: any) => {
+      if (product && product.owned) {
+        restoredCount++;
+        console.log('[IAP] Restored product:', product.id);
+      }
+    };
+    
+    // Set up listener
+    if (store.when && typeof store.when === 'function') {
+      try {
+        store.when().productUpdated(onProductUpdated);
+      } catch (err) {
+        console.warn('[IAP] Could not set up product listener:', err);
+      }
+    }
+    
+    // Trigger the refresh
+    if (store.restorePurchases && typeof store.restorePurchases === 'function') {
+      console.log('[IAP] Calling store.restorePurchases()');
+      store.restorePurchases();
+      
+      // Wait a bit for restoration to complete
+      setTimeout(() => {
+        clearTimeout(timeoutId);
+        console.log('[IAP] Restore process completed, products restored:', restoredCount);
+        resolve();
+      }, 3000);
+    } else if (store.refresh && typeof store.refresh === 'function') {
+      console.log('[IAP] Calling store.refresh()');
+      store.refresh();
+      
+      // Wait a bit for refresh to complete
+      setTimeout(() => {
+        clearTimeout(timeoutId);
+        console.log('[IAP] Refresh completed');
+        resolve();
+      }, 3000);
+    } else {
+      clearTimeout(timeoutId);
+      console.error('[IAP] No restore or refresh method available');
+      reject(new Error('Restore method not available'));
+    }
+  });
 }
 
 // Debug helper function
@@ -334,7 +481,7 @@ export function debugIAPState() {
 
   let product, offer;
   try {
-    product = store.get ? store.get('com.driplove.dating.premium.monthlysub') : null;
+    product = store.get ? store.get('com.driplove.dating.premium.monthlysub1') : null;
     offer = product?.getOffer?.();
   } catch (error) {
     console.error('[IAP Debug] Error getting product:', error);

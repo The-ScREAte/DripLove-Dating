@@ -18,6 +18,8 @@
   ],
   "settings" : {
     "_failTransactionsEnabled" : false,
+    "_locale" : "en_US",
+    "_storefront" : "USA",
     "_storeKitErrors" : [
       {
         "current" : null,
@@ -93,9 +95,37 @@
               "locale" : "en_US"
             }
           ],
-          "productID" : "com.driplove.dating.premium.monthlysub",
+          "productID" : "com.driplove.dating.premium.monthlysub2",
           "recurringSubscriptionPeriod" : "P1M",
           "referenceName" : "DripLove Subscription",
+          "subscriptionGroupID" : "D6764023",
+          "type" : "RecurringSubscription",
+          "winbackOffers" : [
+
+          ]
+        },
+        {
+          "adHocOffers" : [
+
+          ],
+          "codeOffers" : [
+
+          ],
+          "displayPrice" : "1.99",
+          "familyShareable" : false,
+          "groupNumber" : 1,
+          "internalID" : "0387B297",
+          "introductoryOffer" : null,
+          "localizations" : [
+            {
+              "description" : "",
+              "displayName" : "",
+              "locale" : "en_US"
+            }
+          ],
+          "productID" : "com.driplove.dating.premium.monthlysub3",
+          "recurringSubscriptionPeriod" : "P1M",
+          "referenceName" : "DripLove Subscription v3",
           "subscriptionGroupID" : "D6764023",
           "type" : "RecurringSubscription",
           "winbackOffers" : [

@@ -66,7 +66,7 @@ const PaystackPaymentModal: React.FC<PaystackPaymentModalProps> = ({ isOpen, onC
       setIsLoading(true);
       try {
         // Use the correct App Store Connect product ID for monthly premium
-        const productId = 'com.driplove.dating.premium.monthly';
+        const productId = 'com.driplove.dating.premium.monthlysub2';
         await buyIAPProduct(productId);
         onSuccess();
       } catch (err: any) {

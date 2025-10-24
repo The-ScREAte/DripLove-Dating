@@ -252,7 +252,7 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, isPremium }: DiscoverPage
   useEffect(() => {
     function onProductUpdated() {
       // @ts-ignore
-      const p = window.CdvPurchase?.store?.get('com.driplove.dating.premium.monthlysub');
+      const p = window.CdvPurchase?.store?.get('com.driplove.dating.premium.monthlysub1');
       setCanBuy(!!p && !!p.getOffer());
     }
     // @ts-ignore

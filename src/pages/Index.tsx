@@ -270,12 +270,10 @@ const Index = () => {
   };
 
   if (loading) {
-    return (
-      <div className="min-h-fill bg-gradient-to-br from-pink-400 via-purple-500 to-indigo-600 flex flex-col items-center justify-center">
-        <img src="/driplove-logo.png" alt="DripLove Logo" className="w-32 h-32 mb-8 animate-bounce" />
-        <p className="text-white text-lg font-semibold tracking-wide">Loading DripLove...</p>
-      </div>
-    );
+    // Option 1: Show nothing while loading
+    return null;
+    // Option 2: Show a minimal blank screen
+    // return <div style={{ minHeight: '100vh', background: '#fff' }} />;
   }
   
   if (currentView === 'admin') {

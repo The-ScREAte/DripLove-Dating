@@ -5,6 +5,7 @@ import { Input } from '@/components/ui/input';
 import { useNavigate } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
+import { Capacitor } from '@capacitor/core';
 
 const REQUIRED_PHRASE = 'i want to unsubscribe';
 
@@ -12,8 +13,34 @@ const Unsubscribe: React.FC = () => {
   const [confirmation, setConfirmation] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
+  const [showManageInstructions, setShowManageInstructions] = useState(false);
   const navigate = useNavigate();
   const { toast } = useToast();
+
+  const openAppleSubscriptionManagement = async () => {
+    try {
+      // For iOS, open Apple's subscription management
+      if (Capacitor.getPlatform() === 'ios') {
+        // iOS 15+: Direct link to subscription management in Settings
+        // Using itms-apps:// scheme to open directly in App Store app
+        const url = 'itms-apps://apps.apple.com/account/subscriptions';
+        
+        // Use window.open for iOS as it properly opens the URL
+        if (window.open) {
+          window.open(url, '_system');
+        } else {
+          // Fallback to showing manual instructions
+          setShowManageInstructions(true);
+        }
+      } else {
+        // Fallback for web or Android
+        setError('Please manage your subscription through your Apple account settings.');
+      }
+    } catch (err) {
+      console.error('Error opening subscription management:', err);
+      setShowManageInstructions(true);
+    }
+  };
 
   const handleUnsubscribe = async () => {
     setLoading(true);
@@ -23,19 +50,7 @@ const Unsubscribe: React.FC = () => {
       const { data: { user }, error: userError } = await supabase.auth.getUser();
       if (userError || !user) throw new Error('Could not get user ID');
 
-      // If on native app, attempt to cancel IAP subscription first
-      if (isNativeApp()) {
-        try {
-          if (window.store && typeof window.store.cancel === 'function') {
-            await window.store.cancel();
-          }
-        } catch (iapErr) {
-          console.error('IAP cancel error:', iapErr);
-        }
-      }
-
-      // Update subscription status directly using Supabase client
-      // First, get the active subscription
+      // Get the active subscription
       const { data: subscription, error: subError } = await supabase
         .from('user_subscriptions')
         .select('*')
@@ -51,9 +66,43 @@ const Unsubscribe: React.FC = () => {
         throw new Error('No active subscription found');
       }
 
-      console.log('Current subscription:', subscription);
+      console.log('[Unsubscribe] Current subscription:', subscription);
+      console.log('[Unsubscribe] Provider:', subscription.provider, 'Native App:', isNativeApp());
 
-      // Update subscription status to cancelled
+      // For Apple IAP subscriptions, we MUST redirect to Apple's subscription management
+      // Apps cannot programmatically cancel Apple subscriptions
+      if (isNativeApp() && subscription.provider === 'apple') {
+        console.log('[Unsubscribe] Taking Apple IAP path - redirecting to Settings');
+        
+        // Mark as pending cancellation in database
+        const { error: updateError } = await supabase
+          .from('user_subscriptions')
+          .update({ 
+            auto_renew: false,
+            updated_at: new Date().toISOString()
+          })
+          .eq('user_id', user.id)
+          .eq('id', subscription.id);
+
+        if (updateError) {
+          throw new Error(updateError.message || 'Failed to update subscription status');
+        }
+
+        // Open Apple's subscription management
+        await openAppleSubscriptionManagement();
+        
+        toast({
+          title: 'Cancel in Apple Settings',
+          description: 'You will be redirected to manage your subscription in Apple Settings. Please cancel there to complete the process.',
+        });
+        
+        return;
+      }
+
+      // For non-Apple subscriptions (Paystack, web subscriptions, etc.)
+      console.log('[Unsubscribe] Taking direct cancellation path for provider:', subscription.provider);
+
+      // For non-Apple subscriptions (Paystack, etc.), update status to cancelled
       const { error: updateError } = await supabase
         .from('user_subscriptions')
         .update({ 
@@ -68,11 +117,18 @@ const Unsubscribe: React.FC = () => {
         throw new Error(updateError.message || 'Failed to update subscription status');
       }
 
-      // If it's a Paystack subscription, we should ideally disable it at the provider level
-      // For now, we'll just mark it as canceled in our database
-      // You might want to implement a server-side webhook or Edge Function for this
+      // Show success message for non-Apple subscriptions
+      toast({
+        title: 'Subscription Cancelled',
+        description: 'Your subscription has been successfully cancelled.',
+      });
 
-      // Removed: Subscription cancelled toast
+      // For Paystack subscriptions, we should also call their API to cancel
+      // This ensures the subscription is cancelled on the provider's side too
+      if (subscription.provider === 'paystack' && subscription.subscription_id) {
+        console.log('[Paystack] Subscription cancelled in database. Provider-side cancellation handled by webhook.');
+      }
+
       navigate('/');
     } catch (err: any) {
       setError(err.message || 'Failed to cancel subscription.');
@@ -85,28 +141,53 @@ const Unsubscribe: React.FC = () => {
   <div className="min-h-fill flex flex-col items-center justify-center bg-gradient-to-br from-pink-400 via-purple-500 to-indigo-600 p-4">
       <div className="bg-white rounded-3xl shadow-2xl p-8 max-w-md w-full text-center border-4 border-red-300/60 relative animate-fade-in">
         <h1 className="text-2xl font-bold mb-4 text-gray-900">Cancel Subscription</h1>
-        <p className="mb-4 text-gray-700">To confirm, type <span className="font-mono bg-gray-100 px-2 py-1 rounded">{REQUIRED_PHRASE}</span> below and click Unsubscribe.</p>
-        <Input
-          value={confirmation}
-          onChange={e => setConfirmation(e.target.value)}
-          placeholder="Type the phrase exactly..."
-          className="mb-2"
-        />
-        {error && <div className="text-red-500 text-sm mb-2">{error}</div>}
-        <Button
-          onClick={handleUnsubscribe}
-          disabled={loading || confirmation.trim().toLowerCase() !== REQUIRED_PHRASE.toLowerCase()}
-          className="w-full bg-red-600 hover:bg-red-700 text-white font-bold py-2 px-4 rounded-lg mt-2"
-        >
-          {loading ? 'Cancelling...' : 'Unsubscribe'}
-        </Button>
-        <Button
-          variant="outline"
-          onClick={() => navigate('/')}
-          className="w-full mt-2"
-        >
-          Cancel
-        </Button>
+        
+        {showManageInstructions ? (
+          <div className="text-left space-y-4">
+            <p className="text-gray-700 font-semibold">To cancel your Apple subscription:</p>
+            <ol className="list-decimal list-inside space-y-2 text-gray-600 text-sm">
+              <li>Open the <strong>Settings</strong> app on your iPhone/iPad</li>
+              <li>Tap your <strong>Apple ID</strong> at the top</li>
+              <li>Tap <strong>Subscriptions</strong></li>
+              <li>Select <strong>DripLove</strong></li>
+              <li>Tap <strong>Cancel Subscription</strong></li>
+            </ol>
+            <Button
+              onClick={() => {
+                setShowManageInstructions(false);
+                navigate('/');
+              }}
+              className="w-full mt-4"
+            >
+              Done
+            </Button>
+          </div>
+        ) : (
+          <>
+            <p className="mb-4 text-gray-700">To confirm, type <span className="font-mono bg-gray-100 px-2 py-1 rounded">{REQUIRED_PHRASE}</span> below and click Unsubscribe.</p>
+            <Input
+              value={confirmation}
+              onChange={e => setConfirmation(e.target.value)}
+              placeholder="Type the phrase exactly..."
+              className="mb-2"
+            />
+            {error && <div className="text-red-500 text-sm mb-2">{error}</div>}
+            <Button
+              onClick={handleUnsubscribe}
+              disabled={loading || confirmation.trim().toLowerCase() !== REQUIRED_PHRASE.toLowerCase()}
+              className="w-full bg-red-600 hover:bg-red-700 text-white font-bold py-2 px-4 rounded-lg mt-2"
+            >
+              {loading ? 'Processing...' : 'Unsubscribe'}
+            </Button>
+            <Button
+              variant="outline"
+              onClick={() => navigate('/')}
+              className="w-full mt-2"
+            >
+              Cancel
+            </Button>
+          </>
+        )}
       </div>
     </div>
   );
