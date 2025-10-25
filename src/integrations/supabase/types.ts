@@ -919,6 +919,10 @@ export type Database = {
         Args: Record<PropertyKey, never>
         Returns: undefined
       }
+      increment_redirect_clicks: {
+        Args: { redirect_id: string }
+        Returns: undefined
+      }
       cleanup_incomplete_users: {
         Args: Record<PropertyKey, never>
         Returns: undefined

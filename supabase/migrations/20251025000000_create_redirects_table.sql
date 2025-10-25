@@ -48,3 +48,14 @@ CREATE TRIGGER update_redirects_timestamp
 BEFORE UPDATE ON public.redirects
 FOR EACH ROW
 EXECUTE FUNCTION update_redirects_updated_at();
+
+-- Create RPC function for fast click increment
+CREATE OR REPLACE FUNCTION increment_redirect_clicks(redirect_id TEXT)
+RETURNS void AS $$
+BEGIN
+  UPDATE public.redirects
+  SET clicks = clicks + 1,
+      last_clicked_at = NOW()
+  WHERE id = redirect_id;
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER;
