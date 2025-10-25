@@ -803,6 +803,42 @@ export type Database = {
           },
         ]
       }
+      redirects: {
+        Row: {
+          android_url: string | null
+          clicks: number
+          created_at: string
+          created_by: string | null
+          id: string
+          ios_url: string | null
+          last_clicked_at: string | null
+          updated_at: string
+          web_url: string
+        }
+        Insert: {
+          android_url?: string | null
+          clicks?: number
+          created_at?: string
+          created_by?: string | null
+          id: string
+          ios_url?: string | null
+          last_clicked_at?: string | null
+          updated_at?: string
+          web_url: string
+        }
+        Update: {
+          android_url?: string | null
+          clicks?: number
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          ios_url?: string | null
+          last_clicked_at?: string | null
+          updated_at?: string
+          web_url?: string
+        }
+        Relationships: []
+      }
       user_usage: {
         Row: {
           created_at: string

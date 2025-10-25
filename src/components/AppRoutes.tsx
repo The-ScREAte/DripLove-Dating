@@ -11,6 +11,7 @@ import ProfileCompletionPage from '@/components/ProfileCompletionPage';
 import ResetPasswordPage from '@/components/ResetPasswordPage';
 import AppleOAuthCallback from '@/components/AppleOAuthCallback';
 import AppleOAuthTest from '@/components/AppleOAuthTest';
+import RedirectHandler from '@/components/RedirectHandler';
 import { useMobileOAuth } from '@/hooks/useMobileOAuth';
 
 const AppRoutes = () => {
@@ -29,6 +30,7 @@ const AppRoutes = () => {
       <Route path="/auth/apple-test" element={<AppleOAuthTest />} />
       <Route path="/complete-profile" element={<ProfileCompletionPage />} />
       <Route path="/reset-password" element={<ResetPasswordPage />} />
+      <Route path="/r/:id" element={<RedirectHandler />} />
       {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
       <Route path="*" element={<NotFound />} />
     </Routes>

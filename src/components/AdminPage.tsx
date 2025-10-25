@@ -19,6 +19,7 @@ import ImageModerationPanel from './admin/ImageModerationPanel';
 import NotificationTester from './NotificationTester';
 import ManualPremiumManager from './admin/ManualPremiumManager';
 import AdsManagement from './admin/AdsManagement';
+import RedirectLinkCreator from './admin/RedirectLinkCreator';
 import { debounce, userDataCache, createPagination } from '@/utils/performanceOptimizer';
 import { useSupabaseSubscription, useMemoryMonitor } from '@/hooks/usePerformance';
 import { CurrentUser, AdminStats } from '@/types';
@@ -42,7 +43,8 @@ import {
   CreditCard,
   BarChart3,
   Crown,
-  Megaphone
+  Megaphone,
+  Link2
 } from 'lucide-react';
 
 interface AdminPageProps {
@@ -1137,7 +1139,7 @@ const AdminPageComponent = ({ currentUser, onLogout }: AdminPageProps) => {
           {/* Tabbed Interface with Error Boundaries for 1000+ users */}
           <AdminErrorBoundary>
             <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-              <TabsList className="grid w-full grid-cols-6 mb-4 h-11">
+              <TabsList className="grid w-full grid-cols-7 mb-4 h-11">
                 <TabsTrigger value="dashboard" className="text-xs flex flex-col gap-1 py-2">
                   <BarChart3 className="w-4 h-4" />
                   <span>Dashboard</span>
@@ -1153,6 +1155,10 @@ const AdminPageComponent = ({ currentUser, onLogout }: AdminPageProps) => {
                 <TabsTrigger value="ads" className="text-xs flex flex-col gap-1 py-2">
                   <Megaphone className="w-4 h-4" />
                   <span>Ads</span>
+                </TabsTrigger>
+                <TabsTrigger value="redirects" className="text-xs flex flex-col gap-1 py-2">
+                  <Link2 className="w-4 h-4" />
+                  <span>Links</span>
                 </TabsTrigger>
                 <TabsTrigger value="debugger" className="text-xs flex flex-col gap-1 py-2">
                   <Search className="w-4 h-4" />
@@ -1582,6 +1588,11 @@ const AdminPageComponent = ({ currentUser, onLogout }: AdminPageProps) => {
                   longitude: currentUser.longitude
                 }}
               />
+            </TabsContent>
+
+            {/* Redirects Tab */}
+            <TabsContent value="redirects" className="space-y-4">
+              <RedirectLinkCreator />
             </TabsContent>
 
             {/* Settings Tab */}
