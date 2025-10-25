@@ -519,6 +519,642 @@ export const locationData: Record<string, CountryData> = {
       { name: 'Breda', state: 'North Brabant', latitude: 51.5719, longitude: 4.7683, population: 180000, zipCode: '4811' },
       { name: 'Nijmegen', state: 'Gelderland', latitude: 51.8426, longitude: 5.8518, population: 180000, zipCode: '6511' }
     ]
+  },
+
+  // Additional West African Countries
+  benin: {
+    name: 'Benin',
+    code: 'BJ',
+    continent: 'Africa',
+    currency: 'XOF',
+    phoneCode: '+229',
+    majorCities: [
+      { name: 'Cotonou', latitude: 6.3654, longitude: 2.4183, population: 680000 },
+      { name: 'Porto-Novo', latitude: 6.4969, longitude: 2.6289, population: 264000 },
+      { name: 'Parakou', latitude: 9.3333, longitude: 2.6167, population: 255000 },
+      { name: 'Djougou', latitude: 9.7083, longitude: 1.6667, population: 95000 },
+      { name: 'Bohicon', latitude: 7.1833, longitude: 2.0667, population: 93000 }
+    ]
+  },
+
+  togo: {
+    name: 'Togo',
+    code: 'TG',
+    continent: 'Africa',
+    currency: 'XOF',
+    phoneCode: '+228',
+    majorCities: [
+      { name: 'Lomé', latitude: 6.1256, longitude: 1.2219, population: 1500000 },
+      { name: 'Sokodé', latitude: 8.9833, longitude: 1.1333, population: 115000 },
+      { name: 'Kara', latitude: 9.5511, longitude: 1.1861, population: 95000 },
+      { name: 'Kpalimé', latitude: 6.9000, longitude: 0.6333, population: 75000 },
+      { name: 'Atakpamé', latitude: 7.5333, longitude: 1.1167, population: 70000 }
+    ]
+  },
+
+  ivoryCoast: {
+    name: 'Côte d\'Ivoire',
+    code: 'CI',
+    continent: 'Africa',
+    currency: 'XOF',
+    phoneCode: '+225',
+    majorCities: [
+      { name: 'Abidjan', latitude: 5.3600, longitude: -4.0083, population: 4700000 },
+      { name: 'Yamoussoukro', latitude: 6.8276, longitude: -5.2893, population: 280000 },
+      { name: 'Bouaké', latitude: 7.6900, longitude: -5.0300, population: 660000 },
+      { name: 'Daloa', latitude: 6.8770, longitude: -6.4502, population: 270000 },
+      { name: 'San-Pédro', latitude: 4.7500, longitude: -6.6333, population: 260000 }
+    ]
+  },
+
+  burkinaFaso: {
+    name: 'Burkina Faso',
+    code: 'BF',
+    continent: 'Africa',
+    currency: 'XOF',
+    phoneCode: '+226',
+    majorCities: [
+      { name: 'Ouagadougou', latitude: 12.3714, longitude: -1.5197, population: 2400000 },
+      { name: 'Bobo-Dioulasso', latitude: 11.1774, longitude: -4.2980, population: 900000 },
+      { name: 'Koudougou', latitude: 12.2520, longitude: -2.3620, population: 115000 },
+      { name: 'Banfora', latitude: 10.6333, longitude: -4.7667, population: 75000 },
+      { name: 'Ouahigouya', latitude: 13.5833, longitude: -2.4167, population: 75000 }
+    ]
+  },
+
+  mali: {
+    name: 'Mali',
+    code: 'ML',
+    continent: 'Africa',
+    currency: 'XOF',
+    phoneCode: '+223',
+    majorCities: [
+      { name: 'Bamako', latitude: 12.6392, longitude: -8.0029, population: 2400000 },
+      { name: 'Sikasso', latitude: 11.3167, longitude: -5.6667, population: 225000 },
+      { name: 'Koutiala', latitude: 12.3910, longitude: -5.4640, population: 140000 },
+      { name: 'Kayes', latitude: 14.4500, longitude: -11.4333, population: 130000 },
+      { name: 'Ségou', latitude: 13.4317, longitude: -6.2158, population: 130000 }
+    ]
+  },
+
+  niger: {
+    name: 'Niger',
+    code: 'NE',
+    continent: 'Africa',
+    currency: 'XOF',
+    phoneCode: '+227',
+    majorCities: [
+      { name: 'Niamey', latitude: 13.5127, longitude: 2.1128, population: 1300000 },
+      { name: 'Zinder', latitude: 13.8069, longitude: 8.9881, population: 235000 },
+      { name: 'Maradi', latitude: 13.5000, longitude: 7.1000, population: 210000 },
+      { name: 'Agadez', latitude: 16.9735, longitude: 7.9861, population: 125000 },
+      { name: 'Tahoua', latitude: 14.8900, longitude: 5.2700, population: 120000 }
+    ]
+  },
+
+  guinea: {
+    name: 'Guinea',
+    code: 'GN',
+    continent: 'Africa',
+    currency: 'GNF',
+    phoneCode: '+224',
+    majorCities: [
+      { name: 'Conakry', latitude: 9.6412, longitude: -13.5784, population: 1900000 },
+      { name: 'Nzérékoré', latitude: 7.7564, longitude: -8.8179, population: 185000 },
+      { name: 'Kankan', latitude: 10.3850, longitude: -9.3061, population: 190000 },
+      { name: 'Kindia', latitude: 10.0571, longitude: -12.8656, population: 160000 },
+      { name: 'Labé', latitude: 11.3167, longitude: -12.3000, population: 200000 }
+    ]
+  },
+
+  sierraLeone: {
+    name: 'Sierra Leone',
+    code: 'SL',
+    continent: 'Africa',
+    currency: 'SLL',
+    phoneCode: '+232',
+    majorCities: [
+      { name: 'Freetown', latitude: 8.4657, longitude: -13.2317, population: 1200000 },
+      { name: 'Bo', latitude: 7.9647, longitude: -11.7383, population: 175000 },
+      { name: 'Kenema', latitude: 7.8767, longitude: -11.1900, population: 200000 },
+      { name: 'Makeni', latitude: 8.8856, longitude: -12.0453, population: 125000 },
+      { name: 'Koidu', latitude: 8.6439, longitude: -10.9708, population: 90000 }
+    ]
+  },
+
+  liberia: {
+    name: 'Liberia',
+    code: 'LR',
+    continent: 'Africa',
+    currency: 'LRD',
+    phoneCode: '+231',
+    majorCities: [
+      { name: 'Monrovia', latitude: 6.3156, longitude: -10.8074, population: 1400000 },
+      { name: 'Gbarnga', latitude: 6.9986, longitude: -9.4722, population: 57000 },
+      { name: 'Buchanan', latitude: 5.8808, longitude: -10.0467, population: 50000 },
+      { name: 'Kakata', latitude: 6.5300, longitude: -10.3517, population: 35000 },
+      { name: 'Zwedru', latitude: 6.0700, longitude: -8.1317, population: 25000 }
+    ]
+  },
+
+  gambia: {
+    name: 'The Gambia',
+    code: 'GM',
+    continent: 'Africa',
+    currency: 'GMD',
+    phoneCode: '+220',
+    majorCities: [
+      { name: 'Banjul', latitude: 13.4549, longitude: -16.5790, population: 35000 },
+      { name: 'Serekunda', latitude: 13.4333, longitude: -16.6833, population: 345000 },
+      { name: 'Brikama', latitude: 13.2708, longitude: -16.6500, population: 100000 },
+      { name: 'Bakau', latitude: 13.4789, longitude: -16.6817, population: 50000 },
+      { name: 'Farafenni', latitude: 13.5667, longitude: -15.6000, population: 30000 }
+    ]
+  },
+
+  mauritania: {
+    name: 'Mauritania',
+    code: 'MR',
+    continent: 'Africa',
+    currency: 'MRU',
+    phoneCode: '+222',
+    majorCities: [
+      { name: 'Nouakchott', latitude: 18.0735, longitude: -15.9582, population: 1200000 },
+      { name: 'Nouadhibou', latitude: 20.9000, longitude: -17.0333, population: 120000 },
+      { name: 'Rosso', latitude: 16.5133, longitude: -15.8069, population: 50000 },
+      { name: 'Kaédi', latitude: 16.1500, longitude: -13.5000, population: 55000 },
+      { name: 'Kiffa', latitude: 16.6167, longitude: -11.4000, population: 40000 }
+    ]
+  },
+
+  // Central Africa
+  cameroon: {
+    name: 'Cameroon',
+    code: 'CM',
+    continent: 'Africa',
+    currency: 'XAF',
+    phoneCode: '+237',
+    majorCities: [
+      { name: 'Douala', latitude: 4.0511, longitude: 9.7679, population: 2800000 },
+      { name: 'Yaoundé', latitude: 3.8480, longitude: 11.5021, population: 2900000 },
+      { name: 'Bamenda', latitude: 5.9597, longitude: 10.1450, population: 500000 },
+      { name: 'Bafoussam', latitude: 5.4769, longitude: 10.4178, population: 350000 },
+      { name: 'Garoua', latitude: 9.3000, longitude: 13.4000, population: 350000 }
+    ]
+  },
+
+  chad: {
+    name: 'Chad',
+    code: 'TD',
+    continent: 'Africa',
+    currency: 'XAF',
+    phoneCode: '+235',
+    majorCities: [
+      { name: 'N\'Djamena', latitude: 12.1348, longitude: 15.0557, population: 1400000 },
+      { name: 'Moundou', latitude: 8.5667, longitude: 16.0833, population: 140000 },
+      { name: 'Sarh', latitude: 9.1500, longitude: 18.3833, population: 135000 },
+      { name: 'Abéché', latitude: 13.8292, longitude: 20.8322, population: 75000 },
+      { name: 'Kélo', latitude: 9.3086, longitude: 15.8069, population: 60000 }
+    ]
+  },
+
+  centralAfricanRepublic: {
+    name: 'Central African Republic',
+    code: 'CF',
+    continent: 'Africa',
+    currency: 'XAF',
+    phoneCode: '+236',
+    majorCities: [
+      { name: 'Bangui', latitude: 4.3947, longitude: 18.5582, population: 890000 },
+      { name: 'Bimbo', latitude: 4.2536, longitude: 18.5189, population: 130000 },
+      { name: 'Berbérati', latitude: 4.2617, longitude: 15.7925, population: 76000 },
+      { name: 'Carnot', latitude: 4.9428, longitude: 15.8767, population: 45000 },
+      { name: 'Bambari', latitude: 5.7678, longitude: 20.6753, population: 42000 }
+    ]
+  },
+
+  congo: {
+    name: 'Republic of the Congo',
+    code: 'CG',
+    continent: 'Africa',
+    currency: 'XAF',
+    phoneCode: '+242',
+    majorCities: [
+      { name: 'Brazzaville', latitude: 4.2634, longitude: 15.2429, population: 2100000 },
+      { name: 'Pointe-Noire', latitude: 4.7958, longitude: 11.8638, population: 1200000 },
+      { name: 'Dolisie', latitude: 4.2000, longitude: 12.6667, population: 110000 },
+      { name: 'Nkayi', latitude: 4.1833, longitude: 13.2833, population: 75000 },
+      { name: 'Impfondo', latitude: 1.6167, longitude: 18.0667, population: 30000 }
+    ]
+  },
+
+  drCongo: {
+    name: 'Democratic Republic of the Congo',
+    code: 'CD',
+    continent: 'Africa',
+    currency: 'CDF',
+    phoneCode: '+243',
+    majorCities: [
+      { name: 'Kinshasa', latitude: 4.4419, longitude: 15.2663, population: 14000000 },
+      { name: 'Lubumbashi', latitude: 11.6667, longitude: 27.4667, population: 2500000 },
+      { name: 'Mbuji-Mayi', latitude: 6.1500, longitude: 23.6000, population: 2100000 },
+      { name: 'Kananga', latitude: 5.8833, longitude: 22.4167, population: 1200000 },
+      { name: 'Kisangani', latitude: 0.5150, longitude: 25.1900, population: 1300000 }
+    ]
+  },
+
+  gabon: {
+    name: 'Gabon',
+    code: 'GA',
+    continent: 'Africa',
+    currency: 'XAF',
+    phoneCode: '+241',
+    majorCities: [
+      { name: 'Libreville', latitude: 0.4162, longitude: 9.4673, population: 800000 },
+      { name: 'Port-Gentil', latitude: 0.7193, longitude: 8.7815, population: 140000 },
+      { name: 'Franceville', latitude: 1.6333, longitude: 13.5833, population: 110000 },
+      { name: 'Oyem', latitude: 1.5989, longitude: 11.5793, population: 65000 },
+      { name: 'Moanda', latitude: 1.5667, longitude: 13.2000, population: 40000 }
+    ]
+  },
+
+  equatorialGuinea: {
+    name: 'Equatorial Guinea',
+    code: 'GQ',
+    continent: 'Africa',
+    currency: 'XAF',
+    phoneCode: '+240',
+    majorCities: [
+      { name: 'Malabo', latitude: 3.7504, longitude: 8.7371, population: 300000 },
+      { name: 'Bata', latitude: 1.8639, longitude: 9.7658, population: 250000 },
+      { name: 'Ebebiyin', latitude: 2.1500, longitude: 11.3333, population: 25000 },
+      { name: 'Aconibe', latitude: 1.2967, longitude: 10.9364, population: 15000 },
+      { name: 'Añisoc', latitude: 1.8667, longitude: 10.7667, population: 13000 }
+    ]
+  },
+
+  // East Africa
+  rwanda: {
+    name: 'Rwanda',
+    code: 'RW',
+    continent: 'Africa',
+    currency: 'RWF',
+    phoneCode: '+250',
+    majorCities: [
+      { name: 'Kigali', latitude: 1.9536, longitude: 30.0606, population: 1200000 },
+      { name: 'Butare', latitude: 2.5965, longitude: 29.7390, population: 90000 },
+      { name: 'Gitarama', latitude: 2.0744, longitude: 29.7564, population: 90000 },
+      { name: 'Ruhengeri', latitude: 1.5000, longitude: 29.6333, population: 85000 },
+      { name: 'Gisenyi', latitude: 1.7000, longitude: 29.2667, population: 85000 }
+    ]
+  },
+
+  burundi: {
+    name: 'Burundi',
+    code: 'BI',
+    continent: 'Africa',
+    currency: 'BIF',
+    phoneCode: '+257',
+    majorCities: [
+      { name: 'Gitega', latitude: 3.4271, longitude: 29.9246, population: 135000 },
+      { name: 'Bujumbura', latitude: 3.3614, longitude: 29.3599, population: 900000 },
+      { name: 'Muyinga', latitude: 2.8447, longitude: 30.3419, population: 72000 },
+      { name: 'Ngozi', latitude: 2.9081, longitude: 29.8306, population: 50000 },
+      { name: 'Ruyigi', latitude: 3.4764, longitude: 30.2506, population: 40000 }
+    ]
+  },
+
+  somalia: {
+    name: 'Somalia',
+    code: 'SO',
+    continent: 'Africa',
+    currency: 'SOS',
+    phoneCode: '+252',
+    majorCities: [
+      { name: 'Mogadishu', latitude: 2.0469, longitude: 45.3182, population: 2400000 },
+      { name: 'Hargeisa', latitude: 9.5600, longitude: 44.0650, population: 1200000 },
+      { name: 'Bosaso', latitude: 11.2842, longitude: 49.1816, population: 700000 },
+      { name: 'Kismayo', latitude: 0.3582, longitude: 42.5454, population: 500000 },
+      { name: 'Merca', latitude: 1.7151, longitude: 44.7703, population: 230000 }
+    ]
+  },
+
+  djibouti: {
+    name: 'Djibouti',
+    code: 'DJ',
+    continent: 'Africa',
+    currency: 'DJF',
+    phoneCode: '+253',
+    majorCities: [
+      { name: 'Djibouti City', latitude: 11.8251, longitude: 42.5903, population: 600000 },
+      { name: 'Ali Sabieh', latitude: 11.1583, longitude: 42.7125, population: 40000 },
+      { name: 'Tadjourah', latitude: 11.7856, longitude: 42.8828, population: 25000 },
+      { name: 'Obock', latitude: 11.9667, longitude: 43.2900, population: 18000 },
+      { name: 'Dikhil', latitude: 11.1050, longitude: 42.3717, population: 15000 }
+    ]
+  },
+
+  eritrea: {
+    name: 'Eritrea',
+    code: 'ER',
+    continent: 'Africa',
+    currency: 'ERN',
+    phoneCode: '+291',
+    majorCities: [
+      { name: 'Asmara', latitude: 15.3229, longitude: 38.9251, population: 900000 },
+      { name: 'Keren', latitude: 15.7806, longitude: 38.4511, population: 120000 },
+      { name: 'Massawa', latitude: 15.6089, longitude: 39.4521, population: 50000 },
+      { name: 'Assab', latitude: 13.0092, longitude: 42.7389, population: 55000 },
+      { name: 'Mendefera', latitude: 14.8872, longitude: 38.8153, population: 18000 }
+    ]
+  },
+
+  // Southern Africa
+  angola: {
+    name: 'Angola',
+    code: 'AO',
+    continent: 'Africa',
+    currency: 'AOA',
+    phoneCode: '+244',
+    majorCities: [
+      { name: 'Luanda', latitude: 8.8383, longitude: 13.2344, population: 8300000 },
+      { name: 'Huambo', latitude: 12.7761, longitude: 15.7361, population: 1500000 },
+      { name: 'Lobito', latitude: 12.3644, longitude: 13.5355, population: 900000 },
+      { name: 'Benguela', latitude: 12.5764, longitude: 13.4055, population: 560000 },
+      { name: 'Lubango', latitude: 14.9172, longitude: 13.4925, population: 600000 }
+    ]
+  },
+
+  namibia: {
+    name: 'Namibia',
+    code: 'NA',
+    continent: 'Africa',
+    currency: 'NAD',
+    phoneCode: '+264',
+    majorCities: [
+      { name: 'Windhoek', latitude: 22.5597, longitude: 17.0832, population: 430000 },
+      { name: 'Rundu', latitude: 17.9333, longitude: 19.7667, population: 80000 },
+      { name: 'Walvis Bay', latitude: 22.9500, longitude: 14.5000, population: 100000 },
+      { name: 'Oshakati', latitude: 17.7833, longitude: 15.7000, population: 38000 },
+      { name: 'Swakopmund', latitude: 22.6800, longitude: 14.5267, population: 45000 }
+    ]
+  },
+
+  botswana: {
+    name: 'Botswana',
+    code: 'BW',
+    continent: 'Africa',
+    currency: 'BWP',
+    phoneCode: '+267',
+    majorCities: [
+      { name: 'Gaborone', latitude: 24.6282, longitude: 25.9231, population: 230000 },
+      { name: 'Francistown', latitude: 21.1699, longitude: 27.5084, population: 100000 },
+      { name: 'Molepolole', latitude: 24.4069, longitude: 25.4953, population: 67000 },
+      { name: 'Maun', latitude: 19.9945, longitude: 23.4163, population: 60000 },
+      { name: 'Serowe', latitude: 22.3833, longitude: 26.7083, population: 50000 }
+    ]
+  },
+
+  zambia: {
+    name: 'Zambia',
+    code: 'ZM',
+    continent: 'Africa',
+    currency: 'ZMW',
+    phoneCode: '+260',
+    majorCities: [
+      { name: 'Lusaka', latitude: 15.3875, longitude: 28.3228, population: 2500000 },
+      { name: 'Kitwe', latitude: 12.8024, longitude: 28.2132, population: 520000 },
+      { name: 'Ndola', latitude: 12.9687, longitude: 28.6366, population: 455000 },
+      { name: 'Kabwe', latitude: 14.4469, longitude: 28.4464, population: 220000 },
+      { name: 'Chingola', latitude: 12.5289, longitude: 27.8631, population: 185000 }
+    ]
+  },
+
+  malawi: {
+    name: 'Malawi',
+    code: 'MW',
+    continent: 'Africa',
+    currency: 'MWK',
+    phoneCode: '+265',
+    majorCities: [
+      { name: 'Lilongwe', latitude: 13.9626, longitude: 33.7741, population: 1100000 },
+      { name: 'Blantyre', latitude: 15.7850, longitude: 35.0085, population: 800000 },
+      { name: 'Mzuzu', latitude: 11.4650, longitude: 34.0150, population: 130000 },
+      { name: 'Zomba', latitude: 15.3833, longitude: 35.3333, population: 105000 },
+      { name: 'Mangochi', latitude: 14.4789, longitude: 35.2644, population: 52000 }
+    ]
+  },
+
+  mozambique: {
+    name: 'Mozambique',
+    code: 'MZ',
+    continent: 'Africa',
+    currency: 'MZN',
+    phoneCode: '+258',
+    majorCities: [
+      { name: 'Maputo', latitude: 25.9655, longitude: 32.5832, population: 1100000 },
+      { name: 'Matola', latitude: 25.9622, longitude: 32.4589, population: 1000000 },
+      { name: 'Nampula', latitude: 15.1165, longitude: 39.2666, population: 740000 },
+      { name: 'Beira', latitude: 19.8436, longitude: 34.8389, population: 530000 },
+      { name: 'Chimoio', latitude: 19.1164, longitude: 33.4833, population: 340000 }
+    ]
+  },
+
+  madagascar: {
+    name: 'Madagascar',
+    code: 'MG',
+    continent: 'Africa',
+    currency: 'MGA',
+    phoneCode: '+261',
+    majorCities: [
+      { name: 'Antananarivo', latitude: 18.8792, longitude: 47.5079, population: 1400000 },
+      { name: 'Toamasina', latitude: 18.1443, longitude: 49.4022, population: 325000 },
+      { name: 'Antsirabe', latitude: 19.8667, longitude: 47.0333, population: 260000 },
+      { name: 'Fianarantsoa', latitude: 21.4500, longitude: 47.0833, population: 200000 },
+      { name: 'Mahajanga', latitude: 15.7167, longitude: 46.3167, population: 220000 }
+    ]
+  },
+
+  mauritius: {
+    name: 'Mauritius',
+    code: 'MU',
+    continent: 'Africa',
+    currency: 'MUR',
+    phoneCode: '+230',
+    majorCities: [
+      { name: 'Port Louis', latitude: 20.1609, longitude: 57.5012, population: 150000 },
+      { name: 'Beau Bassin-Rose Hill', latitude: 20.2333, longitude: 57.4667, population: 110000 },
+      { name: 'Vacoas-Phoenix', latitude: 20.2981, longitude: 57.4931, population: 110000 },
+      { name: 'Curepipe', latitude: 20.3167, longitude: 57.5167, population: 85000 },
+      { name: 'Quatre Bornes', latitude: 20.2650, longitude: 57.4789, population: 77000 }
+    ]
+  },
+
+  // North Africa (Additional)
+  algeria: {
+    name: 'Algeria',
+    code: 'DZ',
+    continent: 'Africa',
+    currency: 'DZD',
+    phoneCode: '+213',
+    majorCities: [
+      { name: 'Algiers', latitude: 36.7372, longitude: 3.0865, population: 2900000 },
+      { name: 'Oran', latitude: 35.6969, longitude: 0.6331, population: 850000 },
+      { name: 'Constantine', latitude: 36.3650, longitude: 6.6147, population: 450000 },
+      { name: 'Annaba', latitude: 36.9000, longitude: 7.7667, population: 260000 },
+      { name: 'Blida', latitude: 36.4703, longitude: 2.8277, population: 330000 }
+    ]
+  },
+
+  tunisia: {
+    name: 'Tunisia',
+    code: 'TN',
+    continent: 'Africa',
+    currency: 'TND',
+    phoneCode: '+216',
+    majorCities: [
+      { name: 'Tunis', latitude: 36.8065, longitude: 10.1815, population: 2400000 },
+      { name: 'Sfax', latitude: 34.7406, longitude: 10.7603, population: 330000 },
+      { name: 'Sousse', latitude: 35.8256, longitude: 10.6411, population: 270000 },
+      { name: 'Kairouan', latitude: 35.6781, longitude: 10.0963, population: 186000 },
+      { name: 'Bizerte', latitude: 37.2744, longitude: 9.8739, population: 140000 }
+    ]
+  },
+
+  libya: {
+    name: 'Libya',
+    code: 'LY',
+    continent: 'Africa',
+    currency: 'LYD',
+    phoneCode: '+218',
+    majorCities: [
+      { name: 'Tripoli', latitude: 32.8872, longitude: 13.1913, population: 1100000 },
+      { name: 'Benghazi', latitude: 32.1167, longitude: 20.0686, population: 630000 },
+      { name: 'Misrata', latitude: 32.3754, longitude: 15.0925, population: 550000 },
+      { name: 'Bayda', latitude: 32.7617, longitude: 21.7556, population: 250000 },
+      { name: 'Zawiya', latitude: 32.7500, longitude: 12.7333, population: 200000 }
+    ]
+  },
+
+  sudan: {
+    name: 'Sudan',
+    code: 'SD',
+    continent: 'Africa',
+    currency: 'SDG',
+    phoneCode: '+249',
+    majorCities: [
+      { name: 'Khartoum', latitude: 15.5007, longitude: 32.5599, population: 5300000 },
+      { name: 'Omdurman', latitude: 15.6445, longitude: 32.4777, population: 2800000 },
+      { name: 'Port Sudan', latitude: 19.6158, longitude: 37.2164, population: 490000 },
+      { name: 'Kassala', latitude: 15.4500, longitude: 36.4000, population: 400000 },
+      { name: 'Nyala', latitude: 12.0489, longitude: 24.8881, population: 565000 }
+    ]
+  },
+
+  southSudan: {
+    name: 'South Sudan',
+    code: 'SS',
+    continent: 'Africa',
+    currency: 'SSP',
+    phoneCode: '+211',
+    majorCities: [
+      { name: 'Juba', latitude: 4.8517, longitude: 31.5825, population: 525000 },
+      { name: 'Malakal', latitude: 9.5334, longitude: 31.6597, population: 160000 },
+      { name: 'Wau', latitude: 7.7028, longitude: 27.9939, population: 150000 },
+      { name: 'Yei', latitude: 4.0908, longitude: 30.6781, population: 185000 },
+      { name: 'Yambio', latitude: 4.5722, longitude: 28.4167, population: 105000 }
+    ]
+  },
+
+  // Additional Notable Countries
+  lesotho: {
+    name: 'Lesotho',
+    code: 'LS',
+    continent: 'Africa',
+    currency: 'LSL',
+    phoneCode: '+266',
+    majorCities: [
+      { name: 'Maseru', latitude: 29.3167, longitude: 27.4833, population: 330000 },
+      { name: 'Teyateyaneng', latitude: 29.1500, longitude: 27.7500, population: 75000 },
+      { name: 'Mafeteng', latitude: 29.8231, longitude: 27.2372, population: 58000 },
+      { name: 'Leribe', latitude: 28.8719, longitude: 28.0453, population: 47000 },
+      { name: 'Maputsoe', latitude: 28.8878, longitude: 27.9006, population: 33000 }
+    ]
+  },
+
+  eswatini: {
+    name: 'Eswatini',
+    code: 'SZ',
+    continent: 'Africa',
+    currency: 'SZL',
+    phoneCode: '+268',
+    majorCities: [
+      { name: 'Mbabane', latitude: 26.3167, longitude: 31.1333, population: 95000 },
+      { name: 'Manzini', latitude: 26.5000, longitude: 31.3667, population: 110000 },
+      { name: 'Lobamba', latitude: 26.4500, longitude: 31.2000, population: 5800 },
+      { name: 'Siteki', latitude: 26.4500, longitude: 31.9500, population: 6000 },
+      { name: 'Piggs Peak', latitude: 25.9667, longitude: 31.2500, population: 5750 }
+    ]
+  },
+
+  capeverde: {
+    name: 'Cape Verde',
+    code: 'CV',
+    continent: 'Africa',
+    currency: 'CVE',
+    phoneCode: '+238',
+    majorCities: [
+      { name: 'Praia', latitude: 14.9177, longitude: 23.5092, population: 160000 },
+      { name: 'Mindelo', latitude: 16.8894, longitude: 24.9819, population: 75000 },
+      { name: 'Santa Maria', latitude: 16.5976, longitude: 22.9041, population: 19000 },
+      { name: 'Assomada', latitude: 15.0989, longitude: 23.6836, population: 12000 },
+      { name: 'Porto Novo', latitude: 17.0189, longitude: 25.0656, population: 9500 }
+    ]
+  },
+
+  saotomePrincipe: {
+    name: 'São Tomé and Príncipe',
+    code: 'ST',
+    continent: 'Africa',
+    currency: 'STN',
+    phoneCode: '+239',
+    majorCities: [
+      { name: 'São Tomé', latitude: 0.3365, longitude: 6.7273, population: 80000 },
+      { name: 'Santo António', latitude: 1.6397, longitude: 7.4186, population: 1200 },
+      { name: 'Trindade', latitude: 0.2833, longitude: 6.6833, population: 16000 },
+      { name: 'Neves', latitude: 0.3500, longitude: 6.5500, population: 5900 },
+      { name: 'Santana', latitude: 0.2536, longitude: 6.7456, population: 8400 }
+    ]
+  },
+
+  comoros: {
+    name: 'Comoros',
+    code: 'KM',
+    continent: 'Africa',
+    currency: 'KMF',
+    phoneCode: '+269',
+    majorCities: [
+      { name: 'Moroni', latitude: 11.7022, longitude: 43.2551, population: 56000 },
+      { name: 'Mutsamudu', latitude: 12.1667, longitude: 44.4000, population: 23000 },
+      { name: 'Fomboni', latitude: 12.2833, longitude: 43.7333, population: 14000 },
+      { name: 'Domoni', latitude: 12.2597, longitude: 44.5314, population: 14000 },
+      { name: 'Tsimbeo', latitude: 11.8833, longitude: 43.2667, population: 8000 }
+    ]
+  },
+
+  seychelles: {
+    name: 'Seychelles',
+    code: 'SC',
+    continent: 'Africa',
+    currency: 'SCR',
+    phoneCode: '+248',
+    majorCities: [
+      { name: 'Victoria', latitude: 4.6796, longitude: 55.4920, population: 26000 },
+      { name: 'Anse Boileau', latitude: 4.7167, longitude: 55.4833, population: 4200 },
+      { name: 'Beau Vallon', latitude: 4.6167, longitude: 55.4333, population: 3900 },
+      { name: 'Cascade', latitude: 4.6667, longitude: 55.5000, population: 3800 },
+      { name: 'Anse Royale', latitude: 4.7419, longitude: 55.5156, population: 3800 }
+    ]
   }
 };
 
