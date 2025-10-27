@@ -91,6 +91,9 @@ const ChatPage = ({ currentUser, onUnreadChange, onDetailViewChange }: ChatPageP
   // Real-time subscription for matches table
   useEffect(() => {
     if (!currentUser || !currentUser.id) return;
+    
+    console.log('[ChatPage] 🔔 Setting up matches realtime subscription');
+    
     const channel = supabase
       .channel('chat-matches')
       .on(
@@ -101,6 +104,7 @@ const ChatPage = ({ currentUser, onUnreadChange, onDetailViewChange }: ChatPageP
           table: 'matches',
         },
         (payload) => {
+            console.log('[ChatPage] 📨 Realtime match change:', payload.eventType, payload.new);
             // Mark that matches have changed. We'll refresh the UI only when appropriate.
             matchesNeedsRefreshRef.current = true;
             // Still update cache in background so data is fresh when the user returns
@@ -109,9 +113,12 @@ const ChatPage = ({ currentUser, onUnreadChange, onDetailViewChange }: ChatPageP
             onUnreadChange?.();
           }
       )
-      .subscribe();
+      .subscribe((status) => {
+        console.log('[ChatPage] 🔌 Matches subscription status:', status);
+      });
 
     return () => {
+      console.log('[ChatPage] 🔌 Cleaning up matches subscription');
       supabase.removeChannel(channel);
     };
   }, [currentUser?.id]);
@@ -140,6 +147,8 @@ const ChatPage = ({ currentUser, onUnreadChange, onDetailViewChange }: ChatPageP
   useEffect(() => {
     if (!currentUser || !currentUser.id) return;
     if (selectedMatch) {
+      console.log('[ChatPage] 🔔 Setting up chats realtime subscription for match:', selectedMatch.id);
+      
       const channel = supabase
         .channel(`chats:${selectedMatch.id}`)
         .on(
@@ -151,6 +160,7 @@ const ChatPage = ({ currentUser, onUnreadChange, onDetailViewChange }: ChatPageP
             filter: `match_id=eq.${selectedMatch.id}`,
           },
           (payload) => {
+            console.log('[ChatPage] 📨 Realtime new message:', payload.new);
             const newMsg = payload.new as ChatMessage;
             
             // Ensure sent_at is set for proper date display
@@ -162,8 +172,10 @@ const ChatPage = ({ currentUser, onUnreadChange, onDetailViewChange }: ChatPageP
               setMessages((prev) => {
                 // Dedupe: if message id already exists, ignore (prevents duplicates from optimistic + realtime)
                 if (prev.some(m => m.id === newMsg.id)) {
+                  console.log('[ChatPage] ⚠️ Duplicate message detected, skipping');
                   return prev;
                 }
+                console.log('[ChatPage] ✅ Adding new message to state');
                 const updated = [...prev, newMsg];
                 // Update cache with new message
                 chatMessagesCache.set(selectedMatch.id, {
@@ -181,9 +193,12 @@ const ChatPage = ({ currentUser, onUnreadChange, onDetailViewChange }: ChatPageP
             }
           }
         )
-        .subscribe();
+        .subscribe((status) => {
+          console.log('[ChatPage] 🔌 Chats subscription status:', status);
+        });
 
       return () => {
+        console.log('[ChatPage] 🔌 Cleaning up chats subscription for match:', selectedMatch.id);
         supabase.removeChannel(channel);
       };
     }
