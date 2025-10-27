@@ -750,18 +750,23 @@ const MainApp = ({ user, onLogout }: MainAppProps) => {
   useEffect(() => {
     if (!user?.id) return;
 
+    console.log('[MainApp] 🔔 Setting up realtime subscription for matches table');
     const channel = supabase
       .channel('nav-matches')
       .on('postgres_changes', {
         event: '*',
         schema: 'public',
         table: 'matches',
-      }, () => {
+      }, (payload) => {
+        console.log('[MainApp] 🔔 Realtime match change detected:', payload.eventType, payload.new);
         fetchUnreadCount();
       })
-      .subscribe();
+      .subscribe((status) => {
+        console.log('[MainApp] 🔔 Realtime subscription status:', status);
+      });
 
     return () => {
+      console.log('[MainApp] 🔔 Cleaning up realtime subscription');
       supabase.removeChannel(channel);
     };
   }, [user?.id]); // Depend on user.id rather than full user object
@@ -837,6 +842,7 @@ const MainApp = ({ user, onLogout }: MainAppProps) => {
   const fetchUnreadCount = async () => {
     if (!user?.id) return;
 
+    console.log('[MainApp] 📊 Fetching unread count for user:', user.id);
     try {
       // Always use matches table for unread count
       const { data, error } = await supabase
@@ -852,9 +858,10 @@ const MainApp = ({ user, onLogout }: MainAppProps) => {
         return sum + (Number.isFinite(unread) && unread > 0 ? unread : 0);
       }, 0) || 0;
 
+      console.log('[MainApp] 📊 Unread count updated:', total, 'from', data?.length, 'matches');
       setUnreadCount(total);
     } catch (error) {
-      console.error('Error fetching unread count:', error);
+      console.error('[MainApp] ❌ Error fetching unread count:', error);
     }
   };
 
