@@ -643,6 +643,44 @@ const ChatPage = ({ currentUser, onUnreadChange, onDetailViewChange }: ChatPageP
     }
   };
 
+  const deleteMessage = async (messageId: string) => {
+    if (!selectedMatch) return;
+
+    try {
+      // Delete from database
+      const { error } = await supabase
+        .from('chats')
+        .delete()
+        .eq('id', messageId)
+        .eq('sender_id', currentUser.id); // Only allow deleting own messages
+
+      if (error) throw error;
+
+      // Remove from UI immediately
+      setMessages(prev => {
+        const updated = prev.filter(msg => msg.id !== messageId);
+        // Update cache
+        chatMessagesCache.set(selectedMatch.id, {
+          messages: updated,
+          timestamp: Date.now()
+        });
+        return updated;
+      });
+
+      toast({
+        title: 'Message deleted',
+        description: 'The message has been removed.',
+      });
+    } catch (error) {
+      console.error('Error deleting message:', error);
+      toast({
+        title: 'Error',
+        description: 'Failed to delete message. Please try again.',
+        variant: 'destructive'
+      });
+    }
+  };
+
   const testNotification = async () => {
     try {
       // First check if browser supports notifications
@@ -946,6 +984,7 @@ const ChatPage = ({ currentUser, onUnreadChange, onDetailViewChange }: ChatPageP
               message={message}
               currentUser={currentUser}
               isConsecutive={isConsecutive}
+              onDelete={deleteMessage}
             />
           );
         })}
