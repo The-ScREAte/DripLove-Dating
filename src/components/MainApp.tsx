@@ -74,44 +74,49 @@ const MainApp = ({ user, onLogout }: MainAppProps) => {
         console.log('[MainApp] Attempting to setup push notifications...');
         const { PushNotifications } = await import('@capacitor/push-notifications');
         
-        // Add error listener first to catch Firebase initialization errors
+        // Add ALL listeners FIRST before calling register()
         PushNotifications.addListener('registrationError', (error) => {
-          console.error('[MainApp] Push registration error (Firebase may not be configured):', error);
+          console.error('[MainApp] Push registration error:', error);
         });
         
-        // Request permission first to prevent crashes
+        // Add token listener BEFORE registering
+        PushNotifications.addListener('registration', async (token) => {
+          console.log('[MainApp] 📱 Push token received:', token.value);
+          try {
+            const { error } = await supabase.from('push_tokens').upsert({
+              user_id: user.id,
+              token: token.value,
+              platform: Capacitor.getPlatform(),
+              updated_at: new Date().toISOString()
+            }, {
+              onConflict: 'user_id,token'
+            });
+            
+            if (error) {
+              console.error('[MainApp] Failed to save push token:', error);
+            } else {
+              console.log('[MainApp] ✅ Push token saved successfully to database');
+            }
+          } catch (error) {
+            console.error('[MainApp] Exception saving push token:', error);
+          }
+        });
+        
+        // Request permission
         console.log('[MainApp] Requesting push notification permissions...');
         const permissionResult = await PushNotifications.requestPermissions();
         
         if (permissionResult.receive === 'granted') {
-          console.log('[MainApp] Permission granted, attempting to register...');
+          console.log('[MainApp] Permission granted, registering device...');
           
-          // Use setTimeout to prevent blocking the main thread
-          setTimeout(async () => {
-            try {
-              await PushNotifications.register();
-              console.log('[MainApp] Push notification registration successful');
-              
-              PushNotifications.addListener('registration', async (token) => {
-                try {
-                  // Save token to Supabase
-                  await supabase.from('push_tokens').upsert({
-                    user_id: user.id,
-                    token: token.value,
-                    platform: Capacitor.getPlatform()
-                  });
-                  console.log('[MainApp] Push token saved successfully');
-                } catch (error) {
-                  console.error('[MainApp] Failed to save push token:', error);
-                }
-              });
-            } catch (regError) {
-              console.error('[MainApp] Push registration failed (likely Firebase not configured):', regError);
-              // Continue without push notifications
-            }
-          }, 500);
+          try {
+            await PushNotifications.register();
+            console.log('[MainApp] ✅ Push notification registration call completed');
+          } catch (regError) {
+            console.error('[MainApp] Push registration failed:', regError);
+          }
         } else {
-          console.log('[MainApp] Push notification permission not granted');
+          console.log('[MainApp] Push notification permission denied');
         }
       } catch (err) {
         console.error('[MainApp] Push notification setup error:', err);
