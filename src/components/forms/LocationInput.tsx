@@ -4,7 +4,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
-import { MapPin, Search, Check, Loader2, CheckCircle2, Lock } from 'lucide-react';
+import { MapPin, Search, Check, Loader2, CheckCircle2, Lock, X } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { 
   getCountriesList, 
@@ -129,6 +129,26 @@ const LocationInput = ({
     } finally {
       setIsDetecting(false);
     }
+  };
+
+  // Unlock country to allow manual selection
+  const handleUnlockCountry = () => {
+    setIsCountryLocked(false);
+    setDetectionMethod(null);
+    setSelectedCountryCode('');
+    setCityInput('');
+    setIsCustomCity(false);
+    setCoordinates({});
+    
+    onLocationChange({
+      country: '',
+      countryCode: '',
+      city: '',
+      zipCode,
+      latitude: undefined,
+      longitude: undefined,
+      isCustomCity: false
+    });
   };
 
   // Initialize selected country
@@ -287,7 +307,7 @@ const LocationInput = ({
           >
             <SelectTrigger 
               className={`${errors.country ? 'border-red-500' : ''} ${
-                isCountryLocked ? 'bg-green-50 border-green-300 cursor-not-allowed opacity-70' : ''
+                isCountryLocked ? 'bg-green-50 border-green-300 cursor-not-allowed opacity-70 pr-20' : ''
               }`}
             >
               <SelectValue placeholder={loadingCountries ? "Loading countries..." : "Select your country"} />
@@ -306,9 +326,19 @@ const LocationInput = ({
             </SelectContent>
           </Select>
           {isCountryLocked && (
-            <div className="absolute right-10 top-1/2 -translate-y-1/2">
-              <Lock className="w-4 h-4 text-green-600" />
-            </div>
+            <>
+              <div className="absolute right-10 top-1/2 -translate-y-1/2">
+                <Lock className="w-4 h-4 text-green-600" />
+              </div>
+              <button
+                type="button"
+                onClick={handleUnlockCountry}
+                className="absolute right-2 top-1/2 -translate-y-1/2 p-1 hover:bg-red-100 rounded-full transition-colors group"
+                title="Wrong location? Click to select manually"
+              >
+                <X className="w-4 h-4 text-gray-400 group-hover:text-red-500" />
+              </button>
+            </>
           )}
         </div>
         {errors.country && (

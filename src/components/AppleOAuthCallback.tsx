@@ -40,16 +40,8 @@ const AppleOAuthCallback = () => {
         const result = await handleCustomAppleCallback();
         
         if (result.needsProfileCompletion) {
-          toast({ 
-            title: 'Welcome!', 
-            description: "Please complete your profile to continue." 
-          });
           navigate('/complete-profile');
         } else {
-          toast({ 
-            title: 'Welcome back!', 
-            description: "You've been successfully signed in with Apple." 
-          });
           navigate('/');
         }
         

@@ -168,11 +168,9 @@ const AuthForm = ({ isLogin, onToggle, onOAuthSuccess, onBack }: AuthFormProps) 
             if (user) {
               if (data.needsProfileCompletion) {
                 // User needs to complete profile - redirect to completion
-                toast({ title: 'Welcome!', description: "Please complete your profile to continue." });
                 navigate('/complete-profile');
               } else {
                 // User has complete profile - go to main app
-                toast({ title: 'Welcome back!', description: "You've been successfully signed in." });
                 navigate('/');
               }
             }
@@ -317,20 +315,7 @@ const AuthForm = ({ isLogin, onToggle, onOAuthSuccess, onBack }: AuthFormProps) 
                       profile.city === 'Unknown' ||
                       !profile.country;
                   }
-                  // Show success toast
-                  if (needsProfileCompletion) {
-                    toast({ 
-                      title: '✅ Login Successful!', 
-                      description: "Please complete your profile to continue.",
-                      duration: 2000,
-                    });
-                  } else {
-                    toast({ 
-                      title: '✅ Login Successful!', 
-                      description: "Welcome back to DripLove!",
-                      duration: 2000,
-                    });
-                  }
+                  // Navigation without toast message
                   await new Promise(resolve => setTimeout(resolve, 500));
                   setOauthLoading(null);
                   Browser.removeAllListeners();
@@ -346,10 +331,6 @@ const AuthForm = ({ isLogin, onToggle, onOAuthSuccess, onBack }: AuthFormProps) 
                   console.error('Error during post-login processing:', error);
                   setOauthLoading(null);
                   Browser.removeAllListeners();
-                  toast({
-                    title: 'Login Successful',
-                    description: 'Please complete your profile.',
-                  });
                   navigate('/complete-profile');
                 }
               }
@@ -670,11 +651,6 @@ const AuthForm = ({ isLogin, onToggle, onOAuthSuccess, onBack }: AuthFormProps) 
         // Save profile ID to session
         sessionStorage.setItem('profile_id', profile.id);
 
-        toast({
-          title: "Welcome back!",
-          description: "You've been successfully logged in.",
-        });
-
         // Always redirect to home page and let the main app handle routing
         // The auth state change will trigger the proper view (admin/app)
         navigate('/');
@@ -734,11 +710,6 @@ const AuthForm = ({ isLogin, onToggle, onOAuthSuccess, onBack }: AuthFormProps) 
           // With email confirmation enabled, there should be no session initially
           if (!authData.session) {
             // This is the expected flow - email confirmation required
-            toast({
-              title: "Registration Successful!",
-              description: "Please check your email and click the confirmation link to activate your account. After confirming, you can sign in.",
-            });
-            
             // Clear the form and switch to login mode
             setFormData({
               email: '',
@@ -779,11 +750,6 @@ const AuthForm = ({ isLogin, onToggle, onOAuthSuccess, onBack }: AuthFormProps) 
               console.error('[Registration] Profile creation error:', profileError);
               // Don't fail the registration, just log the error
             }
-
-            toast({
-              title: "Registration Successful",
-              description: "Account created successfully. Welcome to LoveConnect!",
-            });
 
             // Navigate to home - user can update their profile later from the main app
             navigate('/');

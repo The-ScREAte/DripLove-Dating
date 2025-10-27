@@ -136,6 +136,7 @@ import { Button } from '@/components/ui/button';
 import { Heart, X, Crown, Calendar, MapPin, ChevronDown, ChevronUp, Briefcase, GraduationCap, Undo2 } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
+import { usePushNotifications } from '@/hooks/usePushNotifications';
 import { useSubscription } from '@/hooks/useSubscription';
 import { useImagePreloader } from '@/hooks/useImagePreloader';
 import { calculateDistance } from '@/constants/locationData';
@@ -305,6 +306,7 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, isPremium }: DiscoverPage
   const pendingSwipesRef = useRef(0);
   
   const { toast } = useToast();
+  const { sendMatchNotification } = usePushNotifications(currentUser?.id);
   const { subscription, checkUsageLimit, refetchSubscription } = useSubscription(currentUser?.id);
   const { preloadImages, preloadImage, getOptimizedUrl, isImageLoaded, imageStatus } = useImagePreloader({
     maxConcurrent: 4, // Cap concurrency to 4
@@ -1218,7 +1220,7 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, isPremium }: DiscoverPage
     const deltaX = endX - startXRef.current;
     const deltaY = Math.abs(endY - startYRef.current);
     const screenWidth = window.innerWidth;
-  const minSwipeDistance = screenWidth * 0.60; // Increased to 0.75 for much longer swipes
+  const minSwipeDistance = screenWidth * 0.65; // Increased to 0.65 for longer swipes
 
     // Reset visual smear (flush any pending rAF)
     latestDeltaRef.current = 0;
@@ -1275,7 +1277,7 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, isPremium }: DiscoverPage
       // compute final deltas
       const deltaX = ev.clientX - startXRef.current;
       const deltaY = Math.abs(ev.clientY - startYRef.current);
-      const minSwipeDistance = 50; // Reduced from 80 to 50 for faster mouse swipes
+      const minSwipeDistance = 70; // Increased from 50 to 70 for more deliberate mouse swipes
       // Reset visual smear (flush any pending rAF)
       latestDeltaRef.current = 0;
       if (rafScheduledRef.current) rafScheduledRef.current = false;
@@ -1499,6 +1501,14 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, isPremium }: DiscoverPage
             if (mutualLike) {
               setMatchedUser(prevMatch);
               setShowMatchAnimation(true);
+              
+              // Send match notification to the other user
+              try {
+                const matchedUserName = `${currentUser.first_name || ''} ${currentUser.last_name || ''}`.trim() || 'Someone';
+                await sendMatchNotification(matchedUserName, prevMatch.id);
+              } catch (notificationError) {
+                // Don't fail the match if notification fails
+              }
             }
           } catch (fallbackErr) {
             // If even fallback fails, rollback to keep UI consistent
@@ -1517,6 +1527,14 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, isPremium }: DiscoverPage
           if ((rpcData as any)?.match) {
             setMatchedUser(prevMatch);
             setShowMatchAnimation(true);
+            
+            // Send match notification to the other user
+            try {
+              const matchedUserName = `${currentUser.first_name || ''} ${currentUser.last_name || ''}`.trim() || 'Someone';
+              await sendMatchNotification(matchedUserName, prevMatch.id);
+            } catch (notificationError) {
+              // Don't fail the match if notification fails
+            }
           }
         }
       } catch (jobErr) {
@@ -1729,12 +1747,6 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, isPremium }: DiscoverPage
         setReverseUsageToday(prev => prev + 1);
       }
 
-      toast({
-        title: 'Undo Successful',
-        description: 'Your last dislike has been reversed.',
-        variant: 'default'
-      });
-
     } catch (error) {
   // ...removed log...
       toast({
@@ -1857,7 +1869,7 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, isPremium }: DiscoverPage
             <p className="text-gray-600 mb-4">
               {isPremium 
                 ? "Refreshing your matches..." 
-                : "Free users get 12 swipes per day. Come back tomorrow or upgrade to Premium for unlimited swipes!"
+                : "Free users get 20 swipes per day. Come back tomorrow or upgrade to Premium for unlimited swipes!"
               }
             </p>
             <div className="space-y-3">

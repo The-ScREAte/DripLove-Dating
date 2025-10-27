@@ -124,7 +124,6 @@ const OAuthCallback = () => {
               }
 
               sessionStorage.setItem('profile_id', profile.id);
-              toast({ title: 'Welcome back!', description: "You've been successfully logged in." });
               navigate('/');
               return;
             }
@@ -208,7 +207,6 @@ const OAuthCallback = () => {
               return;
             }
 
-            toast({ title: 'Welcome back!', description: "You've been successfully logged in." });
             navigate('/');
             return;
           }
@@ -268,7 +266,6 @@ const OAuthCallback = () => {
           return;
         }
 
-        toast({ title: 'Welcome back!', description: "You've been successfully logged in." });
         navigate('/');
       } catch (error: any) {
         clearTimeout(timeout);

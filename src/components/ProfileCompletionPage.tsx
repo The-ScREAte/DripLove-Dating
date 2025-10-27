@@ -21,6 +21,7 @@ interface ImageUpload {
   preview: string;
   moderationResult?: ModerationResult;
   status: 'uploading' | 'moderating' | 'approved' | 'pending' | 'rejected';
+  hash?: string; // Store hash for duplicate detection
 }
 
 const ProfileCompletionPage = () => {
@@ -77,7 +78,8 @@ const ProfileCompletionPage = () => {
           file: null,
           preview: img.preview,
           moderationResult: img.moderationResult,
-          status: img.status
+          status: img.status,
+          hash: img.hash // Restore hash for duplicate detection
         })));
       } catch {}
     }
@@ -88,7 +90,8 @@ const ProfileCompletionPage = () => {
     const serializable = images.map(img => ({
       preview: img.preview,
       moderationResult: img.moderationResult,
-      status: img.status
+      status: img.status,
+      hash: img.hash // Save hash for duplicate detection
     }));
     sessionStorage.setItem('profilecompletion_images', JSON.stringify(serializable));
   }, [images]);
@@ -185,6 +188,15 @@ const ProfileCompletionPage = () => {
       return;
     }
 
+    // Helper function to generate file hash for duplicate detection
+    const getFileHash = async (file: File): Promise<string> => {
+      const arrayBuffer = await file.arrayBuffer();
+      const uint8Array = new Uint8Array(arrayBuffer);
+      const firstBytes = Array.from(uint8Array.slice(0, 100)).join(',');
+      const lastBytes = Array.from(uint8Array.slice(-100)).join(',');
+      return `${file.size}-${file.type}-${firstBytes}-${lastBytes}`;
+    };
+
     for (const file of files) {
       if (!file.type.startsWith('image/')) {
         toast({
@@ -204,10 +216,31 @@ const ProfileCompletionPage = () => {
         continue;
       }
 
-      // Compress and convert to WebP before preview and moderation
+      // Compress and convert to WebP first
       const compressedFile = await compressImage(file);
+      
+      // Generate hash AFTER compression for accurate duplicate detection
+      const fileHash = await getFileHash(compressedFile);
+      
+      // Check against existing images (including their stored hashes)
+      const isDuplicate = images.some(img => img.hash === fileHash);
+
+      if (isDuplicate) {
+        toast({
+          title: "Duplicate image",
+          description: "This image has already been uploaded.",
+          variant: "destructive"
+        });
+        continue;
+      }
+
       const preview = URL.createObjectURL(compressedFile);
-      const newImage: ImageUpload = { file: compressedFile, preview, status: 'moderating' };
+      const newImage: ImageUpload = { 
+        file: compressedFile, 
+        preview, 
+        status: 'moderating',
+        hash: fileHash // Store hash for future comparisons
+      };
 
       setImages(prev => [...prev, newImage]);
 

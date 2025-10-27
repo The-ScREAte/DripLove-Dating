@@ -104,12 +104,58 @@ const ImageManagement = ({ currentUser }: ImageManagementProps) => {
       return;
     }
 
-    // Step 1: Compress and convert to WebP before moderation
+    // Helper function to generate file hash for duplicate detection
+    const getFileHash = async (file: File): Promise<string> => {
+      const arrayBuffer = await file.arrayBuffer();
+      const uint8Array = new Uint8Array(arrayBuffer);
+      // Simple hash: combine file size with first and last bytes
+      const firstBytes = Array.from(uint8Array.slice(0, 100)).join(',');
+      const lastBytes = Array.from(uint8Array.slice(-100)).join(',');
+      return `${file.size}-${file.type}-${firstBytes}-${lastBytes}`;
+    };
+
+    // Step 1: Compress and convert to WebP first
     setModerating(true);
     setModerationResult(null);
 
     // Compress image
     const compressedFile = await compressImage(file);
+    
+    // Generate hash AFTER compression for accurate duplicate detection
+    const newFileHash = await getFileHash(compressedFile);
+
+    // Check against existing images in the database by downloading and comparing
+    let isDuplicate = false;
+    for (const existingImage of userImages) {
+      try {
+        // Fetch the existing image
+        const response = await fetch(existingImage.image_url);
+        if (response.ok) {
+          const blob = await response.blob();
+          const existingFile = new File([blob], 'existing.jpg', { type: blob.type });
+          const existingHash = await getFileHash(existingFile);
+          
+          if (existingHash === newFileHash) {
+            isDuplicate = true;
+            break;
+          }
+        }
+      } catch (err) {
+        // Continue checking other images if fetch fails
+        console.error('Error checking duplicate:', err);
+      }
+    }
+
+    if (isDuplicate) {
+      toast({ 
+        title: "Duplicate image", 
+        description: "This image has already been uploaded.", 
+        variant: "destructive" 
+      });
+      setModerating(false);
+      event.target.value = '';
+      return;
+    }
 
     let moderationResult: ModerationResult | null = null;
 

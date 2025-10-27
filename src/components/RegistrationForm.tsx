@@ -29,6 +29,7 @@ interface ImageUpload {
   preview: string;
   moderationResult?: ModerationResult;
   status: 'uploading' | 'moderating' | 'approved' | 'pending' | 'rejected';
+  hash?: string; // Store hash for duplicate detection
 }
 
 const RegistrationForm = ({ onSubmit, onBackToLogin }: RegistrationFormProps) => {
@@ -47,12 +48,13 @@ const RegistrationForm = ({ onSubmit, onBackToLogin }: RegistrationFormProps) =>
     if (saved) {
       try {
         const parsed = JSON.parse(saved);
-        // Only restore preview/status/moderationResult, not File
+        // Only restore preview/status/moderationResult/hash, not File
         setImages(parsed.map((img: any) => ({
           file: null, // File cannot be restored
           preview: img.preview,
           moderationResult: img.moderationResult,
-          status: img.status
+          status: img.status,
+          hash: img.hash // Restore hash for duplicate detection
         })));
       } catch {}
     }
@@ -60,11 +62,12 @@ const RegistrationForm = ({ onSubmit, onBackToLogin }: RegistrationFormProps) =>
 
   // Save images to sessionStorage whenever they change
   React.useEffect(() => {
-    // Only save serializable data
+    // Only save serializable data including hash
     const serializable = images.map(img => ({
       preview: img.preview,
       moderationResult: img.moderationResult,
-      status: img.status
+      status: img.status,
+      hash: img.hash // Save hash for duplicate detection
     }));
     sessionStorage.setItem('registration_images', JSON.stringify(serializable));
   }, [images]);
@@ -150,6 +153,16 @@ const RegistrationForm = ({ onSubmit, onBackToLogin }: RegistrationFormProps) =>
       return;
     }
 
+    // Helper function to generate a simple hash from file content
+    const getFileHash = async (file: File): Promise<string> => {
+      const arrayBuffer = await file.arrayBuffer();
+      const uint8Array = new Uint8Array(arrayBuffer);
+      // Simple hash: combine file size with first and last bytes
+      const firstBytes = Array.from(uint8Array.slice(0, 100)).join(',');
+      const lastBytes = Array.from(uint8Array.slice(-100)).join(',');
+      return `${file.size}-${file.type}-${firstBytes}-${lastBytes}`;
+    };
+
     for (const file of files) {
       if (!file.type.startsWith('image/')) {
         toast({
@@ -169,10 +182,31 @@ const RegistrationForm = ({ onSubmit, onBackToLogin }: RegistrationFormProps) =>
         continue;
       }
 
-      // Compress and convert to WebP before preview and moderation
+      // Compress and convert to WebP first
       const compressedFile = await compressImage(file);
+      
+      // Generate hash AFTER compression for accurate duplicate detection
+      const fileHash = await getFileHash(compressedFile);
+      
+      // Check against existing images (including their stored hashes)
+      const isDuplicate = images.some(img => img.hash === fileHash);
+
+      if (isDuplicate) {
+        toast({
+          title: "Duplicate image",
+          description: "This image has already been uploaded.",
+          variant: "destructive"
+        });
+        continue;
+      }
+
       const preview = URL.createObjectURL(compressedFile);
-      const newImage: ImageUpload = { file: compressedFile, preview, status: 'moderating' };
+      const newImage: ImageUpload = { 
+        file: compressedFile, 
+        preview, 
+        status: 'moderating',
+        hash: fileHash // Store hash for future comparisons
+      };
 
       setImages(prev => [...prev, newImage]);
 
@@ -610,11 +644,6 @@ const RegistrationForm = ({ onSubmit, onBackToLogin }: RegistrationFormProps) =>
     }
 
     setIsSubmitting(false); // Reset loading state
-    
-    toast({
-      title: 'Account Created!',
-      description: 'Your account and profile have been created. Welcome!',
-    });
     
     // Clear sessionStorage after successful registration
     sessionStorage.removeItem('registration_images');

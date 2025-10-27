@@ -547,7 +547,7 @@ const ChatPage = ({ currentUser, onUnreadChange, onDetailViewChange }: ChatPageP
 
       // Use the proper notification service
       try {
-        await sendMessageNotification(senderName, newMessage.trim(), recipientId, selectedMatch.id);
+        await sendMessageNotification(senderName, messageText, recipientId, selectedMatch.id);
       } catch (notificationError) {
         // Don't fail the message send if notification fails
       }
