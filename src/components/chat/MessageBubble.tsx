@@ -25,7 +25,7 @@ const MessageBubble: React.FC<MessageBubbleProps> = ({
       >
         <p className="text-sm">{message.message}</p>
         <div className={`text-xs mt-1 ${isOwnMessage ? 'text-blue-100' : 'text-gray-500'}`}>
-          {new Date(message.sent_at).toLocaleTimeString([], {
+          {new Date(message.sent_at || message.created_at || '').toLocaleTimeString([], {
             hour: '2-digit',
             minute: '2-digit'
           })}

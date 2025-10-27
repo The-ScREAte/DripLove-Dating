@@ -105,6 +105,8 @@ const ChatPage = ({ currentUser, onUnreadChange, onDetailViewChange }: ChatPageP
             matchesNeedsRefreshRef.current = true;
             // Still update cache in background so data is fresh when the user returns
             fetchMatchesInBackground();
+            // Update unread count badge in tab bar
+            onUnreadChange?.();
           }
       )
       .subscribe();
@@ -151,6 +153,11 @@ const ChatPage = ({ currentUser, onUnreadChange, onDetailViewChange }: ChatPageP
           (payload) => {
             const newMsg = payload.new as ChatMessage;
             
+            // Ensure sent_at is set for proper date display
+            if (!newMsg.sent_at && newMsg.created_at) {
+              newMsg.sent_at = newMsg.created_at;
+            }
+            
             // Update messages state
               setMessages((prev) => {
                 // Dedupe: if message id already exists, ignore (prevents duplicates from optimistic + realtime)
@@ -168,9 +175,10 @@ const ChatPage = ({ currentUser, onUnreadChange, onDetailViewChange }: ChatPageP
             
             if (newMsg.sender_id !== currentUser.id) {
               markMessagesAsRead();
+            } else {
+              // If we sent the message, trigger unread count refresh for other matches
+              onUnreadChange?.();
             }
-
-            onUnreadChange?.();
           }
         )
         .subscribe();
