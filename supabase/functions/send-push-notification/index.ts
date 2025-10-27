@@ -147,11 +147,17 @@ serve(async (req) => {
       console.error('Error fetching tokens:', tokensError)
     }
 
+    console.log(`📱 Push tokens for user ${userId}:`, tokens?.length || 0, 'tokens found')
+    if (!tokens || tokens.length === 0) {
+      console.warn(`⚠️ No push tokens found for user ${userId}. User will only receive in-app notifications.`)
+    }
+
     let pushSuccess = false
     let realTimeStored = false
 
     // Send push notifications if tokens exist
     if (tokens && tokens.length > 0) {
+      console.log(`📤 Sending push notifications to ${tokens.length} device(s)...`)
       try {
         // Get OAuth2 access token
         const accessToken = await getAccessToken()
