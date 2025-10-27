@@ -82,20 +82,29 @@ const MainApp = ({ user, onLogout }: MainAppProps) => {
         // Add token listener BEFORE registering
         PushNotifications.addListener('registration', async (token) => {
           console.log('[MainApp] 📱 Push token received:', token.value);
+          
+          // Verify user is authenticated before saving
+          const { data: { user: currentUser } } = await supabase.auth.getUser();
+          
+          if (!currentUser) {
+            console.error('[MainApp] Cannot save push token - user not authenticated');
+            return;
+          }
+          
           try {
             const { error } = await supabase.from('push_tokens').upsert({
-              user_id: user.id,
+              user_id: currentUser.id,
               token: token.value,
               platform: Capacitor.getPlatform(),
               updated_at: new Date().toISOString()
             }, {
-              onConflict: 'user_id,token'
+              onConflict: 'user_id,platform' // Match the unique constraint
             });
             
             if (error) {
               console.error('[MainApp] Failed to save push token:', error);
             } else {
-              console.log('[MainApp] ✅ Push token saved successfully to database');
+              console.log('[MainApp] ✅ Push token saved successfully for user:', currentUser.id);
             }
           } catch (error) {
             console.error('[MainApp] Exception saving push token:', error);
