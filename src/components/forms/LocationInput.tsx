@@ -59,14 +59,14 @@ const LocationInput = ({
   const [locationDetected, setLocationDetected] = useState(false);
   const { toast } = useToast();
 
-  // Auto-detect location on mount
+  // Auto-detect country on mount (only country, not city)
   useEffect(() => {
     if (autoDetect && !country && !locationDetected) {
       handleDetectLocation();
     }
   }, [autoDetect, country, locationDetected]);
 
-  // Detect user's actual location
+  // Detect user's actual country location
   const handleDetectLocation = async () => {
     setDetectingLocation(true);
     
@@ -74,7 +74,7 @@ const LocationInput = ({
       const detectedLocation = await detectUserLocation();
       
       if (detectedLocation) {
-        const { country: detectedCountry, countryCode, city: detectedCity, latitude, longitude } = detectedLocation;
+        const { country: detectedCountry, countryCode } = detectedLocation;
         
         // Find if detected country is in our enabled list
         const enabledCountries = await getEnabledCountries();
@@ -84,23 +84,22 @@ const LocationInput = ({
         
         if (matchedCountry) {
           setSelectedCountryCode(matchedCountry.code);
-          setCityInput(detectedCity);
-          setCoordinates({ lat: latitude, lng: longitude });
           setLocationDetected(true);
           
+          // Only set country, let user select city and zip themselves
           onLocationChange({
             country: matchedCountry.name,
             countryCode: matchedCountry.code,
-            city: detectedCity,
+            city: '',
             zipCode,
-            latitude,
-            longitude,
-            isCustomCity: true
+            latitude: undefined,
+            longitude: undefined,
+            isCustomCity: false
           });
           
           toast({
-            title: 'Location Detected',
-            description: `Set to ${detectedCity}, ${matchedCountry.name}`,
+            title: 'Country Detected',
+            description: `Your country is ${matchedCountry.name}. Please select your city.`,
           });
         } else {
           toast({
@@ -112,7 +111,7 @@ const LocationInput = ({
       } else {
         toast({
           title: 'Location Detection Failed',
-          description: 'Please select your location manually',
+          description: 'Please select your country manually',
           variant: 'destructive'
         });
       }
@@ -120,7 +119,7 @@ const LocationInput = ({
       console.error('Location detection error:', error);
       toast({
         title: 'Location Detection Error',
-        description: 'Please select your location manually',
+        description: 'Please select your country manually',
         variant: 'destructive'
       });
     } finally {
@@ -267,10 +266,10 @@ const LocationInput = ({
           <div className="flex items-center justify-between">
             <div className="flex-1">
               <div className="font-medium text-sm text-blue-900 mb-1">
-                Auto-detect your location
+                Auto-detect your country
               </div>
               <div className="text-xs text-blue-600">
-                We'll use your device location for accurate matching
+                We'll detect your country automatically. You'll select your city.
               </div>
             </div>
             <Button
@@ -287,7 +286,7 @@ const LocationInput = ({
               ) : (
                 <>
                   <MapPinned className="w-4 h-4 mr-2" />
-                  Detect Location
+                  Detect Country
                 </>
               )}
             </Button>
@@ -299,7 +298,7 @@ const LocationInput = ({
         <div className="p-3 bg-green-50 rounded-lg border border-green-200">
           <div className="flex items-center gap-2 text-green-800">
             <Check className="w-4 h-4" />
-            <span className="text-sm font-medium">Location detected and verified</span>
+            <span className="text-sm font-medium">Country auto-detected. Please select your city below.</span>
           </div>
         </div>
       )}
@@ -337,13 +336,10 @@ const LocationInput = ({
 
       {/* City Selection */}
       {selectedCountryCode && (
-        <div className={`space-y-2 ${locationDetected ? 'opacity-50 pointer-events-none' : ''}`}>
+        <div className="space-y-2">
           <Label className="flex items-center gap-2">
             <Search className="w-4 h-4" />
             City/Town {required && <span className="text-red-500">*</span>}
-            {locationDetected && (
-              <span className="text-xs text-green-600 font-normal ml-2">✓ Auto-detected</span>
-            )}
           </Label>
           
           <div className="relative">
@@ -353,7 +349,6 @@ const LocationInput = ({
               onFocus={() => setShowCitySuggestions(selectedCountryCode !== '')}
               placeholder={`${selectedCountryData?.name ? `Select a city in ${selectedCountryData.name} or type to search` : 'Select a country first'}`}
               className={errors.city ? 'border-red-500' : ''}
-              disabled={locationDetected}
             />
 
             {/* City Suggestions Dropdown */}
@@ -444,16 +439,13 @@ const LocationInput = ({
 
       {/* ZIP/Postal Code */}
       {selectedCountryCode && (
-        <div className={`space-y-2 ${locationDetected ? 'opacity-50 pointer-events-none' : ''}`}>
+        <div className="space-y-2">
           <Label>
             {selectedCountryData?.code === 'US' ? 'ZIP Code' : 
              selectedCountryData?.code === 'GB' ? 'Postcode' : 
              'Postal Code'}
             {selectedCountryData?.continent === 'Africa' && (
               <span className="text-xs text-gray-500 ml-1">(optional)</span>
-            )}
-            {locationDetected && (
-              <span className="text-xs text-green-600 ml-2">✓ Auto-detected</span>
             )}
           </Label>
           <Input
@@ -472,7 +464,6 @@ const LocationInput = ({
               'Enter postal code'
             }
             className={errors.zipCode ? 'border-red-500' : ''}
-            disabled={locationDetected}
           />
           {errors.zipCode && (
             <p className="text-sm text-red-500">{errors.zipCode}</p>
