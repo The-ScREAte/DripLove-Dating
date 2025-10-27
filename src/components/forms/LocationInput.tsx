@@ -305,12 +305,15 @@ const LocationInput = ({
       )}
 
       {/* Country Selection */}
-      <div className="space-y-2">
+      <div className={`space-y-2 ${locationDetected ? 'opacity-50 pointer-events-none' : ''}`}>
         <Label className="flex items-center gap-2">
           <MapPin className="w-4 h-4" />
           Country {required && <span className="text-red-500">*</span>}
+          {locationDetected && (
+            <span className="text-xs text-green-600 font-normal ml-2">✓ Auto-detected</span>
+          )}
         </Label>
-        <Select value={selectedCountryCode} onValueChange={handleCountryChange} disabled={loadingCountries || detectingLocation}>
+        <Select value={selectedCountryCode} onValueChange={handleCountryChange} disabled={loadingCountries || detectingLocation || locationDetected}>
           <SelectTrigger className={errors.country ? 'border-red-500' : ''}>
             <SelectValue placeholder={loadingCountries ? "Loading countries..." : "Select your country"} />
           </SelectTrigger>
@@ -334,10 +337,13 @@ const LocationInput = ({
 
       {/* City Selection */}
       {selectedCountryCode && (
-        <div className="space-y-2">
+        <div className={`space-y-2 ${locationDetected ? 'opacity-50 pointer-events-none' : ''}`}>
           <Label className="flex items-center gap-2">
             <Search className="w-4 h-4" />
             City/Town {required && <span className="text-red-500">*</span>}
+            {locationDetected && (
+              <span className="text-xs text-green-600 font-normal ml-2">✓ Auto-detected</span>
+            )}
           </Label>
           
           <div className="relative">
@@ -347,6 +353,7 @@ const LocationInput = ({
               onFocus={() => setShowCitySuggestions(selectedCountryCode !== '')}
               placeholder={`${selectedCountryData?.name ? `Select a city in ${selectedCountryData.name} or type to search` : 'Select a country first'}`}
               className={errors.city ? 'border-red-500' : ''}
+              disabled={locationDetected}
             />
 
             {/* City Suggestions Dropdown */}
@@ -437,13 +444,16 @@ const LocationInput = ({
 
       {/* ZIP/Postal Code */}
       {selectedCountryCode && (
-        <div className="space-y-2">
+        <div className={`space-y-2 ${locationDetected ? 'opacity-50 pointer-events-none' : ''}`}>
           <Label>
             {selectedCountryData?.code === 'US' ? 'ZIP Code' : 
              selectedCountryData?.code === 'GB' ? 'Postcode' : 
              'Postal Code'}
             {selectedCountryData?.continent === 'Africa' && (
               <span className="text-xs text-gray-500 ml-1">(optional)</span>
+            )}
+            {locationDetected && (
+              <span className="text-xs text-green-600 ml-2">✓ Auto-detected</span>
             )}
           </Label>
           <Input
@@ -462,6 +472,7 @@ const LocationInput = ({
               'Enter postal code'
             }
             className={errors.zipCode ? 'border-red-500' : ''}
+            disabled={locationDetected}
           />
           {errors.zipCode && (
             <p className="text-sm text-red-500">{errors.zipCode}</p>
