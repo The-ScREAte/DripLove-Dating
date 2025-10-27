@@ -1,9 +1,11 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { useToast } from '@/hooks/use-toast';
 import { usePushNotifications } from '@/hooks/usePushNotifications';
-import { Bell, MessageCircle, Heart, Shield } from 'lucide-react';
+import { Bell, MessageCircle, Heart, Shield, Unlock } from 'lucide-react';
+import { PushNotifications } from '@capacitor/push-notifications';
+import { Capacitor } from '@capacitor/core';
 
 interface NotificationTesterProps {
   currentUser: { id: string; first_name?: string; last_name?: string };
@@ -11,6 +13,7 @@ interface NotificationTesterProps {
 
 const NotificationTester = ({ currentUser }: NotificationTesterProps) => {
   const { toast } = useToast();
+  const [isRequestingPermission, setIsRequestingPermission] = useState(false);
   const { 
     isInitialized, 
     isSupported, 
@@ -19,6 +22,59 @@ const NotificationTester = ({ currentUser }: NotificationTesterProps) => {
     sendMatchNotification,
     sendLikeNotification 
   } = usePushNotifications(currentUser.id);
+
+  const requestNotificationPermission = async () => {
+    try {
+      setIsRequestingPermission(true);
+      
+      if (Capacitor.isNativePlatform()) {
+        // Request permission on native platforms
+        const permissionStatus = await PushNotifications.requestPermissions();
+        
+        if (permissionStatus.receive === 'granted') {
+          toast({
+            title: "✅ Permission Granted",
+            description: "Push notifications enabled. Please wait for initialization...",
+          });
+          // Force reload to reinitialize
+          setTimeout(() => window.location.reload(), 1000);
+        } else {
+          toast({
+            title: "❌ Permission Denied",
+            description: "Please enable notifications in your device settings.",
+            variant: "destructive",
+          });
+        }
+      } else {
+        // Request permission on web
+        if ('Notification' in window) {
+          const permission = await Notification.requestPermission();
+          if (permission === 'granted') {
+            toast({
+              title: "✅ Permission Granted",
+              description: "Push notifications enabled. Please wait for initialization...",
+            });
+            // Force reload to reinitialize
+            setTimeout(() => window.location.reload(), 1000);
+          } else {
+            toast({
+              title: "❌ Permission Denied",
+              description: "Please enable notifications in your browser settings.",
+              variant: "destructive",
+            });
+          }
+        }
+      }
+    } catch (error) {
+      toast({
+        title: "Error",
+        description: "Failed to request notification permission",
+        variant: "destructive",
+      });
+    } finally {
+      setIsRequestingPermission(false);
+    }
+  };
 
   // Simple toast position test
   const testToastPosition = () => {
@@ -111,6 +167,28 @@ const NotificationTester = ({ currentUser }: NotificationTesterProps) => {
       </CardHeader>
       
       <CardContent className="space-y-4">
+        {/* Notification Permission Request */}
+        {!isInitialized && (
+          <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4 mb-4">
+            <div className="flex items-start gap-3">
+              <Unlock className="w-5 h-5 text-yellow-600 mt-0.5" />
+              <div className="flex-1">
+                <h4 className="font-medium text-yellow-900 mb-1">Enable Push Notifications</h4>
+                <p className="text-sm text-yellow-700 mb-3">
+                  Grant permission to receive push notifications on your device
+                </p>
+                <Button 
+                  onClick={requestNotificationPermission}
+                  disabled={isRequestingPermission}
+                  className="bg-yellow-600 hover:bg-yellow-700"
+                >
+                  {isRequestingPermission ? 'Requesting...' : '🔔 Enable Notifications'}
+                </Button>
+              </div>
+            </div>
+          </div>
+        )}
+
         {/* Status Indicators */}
         <div className="grid grid-cols-2 gap-4 mb-6">
           <div className="text-center p-3 bg-gray-50 rounded-lg">
@@ -185,25 +263,15 @@ const NotificationTester = ({ currentUser }: NotificationTesterProps) => {
           </Button>
         </div>
 
-        {/* Status Message */}
-        {/* <div className="mt-6 p-4 bg-blue-50 rounded-lg">
-          <div className="flex items-start">
-            <Shield className="w-5 h-5 text-blue-600 mr-2 mt-0.5" />
-            <div className="text-sm text-blue-800">
-              <div className="font-medium mb-1">How it works:</div>
-              <ul className="text-xs space-y-1">
-                <li>• Real-time notifications always work</li>
-                <li>• Push notifications require Firebase setup</li>
-                <li>• All notifications are stored in database</li>
-                <li>• System gracefully handles missing credentials</li>
-              </ul>
+        {/* Initialization Status at Bottom */}
+        {isInitialized && (
+          <div className="mt-6 p-4 bg-green-50 border border-green-200 rounded-lg">
+            <div className="flex items-center justify-center gap-2">
+              <Bell className="w-4 h-4 text-green-600" />
+              <span className="text-sm font-medium text-green-800">
+                ✅ Notification System Ready
+              </span>
             </div>
-          </div>
-        </div> */}
-
-        {!isInitialized && (
-          <div className="text-center text-sm text-gray-500 mt-4">
-            Initializing notification system...
           </div>
         )}
       </CardContent>

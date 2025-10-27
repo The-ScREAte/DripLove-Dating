@@ -27,6 +27,38 @@ class SupabasePushNotificationService {
   private deviceToken: string | null = null;
   private realtimeChannel: RealtimeChannel | null = null;
   private currentUserId: string | null = null;
+  private static readonly PERMISSION_DENIAL_KEY = 'notification_permission_last_denied';
+  private static readonly RETRY_DELAY_DAYS = 3;
+
+  private shouldRequestPermission(): boolean {
+    // Check if permission was denied recently
+    const lastDeniedStr = localStorage.getItem(SupabasePushNotificationService.PERMISSION_DENIAL_KEY);
+    if (!lastDeniedStr) {
+      return true; // First time, should request
+    }
+
+    try {
+      const lastDenied = new Date(lastDeniedStr);
+      const daysSinceDenial = (Date.now() - lastDenied.getTime()) / (1000 * 60 * 60 * 24);
+      
+      // Request again if it's been more than 3 days
+      return daysSinceDenial >= SupabasePushNotificationService.RETRY_DELAY_DAYS;
+    } catch (e) {
+      // If there's an error parsing the date, request permission
+      return true;
+    }
+  }
+
+  private recordPermissionDenial(): void {
+    localStorage.setItem(
+      SupabasePushNotificationService.PERMISSION_DENIAL_KEY,
+      new Date().toISOString()
+    );
+  }
+
+  private clearPermissionDenial(): void {
+    localStorage.removeItem(SupabasePushNotificationService.PERMISSION_DENIAL_KEY);
+  }
 
   async initialize(userId: string): Promise<boolean> {
     if (this.isInitialized) return true;
@@ -66,6 +98,12 @@ class SupabasePushNotificationService {
         return;
       }
 
+      // Check if we should request permission (respects 3-day delay)
+      if (!this.shouldRequestPermission()) {
+        // Too soon since last denial, skip request
+        return;
+      }
+
       // Add a small delay to ensure Firebase is initialized
       await new Promise(resolve => setTimeout(resolve, 1000));
 
@@ -73,6 +111,9 @@ class SupabasePushNotificationService {
       const permissionStatus = await PushNotifications.requestPermissions();
       
       if (permissionStatus.receive === 'granted') {
+        // Permission granted! Clear any denial record
+        this.clearPermissionDenial();
+
         // Add delay to ensure Firebase is fully initialized on Android
         if (Capacitor.getPlatform() === 'android') {
           await new Promise(resolve => setTimeout(resolve, 2000));
@@ -103,7 +144,11 @@ class SupabasePushNotificationService {
         PushNotifications.addListener('pushNotificationActionPerformed', (notification: ActionPerformed) => {
           this.handleNotificationAction(notification);
         });
+      } else if (permissionStatus.receive === 'denied') {
+        // Permission denied, record timestamp for 3-day retry
+        this.recordPermissionDenial();
       }
+      // If permission is 'prompt', don't record as denied
     } catch (error) {
       // Continue silently if push notifications fail
     }
@@ -267,12 +312,29 @@ class SupabasePushNotificationService {
     }
 
     if (Notification.permission === 'granted') {
+      this.clearPermissionDenial();
       return true;
     }
 
-    if (Notification.permission !== 'denied') {
-      const permission = await Notification.requestPermission();
-      return permission === 'granted';
+    if (Notification.permission === 'denied') {
+      // Already denied, don't retry
+      return false;
+    }
+
+    // Check if we should request (respects 3-day delay)
+    if (!this.shouldRequestPermission()) {
+      return false;
+    }
+
+    // Permission is 'default', request it
+    const permission = await Notification.requestPermission();
+    
+    if (permission === 'granted') {
+      this.clearPermissionDenial();
+      return true;
+    } else if (permission === 'denied') {
+      this.recordPermissionDenial();
+      return false;
     }
 
     return false;
