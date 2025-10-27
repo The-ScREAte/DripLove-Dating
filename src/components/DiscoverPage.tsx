@@ -691,9 +691,11 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, isPremium }: DiscoverPage
       .single();
 
     const userMaxDistance = currentUserData?.max_distance || currentUserData?.distance_preference || 50;
-    const allowedGenders = currentUserData?.preference === 'men' ? ['male'] : 
-                          currentUserData?.preference === 'women' ? ['female'] : 
-                          ['male', 'female', 'other'];
+    // Fix: Match the correct values stored in database ('male', 'female', 'everyone')
+    const allowedGenders = currentUserData?.preference === 'male' ? ['male'] : 
+                          currentUserData?.preference === 'female' ? ['female'] : 
+                          currentUserData?.preference === 'everyone' || currentUserData?.preference === 'both' ? ['male', 'female', 'other'] :
+                          ['male', 'female', 'other']; // Default to all if preference is not set
 
     // Get location-based matches
     const locationMatches = await locationService.getLocationBasedMatches(userId, userMaxDistance);
@@ -1505,9 +1507,11 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, isPremium }: DiscoverPage
               // Send match notification to the other user
               try {
                 const matchedUserName = `${currentUser.first_name || ''} ${currentUser.last_name || ''}`.trim() || 'Someone';
-                await sendMatchNotification(matchedUserName, prevMatch.id);
+                console.log('🔔 Sending match notification to:', prevMatch.id, 'from:', matchedUserName);
+                const result = await sendMatchNotification(matchedUserName, prevMatch.id);
+                console.log('🔔 Match notification result:', result);
               } catch (notificationError) {
-                // Don't fail the match if notification fails
+                console.error('🔔 Match notification error:', notificationError);
               }
             }
           } catch (fallbackErr) {
@@ -1531,9 +1535,11 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, isPremium }: DiscoverPage
             // Send match notification to the other user
             try {
               const matchedUserName = `${currentUser.first_name || ''} ${currentUser.last_name || ''}`.trim() || 'Someone';
-              await sendMatchNotification(matchedUserName, prevMatch.id);
+              console.log('🔔 Sending match notification to:', prevMatch.id, 'from:', matchedUserName);
+              const result = await sendMatchNotification(matchedUserName, prevMatch.id);
+              console.log('🔔 Match notification result:', result);
             } catch (notificationError) {
-              // Don't fail the match if notification fails
+              console.error('🔔 Match notification error:', notificationError);
             }
           }
         }

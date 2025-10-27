@@ -186,9 +186,11 @@ const MainApp = ({ user, onLogout }: MainAppProps) => {
       const excludedIds = [...likedUserIds, ...blockedUserIds, ...hiddenPassedIds, userId];
       
       const userMaxDistance = currentUserData?.max_distance || currentUserData?.distance_preference || 50;
-      const allowedGenders = currentUserData?.preference === 'men' ? ['male'] : 
-                            currentUserData?.preference === 'women' ? ['female'] : 
-                            ['male', 'female', 'other'];
+      // Fix: Match the correct values stored in database ('male', 'female', 'everyone')
+      const allowedGenders = currentUserData?.preference === 'male' ? ['male'] : 
+                            currentUserData?.preference === 'female' ? ['female'] : 
+                            currentUserData?.preference === 'everyone' || currentUserData?.preference === 'both' ? ['male', 'female', 'other'] :
+                            ['male', 'female', 'other']; // Default to all if preference is not set
 
       // Get location-based matches (simplified for preloading)
       const { data: profiles, error } = await supabase
@@ -379,9 +381,11 @@ const MainApp = ({ user, onLogout }: MainAppProps) => {
         const hiddenPassedIds = recentPasses?.map(p => p.passed_id) || [];
         const excludedIds = [...likedUserIds, ...blockedUserIds, ...hiddenPassedIds, userId, ...existingIds];
 
-        const allowedGenders = currentUserData?.preference === 'men' ? ['male'] : 
-                              currentUserData?.preference === 'women' ? ['female'] : 
-                              ['male', 'female', 'other'];
+        // Fix: Match the correct values stored in database ('male', 'female', 'everyone')
+        const allowedGenders = currentUserData?.preference === 'male' ? ['male'] : 
+                              currentUserData?.preference === 'female' ? ['female'] : 
+                              currentUserData?.preference === 'everyone' || currentUserData?.preference === 'both' ? ['male', 'female', 'other'] :
+                              ['male', 'female', 'other']; // Default to all if preference is not set
 
         // Fetch new profiles
         const { data: newProfiles } = await supabase

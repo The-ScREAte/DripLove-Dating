@@ -547,9 +547,11 @@ const ChatPage = ({ currentUser, onUnreadChange, onDetailViewChange }: ChatPageP
 
       // Use the proper notification service
       try {
-        await sendMessageNotification(senderName, messageText, recipientId, selectedMatch.id);
+        console.log('💬 Sending message notification to:', recipientId, 'from:', senderName);
+        const result = await sendMessageNotification(senderName, messageText, recipientId, selectedMatch.id);
+        console.log('💬 Message notification result:', result);
       } catch (notificationError) {
-        // Don't fail the message send if notification fails
+        console.error('💬 Message notification error:', notificationError);
       }
 
       // Try to update unread count (only if field exists)

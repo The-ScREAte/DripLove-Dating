@@ -255,15 +255,16 @@ serve(async (req) => {
       .insert({
         user_id: userId,
         title,
-        body,
+        message: body, // Column is 'message', not 'body'
         type,
-        data,
-        read: false,
+        is_read: false, // Column is 'is_read', not 'read'
         created_at: new Date().toISOString(),
       })
 
     if (!insertError) {
       realTimeStored = true
+    } else {
+      console.error('Error inserting notification:', insertError)
     }
 
     return new Response(
