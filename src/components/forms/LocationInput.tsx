@@ -4,7 +4,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
-import { MapPin, Search, Check } from 'lucide-react';
+import { MapPin, Search, Check, Loader2, MapPinned } from 'lucide-react';
 import { 
   getCountriesList, 
   getCitiesForCountry, 
@@ -13,6 +13,8 @@ import {
   type CityData 
 } from '@/constants/locationData';
 import { getEnabledCountries } from '@/utils/enabledCountries';
+import { detectUserLocation } from '@/utils/locationDetection';
+import { useToast } from '@/hooks/use-toast';
 
 interface LocationInputProps {
   country: string;
@@ -33,6 +35,7 @@ interface LocationInputProps {
     zipCode?: string;
   };
   required?: boolean;
+  autoDetect?: boolean; // New prop to enable auto-detection
 }
 
 const LocationInput = ({
@@ -41,7 +44,8 @@ const LocationInput = ({
   zipCode,
   onLocationChange,
   errors = {},
-  required = false
+  required = false,
+  autoDetect = true // Enable by default
 }: LocationInputProps) => {
   const [selectedCountryCode, setSelectedCountryCode] = useState<string>('');
   const [cityInput, setCityInput] = useState<string>(city);
@@ -51,6 +55,78 @@ const LocationInput = ({
   const [coordinates, setCoordinates] = useState<{lat?: number, lng?: number}>({});
   const [countries, setCountries] = useState<any[]>([]);
   const [loadingCountries, setLoadingCountries] = useState(true);
+  const [detectingLocation, setDetectingLocation] = useState(false);
+  const [locationDetected, setLocationDetected] = useState(false);
+  const { toast } = useToast();
+
+  // Auto-detect location on mount
+  useEffect(() => {
+    if (autoDetect && !country && !locationDetected) {
+      handleDetectLocation();
+    }
+  }, [autoDetect, country, locationDetected]);
+
+  // Detect user's actual location
+  const handleDetectLocation = async () => {
+    setDetectingLocation(true);
+    
+    try {
+      const detectedLocation = await detectUserLocation();
+      
+      if (detectedLocation) {
+        const { country: detectedCountry, countryCode, city: detectedCity, latitude, longitude } = detectedLocation;
+        
+        // Find if detected country is in our enabled list
+        const enabledCountries = await getEnabledCountries();
+        const matchedCountry = enabledCountries.find(
+          c => c.code.toUpperCase() === countryCode.toUpperCase()
+        );
+        
+        if (matchedCountry) {
+          setSelectedCountryCode(matchedCountry.code);
+          setCityInput(detectedCity);
+          setCoordinates({ lat: latitude, lng: longitude });
+          setLocationDetected(true);
+          
+          onLocationChange({
+            country: matchedCountry.name,
+            countryCode: matchedCountry.code,
+            city: detectedCity,
+            zipCode,
+            latitude,
+            longitude,
+            isCustomCity: true
+          });
+          
+          toast({
+            title: 'Location Detected',
+            description: `Set to ${detectedCity}, ${matchedCountry.name}`,
+          });
+        } else {
+          toast({
+            title: 'Country Not Available',
+            description: `${detectedCountry} is not yet available in our service. Please select manually.`,
+            variant: 'destructive'
+          });
+        }
+      } else {
+        toast({
+          title: 'Location Detection Failed',
+          description: 'Please select your location manually',
+          variant: 'destructive'
+        });
+      }
+    } catch (error) {
+      console.error('Location detection error:', error);
+      toast({
+        title: 'Location Detection Error',
+        description: 'Please select your location manually',
+        variant: 'destructive'
+      });
+    } finally {
+      setDetectingLocation(false);
+    }
+  };
 
   // Load enabled countries on mount
   useEffect(() => {
@@ -185,13 +261,56 @@ const LocationInput = ({
 
   return (
     <div className="space-y-4">
+      {/* Auto Location Detection Button */}
+      {!locationDetected && (
+        <div className="p-3 bg-gradient-to-r from-blue-50 to-purple-50 rounded-lg border border-blue-200">
+          <div className="flex items-center justify-between">
+            <div className="flex-1">
+              <div className="font-medium text-sm text-blue-900 mb-1">
+                Auto-detect your location
+              </div>
+              <div className="text-xs text-blue-600">
+                We'll use your device location for accurate matching
+              </div>
+            </div>
+            <Button
+              onClick={handleDetectLocation}
+              disabled={detectingLocation}
+              className="bg-blue-600 hover:bg-blue-700"
+              size="sm"
+            >
+              {detectingLocation ? (
+                <>
+                  <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                  Detecting...
+                </>
+              ) : (
+                <>
+                  <MapPinned className="w-4 h-4 mr-2" />
+                  Detect Location
+                </>
+              )}
+            </Button>
+          </div>
+        </div>
+      )}
+
+      {locationDetected && (
+        <div className="p-3 bg-green-50 rounded-lg border border-green-200">
+          <div className="flex items-center gap-2 text-green-800">
+            <Check className="w-4 h-4" />
+            <span className="text-sm font-medium">Location detected and verified</span>
+          </div>
+        </div>
+      )}
+
       {/* Country Selection */}
       <div className="space-y-2">
         <Label className="flex items-center gap-2">
           <MapPin className="w-4 h-4" />
           Country {required && <span className="text-red-500">*</span>}
         </Label>
-        <Select value={selectedCountryCode} onValueChange={handleCountryChange} disabled={loadingCountries}>
+        <Select value={selectedCountryCode} onValueChange={handleCountryChange} disabled={loadingCountries || detectingLocation}>
           <SelectTrigger className={errors.country ? 'border-red-500' : ''}>
             <SelectValue placeholder={loadingCountries ? "Loading countries..." : "Select your country"} />
           </SelectTrigger>
