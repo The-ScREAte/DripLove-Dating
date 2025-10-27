@@ -91,23 +91,34 @@ const MainApp = ({ user, onLogout }: MainAppProps) => {
             return;
           }
           
+          console.log('[MainApp] 🔐 Authenticated user ID:', currentUser.id);
+          console.log('[MainApp] 🌐 Supabase URL:', supabase.supabaseUrl);
+          
           try {
-            const { error } = await supabase.from('push_tokens').upsert({
+            const { data, error } = await supabase.from('push_tokens').upsert({
               user_id: currentUser.id,
               token: token.value,
               platform: Capacitor.getPlatform(),
               updated_at: new Date().toISOString()
             }, {
               onConflict: 'user_id,platform' // Match the unique constraint
-            });
+            }).select();
+            
+            console.log('[MainApp] 📊 Push token save response:', { data, error });
             
             if (error) {
-              console.error('[MainApp] Failed to save push token:', error);
+              console.error('[MainApp] ❌ Failed to save push token:', error);
+              console.error('[MainApp] Error code:', error.code);
+              console.error('[MainApp] Error details:', error.details);
+              console.error('[MainApp] Error hint:', error.hint);
             } else {
-              console.log('[MainApp] ✅ Push token saved successfully for user:', currentUser.id);
+              console.log('[MainApp] ✅ Push token saved successfully!');
+              console.log('[MainApp] ✅ User:', currentUser.id);
+              console.log('[MainApp] ✅ Platform:', Capacitor.getPlatform());
+              console.log('[MainApp] ✅ Data returned:', data);
             }
           } catch (error) {
-            console.error('[MainApp] Exception saving push token:', error);
+            console.error('[MainApp] 💥 Exception saving push token:', error);
           }
         });
         
