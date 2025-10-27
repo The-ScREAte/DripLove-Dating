@@ -688,6 +688,7 @@ const ProfileCompletionPage = () => {
                       onLocationChange={handleLocationChange}
                       errors={errors}
                       required={true}
+                      autoDetect={true}
                     />
                   </div>
 

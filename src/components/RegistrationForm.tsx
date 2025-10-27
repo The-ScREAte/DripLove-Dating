@@ -693,6 +693,7 @@ const RegistrationForm = ({ onSubmit, onBackToLogin }: RegistrationFormProps) =>
                 zipCode: errors.zipCode
               }}
               required={true}
+              autoDetect={true}
             />
           </div>
           </div>
