@@ -193,6 +193,32 @@ const ChatPage = ({ currentUser, onUnreadChange, onDetailViewChange }: ChatPageP
             }
           }
         )
+        .on(
+          'postgres_changes',
+          {
+            event: 'UPDATE',
+            schema: 'public',
+            table: 'chats',
+            filter: `match_id=eq.${selectedMatch.id}`,
+          },
+          (payload) => {
+            console.log('[ChatPage] 📝 Realtime message update:', payload.new);
+            const updatedMsg = payload.new as ChatMessage;
+            
+            // Update the specific message in state
+            setMessages((prev) => {
+              const updated = prev.map(m => 
+                m.id === updatedMsg.id ? { ...m, is_read: updatedMsg.is_read } : m
+              );
+              // Update cache
+              chatMessagesCache.set(selectedMatch.id, {
+                messages: updated,
+                timestamp: Date.now()
+              });
+              return updated;
+            });
+          }
+        )
         .subscribe((status) => {
           console.log('[ChatPage] 🔌 Chats subscription status:', status);
         });
@@ -208,7 +234,8 @@ const ChatPage = ({ currentUser, onUnreadChange, onDetailViewChange }: ChatPageP
   const processMatchesData = (matches: any[]) => {
     const matchesWithPartner = (matches?.map(match => {
       const partner = match.user1_id === currentUser.id ? match.user2 : match.user1;
-      const lastMessage = match.chats?.[match.chats.length - 1];
+      // Since chats are ordered DESC by created_at, the first one is the most recent
+      const lastMessage = match.chats?.[0];
       let unreadCount = 0;
       if ('user1_unread_count' in match && 'user2_unread_count' in match) {
         unreadCount = match.user1_id === currentUser.id ? Number(match.user1_unread_count) : Number(match.user2_unread_count);
@@ -248,10 +275,11 @@ const ChatPage = ({ currentUser, onUnreadChange, onDetailViewChange }: ChatPageP
           *,
           user1:profiles!matches_user1_id_fkey(id, first_name, last_name, is_admin),
           user2:profiles!matches_user2_id_fkey(id, first_name, last_name, is_admin),
-          chats(id, message, created_at, sender_id)
+          chats!inner(id, message, created_at, sender_id)
         `)
         .or(`user1_id.eq.${currentUser.id},user2_id.eq.${currentUser.id}`)
-        .order('created_at', { ascending: false });
+        .order('created_at', { ascending: false })
+        .order('created_at', { foreignTable: 'chats', ascending: false });
 
       if (error) throw error;
 
@@ -287,10 +315,11 @@ const ChatPage = ({ currentUser, onUnreadChange, onDetailViewChange }: ChatPageP
           *,
           user1:profiles!matches_user1_id_fkey(id, first_name, last_name, is_admin),
           user2:profiles!matches_user2_id_fkey(id, first_name, last_name, is_admin),
-          chats(id, message, created_at, sender_id)
+          chats!inner(id, message, created_at, sender_id)
         `)
         .or(`user1_id.eq.${currentUser.id},user2_id.eq.${currentUser.id}`)
-        .order('created_at', { ascending: false });
+        .order('created_at', { ascending: false })
+        .order('created_at', { foreignTable: 'chats', ascending: false });
 
       if (error) throw error;
 

@@ -24,13 +24,15 @@ const MessageBubble: React.FC<MessageBubbleProps> = ({
         } ${isConsecutive ? '' : 'shadow-sm'}`}
       >
         <p className="text-sm">{message.message}</p>
-        <div className={`text-xs mt-1 ${isOwnMessage ? 'text-blue-100' : 'text-gray-500'}`}>
-          {new Date(message.sent_at || message.created_at || '').toLocaleTimeString([], {
-            hour: '2-digit',
-            minute: '2-digit'
-          })}
+        <div className={`flex items-center gap-1 text-xs mt-1 ${isOwnMessage ? 'text-blue-100' : 'text-gray-500'}`}>
+          <span>
+            {new Date(message.sent_at || message.created_at || '').toLocaleTimeString([], {
+              hour: '2-digit',
+              minute: '2-digit'
+            })}
+          </span>
           {isOwnMessage && (
-            <span className="ml-2">
+            <span className={`text-sm font-semibold ${message.is_read ? 'text-blue-200' : 'text-blue-300'}`}>
               {message.is_read ? '✓✓' : '✓'}
             </span>
           )}
