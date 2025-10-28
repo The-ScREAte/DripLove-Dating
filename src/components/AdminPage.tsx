@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -100,6 +100,8 @@ const AdminPageComponent = ({ currentUser, onLogout }: AdminPageProps) => {
   const [currentPage, setCurrentPage] = useState(1);
   const [matchUser1, setMatchUser1] = useState('');
   const [matchUser2, setMatchUser2] = useState('');
+  const matchUser1Ref = useRef('');
+  const matchUser2Ref = useRef('');
   const [selectedUserId, setSelectedUserId] = useState<string | null>(null);
   const [isProfileModalOpen, setIsProfileModalOpen] = useState(false);
   const [activeTab, setActiveTab] = useState('dashboard');
@@ -982,7 +984,19 @@ const AdminPageComponent = ({ currentUser, onLogout }: AdminPageProps) => {
   };
 
   const createManualMatch = async () => {
-    if (!matchUser1 || !matchUser2) {
+    console.log('=== CREATE MATCH CALLED ===');
+    console.log('matchUser1 state:', matchUser1);
+    console.log('matchUser2 state:', matchUser2);
+    console.log('matchUser1Ref:', matchUser1Ref.current);
+    console.log('matchUser2Ref:', matchUser2Ref.current);
+    
+    // Use refs instead of state to avoid closure issues
+    const user1Id = matchUser1Ref.current || matchUser1;
+    const user2Id = matchUser2Ref.current || matchUser2;
+    
+    console.log('Using values:', { user1Id, user2Id });
+    
+    if (!user1Id || !user2Id) {
       toast({
         title: 'Error',
         description: 'Please select both users to create a match',
@@ -991,7 +1005,8 @@ const AdminPageComponent = ({ currentUser, onLogout }: AdminPageProps) => {
       return;
     }
 
-    if (matchUser1 === matchUser2) {
+    if (user1Id === user2Id) {
+      console.log('ERROR: Both users have same ID!');
       toast({
         title: 'Error',
         description: 'Cannot match a user with themselves',
@@ -1000,28 +1015,60 @@ const AdminPageComponent = ({ currentUser, onLogout }: AdminPageProps) => {
       return;
     }
 
+    // Debug logging
+    const user1Data = users.find(u => u.id === user1Id);
+    const user2Data = users.find(u => u.id === user2Id);
+    
+    console.log('Creating match with:', {
+      user1_id: user1Id,
+      user2_id: user2Id,
+      user1_data: user1Data,
+      user2_data: user2Data,
+      are_equal: user1Id === user2Id
+    });
+
     try {
-      const { error } = await supabase.rpc('admin_create_match', {
-        user1_id: matchUser1,
-        user2_id: matchUser2
+      const { data, error } = await supabase.rpc('admin_create_match', {
+        p_user1_id: user1Id,
+        p_user2_id: user2Id
       });
 
-      if (error) throw error;
+      if (error) {
+        console.error('RPC Error:', error);
+        throw error;
+      }
+
+      console.log('Match creation response:', data);
+
+      // Check the response from the function
+      if (data && typeof data === 'object') {
+        if (data.success === false) {
+          toast({
+            title: 'Error',
+            description: data.error || 'Failed to create match',
+            variant: 'destructive'
+          });
+          return;
+        }
+      }
 
       toast({
         title: 'Success',
-        description: 'Match created successfully'
+        description: data?.message || 'Match created successfully'
       });
 
       setMatchUser1('');
       setMatchUser2('');
+      matchUser1Ref.current = '';
+      matchUser2Ref.current = '';
       await fetchAppStats();
 
     } catch (error) {
       console.error('Error creating match:', error);
+      const errorMessage = error instanceof Error ? error.message : 'Failed to create match';
       toast({
         title: 'Error',
-        description: 'Failed to create match',
+        description: errorMessage,
         variant: 'destructive'
       });
     }
@@ -1270,26 +1317,34 @@ const AdminPageComponent = ({ currentUser, onLogout }: AdminPageProps) => {
                 </CardHeader>
                 <CardContent className="space-y-3">
                   <div className="grid grid-cols-2 gap-2">
-                    <Select value={matchUser1} onValueChange={setMatchUser1}>
+                    <Select value={matchUser1} onValueChange={(value) => {
+                      console.log('User 1 selected:', value, users.find(u => u.id === value));
+                      matchUser1Ref.current = value;
+                      setMatchUser1(value);
+                    }}>
                       <SelectTrigger className="text-sm">
                         <SelectValue placeholder="Select User 1" />
                       </SelectTrigger>
                       <SelectContent>
-                        {users.map((user) => (
-                          <SelectItem key={user.id} value={user.id}>
-                            {user.first_name} {user.last_name}
+                        {users.map((user, index) => (
+                          <SelectItem key={`${user.id}-${index}`} value={user.id}>
+                            {user.first_name} {user.last_name} (ID: {user.id.substring(0, 8)}...)
                           </SelectItem>
                         ))}
                       </SelectContent>
                     </Select>
-                    <Select value={matchUser2} onValueChange={setMatchUser2}>
+                    <Select value={matchUser2} onValueChange={(value) => {
+                      console.log('User 2 selected:', value, users.find(u => u.id === value));
+                      matchUser2Ref.current = value;
+                      setMatchUser2(value);
+                    }}>
                       <SelectTrigger className="text-sm">
                         <SelectValue placeholder="Select User 2" />
                       </SelectTrigger>
                       <SelectContent>
-                        {users.map((user) => (
-                          <SelectItem key={user.id} value={user.id}>
-                            {user.first_name} {user.last_name}
+                        {users.map((user, index) => (
+                          <SelectItem key={`${user.id}-${index}`} value={user.id}>
+                            {user.first_name} {user.last_name} (ID: {user.id.substring(0, 8)}...)
                           </SelectItem>
                         ))}
                       </SelectContent>

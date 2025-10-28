@@ -8,16 +8,18 @@ interface ChatUserAvatarProps {
   firstName?: string;
   lastName?: string;
   onClick?: () => void;
-  size?: 'sm' | 'md' | 'lg';
+  size?: 'sm' | 'md' | 'lg' | 'custom';
+  className?: string;
 }
 
-const ChatUserAvatar = ({ userId, firstName = '', lastName = '', onClick, size = 'md' }: ChatUserAvatarProps) => {
+const ChatUserAvatar = ({ userId, firstName = '', lastName = '', onClick, size = 'md', className }: ChatUserAvatarProps) => {
   const [profileImage, setProfileImage] = useState<string | null>(null);
 
   const sizeClasses = {
     sm: 'h-8 w-8',
     md: 'h-10 w-10', 
-    lg: 'h-12 w-12'
+    lg: 'h-12 w-12',
+    custom: '' // Allow custom sizing via className
   };
 
   useEffect(() => {
@@ -60,7 +62,7 @@ const ChatUserAvatar = ({ userId, firstName = '', lastName = '', onClick, size =
 
   return (
     <Avatar 
-      className={`${sizeClasses[size]} ${onClick ? 'cursor-pointer hover:ring-2 hover:ring-blue-400 transition-all' : ''}`}
+      className={`${sizeClasses[size]} ${className || ''} ${onClick ? 'cursor-pointer hover:ring-2 hover:ring-blue-400 transition-all' : ''}`}
       onClick={onClick}
     >
 <AvatarImage

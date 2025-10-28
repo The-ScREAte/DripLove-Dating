@@ -324,7 +324,7 @@ const ChatPage = ({ currentUser, onUnreadChange, onDetailViewChange }: ChatPageP
           *,
           user1:profiles!matches_user1_id_fkey(id, first_name, last_name, is_admin),
           user2:profiles!matches_user2_id_fkey(id, first_name, last_name, is_admin),
-          chats!inner(id, message, created_at, sender_id)
+          chats(id, message, created_at, sender_id)
         `)
         .or(`user1_id.eq.${currentUser.id},user2_id.eq.${currentUser.id}`)
         .order('created_at', { ascending: false })
@@ -364,7 +364,7 @@ const ChatPage = ({ currentUser, onUnreadChange, onDetailViewChange }: ChatPageP
           *,
           user1:profiles!matches_user1_id_fkey(id, first_name, last_name, is_admin),
           user2:profiles!matches_user2_id_fkey(id, first_name, last_name, is_admin),
-          chats!inner(id, message, created_at, sender_id)
+          chats(id, message, created_at, sender_id)
         `)
         .or(`user1_id.eq.${currentUser.id},user2_id.eq.${currentUser.id}`)
         .order('created_at', { ascending: false })
@@ -991,7 +991,7 @@ const ChatPage = ({ currentUser, onUnreadChange, onDetailViewChange }: ChatPageP
   <div className="fixed inset-0 flex flex-col bg-gray-50">
         {/* Header (safe area respected via env padding) */}
         <div 
-          className="sticky top-0 z-30 bg-gradient-to-r from-pink-500 to-purple-600 text-white" 
+          className="sticky top-0 z-30 bg-white text-gray-900 shadow-sm" 
           style={{ 
             paddingTop: Capacitor.getPlatform() === 'ios' 
               ? 'clamp(30px, calc(env(safe-area-inset-top, 10px) + 15px), 40px)' 
@@ -999,7 +999,9 @@ const ChatPage = ({ currentUser, onUnreadChange, onDetailViewChange }: ChatPageP
           }}
         >
           <div className="px-2 pb-1 pt-2">
-            <h2 className="text-xl font-bold m-1">DripChat</h2>
+            <h2 className="text-xl font-bold m-1 bg-gradient-to-r from-pink-500 to-purple-600 bg-clip-text text-transparent">
+              💧 DripChat
+            </h2>
           </div>
         </div>
         
@@ -1019,14 +1021,17 @@ const ChatPage = ({ currentUser, onUnreadChange, onDetailViewChange }: ChatPageP
                     onClick={() => setSelectedMatch(match)}
                   >
                     <div className="relative mb-2">
-                      <div className="w-16 h-16 rounded-full p-[3px] bg-gradient-to-br from-blue-400 to-blue-600">
-                        <ChatUserAvatar
-                          userId={partnerId}
-                          firstName={match.first_name}
-                          lastName={match.last_name}
-                          size="md"
-                          onClick={() => handleUserProfileClick(partnerId)}
-                        />
+                      <div className="w-16 h-16 rounded-full p-[3px] bg-gradient-to-br from-pink-500 to-purple-600 flex items-center justify-center">
+                        <div className="w-full h-full rounded-full overflow-hidden bg-white">
+                          <ChatUserAvatar
+                            userId={partnerId}
+                            firstName={match.first_name}
+                            lastName={match.last_name}
+                            size="custom"
+                            className="w-full h-full"
+                            onClick={() => handleUserProfileClick(partnerId)}
+                          />
+                        </div>
                       </div>
                     </div>
                     <span className="text-xs text-gray-900 text-center truncate w-full">
