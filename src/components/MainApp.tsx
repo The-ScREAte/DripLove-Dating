@@ -969,7 +969,7 @@ const MainApp = ({ user, onLogout }: MainAppProps) => {
 
         {/* Main Content */}
         <div 
-          className={`flex-1 overflow-auto ${!showTerms && !showPrivacy ? 'pt-[10px]' : ''}`}
+          className={`flex-1 overflow-auto ${!showTerms && !showPrivacy ? 'pt-[50px]' : ''}`}
         >
           {/* Keep pages mounted to avoid reloading when switching tabs. Show/hide via classes. */}
           <div className={`${activeTab === 'dripcheck' ? 'block' : 'hidden'} w-full h-full`}> 
