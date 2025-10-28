@@ -24,6 +24,10 @@ const ChatUserList: React.FC<ChatUserListProps> = ({
   currentUserId
 }) => {
   const [localSearchTerm, setLocalSearchTerm] = React.useState(searchTerm);
+  
+  // Only apply safe-area padding on iOS native, not on web
+  const isIOS = typeof window !== 'undefined' && /iPhone|iPad|iPod/.test(navigator.userAgent);
+  const paddingTopValue = isIOS ? 'clamp(16px, calc(env(safe-area-inset-top, 0px) + 16px), 60px)' : '16px';
 
   const handleSearchChange = (value: string) => {
     setLocalSearchTerm(value);
@@ -39,7 +43,7 @@ const ChatUserList: React.FC<ChatUserListProps> = ({
       {/* Sticky Header with gradient background */}
       <div
         className="sticky top-0 z-10 p-4 bg-gradient-to-r from-pink-500 to-purple-600 text-white flex-shrink-0"
-        style={{ paddingTop: 'clamp(16px, env(safe-area-inset-top, 0px), 24px)' }}
+        style={{ paddingTop: paddingTopValue }}
       >
         <h2 className="text-xl font-bold mb-4">Messages</h2>
         <div className="relative">
