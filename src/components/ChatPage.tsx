@@ -948,25 +948,6 @@ const ChatPage = ({ currentUser, onUnreadChange, onDetailViewChange }: ChatPageP
     setSwipeStartY(0);
   };
 
-  const filteredMatches = matches.filter(match => {
-    const partnerName = `${match.partner?.first_name || ''} ${match.partner?.last_name || ''}`.toLowerCase();
-    return partnerName.includes(searchTerm.toLowerCase());
-  });
-
-  // If there's no authenticated user yet, render a light loading state to avoid
-  // dereferencing `currentUser.id` in JSX/handlers. Hooks above must remain
-  // unconditionally called (so don't early-return before them).
-  if (!currentUser || !currentUser.id) {
-    return (
-      <div className="min-h-screen flex items-center justify-center bg-gray-50">
-        <div className="text-center">
-          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-pink-500 mx-auto mb-4" />
-          <p className="text-gray-600">Loading chats...</p>
-        </div>
-      </div>
-    );
-  }
-
   const handleBlockClick = () => {
     if (selectedMatch?.partner) {
       setUserToBlock(selectedMatch as ChatMatch);
@@ -983,119 +964,33 @@ const ChatPage = ({ currentUser, onUnreadChange, onDetailViewChange }: ChatPageP
     });
   };
 
-  if (!selectedMatch) {
+  // If there's no authenticated user yet, render a light loading state
+  if (!currentUser || !currentUser.id) {
     return (
-  <div className="fixed inset-0 flex flex-col bg-gray-50">
-        {/* Header (safe area respected via env padding) */}
-        <div 
-          className="sticky top-0 z-30 bg-gradient-to-r from-pink-500 to-purple-600 text-white" 
-          style={{ 
-            paddingTop: Capacitor.getPlatform() === 'ios' 
-              ? 'clamp(30px, calc(env(safe-area-inset-top, 10px) + 15px), 40px)' 
-              : '40px' 
-          }}
-        >
-          <div className="px-2 pb-1 pt-2">
-            <h2 className="text-xl font-bold m-1">DripChat</h2>
-            <div className="relative">
-              <input
-                type="text"
-                placeholder="Search conversations..."
-                value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
-                className="w-full pr-10 bg-white text-gray-900 rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-pink-300"
-              />
-              <svg className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="m21 21-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
-              </svg>
-            </div>
-          </div>
-        </div>
-
-  {/* Scrollable Chat List (only this area scrolls) */}
-  <div
-    className="flex-1 overflow-y-auto pb-35"
-    style={{ 
-      WebkitOverflowScrolling: 'touch',
-      marginTop: Capacitor.getPlatform() === 'ios' 
-        ? '80px' // Fixed margin for iOS
-        : '0px' // Pull down a bit more for non-iOS platforms (web browsers)
-    }}
-    onTouchStart={handleTouchStart}
-    onTouchMove={handleTouchMove}
-    onTouchEnd={handleTouchEnd}
-  >
-    {/* Pull to refresh indicator */}
-    {pullDistance > 0 && (
-      <div
-        className="flex items-center justify-center bg-pink-50 transition-all duration-200"
-        style={{ height: `${pullDistance}px` }}
-      >
-        <div className="text-pink-600 text-sm">
-          {pullDistance > 50 ? (isRefreshing ? '🔄 Refreshing...' : '↓ Release to refresh') : '↓ Pull to refresh'}
+      <div className="min-h-screen flex items-center justify-center bg-background">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-pink-500 mx-auto mb-4" />
+          <p className="text-muted-foreground">Loading chats...</p>
         </div>
       </div>
-    )}
-          {filteredMatches.length === 0 ? (
-            <div className="p-4 text-center text-gray-500">
-              {searchTerm ? 'No matches found' : 'No conversations yet'}
-            </div>
-          ) : (
-            filteredMatches.map((match) => {
-              // Determine the correct partner ID for avatar
-              const partnerId = match.partner?.id || 
-                               (match.user1_id === currentUser.id ? match.user2_id : match.user1_id);
-              
-              return (
-                <div
-                  key={match.id}
-                  className={`p-4 border-b border-gray-200 cursor-pointer hover:bg-gray-100 transition-colors ${
-                    selectedMatch?.id === match.id ? 'bg-pink-50 border-pink-200' : 'bg-white'
-                  } ${match.unread_messages > 0 ? 'font-bold bg-purple-50' : ''}`}
-                  onClick={() => setSelectedMatch(match)}
-                >
-                  <div className="flex items-center space-x-3">
-                    <div className="relative">
-                      <ChatUserAvatar
-                        userId={partnerId}
-                        firstName={match.first_name}
-                        lastName={match.last_name}
-                        onClick={() => handleUserProfileClick(partnerId)}
-                        size="md"
-                      />
-                      {match.unread_messages > 0 && (
-                        <div className="absolute -top-1 -right-1 bg-red-500 text-white text-xs rounded-full w-5 h-5 flex items-center justify-center">
-                          {match.unread_messages > 9 ? '9+' : match.unread_messages}
-                        </div>
-                      )}
-                    </div>
-                  <div className="flex-1 min-w-0">
-                    <div className="flex justify-between items-start">
-                      <h3 className={`font-semibold truncate ${match.unread_messages > 0 ? 'text-purple-700' : 'text-gray-900'}`}
-                        >
-                        {match.first_name} {match.last_name}
-                      </h3>
-                      {match.last_message_time && (
-                        <span className="text-xs text-gray-500 ml-2">
-                          {new Date(match.last_message_time).toLocaleTimeString([], {
-                            hour: '2-digit',
-                            minute: '2-digit'
-                          })}
-                        </span>
-                      )}
-                    </div>
-                    {match.last_message && (
-                      <p className="text-sm text-gray-600 truncate mt-1">
-                        {match.last_message}
-                      </p>
-                    )}
-                  </div>
-                </div>
-              </div>
-              );
-            })
-          )}
-        </div>
+    );
+  }
+
+  // Separate new matches (no messages yet) from conversations
+  const newMatches = matches.filter(match => !match.last_message);
+  const conversationMatches = matches.filter(match => match.last_message);
+
+  if (!selectedMatch) {
+    return (
+      <div className="fixed inset-0 flex flex-col bg-background">
+        <ChatUserList
+          matches={conversationMatches}
+          newMatches={newMatches}
+          selectedMatch={selectedMatch}
+          onMatchSelect={setSelectedMatch}
+          onUserProfileOpen={handleUserProfileClick}
+          currentUserId={currentUser.id}
+        />
 
         <UserProfileModal
           isOpen={isUserProfileOpen}
@@ -1145,7 +1040,7 @@ const ChatPage = ({ currentUser, onUnreadChange, onDetailViewChange }: ChatPageP
         }}
         onTouchStart={handleSwipeStart}
         onTouchMove={handleSwipeMove}
-        onTouchEnd={handleSwipeEnd}
+      onTouchEnd={handleSwipeEnd}
       >
         {messages.map((message, index) => {
           const prevMessage = messages[index - 1];
