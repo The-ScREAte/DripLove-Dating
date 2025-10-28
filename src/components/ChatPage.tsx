@@ -67,6 +67,11 @@ const ChatPage = ({ currentUser, onUnreadChange, onDetailViewChange }: ChatPageP
   const [pullDistance, setPullDistance] = useState(0);
   const [startY, setStartY] = useState(0);
   const matchesNeedsRefreshRef = useRef(false);
+  
+  // Swipe gesture state for back navigation
+  const [swipeStartX, setSwipeStartX] = useState(0);
+  const [swipeStartY, setSwipeStartY] = useState(0);
+  const [isSwiping, setIsSwiping] = useState(false);
 
   useEffect(() => {
     if (!currentUser || !currentUser.id) return;
@@ -911,6 +916,38 @@ const ChatPage = ({ currentUser, onUnreadChange, onDetailViewChange }: ChatPageP
     }
   };
 
+  // Swipe gesture handlers for back navigation
+  const handleSwipeStart = (e: React.TouchEvent) => {
+    const touch = e.touches[0];
+    // Only start swipe tracking if touch starts from the left edge (first 50px)
+    if (touch.clientX < 50) {
+      setSwipeStartX(touch.clientX);
+      setSwipeStartY(touch.clientY);
+      setIsSwiping(true);
+    }
+  };
+
+  const handleSwipeMove = (e: React.TouchEvent) => {
+    if (!isSwiping) return;
+    
+    const touch = e.touches[0];
+    const deltaX = touch.clientX - swipeStartX;
+    const deltaY = touch.clientY - swipeStartY;
+    
+    // If horizontal swipe is dominant and moving right
+    if (Math.abs(deltaX) > Math.abs(deltaY) && deltaX > 50) {
+      // Trigger back navigation
+      setIsSwiping(false);
+      setSelectedMatch(null);
+    }
+  };
+
+  const handleSwipeEnd = () => {
+    setIsSwiping(false);
+    setSwipeStartX(0);
+    setSwipeStartY(0);
+  };
+
   const filteredMatches = matches.filter(match => {
     const partnerName = `${match.partner?.first_name || ''} ${match.partner?.last_name || ''}`.toLowerCase();
     return partnerName.includes(searchTerm.toLowerCase());
@@ -1104,8 +1141,11 @@ const ChatPage = ({ currentUser, onUnreadChange, onDetailViewChange }: ChatPageP
           WebkitOverflowScrolling: 'touch', 
           paddingTop: Capacitor.getPlatform() === 'ios' 
             ? 'clamp(130px, calc(env(safe-area-inset-top, 10px) + 100px), 140px)'
-            : '130px'
+            : '80px'
         }}
+        onTouchStart={handleSwipeStart}
+        onTouchMove={handleSwipeMove}
+        onTouchEnd={handleSwipeEnd}
       >
         {messages.map((message, index) => {
           const prevMessage = messages[index - 1];

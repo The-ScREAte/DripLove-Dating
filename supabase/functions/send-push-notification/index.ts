@@ -31,12 +31,25 @@ async function getAccessToken(): Promise<string> {
 
   console.log('✅ Firebase credentials found, decoding...')
   
-  // Decode the base64 service account
-  const serviceAccountJson = atob(serviceAccountBase64)
-  const serviceAccount = JSON.parse(serviceAccountJson)
-  
-  console.log('✅ Service account parsed. Project ID:', serviceAccount.project_id)
+  try {
+    // Decode the base64 service account
+    const serviceAccountJson = atob(serviceAccountBase64)
+    const serviceAccount = JSON.parse(serviceAccountJson)
+    
+    console.log('✅ Service account parsed. Project ID:', serviceAccount.project_id)
+    return await generateAccessToken(serviceAccount)
+  } catch (error) {
+    console.error('❌ Failed to decode FCM credentials:', error)
+    console.error('⚠️ Make sure your FCM_CREDENTIALS secret is a valid base64-encoded JSON service account file')
+    console.error('⚠️ To create: 1) Download service account JSON from Firebase Console')
+    console.error('⚠️            2) Run: cat service-account.json | base64')
+    console.error('⚠️            3) Set the result as FCM_CREDENTIALS secret')
+    throw new Error('Invalid FCM_CREDENTIALS format - must be base64-encoded JSON')
+  }
+}
 
+async function generateAccessToken(serviceAccount: any): Promise<string> {
+  
   // Create JWT for OAuth2
   const now = Math.floor(Date.now() / 1000)
   const expiry = now + 3600

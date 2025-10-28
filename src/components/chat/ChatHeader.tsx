@@ -35,12 +35,9 @@ const ChatHeader: React.FC<ChatHeaderProps> = ({
   const [openReport, setOpenReport] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
   const { toast } = useToast();
-  // Globally clamp the safe-area inset so we have a sensible minimum and
-  // maximum across platforms. This gives a minimum breathing room on
-  // Android/web and prevents extremely tall headers on devices with very
-  // large safe insets.
-  // Use reasonable min/max for the top inset, starting from where main header ends
-  const paddingTopValue = 'clamp(70px, calc(env(safe-area-inset-top, 10px) + 50px), 90px)';
+  // Only apply safe-area padding on iOS native, not on web
+  const isIOS = typeof window !== 'undefined' && /iPhone|iPad|iPod/.test(navigator.userAgent);
+  const paddingTopValue = isIOS ? 'clamp(70px, calc(env(safe-area-inset-top, 10px) + 50px), 90px)' : '0px';
 
   return (
     <div
