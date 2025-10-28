@@ -1,60 +1,71 @@
 import React from 'react';
 import { ChatMatch } from '@/types';
 import ChatUserAvatar from '../ChatUserAvatar';
-import NewMatches from './NewMatches';
+import { Input } from '@/components/ui/input';
+import { Search } from 'lucide-react';
 
 interface ChatUserListProps {
   matches: ChatMatch[];
-  newMatches: ChatMatch[];
   selectedMatch: ChatMatch | null;
+  searchTerm: string;
   onMatchSelect: (match: ChatMatch) => void;
   onUserProfileOpen: (userId: string) => void;
+  onSearchChange?: (searchTerm: string) => void;
   currentUserId?: string;
 }
 
 const ChatUserList: React.FC<ChatUserListProps> = ({
   matches,
-  newMatches,
   selectedMatch,
+  searchTerm,
   onMatchSelect,
   onUserProfileOpen,
+  onSearchChange,
   currentUserId
 }) => {
+  const [localSearchTerm, setLocalSearchTerm] = React.useState(searchTerm);
+  
   // Only apply safe-area padding on iOS native, not on web
   const isIOS = typeof window !== 'undefined' && /iPhone|iPad|iPod/.test(navigator.userAgent);
-  const isNative = typeof (window as any).Capacitor !== 'undefined';
-  const paddingTopValue = isIOS && isNative ? 'clamp(16px, calc(env(safe-area-inset-top, 0px) + 16px), 60px)' : '16px';
+  const paddingTopValue = isIOS ? 'clamp(16px, calc(env(safe-area-inset-top, 0px) + 16px), 60px)' : '16px';
+
+  const handleSearchChange = (value: string) => {
+    setLocalSearchTerm(value);
+    onSearchChange?.(value);
+  };
+
+  const filteredMatches = matches.filter(match =>
+    `${match.first_name} ${match.last_name}`.toLowerCase().includes(localSearchTerm.toLowerCase())
+  );
 
   return (
     <div className="w-full h-full flex flex-col">
       {/* Sticky Header with gradient background */}
       <div
-        className="sticky top-0 z-10 pb-2 bg-gradient-to-r from-pink-500 to-purple-600 text-white flex-shrink-0"
+        className="sticky top-0 z-10 p-4 bg-gradient-to-r from-pink-500 to-purple-600 text-white flex-shrink-0"
         style={{ paddingTop: paddingTopValue }}
       >
-        <h2 className="text-xl font-bold px-4 pt-2">Messages</h2>
-      </div>
-      
-      {/* New Matches Section */}
-      {newMatches.length > 0 && (
-        <div className="bg-background">
-          <NewMatches
-            matches={newMatches}
-            onMatchSelect={onMatchSelect}
-            onUserProfileOpen={onUserProfileOpen}
-            currentUserId={currentUserId}
+        <h2 className="text-xl font-bold mb-4">Messages</h2>
+        <div className="relative">
+          <Input
+            type="text"
+            placeholder="Search conversations..."
+            value={localSearchTerm}
+            onChange={(e) => handleSearchChange(e.target.value)}
+            className="pr-10 bg-white text-gray-900 focus:ring-pink-300"
           />
+          <Search className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4" />
         </div>
-      )}
+      </div>
       
       {/* Scrollable conversations list */}
       <div className="flex-1 overflow-y-auto">
-        {matches.length === 0 ? (
-          <div className="p-4 text-center text-muted-foreground">
-            No conversations yet
+        {filteredMatches.length === 0 ? (
+          <div className="p-4 text-center text-gray-500">
+            {localSearchTerm ? 'No matches found' : 'No conversations yet'}
           </div>
         ) : (
-          matches.map((match) => {
+          filteredMatches.map((match) => {
             // Determine the correct partner ID for avatar
             const partnerId = match.partner?.id || 
                              (currentUserId && match.user1_id === currentUserId ? match.user2_id : match.user1_id);
@@ -62,7 +73,7 @@ const ChatUserList: React.FC<ChatUserListProps> = ({
             return (
                 <div
                   key={match.id}
-                  className={`p-4 border-b cursor-pointer hover:bg-accent/50 transition-colors ${
+                  className={`p-4 border-b cursor-pointer hover:bg-gray-50 transition-colors ${
                     selectedMatch?.id === match.id ? 'bg-pink-50 border-pink-200' : ''
                   } ${match.unread_messages > 0 ? 'bg-blue-50/30' : ''}`}
                   onClick={() => onMatchSelect(match)}
@@ -83,11 +94,11 @@ const ChatUserList: React.FC<ChatUserListProps> = ({
                   </div>
                  <div className="flex-1 min-w-0">
                    <div className="flex justify-between items-start">
-                     <h3 className={`truncate ${match.unread_messages > 0 ? 'font-bold text-foreground' : 'font-semibold text-foreground'}`}>
+                     <h3 className={`truncate ${match.unread_messages > 0 ? 'font-bold text-gray-900' : 'font-semibold text-gray-900'}`}>
                        {match.first_name} {match.last_name}
                      </h3>
                     {match.last_message_time && (
-                      <span className="text-xs text-muted-foreground ml-2">
+                      <span className="text-xs text-gray-500 ml-2">
                         {new Date(match.last_message_time).toLocaleTimeString([], {
                           hour: '2-digit',
                           minute: '2-digit'
@@ -96,7 +107,7 @@ const ChatUserList: React.FC<ChatUserListProps> = ({
                     )}
                   </div>
                      {match.last_message && (
-                       <p className={`text-sm truncate mt-1 ${match.unread_messages > 0 ? 'font-bold text-foreground' : 'text-muted-foreground'}`}>
+                       <p className={`text-sm truncate mt-1 ${match.unread_messages > 0 ? 'font-bold text-gray-800' : 'text-gray-600'}`}>
                          {match.last_message}
                        </p>
                      )}
