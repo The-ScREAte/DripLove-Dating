@@ -101,30 +101,30 @@ export type Database = {
       chats: {
         Row: {
           created_at: string
+          deleted_for: string[] | null
           id: string
           is_read: boolean | null
           match_id: string
           message: string
           sender_id: string
-          deleted_for: string[] | null
         }
         Insert: {
           created_at?: string
+          deleted_for?: string[] | null
           id?: string
           is_read?: boolean | null
           match_id: string
           message: string
           sender_id: string
-          deleted_for?: string[] | null
         }
         Update: {
           created_at?: string
+          deleted_for?: string[] | null
           id?: string
           is_read?: boolean | null
           match_id?: string
           message?: string
           sender_id?: string
-          deleted_for?: string[] | null
         }
         Relationships: [
           {
@@ -544,6 +544,42 @@ export type Database = {
           },
         ]
       }
+      redirects: {
+        Row: {
+          android_url: string | null
+          clicks: number | null
+          created_at: string | null
+          created_by: string | null
+          id: string
+          ios_url: string | null
+          last_clicked_at: string | null
+          updated_at: string | null
+          web_url: string
+        }
+        Insert: {
+          android_url?: string | null
+          clicks?: number | null
+          created_at?: string | null
+          created_by?: string | null
+          id: string
+          ios_url?: string | null
+          last_clicked_at?: string | null
+          updated_at?: string | null
+          web_url: string
+        }
+        Update: {
+          android_url?: string | null
+          clicks?: number | null
+          created_at?: string | null
+          created_by?: string | null
+          id?: string
+          ios_url?: string | null
+          last_clicked_at?: string | null
+          updated_at?: string | null
+          web_url?: string
+        }
+        Relationships: []
+      }
       reported_chats: {
         Row: {
           admin_id: string | null
@@ -806,42 +842,6 @@ export type Database = {
           },
         ]
       }
-      redirects: {
-        Row: {
-          android_url: string | null
-          clicks: number
-          created_at: string
-          created_by: string | null
-          id: string
-          ios_url: string | null
-          last_clicked_at: string | null
-          updated_at: string
-          web_url: string
-        }
-        Insert: {
-          android_url?: string | null
-          clicks?: number
-          created_at?: string
-          created_by?: string | null
-          id: string
-          ios_url?: string | null
-          last_clicked_at?: string | null
-          updated_at?: string
-          web_url: string
-        }
-        Update: {
-          android_url?: string | null
-          clicks?: number
-          created_at?: string
-          created_by?: string | null
-          id?: string
-          ios_url?: string | null
-          last_clicked_at?: string | null
-          updated_at?: string
-          web_url?: string
-        }
-        Relationships: []
-      }
       user_usage: {
         Row: {
           created_at: string
@@ -918,18 +918,8 @@ export type Database = {
         Args: { lat1: number; lat2: number; lon1: number; lon2: number }
         Returns: number
       }
-      cancel_user_subscription: {
-        Args: Record<PropertyKey, never>
-        Returns: undefined
-      }
-      increment_redirect_clicks: {
-        Args: { redirect_id: string }
-        Returns: undefined
-      }
-      cleanup_incomplete_users: {
-        Args: Record<PropertyKey, never>
-        Returns: undefined
-      }
+      cancel_user_subscription: { Args: never; Returns: undefined }
+      cleanup_incomplete_users: { Args: never; Returns: undefined }
       create_admin_user: {
         Args: {
           admin_email: string
@@ -938,10 +928,7 @@ export type Database = {
         }
         Returns: Json
       }
-      delete_old_messages: {
-        Args: Record<PropertyKey, never>
-        Returns: undefined
-      }
+      delete_old_messages: { Args: never; Returns: undefined }
       delete_user_and_data: {
         Args: { user_id_to_delete: string }
         Returns: undefined
@@ -955,14 +942,8 @@ export type Database = {
           profile_id: string
         }[]
       }
-      get_admin_stats: {
-        Args: Record<PropertyKey, never>
-        Returns: Json
-      }
-      get_app_stats: {
-        Args: Record<PropertyKey, never>
-        Returns: Json
-      }
+      get_admin_stats: { Args: never; Returns: Json }
+      get_app_stats: { Args: never; Returns: Json }
       get_current_subscription_status: {
         Args: { p_user_id: string }
         Returns: {
@@ -973,7 +954,7 @@ export type Database = {
         }[]
       }
       get_enabled_countries: {
-        Args: Record<PropertyKey, never>
+        Args: never
         Returns: {
           country_code: string
           country_name: string
@@ -994,10 +975,7 @@ export type Database = {
         Args: { p_reason?: string; p_user_id: string }
         Returns: boolean
       }
-      handle_subscription_expiry: {
-        Args: Record<PropertyKey, never>
-        Returns: undefined
-      }
+      handle_subscription_expiry: { Args: never; Returns: undefined }
       handle_subscription_payment: {
         Args: {
           p_amount: number
@@ -1006,6 +984,10 @@ export type Database = {
           p_user_id: string
         }
         Returns: boolean
+      }
+      increment_redirect_clicks: {
+        Args: { redirect_id: string }
+        Returns: undefined
       }
       increment_unread_count: {
         Args: { field_name: string; match_id_input: string }
@@ -1031,10 +1013,7 @@ export type Database = {
         Args: { admin_notes?: string; image_id: string }
         Returns: boolean
       }
-      test_subscription_info: {
-        Args: { user_id_param: string }
-        Returns: Json
-      }
+      test_subscription_info: { Args: { user_id_param: string }; Returns: Json }
       update_user_usage: {
         Args: {
           increment_by?: number
