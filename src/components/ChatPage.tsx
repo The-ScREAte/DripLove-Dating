@@ -51,7 +51,6 @@ const ChatPage = ({ currentUser, onUnreadChange, onDetailViewChange }: ChatPageP
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [newMessage, setNewMessage] = useState('');
   const [isSending, setIsSending] = useState(false);
-  const [searchTerm, setSearchTerm] = useState('');
   const [isUserProfileOpen, setIsUserProfileOpen] = useState(false);
   const [selectedUserId, setSelectedUserId] = useState<string>('');
   const [isBlockDialogOpen, setIsBlockDialogOpen] = useState(false);
@@ -948,9 +947,10 @@ const ChatPage = ({ currentUser, onUnreadChange, onDetailViewChange }: ChatPageP
     setSwipeStartY(0);
   };
 
+
   const filteredMatches = matches.filter(match => {
     const partnerName = `${match.partner?.first_name || ''} ${match.partner?.last_name || ''}`.toLowerCase();
-    return partnerName.includes(searchTerm.toLowerCase());
+    return match.last_message; // Only show conversations with messages
   });
 
   // If there's no authenticated user yet, render a light loading state to avoid
@@ -984,6 +984,9 @@ const ChatPage = ({ currentUser, onUnreadChange, onDetailViewChange }: ChatPageP
   };
 
   if (!selectedMatch) {
+    const newMatchList = matches.filter(m => !m.last_message);
+    const conversationList = matches.filter(m => m.last_message);
+    
     return (
   <div className="fixed inset-0 flex flex-col bg-gray-50">
         {/* Header (safe area respected via env padding) */}
@@ -997,20 +1000,44 @@ const ChatPage = ({ currentUser, onUnreadChange, onDetailViewChange }: ChatPageP
         >
           <div className="px-2 pb-1 pt-2">
             <h2 className="text-xl font-bold m-1">DripChat</h2>
-            <div className="relative">
-              <input
-                type="text"
-                placeholder="Search conversations..."
-                value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
-                className="w-full pr-10 bg-white text-gray-900 rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-pink-300"
-              />
-              <svg className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="m21 21-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
-              </svg>
-            </div>
           </div>
         </div>
+        
+        {/* New Matches Section */}
+        {newMatchList.length > 0 && (
+          <div className="px-4 py-3 border-b bg-white">
+            <h3 className="text-sm font-semibold text-gray-900 mb-3">New Matches</h3>
+            <div className="flex gap-4 overflow-x-auto pb-2 scrollbar-hide">
+              {newMatchList.map((match) => {
+                const partnerId = match.partner?.id || 
+                                 (match.user1_id === currentUser.id ? match.user2_id : match.user1_id);
+                
+                return (
+                  <div
+                    key={match.id}
+                    className="flex flex-col items-center min-w-[70px] cursor-pointer"
+                    onClick={() => setSelectedMatch(match)}
+                  >
+                    <div className="relative mb-2">
+                      <div className="w-16 h-16 rounded-full p-[3px] bg-gradient-to-br from-blue-400 to-blue-600">
+                        <ChatUserAvatar
+                          userId={partnerId}
+                          firstName={match.first_name}
+                          lastName={match.last_name}
+                          size="md"
+                          onClick={() => handleUserProfileClick(partnerId)}
+                        />
+                      </div>
+                    </div>
+                    <span className="text-xs text-gray-900 text-center truncate w-full">
+                      {match.first_name}
+                    </span>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        )}
 
   {/* Scrollable Chat List (only this area scrolls) */}
   <div
@@ -1036,12 +1063,12 @@ const ChatPage = ({ currentUser, onUnreadChange, onDetailViewChange }: ChatPageP
         </div>
       </div>
     )}
-          {filteredMatches.length === 0 ? (
+          {conversationList.length === 0 ? (
             <div className="p-4 text-center text-gray-500">
-              {searchTerm ? 'No matches found' : 'No conversations yet'}
+              No conversations yet
             </div>
           ) : (
-            filteredMatches.map((match) => {
+            conversationList.map((match) => {
               // Determine the correct partner ID for avatar
               const partnerId = match.partner?.id || 
                                (match.user1_id === currentUser.id ? match.user2_id : match.user1_id);
