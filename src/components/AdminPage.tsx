@@ -1042,19 +1042,21 @@ const AdminPageComponent = ({ currentUser, onLogout }: AdminPageProps) => {
 
       // Check the response from the function
       if (data && typeof data === 'object') {
-        if (data.success === false) {
+        const result = data as { success?: boolean; error?: string; message?: string };
+        if (result.success === false) {
           toast({
             title: 'Error',
-            description: data.error || 'Failed to create match',
+            description: result.error || 'Failed to create match',
             variant: 'destructive'
           });
           return;
         }
       }
 
+      const result = data as { message?: string } | null;
       toast({
         title: 'Success',
-        description: data?.message || 'Match created successfully'
+        description: result?.message || 'Match created successfully'
       });
 
       setMatchUser1('');

@@ -18,8 +18,8 @@ const NewMatches: React.FC<NewMatchesProps> = ({
   if (matches.length === 0) return null;
 
   return (
-    <div className="px-4 py-3 border-b bg-background">
-      <h3 className="text-sm font-semibold text-foreground mb-3">New Matches</h3>
+    <div className="px-4 pt-2 pb-3 border-b bg-background">
+      <h3 className="text-sm font-semibold text-foreground mb-2">New Matches</h3>
       <div className="flex gap-4 overflow-x-auto pb-2 scrollbar-hide">
         {matches.map((match) => {
           const partnerId = match.partner?.id || 
