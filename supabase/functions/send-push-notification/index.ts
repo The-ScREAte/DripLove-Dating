@@ -21,15 +21,21 @@ interface NotificationPayload {
 
 // Get OAuth2 access token for FCM v1 API
 async function getAccessToken(): Promise<string> {
-  const serviceAccountBase64 = Deno.env.get('FIREBASE_SERVICE_ACCOUNT')
+  // Try FCM_CREDENTIALS first (from your Firebase setup), fallback to FIREBASE_SERVICE_ACCOUNT
+  const serviceAccountBase64 = Deno.env.get('FCM_CREDENTIALS') || Deno.env.get('FIREBASE_SERVICE_ACCOUNT')
   
   if (!serviceAccountBase64) {
+    console.error('❌ No Firebase credentials found. Please set FCM_CREDENTIALS or FIREBASE_SERVICE_ACCOUNT secret.')
     throw new Error('FIREBASE_SERVICE_ACCOUNT not configured')
   }
 
+  console.log('✅ Firebase credentials found, decoding...')
+  
   // Decode the base64 service account
   const serviceAccountJson = atob(serviceAccountBase64)
   const serviceAccount = JSON.parse(serviceAccountJson)
+  
+  console.log('✅ Service account parsed. Project ID:', serviceAccount.project_id)
 
   // Create JWT for OAuth2
   const now = Math.floor(Date.now() / 1000)
@@ -128,6 +134,8 @@ serve(async (req) => {
     return new Response('ok', { headers: corsHeaders })
   }
 
+  console.log('🔔 send-push-notification edge function called')
+  
   try {
     const supabase = createClient(
       Deno.env.get('SUPABASE_URL') ?? '',
@@ -137,6 +145,8 @@ serve(async (req) => {
     const payload: NotificationPayload = await req.json()
     const { title, body, userId, type = 'system', data = {} } = payload
 
+    console.log(`📤 Processing notification for user ${userId}:`, { title, body, type })
+
     // Get user's push tokens
     const { data: tokens, error: tokensError } = await supabase
       .from('push_tokens')
@@ -144,11 +154,13 @@ serve(async (req) => {
       .eq('user_id', userId)
 
     if (tokensError) {
-      console.error('Error fetching tokens:', tokensError)
+      console.error('❌ Error fetching tokens:', tokensError)
     }
 
     console.log(`📱 Push tokens for user ${userId}:`, tokens?.length || 0, 'tokens found')
-    if (!tokens || tokens.length === 0) {
+    if (tokens && tokens.length > 0) {
+      console.log('📱 Tokens:', tokens.map(t => ({ platform: t.platform, token: t.token.substring(0, 20) + '...' })))
+    } else {
       console.warn(`⚠️ No push tokens found for user ${userId}. User will only receive in-app notifications.`)
     }
 
@@ -160,7 +172,9 @@ serve(async (req) => {
       console.log(`📤 Sending push notifications to ${tokens.length} device(s)...`)
       try {
         // Get OAuth2 access token
+        console.log('🔑 Getting FCM access token...')
         const accessToken = await getAccessToken()
+        console.log('✅ FCM access token obtained')
         
         // Determine notification channel and sound based on type
         let androidChannelId = 'driplove_general'
@@ -217,6 +231,7 @@ serve(async (req) => {
           }
 
           try {
+            console.log(`📤 Sending FCM to ${tokenData.platform} device...`)
             const response = await fetch('https://fcm.googleapis.com/v1/projects/time-tracking-b70af/messages:send', {
               method: 'POST',
               headers: {
@@ -228,10 +243,11 @@ serve(async (req) => {
 
             if (!response.ok) {
               const errorText = await response.text()
-              console.error(`FCM Error for token ${tokenData.token}:`, errorText)
+              console.error(`❌ FCM Error for token ${tokenData.token.substring(0, 20)}...:`, response.status, errorText)
               
               // Remove invalid tokens
-              if (response.status === 404 || response.status === 400) {
+              if (response.status === 404 || response.status === 400 || errorText.includes('not found') || errorText.includes('invalid')) {
+                console.log(`🗑️ Removing invalid token from database`)
                 await supabase
                   .from('push_tokens')
                   .delete()
@@ -240,22 +256,25 @@ serve(async (req) => {
               return false
             }
 
+            console.log(`✅ FCM sent successfully to ${tokenData.platform} device`)
             return true
           } catch (error) {
-            console.error(`Error sending FCM to token ${tokenData.token}:`, error)
+            console.error(`❌ Error sending FCM to token ${tokenData.token.substring(0, 20)}...:`, error)
             return false
           }
         })
 
         const results = await Promise.all(sendPromises)
         pushSuccess = results.some((result: boolean) => result === true)
+        console.log(`📊 Push notification results: ${results.filter(r => r).length}/${results.length} successful`)
       } catch (error) {
-        console.error('Error sending push notifications:', error)
+        console.error('❌ Error sending push notifications:', error)
         pushSuccess = false
       }
     }
 
     // Store notification in database for real-time delivery
+    console.log('💾 Storing notification in database...')
     const { error: insertError } = await supabase
       .from('notifications')
       .insert({
@@ -269,13 +288,17 @@ serve(async (req) => {
 
     if (!insertError) {
       realTimeStored = true
+      console.log('✅ Notification stored in database successfully')
     } else {
-      console.error('Error inserting notification:', insertError)
+      console.error('❌ Error inserting notification:', insertError)
     }
+
+    const finalSuccess = pushSuccess || realTimeStored
+    console.log(`📊 Final result: ${finalSuccess ? 'SUCCESS' : 'FAILURE'} (push: ${pushSuccess}, realtime: ${realTimeStored})`)
 
     return new Response(
       JSON.stringify({
-        success: pushSuccess || realTimeStored,
+        success: finalSuccess,
         pushSuccess,
         realTimeStored,
       }),
@@ -285,7 +308,7 @@ serve(async (req) => {
       }
     )
   } catch (error) {
-    console.error('Error in send-push-notification:', error)
+    console.error('❌ Error in send-push-notification:', error)
     return new Response(
       JSON.stringify({ error: error instanceof Error ? error.message : 'Unknown error' }),
       {
