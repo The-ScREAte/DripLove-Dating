@@ -998,7 +998,7 @@ const ChatPage = ({ currentUser, onUnreadChange, onDetailViewChange }: ChatPageP
             style={{
               paddingTop: Capacitor.getPlatform() === 'ios'
                 ? 'env(safe-area-inset-top, 0px)'
-                : '55px'
+                : '0px'
             }}
           >
             <h2 className="text-xl font-bold m-1 bg-gradient-to-r from-pink-500 to-purple-600 bg-clip-text text-transparent">
