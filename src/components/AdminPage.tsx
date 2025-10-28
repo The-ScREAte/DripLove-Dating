@@ -16,7 +16,7 @@ import AdminErrorBoundary from './admin/AdminErrorBoundary';
 import UserPoolDebugger from './admin/UserPoolDebugger';
 import CountryManagement from './admin/CountryManagement';
 import ImageModerationPanel from './admin/ImageModerationPanel';
-import NotificationTester from './NotificationTester';
+
 import ManualPremiumManager from './admin/ManualPremiumManager';
 import AdsManagement from './admin/AdsManagement';
 import RedirectLinkCreator from './admin/RedirectLinkCreator';
@@ -826,7 +826,7 @@ const AdminPageComponent = ({ currentUser, onLogout }: AdminPageProps) => {
       setLoading(true);
       
       // Check cache first for performance
-      const cacheKey = `users_${currentPage}_${statusFilter}`;
+      const cacheKey = `users_all_${statusFilter}`;
       const cachedUsers = userDataCache.get(cacheKey);
       if (cachedUsers) {
         const { regularUsers, admins } = cachedUsers;
@@ -836,12 +836,12 @@ const AdminPageComponent = ({ currentUser, onLogout }: AdminPageProps) => {
         return;
       }
 
-      // Use pagination for better performance with large datasets
+      // Fetch ALL users (not paginated in query - pagination happens in UI)
       let query = supabase
         .from('profiles')
         .select('id, first_name, last_name, email, account_status, created_at, city, country, date_of_birth, is_admin')
-        .order('created_at', { ascending: false })
-        .range((currentPage - 1) * usersPerPage, currentPage * usersPerPage - 1);
+        .eq('is_admin', false)
+        .order('created_at', { ascending: false });
 
       if (statusFilter !== 'all') {
         query = query.eq('account_status', statusFilter);
@@ -856,15 +856,23 @@ const AdminPageComponent = ({ currentUser, onLogout }: AdminPageProps) => {
         age: calculateAge(user.date_of_birth)
       })) || [];
 
-      // Separate admin and regular users
-      const regularUsers = usersWithAge.filter(user => !user.is_admin);
-      const admins = usersWithAge.filter(user => user.is_admin);
+      // Fetch admin users separately
+      const { data: adminData } = await supabase
+        .from('profiles')
+        .select('id, first_name, last_name, email, account_status, created_at, city, country, date_of_birth, is_admin')
+        .eq('is_admin', true)
+        .order('created_at', { ascending: false });
 
-      setUsers(regularUsers);
-      setAdminUsers(admins);
+      const adminsWithAge = adminData?.map(user => ({
+        ...user,
+        age: calculateAge(user.date_of_birth)
+      })) || [];
+
+      setUsers(usersWithAge);
+      setAdminUsers(adminsWithAge);
       
       // Cache the users data for 3 minutes
-      userDataCache.set(cacheKey, { regularUsers, admins });
+      userDataCache.set(cacheKey, { regularUsers: usersWithAge, admins: adminsWithAge });
     } catch (error) {
       console.error('Error fetching users:', error);
       toast({
@@ -875,7 +883,7 @@ const AdminPageComponent = ({ currentUser, onLogout }: AdminPageProps) => {
     } finally {
       setLoading(false);
     }
-  }, 300), [toast, currentPage, statusFilter, usersPerPage]);
+  }, 300), [toast, statusFilter]);
 
   const calculateAge = (dateOfBirth: string) => {
     const today = new Date();
@@ -1105,9 +1113,6 @@ const AdminPageComponent = ({ currentUser, onLogout }: AdminPageProps) => {
            WebkitUserSelect: 'none',
            WebkitTouchCallout: 'none'
          }}>
-      {/* Notification Tester - Remove in production */}
-      <NotificationTester currentUser={currentUser} />
-      
       <div className="w-full max-w-[390px] mx-auto bg-white min-h-screen">
         {/* Fixed Header with Safe Area */}
         <div className="sticky top-0 z-50 bg-white border-b border-gray-200">

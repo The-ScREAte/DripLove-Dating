@@ -20,7 +20,7 @@ import ImageManagement from './profile/ImageManagement';
 import AccountActions from './profile/AccountActions';
 import ProfileSummaryCard from './ProfileSummaryCard';
 import ReportButton from './ReportButton';
-import NotificationDebugger from './NotificationDebugger';
+
 import { calculateProfileCompletion } from '@/utils/profileCompletion';
 import PremiumUpgrade from './PremiumUpgrade';
 import CollapsibleSection from './ui/CollapsibleSection';
@@ -52,7 +52,6 @@ const ProfilePage = ({ currentUser, profile, onProfileUpdate, onLogout, onShowTe
   const [showAdinkraSection, setShowAdinkraSection] = useState(false);
   const [showAccountActionsSection, setShowAccountActionsSection] = useState(false);
   const [showPhotoSection, setShowPhotoSection] = useState(false);
-  const [showNotificationDebugger, setShowNotificationDebugger] = useState(false);
   
   const { toast } = useToast();
   const { subscription, loading: subscriptionLoading } = useSubscription(currentUser?.id);
@@ -699,14 +698,6 @@ const ProfilePage = ({ currentUser, profile, onProfileUpdate, onLogout, onShowTe
             />
           </CollapsibleSection>
           <div className="mb-2" />
-          {/* Notification Debugger - for testing push notifications */}
-          <CollapsibleSection
-            title="🔔 Notification Tester"
-            isOpen={showNotificationDebugger}
-            onToggle={() => setShowNotificationDebugger(!showNotificationDebugger)}
-          >
-            <NotificationDebugger currentUserId={currentUser?.id} />
-          </CollapsibleSection>
         </div>
         {/* Move Logout, Terms of Service, and Privacy Policy to the bottom of the page */}
         <div className="mt-2 flex flex-col items-center gap-4">
