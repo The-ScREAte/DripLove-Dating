@@ -993,9 +993,11 @@ const ChatPage = ({ currentUser, onUnreadChange, onDetailViewChange }: ChatPageP
         <div 
           className="sticky top-0 z-30 bg-white text-gray-900 shadow-sm" 
           style={{ 
-            paddingTop: Capacitor.getPlatform() === 'ios' 
-              ? 'clamp(30px, calc(env(safe-area-inset-top, 10px) + 15px), 40px)' 
-              : '40px' 
+            paddingTop: Capacitor.getPlatform() === 'web' 
+              ? '0px' 
+              : Capacitor.getPlatform() === 'ios' 
+                ? 'clamp(30px, calc(env(safe-area-inset-top, 10px) + 15px), 40px)' 
+                : '40px' 
           }}
         >
           <div className="px-2 pb-1 pt-2">
@@ -1007,7 +1009,14 @@ const ChatPage = ({ currentUser, onUnreadChange, onDetailViewChange }: ChatPageP
         
         {/* New Matches Section */}
         {newMatchList.length > 0 && (
-          <div className="px-4 py-3 border-b bg-white">
+          <div 
+            className="px-4 py-3 border-b bg-white"
+            style={{
+              marginTop: Capacitor.getPlatform() === 'ios'
+                ? 'clamp(0px, calc(env(safe-area-inset-top, 0px) + 25px), 5px)'
+                : '0px'
+            }}
+          >
             <h3 className="text-sm font-semibold text-gray-900 mb-3">New Matches</h3>
             <div className="flex gap-4 overflow-x-auto pb-2 scrollbar-hide">
               {newMatchList.map((match) => {
@@ -1049,9 +1058,7 @@ const ChatPage = ({ currentUser, onUnreadChange, onDetailViewChange }: ChatPageP
     className="flex-1 overflow-y-auto pb-35"
     style={{ 
       WebkitOverflowScrolling: 'touch',
-      marginTop: Capacitor.getPlatform() === 'ios' 
-        ? '80px' // Fixed margin for iOS
-        : '0px' // Pull down a bit more for non-iOS platforms (web browsers)
+      marginTop: '0px'
     }}
     onTouchStart={handleTouchStart}
     onTouchMove={handleTouchMove}
