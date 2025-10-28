@@ -30,6 +30,9 @@ dist-ssr
 .env.test.local
 .env.production.local
 
+# Firebase credentials
+server/config/serviceAccountKey.json
+
 # Capacitor
 android/app/src/main/assets/public
 ios/App/App/public

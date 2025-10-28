@@ -3,6 +3,16 @@
 
 const express = require('express');
 const fetch = require('node-fetch');
+const admin = require('firebase-admin');
+const serviceAccount = require('./config/serviceAccountKey.json');
+
+// Initialize Firebase Admin SDK
+admin.initializeApp({
+  credential: admin.credential.cert(serviceAccount)
+});
+
+console.log('✅ Firebase Admin initialized successfully');
+
 const app = express();
 app.use(express.json());
 
@@ -34,6 +44,31 @@ app.post('/verify-apple-receipt', async (req, res) => {
   }
 
   res.json(result);
+});
+
+// GET /firebase-test - Test Firebase connection
+app.get('/firebase-test', async (req, res) => {
+  try {
+    const db = admin.firestore();
+    const docRef = db.collection('test').doc('connection-check');
+    await docRef.set({ 
+      initialized: true, 
+      timestamp: new Date(),
+      message: 'Firebase Admin SDK is working!' 
+    });
+    
+    const doc = await docRef.get();
+    res.json({ 
+      success: true, 
+      message: '✅ Firebase is working!',
+      data: doc.data() 
+    });
+  } catch (error) {
+    res.status(500).json({ 
+      success: false, 
+      error: error.message 
+    });
+  }
 });
 
 const PORT = process.env.PORT || 3001;
