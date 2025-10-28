@@ -991,16 +991,16 @@ const ChatPage = ({ currentUser, onUnreadChange, onDetailViewChange }: ChatPageP
   <div className="fixed inset-0 flex flex-col bg-gray-50">
         {/* Header (safe area respected via env padding) */}
         <div 
-          className="sticky top-0 z-30 bg-white text-gray-900 shadow-sm"
+          className="sticky top-0 z-30 bg-white text-gray-900 shadow-sm" 
+          style={{ 
+            paddingTop: Capacitor.getPlatform() === 'web' 
+              ? '0px' 
+              : Capacitor.getPlatform() === 'ios' 
+                ? 'clamp(30px, calc(env(safe-area-inset-top, 10px) + 15px), 40px)' 
+                : '40px' 
+          }}
         >
-          <div
-            className="px-2 pb-1 pt-2"
-            style={{
-              paddingTop: Capacitor.getPlatform() === 'ios'
-                ? 'env(safe-area-inset-top, 0px)'
-                : '0px'
-            }}
-          >
+          <div className="px-2 pb-1 pt-2">
             <h2 className="text-xl font-bold m-1 bg-gradient-to-r from-pink-500 to-purple-600 bg-clip-text text-transparent">
               💧 DripChat
             </h2>
@@ -1010,8 +1010,7 @@ const ChatPage = ({ currentUser, onUnreadChange, onDetailViewChange }: ChatPageP
         {/* New Matches Section */}
         {newMatchList.length > 0 && (
           <div 
-            className="px-4 py-1 border-b bg-white"
-            style={{ marginTop: '0px', paddingTop: '0px' }}
+            className="px-4 py-3 border-b bg-white"
           >
             <h3 className="text-sm font-semibold text-gray-900 mb-3">New Matches</h3>
             <div className="flex gap-4 overflow-x-auto pb-2 scrollbar-hide">
@@ -1053,7 +1052,8 @@ const ChatPage = ({ currentUser, onUnreadChange, onDetailViewChange }: ChatPageP
   <div
     className="flex-1 overflow-y-auto pb-35"
     style={{ 
-      WebkitOverflowScrolling: 'touch'
+      WebkitOverflowScrolling: 'touch',
+      marginTop: '0px'
     }}
     onTouchStart={handleTouchStart}
     onTouchMove={handleTouchMove}
