@@ -1177,7 +1177,7 @@ const ChatPage = ({ currentUser, onUnreadChange, onDetailViewChange }: ChatPageP
             ? 'clamp(130px, calc(env(safe-area-inset-top, 10px) + 100px), 140px)'
             : Capacitor.getPlatform() === 'web'
               ? '120px'
-              : '80px'
+              : '120px'
         }}
         onTouchStart={handleSwipeStart}
         onTouchMove={handleSwipeMove}
