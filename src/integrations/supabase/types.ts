@@ -997,7 +997,7 @@ export type Database = {
         Args: {
           liked_id_param: string
           liker_id_param: string
-          premium_param: boolean
+          premium_param?: boolean
         }
         Returns: Json
       }
