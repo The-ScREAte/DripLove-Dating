@@ -1,85 +1,88 @@
 import React, { useState } from 'react';
 import { ChatMessage, CurrentUser } from '@/types';
-import { Trash2 } from 'lucide-react';
+import MessageOptionsMenu from './MessageOptionsMenu';
+import DeleteConfirmDialog from './DeleteConfirmDialog';
 
 interface MessageBubbleProps {
   message: ChatMessage;
   currentUser: CurrentUser;
   isConsecutive: boolean;
-  onDelete?: (messageId: string) => void;
+  onDeleteForMe?: (messageId: string) => void;
+  onDeleteForEveryone?: (messageId: string) => void;
 }
 
 const MessageBubble: React.FC<MessageBubbleProps> = ({
   message,
   currentUser,
   isConsecutive,
-  onDelete
+  onDeleteForMe,
+  onDeleteForEveryone
 }) => {
   const isOwnMessage = message.sender_id === currentUser.id;
-  const [showDelete, setShowDelete] = useState(false);
-  const [pressTimer, setPressTimer] = useState<NodeJS.Timeout | null>(null);
+  const [showConfirm, setShowConfirm] = useState(false);
+  const [deleteType, setDeleteType] = useState<'me' | 'everyone'>('me');
   
-  const handlePressStart = () => {
-    const timer = setTimeout(() => {
-      setShowDelete(true);
-    }, 500); // Long press for 500ms
-    setPressTimer(timer);
+  const handleDeleteForMe = () => {
+    setDeleteType('me');
+    setShowConfirm(true);
   };
-  
-  const handlePressEnd = () => {
-    if (pressTimer) {
-      clearTimeout(pressTimer);
-      setPressTimer(null);
-    }
+
+  const handleDeleteForEveryone = () => {
+    setDeleteType('everyone');
+    setShowConfirm(true);
   };
-  
-  const handleDelete = () => {
-    if (onDelete && message.id) {
-      onDelete(message.id);
+
+  const handleConfirmDelete = () => {
+    if (deleteType === 'me' && onDeleteForMe && message.id) {
+      onDeleteForMe(message.id);
+    } else if (deleteType === 'everyone' && onDeleteForEveryone && message.id) {
+      onDeleteForEveryone(message.id);
     }
   };
   
   return (
-    <div className={`flex ${isOwnMessage ? 'justify-end' : 'justify-start'} ${isConsecutive ? 'mt-1' : 'mt-4'}`}>
-      <div
-        className={`relative max-w-xs lg:max-w-md px-4 py-2 rounded-lg ${
-          isOwnMessage
-            ? 'bg-blue-500 text-white'
-            : 'bg-gray-200 text-gray-900'
-        } ${isConsecutive ? '' : 'shadow-sm'}`}
-        onMouseDown={handlePressStart}
-        onMouseUp={handlePressEnd}
-        onMouseLeave={handlePressEnd}
-        onTouchStart={handlePressStart}
-        onTouchEnd={handlePressEnd}
-      >
-        <p className="text-sm">{message.message}</p>
-        <div className={`flex items-center gap-1 text-xs mt-1 ${isOwnMessage ? 'text-blue-100' : 'text-gray-500'}`}>
-          <span>
-            {new Date(message.sent_at || message.created_at || '').toLocaleTimeString([], {
-              hour: '2-digit',
-              minute: '2-digit'
-            })}
-          </span>
-          {isOwnMessage && (
-            <span className={`text-sm font-semibold ${message.is_read ? 'text-blue-200' : 'text-blue-300'}`}>
-              {message.is_read ? '✓✓' : '✓'}
+    <>
+      <div className={`flex ${isOwnMessage ? 'justify-end' : 'justify-start'} ${isConsecutive ? 'mt-1' : 'mt-4'}`}>
+        <div
+          className={`relative max-w-xs lg:max-w-md px-4 py-2 rounded-lg ${
+            isOwnMessage
+              ? 'bg-blue-500 text-white'
+              : 'bg-gray-200 text-gray-900'
+          } ${isConsecutive ? '' : 'shadow-sm'}`}
+        >
+          {/* Three-dot menu in top corner inside bubble */}
+          <div className={`absolute top-1 ${isOwnMessage ? 'right-1' : 'left-1'}`}>
+            <MessageOptionsMenu
+              isOwnMessage={isOwnMessage}
+              onDeleteForMe={handleDeleteForMe}
+              onDeleteForEveryone={handleDeleteForEveryone}
+            />
+          </div>
+
+          <p className="text-sm break-words pr-6">{message.message}</p>
+          <div className={`flex items-center gap-1 text-xs mt-1 ${isOwnMessage ? 'text-blue-100' : 'text-gray-500'}`}>
+            <span>
+              {new Date(message.sent_at || message.created_at || '').toLocaleTimeString([], {
+                hour: '2-digit',
+                minute: '2-digit'
+              })}
             </span>
-          )}
+            {isOwnMessage && (
+              <span className={`text-sm font-semibold ${message.is_read ? 'text-blue-200' : 'text-blue-300'}`}>
+                {message.is_read ? '✓✓' : '✓'}
+              </span>
+            )}
+          </div>
         </div>
-        
-        {/* Delete button (shows on long press) */}
-        {showDelete && isOwnMessage && (
-          <button
-            onClick={handleDelete}
-            className="absolute -top-2 -right-2 bg-red-500 text-white rounded-full p-1.5 shadow-lg hover:bg-red-600 transition-colors"
-            aria-label="Delete message"
-          >
-            <Trash2 className="w-3 h-3" />
-          </button>
-        )}
       </div>
-    </div>
+
+      <DeleteConfirmDialog
+        isOpen={showConfirm}
+        onClose={() => setShowConfirm(false)}
+        onConfirm={handleConfirmDelete}
+        deleteType={deleteType}
+      />
+    </>
   );
 };
 

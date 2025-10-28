@@ -73,6 +73,7 @@ export interface ChatMessage {
   created_at?: string;
   is_read: boolean;
   match_id?: string;
+  deleted_for?: string[]; // Array of user IDs who deleted this message
   sender?: {
     first_name: string;
     last_name: string;

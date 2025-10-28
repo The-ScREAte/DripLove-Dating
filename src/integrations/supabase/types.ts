@@ -106,6 +106,7 @@ export type Database = {
           match_id: string
           message: string
           sender_id: string
+          deleted_for: string[] | null
         }
         Insert: {
           created_at?: string
@@ -114,6 +115,7 @@ export type Database = {
           match_id: string
           message: string
           sender_id: string
+          deleted_for?: string[] | null
         }
         Update: {
           created_at?: string
@@ -122,6 +124,7 @@ export type Database = {
           match_id?: string
           message?: string
           sender_id?: string
+          deleted_for?: string[] | null
         }
         Relationships: [
           {

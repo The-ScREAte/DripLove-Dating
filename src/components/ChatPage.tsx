@@ -168,6 +168,12 @@ const ChatPage = ({ currentUser, onUnreadChange, onDetailViewChange }: ChatPageP
               newMsg.sent_at = newMsg.created_at;
             }
             
+            // Check if message is deleted for current user
+            if (newMsg.deleted_for && newMsg.deleted_for.includes(currentUser.id)) {
+              console.log('[ChatPage] ⚠️ New message is deleted for current user, skipping');
+              return;
+            }
+            
             // Update messages state
               setMessages((prev) => {
                 // Dedupe: if message id already exists, ignore (prevents duplicates from optimistic + realtime)
@@ -205,11 +211,50 @@ const ChatPage = ({ currentUser, onUnreadChange, onDetailViewChange }: ChatPageP
             console.log('[ChatPage] 📝 Realtime message update:', payload.new);
             const updatedMsg = payload.new as ChatMessage;
             
+            // Check if message was deleted for current user
+            if (updatedMsg.deleted_for && updatedMsg.deleted_for.includes(currentUser.id)) {
+              console.log('[ChatPage] 🗑️ Message deleted for current user, removing from UI');
+              setMessages((prev) => {
+                const updated = prev.filter(m => m.id !== updatedMsg.id);
+                // Update cache
+                chatMessagesCache.set(selectedMatch.id, {
+                  messages: updated,
+                  timestamp: Date.now()
+                });
+                return updated;
+              });
+              return;
+            }
+            
             // Update the specific message in state
             setMessages((prev) => {
               const updated = prev.map(m => 
-                m.id === updatedMsg.id ? { ...m, is_read: updatedMsg.is_read } : m
+                m.id === updatedMsg.id ? { ...m, ...updatedMsg } : m
               );
+              // Update cache
+              chatMessagesCache.set(selectedMatch.id, {
+                messages: updated,
+                timestamp: Date.now()
+              });
+              return updated;
+            });
+          }
+        )
+        .on(
+          'postgres_changes',
+          {
+            event: 'DELETE',
+            schema: 'public',
+            table: 'chats',
+            filter: `match_id=eq.${selectedMatch.id}`,
+          },
+          (payload) => {
+            console.log('[ChatPage] 🗑️ Realtime message delete:', payload.old);
+            const deletedMsg = payload.old as { id: string };
+            
+            // Remove the message from state
+            setMessages((prev) => {
+              const updated = prev.filter(m => m.id !== deletedMsg.id);
               // Update cache
               chatMessagesCache.set(selectedMatch.id, {
                 messages: updated,
@@ -355,7 +400,11 @@ const ChatPage = ({ currentUser, onUnreadChange, onDetailViewChange }: ChatPageP
     // Check cache first
     const cached = chatMessagesCache.get(selectedMatch.id);
     if (cached && Date.now() - cached.timestamp < MESSAGE_CACHE_DURATION) {
-      setMessages(cached.messages);
+      // Filter out messages deleted for current user
+      const visibleMessages = cached.messages.filter(msg => 
+        !msg.deleted_for || !msg.deleted_for.includes(currentUser.id)
+      );
+      setMessages(visibleMessages);
       // Still fetch in background for updates
       fetchMessagesInBackground(selectedMatch.id);
       return;
@@ -383,13 +432,18 @@ const ChatPage = ({ currentUser, onUnreadChange, onDetailViewChange }: ChatPageP
 
       const processedMessages = mappedMessages as unknown as ChatMessage[];
       
-      // Update cache
+      // Filter out messages deleted for current user
+      const visibleMessages = processedMessages.filter(msg => 
+        !msg.deleted_for || !msg.deleted_for.includes(currentUser.id)
+      );
+      
+      // Update cache with all messages
       chatMessagesCache.set(selectedMatch.id, {
         messages: processedMessages,
         timestamp: Date.now()
       });
 
-      setMessages(processedMessages);
+      setMessages(visibleMessages);
     } catch (error) {
       // ...removed log...
     }
@@ -418,7 +472,12 @@ const ChatPage = ({ currentUser, onUnreadChange, onDetailViewChange }: ChatPageP
 
       const processedMessages = mappedMessages as unknown as ChatMessage[];
       
-      // Update cache
+      // Filter out messages deleted for current user
+      const visibleMessages = processedMessages.filter(msg => 
+        !msg.deleted_for || !msg.deleted_for.includes(currentUser.id)
+      );
+      
+      // Update cache with all messages
       chatMessagesCache.set(matchId, {
         messages: processedMessages,
         timestamp: Date.now()
@@ -426,7 +485,7 @@ const ChatPage = ({ currentUser, onUnreadChange, onDetailViewChange }: ChatPageP
 
       // Update state if this is still the selected match
       if (selectedMatch?.id === matchId) {
-        setMessages(processedMessages);
+        setMessages(visibleMessages);
       }
     } catch (error) {
       // Silently handle background fetch errors
@@ -461,11 +520,18 @@ const ChatPage = ({ currentUser, onUnreadChange, onDetailViewChange }: ChatPageP
 
       // Try to update chat messages as read with proper error handling
       try {
-        await supabase
+        const { error } = await supabase
           .from('chats')
           .update({ is_read: true })
           .eq('match_id', selectedMatch.id)
           .neq('sender_id', currentUser.id);
+        
+        if (!error) {
+          // Update local state to show double checkmarks immediately
+          setMessages(prev => prev.map(msg => 
+            msg.sender_id !== currentUser.id ? { ...msg, is_read: true } : msg
+          ));
+        }
       } catch (chatError) {
         // Silently handle if is_read field doesn't exist
       }
@@ -647,37 +713,106 @@ const ChatPage = ({ currentUser, onUnreadChange, onDetailViewChange }: ChatPageP
     if (!selectedMatch) return;
 
     try {
-      // Delete from database
-      const { error } = await supabase
+      // Delete from database permanently (only for sender's own messages)
+      const { error: deleteError } = await supabase
         .from('chats')
         .delete()
         .eq('id', messageId)
         .eq('sender_id', currentUser.id); // Only allow deleting own messages
 
-      if (error) throw error;
+      if (deleteError) throw deleteError;
+
+      // Clear cache to force fresh fetch next time
+      chatMessagesCache.delete(selectedMatch.id);
 
       // Remove from UI immediately
-      setMessages(prev => {
-        const updated = prev.filter(msg => msg.id !== messageId);
-        // Update cache
-        chatMessagesCache.set(selectedMatch.id, {
-          messages: updated,
-          timestamp: Date.now()
-        });
-        return updated;
-      });
-
-      toast({
-        title: 'Message deleted',
-        description: 'The message has been removed.',
-      });
+      setMessages(prev => prev.filter(msg => msg.id !== messageId));
     } catch (error) {
       console.error('Error deleting message:', error);
-      toast({
-        title: 'Error',
-        description: 'Failed to delete message. Please try again.',
-        variant: 'destructive'
-      });
+    }
+  };
+
+  const deleteMessageForMe = async (messageId: string) => {
+    if (!selectedMatch) return;
+
+    try {
+      // Fetch fresh data from database
+      const { data: currentMsg, error: fetchError } = await supabase
+        .from('chats')
+        .select('*')
+        .eq('id', messageId)
+        .single();
+
+      if (fetchError) throw fetchError;
+      if (!currentMsg) return;
+
+      // Get current deleted_for array or initialize empty
+      const deletedFor = (currentMsg.deleted_for || []) as string[];
+      
+      // Add current user to deleted_for array if not already there
+      if (!deletedFor.includes(currentUser.id)) {
+        deletedFor.push(currentUser.id);
+      }
+
+      // Get the other user ID
+      const otherUserId = selectedMatch.user1_id === currentUser.id 
+        ? selectedMatch.user2_id 
+        : selectedMatch.user1_id;
+
+      // If both users have deleted, remove from database completely
+      if (deletedFor.includes(otherUserId)) {
+        const { error: deleteError } = await supabase
+          .from('chats')
+          .delete()
+          .eq('id', messageId);
+
+        if (deleteError) throw deleteError;
+      } else {
+        // Otherwise just update the deleted_for field
+        const { error: updateError } = await supabase
+          .from('chats')
+          .update({ deleted_for: deletedFor })
+          .eq('id', messageId);
+
+        if (updateError) throw updateError;
+      }
+
+      // Clear cache to force fresh fetch next time
+      chatMessagesCache.delete(selectedMatch.id);
+
+      // Remove from UI immediately
+      setMessages(prev => prev.filter(msg => msg.id !== messageId));
+    } catch (error) {
+      console.error('Error deleting message for me:', error);
+    }
+  };
+
+  const deleteMessageForEveryone = async (messageId: string) => {
+    if (!selectedMatch) return;
+
+    try {
+      // Get the message to check if user is the sender
+      const message = messages.find(msg => msg.id === messageId);
+      if (!message || message.sender_id !== currentUser.id) {
+        return;
+      }
+
+      // Delete from database completely
+      const { error: deleteError } = await supabase
+        .from('chats')
+        .delete()
+        .eq('id', messageId)
+        .eq('sender_id', currentUser.id); // Double-check it's their message
+
+      if (deleteError) throw deleteError;
+
+      // Clear cache to force fresh fetch next time
+      chatMessagesCache.delete(selectedMatch.id);
+
+      // Remove from UI immediately
+      setMessages(prev => prev.filter(msg => msg.id !== messageId));
+    } catch (error) {
+      console.error('Error deleting message for everyone:', error);
     }
   };
 
@@ -984,7 +1119,8 @@ const ChatPage = ({ currentUser, onUnreadChange, onDetailViewChange }: ChatPageP
               message={message}
               currentUser={currentUser}
               isConsecutive={isConsecutive}
-              onDelete={deleteMessage}
+              onDeleteForMe={deleteMessageForMe}
+              onDeleteForEveryone={deleteMessageForEveryone}
             />
           );
         })}
