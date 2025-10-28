@@ -994,10 +994,10 @@ const ChatPage = ({ currentUser, onUnreadChange, onDetailViewChange }: ChatPageP
           className="sticky top-0 z-30 bg-white text-gray-900 shadow-sm" 
           style={{ 
             paddingTop: Capacitor.getPlatform() === 'web' 
-              ? '0px' 
+              ? '40px' 
               : Capacitor.getPlatform() === 'ios' 
                 ? 'clamp(10px, calc(env(safe-area-inset-top, 10px) + 15px), 00px)' 
-                : '60px' 
+                : '40px' 
           }}
         >
           <div className="px-2 pb-1 pt-2">
