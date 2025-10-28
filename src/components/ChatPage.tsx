@@ -997,7 +997,7 @@ const ChatPage = ({ currentUser, onUnreadChange, onDetailViewChange }: ChatPageP
               ? '0px' 
               : Capacitor.getPlatform() === 'ios' 
                 ? 'clamp(30px, calc(env(safe-area-inset-top, 10px) + 15px), 40px)' 
-                : '40px' 
+                : '0px' 
           }}
         >
           <div className="px-2 pb-1 pt-2">
