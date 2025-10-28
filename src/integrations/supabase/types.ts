@@ -890,7 +890,7 @@ export type Database = {
         Returns: boolean
       }
       admin_create_match: {
-        Args: { user1_id: string; user2_id: string }
+        Args: { p_user1_id: string; p_user2_id: string }
         Returns: undefined
       }
       admin_get_user_premium_status: {
