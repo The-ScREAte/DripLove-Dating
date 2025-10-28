@@ -9,7 +9,7 @@ import ProfilePage from '@/components/ProfilePage';
 import TermsOfService from '@/components/TermsOfService';
 import PrivacyPolicy from '@/components/PrivacyPolicy';
 import DripCoupleIcon from '@/components/DripCoupleIcon';
-import { supabase } from '@/integrations/supabase/client';
+import { supabase, SUPABASE_URL } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import { usePushNotifications } from '@/hooks/usePushNotifications';
 // No SafeArea helpers here; header/nav will be fixed to viewport
@@ -92,7 +92,7 @@ const MainApp = ({ user, onLogout }: MainAppProps) => {
           }
           
           console.log('[MainApp] 🔐 Authenticated user ID:', currentUser.id);
-          console.log('[MainApp] 🌐 Supabase URL:', supabase.supabaseUrl);
+          console.log('[MainApp] 🌐 Supabase URL:', SUPABASE_URL);
           
           try {
             const { data, error } = await supabase.from('push_tokens').upsert({

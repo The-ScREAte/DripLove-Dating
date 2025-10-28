@@ -566,6 +566,7 @@ const ChatPage = ({ currentUser, onUnreadChange, onDetailViewChange }: ChatPageP
       message: messageText,
       created_at: new Date().toISOString(),
       sent_at: new Date().toISOString(),
+      is_read: false, // Initially not read - shows single checkmark
       receiver_id: selectedMatch.user1_id === currentUser.id ? selectedMatch.user2_id : selectedMatch.user1_id,
       sender: {
         first_name: currentUser.first_name,
