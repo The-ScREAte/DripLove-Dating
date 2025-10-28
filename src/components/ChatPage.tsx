@@ -1175,7 +1175,9 @@ const ChatPage = ({ currentUser, onUnreadChange, onDetailViewChange }: ChatPageP
           WebkitOverflowScrolling: 'touch', 
           paddingTop: Capacitor.getPlatform() === 'ios' 
             ? 'clamp(130px, calc(env(safe-area-inset-top, 10px) + 100px), 140px)'
-            : '80px'
+            : Capacitor.getPlatform() === 'web'
+              ? '120px'
+              : '80px'
         }}
         onTouchStart={handleSwipeStart}
         onTouchMove={handleSwipeMove}

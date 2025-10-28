@@ -1,6 +1,7 @@
 import React from 'react';
 import { Button } from '@/components/ui/button';
 import { Heart, X, Undo2 } from 'lucide-react';
+import { Capacitor } from '@capacitor/core';
 
 interface SwipeButtonsProps {
   onPass: () => void;
@@ -21,14 +22,16 @@ const SwipeButtons: React.FC<SwipeButtonsProps> = ({
 }) => {
   const showCount = !isPremium && reversesLeft !== undefined && reversesLeft > 0;
   
-  // Detect iOS
-  const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) || 
-                (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+  // Detect platform
+  const platform = Capacitor.getPlatform();
+  const isWeb = platform === 'web';
+  const isIOS = platform === 'ios';
+  
+  // Adjust bottom position based on platform
+  const bottomClass = isIOS ? 'bottom-24 sm:bottom-24' : isWeb ? 'bottom-14 sm:bottom-14' : 'bottom-16 sm:bottom-16';
   
   return (
-  <div className={`fixed right-6 z-30 sm:absolute sm:right-6 ${
-    isIOS ? 'bottom-24 sm:bottom-24' : 'bottom-16 sm:bottom-16'
-  }`}>
+  <div className={`fixed right-6 z-30 sm:absolute sm:right-6 ${bottomClass}`}>
       <div className="relative">
         <Button
           onClick={onReverse}
