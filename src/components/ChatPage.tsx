@@ -1015,7 +1015,7 @@ const ChatPage = ({ currentUser, onUnreadChange, onDetailViewChange }: ChatPageP
               marginTop: Capacitor.getPlatform() === 'web'
                 ? '8px'
                 : Capacitor.getPlatform() === 'ios'
-                  ? 'clamp(30px, calc(env(safe-area-inset-top, 0px) + 1px), 5px)'
+                  ? 'clamp(30px, calc(env(safe-area-inset-top, 30px) + 5px), 5px)'
                   : '0px'
             }}
           >

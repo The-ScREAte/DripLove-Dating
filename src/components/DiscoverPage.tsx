@@ -1451,7 +1451,7 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, isPremium }: DiscoverPage
     if (profileCompletion < 70 && todaySwipeCount >= 5) {
       toast({
         title: 'Complete Your Profile',
-        description: `You need ${70 - profileCompletion}% more to continue swiping. Complete your profile to unlock unlimited swipes! `,
+        description: `You need ${70 - profileCompletion}% more to continue swiping. Complete your profile to unlock more swipes! `,
         variant: 'destructive'
       });
       setShowProfileCompletionModal(true);
@@ -1590,7 +1590,7 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, isPremium }: DiscoverPage
     if (profileCompletion < 70 && todaySwipeCount >= 5) {
       toast({
         title: 'Complete Your Profile',
-        description: `You need ${70 - profileCompletion}% more to continue swiping. Complete your profile to unlock unlimited swipes!`,
+        description: `You need ${70 - profileCompletion}% more to continue swiping. Complete your profile to unlock more swipes!`,
         variant: 'destructive'
       });
       setShowProfileCompletionModal(true);
@@ -2032,7 +2032,7 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, isPremium }: DiscoverPage
             <Heart className="w-16 h-16 mx-auto mb-4 text-gray-300" />
             <h2 className="text-xl font-semibold mb-2">No more profiles</h2>
             <p className="text-gray-600 mb-4">
-              You've seen all available profiles. Check back later for new matches!
+              You've seen all available profiles.  Check back later for new matches! or Adjust your preference in settings for moreprofiles.
             </p>
             <Button onClick={fetchPotentialMatches} className="w-full">
               Refresh

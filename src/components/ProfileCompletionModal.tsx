@@ -42,7 +42,7 @@ const ProfileCompletionModal: React.FC<ProfileCompletionModalProps> = ({
             Complete Your Profile to Continue
           </CardTitle>
           <CardDescription className="text-gray-600">
-            You've used {swipesUsedToday} of your daily swipes. Complete your profile so others can see you better and connect with real people who share your interests!
+            You've used {swipesUsedToday} of your daily swipes. Complete your profile so others can see the real you and connect with real people who share your interests!
           </CardDescription>
         </CardHeader>
         
