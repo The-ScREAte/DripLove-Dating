@@ -23,7 +23,7 @@ const ChatUserList: React.FC<ChatUserListProps> = ({
   // Only apply safe-area padding on iOS native, not on web
   const isIOS = typeof window !== 'undefined' && /iPhone|iPad|iPod/.test(navigator.userAgent);
   const isNative = typeof window !== 'undefined' && (window as any).Capacitor?.isNativePlatform();
-  const paddingTopValue = isIOS && isNative ? 'clamp(16px, calc(env(safe-area-inset-top, 0px) + 16px), 60px)' : '16px';
+  const paddingTopValue = isIOS && isNative ? 'clamp(32px, calc(env(safe-area-inset-top, 0px) + 32px), 80px)' : '16px';
 
   return (
     <div className="w-full h-full flex flex-col">
