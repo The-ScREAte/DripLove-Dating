@@ -994,9 +994,9 @@ const ChatPage = ({ currentUser, onUnreadChange, onDetailViewChange }: ChatPageP
           className="sticky top-0 z-30 bg-white text-gray-900 shadow-sm" 
           style={{ 
             paddingTop: Capacitor.getPlatform() === 'web' 
-              ? '0px' 
+              ? '60px' 
               : Capacitor.getPlatform() === 'ios' 
-                ? 'clamp(10px, calc(env(safe-area-inset-top, 10px) + 15px), 00px)' 
+                ? 'clamp(30px, calc(env(safe-area-inset-top, 30px) + 15px), 00px)' 
                 : '40px' 
           }}
         >
@@ -1011,6 +1011,13 @@ const ChatPage = ({ currentUser, onUnreadChange, onDetailViewChange }: ChatPageP
         {newMatchList.length > 0 && (
           <div 
             className="px-4 py-3 border-b bg-white"
+            style={{
+              marginTop: Capacitor.getPlatform() === 'web'
+                ? '10px'
+                : Capacitor.getPlatform() === 'ios'
+                  ? 'clamp(30px, calc(env(safe-area-inset-top, 30px) + 15px), 45px)'
+                  : '0px'
+            }}
           >
             <h3 className="text-sm font-semibold text-gray-900 mb-3">New Matches</h3>
             <div className="flex gap-4 overflow-x-auto pb-2 scrollbar-hide">
