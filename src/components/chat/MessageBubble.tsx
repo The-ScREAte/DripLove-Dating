@@ -46,12 +46,12 @@ const MessageBubble: React.FC<MessageBubbleProps> = ({
         <div
           className={`relative max-w-xs lg:max-w-md px-4 py-2 rounded-lg ${
             isOwnMessage
-              ? 'bg-blue-500 text-white'
+              ? 'bg-primary text-primary-foreground'
               : 'bg-gray-200 text-gray-900'
           } ${isConsecutive ? '' : 'shadow-sm'}`}
         >
           {/* Three-dot menu in top corner inside bubble */}
-          <div className={`absolute top-1 ${isOwnMessage ? 'right-1' : 'left-1'}`}>
+          <div className={`absolute top-0 ${isOwnMessage ? 'right-1' : 'left-1'}`}>
             <MessageOptionsMenu
               isOwnMessage={isOwnMessage}
               onDeleteForMe={handleDeleteForMe}
@@ -60,7 +60,7 @@ const MessageBubble: React.FC<MessageBubbleProps> = ({
           </div>
 
           <p className="text-sm break-words pr-6">{message.message}</p>
-          <div className={`flex items-center gap-1 text-xs mt-1 ${isOwnMessage ? 'text-blue-100' : 'text-gray-500'}`}>
+          <div className={`flex items-center gap-1 text-xs mt-1 ${isOwnMessage ? 'text-primary-foreground/70' : 'text-gray-500'}`}>
             <span>
               {new Date(message.sent_at || message.created_at || '').toLocaleTimeString([], {
                 hour: '2-digit',
@@ -68,7 +68,7 @@ const MessageBubble: React.FC<MessageBubbleProps> = ({
               })}
             </span>
             {isOwnMessage && (
-              <span className={`text-sm font-semibold ${message.is_read ? 'text-blue-200' : 'text-blue-300'}`}>
+              <span className={`text-sm font-semibold text-primary-foreground/90`}>
                 {message.is_read ? '✓✓' : '✓'}
               </span>
             )}
