@@ -1230,13 +1230,21 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, isPremium }: DiscoverPage
     setSwipeUI(prev => ({ ...prev, dragOffset: 0, swipeDistance: 0 }));
 
     if (Math.abs(deltaX) > minSwipeDistance && Math.abs(deltaX) > deltaY) {
+      // Trigger exit animation
+      setExitDirection(deltaX > 0 ? 'right' : 'left');
+      setExitingCard(true);
       setSwipeUI(prev => ({ ...prev, swipeDirection: null }));
-      // Immediate swipe action without delays
-      if (deltaX > 0) {
-        handleLike();
-      } else {
-        handlePass();
-      }
+      
+      // Wait for animation to complete before executing action
+      setTimeout(() => {
+        if (deltaX > 0) {
+          handleLike();
+        } else {
+          handlePass();
+        }
+        setExitingCard(false);
+        setExitDirection(null);
+      }, 400); // Animation duration
     } else {
       setSwipeUI(prev => ({ ...prev, swipeDirection: null }));
     }
@@ -1285,7 +1293,16 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, isPremium }: DiscoverPage
       if (rafScheduledRef.current) rafScheduledRef.current = false;
       setSwipeUI(prev => ({ ...prev, dragOffset: 0, swipeDistance: 0, swipeDirection: null }));
       if (Math.abs(deltaX) > minSwipeDistance && Math.abs(deltaX) > deltaY) {
-        if (deltaX > 0) handleLike(); else handlePass();
+        // Trigger exit animation
+        setExitDirection(deltaX > 0 ? 'right' : 'left');
+        setExitingCard(true);
+        
+        // Wait for animation to complete before executing action
+        setTimeout(() => {
+          if (deltaX > 0) handleLike(); else handlePass();
+          setExitingCard(false);
+          setExitDirection(null);
+        }, 400); // Animation duration
       }
       window.removeEventListener('mousemove', onWindowMouseMove);
       window.removeEventListener('mouseup', onWindowMouseUp);
@@ -1914,7 +1931,21 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, isPremium }: DiscoverPage
 
   // Handle ads separately
   if (currentMatch && isAd(currentMatch)) {
-    const adCardTransform = swipeUI.isDragging ? `translate3d(${swipeUI.dragOffset}px, 0, 0) rotate(${swipeUI.dragOffset * 0.08}deg)` : '';
+    const getAdCardTransform = () => {
+      if (exitingCard && exitDirection) {
+        const screenWidth = window.innerWidth;
+        const exitX = exitDirection === 'right' ? screenWidth * 1.5 : -screenWidth * 1.5;
+        const exitY = window.innerHeight * 0.3; // Fall down effect
+        const rotation = exitDirection === 'right' ? 30 : -30;
+        return `translate3d(${exitX}px, ${exitY}px, 0) rotate(${rotation}deg)`;
+      }
+      if (swipeUI.isDragging) {
+        return `translate3d(${swipeUI.dragOffset}px, 0, 0) rotate(${swipeUI.dragOffset * 0.08}deg)`;
+      }
+      return '';
+    };
+    
+    const adCardTransform = getAdCardTransform();
     
     return (
       <div className="h-full w-full fixed left-0 overflow-hidden"
@@ -1931,7 +1962,11 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, isPremium }: DiscoverPage
         <div className="h-full w-full relative z-10 flex flex-col"
              style={{
                transform: adCardTransform,
-               transition: swipeUI.isDragging ? 'none' : 'transform 0.2s ease-out',
+               transition: exitingCard 
+                 ? 'transform 0.4s cubic-bezier(0.34, 1.56, 0.64, 1)' // Smooth exit with slight bounce
+                 : swipeUI.isDragging 
+                   ? 'none' 
+                   : 'transform 0.2s ease-out',
                willChange: 'transform',
                boxShadow: swipeUI.isDragging ? '0 6px 18px rgba(0,0,0,0.18)' : '0 2px 8px rgba(0,0,0,0.08)'
              }}
@@ -2013,7 +2048,21 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, isPremium }: DiscoverPage
 
   // Simple card transform for smooth dragging only - use dragOffset (signed) to avoid stale state
   // Use translate3d to ensure GPU compositing and avoid expensive layout
-  const cardTransform = swipeUI.isDragging ? `translate3d(${swipeUI.dragOffset}px, 0, 0) rotate(${swipeUI.dragOffset * 0.08}deg)` : '';
+  const getCardTransform = () => {
+    if (exitingCard && exitDirection) {
+      const screenWidth = window.innerWidth;
+      const exitX = exitDirection === 'right' ? screenWidth * 1.5 : -screenWidth * 1.5;
+      const exitY = window.innerHeight * 0.3; // Fall down effect
+      const rotation = exitDirection === 'right' ? 30 : -30;
+      return `translate3d(${exitX}px, ${exitY}px, 0) rotate(${rotation}deg)`;
+    }
+    if (swipeUI.isDragging) {
+      return `translate3d(${swipeUI.dragOffset}px, 0, 0) rotate(${swipeUI.dragOffset * 0.08}deg)`;
+    }
+    return '';
+  };
+  
+  const cardTransform = getCardTransform();
 
 
 
@@ -2184,7 +2233,11 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, isPremium }: DiscoverPage
           className="h-full w-full relative z-10 flex flex-col"
           style={{
             transform: cardTransform,
-            transition: swipeUI.isDragging ? 'none' : 'transform 0.2s ease-out', // Faster snap-back
+            transition: exitingCard 
+              ? 'transform 0.4s cubic-bezier(0.34, 1.56, 0.64, 1)' // Smooth exit with slight bounce
+              : swipeUI.isDragging 
+                ? 'none' 
+                : 'transform 0.2s ease-out', // Faster snap-back
             willChange: 'transform',
             boxShadow: swipeUI.isDragging ? '0 6px 18px rgba(0,0,0,0.18)' : '0 2px 8px rgba(0,0,0,0.08)'
           }}
