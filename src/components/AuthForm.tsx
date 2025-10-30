@@ -384,37 +384,297 @@ const AuthForm = ({ isLogin, onToggle, onOAuthSuccess, onBack }: AuthFormProps) 
           return;
         }
         
-        // Standard OAuth flow for web and Android
-        console.log(`Using standard OAuth flow for ${provider} on web/Android`);
-        console.log(`[OAuth] Starting ${provider} OAuth with config:`, {
-          redirectTo,
-          currentOrigin: window.location.origin,
-          currentUrl: window.location.href
-        });
-        
-        const { data, error } = await supabase.auth.signInWithOAuth({
-          provider: provider,
-          options: {
-            redirectTo,
-            queryParams: {
-              prompt: 'select_account',
-              access_type: 'offline', // Request refresh token
-            }
-          }
-        });
+        // For Google OAuth on Android: use in-app WebView modal
+        if (provider === 'google' && isNative && (window as any).Capacitor?.getPlatform?.() === 'android') {
+          console.log('🤖 Using in-app WebView modal for Google OAuth (Android native)');
+          
+          try {
+            // Generate the OAuth URL
+            const { data: oauthData, error: oauthError } = await supabase.auth.signInWithOAuth({
+              provider: 'google',
+              options: {
+                redirectTo,
+                queryParams: {
+                  prompt: 'select_account',
+                  access_type: 'offline',
+                },
+                skipBrowserRedirect: true, // Get URL without auto-redirect
+              }
+            });
 
-        if (error) {
-          console.error(`${provider} OAuth error:`, error);
-          toast({
-            title: "Authentication Error",
-            description: error.message || `Failed to sign in with ${provider}. Please try again.`,
-            variant: "destructive",
-          });
-          setOauthLoading(null);
+            if (oauthError || !oauthData?.url) {
+              throw new Error(oauthError?.message || 'Failed to generate OAuth URL');
+            }
+
+            // Open OAuth URL in in-app browser (WebView)
+            const { Browser } = await import('@capacitor/browser');
+            await Browser.open({ 
+              url: oauthData.url,
+              presentationStyle: 'popover', // Show as modal overlay
+              toolbarColor: '#000000',
+            });
+
+            // Poll for session in the background while browser is open
+            let sessionCheckInterval: NodeJS.Timeout | null = null;
+            let hasProcessedSession = false;
+
+            const checkForSession = async () => {
+              if (hasProcessedSession) return;
+              
+              const { data: { session } } = await supabase.auth.getSession();
+              
+              if (session) {
+                hasProcessedSession = true;
+                console.log('✅ Google OAuth successful, session detected');
+                
+                // Clear the polling interval
+                if (sessionCheckInterval) {
+                  clearInterval(sessionCheckInterval);
+                  sessionCheckInterval = null;
+                }
+                
+                // Close the browser immediately
+                try {
+                  await Browser.close();
+                } catch (e) {
+                  console.log('Browser already closed');
+                }
+                
+                try {
+                  // Ensure profile exists
+                  await ensureProfileExists(session.user);
+                  await new Promise(resolve => setTimeout(resolve, 300));
+                  
+                  // Check if profile is complete
+                  const { data: profile, error: profileError } = await supabase
+                    .from('profiles')
+                    .select('first_name, last_name, bio, date_of_birth, city, country')
+                    .eq('id', session.user.id)
+                    .maybeSingle();
+                    
+                  let needsProfileCompletion = false;
+                  if (profileError) {
+                    console.error('Error fetching profile:', profileError);
+                    needsProfileCompletion = true;
+                  } else {
+                    needsProfileCompletion = !profile || 
+                      !profile.first_name || 
+                      profile.first_name === 'User' ||
+                      !profile.bio || 
+                      profile.date_of_birth === '1990-01-01' ||
+                      !profile.city || 
+                      profile.city === 'Unknown' ||
+                      !profile.country;
+                  }
+                  
+                  await new Promise(resolve => setTimeout(resolve, 500));
+                  setOauthLoading(null);
+                  Browser.removeAllListeners();
+                  
+                  // Navigate based on profile completion
+                  if (needsProfileCompletion) {
+                    navigate('/complete-profile');
+                  } else {
+                    navigate('/');
+                  }
+                } catch (error) {
+                  console.error('Error during post-login processing:', error);
+                  setOauthLoading(null);
+                  Browser.removeAllListeners();
+                  navigate('/complete-profile');
+                }
+              }
+            };
+
+            // Start polling for session every 500ms
+            sessionCheckInterval = setInterval(checkForSession, 500);
+
+            const handleBrowserFinish = async () => {
+              console.log('🤖 In-app browser closed');
+              
+              // Clear polling interval
+              if (sessionCheckInterval) {
+                clearInterval(sessionCheckInterval);
+                sessionCheckInterval = null;
+              }
+
+              // Do one final check for session
+              if (!hasProcessedSession) {
+                await checkForSession();
+              }
+              
+              // If still no session, show message
+              if (!hasProcessedSession) {
+                toast({
+                  title: 'Authentication Cancelled',
+                  description: 'Google sign-in was cancelled.',
+                  variant: 'default',
+                });
+              }
+              
+              setOauthLoading(null);
+              Browser.removeAllListeners();
+            };
+            
+            // Listen for browser close
+            Browser.addListener('browserFinished', handleBrowserFinish);
+
+            return;
+
+          } catch (err: any) {
+            console.error('❌ Android WebView error:', err);
+            toast({
+              title: 'Authentication Error',
+              description: err?.message || 'Failed to open Google Sign-In',
+              variant: 'destructive',
+            });
+            setOauthLoading(null);
+          }
           return;
         }
+        
+        // For Web: use popup-based OAuth (no redirect)
+        if (provider === 'google' && !isNative) {
+          console.log('🌐 Using popup-based OAuth for Google (Web)');
+          
+          try {
+            // Generate the OAuth URL
+            const { data: oauthData, error: oauthError } = await supabase.auth.signInWithOAuth({
+              provider: 'google',
+              options: {
+                redirectTo,
+                queryParams: {
+                  prompt: 'select_account',
+                  access_type: 'offline',
+                },
+                skipBrowserRedirect: true, // Get URL without auto-redirect
+              }
+            });
 
-        // For web and standard OAuth flows, the redirect will happen automatically
+            if (oauthError || !oauthData?.url) {
+              throw new Error(oauthError?.message || 'Failed to generate OAuth URL');
+            }
+
+            // Open OAuth URL in popup window
+            const width = 500;
+            const height = 600;
+            const left = window.screen.width / 2 - width / 2;
+            const top = window.screen.height / 2 - height / 2;
+            
+            const popup = window.open(
+              oauthData.url,
+              'Google Sign In',
+              `width=${width},height=${height},left=${left},top=${top},popup=yes,toolbar=no,location=no,status=no,menubar=no`
+            );
+
+            if (!popup) {
+              throw new Error('Failed to open popup. Please allow popups for this site.');
+            }
+
+            // Poll for session while popup is open
+            let sessionCheckInterval: NodeJS.Timeout | null = null;
+            let hasProcessedSession = false;
+
+            const checkForSession = async () => {
+              if (hasProcessedSession) return;
+              
+              // Check if popup is closed
+              if (popup.closed) {
+                if (sessionCheckInterval) {
+                  clearInterval(sessionCheckInterval);
+                  sessionCheckInterval = null;
+                }
+                
+                if (!hasProcessedSession) {
+                  toast({
+                    title: 'Authentication Cancelled',
+                    description: 'Google sign-in was cancelled.',
+                    variant: 'default',
+                  });
+                  setOauthLoading(null);
+                }
+                return;
+              }
+              
+              const { data: { session } } = await supabase.auth.getSession();
+              
+              if (session) {
+                hasProcessedSession = true;
+                console.log('✅ Google OAuth successful, session detected');
+                
+                // Clear the polling interval
+                if (sessionCheckInterval) {
+                  clearInterval(sessionCheckInterval);
+                  sessionCheckInterval = null;
+                }
+                
+                // Close the popup
+                try {
+                  popup.close();
+                } catch (e) {
+                  console.log('Popup already closed');
+                }
+                
+                try {
+                  // Ensure profile exists
+                  await ensureProfileExists(session.user);
+                  await new Promise(resolve => setTimeout(resolve, 300));
+                  
+                  // Check if profile is complete
+                  const { data: profile, error: profileError } = await supabase
+                    .from('profiles')
+                    .select('first_name, last_name, bio, date_of_birth, city, country')
+                    .eq('id', session.user.id)
+                    .maybeSingle();
+                    
+                  let needsProfileCompletion = false;
+                  if (profileError) {
+                    console.error('Error fetching profile:', profileError);
+                    needsProfileCompletion = true;
+                  } else {
+                    needsProfileCompletion = !profile || 
+                      !profile.first_name || 
+                      profile.first_name === 'User' ||
+                      !profile.bio || 
+                      profile.date_of_birth === '1990-01-01' ||
+                      !profile.city || 
+                      profile.city === 'Unknown' ||
+                      !profile.country;
+                  }
+                  
+                  await new Promise(resolve => setTimeout(resolve, 500));
+                  setOauthLoading(null);
+                  
+                  // Navigate based on profile completion
+                  if (needsProfileCompletion) {
+                    navigate('/complete-profile');
+                  } else {
+                    navigate('/');
+                  }
+                } catch (error) {
+                  console.error('Error during post-login processing:', error);
+                  setOauthLoading(null);
+                  navigate('/complete-profile');
+                }
+              }
+            };
+
+            // Start polling for session every 500ms
+            sessionCheckInterval = setInterval(checkForSession, 500);
+
+            return;
+
+          } catch (err: any) {
+            console.error('❌ Web popup OAuth error:', err);
+            toast({
+              title: 'Authentication Error',
+              description: err?.message || 'Failed to open Google Sign-In popup',
+              variant: 'destructive',
+            });
+            setOauthLoading(null);
+          }
+          return;
+        }
       }
 
     } catch (error: any) {
