@@ -37,7 +37,12 @@ const ChatHeader: React.FC<ChatHeaderProps> = ({
   const { toast } = useToast();
   // Only apply safe-area padding on iOS native, not on web
   const isIOS = typeof window !== 'undefined' && /iPhone|iPad|iPod/.test(navigator.userAgent);
-  const paddingTopValue = isIOS ? 'clamp(70px, calc(env(safe-area-inset-top, 10px) + 50px), 90px)' : '0px';
+  const isLargeScreen = typeof window !== 'undefined' && window.innerWidth >= 768;
+  const paddingTopValue = isIOS 
+    ? 'clamp(70px, calc(env(safe-area-inset-top, 10px) + 50px), 90px)' 
+    : isLargeScreen 
+      ? '40px' 
+      : '0px';
 
   return (
     <div
