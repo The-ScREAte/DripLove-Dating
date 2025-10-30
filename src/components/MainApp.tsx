@@ -1005,7 +1005,7 @@ const MainApp = ({ user, onLogout }: MainAppProps) => {
             className="fixed bottom-0 left-0 right-0 w-full bg-white z-[99999]"
             style={{ 
               paddingBottom: Capacitor.getPlatform() === 'android' 
-                ? '16px' 
+                ? '24px' 
                 : 'clamp(4px, env(safe-area-inset-bottom, 0px), 6px)' 
             }}
           >

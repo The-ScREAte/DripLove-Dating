@@ -7,6 +7,7 @@ import { createPortal } from 'react-dom';
 import ReportModal from '@/components/ReportModal';
 import { useState } from 'react';
 import { useToast } from '@/hooks/use-toast';
+import { Capacitor } from '@capacitor/core';
 
 interface ChatHeaderProps {
   selectedMatch: ChatMatch;
@@ -35,13 +36,12 @@ const ChatHeader: React.FC<ChatHeaderProps> = ({
   const [openReport, setOpenReport] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
   const { toast } = useToast();
-  // Only apply safe-area padding on iOS native, not on web
-  const isIOS = typeof window !== 'undefined' && /iPhone|iPad|iPod/.test(navigator.userAgent);
-  const isAndroid = typeof window !== 'undefined' && /Android/.test(navigator.userAgent);
-  const paddingTopValue = isIOS 
+  // Platform-specific safe area padding
+  const platform = Capacitor.getPlatform();
+  const paddingTopValue = platform === 'ios' 
     ? 'clamp(70px, calc(env(safe-area-inset-top, 10px) + 50px), 90px)' 
-    : isAndroid 
-    ? '32px' 
+    : platform === 'android' 
+    ? '56px' 
     : '0px';
 
   return (
