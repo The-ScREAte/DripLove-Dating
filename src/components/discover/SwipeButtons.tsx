@@ -28,8 +28,8 @@ const SwipeButtons: React.FC<SwipeButtonsProps> = ({
   const isIOS = platform === 'ios';
   
   // Adjust bottom position based on platform
-  const bottomClass = isIOS ? 'bottom-24 sm:bottom-24' : isWeb ? 'bottom-14 sm:bottom-14' : 'bottom-16 sm:bottom-16';
-  
+  const bottomClass = isIOS ? 'bottom-24 sm:bottom-24' : isWeb ? 'bottom-16 sm:bottom-16' : 'bottom-16 sm:bottom-16';
+
   return (
   <div className={`fixed right-6 z-30 sm:absolute sm:right-6 ${bottomClass}`}>
       <div className="relative">

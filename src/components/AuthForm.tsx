@@ -616,12 +616,24 @@ const AuthForm = ({ isLogin, onToggle, onOAuthSuccess, onBack }: AuthFormProps) 
         if (profileError || !profile) {
           // Sign out the user since they don't have a profile
           await supabase.auth.signOut();
+          
+          // Show error toast
           toast({
             title: "Account Not Found",
             description: "This account doesn't exist in our system. Please register first.",
             variant: "destructive",
           });
+          
           setLoading(false);
+          
+          // Redirect to welcome page after a short delay to show the toast
+          setTimeout(() => {
+            if (onBack) {
+              onBack(); // Go back to welcome screen
+            } else {
+              window.location.href = '/'; // Force reload to landing page
+            }
+          }, 2000);
           return;
         }
 
