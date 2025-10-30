@@ -5,6 +5,7 @@ import { Smile, Send } from 'lucide-react';
 import EmojiPicker from '../EmojiPicker';
 import { sanitizeMessage } from '@/utils/inputSanitization';
 import { containsBadWords } from '@/utils/textModeration';
+import { Capacitor } from '@capacitor/core';
 
 interface MessageInputProps {
   newMessage: string;
@@ -128,12 +129,17 @@ const MessageInput: React.FC<MessageInputProps> = ({
     }
   }, []);
 
+  const platform = Capacitor.getPlatform();
+  const paddingBottomValue = platform === 'android' 
+    ? '24px' 
+    : `calc(env(safe-area-inset-bottom, 0px) + 0px)`;
+
   return (
     <div 
       ref={containerRef}
       className="p-2 border-t bg-white relative z-30"
       style={{
-        paddingBottom: `calc(env(safe-area-inset-bottom, 0px) + 0px)`,
+        paddingBottom: paddingBottomValue,
         transform: keyboardOffset > 0 ? `translateY(-${keyboardOffset}px)` : 'translateY(0px)',
         transition: 'transform 0.3s ease-out'
       }}

@@ -41,8 +41,8 @@ const ChatHeader: React.FC<ChatHeaderProps> = ({
   const paddingTopValue = platform === 'ios' 
     ? 'clamp(70px, calc(env(safe-area-inset-top, 10px) + 50px), 90px)' 
     : platform === 'android' 
-    ? '56px' 
-    : '0px';
+    ? '72px' 
+    : '16px';
 
   return (
     <div
