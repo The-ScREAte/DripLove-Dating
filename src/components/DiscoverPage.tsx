@@ -1,5 +1,6 @@
 // Use shared IAP actions
 import { buyMonthly, restorePurchases } from '../iap';
+import { Capacitor } from '@capacitor/core';
 
 function DominantColorImageBg({ imageUrl, children }) {
   // Use lightweight static background color instead of expensive pixel scanning
@@ -2377,7 +2378,11 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, isPremium }: DiscoverPage
                 maxHeight: showMoreInfo ? 'min(45vh, 400px)' : '230px', // Fixed max height when collapsed
                 minHeight: showMoreInfo ? 'min(20vh, 200px)' : 'auto',
                 paddingBottom: showMoreInfo 
-                  ? `calc(${window.innerHeight < 700 ? '190px' : '180px'} + env(safe-area-inset-bottom, 0px))` 
+                  ? `calc(${
+                      Capacitor.getPlatform() === 'ios' 
+                        ? (window.innerHeight < 700 ? '220px' : '210px')
+                        : (window.innerHeight < 700 ? '190px' : '180px')
+                    } + env(safe-area-inset-bottom, 0px))` 
                   : '0px'
               }}
             >

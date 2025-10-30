@@ -24,7 +24,7 @@ const ChatUserList: React.FC<ChatUserListProps> = ({
   // Platform-specific safe area padding
   const platform = Capacitor.getPlatform();
   const paddingTopValue = platform === 'ios' 
-    ? 'clamp(32px, calc(env(safe-area-inset-top, 0px) + 32px), 80px)' 
+    ? 'clamp(50px, calc(env(safe-area-inset-top, 0px) + 50px), 100px)' 
     : platform === 'android' 
     ? '56px' 
     : '16px';
