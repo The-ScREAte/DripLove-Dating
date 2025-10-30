@@ -123,8 +123,6 @@ const AuthForm = ({ isLogin, onToggle, onOAuthSuccess, onBack }: AuthFormProps) 
 
         if (insertError) {
           console.error('[OAuth] Profile creation error:', insertError);
-        } else {
-          console.log('[OAuth] Created profile for user:', user.id);
         }
       }
     } catch (err) {
@@ -142,24 +140,10 @@ const AuthForm = ({ isLogin, onToggle, onOAuthSuccess, onBack }: AuthFormProps) 
       // Get platform-specific redirect URI for the provider
       const redirectTo = getRedirectUri(provider);
       
-      console.log(`Starting ${provider} OAuth with redirectTo: ${redirectTo}`);
-      console.log('Current location:', {
-        origin: window.location.origin,
-        href: window.location.href,
-        port: window.location.port
-      });
-      console.log('Current platform detection:', {
-        isNative: (window as any).Capacitor?.isNativePlatform?.(),
-        platform: (window as any).Capacitor?.getPlatform?.(),
-        userAgent: navigator.userAgent,
-        appleSignInAvailable: isAppleSignInAvailable()
-      });
-      
       // For Apple provider, use native modal on iOS and fallback to web OAuth on other platforms
       if (provider === 'apple') {
         // Check if native Apple Sign-In is available (iOS native only)
         if (isAppleSignInAvailable()) {
-          console.log('🍎 Using NATIVE Apple Sign-In Modal (iOS)');
           try {
             const data = await signInWithAppleNativeModal();
 
@@ -197,20 +181,17 @@ const AuthForm = ({ isLogin, onToggle, onOAuthSuccess, onBack }: AuthFormProps) 
           return;
         } else {
           // Use web OAuth fallback for non-iOS platforms (browser, Android)
-          console.log('🍎 Using WEB Apple OAuth fallback (Browser/Android)');
           try {
             // This function redirects and never returns
             // The callback will be handled by AppleOAuthCallback component
             await signInWithAppleFallback();
             
             // This code never executes since signInWithAppleFallback redirects
-            console.log('🍎 Apple OAuth redirect initiated');
           } catch (err: any) {
             console.error('[Apple Web OAuth Error]:', err);
             
             // Check if this is a redirect (not really an error)
             if (err.message?.includes('Redirect should have happened')) {
-              console.log('🍎 Apple OAuth redirect initiated - waiting for callback');
               // Don't show error, user will be redirected back
               return;
             }
@@ -234,10 +215,12 @@ const AuthForm = ({ isLogin, onToggle, onOAuthSuccess, onBack }: AuthFormProps) 
           return;
         }
       } else {
+        // Get current platform for Google OAuth
+        const platform = Capacitor.getPlatform();
+        
         // For Google OAuth on iOS native: use Safari View Controller (in-app browser)
         // This keeps the user in-app and satisfies Apple's review guidelines
-        if (provider === 'google' && isNative && (window as any).Capacitor?.getPlatform?.() === 'ios') {
-          console.log('🔐 Using Safari View Controller for Google OAuth (iOS native)');
+        if (provider === 'google' && isNative && platform === 'ios') {
           
           try {
             // Generate the OAuth URL
@@ -276,7 +259,6 @@ const AuthForm = ({ isLogin, onToggle, onOAuthSuccess, onBack }: AuthFormProps) 
               
               if (session) {
                 hasProcessedSession = true;
-                console.log('✅ Google OAuth successful, session detected');
                 
                 // Clear the polling interval
                 if (sessionCheckInterval) {
@@ -288,7 +270,7 @@ const AuthForm = ({ isLogin, onToggle, onOAuthSuccess, onBack }: AuthFormProps) 
                 try {
                   await Browser.close();
                 } catch (e) {
-                  console.log('Browser already closed');
+                  // Browser already closed
                 }
                 
                 try {
@@ -340,8 +322,6 @@ const AuthForm = ({ isLogin, onToggle, onOAuthSuccess, onBack }: AuthFormProps) 
             sessionCheckInterval = setInterval(checkForSession, 500);
 
             const handleBrowserFinish = async () => {
-              console.log('🔐 Safari View Controller closed');
-              
               // Clear polling interval
               if (sessionCheckInterval) {
                 clearInterval(sessionCheckInterval);
@@ -384,9 +364,8 @@ const AuthForm = ({ isLogin, onToggle, onOAuthSuccess, onBack }: AuthFormProps) 
           return;
         }
         
-        // For Google OAuth on Android: use in-app WebView modal
-        if (provider === 'google' && isNative && (window as any).Capacitor?.getPlatform?.() === 'android') {
-          console.log('🤖 Using in-app WebView modal for Google OAuth (Android native)');
+        // For Google OAuth on Android: use in-app WebView modal (fullscreen with close button)
+        if (provider === 'google' && isNative && platform === 'android') {
           
           try {
             // Generate the OAuth URL
@@ -406,12 +385,13 @@ const AuthForm = ({ isLogin, onToggle, onOAuthSuccess, onBack }: AuthFormProps) 
               throw new Error(oauthError?.message || 'Failed to generate OAuth URL');
             }
 
-            // Open OAuth URL in in-app browser (WebView)
+            // Open OAuth URL in in-app browser (WebView) - fullscreen modal style
             const { Browser } = await import('@capacitor/browser');
             await Browser.open({ 
               url: oauthData.url,
-              presentationStyle: 'popover', // Show as modal overlay
+              presentationStyle: 'fullscreen', // Fullscreen modal for better UX on Android
               toolbarColor: '#000000',
+              windowName: '_blank'
             });
 
             // Poll for session in the background while browser is open
@@ -425,7 +405,6 @@ const AuthForm = ({ isLogin, onToggle, onOAuthSuccess, onBack }: AuthFormProps) 
               
               if (session) {
                 hasProcessedSession = true;
-                console.log('✅ Google OAuth successful, session detected');
                 
                 // Clear the polling interval
                 if (sessionCheckInterval) {
@@ -437,7 +416,7 @@ const AuthForm = ({ isLogin, onToggle, onOAuthSuccess, onBack }: AuthFormProps) 
                 try {
                   await Browser.close();
                 } catch (e) {
-                  console.log('Browser already closed');
+                  // Browser already closed
                 }
                 
                 try {
@@ -490,8 +469,6 @@ const AuthForm = ({ isLogin, onToggle, onOAuthSuccess, onBack }: AuthFormProps) 
             sessionCheckInterval = setInterval(checkForSession, 500);
 
             const handleBrowserFinish = async () => {
-              console.log('🤖 In-app browser closed');
-              
               // Clear polling interval
               if (sessionCheckInterval) {
                 clearInterval(sessionCheckInterval);
@@ -533,29 +510,115 @@ const AuthForm = ({ isLogin, onToggle, onOAuthSuccess, onBack }: AuthFormProps) 
           return;
         }
         
-        // For Web: use popup-based OAuth (no redirect)
+        // For Web: use small modal-style popup window (feels like in-page modal)
         if (provider === 'google' && !isNative) {
-          console.log('🌐 Using popup-based OAuth for Google (Web)');
           
           try {
-            // Open popup FIRST (immediately on user click to avoid popup blocker)
-            const width = 500;
-            const height = 600;
+            // Smaller, more modal-like dimensions
+            const width = 450;
+            const height = 550;
             const left = window.screen.width / 2 - width / 2;
             const top = window.screen.height / 2 - height / 2;
             
+            // Open minimal popup (no browser chrome, looks like modal)
             const popup = window.open(
               'about:blank',
-              'Google Sign In',
-              `width=${width},height=${height},left=${left},top=${top},popup=yes,toolbar=no,location=no,status=no,menubar=no`
+              'googleauth',
+              `width=${width},height=${height},left=${left},top=${top},popup=1,toolbar=0,location=0,status=0,menubar=0,scrollbars=1,resizable=0`
             );
 
             if (!popup) {
-              throw new Error('Failed to open popup. Please allow popups for this site.');
+              throw new Error('Popup blocked. Please allow popups for this site and try again.');
             }
 
-            // Show loading in popup
-            popup.document.write('<html><body style="display:flex;align-items:center;justify-content:center;height:100vh;font-family:sans-serif;background:#000;color:#fff;"><div>Loading Google Sign In...</div></body></html>');
+            // Create overlay on main page to make it feel like a modal
+            const overlay = document.createElement('div');
+            overlay.id = 'oauth-overlay';
+            overlay.style.cssText = `
+              position: fixed;
+              top: 0;
+              left: 0;
+              width: 100%;
+              height: 100%;
+              background: rgba(0, 0, 0, 0.75);
+              z-index: 999998;
+              display: flex;
+              align-items: center;
+              justify-content: center;
+              backdrop-filter: blur(4px);
+            `;
+            
+            const overlayMessage = document.createElement('div');
+            overlayMessage.style.cssText = `
+              background: white;
+              padding: 32px;
+              border-radius: 16px;
+              box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+              text-align: center;
+              max-width: 350px;
+            `;
+            overlayMessage.innerHTML = `
+              <div style="font-size: 48px; margin-bottom: 16px;">🔐</div>
+              <div style="font-size: 18px; font-weight: 600; color: #1f2937; margin-bottom: 8px;">
+                Sign in with Google
+              </div>
+              <div style="font-size: 14px; color: #6b7280;">
+                Complete sign-in in the popup window
+              </div>
+            `;
+            
+            overlay.appendChild(overlayMessage);
+            document.body.appendChild(overlay);
+            document.body.style.overflow = 'hidden';
+
+            const removeOverlay = () => {
+              if (overlay && overlay.parentNode) {
+                overlay.parentNode.removeChild(overlay);
+              }
+              document.body.style.overflow = '';
+            };
+
+            // Show loading message in popup
+            popup.document.write(`
+              <html>
+                <head>
+                  <style>
+                    body {
+                      display: flex;
+                      align-items: center;
+                      justify-content: center;
+                      height: 100vh;
+                      margin: 0;
+                      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+                      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+                      color: white;
+                    }
+                    .loader {
+                      text-align: center;
+                    }
+                    .spinner {
+                      border: 4px solid rgba(255, 255, 255, 0.3);
+                      border-top: 4px solid white;
+                      border-radius: 50%;
+                      width: 40px;
+                      height: 40px;
+                      animation: spin 1s linear infinite;
+                      margin: 0 auto 20px;
+                    }
+                    @keyframes spin {
+                      0% { transform: rotate(0deg); }
+                      100% { transform: rotate(360deg); }
+                    }
+                  </style>
+                </head>
+                <body>
+                  <div class="loader">
+                    <div class="spinner"></div>
+                    <div>Opening Google Sign In...</div>
+                  </div>
+                </body>
+              </html>
+            `);
 
             // Generate the OAuth URL
             const { data: oauthData, error: oauthError } = await supabase.auth.signInWithOAuth({
@@ -566,7 +629,7 @@ const AuthForm = ({ isLogin, onToggle, onOAuthSuccess, onBack }: AuthFormProps) 
                   prompt: 'select_account',
                   access_type: 'offline',
                 },
-                skipBrowserRedirect: true, // Get URL without auto-redirect
+                skipBrowserRedirect: true,
               }
             });
 
@@ -585,12 +648,14 @@ const AuthForm = ({ isLogin, onToggle, onOAuthSuccess, onBack }: AuthFormProps) 
             const checkForSession = async () => {
               if (hasProcessedSession) return;
               
-              // Check if popup is closed
+              // Check if popup was closed
               if (popup.closed) {
                 if (sessionCheckInterval) {
                   clearInterval(sessionCheckInterval);
                   sessionCheckInterval = null;
                 }
+                
+                removeOverlay();
                 
                 if (!hasProcessedSession) {
                   toast({
@@ -607,19 +672,21 @@ const AuthForm = ({ isLogin, onToggle, onOAuthSuccess, onBack }: AuthFormProps) 
               
               if (session) {
                 hasProcessedSession = true;
-                console.log('✅ Google OAuth successful, session detected');
                 
-                // Clear the polling interval
+                // Clear interval
                 if (sessionCheckInterval) {
                   clearInterval(sessionCheckInterval);
                   sessionCheckInterval = null;
                 }
                 
-                // Close the popup
+                // Remove overlay and close popup
+                removeOverlay();
+                
+                // Close popup
                 try {
                   popup.close();
                 } catch (e) {
-                  console.log('Popup already closed');
+                  // Popup already closed
                 }
                 
                 try {
@@ -652,7 +719,7 @@ const AuthForm = ({ isLogin, onToggle, onOAuthSuccess, onBack }: AuthFormProps) 
                   await new Promise(resolve => setTimeout(resolve, 500));
                   setOauthLoading(null);
                   
-                  // Navigate based on profile completion
+                  // Navigate - main page stays, no redirect
                   if (needsProfileCompletion) {
                     navigate('/complete-profile');
                   } else {
@@ -666,7 +733,7 @@ const AuthForm = ({ isLogin, onToggle, onOAuthSuccess, onBack }: AuthFormProps) 
               }
             };
 
-            // Start polling for session every 500ms
+            // Start polling every 500ms
             sessionCheckInterval = setInterval(checkForSession, 500);
 
             return;

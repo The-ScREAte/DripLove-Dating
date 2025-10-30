@@ -153,31 +153,30 @@ const Index = () => {
         return;
       }
 
-      // Check if user has accepted terms
-      if (!profile.terms_accepted) {
-        setCurrentView('terms-acceptance');
-        setLoading(false);
-        return;
-      }
-
       // Check if profile is incomplete (missing required fields)
       // Only redirect to profile completion for OAuth users (Google)
       // Manual registration users get basic profiles and can update later
       const requiredFields = ['first_name', 'last_name', 'date_of_birth', 'country', 'city', 'gender', 'preference', 'relationship_intent', 'occupation', 'industry', 'education_level'];
       const isIncomplete = requiredFields.some(field => !profile[field]);
 
-      if (isIncomplete) {
-        // Check if this is an OAuth user by looking at the auth provider
-  const { data: { user } } = await supabase.auth.getUser();
-  const provider = user?.app_metadata?.provider;
-  const isOAuthUser = provider === 'google' || provider === 'apple';
-        
-        if (isOAuthUser) {
-          setCurrentView('profile-completion');
-          setLoading(false);
-          return;
-        }
-        // Manual registration users skip profile completion and go directly to app
+      // Check if this is an OAuth user by looking at the auth provider
+      const { data: { user } } = await supabase.auth.getUser();
+      const provider = user?.app_metadata?.provider;
+      const isOAuthUser = provider === 'google' || provider === 'apple';
+
+      // For OAuth users with incomplete profiles, redirect to profile completion
+      // ProfileCompletionPage will handle showing terms acceptance after completion
+      if (isIncomplete && isOAuthUser) {
+        setCurrentView('profile-completion');
+        setLoading(false);
+        return;
+      }
+
+      // For complete profiles, check if user has accepted terms
+      if (!profile.terms_accepted) {
+        setCurrentView('terms-acceptance');
+        setLoading(false);
+        return;
       }
 
       // Redirect based on user type

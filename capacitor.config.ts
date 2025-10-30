@@ -43,7 +43,11 @@ const config: CapacitorConfig = {
       // This satisfies Apple's Guideline 4.0 by keeping users in-app during authentication
       toolbarColor: '#000000',
       // Enable Safari View Controller on iOS (in-app browser)
-      presentationStyle: 'popover'
+      presentationStyle: 'popover',
+      // Android in-app WebView configuration
+      // androidToolbarColor: '#000000',
+      // Keep users in-app on Android with fullscreen modal
+      windowName: '_blank'
     },
     // Performance monitoring
     CapacitorHttp: {
