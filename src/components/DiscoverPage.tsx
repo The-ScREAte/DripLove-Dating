@@ -2380,7 +2380,7 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, isPremium }: DiscoverPage
                 paddingBottom: showMoreInfo 
                   ? `calc(${
                       Capacitor.getPlatform() === 'ios' 
-                        ? (window.innerHeight < 700 ? '220px' : '210px')
+                        ? (window.innerHeight < 700 ? '190px' : '180px')
                         : (window.innerHeight < 700 ? '190px' : '180px')
                     } + env(safe-area-inset-bottom, 0px))` 
                   : '0px'

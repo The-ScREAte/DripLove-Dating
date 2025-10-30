@@ -1181,7 +1181,7 @@ const ChatPage = ({ currentUser, onUnreadChange, onDetailViewChange }: ChatPageP
         style={{ 
           WebkitOverflowScrolling: 'touch', 
           paddingTop: Capacitor.getPlatform() === 'ios' 
-            ? 'clamp(130px, calc(env(safe-area-inset-top, 10px) + 100px), 140px)'
+            ? 'clamp(140px, calc(env(safe-area-inset-top, 10px) + 120px), 140px)'
             : Capacitor.getPlatform() === 'web'
               ? '120px'
               : '120px'

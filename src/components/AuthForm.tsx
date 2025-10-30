@@ -26,8 +26,10 @@ const AuthForm = ({ isLogin, onToggle, onOAuthSuccess, onBack }: AuthFormProps) 
   const navigate = useNavigate();
   const { toast } = useToast();
   
-  // Check if running on native platform
+  // Check if running on native platform and get platform
   const isNative = Capacitor.isNativePlatform();
+  const platform = Capacitor.getPlatform();
+  const isIOS = platform === 'ios';
 
   const [formData, setFormData] = useState({
     email: '',
@@ -355,13 +357,13 @@ const AuthForm = ({ isLogin, onToggle, onOAuthSuccess, onBack }: AuthFormProps) 
               throw new Error(oauthError?.message || 'Failed to generate OAuth URL');
             }
 
-            // Open OAuth URL in in-app browser (WebView) - fullscreen modal style
+            // Open OAuth URL in Chrome Custom Tabs (Android's in-app browser)
+            // This keeps users in-app, similar to iOS Safari View Controller
             const { Browser } = await import('@capacitor/browser');
             await Browser.open({ 
               url: oauthData.url,
-              presentationStyle: 'fullscreen', // Fullscreen modal for better UX on Android
-              toolbarColor: '#000000',
-              windowName: '_blank'
+              presentationStyle: 'fullscreen',
+              toolbarColor: '#000000'
             });
 
             // Poll for session in the background while browser is open
@@ -1121,8 +1123,8 @@ const AuthForm = ({ isLogin, onToggle, onOAuthSuccess, onBack }: AuthFormProps) 
           <>
             {/* OAuth Buttons - Cute and Simple */}
             <div className="space-y-3 mb-6 flex flex-col items-center">
-              {/* Apple Sign-In - Only show on native platforms (iOS/Android) */}
-              {isNative && (
+              {/* Apple Sign-In - Only show on iOS native platform */}
+              {isIOS && (
                 <Button
                   type="button"
                   variant="outline"
