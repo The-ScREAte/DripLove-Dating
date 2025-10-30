@@ -36,6 +36,7 @@ const ChatHeader: React.FC<ChatHeaderProps> = ({
   const [openReport, setOpenReport] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
   const { toast } = useToast();
+  const menuRef = React.useRef<HTMLDivElement>(null);
   // Platform-specific safe area padding
   const platform = Capacitor.getPlatform();
   const paddingTopValue = platform === 'ios' 
@@ -43,6 +44,25 @@ const ChatHeader: React.FC<ChatHeaderProps> = ({
     : platform === 'android' 
     ? '72px' 
     : '16px';
+
+  // Click outside to close menu
+  React.useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (menuRef.current && !menuRef.current.contains(event.target as Node)) {
+        setMenuOpen(false);
+      }
+    };
+
+    if (menuOpen) {
+      document.addEventListener('mousedown', handleClickOutside);
+      document.addEventListener('touchstart', handleClickOutside as any);
+    }
+
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+      document.removeEventListener('touchstart', handleClickOutside as any);
+    };
+  }, [menuOpen]);
 
   return (
     <div
@@ -76,7 +96,7 @@ const ChatHeader: React.FC<ChatHeaderProps> = ({
         </div>
   </div>
       
-      <div>
+      <div ref={menuRef}>
         <Button
           variant="ghost"
           size="sm"
@@ -91,9 +111,8 @@ const ChatHeader: React.FC<ChatHeaderProps> = ({
           </svg>
         </Button>
 
-        {menuOpen &&
-          createPortal(
-            <div className="fixed top-20 right-4 z-[999999]">
+        {menuOpen && (
+            <div className="absolute top-16 right-4 z-[999999]">
               <div className="min-w-[160px] overflow-hidden rounded-md border bg-white p-4 shadow-lg space-y-1">
                 <button
                   className="w-full text-left px-4 py-3 text-sm"
@@ -112,8 +131,7 @@ const ChatHeader: React.FC<ChatHeaderProps> = ({
                   Block User
                 </button>
               </div>
-            </div>,
-            document.body
+            </div>
           )}
 
         <ReportModal

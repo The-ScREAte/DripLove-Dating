@@ -13,7 +13,9 @@ const MessageOptionsMenu: React.FC<MessageOptionsMenuProps> = ({
   onDeleteForEveryone,
 }) => {
   const [isOpen, setIsOpen] = useState(false);
+  const [showBelow, setShowBelow] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
+  const buttonRef = useRef<HTMLButtonElement>(null);
 
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
@@ -23,6 +25,16 @@ const MessageOptionsMenu: React.FC<MessageOptionsMenuProps> = ({
     };
 
     if (isOpen) {
+      // Check position when menu opens
+      if (buttonRef.current) {
+        const rect = buttonRef.current.getBoundingClientRect();
+        const spaceAbove = rect.top;
+        const spaceBelow = window.innerHeight - rect.bottom;
+        
+        // If less than 150px space above, show below
+        setShowBelow(spaceAbove < 150);
+      }
+      
       document.addEventListener('mousedown', handleClickOutside);
       document.addEventListener('touchstart', handleClickOutside as any);
     }
@@ -46,6 +58,7 @@ const MessageOptionsMenu: React.FC<MessageOptionsMenuProps> = ({
   return (
     <div className="relative inline-block" ref={menuRef}>
       <button
+        ref={buttonRef}
         onClick={() => setIsOpen(!isOpen)}
         className="p-0 focus:outline-none text-current opacity-50 hover:opacity-100 transition-opacity"
         aria-label="Message options"
@@ -55,7 +68,7 @@ const MessageOptionsMenu: React.FC<MessageOptionsMenuProps> = ({
 
       {isOpen && (
         <div
-          className={`absolute bottom-full mb-1 ${
+          className={`absolute ${showBelow ? 'top-full mt-1' : 'bottom-full mb-1'} ${
             isOwnMessage ? 'right-0' : 'left-0'
           } bg-white rounded-lg shadow-lg border border-gray-200 py-0.5 z-50 w-32 text-sm`}
         >
