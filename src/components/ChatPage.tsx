@@ -1158,7 +1158,16 @@ const ChatPage = ({ currentUser, onUnreadChange, onDetailViewChange }: ChatPageP
   return (
   <div className="fixed inset-0 flex flex-col bg-gray-50">
       {/* Chat Header (below global header) */}
-  <div className="shrink-0 bg-white border-b border-gray-200 shadow-sm z-20 m-0 p-0">
+  <div 
+    className="shrink-0 bg-white border-b border-gray-200 shadow-sm z-20 m-0 p-0"
+    style={{
+      paddingTop: Capacitor.getPlatform() === 'web' 
+        ? '50px'  // Add padding for web to push header below global nav
+        : Capacitor.getPlatform() === 'ios'
+          ? 'env(safe-area-inset-top, 0px)'
+          : '0px'
+    }}
+  >
         <ChatHeader
           selectedMatch={selectedMatch}
           onBack={() => setSelectedMatch(null)}

@@ -2377,7 +2377,7 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, isPremium }: DiscoverPage
                 maxHeight: showMoreInfo ? 'min(45vh, 400px)' : '230px', // Fixed max height when collapsed
                 minHeight: showMoreInfo ? 'min(20vh, 200px)' : 'auto',
                 paddingBottom: showMoreInfo 
-                  ? `calc(${window.innerHeight < 700 ? '180px' : '180px'} + env(safe-area-inset-bottom, 0px))` 
+                  ? `calc(${window.innerHeight < 700 ? '190px' : '180px'} + env(safe-area-inset-bottom, 0px))` 
                   : '0px'
               }}
             >
