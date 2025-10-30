@@ -2,6 +2,7 @@ import React from 'react';
 import { ChatMatch } from '@/types';
 import ChatUserAvatar from '../ChatUserAvatar';
 import NewMatches from './NewMatches';
+import { Capacitor } from '@capacitor/core';
 
 interface ChatUserListProps {
   matches: ChatMatch[];
@@ -20,10 +21,13 @@ const ChatUserList: React.FC<ChatUserListProps> = ({
   onUserProfileOpen,
   currentUserId
 }) => {
-  // Only apply safe-area padding on iOS native, not on web
-  const isIOS = typeof window !== 'undefined' && /iPhone|iPad|iPod/.test(navigator.userAgent);
-  const isNative = typeof window !== 'undefined' && (window as any).Capacitor?.isNativePlatform();
-  const paddingTopValue = isIOS && isNative ? 'clamp(32px, calc(env(safe-area-inset-top, 0px) + 32px), 80px)' : '16px';
+  // Platform-specific safe area padding
+  const platform = Capacitor.getPlatform();
+  const paddingTopValue = platform === 'ios' 
+    ? 'clamp(32px, calc(env(safe-area-inset-top, 0px) + 32px), 80px)' 
+    : platform === 'android' 
+    ? '56px' 
+    : '16px';
 
   return (
     <div className="w-full h-full flex flex-col">
