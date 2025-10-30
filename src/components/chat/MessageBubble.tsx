@@ -51,7 +51,7 @@ const MessageBubble: React.FC<MessageBubbleProps> = ({
           } ${isConsecutive ? '' : 'shadow-sm'}`}
         >
           {/* Three-dot menu in top corner inside bubble */}
-          <div className={`absolute top-0 ${isOwnMessage ? 'right-1' : 'left-1'}`}>
+          <div className={`absolute -top-1 ${isOwnMessage ? 'right-1' : 'left-1'}`}>
             <MessageOptionsMenu
               isOwnMessage={isOwnMessage}
               onDeleteForMe={handleDeleteForMe}
