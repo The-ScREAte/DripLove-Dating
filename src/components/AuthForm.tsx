@@ -80,53 +80,27 @@ const AuthForm = ({ isLogin, onToggle, onOAuthSuccess, onBack }: AuthFormProps) 
     return Object.keys(newErrors).length === 0;
   };
 
-  // Ensure the user has a profiles row in the database. Used after setting the
-  // session for mobile Safari VC OAuth flows where Supabase doesn't auto-create
-  // a profile row.
-  const ensureProfileExists = async (user: any) => {
-    if (!user || !user.id) return;
+  // Check if user has a profile in the database
+  // DO NOT create profile automatically - profiles are only created when:
+  // 1. User completes registration form (email/password)
+  // 2. User completes profile completion page (after OAuth)
+  const checkProfileExists = async (userId: string) => {
     try {
-      const { data: existingProfile, error: profileError } = await supabase
+      const { data: profile, error } = await supabase
         .from('profiles')
-        .select('id')
-        .eq('id', user.id)
+        .select('id, first_name, last_name, bio, date_of_birth, city, country')
+        .eq('id', userId)
         .maybeSingle();
 
-      if (profileError) {
-        console.error('[OAuth] Error checking profile existence:', profileError);
-        return;
+      if (error) {
+        console.error('[OAuth] Error checking profile:', error);
+        return null;
       }
 
-      if (!existingProfile) {
-        const firstName = user.user_metadata?.full_name?.split(' ')[0] || user.user_metadata?.full_name || 'User';
-        const lastName = user.user_metadata?.full_name?.split(' ').slice(1).join(' ') || '';
-
-        const { error: insertError } = await supabase
-          .from('profiles')
-          .insert({
-            id: user.id,
-            email: user.email,
-            first_name: firstName,
-            last_name: lastName,
-            date_of_birth: '1990-01-01',
-            country: 'US',
-            city: 'Unknown',
-            gender: 'prefer-not-to-say',
-            preference: 'both',
-            relationship_intent: 'not-sure',
-            occupation: 'Not specified',
-            industry: 'Not specified',
-            education_level: 'not-specified',
-            account_status: 'active',
-            is_admin: false
-          });
-
-        if (insertError) {
-          console.error('[OAuth] Profile creation error:', insertError);
-        }
-      }
+      return profile;
     } catch (err) {
-      console.error('[OAuth] ensureProfileExists exception:', err);
+      console.error('[OAuth] checkProfileExists exception:', err);
+      return null;
     }
   };
 
@@ -274,22 +248,18 @@ const AuthForm = ({ isLogin, onToggle, onOAuthSuccess, onBack }: AuthFormProps) 
                 }
                 
                 try {
-                  // Ensure profile exists - CRITICAL for new users
-                  await ensureProfileExists(session.user);
+                  // Check if profile exists (don't create it)
+                  const profile = await checkProfileExists(session.user.id);
                   await new Promise(resolve => setTimeout(resolve, 300));
-                  // Check if profile is complete
-                  const { data: profile, error: profileError } = await supabase
-                    .from('profiles')
-                    .select('first_name, last_name, bio, date_of_birth, city, country')
-                    .eq('id', session.user.id)
-                    .maybeSingle();
+                  
+                  // Determine if profile needs completion
                   let needsProfileCompletion = false;
-                  if (profileError) {
-                    console.error('Error fetching profile:', profileError);
+                  if (!profile) {
+                    // No profile exists - user needs to complete profile
                     needsProfileCompletion = true;
                   } else {
-                    needsProfileCompletion = !profile || 
-                      !profile.first_name || 
+                    // Profile exists - check if it's complete
+                    needsProfileCompletion = !profile.first_name || 
                       profile.first_name === 'User' ||
                       !profile.bio || 
                       profile.date_of_birth === '1990-01-01' ||
@@ -420,24 +390,18 @@ const AuthForm = ({ isLogin, onToggle, onOAuthSuccess, onBack }: AuthFormProps) 
                 }
                 
                 try {
-                  // Ensure profile exists
-                  await ensureProfileExists(session.user);
+                  // Check if profile exists (don't create it)
+                  const profile = await checkProfileExists(session.user.id);
                   await new Promise(resolve => setTimeout(resolve, 300));
                   
-                  // Check if profile is complete
-                  const { data: profile, error: profileError } = await supabase
-                    .from('profiles')
-                    .select('first_name, last_name, bio, date_of_birth, city, country')
-                    .eq('id', session.user.id)
-                    .maybeSingle();
-                    
+                  // Determine if profile needs completion
                   let needsProfileCompletion = false;
-                  if (profileError) {
-                    console.error('Error fetching profile:', profileError);
+                  if (!profile) {
+                    // No profile exists - user needs to complete profile
                     needsProfileCompletion = true;
                   } else {
-                    needsProfileCompletion = !profile || 
-                      !profile.first_name || 
+                    // Profile exists - check if it's complete
+                    needsProfileCompletion = !profile.first_name || 
                       profile.first_name === 'User' ||
                       !profile.bio || 
                       profile.date_of_birth === '1990-01-01' ||
@@ -690,24 +654,18 @@ const AuthForm = ({ isLogin, onToggle, onOAuthSuccess, onBack }: AuthFormProps) 
                 }
                 
                 try {
-                  // Ensure profile exists
-                  await ensureProfileExists(session.user);
+                  // Check if profile exists (don't create it)
+                  const profile = await checkProfileExists(session.user.id);
                   await new Promise(resolve => setTimeout(resolve, 300));
                   
-                  // Check if profile is complete
-                  const { data: profile, error: profileError } = await supabase
-                    .from('profiles')
-                    .select('first_name, last_name, bio, date_of_birth, city, country')
-                    .eq('id', session.user.id)
-                    .maybeSingle();
-                    
+                  // Determine if profile needs completion
                   let needsProfileCompletion = false;
-                  if (profileError) {
-                    console.error('Error fetching profile:', profileError);
+                  if (!profile) {
+                    // No profile exists - user needs to complete profile
                     needsProfileCompletion = true;
                   } else {
-                    needsProfileCompletion = !profile || 
-                      !profile.first_name || 
+                    // Profile exists - check if it's complete
+                    needsProfileCompletion = !profile.first_name || 
                       profile.first_name === 'User' ||
                       !profile.bio || 
                       profile.date_of_birth === '1990-01-01' ||
