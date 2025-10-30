@@ -43,7 +43,7 @@ const ChatHeader: React.FC<ChatHeaderProps> = ({
     ? 'clamp(70px, calc(env(safe-area-inset-top, 10px) + 50px), 90px)' 
     : platform === 'android' 
     ? '72px' 
-    : '36px';
+    : '56px';
 
   // Click outside to close menu
   React.useEffect(() => {
