@@ -538,6 +538,25 @@ const AuthForm = ({ isLogin, onToggle, onOAuthSuccess, onBack }: AuthFormProps) 
           console.log('🌐 Using popup-based OAuth for Google (Web)');
           
           try {
+            // Open popup FIRST (immediately on user click to avoid popup blocker)
+            const width = 500;
+            const height = 600;
+            const left = window.screen.width / 2 - width / 2;
+            const top = window.screen.height / 2 - height / 2;
+            
+            const popup = window.open(
+              'about:blank',
+              'Google Sign In',
+              `width=${width},height=${height},left=${left},top=${top},popup=yes,toolbar=no,location=no,status=no,menubar=no`
+            );
+
+            if (!popup) {
+              throw new Error('Failed to open popup. Please allow popups for this site.');
+            }
+
+            // Show loading in popup
+            popup.document.write('<html><body style="display:flex;align-items:center;justify-content:center;height:100vh;font-family:sans-serif;background:#000;color:#fff;"><div>Loading Google Sign In...</div></body></html>');
+
             // Generate the OAuth URL
             const { data: oauthData, error: oauthError } = await supabase.auth.signInWithOAuth({
               provider: 'google',
@@ -552,24 +571,12 @@ const AuthForm = ({ isLogin, onToggle, onOAuthSuccess, onBack }: AuthFormProps) 
             });
 
             if (oauthError || !oauthData?.url) {
+              popup.close();
               throw new Error(oauthError?.message || 'Failed to generate OAuth URL');
             }
 
-            // Open OAuth URL in popup window
-            const width = 500;
-            const height = 600;
-            const left = window.screen.width / 2 - width / 2;
-            const top = window.screen.height / 2 - height / 2;
-            
-            const popup = window.open(
-              oauthData.url,
-              'Google Sign In',
-              `width=${width},height=${height},left=${left},top=${top},popup=yes,toolbar=no,location=no,status=no,menubar=no`
-            );
-
-            if (!popup) {
-              throw new Error('Failed to open popup. Please allow popups for this site.');
-            }
+            // Navigate popup to OAuth URL
+            popup.location.href = oauthData.url;
 
             // Poll for session while popup is open
             let sessionCheckInterval: NodeJS.Timeout | null = null;
