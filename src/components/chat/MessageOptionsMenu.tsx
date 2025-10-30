@@ -28,11 +28,19 @@ const MessageOptionsMenu: React.FC<MessageOptionsMenuProps> = ({
       // Check position when menu opens
       if (buttonRef.current) {
         const rect = buttonRef.current.getBoundingClientRect();
-        const spaceAbove = rect.top;
-        const spaceBelow = window.innerHeight - rect.bottom;
         
-        // If less than 150px space above, show below
-        setShowBelow(spaceAbove < 150);
+        // Account for safe areas on iOS
+        const safeAreaTop = parseInt(getComputedStyle(document.documentElement)
+          .getPropertyValue('--safe-area-inset-top') || '0');
+        const safeAreaBottom = parseInt(getComputedStyle(document.documentElement)
+          .getPropertyValue('--safe-area-inset-bottom') || '0');
+        
+        const spaceAbove = rect.top - safeAreaTop;
+        const spaceBelow = window.innerHeight - rect.bottom - safeAreaBottom;
+        
+        // Menu needs ~120px space to display properly
+        // If less than 180px space above (accounting for header), show below
+        setShowBelow(spaceAbove < 180);
       }
       
       document.addEventListener('mousedown', handleClickOutside);
