@@ -37,25 +37,19 @@ const ChatHeader: React.FC<ChatHeaderProps> = ({
   const { toast } = useToast();
   // Only apply safe-area padding on iOS native, not on web
   const isIOS = typeof window !== 'undefined' && /iPhone|iPad|iPod/.test(navigator.userAgent);
-  const isLargeScreen = typeof window !== 'undefined' && window.innerWidth >= 768;
+  const isAndroid = typeof window !== 'undefined' && /Android/.test(navigator.userAgent);
   const paddingTopValue = isIOS 
     ? 'clamp(70px, calc(env(safe-area-inset-top, 10px) + 50px), 90px)' 
-    : isLargeScreen 
-      ? '40px' 
-      : '0px';
-  
-  // Add top margin for the inner content on large screens
-  const innerContentMarginTop = isLargeScreen && !isIOS ? '40px' : '0px';
+    : isAndroid 
+    ? '32px' 
+    : '0px';
 
   return (
     <div
       className="fixed top-0 left-0 right-0 z-50 bg-white border-b border-gray-200"
       style={{ paddingTop: paddingTopValue }}
     >
-      <div 
-        className="flex items-center px-4 py-3 justify-between"
-        style={{ marginTop: innerContentMarginTop }}
-      >
+      <div className="flex items-center px-4 py-3 justify-between">
       <div className="flex items-center space-x-3">
         {isMobile && (
           <Button 

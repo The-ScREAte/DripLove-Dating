@@ -953,6 +953,8 @@ const MainApp = ({ user, onLogout }: MainAppProps) => {
                 style={{
                   paddingTop: Capacitor.getPlatform() === 'ios' 
                     ? 'clamp(10px, env(safe-area-inset-top, 10px), 40px)' 
+                    : Capacitor.getPlatform() === 'android'
+                    ? '24px'
                     : '8px'
                 }}
               >
@@ -1001,7 +1003,11 @@ const MainApp = ({ user, onLogout }: MainAppProps) => {
   {!showTerms && !showPrivacy && !isKeyboardOpen && !isChatDetailOpen && (
           <div
             className="fixed bottom-0 left-0 right-0 w-full bg-white z-[99999]"
-            style={{ paddingBottom: 'clamp(4px, env(safe-area-inset-bottom, 0px), 6px)' }}
+            style={{ 
+              paddingBottom: Capacitor.getPlatform() === 'android' 
+                ? '16px' 
+                : 'clamp(4px, env(safe-area-inset-bottom, 0px), 6px)' 
+            }}
           >
             <div className={`flex justify-around items-center ${Capacitor.getPlatform() === 'ios' ? 'pb-5' : ''}`}>
               {[
