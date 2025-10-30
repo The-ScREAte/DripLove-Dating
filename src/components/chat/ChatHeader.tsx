@@ -43,13 +43,19 @@ const ChatHeader: React.FC<ChatHeaderProps> = ({
     : isLargeScreen 
       ? '40px' 
       : '0px';
+  
+  // Add top margin for the inner content on large screens
+  const innerContentMarginTop = isLargeScreen && !isIOS ? '40px' : '0px';
 
   return (
     <div
       className="fixed top-0 left-0 right-0 z-50 bg-white border-b border-gray-200"
       style={{ paddingTop: paddingTopValue }}
     >
-      <div className="flex items-center px-4 py-3 justify-between">
+      <div 
+        className="flex items-center px-4 py-3 justify-between"
+        style={{ marginTop: innerContentMarginTop }}
+      >
       <div className="flex items-center space-x-3">
         {isMobile && (
           <Button 
