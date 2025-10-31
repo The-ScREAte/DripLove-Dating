@@ -140,19 +140,7 @@ const PremiumUpgrade = ({ currentUser, onClose, preselectedPlan }: PremiumUpgrad
       if (!canBuy) {
         console.warn('[UI] IAP loading timeout - products not available after 8 seconds');
         setIapLoadingTimeout(true);
-        
-        // Show a subtle message without technical details
-        if (isIOS() && isNativeApp()) {
-          toast({
-            title: 'Taking longer than usual',
-            description: 'Still connecting to payment service...',
-          });
-        } else {
-          toast({
-            title: 'Loading payment options',
-            description: 'Please wait a moment or try alternative payment methods below.',
-          });
-        }
+        // Silently handle timeout without showing toast
       }
     }, 8000); // 8 seconds timeout for better UX
     
@@ -237,10 +225,7 @@ const PremiumUpgrade = ({ currentUser, onClose, preselectedPlan }: PremiumUpgrad
   const handlePaymentTypeSelection = async (type: 'subscription' | 'one-time' | 'iap') => {
     if (type === 'iap') {
       if (!canBuy) {
-        toast({
-          title: 'Please wait',
-          description: 'Payment service is still loading. Try again in a moment.',
-        });
+        // Silently prevent action if not ready
         return;
       }
       setIapLoading(true);
@@ -521,7 +506,7 @@ const PremiumUpgrade = ({ currentUser, onClose, preselectedPlan }: PremiumUpgrad
               ✕
             </button>
             <h2 className="text-xl font-bold mb-4 text-center">
-              {isIOS() && isNativeApp() ? 'Subscribe via In-App Purchase' : 'Choose Payment Option'}
+              Choose Payment Option
             </h2>
             <div className="space-y-4">
               {/* Apple IAP - show on iOS native when available */}
@@ -558,13 +543,34 @@ const PremiumUpgrade = ({ currentUser, onClose, preselectedPlan }: PremiumUpgrad
                   </div>
                 </div>
               )}
+              
+              {/* Paystack/Card Payment Options - show on web and Android only, NOT on iOS */}
+              {!(isIOS() && isNativeApp()) && (
+                <>
+                  <button
+                    onClick={() => handlePaymentTypeSelection('subscription')}
+                    className="w-full p-4 bg-gradient-to-r from-green-500 to-emerald-600 text-white rounded-lg hover:from-green-600 hover:to-emerald-700 transition-all duration-200 font-semibold"
+                  >
+                    <div className="text-lg">💳 Monthly Subscription</div>
+                    <div className="text-sm opacity-90">{currency} {monthlyPrice}/month • Cancel anytime</div>
+                  </button>
+                  
+                  <button
+                    onClick={() => handlePaymentTypeSelection('one-time')}
+                    className="w-full p-4 bg-gradient-to-r from-blue-500 to-blue-600 text-white rounded-lg hover:from-blue-600 hover:to-blue-700 transition-all duration-200 font-semibold"
+                  >
+                    <div className="text-lg">🎯 One-Time Payment</div>
+                    <div className="text-sm opacity-90">{currency} {price}/month • No auto-renewal</div>
+                  </button>
+                </>
+              )}
             </div>
           </div>
         </div>
       )}
 
-      {/* Payment Modals - Only render on non-iOS platforms */}
-      {!isIOS() && !isNativeApp() && (
+      {/* Payment Modals - Show on Web and Android (non-iOS platforms) */}
+      {(!isIOS() || !isNativeApp()) && (
         <PaystackPaymentModal
           isOpen={showPaymentModal}
           onClose={() => setShowPaymentModal(false)}

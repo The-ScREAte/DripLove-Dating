@@ -12,6 +12,7 @@ interface SubscriptionStatus {
 export function useEnhancedSubscription() {
   const [subscriptionStatus, setSubscriptionStatus] = useState<SubscriptionStatus | null>(null)
   const [loading, setLoading] = useState(true)
+  const [hasShownExpiredNotification, setHasShownExpiredNotification] = useState(false)
   const { toast } = useToast()
 
   const checkSubscription = async () => {
@@ -72,13 +73,14 @@ export function useEnhancedSubscription() {
         // Update with the comprehensive result
         setSubscriptionStatus(status)
         
-        // Show notification if subscription was downgraded due to payment failure
-        if (status.status === 'payment_failed' || status.status === 'expired') {
+        // Show notification ONLY ONCE if subscription expired or payment failed
+        if (!hasShownExpiredNotification && (status.status === 'payment_failed' || status.status === 'expired')) {
+          setHasShownExpiredNotification(true)
           toast({
-            title: 'Subscription Status Changed',
+            title: 'Subscription Status',
             description: status.status === 'payment_failed' 
-              ? 'Your subscription was suspended due to payment failure. Please update your payment method.'
-              : 'Your subscription has expired. Please renew to continue using premium features.',
+              ? 'Your subscription payment failed. Please update your payment method to continue enjoying premium features.'
+              : 'Your subscription has expired. Renew now to continue enjoying premium features.',
             variant: 'destructive',
           })
         }

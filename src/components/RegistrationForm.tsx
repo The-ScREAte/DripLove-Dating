@@ -336,7 +336,7 @@ const RegistrationForm = ({ onSubmit, onBackToLogin }: RegistrationFormProps) =>
     if (!formData.password) firstStepErrors.password = 'Password is required';
     if (!formData.confirmPassword) firstStepErrors.confirmPassword = 'Please confirm your password';
     if (!formData.dateOfBirth) firstStepErrors.dateOfBirth = 'Date of birth is required';
-    if (!formData.country) firstStepErrors.country = 'Country is required';
+    // Country is now optional per Apple's guidelines
     if (!formData.city.trim()) firstStepErrors.city = 'City is required';
     
     // Email validation
@@ -721,7 +721,7 @@ const RegistrationForm = ({ onSubmit, onBackToLogin }: RegistrationFormProps) =>
                 city: errors.city,
                 zipCode: errors.zipCode
               }}
-              required={true}
+              required={false}
               autoDetect={true}
             />
           </div>

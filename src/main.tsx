@@ -3,6 +3,7 @@ import React from "react";
 import ReactDOM from "react-dom/client";
 import App from "./App.tsx";
 import "./index.css";
+import { initializeGoogleAuth } from "./utils/googleNativeAuth";
 
 // Create a loading screen component
 const LoadingScreen = () => (
@@ -89,6 +90,9 @@ const AppWrapper = () => {
   React.useEffect(() => {
     const initializeApp = async () => {
       try {
+        // Initialize native Google Auth on mobile platforms
+        initializeGoogleAuth();
+        
         // Quick OAuth redirect check (non-blocking)
         // If we detect an OAuth fragment or error in the URL, ensure the app
         // navigates to `/auth/callback` (preserving the fragment) so the

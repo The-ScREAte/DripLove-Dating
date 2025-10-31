@@ -161,15 +161,34 @@ const LocationInput = ({
     }
   }, [country, countries]);
 
-  // Update suggested cities when country changes
+  // Update suggested cities when country changes OR when searching without a country
   useEffect(() => {
     if (selectedCountryCode) {
       const cities = getCitiesForCountry(selectedCountryCode);
       setSuggestedCities(cities);
+    } else if (cityInput.length >= 2) {
+      // If no country is selected but user is typing, search across all countries
+      const allCities: CityData[] = [];
+      const countryCodes = getCountriesList();
+      
+      // Collect cities from all countries that match the search
+      countryCodes.forEach(country => {
+        const cities = getCitiesForCountry(country.code);
+        cities.forEach(city => {
+          if (city.name.toLowerCase().includes(cityInput.toLowerCase())) {
+            allCities.push({
+              ...city,
+              state: `${city.state ? city.state + ', ' : ''}${country.name}` // Add country name to state for context
+            });
+          }
+        });
+      });
+      
+      setSuggestedCities(allCities);
     } else {
       setSuggestedCities([]);
     }
-  }, [selectedCountryCode]);
+  }, [selectedCountryCode, cityInput]);
 
   // Update coordinates when city changes
   useEffect(() => {
@@ -212,10 +231,28 @@ const LocationInput = ({
     setIsCustomCity(false);
     setCoordinates({ lat: selectedCity.latitude, lng: selectedCity.longitude });
 
-    const selectedCountry = countries.find(c => c.code === selectedCountryCode);
+    // If no country was selected, try to infer it from the city's state field
+    let inferredCountry = selectedCountryCode;
+    let inferredCountryName = '';
+    
+    if (!selectedCountryCode && selectedCity.state) {
+      // Extract country name from state field (format: "State, Country" when searching all countries)
+      const parts = selectedCity.state.split(', ');
+      if (parts.length > 1) {
+        const countryName = parts[parts.length - 1];
+        const country = countries.find(c => c.name === countryName);
+        if (country) {
+          inferredCountry = country.code;
+          inferredCountryName = country.name;
+          setSelectedCountryCode(country.code);
+        }
+      }
+    }
+
+    const selectedCountry = countries.find(c => c.code === inferredCountry || c.code === selectedCountryCode);
     onLocationChange({
-      country: selectedCountry?.name || '',
-      countryCode: selectedCountryCode,
+      country: selectedCountry?.name || inferredCountryName || '',
+      countryCode: inferredCountry || selectedCountryCode,
       city: selectedCity.name,
       zipCode,
       latitude: selectedCity.latitude,
@@ -226,11 +263,11 @@ const LocationInput = ({
 
   const handleCityInputChange = (value: string) => {
     setCityInput(value);
-    // Always show suggestions when there's a selected country, regardless of input
-    setShowCitySuggestions(selectedCountryCode !== '');
+    // Show suggestions when typing (with or without country selected)
+    setShowCitySuggestions(value.length >= 2 || selectedCountryCode !== '');
 
     // Check if it matches a major city
-    const cityData = getCityCoordinates(selectedCountryCode, value);
+    const cityData = selectedCountryCode ? getCityCoordinates(selectedCountryCode, value) : null;
     const selectedCountry = countries.find(c => c.code === selectedCountryCode);
     
     onLocationChange({
@@ -291,7 +328,7 @@ const LocationInput = ({
       <div className="space-y-2">
         <Label className="flex items-center gap-2">
           <MapPin className="w-4 h-4" />
-          Country {required && <span className="text-red-500">*</span>}
+          Country
           {isCountryLocked && (
             <span className="flex items-center gap-1 text-xs text-green-600 font-medium">
               <CheckCircle2 className="w-3 h-3" />
@@ -347,30 +384,33 @@ const LocationInput = ({
       </div>
 
       {/* City Selection */}
-      {selectedCountryCode && (
-        <div className="space-y-2">
-          <Label className="flex items-center gap-2">
-            <Search className="w-4 h-4" />
-            City/Town {required && <span className="text-red-500">*</span>}
-          </Label>
-          
-          <div className="relative">
-            <Input
-              value={cityInput}
-              onChange={(e) => handleCityInputChange(e.target.value)}
-              onFocus={() => setShowCitySuggestions(selectedCountryCode !== '')}
-              placeholder={`${selectedCountryData?.name ? `Select a city in ${selectedCountryData.name} or type to search` : 'Select a country first'}`}
-              className={errors.city ? 'border-red-500' : ''}
-            />
+      <div className="space-y-2">
+        <Label className="flex items-center gap-2">
+          <Search className="w-4 h-4" />
+          City/Town {required && <span className="text-red-500">*</span>}
+        </Label>
+        
+        <div className="relative">
+          <Input
+            value={cityInput}
+            onChange={(e) => handleCityInputChange(e.target.value)}
+            onFocus={() => setShowCitySuggestions(cityInput.length >= 2 || selectedCountryCode !== '')}
+            placeholder={selectedCountryData?.name 
+              ? `Select a city in ${selectedCountryData.name} or type to search` 
+              : 'Type your city name (at least 2 characters)'}
+            className={errors.city ? 'border-red-500' : ''}
+          />
 
             {/* City Suggestions Dropdown */}
             {showCitySuggestions && filteredCities.length > 0 && (
               <Card className="absolute top-full left-0 right-0 z-50 mt-1 max-h-64 overflow-y-auto">
                 <CardContent className="p-2">
                   <div className="text-xs text-gray-600 mb-2 px-2">
-                    {cityInput === '' 
-                      ? `📍 Available cities in ${selectedCountryData?.name} (click to select):`
-                      : `🔍 Matching cities in ${selectedCountryData?.name}:`
+                    {cityInput === '' && selectedCountryData
+                      ? `📍 Available cities in ${selectedCountryData.name} (click to select):`
+                      : selectedCountryData
+                      ? `🔍 Matching cities in ${selectedCountryData.name}:`
+                      : `🔍 Matching cities (select one):`
                     }
                   </div>
                   {filteredCities.map((city, index) => (
@@ -447,7 +487,6 @@ const LocationInput = ({
             <p className="text-sm text-red-500">{errors.city}</p>
           )}
         </div>
-      )}
 
       {/* ZIP/Postal Code */}
       {selectedCountryCode && (

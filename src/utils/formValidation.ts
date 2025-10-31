@@ -9,7 +9,7 @@ export const validateRegistrationForm = (formData: any) => {
   if (!formData.password) newErrors.password = 'Password is required';
   if (!formData.confirmPassword) newErrors.confirmPassword = 'Please confirm your password';
   if (!formData.dateOfBirth) newErrors.dateOfBirth = 'Date of birth is required';
-  if (!formData.country) newErrors.country = 'Country is required';
+  // Country is now optional per Apple's App Store guidelines
   if (!formData.gender) newErrors.gender = 'Gender is required';
   if (!formData.preference) newErrors.preference = 'Preference is required';
   if (!formData.adinkraSymbols || formData.adinkraSymbols.length === 0) newErrors.adinkraSymbols = 'Please select at least 1 Adinkra symbol';

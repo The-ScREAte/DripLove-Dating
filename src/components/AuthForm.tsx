@@ -336,10 +336,38 @@ const AuthForm = ({ isLogin, onToggle, onOAuthSuccess, onBack }: AuthFormProps) 
           return;
         }
         
-        // For Google OAuth on Android: use in-app WebView modal (fullscreen with close button)
+        // For Google OAuth on Android: use Chrome Custom Tabs (in-app browser)
+        // The deep link redirect will automatically close the browser and return to app
         if (provider === 'google' && isNative && platform === 'android') {
           
           try {
+            // Use native Google Sign-In (entirely in-app, no browser!)
+            const { signInWithGoogleNative, isNativeGoogleAuthAvailable } = await import('@/utils/googleNativeAuth');
+            
+            if (isNativeGoogleAuthAvailable()) {
+              console.log('🔵 Using native Google Sign-In for Android');
+              
+              const result = await signInWithGoogleNative();
+              
+              console.log('✅ Native Google Sign-In completed:', result);
+              
+              // Navigate based on profile completion
+              if (result.needsProfileCompletion) {
+                console.log('→ Navigating to profile completion');
+                setOauthLoading(null);
+                navigate('/complete-profile');
+              } else {
+                console.log('→ Navigating to main app');
+                setOauthLoading(null);
+                navigate('/');
+              }
+              
+              return;
+            }
+            
+            // Fallback to browser-based OAuth if native isn't available
+            console.log('⚠️ Native Google Auth not available, falling back to browser');
+            
             // Generate the OAuth URL
             const { data: oauthData, error: oauthError } = await supabase.auth.signInWithOAuth({
               provider: 'google',
@@ -358,7 +386,8 @@ const AuthForm = ({ isLogin, onToggle, onOAuthSuccess, onBack }: AuthFormProps) 
             }
 
             // Open OAuth URL in Chrome Custom Tabs (Android's in-app browser)
-            // This keeps users in-app, similar to iOS Safari View Controller
+            // The OAuth callback will deep link back to app (driplove://auth/callback)
+            // which automatically closes this browser and triggers appUrlOpen listener
             const { Browser } = await import('@capacitor/browser');
             await Browser.open({ 
               url: oauthData.url,
@@ -366,111 +395,55 @@ const AuthForm = ({ isLogin, onToggle, onOAuthSuccess, onBack }: AuthFormProps) 
               toolbarColor: '#000000'
             });
 
-            // Poll for session in the background while browser is open
-            let sessionCheckInterval: NodeJS.Timeout | null = null;
-            let hasProcessedSession = false;
-
-            const checkForSession = async () => {
-              if (hasProcessedSession) return;
+            // Listen for browser close (user cancelled or completed)
+            const handleBrowserFinish = async () => {
+              console.log('🔍 Android browser closed');
               
+              // Give deep link time to process
+              await new Promise(resolve => setTimeout(resolve, 500));
+              
+              // Check if session was established via deep link
               const { data: { session } } = await supabase.auth.getSession();
               
-              if (session) {
-                hasProcessedSession = true;
-                
-                // Clear the polling interval
-                if (sessionCheckInterval) {
-                  clearInterval(sessionCheckInterval);
-                  sessionCheckInterval = null;
-                }
-                
-                // Close the browser immediately
-                try {
-                  await Browser.close();
-                } catch (e) {
-                  // Browser already closed
-                }
-                
-                try {
-                  // Check if profile exists (don't create it)
-                  const profile = await checkProfileExists(session.user.id);
-                  await new Promise(resolve => setTimeout(resolve, 300));
-                  
-                  // Determine if profile needs completion
-                  let needsProfileCompletion = false;
-                  if (!profile) {
-                    // No profile exists - user needs to complete profile
-                    needsProfileCompletion = true;
-                  } else {
-                    // Profile exists - check if it's complete
-                    needsProfileCompletion = !profile.first_name || 
-                      profile.first_name === 'User' ||
-                      !profile.bio || 
-                      profile.date_of_birth === '1990-01-01' ||
-                      !profile.city || 
-                      profile.city === 'Unknown' ||
-                      !profile.country;
-                  }
-                  
-                  await new Promise(resolve => setTimeout(resolve, 500));
-                  setOauthLoading(null);
-                  Browser.removeAllListeners();
-                  
-                  // Navigate based on profile completion
-                  if (needsProfileCompletion) {
-                    navigate('/complete-profile');
-                  } else {
-                    navigate('/');
-                  }
-                } catch (error) {
-                  console.error('Error during post-login processing:', error);
-                  setOauthLoading(null);
-                  Browser.removeAllListeners();
-                  navigate('/complete-profile');
-                }
-              }
-            };
-
-            // Start polling for session every 500ms
-            sessionCheckInterval = setInterval(checkForSession, 500);
-
-            const handleBrowserFinish = async () => {
-              // Clear polling interval
-              if (sessionCheckInterval) {
-                clearInterval(sessionCheckInterval);
-                sessionCheckInterval = null;
-              }
-
-              // Do one final check for session
-              if (!hasProcessedSession) {
-                await checkForSession();
-              }
-              
-              // If still no session, show message
-              if (!hasProcessedSession) {
+              if (!session) {
+                // No session = user cancelled
+                console.log('❌ No session found, user cancelled');
                 toast({
                   title: 'Authentication Cancelled',
                   description: 'Google sign-in was cancelled.',
                   variant: 'default',
                 });
+              } else {
+                // Session exists but deep link handler in main.tsx will handle navigation
+                console.log('✅ Session found, deep link handler will navigate');
               }
               
               setOauthLoading(null);
               Browser.removeAllListeners();
             };
             
-            // Listen for browser close
             Browser.addListener('browserFinished', handleBrowserFinish);
 
+            // Don't poll - let deep link redirect handle everything
             return;
 
           } catch (err: any) {
-            console.error('❌ Android WebView error:', err);
-            toast({
-              title: 'Authentication Error',
-              description: err?.message || 'Failed to open Google Sign-In',
-              variant: 'destructive',
-            });
+            console.error('❌ Android OAuth error:', err);
+            
+            // Handle user cancellation
+            if (err.message?.includes('cancel')) {
+              toast({
+                title: 'Sign-in Cancelled',
+                description: 'Google sign-in was cancelled.',
+                variant: 'default',
+              });
+            } else {
+              toast({
+                title: 'Authentication Error',
+                description: err?.message || 'Failed to sign in with Google',
+                variant: 'destructive',
+              });
+            }
             setOauthLoading(null);
           }
           return;

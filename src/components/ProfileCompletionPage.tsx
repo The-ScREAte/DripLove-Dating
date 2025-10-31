@@ -382,7 +382,7 @@ const ProfileCompletionPage = () => {
     if (!formData.firstName.trim()) validationErrors.firstName = 'First name is required';
     if (!formData.lastName.trim()) validationErrors.lastName = 'Last name is required';
     if (!formData.dateOfBirth) validationErrors.dateOfBirth = 'Date of birth is required';
-    if (!formData.country) validationErrors.country = 'Country is required';
+    // Country is now optional per Apple's guidelines
     if (!formData.city) validationErrors.city = 'City is required';
     if (!formData.gender) validationErrors.gender = 'Gender is required';
     if (!formData.preference) validationErrors.preference = 'Preference is required';
@@ -713,14 +713,15 @@ const ProfileCompletionPage = () => {
                   </div>
 
                   <div className="space-y-4">
-                    <h3 className="text-lg font-semibold text-gray-800">Location *</h3>
+                    <h3 className="text-lg font-semibold text-gray-800">Location</h3>
+                    <p className="text-sm text-gray-600">City is required. Country is optional but helps improve matches.</p>
                     <LocationInput
                       country={formData.country}
                       city={formData.city}
                       zipCode={formData.zipCode}
                       onLocationChange={handleLocationChange}
                       errors={errors}
-                      required={true}
+                      required={false}
                       autoDetect={true}
                     />
                   </div>
