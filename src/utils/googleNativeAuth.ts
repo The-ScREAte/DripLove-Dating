@@ -13,7 +13,7 @@ export const initializeGoogleAuth = () => {
   if (Capacitor.isNativePlatform()) {
     // This MUST be called in main.tsx on app startup
     GoogleAuth.initialize({
-      clientId: '1032929166034-h92c0d2jk2lv8u7hhqugk1bepnj4tfgv.apps.googleusercontent.com', // Your Google OAuth Client ID for Android
+      clientId: '1032929166034-h92c0d2jk2lv8u7hhqugk1bepnj4tfgv.apps.googleusercontent.com', // Web Client ID (server auth code)
       scopes: ['profile', 'email'],
       grantOfflineAccess: true,
     });

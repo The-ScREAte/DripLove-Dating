@@ -1,6 +1,6 @@
 require_relative '../../node_modules/@capacitor/ios/scripts/pods_helpers'
 
-platform :ios, '14.0'
+platform :ios, '15.0'
 use_frameworks!
 
 # workaround to avoid Xcode caching of Pods that requires
@@ -25,10 +25,23 @@ end
 target 'App' do
   capacitor_pods
   # Add your Pods here
+  
+  # Override GoogleSignIn to use latest version with privacy manifests
+  # This fixes Apple's ITMS-91061 privacy manifest requirement
+  pod 'GoogleSignIn', '~> 7.1'
+  pod 'GTMAppAuth', '~> 4.1'
+  pod 'GTMSessionFetcher', '~> 3.5'
 end
 
 post_install do |installer|
   assertDeploymentTarget(installer)
+  
+  # Force GoogleSignIn to use version 7.1+ with privacy manifests
+  installer.pods_project.targets.each do |target|
+    target.build_configurations.each do |config|
+      config.build_settings['IPHONEOS_DEPLOYMENT_TARGET'] = '15.0'
+    end
+  end
   
   # Automatically copy notification sound to app bundle
   sounds_source = File.expand_path('App/sounds/botificationsound.caf', __dir__)

@@ -24,17 +24,21 @@ PODS:
     - Capacitor
   - CordovaPlugins (7.4.2):
     - CapacitorCordova
-  - GoogleSignIn (6.2.4):
-    - AppAuth (~> 1.5)
-    - GTMAppAuth (~> 1.3)
-    - GTMSessionFetcher/Core (< 3.0, >= 1.1)
-  - GTMAppAuth (1.3.1):
-    - AppAuth/Core (~> 1.6)
-    - GTMSessionFetcher/Core (< 3.0, >= 1.5)
-  - GTMSessionFetcher/Core (2.3.0)
+  - GoogleSignIn (7.1.0):
+    - AppAuth (< 2.0, >= 1.7.3)
+    - GTMAppAuth (< 5.0, >= 4.1.1)
+    - GTMSessionFetcher/Core (~> 3.3)
+  - GTMAppAuth (4.1.1):
+    - AppAuth/Core (~> 1.7)
+    - GTMSessionFetcher/Core (< 4.0, >= 3.3)
+  - GTMSessionFetcher (3.5.0):
+    - GTMSessionFetcher/Full (= 3.5.0)
+  - GTMSessionFetcher/Core (3.5.0)
+  - GTMSessionFetcher/Full (3.5.0):
+    - GTMSessionFetcher/Core
   - SouthdevsCapacitorGoogleAuth (0.0.1):
     - Capacitor
-    - GoogleSignIn (~> 6.2.4)
+    - GoogleSignIn (~> 7.1)
 
 DEPENDENCIES:
   - "Capacitor (from `../../node_modules/@capacitor/ios`)"
@@ -47,6 +51,9 @@ DEPENDENCIES:
   - "CapacitorPushNotifications (from `../../node_modules/@capacitor/push-notifications`)"
   - "CapacitorStatusBar (from `../../node_modules/@capacitor/status-bar`)"
   - CordovaPlugins (from `../capacitor-cordova-ios-plugins`)
+  - GoogleSignIn (~> 7.1)
+  - GTMAppAuth (~> 4.1)
+  - GTMSessionFetcher (~> 3.5)
   - "SouthdevsCapacitorGoogleAuth (from `../../node_modules/@southdevs/capacitor-google-auth`)"
 
 SPEC REPOS:
@@ -92,11 +99,11 @@ SPEC CHECKSUMS:
   CapacitorPushNotifications: bdd621fbd562be34a41f4a7b1750efa000447d5a
   CapacitorStatusBar: 6e7af040d8fc4dd655999819625cae9c2d74c36f
   CordovaPlugins: b2618e17f8dd580d2354710b7b52b0af9d6f03f2
-  GoogleSignIn: 5651ce3a61e56ca864160e79b484cd9ed3f49b7a
-  GTMAppAuth: 0ff230db599948a9ad7470ca667337803b3fc4dd
-  GTMSessionFetcher: 3a63d75eecd6aa32c2fc79f578064e1214dfdec2
-  SouthdevsCapacitorGoogleAuth: 6488c21faed47c2cf72404bfbfc0fe0e9af766bc
+  GoogleSignIn: d4281ab6cf21542b1cfaff85c191f230b399d2db
+  GTMAppAuth: f69bd07d68cd3b766125f7e072c45d7340dea0de
+  GTMSessionFetcher: 5aea5ba6bd522a239e236100971f10cb71b96ab6
+  SouthdevsCapacitorGoogleAuth: 453cab6e5f58fec290e30b2d918ded3434ad22c9
 
-PODFILE CHECKSUM: 165b0cb656890df993a099e32a76b7106eccdb87
+PODFILE CHECKSUM: a5a0bec2b35180b8a01636534eaedeee5d953ac5
 
 COCOAPODS: 1.16.2

@@ -344,7 +344,11 @@ const AuthForm = ({ isLogin, onToggle, onOAuthSuccess, onBack }: AuthFormProps) 
             // Use native Google Sign-In (entirely in-app, no browser!)
             const { signInWithGoogleNative, isNativeGoogleAuthAvailable } = await import('@/utils/googleNativeAuth');
             
-            if (isNativeGoogleAuthAvailable()) {
+            // TEMPORARILY DISABLED: Native Google Auth needs SHA-1 certificate registered
+            // Uncomment after adding SHA-1 to Google Cloud Console
+            const useNativeAuth = false; // Change to true after SHA-1 is registered
+            
+            if (useNativeAuth && isNativeGoogleAuthAvailable()) {
               console.log('🔵 Using native Google Sign-In for Android');
               
               const result = await signInWithGoogleNative();
@@ -366,7 +370,7 @@ const AuthForm = ({ isLogin, onToggle, onOAuthSuccess, onBack }: AuthFormProps) 
             }
             
             // Fallback to browser-based OAuth if native isn't available
-            console.log('⚠️ Native Google Auth not available, falling back to browser');
+            console.log('⚠️ Using browser-based Google OAuth (SHA-1 certificate not yet registered)');
             
             // Generate the OAuth URL
             const { data: oauthData, error: oauthError } = await supabase.auth.signInWithOAuth({
