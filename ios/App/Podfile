@@ -40,6 +40,28 @@ post_install do |installer|
   installer.pods_project.targets.each do |target|
     target.build_configurations.each do |config|
       config.build_settings['IPHONEOS_DEPLOYMENT_TARGET'] = '15.0'
+      
+      # Suppress deprecation warnings from third-party pods
+      config.build_settings['GCC_WARN_ABOUT_DEPRECATED_FUNCTIONS'] = 'NO'
+      config.build_settings['CLANG_WARN_DEPRECATED_OBJC_IMPLEMENTATIONS'] = 'NO'
+      config.build_settings['GCC_WARN_DEPRECATED_DECLARATIONS'] = 'NO'
+      config.build_settings['CLANG_WARN_DEPRECATED_DECLARATIONS'] = 'NO'
+      
+      # Suppress specific Swift warnings
+      config.build_settings['OTHER_SWIFT_FLAGS'] = ['$(inherited)', '-Xcc', '-Wno-deprecated-declarations', '-suppress-warnings']
+      
+      # Suppress warning about script phase outputs
+      config.build_settings['CLANG_WARN_STRICT_PROTOTYPES'] = 'NO'
+    end
+  end
+  
+  # Suppress warnings in main project as well
+  installer.generated_projects.each do |project|
+    project.targets.each do |target|
+      target.build_configurations.each do |config|
+        config.build_settings['GCC_WARN_DEPRECATED_DECLARATIONS'] = 'NO'
+        config.build_settings['CLANG_WARN_DEPRECATED_DECLARATIONS'] = 'NO'
+      end
     end
   end
   
