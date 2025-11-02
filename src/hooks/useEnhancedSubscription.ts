@@ -73,17 +73,17 @@ export function useEnhancedSubscription() {
         // Update with the comprehensive result
         setSubscriptionStatus(status)
         
-        // Show notification ONLY ONCE if subscription expired or payment failed
-        if (!hasShownExpiredNotification && (status.status === 'payment_failed' || status.status === 'expired')) {
-          setHasShownExpiredNotification(true)
-          toast({
-            title: 'Subscription Status',
-            description: status.status === 'payment_failed' 
-              ? 'Your subscription payment failed. Please update your payment method to continue enjoying premium features.'
-              : 'Your subscription has expired. Renew now to continue enjoying premium features.',
-            variant: 'destructive',
-          })
-        }
+        // Disabled: Flash notification removed - subscription status is already visible on profile page
+        // if (!hasShownExpiredNotification && (status.status === 'payment_failed' || status.status === 'expired')) {
+        //   setHasShownExpiredNotification(true)
+        //   toast({
+        //     title: 'Subscription Status',
+        //     description: status.status === 'payment_failed' 
+        //       ? 'Your subscription payment failed. Please update your payment method to continue enjoying premium features.'
+        //       : 'Your subscription has expired. Renew now to continue enjoying premium features.',
+        //     variant: 'destructive',
+        //   })
+        // }
       } else {
         // Comprehensive check found no subscription, confirm free status
         // (but don't change if quick check already set premium - avoid flicker)

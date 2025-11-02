@@ -8,6 +8,7 @@ import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, D
 import { LogOut, AlertTriangle, Mail } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
+import RateAppButton from '@/components/RateAppButton';
 
 import { useEnhancedSubscription } from '@/hooks/useEnhancedSubscription';
 import { useNavigate } from 'react-router-dom';
@@ -103,6 +104,17 @@ const AccountActions = ({ currentUser, onLogout, onShowTerms, onShowPrivacy, hid
         <CardTitle>Account Actions</CardTitle>
       </CardHeader>
       <CardContent className="space-y-4">
+        {/* Rate DripLove Button */}
+        <div className="bg-yellow-50 p-4 rounded-lg border border-yellow-200">
+          <div className="flex flex-col space-y-3">
+            <span className="font-medium text-gray-900">⭐ Enjoying DripLove?</span>
+            <p className="text-sm text-gray-600">
+              Rate your experience and help us grow!
+            </p>
+            <RateAppButton className="w-full sm:w-auto" />
+          </div>
+        </div>
+
         {/* Support Email */}
         <div className="bg-gray-50 p-4 rounded-lg border">
           <div className="flex items-center space-x-2 mb-2">

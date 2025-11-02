@@ -20,6 +20,8 @@ PODS:
     - Capacitor
   - CapacitorPushNotifications (7.0.3):
     - Capacitor
+  - CapacitorRateApp (4.0.3):
+    - Capacitor
   - CapacitorStatusBar (7.0.1):
     - Capacitor
   - CordovaPlugins (7.4.2):
@@ -49,6 +51,7 @@ DEPENDENCIES:
   - "CapacitorCordova (from `../../node_modules/@capacitor/ios`)"
   - "CapacitorKeyboard (from `../../node_modules/@capacitor/keyboard`)"
   - "CapacitorPushNotifications (from `../../node_modules/@capacitor/push-notifications`)"
+  - CapacitorRateApp (from `../../node_modules/capacitor-rate-app`)
   - "CapacitorStatusBar (from `../../node_modules/@capacitor/status-bar`)"
   - CordovaPlugins (from `../capacitor-cordova-ios-plugins`)
   - GoogleSignIn (~> 7.1)
@@ -80,6 +83,8 @@ EXTERNAL SOURCES:
     :path: "../../node_modules/@capacitor/keyboard"
   CapacitorPushNotifications:
     :path: "../../node_modules/@capacitor/push-notifications"
+  CapacitorRateApp:
+    :path: "../../node_modules/capacitor-rate-app"
   CapacitorStatusBar:
     :path: "../../node_modules/@capacitor/status-bar"
   CordovaPlugins:
@@ -97,6 +102,7 @@ SPEC CHECKSUMS:
   CapacitorCordova: 435121e81a2df4d0034f0fb11fcefab5104cfdb5
   CapacitorKeyboard: 62f36104f26d53d8b3a2a43f2a69fe714f1777d5
   CapacitorPushNotifications: bdd621fbd562be34a41f4a7b1750efa000447d5a
+  CapacitorRateApp: 20928fa996851647e912bbf119af59a48a171712
   CapacitorStatusBar: 6e7af040d8fc4dd655999819625cae9c2d74c36f
   CordovaPlugins: b2618e17f8dd580d2354710b7b52b0af9d6f03f2
   GoogleSignIn: d4281ab6cf21542b1cfaff85c191f230b399d2db
@@ -104,6 +110,6 @@ SPEC CHECKSUMS:
   GTMSessionFetcher: 5aea5ba6bd522a239e236100971f10cb71b96ab6
   SouthdevsCapacitorGoogleAuth: 453cab6e5f58fec290e30b2d918ded3434ad22c9
 
-PODFILE CHECKSUM: a65f77707716d8d9050fdd71ed3dac431ef2b9b9
+PODFILE CHECKSUM: 25263e1bef1ec4527ee0e31dfa621329f3f70c3b
 
 COCOAPODS: 1.16.2

@@ -9,9 +9,16 @@ import ProfilePage from '@/components/ProfilePage';
 import TermsOfService from '@/components/TermsOfService';
 import PrivacyPolicy from '@/components/PrivacyPolicy';
 import DripCoupleIcon from '@/components/DripCoupleIcon';
+import RatingDialog from '@/components/RatingDialog';
 import { supabase, SUPABASE_URL } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import { usePushNotifications } from '@/hooks/usePushNotifications';
+
+// Import rating debug utilities for development
+if (import.meta.env.DEV) {
+  import('@/utils/ratingDebug');
+}
+
 // No SafeArea helpers here; header/nav will be fixed to viewport
 
 interface MainAppProps {
@@ -1042,6 +1049,9 @@ const MainApp = ({ user, onLogout }: MainAppProps) => {
           </div>
         )}
       </div>
+
+      {/* Rating Dialog - Shows after 2 minutes, then weekly */}
+      <RatingDialog initialDelay={120000} />
     </div>
   );
 };
