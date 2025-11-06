@@ -92,23 +92,23 @@ const GlobalLanguageSelector: React.FC<GlobalLanguageSelectorProps> = ({
   return (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
-        <button className="flex items-center space-x-2 p-2 rounded-lg hover:bg-gray-100 transition-colors duration-200">
-          <Globe className="h-5 w-5" />
-          <span className="uppercase">{currentLang.code}</span>
+        <button className="flex items-center space-x-1 px-2 py-1 rounded hover:bg-muted/50 transition-colors text-xs opacity-60 hover:opacity-100">
+          <Globe className="h-3 w-3" />
+          <span className="uppercase text-[10px] font-medium">{currentLang.code}</span>
         </button>
       </DropdownMenuTrigger>
-      <DropdownMenuContent align="end" className="w-40">
+      <DropdownMenuContent align="end" className="w-32">
         {languages.map((language) => (
           <DropdownMenuItem
             key={language.code}
             onClick={() => handleLanguageChange(language.code)}
-            className={`cursor-pointer ${
-              currentLanguage === language.code ? 'bg-purple-100' : ''
+            className={`cursor-pointer text-xs ${
+              currentLanguage === language.code ? 'bg-primary/10' : ''
             }`}
           >
-            <span className="uppercase">{language.code}</span>
+            <span className="uppercase text-[10px]">{language.code}</span>
             {currentLanguage === language.code && (
-              <span className="ml-auto text-purple-600">✓</span>
+              <span className="ml-auto text-primary">✓</span>
             )}
           </DropdownMenuItem>
         ))}

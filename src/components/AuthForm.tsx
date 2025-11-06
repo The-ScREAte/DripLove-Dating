@@ -15,7 +15,6 @@ import { signInWithAppleNativeModal, signInWithAppleFallback, isAppleSignInAvail
 import AppleAuthDebug from '@/components/AppleAuthDebug';
 import { Capacitor } from '@capacitor/core';
 import { useTranslation } from 'react-i18next';
-import { saveLanguageToDatabase } from '@/utils/languageDetection';
 
 interface AuthFormProps {
   isLogin: boolean;
@@ -936,16 +935,6 @@ const AuthForm = ({ isLogin, onToggle, onOAuthSuccess, onBack }: AuthFormProps) 
 
         // Save profile ID to session
         sessionStorage.setItem('profile_id', profile.id);
-
-        // Save language preference to database on login
-        const sessionLanguage = sessionStorage.getItem('preferredLanguage');
-        if (sessionLanguage && sessionLanguage !== 'en') {
-          try {
-            await saveLanguageToDatabase(authData.user.id, sessionLanguage);
-          } catch (error) {
-            console.error('Error saving language preference on login:', error);
-          }
-        }
 
         // Always redirect to home page and let the main app handle routing
         // The auth state change will trigger the proper view (admin/app)

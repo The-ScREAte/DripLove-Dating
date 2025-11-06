@@ -14,7 +14,6 @@ import RatingDialog from '@/components/RatingDialog';
 import { supabase, SUPABASE_URL } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import { usePushNotifications } from '@/hooks/usePushNotifications';
-import { loadUserLanguagePreference, saveLanguageToDatabase } from '@/utils/languageDetection';
 
 // Import rating debug utilities for development
 if (import.meta.env.DEV) {
@@ -188,36 +187,6 @@ const MainApp = ({ user, onLogout }: MainAppProps) => {
   const [isPremium, setIsPremium] = useState(false);
   const [unreadCount, setUnreadCount] = useState(0);
   const { toast } = useToast();
-
-  // Load user's language preference on mount
-  useEffect(() => {
-    const loadUserLanguage = async () => {
-      if (!user?.id) return;
-      
-      try {
-        // Try to load from database first
-        const savedLanguage = await loadUserLanguagePreference(user.id);
-        
-        if (savedLanguage) {
-          console.log('Loading user language preference from DB:', savedLanguage);
-          await i18n.changeLanguage(savedLanguage);
-          // Also save to session storage for consistency
-          sessionStorage.setItem('preferredLanguage', savedLanguage);
-        } else {
-          // If no saved preference, check if there's a session preference to save
-          const sessionLanguage = sessionStorage.getItem('preferredLanguage');
-          if (sessionLanguage && sessionLanguage !== 'en') {
-            console.log('Saving session language to DB:', sessionLanguage);
-            await saveLanguageToDatabase(user.id, sessionLanguage);
-          }
-        }
-      } catch (error) {
-        console.error('Error loading language preference:', error);
-      }
-    };
-    
-    loadUserLanguage();
-  }, [user?.id, i18n]);
 
   /**
    * PROGRESSIVE LOADING SYSTEM FOR DISCOVER PAGE
