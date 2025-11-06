@@ -405,7 +405,13 @@
     "goBack": "العودة إلى قائمة الدردشة",
     "speaks": "يتحدث {{language}}",
     "sayHelloTo": "قل مرحبا لـ {name}! اكسر الجليد وابدأ الدردشة 💬",
-    "conversationTip": "نصيحة: اسأل عن اهتماماتهم أو شارك شيئًا ممتعًا!"
+    "conversationTip": "نصيحة: اسأل عن اهتماماتهم أو شارك شيئًا ممتعًا!",
+    "noMatchesYet": "لا توجد مطابقات بعد",
+    "swipeRightInDripCheck": "اسحب لليمين على الملفات الشخصية في DripCheck لبدء المطابقة!",
+    "moreYouSwipe": "كلما قمت بالسحب أكثر، كلما حصلت على مطابقات أكثر 💕",
+    "startSwipingInDripCheck": "ابدأ السحب في DripCheck",
+    "newMatchesWaiting": "مطابقات جديدة في الانتظار!",
+    "tapMatchToMessage": "انقر على مطابقة أعلاه لإرسال رسالتك الأولى"
   },
   "premium": {
     "goPremium": "الترقية إلى Premium",

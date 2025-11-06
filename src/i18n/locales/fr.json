@@ -409,7 +409,13 @@
     "goBack": "Retour à la liste des conversations",
     "speaks": "Parle {{language}}",
     "sayHelloTo": "Dites bonjour à {name} ! Brisez la glace et commencez à discuter 💬",
-    "conversationTip": "Astuce : Posez des questions sur leurs centres d'intérêt ou partagez quelque chose d'amusant !"
+    "conversationTip": "Astuce : Posez des questions sur leurs centres d'intérêt ou partagez quelque chose d'amusant !",
+    "noMatchesYet": "Pas encore de matchs",
+    "swipeRightInDripCheck": "Faites glisser vers la droite les profils dans DripCheck pour commencer à matcher !",
+    "moreYouSwipe": "Plus vous faites glisser, plus vous aurez de matchs 💕",
+    "startSwipingInDripCheck": "Commencer à faire glisser dans DripCheck",
+    "newMatchesWaiting": "Nouveaux matchs en attente !",
+    "tapMatchToMessage": "Appuyez sur un match ci-dessus pour envoyer votre premier message"
   },
   "premium": {
     "upgrade": "Améliorer",

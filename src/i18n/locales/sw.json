@@ -405,7 +405,13 @@
     "goBack": "Rudi kwenye orodha ya mazungumzo",
     "speaks": "Anazungumza {{language}}",
     "sayHelloTo": "Sema habari kwa {name}! Vunja barafu na uanze kuzungumza 💬",
-    "conversationTip": "Kidokezo: Uliza kuhusu mapenzi yao au shiriki kitu cha kufurahisha!"
+    "conversationTip": "Kidokezo: Uliza kuhusu mapenzi yao au shiriki kitu cha kufurahisha!",
+    "noMatchesYet": "Hakuna Mechi Bado",
+    "swipeRightInDripCheck": "Swipe kulia kwenye wasifu katika DripCheck ili kuanza kulingana!",
+    "moreYouSwipe": "Kadiri unavyoswipe zaidi, ndivyo utapata mechi zaidi 💕",
+    "startSwipingInDripCheck": "Anza kuswipe katika DripCheck",
+    "newMatchesWaiting": "Mechi Mpya Zinasubiri!",
+    "tapMatchToMessage": "Gusa mechi hapo juu ili kutuma ujumbe wako wa kwanza"
   },
   "premium": {
     "goPremium": "Pata Premium",

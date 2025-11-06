@@ -405,7 +405,13 @@
     "goBack": "Voltar à lista de conversas",
     "speaks": "Fala {{language}}",
     "sayHelloTo": "Diga olá para {name}! Quebre o gelo e comece a conversar 💬",
-    "conversationTip": "Dica: Pergunte sobre os interesses deles ou compartilhe algo divertido!"
+    "conversationTip": "Dica: Pergunte sobre os interesses deles ou compartilhe algo divertido!",
+    "noMatchesYet": "Ainda Sem Matches",
+    "swipeRightInDripCheck": "Deslize para a direita nos perfis no DripCheck para começar a combinar!",
+    "moreYouSwipe": "Quanto mais você desliza, mais matches você terá 💕",
+    "startSwipingInDripCheck": "Comece a deslizar no DripCheck",
+    "newMatchesWaiting": "Novos Matches Esperando!",
+    "tapMatchToMessage": "Toque em um match acima para enviar sua primeira mensagem"
   },
   "premium": {
     "goPremium": "Assinar Premium",

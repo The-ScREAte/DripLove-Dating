@@ -409,7 +409,13 @@
     "goBack": "Zurück zur Chat-Liste",
     "speaks": "Spricht {{language}}",
     "sayHelloTo": "Sag Hallo zu {name}! Brich das Eis und fang an zu chatten 💬",
-    "conversationTip": "Tipp: Frag nach ihren Interessen oder teile etwas Lustiges!"
+    "conversationTip": "Tipp: Frag nach ihren Interessen oder teile etwas Lustiges!",
+    "noMatchesYet": "Noch keine Matches",
+    "swipeRightInDripCheck": "Wischen Sie Profile in DripCheck nach rechts, um mit dem Matching zu beginnen!",
+    "moreYouSwipe": "Je mehr Sie wischen, desto mehr Matches erhalten Sie 💕",
+    "startSwipingInDripCheck": "Beginnen Sie mit dem Wischen in DripCheck",
+    "newMatchesWaiting": "Neue Matches warten!",
+    "tapMatchToMessage": "Tippen Sie auf ein Match oben, um Ihre erste Nachricht zu senden"
   },
   "premium": {
     "upgrade": "Upgrade",

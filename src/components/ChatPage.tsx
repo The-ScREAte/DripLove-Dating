@@ -1142,17 +1142,17 @@ const ChatPage = ({ currentUser, onUnreadChange, onDetailViewChange }: ChatPageP
                 </div>
               </div>
               <h3 className="text-xl font-bold text-gray-800 mb-3">
-                No Matches Yet
+                {t('chat.noMatchesYet')}
               </h3>
               <p className="text-gray-600 mb-2 max-w-sm">
-                Swipe right on profiles in DripCheck to start matching!
+                {t('chat.swipeRightInDripCheck')}
               </p>
               <p className="text-sm text-gray-500 mb-6">
-                The more you swipe, the more matches you'll get 💕
+                {t('chat.moreYouSwipe')}
               </p>
               <div className="flex items-center gap-2 text-pink-600 font-medium">
                 <span>💧</span>
-                <span>Start swiping in DripCheck</span>
+                <span>{t('chat.startSwipingInDripCheck')}</span>
                 <span>→</span>
               </div>
             </div>
@@ -1164,10 +1164,10 @@ const ChatPage = ({ currentUser, onUnreadChange, onDetailViewChange }: ChatPageP
                 </div>
               </div>
               <h3 className="text-lg font-bold text-gray-800 mb-2">
-                New Matches Waiting!
+                {t('chat.newMatchesWaiting')}
               </h3>
               <p className="text-gray-600 max-w-sm">
-                Tap on a match above to send your first message
+                {t('chat.tapMatchToMessage')}
               </p>
             </div>
           ) : (
