@@ -1153,7 +1153,6 @@ const ChatPage = ({ currentUser, onUnreadChange, onDetailViewChange }: ChatPageP
               <div className="flex items-center gap-2 text-pink-600 font-medium">
                 <span>💧</span>
                 <span>{t('chat.startSwipingInDripCheck')}</span>
-                <span>→</span>
               </div>
             </div>
           ) : conversationList.length === 0 ? (
