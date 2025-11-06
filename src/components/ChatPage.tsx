@@ -82,6 +82,7 @@ const ChatPage = ({ currentUser, onUnreadChange, onDetailViewChange }: ChatPageP
       fetchMatchesInBackground();
     } else {
       // No cache or stale cache, fetch immediately but don't show loading
+      console.log('[ChatPage] 🔄 No cached data, fetching matches');
       fetchMatches();
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -127,6 +128,30 @@ const ChatPage = ({ currentUser, onUnreadChange, onDetailViewChange }: ChatPageP
     };
   }, [currentUser?.id]);
 
+  // Listen for new match events from DiscoverPage
+  useEffect(() => {
+    if (!currentUser || !currentUser.id) return;
+    
+    const handleNewMatch = (event: CustomEvent) => {
+      console.log('[ChatPage] 💬 New match event received:', event.detail);
+      if (event.detail.userId === currentUser.id) {
+        console.log('[ChatPage] 💬 Refreshing matches due to new match');
+        // Clear cache
+        chatMatchesCache.delete(currentUser.id);
+        // Fetch fresh data in background
+        fetchMatchesInBackground();
+        // Update unread count
+        onUnreadChange?.();
+      }
+    };
+    
+    window.addEventListener('newMatch', handleNewMatch as EventListener);
+    
+    return () => {
+      window.removeEventListener('newMatch', handleNewMatch as EventListener);
+    };
+  }, [currentUser?.id, onUnreadChange]);
+
   useEffect(() => {
     if (!currentUser || !currentUser.id) return;
     if (selectedMatch) {
@@ -136,8 +161,10 @@ const ChatPage = ({ currentUser, onUnreadChange, onDetailViewChange }: ChatPageP
     }
     else {
       onDetailViewChange?.(false);
-      // Only refresh the matches list when there were changes while inside the conversation.
+      // Refresh the matches list when there were changes while inside the conversation
+      // OR when we're returning to the chat list view
       if (matchesNeedsRefreshRef.current) {
+        console.log('[ChatPage] 🔄 Refreshing matches due to changes');
         void fetchMatches();
       }
     }

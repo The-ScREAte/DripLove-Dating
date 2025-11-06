@@ -767,6 +767,40 @@ const MainApp = ({ user, onLogout }: MainAppProps) => {
     }
   }, [user?.id, activeTab]);
 
+  // Refresh discover data when switching to dripcheck tab if cache is missing
+  useEffect(() => {
+    if (user?.id && activeTab === 'dripcheck') {
+      // Check if discover cache exists
+      const cache = typeof window !== 'undefined' && (window as any).discoverCache?.get(user.id);
+      if (!cache) {
+        console.log('🔄 Discover cache missing, reloading data...');
+        preloadDiscoverData(user.id);
+      }
+    }
+  }, [activeTab, user?.id]);
+
+  // Listen for new match events to refresh chat data
+  useEffect(() => {
+    if (!user?.id) return;
+    
+    const handleNewMatch = (event: CustomEvent) => {
+      console.log('[MainApp] 💬 New match event received:', event.detail);
+      if (event.detail.userId === user.id) {
+        console.log('[MainApp] 💬 Preloading chat matches due to new match');
+        // Reload chat matches in background
+        preloadChatMatches(user.id);
+        // Update unread count
+        fetchUnreadCount();
+      }
+    };
+    
+    window.addEventListener('newMatch', handleNewMatch as EventListener);
+    
+    return () => {
+      window.removeEventListener('newMatch', handleNewMatch as EventListener);
+    };
+  }, [user?.id]);
+
   useEffect(() => {
     if (user?.id) {
       fetchUserProfile();

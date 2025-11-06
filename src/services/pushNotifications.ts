@@ -1,5 +1,6 @@
 import { supabase } from '@/integrations/supabase/client';
 import { PushNotifications, Token, PushNotificationSchema, ActionPerformed } from '@capacitor/push-notifications';
+import { FirebaseMessaging } from '@capacitor-firebase/messaging';
 import { Capacitor } from '@capacitor/core';
 import { RealtimeChannel } from '@supabase/supabase-js';
 
@@ -129,8 +130,24 @@ class SupabasePushNotificationService {
         
         // Set up event listeners
         PushNotifications.addListener('registration', async (token: Token) => {
-          this.deviceToken = token.value;
-          await this.saveTokenToDatabase(userId, token.value, Capacitor.getPlatform());
+          // For iOS, get FCM token from Firebase Messaging plugin
+          if (Capacitor.getPlatform() === 'ios') {
+            try {
+              const { token: fcmToken } = await FirebaseMessaging.getToken();
+              console.log('📱 Got FCM token for iOS:', fcmToken.substring(0, 20) + '...');
+              this.deviceToken = fcmToken;
+              await this.saveTokenToDatabase(userId, fcmToken, 'ios');
+            } catch (error) {
+              console.error('❌ Failed to get FCM token for iOS:', error);
+              // Fallback to APNs token (won't work with FCM but better than nothing)
+              this.deviceToken = token.value;
+              await this.saveTokenToDatabase(userId, token.value, 'ios');
+            }
+          } else {
+            // Android uses token.value directly (it's already an FCM token)
+            this.deviceToken = token.value;
+            await this.saveTokenToDatabase(userId, token.value, Capacitor.getPlatform());
+          }
         });
 
         PushNotifications.addListener('registrationError', (error: unknown) => {

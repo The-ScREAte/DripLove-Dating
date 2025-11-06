@@ -6,6 +6,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
 import { Eye, Trash2, CheckCircle, XCircle, Clock, AlertTriangle, User } from 'lucide-react';
+import { usePushNotifications } from '@/hooks/usePushNotifications';
 
 interface PendingImage {
   id: string;
@@ -54,6 +55,20 @@ const ImageModerationPanel = () => {
   const [rejectingImages, setRejectingImages] = useState<Record<string, boolean>>({});
   const [processingReports, setProcessingReports] = useState<Record<string, boolean>>({});
   const { toast } = useToast();
+  
+  // Get current admin user for push notifications
+  const [currentAdminId, setCurrentAdminId] = useState<string | null>(null);
+  const { sendAdminNotification } = usePushNotifications(currentAdminId || undefined);
+
+  useEffect(() => {
+    const getCurrentAdmin = async () => {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (user) {
+        setCurrentAdminId(user.id);
+      }
+    };
+    getCurrentAdmin();
+  }, []);
 
   const fetchPendingImages = useCallback(async () => {
     try {
@@ -162,12 +177,30 @@ const ImageModerationPanel = () => {
     try {
       setApprovingImages(prev => ({ ...prev, [imageId]: true }));
 
+      // Get image details before approving
+      const imageToApprove = pendingImages.find(img => img.id === imageId);
+      
       const { error } = await supabase.rpc('approve_image', {
         image_id: imageId,
         admin_notes: 'Approved by admin'
       });
 
       if (error) throw error;
+
+      // Send push notification to user
+      if (imageToApprove?.user_id) {
+        try {
+          await sendAdminNotification(
+            '✅ Photo Approved!',
+            'Your photo has been approved and is now visible on your profile.',
+            imageToApprove.user_id
+          );
+          console.log('📤 Image approval notification sent to:', imageToApprove.user_id);
+        } catch (notifError) {
+          console.error('📤 Failed to send approval notification:', notifError);
+          // Don't fail the approval if notification fails
+        }
+      }
 
       toast({
         title: 'Success',
@@ -191,6 +224,9 @@ const ImageModerationPanel = () => {
     try {
       setRejectingImages(prev => ({ ...prev, [imageId]: true }));
 
+      // Get image details before rejecting
+      const imageToReject = pendingImages.find(img => img.id === imageId);
+
       // First get the image URL before deleting from database
       const { data: imageData } = await supabase
         .from('user_images')
@@ -205,6 +241,21 @@ const ImageModerationPanel = () => {
       });
 
       if (error) throw error;
+
+      // Send push notification to user
+      if (imageToReject?.user_id) {
+        try {
+          await sendAdminNotification(
+            '❌ Photo Rejected',
+            'One of your photos was removed as it did not meet our community guidelines. Please upload appropriate photos.',
+            imageToReject.user_id
+          );
+          console.log('📤 Image rejection notification sent to:', imageToReject.user_id);
+        } catch (notifError) {
+          console.error('📤 Failed to send rejection notification:', notifError);
+          // Don't fail the rejection if notification fails
+        }
+      }
 
       // Delete from storage if we have the image URL
       if (imageData?.image_url) {
@@ -302,6 +353,19 @@ const ImageModerationPanel = () => {
           console.error('Delete by URL error:', deleteByUrlError);
           throw deleteByUrlError;
         }
+      }
+
+      // Send push notification to user about image deletion
+      try {
+        await sendAdminNotification(
+          '⚠️ Photo Removed',
+          'One of your photos was removed after review. It violated our community guidelines. Please ensure all photos are appropriate.',
+          reportedUserId
+        );
+        console.log('📤 Image deletion notification sent to:', reportedUserId);
+      } catch (notifError) {
+        console.error('📤 Failed to send deletion notification:', notifError);
+        // Don't fail the deletion if notification fails
       }
 
       // Delete from storage

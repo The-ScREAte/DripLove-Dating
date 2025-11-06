@@ -306,6 +306,20 @@ const ProfilePage = ({ currentUser, profile, onProfileUpdate, onLogout, onShowTe
       }
 
   setIsEditing(false);
+  
+  // Clear discover cache to force refresh with new settings
+  if (typeof window !== 'undefined' && (window as any).discoverCache && currentUser?.id) {
+    console.log('🔄 Clearing discover cache due to profile update');
+    (window as any).discoverCache.delete(currentUser.id);
+    
+    // Show toast notification
+    toast({
+      title: "Profile Updated! 🎉",
+      description: "Your changes have been saved. Visit DripCheck to see matches based on your new preferences!",
+      duration: 5000,
+    });
+  }
+  
   onProfileUpdate();
     } catch (error: any) {
       console.error('🚨 Save failed:', error);

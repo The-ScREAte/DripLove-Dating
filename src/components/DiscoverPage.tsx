@@ -1522,6 +1522,19 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, isPremium }: DiscoverPage
               setMatchedUser(prevMatch);
               setShowMatchAnimation(true);
               
+              // Clear chat cache to force refresh when user opens ChatPage
+              if (typeof window !== 'undefined' && (window as any).chatMatchesCache) {
+                console.log('💬 Clearing chat cache due to new match (fallback)');
+                (window as any).chatMatchesCache.delete(currentUser.id);
+              }
+              
+              // Trigger global event to notify ChatPage of new match
+              if (typeof window !== 'undefined') {
+                const event = new CustomEvent('newMatch', { detail: { userId: currentUser.id } });
+                window.dispatchEvent(event);
+                console.log('💬 Dispatched newMatch event (fallback)');
+              }
+              
               // Send match notification to the other user
               try {
                 const matchedUserName = `${currentUser.first_name || ''} ${currentUser.last_name || ''}`.trim() || 'Someone';
@@ -1549,6 +1562,19 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, isPremium }: DiscoverPage
           if ((rpcData as any)?.match) {
             setMatchedUser(prevMatch);
             setShowMatchAnimation(true);
+            
+            // Clear chat cache to force refresh when user opens ChatPage
+            if (typeof window !== 'undefined' && (window as any).chatMatchesCache) {
+              console.log('💬 Clearing chat cache due to new match');
+              (window as any).chatMatchesCache.delete(currentUser.id);
+            }
+            
+            // Trigger global event to notify ChatPage of new match
+            if (typeof window !== 'undefined') {
+              const event = new CustomEvent('newMatch', { detail: { userId: currentUser.id } });
+              window.dispatchEvent(event);
+              console.log('💬 Dispatched newMatch event');
+            }
             
             // Send match notification to the other user
             try {

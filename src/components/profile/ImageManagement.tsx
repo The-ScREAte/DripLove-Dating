@@ -8,7 +8,7 @@ import {
   AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription,
   AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger
 } from '@/components/ui/alert-dialog';
-import { Upload, Trash2, Shield, AlertTriangle, CheckCircle } from 'lucide-react';
+import { Upload, Trash2, Shield, AlertTriangle, CheckCircle, RefreshCw } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import { moderateImage, saveModerationResult, ModerationResult } from '@/utils/photoModeration';
@@ -33,6 +33,7 @@ const ImageManagement = ({ currentUser }: ImageManagementProps) => {
   const [deleting, setDeleting] = useState(false);
   const [moderating, setModerating] = useState(false);
   const [moderationResult, setModerationResult] = useState<ModerationResult | null>(null);
+  const [replacingImageUrl, setReplacingImageUrl] = useState<string | null>(null);
   const { toast } = useToast();
 
   const fetchUserImages = useCallback(async () => {
@@ -89,7 +90,8 @@ const ImageManagement = ({ currentUser }: ImageManagementProps) => {
     const file = event.target.files?.[0];
     if (!file) return;
 
-    if (userImages.length >= 7) {
+    // Allow upload if replacing OR if under 7 images
+    if (!replacingImageUrl && userImages.length >= 7) {
       toast({ title: "Maximum images reached", description: "You can upload a maximum of 7 images.", variant: "destructive" });
       return;
     }
@@ -218,73 +220,140 @@ const ImageManagement = ({ currentUser }: ImageManagementProps) => {
 
       const publicUrl = urlData.publicUrl;
       
-      // Get the next available image order
-      const { data: existingImages, error: orderError } = await supabase
-        .from('user_images')
-        .select('image_order')
-        .eq('user_id', currentUser.id)
-        .order('image_order', { ascending: true });
+      // If replacing an existing image
+      if (replacingImageUrl) {
+        // Get the image order of the image being replaced
+        const { data: existingImage, error: orderError } = await supabase
+          .from('user_images')
+          .select('image_order')
+          .eq('user_id', currentUser.id)
+          .eq('image_url', replacingImageUrl)
+          .single();
 
-      if (orderError) {
-  // ...removed log...
-        throw orderError;
-      }
+        if (orderError) throw orderError;
 
-      // Find the next available order
-      let nextImageOrder = 1;
-      const existingOrders = existingImages?.map(img => img.image_order).filter(order => order > 0).sort((a, b) => a - b) || [];
-      
-      for (let i = 1; i <= 7; i++) {
-        if (!existingOrders.includes(i)) {
-          nextImageOrder = i;
-          break;
+        const imageOrder = existingImage?.image_order || 1;
+
+        // Delete old image from storage
+        const urlParts = replacingImageUrl.split('/');
+        const bucketIndex = urlParts.findIndex(part => part === 'user-photos');
+        if (bucketIndex !== -1 && bucketIndex < urlParts.length - 1) {
+          const filePath = urlParts.slice(bucketIndex + 1).join('/');
+          await supabase.storage
+            .from('user-photos')
+            .remove([filePath]);
         }
-      }
 
-      // Determine if image needs review
-      const requiresReview = moderationResult?.details?.requiresReview || false;
-      
-      // Prepare insert data
-      const insertData = {
-        user_id: currentUser.id, 
-        image_url: publicUrl, 
-        image_order: nextImageOrder,
-        is_approved: !requiresReview,
-        moderation_status: requiresReview ? 'pending' : 'approved',
-        moderation_notes: requiresReview 
-          ? `AI flagged: ${moderationResult?.message || 'Requires manual review'}`
-          : `Auto-approved: ${moderationResult?.message || 'Passed content guidelines'}`,
-        flagged_content: moderationResult?.flags || [],
-        confidence_score: Math.round(moderationResult?.confidence || 50)
-      };
+        // Delete old image from database
+        await supabase
+          .from('user_images')
+          .delete()
+          .eq('user_id', currentUser.id)
+          .eq('image_url', replacingImageUrl);
 
-      // Insert to database
-      const { error: dbError } = await supabase
-        .from('user_images')
-        .insert(insertData);
+        // Determine if image needs review
+        const requiresReview = moderationResult?.details?.requiresReview || false;
+        
+        // Insert new image with the same order
+        const insertData = {
+          user_id: currentUser.id, 
+          image_url: publicUrl, 
+          image_order: imageOrder,
+          is_approved: !requiresReview,
+          moderation_status: requiresReview ? 'pending' : 'approved',
+          moderation_notes: requiresReview 
+            ? `AI flagged: ${moderationResult?.message || 'Requires manual review'}`
+            : `Auto-approved: ${moderationResult?.message || 'Passed content guidelines'}`,
+          flagged_content: moderationResult?.flags || [],
+          confidence_score: Math.round(moderationResult?.confidence || 50)
+        };
 
-      if (dbError) {
-  // ...removed log...
-        throw dbError;
+        const { error: dbError } = await supabase
+          .from('user_images')
+          .insert(insertData);
+
+        if (dbError) throw dbError;
+
+        // Clear replacing state
+        setReplacingImageUrl(null);
+
+        toast({ 
+          title: "✅ Image replaced successfully", 
+          description: requiresReview 
+            ? "Your new image requires admin review before being visible to others."
+            : "Your image has been replaced and is now visible to others.",
+          variant: "default"
+        });
+      } else {
+        // Normal upload flow (not replacing)
+        // Get the next available image order
+        const { data: existingImages, error: orderError } = await supabase
+          .from('user_images')
+          .select('image_order')
+          .eq('user_id', currentUser.id)
+          .order('image_order', { ascending: true });
+
+        if (orderError) {
+    // ...removed log...
+          throw orderError;
+        }
+
+        // Find the next available order
+        let nextImageOrder = 1;
+        const existingOrders = existingImages?.map(img => img.image_order).filter(order => order > 0).sort((a, b) => a - b) || [];
+        
+        for (let i = 1; i <= 7; i++) {
+          if (!existingOrders.includes(i)) {
+            nextImageOrder = i;
+            break;
+          }
+        }
+
+        // Determine if image needs review
+        const requiresReview = moderationResult?.details?.requiresReview || false;
+        
+        // Prepare insert data
+        const insertData = {
+          user_id: currentUser.id, 
+          image_url: publicUrl, 
+          image_order: nextImageOrder,
+          is_approved: !requiresReview,
+          moderation_status: requiresReview ? 'pending' : 'approved',
+          moderation_notes: requiresReview 
+            ? `AI flagged: ${moderationResult?.message || 'Requires manual review'}`
+            : `Auto-approved: ${moderationResult?.message || 'Passed content guidelines'}`,
+          flagged_content: moderationResult?.flags || [],
+          confidence_score: Math.round(moderationResult?.confidence || 50)
+        };
+
+        // Insert to database
+        const { error: dbError } = await supabase
+          .from('user_images')
+          .insert(insertData);
+
+        if (dbError) {
+    // ...removed log...
+          throw dbError;
+        }
+          
+        // Show appropriate success message AFTER successful upload
+        if (requiresReview) {
+          toast({ 
+            title: "🔒 Image uploaded - Pending approval", 
+            description: "Your image requires admin review before others can see it.",
+            variant: "default"
+          });
+        } else {
+          toast({ 
+            title: "✅ Image uploaded successfully", 
+            description: "Your image has been approved and is now visible to others.",
+            variant: "default"
+          });
+        }
       }
         
       // Refresh the image list
       await fetchUserImages();
-      
-      // Show appropriate success message AFTER successful upload
-      if (requiresReview) {
-        toast({ 
-          title: "🔒 Image uploaded - Pending approval", 
-          description: "Your image requires admin review before others can see it.",
-          variant: "default"
-        });
-      } else {
-        toast({ 
-          title: "✅ Image uploaded successfully", 
-          description: "Your image has been approved and is now visible to others.",
-          variant: "default"
-        });
-      }
     } catch (error) {
   // ...removed log...
       
@@ -310,11 +379,22 @@ const ImageManagement = ({ currentUser }: ImageManagementProps) => {
     } finally {
       setUploading(false);
       setModerationResult(null);
+      setReplacingImageUrl(null); // Always clear replace state
       event.target.value = '';
     }
   };
 
   const handleDeleteImage = async (imageUrl: string) => {
+    // Check if only 2 images remain - prevent deletion
+    if (userImages.length <= 2) {
+      toast({ 
+        title: "Cannot delete image", 
+        description: "You must have at least 2 images. Use 'Replace' to change this image.", 
+        variant: "destructive" 
+      });
+      return;
+    }
+
     setDeleting(true);
 
     try {
@@ -351,6 +431,23 @@ const ImageManagement = ({ currentUser }: ImageManagementProps) => {
     }
   };
 
+  const handleReplaceImage = (imageUrl: string) => {
+    setReplacingImageUrl(imageUrl);
+    
+    // Show a toast notification
+    toast({ 
+      title: "Replace Mode", 
+      description: "Select a new image from your files to replace the current one.",
+      variant: "default"
+    });
+    
+    // Trigger file input click
+    const fileInput = document.getElementById('image_upload') as HTMLInputElement;
+    if (fileInput) {
+      fileInput.click();
+    }
+  };
+
   return (
     <Card>
       <CardHeader>
@@ -371,6 +468,27 @@ const ImageManagement = ({ currentUser }: ImageManagementProps) => {
         {userImages.length < 7 && (
           <div className="mb-6">
             <Label htmlFor="image_upload" className="block mb-2">Upload Image</Label>
+            
+            {replacingImageUrl && (
+              <div className="mb-2 p-2 bg-blue-50 border border-blue-200 rounded text-sm text-blue-700 flex items-center justify-between">
+                <span>🔄 Replace mode active - Click to cancel and upload new image instead</span>
+                <Button 
+                  variant="ghost" 
+                  size="sm" 
+                  onClick={() => {
+                    setReplacingImageUrl(null);
+                    toast({ 
+                      title: "Replace cancelled", 
+                      description: "You can now upload a new image normally.",
+                      variant: "default"
+                    });
+                  }}
+                  className="h-6 px-2 text-xs hover:bg-blue-100"
+                >
+                  Cancel Replace
+                </Button>
+              </div>
+            )}
          
             <Input 
               type="file" 
@@ -378,7 +496,13 @@ const ImageManagement = ({ currentUser }: ImageManagementProps) => {
               accept="image/*" 
               onChange={handleImageUpload} 
               disabled={uploading || moderating} 
-              className="w-full" 
+              className="w-full"
+              onClick={() => {
+                // Clear replace mode when user clicks the upload button directly
+                if (replacingImageUrl) {
+                  setReplacingImageUrl(null);
+                }
+              }}
             />
             {moderating && (
               <div className="text-sm text-purple-600 mt-2 flex items-center">
@@ -410,7 +534,7 @@ const ImageManagement = ({ currentUser }: ImageManagementProps) => {
         <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-4">
           {userImages.map((userImage, index) => (
             <div key={userImage.image_url} className="relative group">
-              <img src={userImage.image_url} alt={`User Image ${index + 1}`} className="w-full h-32 sm:h-40 object-cover rounded-lg shadow-sm" />
+              <img src={userImage.image_url} alt={`User Image ${index + 1}`} className="w-full h-28 sm:h-36 object-cover rounded-lg shadow-sm" />
               
               {/* Pending approval indicator */}
               {userImage.is_approved === false && (
@@ -419,25 +543,60 @@ const ImageManagement = ({ currentUser }: ImageManagementProps) => {
                 </div>
               )}
               
-              <AlertDialog>
-                <AlertDialogTrigger asChild>
-                  <Button variant="destructive" size="sm" className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity p-1 h-8 w-8">
-                    <Trash2 className="w-4 h-4" />
+              {/* Action buttons - top right corner */}
+              <div className="absolute top-2 right-2 flex gap-1">
+                {/* Show Replace button if only 2 images remain, otherwise show Delete */}
+                {userImages.length <= 2 ? (
+                  <Button 
+                    variant="default"
+                    size="sm" 
+                    onClick={() => handleReplaceImage(userImage.image_url)}
+                    className="opacity-0 group-hover:opacity-100 transition-opacity h-6 w-6 p-0 bg-blue-600 hover:bg-blue-700 rounded-full shadow-md"
+                    title="Replace image"
+                  >
+                    <RefreshCw className="w-3 h-3" />
                   </Button>
-                </AlertDialogTrigger>
-                <AlertDialogContent className="sm:max-w-md">
-                  <AlertDialogHeader>
-                    <AlertDialogTitle>Delete Image</AlertDialogTitle>
-                    <AlertDialogDescription>Are you sure you want to delete this image? This action cannot be undone.</AlertDialogDescription>
-                  </AlertDialogHeader>
-                  <AlertDialogFooter>
-                    <AlertDialogCancel>Cancel</AlertDialogCancel>
-                    <AlertDialogAction disabled={deleting} onClick={() => handleDeleteImage(userImage.image_url)} className="bg-red-600 hover:bg-red-700">
-                      {deleting ? 'Deleting...' : 'Delete'}
-                    </AlertDialogAction>
-                  </AlertDialogFooter>
-                </AlertDialogContent>
-              </AlertDialog>
+                ) : (
+                  <>
+                    {/* Replace button - always available */}
+                    <Button 
+                      variant="default"
+                      size="sm" 
+                      onClick={() => handleReplaceImage(userImage.image_url)}
+                      className="opacity-0 group-hover:opacity-100 transition-opacity h-6 w-6 p-0 bg-blue-600 hover:bg-blue-700 rounded-full shadow-md"
+                      title="Replace image"
+                    >
+                      <RefreshCw className="w-3 h-3" />
+                    </Button>
+                    
+                    {/* Delete button - only when more than 2 images */}
+                    <AlertDialog>
+                      <AlertDialogTrigger asChild>
+                        <Button 
+                          variant="destructive" 
+                          size="sm" 
+                          className="opacity-0 group-hover:opacity-100 transition-opacity h-6 w-6 p-0 rounded-full shadow-md"
+                          title="Delete image"
+                        >
+                          <Trash2 className="w-3 h-3" />
+                        </Button>
+                      </AlertDialogTrigger>
+                      <AlertDialogContent className="sm:max-w-md">
+                        <AlertDialogHeader>
+                          <AlertDialogTitle>Delete Image</AlertDialogTitle>
+                          <AlertDialogDescription>Are you sure you want to delete this image? This action cannot be undone.</AlertDialogDescription>
+                        </AlertDialogHeader>
+                        <AlertDialogFooter>
+                          <AlertDialogCancel>Cancel</AlertDialogCancel>
+                          <AlertDialogAction disabled={deleting} onClick={() => handleDeleteImage(userImage.image_url)} className="bg-red-600 hover:bg-red-700">
+                            {deleting ? 'Deleting...' : 'Delete'}
+                          </AlertDialogAction>
+                        </AlertDialogFooter>
+                      </AlertDialogContent>
+                    </AlertDialog>
+                  </>
+                )}
+              </div>
             </div>
           ))}
         </div>

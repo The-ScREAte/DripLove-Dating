@@ -14,6 +14,8 @@ export interface ModerationResult {
     explicitContent?: number;
     suggestiveContent?: number;
     faceDetected?: boolean;
+    personDetected?: boolean;
+    humanConfidence?: number;
     imageQuality?: 'good' | 'poor' | 'blurry';
     requiresReview?: boolean;
   };
@@ -26,6 +28,7 @@ export interface ModerationFlags {
   VIOLENCE: string;
   INAPPROPRIATE: string;
   NO_FACE_DETECTED: string;
+  NO_PERSON_DETECTED: string;
   POOR_QUALITY: string;
   MULTIPLE_FACES: string;
   INVALID_IMAGE: string;
@@ -39,6 +42,7 @@ const MODERATION_FLAGS: ModerationFlags = {
   VIOLENCE: 'Violent content detected',
   INAPPROPRIATE: 'Inappropriate content detected',
   NO_FACE_DETECTED: 'No face detected in image',
+  NO_PERSON_DETECTED: 'No person detected in image',
   POOR_QUALITY: 'Image quality is too poor',
   MULTIPLE_FACES: 'Multiple faces detected',
   INVALID_IMAGE: 'Invalid or corrupted image',
@@ -67,6 +71,7 @@ class PhotoModerationService {
       const analyses = await Promise.all([
         this.analyzeImageContent(imageData),
         this.detectFaces(imageData),
+        this.detectPerson(imageData),
         this.checkImageQuality(imageData),
         this.validateImageProperties(file)
       ]);
@@ -654,6 +659,190 @@ class PhotoModerationService {
   }
 
   /**
+   * Detect human figure/person in the image using body shape analysis
+   */
+  private async detectPerson(imageData: ImageData): Promise<Partial<ModerationResult>> {
+    const data = imageData.data;
+    const width = imageData.width;
+    const height = imageData.height;
+    const pixels = data.length / 4;
+    
+    // Method 1: Skin tone distribution analysis
+    let skinPixels = 0;
+    let headRegionSkin = 0;
+    let torsoRegionSkin = 0;
+    let limbsRegionSkin = 0;
+    
+    // Divide image into regions (head, torso, limbs)
+    const headHeight = Math.floor(height * 0.3); // Top 30% for head
+    const torsoHeight = Math.floor(height * 0.5); // Middle 50% for torso
+    
+    for (let y = 0; y < height; y++) {
+      for (let x = 0; x < width; x++) {
+        const idx = (y * width + x) * 4;
+        const r = data[idx];
+        const g = data[idx + 1];
+        const b = data[idx + 2];
+        
+        if (this.isSkinTone(r, g, b) || this.isFleshColor(r, g, b) || 
+            this.isMaleNudityColor(r, g, b) || this.isBlackMaleNudityColor(r, g, b)) {
+          skinPixels++;
+          
+          // Track regional distribution
+          if (y < headHeight) {
+            headRegionSkin++;
+          } else if (y < torsoHeight) {
+            torsoRegionSkin++;
+          } else {
+            limbsRegionSkin++;
+          }
+        }
+      }
+    }
+    
+    const skinRatio = skinPixels / pixels;
+    const headSkinRatio = headRegionSkin / (width * headHeight);
+    const torsoSkinRatio = torsoRegionSkin / (width * (torsoHeight - headHeight));
+    
+    // Method 2: Vertical body structure detection
+    let verticalBodyPatterns = 0;
+    const sampleWidth = 10; // Sample every 10 pixels
+    
+    for (let x = 0; x < width; x += sampleWidth) {
+      let skinInColumn = 0;
+      let continuousSkinStreak = 0;
+      let maxStreak = 0;
+      
+      for (let y = 0; y < height; y++) {
+        const idx = (y * width + x) * 4;
+        const r = data[idx];
+        const g = data[idx + 1];
+        const b = data[idx + 2];
+        
+        if (this.isSkinTone(r, g, b) || this.isFleshColor(r, g, b)) {
+          skinInColumn++;
+          continuousSkinStreak++;
+          maxStreak = Math.max(maxStreak, continuousSkinStreak);
+        } else {
+          continuousSkinStreak = 0;
+        }
+      }
+      
+      // Body-like pattern: continuous vertical skin distribution (RELAXED)
+      if (maxStreak > height * 0.2 && skinInColumn > height * 0.15) {
+        verticalBodyPatterns++;
+      }
+    }
+    
+    const verticalBodyRatio = verticalBodyPatterns / (width / sampleWidth);
+    
+    // Method 3: Aspect ratio and proportions (human body is typically vertical)
+    const aspectRatio = height / width;
+    const isVerticalOrientation = aspectRatio > 0.6; // More relaxed
+    
+    // Method 4: Edge density in typical body regions
+    const edgeDensity = await this.calculateEdgeDensity(imageData);
+    const hasBodyEdgePattern = edgeDensity > 0.03 && edgeDensity < 0.5; // More relaxed
+    
+    // Calculate confidence score for person detection (MUCH MORE RELAXED)
+    let humanConfidence = 0;
+    
+    // Skin distribution scoring (50 points max) - MORE GENEROUS
+    if (skinRatio > 0.08) { // Lowered from 0.15 to 0.08
+      humanConfidence += Math.min(skinRatio * 80, 50); // Increased multiplier
+    }
+    
+    // Regional distribution scoring (25 points max) - MORE RELAXED
+    if (headSkinRatio > 0.05 || torsoSkinRatio > 0.05) { // Lowered from 0.1
+      humanConfidence += 25;
+    }
+    
+    // Vertical body structure scoring (20 points max) - MORE GENEROUS
+    if (verticalBodyRatio > 0.1) { // Lowered from 0.2
+      humanConfidence += Math.min(verticalBodyRatio * 60, 20); // Increased multiplier
+    }
+    
+    // Aspect ratio scoring (10 points max)
+    if (isVerticalOrientation) {
+      humanConfidence += 10;
+    }
+    
+    // Edge pattern scoring (10 points max) - INCREASED
+    if (hasBodyEdgePattern) {
+      humanConfidence += 10; // Increased from 5
+    }
+    
+    // BONUS: If any skin is detected at all, give baseline confidence
+    if (skinRatio > 0.03) { // Any skin detected
+      humanConfidence = Math.max(humanConfidence, 40); // Ensure at least 40% confidence
+    }
+    
+    // Determine if person is detected with RELAXED confidence levels
+    const personDetected = humanConfidence >= 35; // Lowered from 50% to 35%
+    const highConfidence = humanConfidence >= 60; // Lowered from 75% to 60%
+    
+    const flags: string[] = [];
+    let requiresReview = false;
+    
+    // Decision logic based on confidence (MORE LENIENT)
+    if (!personDetected) {
+      // No person detected - reject
+      flags.push(MODERATION_FLAGS.NO_PERSON_DETECTED);
+    } else if (!highConfidence) {
+      // Low to medium confidence - send for admin review
+      requiresReview = true;
+    }
+    // High confidence - auto-approve (no flags needed)
+    
+    return {
+      flags,
+      details: {
+        personDetected,
+        humanConfidence,
+        requiresReview
+      }
+    };
+  }
+
+  /**
+   * Calculate edge density for body detection
+   */
+  private async calculateEdgeDensity(imageData: ImageData): Promise<number> {
+    const data = imageData.data;
+    const width = imageData.width;
+    const height = imageData.height;
+    
+    // Convert to grayscale
+    const gray = new Uint8Array(width * height);
+    for (let i = 0; i < data.length; i += 4) {
+      const r = data[i];
+      const g = data[i + 1];
+      const b = data[i + 2];
+      gray[i / 4] = Math.round(0.299 * r + 0.587 * g + 0.114 * b);
+    }
+    
+    let edgeCount = 0;
+    const threshold = 30;
+    
+    for (let y = 1; y < height - 1; y++) {
+      for (let x = 1; x < width - 1; x++) {
+        const idx = y * width + x;
+        
+        // Simple edge detection
+        const dx = Math.abs(gray[idx + 1] - gray[idx - 1]);
+        const dy = Math.abs(gray[idx + width] - gray[idx - width]);
+        const gradient = Math.sqrt(dx * dx + dy * dy);
+        
+        if (gradient > threshold) {
+          edgeCount++;
+        }
+      }
+    }
+    
+    return edgeCount / (width * height);
+  }
+
+  /**
    * Check image quality metrics
    */
   private async checkImageQuality(imageData: ImageData): Promise<Partial<ModerationResult>> {
@@ -741,28 +930,42 @@ class PhotoModerationService {
     let message = '';
     let requiresReview = false;
 
-    // Block completely invalid files
+    // PRIORITY 1: Block completely invalid files
     if (hasBlockingFlags) {
       isApproved = false;
       confidence = 95;
       message = 'Image file is corrupted or invalid and cannot be uploaded.';
       // Image blocked: Invalid file
     }
-    // ⚠️ REVIEW: For explicit nudity, allow upload but require admin review (never outright reject for nudity)
+    // PRIORITY 2: Check for person detection
+    else if (allFlags.includes(MODERATION_FLAGS.NO_PERSON_DETECTED)) {
+      // No person detected - REJECT the image
+      isApproved = false;
+      confidence = 90;
+      message = 'No person detected in image. Profile photos must clearly show a person.';
+    }
+    // PRIORITY 3: If person detection has low confidence, send to admin for review
+    else if (combinedDetails.personDetected && combinedDetails.humanConfidence && combinedDetails.humanConfidence < 75) {
+      isApproved = true;
+      requiresReview = true;
+      confidence = 40;
+      message = 'Image uploaded but requires admin approval to verify it shows a person.';
+    }
+    // PRIORITY 4: For explicit nudity, allow upload but require admin review
     else if (combinedDetails.explicitContent && combinedDetails.explicitContent >= 95) {
       isApproved = true; // Allow upload
       requiresReview = true;
       confidence = 20;
       message = 'Image uploaded but requires admin approval due to explicit nudity.';
     }
-    // ⚠️ REVIEW blood/gore content (send to admin, don't auto-approve)
+    // PRIORITY 5: REVIEW blood/gore content (send to admin, don't auto-approve)
     else if (allFlags.includes(MODERATION_FLAGS.BLOOD_GORE)) {
       isApproved = true; // Allow upload but require review
       requiresReview = true;
       confidence = 20;
       message = 'Image uploaded but requires admin approval due to potential violent content.';
     }
-    // ⚠️ REVIEW AI-generated content (send to admin) - RELAXED
+    // PRIORITY 6: REVIEW AI-generated content (send to admin) - RELAXED
     else if (allFlags.includes(MODERATION_FLAGS.AI_GENERATED) && combinedDetails.explicitContent && combinedDetails.explicitContent >= 80) {
       isApproved = true; // Allow upload but require review
       requiresReview = true;

@@ -9,6 +9,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { defaultPaymentMethods, PaymentMethod } from '@/constants/paymentConfig';
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
+import { usePushNotifications } from '@/hooks/usePushNotifications';
 import UserProfileModal from '@/components/UserProfileModal';
 import StatsCard from './admin/StatsCard';
 import UserModerationPanel from './admin/UserModerationPanel';
@@ -122,6 +123,9 @@ const AdminPageComponent = ({ currentUser, onLogout }: AdminPageProps) => {
   // Constants
   const usersPerPage = 20;
   const { toast } = useToast();
+  
+  // Push notifications hook for sending admin notifications
+  const { sendAdminNotification } = usePushNotifications(currentUser?.id);
 
   // Fetch payment config from DB on mount
   useEffect(() => {
@@ -634,6 +638,19 @@ const AdminPageComponent = ({ currentUser, onLogout }: AdminPageProps) => {
       });
       if (error) throw error;
 
+      // Send push notification to blocked user
+      try {
+        await sendAdminNotification(
+          '🚫 Account Blocked',
+          'Your account has been blocked due to community guideline violations. Please contact support if you believe this is an error.',
+          reportedUserId
+        );
+        console.log('📤 Account block notification sent to:', reportedUserId);
+      } catch (notifError) {
+        console.error('📤 Failed to send block notification:', notifError);
+        // Don't fail the block action if notification fails
+      }
+
       // Optionally remove the report after blocking
   const { error: repErr } = await supabase.from('reported_chats').delete().eq('id', reportId);
       if (repErr) throw repErr;
@@ -918,6 +935,33 @@ const AdminPageComponent = ({ currentUser, onLogout }: AdminPageProps) => {
       });
 
       if (error) throw error;
+
+      // Send push notification based on status change
+      try {
+        const notificationMessages = {
+          'active': {
+            title: '✅ Account Activated',
+            body: 'Your account has been activated. You can now use all features of the app!'
+          },
+          'on_hold': {
+            title: '⏸️ Account On Hold',
+            body: 'Your account has been placed on hold pending review. Please contact support for more information.'
+          },
+          'blocked': {
+            title: '🚫 Account Blocked',
+            body: 'Your account has been blocked due to policy violations. Contact support if you believe this is an error.'
+          }
+        };
+
+        const notification = notificationMessages[newStatus as keyof typeof notificationMessages];
+        if (notification) {
+          await sendAdminNotification(notification.title, notification.body, userId);
+          console.log('📤 Account status notification sent to:', userId, '- Status:', newStatus);
+        }
+      } catch (notifError) {
+        console.error('📤 Failed to send status notification:', notifError);
+        // Don't fail the status update if notification fails
+      }
 
       // Optimistic update for better UX
       setUsers(users.map(user => 
