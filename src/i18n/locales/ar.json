@@ -25,7 +25,8 @@
     "select": "اختر",
     "findYourPerfectMatch": "ابحث عن شريكك المثالي",
     "findYour": "ابحث عن",
-    "perfectMatch": "شريكك المثالي 💖"
+    "perfectMatch": "شريكك المثالي 💖",
+    "clickToClose": "انقر للإغلاق"
   },
   "auth": {
     "signIn": "تسجيل الدخول",

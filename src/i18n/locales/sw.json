@@ -25,7 +25,8 @@
     "select": "Chagua",
     "findYourPerfectMatch": "Pata Mwenzi Wako Kamili",
     "findYour": "Pata",
-    "perfectMatch": "Mwenzi Wako Kamili 💖"
+    "perfectMatch": "Mwenzi Wako Kamili 💖",
+    "clickToClose": "Bonyeza kufunga"
   },
   "auth": {
     "signIn": "Ingia",

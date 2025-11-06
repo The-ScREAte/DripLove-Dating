@@ -128,7 +128,7 @@ const AdinkraBar: React.FC = () => {
         >
           <strong className="text-base mb-1">{adinkraSymbols[tooltipIdx].name}</strong>
           <div className="mt-1 text-center">{t(`adinkraMeanings.${adinkraSymbols[tooltipIdx].name}`)}</div>
-          <div className="text-[10px] text-gray-400 mt-2">(Click to close)</div>
+          <div className="text-[10px] text-gray-400 mt-2">({t('common.clickToClose')})</div>
         </div>
       )}
     </div>

@@ -25,7 +25,8 @@
     "select": "Select",
     "findYourPerfectMatch": "Find Your Perfect Match",
     "findYour": "Find Your",
-    "perfectMatch": "Perfect Match 💖"
+    "perfectMatch": "Perfect Match 💖",
+    "clickToClose": "Click to close"
   },
   "auth": {
     "signIn": "Sign In",

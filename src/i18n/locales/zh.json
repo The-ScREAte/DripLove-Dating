@@ -25,7 +25,8 @@
     "select": "选择",
     "findYourPerfectMatch": "找到您的完美伴侣",
     "findYour": "找到您的",
-    "perfectMatch": "完美伴侣 💖"
+    "perfectMatch": "完美伴侣 💖",
+    "clickToClose": "点击关闭"
   },
   "auth": {
     "signIn": "登录",

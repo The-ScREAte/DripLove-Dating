@@ -25,7 +25,8 @@
     "select": "Selecionar",
     "findYourPerfectMatch": "Encontre Seu Par Perfeito",
     "findYour": "Encontre Seu",
-    "perfectMatch": "Par Perfeito 💖"
+    "perfectMatch": "Par Perfeito 💖",
+    "clickToClose": "Clique para fechar"
   },
   "auth": {
     "signIn": "Entrar",
