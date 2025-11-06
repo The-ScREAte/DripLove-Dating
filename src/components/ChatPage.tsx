@@ -1134,9 +1134,41 @@ const ChatPage = ({ currentUser, onUnreadChange, onDetailViewChange }: ChatPageP
         </div>
       </div>
     )}
-          {conversationList.length === 0 ? (
-            <div className="p-4 text-center text-gray-500">
-              {t('chat.noConversations')}
+          {conversationList.length === 0 && newMatchList.length === 0 ? (
+            <div className="flex flex-col items-center justify-center p-8 text-center mt-20">
+              <div className="mb-6">
+                <div className="w-24 h-24 mx-auto rounded-full bg-gradient-to-br from-pink-100 to-purple-100 flex items-center justify-center">
+                  <span className="text-5xl">💬</span>
+                </div>
+              </div>
+              <h3 className="text-xl font-bold text-gray-800 mb-3">
+                No Matches Yet
+              </h3>
+              <p className="text-gray-600 mb-2 max-w-sm">
+                Swipe right on profiles in DripCheck to start matching!
+              </p>
+              <p className="text-sm text-gray-500 mb-6">
+                The more you swipe, the more matches you'll get 💕
+              </p>
+              <div className="flex items-center gap-2 text-pink-600 font-medium">
+                <span>💧</span>
+                <span>Start swiping in DripCheck</span>
+                <span>→</span>
+              </div>
+            </div>
+          ) : conversationList.length === 0 ? (
+            <div className="flex flex-col items-center justify-center p-8 text-center mt-12">
+              <div className="mb-6">
+                <div className="w-20 h-20 mx-auto rounded-full bg-gradient-to-br from-pink-100 to-purple-100 flex items-center justify-center">
+                  <span className="text-4xl">✨</span>
+                </div>
+              </div>
+              <h3 className="text-lg font-bold text-gray-800 mb-2">
+                New Matches Waiting!
+              </h3>
+              <p className="text-gray-600 max-w-sm">
+                Tap on a match above to send your first message
+              </p>
             </div>
           ) : (
             conversationList.map((match) => {
@@ -1247,25 +1279,46 @@ const ChatPage = ({ currentUser, onUnreadChange, onDetailViewChange }: ChatPageP
         onTouchMove={handleSwipeMove}
         onTouchEnd={handleSwipeEnd}
       >
-        {messages.map((message, index) => {
-          const prevMessage = messages[index - 1];
-          const isConsecutive = prevMessage &&
-            prevMessage.sender_id === message.sender_id &&
-            new Date(message.created_at || message.sent_at || '').getTime() -
-            new Date(prevMessage.created_at || prevMessage.sent_at || '').getTime() < 300000;
+        {messages.length === 0 ? (
+          <div className="flex flex-col items-center justify-center h-full pt-20">
+            <div className="mb-6">
+              <div className="w-20 h-20 mx-auto rounded-full bg-gradient-to-br from-pink-100 to-purple-100 flex items-center justify-center">
+                <span className="text-4xl">👋</span>
+              </div>
+            </div>
+            <h3 className="text-lg font-bold text-gray-800 mb-2">
+              {t('chat.startConversation')}
+            </h3>
+            <p className="text-gray-600 text-center px-6 max-w-sm mb-4">
+              {t('chat.sayHelloTo', { name: selectedMatch?.first_name })}
+            </p>
+            <div className="text-sm text-gray-500 text-center px-6">
+              {t('chat.conversationTip')}
+            </div>
+          </div>
+        ) : (
+          <>
+            {messages.map((message, index) => {
+              const prevMessage = messages[index - 1];
+              const isConsecutive = prevMessage &&
+                prevMessage.sender_id === message.sender_id &&
+                new Date(message.created_at || message.sent_at || '').getTime() -
+                new Date(prevMessage.created_at || prevMessage.sent_at || '').getTime() < 300000;
 
-          return (
-            <MessageBubble
-              key={message.id}
-              message={message}
-              currentUser={currentUser}
-              isConsecutive={isConsecutive}
-              onDeleteForMe={deleteMessageForMe}
-              onDeleteForEveryone={deleteMessageForEveryone}
-            />
-          );
-        })}
-        <div ref={messagesEndRef} />
+              return (
+                <MessageBubble
+                  key={message.id}
+                  message={message}
+                  currentUser={currentUser}
+                  isConsecutive={isConsecutive}
+                  onDeleteForMe={deleteMessageForMe}
+                  onDeleteForEveryone={deleteMessageForEveryone}
+                />
+              );
+            })}
+            <div ref={messagesEndRef} />
+          </>
+        )}
       </div>
 
       {/* Message Input (fixed, non-scrolling). MessageInput now owns its container so it can control safe-area and stacking */}

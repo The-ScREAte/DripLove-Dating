@@ -364,7 +364,7 @@
     "offline": "غير متصل",
     "typing": "يكتب...",
     "noMessages": "لا توجد رسائل بعد",
-    "startConversation": "ابدأ محادثة",
+    "startConversation": "ابدأ المحادثة!",
     "unmatchWarning": "هل أنت متأكد من إلغاء هذا التطابق؟",
     "blockWarning": "هل أنت متأكد من حظر هذا المستخدم؟",
     "reportUser": "إبلاغ عن المستخدم",
@@ -403,7 +403,9 @@
     "sendMessage": "إرسال رسالة",
     "moreOptions": "المزيد من الخيارات",
     "goBack": "العودة إلى قائمة الدردشة",
-    "speaks": "يتحدث {{language}}"
+    "speaks": "يتحدث {{language}}",
+    "sayHelloTo": "قل مرحبا لـ {name}! اكسر الجليد وابدأ الدردشة 💬",
+    "conversationTip": "نصيحة: اسأل عن اهتماماتهم أو شارك شيئًا ممتعًا!"
   },
   "premium": {
     "goPremium": "الترقية إلى Premium",

@@ -369,7 +369,7 @@
     "offline": "Offline",
     "typing": "tippt...",
     "noMessages": "Noch keine Nachrichten",
-    "startConversation": "Unterhaltung beginnen",
+    "startConversation": "Starte das Gespräch!",
     "unmatchWarning": "Möchten Sie dieses Match wirklich auflösen?",
     "blockWarning": "Möchten Sie diesen Benutzer wirklich blockieren?",
     "reportUser": "Benutzer melden",
@@ -407,7 +407,9 @@
     "sendMessage": "Nachricht senden",
     "moreOptions": "Weitere Optionen",
     "goBack": "Zurück zur Chat-Liste",
-    "speaks": "Spricht {{language}}"
+    "speaks": "Spricht {{language}}",
+    "sayHelloTo": "Sag Hallo zu {name}! Brich das Eis und fang an zu chatten 💬",
+    "conversationTip": "Tipp: Frag nach ihren Interessen oder teile etwas Lustiges!"
   },
   "premium": {
     "upgrade": "Upgrade",

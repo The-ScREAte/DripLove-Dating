@@ -364,7 +364,7 @@
     "offline": "Offline",
     "typing": "typing...",
     "noMessages": "No messages yet",
-    "startConversation": "Start a conversation",
+    "startConversation": "Start the Conversation!",
     "unmatchWarning": "Are you sure you want to unmatch?",
     "blockWarning": "Are you sure you want to block this user?",
     "reportUser": "Report User",
@@ -402,7 +402,9 @@
     "sendMessage": "Send message",
     "moreOptions": "More options",
     "goBack": "Go back to chat list",
-    "speaks": "Speaks {{language}}"
+    "speaks": "Speaks {{language}}",
+    "sayHelloTo": "Say hello to {name}! Break the ice and start chatting 💬",
+    "conversationTip": "Tip: Ask about their interests or share something fun!"
   },
   "premium": {
     "goPremium": "Go Premium",

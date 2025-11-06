@@ -364,7 +364,7 @@
     "offline": "Nje ya Mkondo",
     "typing": "anaandika...",
     "noMessages": "Hakuna ujumbe bado",
-    "startConversation": "Anza mazungumzo",
+    "startConversation": "Anza Mazungumzo!",
     "unmatchWarning": "Una uhakika unataka kuondoa mechi hii?",
     "blockWarning": "Una uhakika unataka kuzuia mtumiaji huyu?",
     "reportUser": "Ripoti Mtumiaji",
@@ -403,7 +403,9 @@
     "sendMessage": "Tuma ujumbe",
     "moreOptions": "Chaguo zaidi",
     "goBack": "Rudi kwenye orodha ya mazungumzo",
-    "speaks": "Anazungumza {{language}}"
+    "speaks": "Anazungumza {{language}}",
+    "sayHelloTo": "Sema habari kwa {name}! Vunja barafu na uanze kuzungumza 💬",
+    "conversationTip": "Kidokezo: Uliza kuhusu mapenzi yao au shiriki kitu cha kufurahisha!"
   },
   "premium": {
     "goPremium": "Pata Premium",

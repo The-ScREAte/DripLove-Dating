@@ -687,14 +687,6 @@ const RegistrationForm = ({ onSubmit, onBackToLogin }: RegistrationFormProps) =>
         <CardTitle className="text-2xl font-bold bg-gradient-to-r from-pink-600 to-purple-600 bg-clip-text text-transparent animate-fade-in">
           {currentStep === 1 ? t('registration.createAccount') : currentStep === 2 ? t('registration.tellUsMore') : t('registration.addPhotos')}
         </CardTitle>
-        <CardDescription className="text-gray-600 animate-fade-in">
-          {currentStep === 1 
-            ? t('registration.step1Description')
-            : currentStep === 2
-            ? t('registration.step2Description')
-            : t('registration.step3Description')
-          }
-        </CardDescription>
       </CardHeader>
       <CardContent className="animate-fade-in" style={{ paddingBottom: 0, marginBottom: 0 }}>
         <form onSubmit={handleSubmit} className="space-y-8">

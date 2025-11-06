@@ -364,7 +364,7 @@
     "offline": "离线",
     "typing": "正在输入...",
     "noMessages": "还没有消息",
-    "startConversation": "开始对话",
+    "startConversation": "开始对话！",
     "unmatchWarning": "您确定要取消此匹配吗？",
     "blockWarning": "您确定要屏蔽此用户吗？",
     "reportUser": "举报用户",
@@ -403,7 +403,9 @@
     "sendMessage": "发送消息",
     "moreOptions": "更多选项",
     "goBack": "返回聊天列表",
-    "speaks": "说{{language}}"
+    "speaks": "说{{language}}",
+    "sayHelloTo": "向{name}打个招呼！破冰开始聊天 💬",
+    "conversationTip": "提示：询问他们的兴趣或分享有趣的事情！"
   },
   "premium": {
     "goPremium": "升级到高级版",

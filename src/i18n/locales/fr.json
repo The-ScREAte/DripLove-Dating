@@ -369,7 +369,7 @@
     "offline": "Hors ligne",
     "typing": "tape...",
     "noMessages": "Pas encore de messages",
-    "startConversation": "Démarrer une conversation",
+    "startConversation": "Commencez la Conversation !",
     "unmatchWarning": "Êtes-vous sûr de vouloir annuler ce match?",
     "blockWarning": "Êtes-vous sûr de vouloir bloquer cet utilisateur?",
     "reportUser": "Signaler l'utilisateur",
@@ -407,7 +407,9 @@
     "sendMessage": "Envoyer le message",
     "moreOptions": "Plus d'options",
     "goBack": "Retour à la liste des conversations",
-    "speaks": "Parle {{language}}"
+    "speaks": "Parle {{language}}",
+    "sayHelloTo": "Dites bonjour à {name} ! Brisez la glace et commencez à discuter 💬",
+    "conversationTip": "Astuce : Posez des questions sur leurs centres d'intérêt ou partagez quelque chose d'amusant !"
   },
   "premium": {
     "upgrade": "Améliorer",

@@ -364,7 +364,7 @@
     "offline": "Offline",
     "typing": "digitando...",
     "noMessages": "Ainda não há mensagens",
-    "startConversation": "Iniciar conversa",
+    "startConversation": "Inicie a Conversa!",
     "unmatchWarning": "Tem certeza de que deseja desfazer este match?",
     "blockWarning": "Tem certeza de que deseja bloquear este usuário?",
     "reportUser": "Denunciar Usuário",
@@ -403,7 +403,9 @@
     "sendMessage": "Enviar mensagem",
     "moreOptions": "Mais opções",
     "goBack": "Voltar à lista de conversas",
-    "speaks": "Fala {{language}}"
+    "speaks": "Fala {{language}}",
+    "sayHelloTo": "Diga olá para {name}! Quebre o gelo e comece a conversar 💬",
+    "conversationTip": "Dica: Pergunte sobre os interesses deles ou compartilhe algo divertido!"
   },
   "premium": {
     "goPremium": "Assinar Premium",
