@@ -10,143 +10,108 @@ import { supabase } from '@/integrations/supabase/client';
  */
 export async function handleOAuthRedirect(url?: string) {
   try {
-    // Step A: If a URL with fragment was provided, try setting session from fragment
+    let sessionData: any = null;
+
+    // Step A: If URL has tokens in fragment, set session immediately (fastest path)
     if (url) {
-      try {
-        const fragment = url.split('#')[1] || '';
-        const params = new URLSearchParams(fragment);
-        const access_token = params.get('access_token');
-        const refresh_token = params.get('refresh_token');
+      const fragment = url.split('#')[1] || '';
+      const params = new URLSearchParams(fragment);
+      const access_token = params.get('access_token');
+      const refresh_token = params.get('refresh_token');
 
-        if (access_token) {
-          console.log('[OAuthHandler] Found tokens in fragment; calling supabase.auth.setSession');
-          const { data, error } = await supabase.auth.setSession({ access_token, refresh_token } as any);
-          if (error) {
-            console.warn('[OAuthHandler] setSession returned error:', error);
-          } else {
-            console.log('[OAuthHandler] setSession success:', data);
-          }
+      if (access_token) {
+        console.log('[OAuthHandler] Setting session from URL tokens');
+        const { data, error } = await supabase.auth.setSession({ 
+          access_token, 
+          refresh_token: refresh_token || '' 
+        });
+        
+        if (error) {
+          console.warn('[OAuthHandler] setSession error:', error);
+        } else if (data?.session) {
+          sessionData = data;
+          console.log('[OAuthHandler] Session set successfully');
         }
-      } catch (e) {
-        console.warn('[OAuthHandler] Failed to set session from fragment:', e);
-      }
-
-      // Step B: If getSessionFromUrl is provided by the client, try it as it can
-      // parse provider callback fragments/queries that setSession may not handle.
-      try {
-        if ((supabase.auth as any).getSessionFromUrl) {
-          const { data, error } = await (supabase.auth as any).getSessionFromUrl({ url });
-          if (error) {
-            console.warn('[OAuthHandler] getSessionFromUrl returned error:', error);
-          } else {
-            console.log('[OAuthHandler] getSessionFromUrl success:', data);
-          }
-        }
-      } catch (e) {
-        console.warn('[OAuthHandler] getSessionFromUrl failed:', e);
       }
     }
 
-    // Step C: Always try to get session from client with optimized retry logic
-    async function tryGetSession(retries = 3, delayMs = 150) {
-      for (let i = 0; i < retries; i++) {
-        const { data: sessionData, error: sessionError } = await supabase.auth.getSession();
-        if (sessionError) {
-          console.warn('[OAuthHandler] getSession returned error:', sessionError);
-          throw sessionError;
-        }
-        if (sessionData?.session) {
-          return sessionData;
-        }
-
-        // Only wait if we're going to retry
-        if (i < retries - 1) {
-          await new Promise((res) => setTimeout(res, delayMs));
-        }
+    // Step B: If we don't have session yet, try getSession (no retries needed if tokens were set)
+    if (!sessionData?.session) {
+      const { data, error } = await supabase.auth.getSession();
+      if (error) {
+        console.warn('[OAuthHandler] getSession error:', error);
+        throw error;
       }
-
-      // Final attempt with diagnostics
-      const { data: finalData, error: finalError } = await supabase.auth.getSession();
-      if (finalError) console.warn('[OAuthHandler] final getSession error:', finalError);
-      if (!finalData?.session && typeof window !== 'undefined') {
-        console.warn('[OAuthHandler] No session found. URL:', window.location.href);
-      }
-      return finalData;
+      sessionData = data;
     }
-
-    const sessionData = await tryGetSession(3, 150);
     if (!sessionData?.session) {
       throw new Error('No session available after OAuth redirect');
     }
 
     const user = sessionData.session.user;
 
-    // Step D: Ensure profile exists and return profile info (matching OAuthCallback)
-    let { data: profile, error: profileError } = await supabase
-      .from('profiles')
-      .select('id, is_admin, account_status, first_name, last_name')
-      .eq('id', user.id)
-      .maybeSingle();
-
-    if (profileError) throw profileError;
-
-    // If no profile exists for an OAuth user, create a minimal profile record so
-    // the rest of the app (profile completion flow) can operate normally.
-    if (!profile) {
+    // Step C: Fetch or create profile asynchronously (don't block redirect)
+    // We'll do a quick check and create if needed, but won't wait for all retries
+    const profilePromise = (async () => {
       try {
-        const fullName = user.user_metadata?.full_name || user.user_metadata?.name || '';
-        const firstName = fullName.split(' ')[0] || '';
-        const lastName = fullName.split(' ').slice(1).join(' ') || '';
-
-        const { data: inserted, error: insertError } = await supabase
+        let { data: profile, error: profileError } = await supabase
           .from('profiles')
-          .insert({
-            id: user.id,
-            email: user.email,
-            first_name: firstName || null,
-            last_name: lastName || null,
-            date_of_birth: '1990-01-01',
-            country: null,
-            city: null,
-            gender: null,
-            preference: 'both',
-            relationship_intent: 'not-sure',
-            occupation: null,
-            industry: null,
-            education_level: null,
-            account_status: 'active',
-            is_admin: false,
-            terms_accepted: false
-          })
-          .select()
-          .single();
+          .select('id, is_admin, account_status, first_name, last_name, preferred_language')
+          .eq('id', user.id)
+          .maybeSingle();
 
-        if (insertError) {
-          console.error('[OAuthHandler] Failed creating profile for user:', user.id, insertError);
-        } else {
+        if (profileError) {
+          console.warn('[OAuthHandler] Profile fetch error:', profileError);
+          return null;
+        }
+
+        // Create profile if it doesn't exist
+        if (!profile) {
+          const fullName = user.user_metadata?.full_name || user.user_metadata?.name || '';
+          const firstName = fullName.split(' ')[0] || '';
+          const lastName = fullName.split(' ').slice(1).join(' ') || '';
+
+          const { data: inserted } = await supabase
+            .from('profiles')
+            .insert({
+              id: user.id,
+              email: user.email,
+              first_name: firstName || null,
+              last_name: lastName || null,
+              date_of_birth: '1990-01-01',
+              country: null,
+              city: null,
+              gender: null,
+              preference: 'both',
+              relationship_intent: 'not-sure',
+              account_status: 'active',
+              is_admin: false,
+              terms_accepted: false
+            })
+            .select()
+            .maybeSingle();
+
           profile = inserted;
-          console.log('[OAuthHandler] Created minimal profile for OAuth user:', user.id);
+          console.log('[OAuthHandler] Created profile for OAuth user:', user.id);
         }
-      } catch (e) {
-        console.error('[OAuthHandler] Exception creating profile for user:', user.id, e);
-      }
-    }
 
-    // Persist the profile into sessionStorage so native redirects (Capacitor
-    // deep links) and the initial app landing page can read it immediately
-    // without waiting for a DB read. This avoids a race where the app queries
-    // `profiles` before the newly inserted profile has fully propagated.
-    try {
-      if (typeof window !== 'undefined' && profile) {
-        try {
+        // Cache profile in sessionStorage
+        if (typeof window !== 'undefined' && profile) {
           sessionStorage.setItem('oauth_profile', JSON.stringify(profile));
-        } catch (e) {
-          console.warn('[OAuthHandler] Could not write oauth_profile to sessionStorage:', e);
         }
+
+        return profile;
+      } catch (e) {
+        console.error('[OAuthHandler] Profile operation failed:', e);
+        return null;
       }
-    } catch (e) {
-      // Ignore storage errors on platforms without a window/sessionStorage
-    }
+    })();
+
+    // Wait for profile but with a timeout to prevent blocking
+    const profile = await Promise.race([
+      profilePromise,
+      new Promise<null>((resolve) => setTimeout(() => resolve(null), 1000))
+    ]);
 
     return {
       session: sessionData.session,
