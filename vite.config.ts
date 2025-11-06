@@ -27,7 +27,7 @@ export default defineConfig(({ mode }) => ({
         '**/temp/**',
         '**/android/**',
         '**/ios/**'
-      ],
+      ], 
       // Use polling with a reasonable interval to reduce file watcher usage
       usePolling: true,
       interval: 1000,
