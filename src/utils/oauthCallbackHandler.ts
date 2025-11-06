@@ -47,54 +47,34 @@ export async function handleOAuthRedirect(url?: string) {
       }
     }
 
-    // Step C: Always try to get session from client (covers cookie/session cases)
-    // Some providers and environments (mobile webviews, cookie policies) can
-    // cause a short delay before the session is available. Retry a few times
-    // and log diagnostics if we still don't have a session.
-    async function tryGetSession(retries = 3, delayMs = 500) {
+    // Step C: Always try to get session from client with optimized retry logic
+    async function tryGetSession(retries = 3, delayMs = 150) {
       for (let i = 0; i < retries; i++) {
         const { data: sessionData, error: sessionError } = await supabase.auth.getSession();
         if (sessionError) {
           console.warn('[OAuthHandler] getSession returned error:', sessionError);
-          // If there's an error, still break out to avoid masking it later
           throw sessionError;
         }
         if (sessionData?.session) {
           return sessionData;
         }
 
-        // not available yet — wait and retry
-        await new Promise((res) => setTimeout(res, delayMs));
-      }
-
-      // Final attempt to gather diagnostics before throwing
-      try {
-        const { data: finalData, error: finalError } = await supabase.auth.getSession();
-        if (finalError) console.warn('[OAuthHandler] final getSession error:', finalError);
-        console.warn('[OAuthHandler] No session after retries. Diagnostics:');
-        try {
-          if (typeof window !== 'undefined') {
-            console.warn('[OAuthHandler] window.location.href =', window.location.href);
-            console.warn('[OAuthHandler] window.location.search =', window.location.search);
-            console.warn('[OAuthHandler] window.location.hash =', window.location.hash);
-            try {
-              console.warn('[OAuthHandler] document.cookie =', document.cookie);
-            } catch (e) {
-              console.warn('[OAuthHandler] document.cookie inaccessible:', e);
-            }
-          }
-        } catch (e) {
-          console.warn('[OAuthHandler] Diagnostics collection failed:', e);
+        // Only wait if we're going to retry
+        if (i < retries - 1) {
+          await new Promise((res) => setTimeout(res, delayMs));
         }
-
-        return finalData;
-      } catch (e) {
-        console.warn('[OAuthHandler] final diagnostic getSession failed:', e);
-        return null;
       }
+
+      // Final attempt with diagnostics
+      const { data: finalData, error: finalError } = await supabase.auth.getSession();
+      if (finalError) console.warn('[OAuthHandler] final getSession error:', finalError);
+      if (!finalData?.session && typeof window !== 'undefined') {
+        console.warn('[OAuthHandler] No session found. URL:', window.location.href);
+      }
+      return finalData;
     }
 
-    const sessionData = await tryGetSession(4, 500);
+    const sessionData = await tryGetSession(3, 150);
     if (!sessionData?.session) {
       throw new Error('No session available after OAuth redirect');
     }
