@@ -20,13 +20,13 @@ const LanguageSelector: React.FC<LanguageSelectorProps> = ({
   const { t } = useTranslation();
   
   const languages = [
-    { code: 'en', name: t('languages.english'), flag: '🇺🇸' },
-    { code: 'fr', name: t('languages.french'), flag: '🇫🇷' },
-    { code: 'de', name: t('languages.german'), flag: '🇩🇪' },
-    { code: 'zh', name: t('languages.chinese'), flag: '🇨🇳' },
-    { code: 'sw', name: t('languages.swahili'), flag: '🇰🇪' },
-    { code: 'pt', name: t('languages.portuguese'), flag: '🇵🇹' },
-    { code: 'ar', name: t('languages.arabic'), flag: '🇸🇦' },
+    { code: 'en', name: 'English' },
+    { code: 'fr', name: 'Français' },
+    { code: 'de', name: 'Deutsch' },
+    { code: 'zh', name: '中文' },
+    { code: 'sw', name: 'Kiswahili' },
+    { code: 'pt', name: 'Português' },
+    { code: 'ar', name: 'العربية' },
   ];
 
   const currentLanguage = languages.find(lang => lang.code === value) || languages[0];
@@ -44,8 +44,8 @@ const LanguageSelector: React.FC<LanguageSelectorProps> = ({
         <SelectTrigger className="w-full">
           <SelectValue>
             <span className="flex items-center gap-2">
-              <span>{currentLanguage.flag}</span>
-              <span>{currentLanguage.name}</span>
+              <Globe className="w-4 h-4" />
+              <span className="uppercase font-medium">{currentLanguage.code}</span>
             </span>
           </SelectValue>
         </SelectTrigger>
@@ -53,8 +53,8 @@ const LanguageSelector: React.FC<LanguageSelectorProps> = ({
           {languages.map((lang) => (
             <SelectItem key={lang.code} value={lang.code}>
               <span className="flex items-center gap-2">
-                <span>{lang.flag}</span>
-                <span>{lang.name}</span>
+                <Globe className="w-4 h-4" />
+                <span className="uppercase font-medium">{lang.code}</span>
               </span>
             </SelectItem>
           ))}

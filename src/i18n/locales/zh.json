@@ -683,49 +683,74 @@
   },
   "aboutUs": {
     "title": "关于DripLove",
-    "subtitle": "连接跨越大陆的心灵",
-    "ourStory": {
-      "heading": "我们的故事",
-      "description": "DripLove诞生于一个简单的信念：爱不应该受到边界的限制。我们创建了一个平台，庆祝多样性，促进真实的联系，并帮助人们找到他们的完美伴侣，无论他们身在何处。"
-    },
-    "ourMission": {
-      "heading": "我们的使命",
-      "description": "通过尖端技术和真正关心用户体验，使有意义的关系成为可能。我们致力于创建一个安全、包容和充满活力的社区，让爱情可以跨越文化和距离蓬勃发展。"
-    },
-    "whatMakesUsDifferent": {
-      "heading": "我们的与众不同之处",
-      "globalReach": "全球覆盖，本地化体验",
-      "globalReachDesc": "在多个国家和城市连接，同时尊重当地文化和偏好。",
-      "authenticProfiles": "真实个人资料",
-      "authenticProfilesDesc": "高级验证系统确保真实的联系和安全的约会环境。",
-      "smartMatching": "智能匹配",
-      "smartMatchingDesc": "我们的AI驱动算法考虑兴趣、价值观和兼容性以找到您的完美匹配。",
-      "culturalSensitivity": "文化敏感性",
-      "culturalSensitivityDesc": "我们理解并尊重不同的约会规范和文化偏好。"
-    },
-    "safetyFirst": {
-      "heading": "安全第一",
-      "description": "您的安全是我们的首要任务。我们采用行业领先的安全措施、照片验证和24/7审核团队，以确保积极和安全的约会体验。"
-    },
-    "joinOurCommunity": {
-      "heading": "加入我们的社区",
-      "description": "成为成千上万找到爱情、友谊和有意义联系的人之一。无论您是在寻找认真的关系还是遇见新朋友，DripLove都是您开始旅程的地方。"
-    },
-    "contactUs": {
-      "heading": "联系我们",
-      "description": "有问题或反馈？我们很乐意听取您的意见。"
-    },
+    "back": "返回",
+    "lastUpdated": "最后更新：2025年7月13日",
     "sections": {
+      "mission": {
+        "title": "我们的使命",
+        "content": [
+          "DripLove不仅仅是一个约会应用——我们是一个致力于帮助人们找到真实联系和有意义关系的全球社区。我们的使命是创建一个安全、包容和充满活力的平台，让爱没有界限。",
+          "无论您是在寻找灵魂伴侣、终身伴侣还是新朋友，DripLove都能提供工具和社区，帮助您发现真正重要的真实联系。"
+        ]
+      },
+      "different": {
+        "title": "我们的与众不同之处",
+        "intro": "DripLove在拥挤的约会应用市场中脱颖而出，因为我们致力于：",
+        "points": [
+          "基于共同价值观和兴趣的真实联系",
+          "庆祝所有背景的多元化全球社区",
+          "优先考虑兼容性的先进匹配算法",
+          "安全、可靠和无骚扰的环境",
+          "为每个人设计的包容性功能"
+        ]
+      },
+      "community": {
+        "title": "全球社区",
+        "content": [
+          "从纽约到内罗毕，从伦敦到拉各斯，从东京到多伦多——DripLove连接跨越大陆的心灵。我们的平台汇集了来自各行各业的活力灵魂，创造真正全球化的约会体验。",
+          "爱情不认边界，我们也不认。无论您是寻求本地联系还是国际浪漫，DripLove都能实现。"
+        ]
+      },
+      "values": {
+        "title": "我们的价值观",
+        "authenticity": {
+          "title": "真实性",
+          "description": "我们鼓励真诚的联系和真实的对话。"
+        },
+        "inclusivity": {
+          "title": "包容性",
+          "description": "无论背景、身份或信仰如何，每个人都受欢迎。"
+        },
+        "safety": {
+          "title": "安全",
+          "description": "您的安全和隐私是我们的首要任务。"
+        },
+        "innovation": {
+          "title": "创新",
+          "description": "我们不断改进以提供最佳的约会体验。"
+        }
+      },
+      "journey": {
+        "title": "我们的旅程",
+        "content": "DripLove成立于2024年，源于一个简单的信念：每个人都值得找到爱情。我们的团队热衷于创造将人们聚集在一起而不是分开的技术。"
+      },
+      "contact": {
+        "title": "联系我们",
+        "content": "我们很乐意听取我们社区的意见！无论您有问题、反馈，还是只是想打个招呼，我们都在这里为您服务。",
+        "email": "发送电子邮件至：",
+        "support": "如需支持咨询：",
+        "social": "在社交媒体上关注我们，了解最新功能和成功故事。"
+      },
       "company": {
         "title": "关于 The ScREAte Ltd",
         "content": [
-          "DripLove 由 The ScREAte Ltd 自豪地创建，这是一家致力于构建创新数字体验的科技公司，将人们聚集在一起。我们专注于创建促进真实人际联系的平台。",
+          "DripLove由The ScREAte Ltd自豪地创建，这是一家致力于构建创新数字体验的科技公司，将人们聚集在一起。我们专注于创建促进真实人际联系的平台。",
           "我们的团队将技术专长与对人际关系的深刻理解相结合，创造出对人们生活产生有意义影响的产品。"
         ]
       },
       "safety": {
         "title": "安全与保障",
-        "intro": "您的安全对我们至关重要。DripLove 实施全面的安全措施，包括：",
+        "intro": "您的安全对我们至关重要。DripLove实施全面的安全措施，包括：",
         "points": [
           "个人资料验证系统",
           "高级举报和屏蔽功能",

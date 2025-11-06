@@ -15,13 +15,13 @@ interface GlobalLanguageSelectorProps {
 }
 
 const languages = [
-  { code: 'en', name: 'English', flag: '🇺🇸' },
-  { code: 'fr', name: 'Français', flag: '🇫🇷' },
-  { code: 'de', name: 'Deutsch', flag: '🇩🇪' },
-  { code: 'zh', name: '中文', flag: '🇨🇳' },
-  { code: 'sw', name: 'Kiswahili', flag: '🇰🇪' },
-  { code: 'pt', name: 'Português', flag: '🇵🇹' },
-  { code: 'ar', name: 'العربية', flag: '🇸🇦' },
+  { code: 'en', name: 'English' },
+  { code: 'fr', name: 'Français' },
+  { code: 'de', name: 'Deutsch' },
+  { code: 'zh', name: '中文' },
+  { code: 'sw', name: 'Kiswahili' },
+  { code: 'pt', name: 'Português' },
+  { code: 'ar', name: 'العربية' },
 ];
 
 const GlobalLanguageSelector: React.FC<GlobalLanguageSelectorProps> = ({ 
@@ -66,7 +66,6 @@ const GlobalLanguageSelector: React.FC<GlobalLanguageSelectorProps> = ({
         <DropdownMenuTrigger asChild>
           <button className="flex items-center space-x-1 text-white hover:text-white/80 transition-colors duration-200 bg-transparent border-none cursor-pointer text-sm font-bold">
             <Globe className="h-4 w-4" />
-            <span>{currentLang.flag}</span>
             <span className="uppercase">{currentLang.code}</span>
           </button>
         </DropdownMenuTrigger>
@@ -79,7 +78,6 @@ const GlobalLanguageSelector: React.FC<GlobalLanguageSelectorProps> = ({
                 currentLanguage === language.code ? 'bg-purple-100' : ''
               }`}
             >
-              <span className="mr-2">{language.flag}</span>
               <span className="uppercase">{language.code}</span>
               {currentLanguage === language.code && (
                 <span className="ml-auto text-purple-600">✓</span>
@@ -96,7 +94,6 @@ const GlobalLanguageSelector: React.FC<GlobalLanguageSelectorProps> = ({
       <DropdownMenuTrigger asChild>
         <button className="flex items-center space-x-2 p-2 rounded-lg hover:bg-gray-100 transition-colors duration-200">
           <Globe className="h-5 w-5" />
-          <span>{currentLang.flag}</span>
           <span className="uppercase">{currentLang.code}</span>
         </button>
       </DropdownMenuTrigger>
@@ -109,7 +106,6 @@ const GlobalLanguageSelector: React.FC<GlobalLanguageSelectorProps> = ({
               currentLanguage === language.code ? 'bg-purple-100' : ''
             }`}
           >
-            <span className="mr-2">{language.flag}</span>
             <span className="uppercase">{language.code}</span>
             {currentLanguage === language.code && (
               <span className="ml-auto text-purple-600">✓</span>

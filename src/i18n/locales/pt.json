@@ -682,49 +682,74 @@
   },
   "aboutUs": {
     "title": "Sobre o DripLove",
-    "subtitle": "Conectando corações através dos continentes",
-    "ourStory": {
-      "heading": "Nossa História",
-      "description": "DripLove nasceu de uma crença simples: o amor não deve ser limitado por fronteiras. Criamos uma plataforma que celebra a diversidade, promove conexões genuínas e ajuda as pessoas a encontrarem seu par perfeito, não importa onde estejam."
-    },
-    "ourMission": {
-      "heading": "Nossa Missão",
-      "description": "Tornar relacionamentos significativos possíveis através de tecnologia de ponta e um cuidado genuíno pela experiência do usuário. Estamos comprometidos em criar uma comunidade segura, inclusiva e vibrante onde o amor pode florescer através de culturas e distâncias."
-    },
-    "whatMakesUsDifferent": {
-      "heading": "O Que Nos Torna Diferentes",
-      "globalReach": "Alcance Global, Experiência Local",
-      "globalReachDesc": "Conecte-se em vários países e cidades enquanto respeita culturas e preferências locais.",
-      "authenticProfiles": "Perfis Autênticos",
-      "authenticProfilesDesc": "Sistemas de verificação avançados garantem conexões genuínas e um ambiente de namoro seguro.",
-      "smartMatching": "Combinação Inteligente",
-      "smartMatchingDesc": "Nossos algoritmos movidos a IA consideram interesses, valores e compatibilidade para encontrar seu par perfeito.",
-      "culturalSensitivity": "Sensibilidade Cultural",
-      "culturalSensitivityDesc": "Entendemos e respeitamos diferentes normas de namoro e preferências culturais."
-    },
-    "safetyFirst": {
-      "heading": "Segurança em Primeiro Lugar",
-      "description": "Sua segurança é nossa principal prioridade. Empregamos medidas de segurança líderes do setor, verificação de fotos e uma equipe de moderação 24/7 para garantir uma experiência de namoro positiva e segura."
-    },
-    "joinOurCommunity": {
-      "heading": "Junte-se à Nossa Comunidade",
-      "description": "Seja um dos milhares que encontraram amor, amizade e conexões significativas. Esteja você procurando um relacionamento sério ou conhecer novos amigos, DripLove é onde sua jornada começa."
-    },
-    "contactUs": {
-      "heading": "Entre em Contato",
-      "description": "Tem perguntas ou feedback? Adoraríamos ouvir de você."
-    },
+    "back": "Voltar",
+    "lastUpdated": "Última Atualização: 13 de julho de 2025",
     "sections": {
+      "mission": {
+        "title": "Nossa Missão",
+        "content": [
+          "DripLove é mais do que apenas um aplicativo de namoro – somos uma comunidade global dedicada a ajudar as pessoas a encontrar conexões autênticas e relacionamentos significativos. Nossa missão é criar uma plataforma segura, inclusiva e vibrante onde o amor não conhece fronteiras.",
+          "Seja procurando sua alma gêmea, parceiro para toda a vida ou novas amizades, o DripLove fornece as ferramentas e a comunidade para ajudá-lo a descobrir conexões genuínas que importam."
+        ]
+      },
+      "different": {
+        "title": "O Que Nos Torna Diferentes",
+        "intro": "O DripLove se destaca no cenário lotado de aplicativos de namoro através do nosso compromisso com:",
+        "points": [
+          "Conexões autênticas baseadas em valores e interesses compartilhados",
+          "Uma comunidade global diversa que celebra todas as origens",
+          "Algoritmos de correspondência avançados que priorizam a compatibilidade",
+          "Ambiente seguro, protegido e livre de assédio",
+          "Recursos inclusivos projetados para todos"
+        ]
+      },
+      "community": {
+        "title": "Comunidade Global",
+        "content": [
+          "De Nova York a Nairóbi, Londres a Lagos, Tóquio a Toronto – o DripLove conecta corações através dos continentes. Nossa plataforma reúne almas vibrantes de todos os estilos de vida, criando uma experiência de namoro verdadeiramente global.",
+          "O amor não reconhece fronteiras, e nós também não. Seja buscando conexões locais ou romance internacional, o DripLove torna isso possível."
+        ]
+      },
+      "values": {
+        "title": "Nossos Valores",
+        "authenticity": {
+          "title": "Autenticidade",
+          "description": "Incentivamos conexões genuínas e conversas reais."
+        },
+        "inclusivity": {
+          "title": "Inclusividade",
+          "description": "Todos são bem-vindos, independentemente de origem, identidade ou crenças."
+        },
+        "safety": {
+          "title": "Segurança",
+          "description": "Sua segurança e privacidade são nossas principais prioridades."
+        },
+        "innovation": {
+          "title": "Inovação",
+          "description": "Melhoramos continuamente para fornecer a melhor experiência de namoro."
+        }
+      },
+      "journey": {
+        "title": "Nossa Jornada",
+        "content": "Fundado em 2024, o DripLove nasceu de uma crença simples: todos merecem encontrar o amor. Nossa equipe é apaixonada por criar tecnologia que aproxima as pessoas, não as afasta."
+      },
+      "contact": {
+        "title": "Entre em Contato",
+        "content": "Adoramos ouvir nossa comunidade! Seja com perguntas, feedback ou apenas para dizer oi, estamos aqui para você.",
+        "email": "Envie-nos um e-mail para:",
+        "support": "Para consultas de suporte:",
+        "social": "Siga-nos nas redes sociais para se manter atualizado com os recursos mais recentes e histórias de sucesso."
+      },
       "company": {
         "title": "Sobre The ScREAte Ltd",
         "content": [
-          "DripLove é orgulhosamente criado pela The ScREAte Ltd, uma empresa de tecnologia dedicada a construir experiências digitais inovadoras que aproximam as pessoas. Somos especializados na criação de plataformas que promovem conexões humanas genuínas.",
-          "Nossa equipe combina expertise técnica com profundo entendimento de relacionamentos humanos para criar produtos que fazem uma diferença significativa na vida das pessoas."
+          "DripLove é orgulhosamente criado pela The ScREAte Ltd, uma empresa de tecnologia dedicada a construir experiências digitais inovadoras que aproximam as pessoas. Somos especializados em criar plataformas que promovem conexões humanas genuínas.",
+          "Nossa equipe combina expertise técnica com uma compreensão profunda dos relacionamentos humanos para criar produtos que fazem uma diferença significativa na vida das pessoas."
         ]
       },
       "safety": {
         "title": "Segurança e Proteção",
-        "intro": "Sua segurança é primordial para nós. DripLove implementa medidas de segurança abrangentes incluindo:",
+        "intro": "Sua segurança é fundamental para nós. O DripLove implementa medidas de segurança abrangentes, incluindo:",
         "points": [
           "Sistemas de verificação de perfil",
           "Recursos avançados de denúncia e bloqueio",

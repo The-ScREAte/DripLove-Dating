@@ -683,54 +683,79 @@
   },
   "aboutUs": {
     "title": "Kuhusu DripLove",
-    "subtitle": "Kuunganisha mioyo kote bara",
-    "ourStory": {
-      "heading": "Hadithi Yetu",
-      "description": "DripLove ilizaliwa kutokana na imani rahisi: upendo haupaswi kuwekwa mipaka. Tumeunda jukwaa linalosherehekea utofauti, kukuza uhusiano wa kweli, na kusaidia watu kupata mwenzi wao kamilifu, bila kujali wapo wapi."
-    },
-    "ourMission": {
-      "heading": "Dhamira Yetu",
-      "description": "Kufanya mahusiano yenye maana yawezekaneavyo kupitia teknolojia ya kisasa na kujali uzoefu wa watumiaji. Tumejitolea kuunda jamii salama, ya pamoja na yenye nguvu ambapo upendo unaweza kustawi kote tamaduni na umbali."
-    },
-    "whatMakesUsDifferent": {
-      "heading": "Kinachotufanya Tofauti",
-      "globalReach": "Fikio la Kimataifa, Uzoefu wa Kikanda",
-      "globalReachDesc": "Unganisha katika nchi na miji mingi huku ukiheshimu tamaduni za kikanda na mapendeleo.",
-      "authenticProfiles": "Wasifu Halisi",
-      "authenticProfilesDesc": "Mfumo wa juu wa uthibitishaji unahakikisha miunganisho halisi na mazingira salama ya kutembelea.",
-      "smartMatching": "Ulinganifu Mahiri",
-      "smartMatchingDesc": "Algoriti yetu inayoendeshwa na AI inazingatia maslahi, maadili na upatanisho kupata mechi yako kamilifu.",
-      "culturalSensitivity": "Unyeti wa Kitamaduni",
-      "culturalSensitivityDesc": "Tunaelewa na kuheshimu miiko tofauti ya kutembelea na mapendeleo ya kitamaduni."
-    },
-    "safetyFirst": {
-      "heading": "Usalama Kwanza",
-      "description": "Usalama wako ni kipaumbele chetu cha juu. Tunatumia hatua za usalama za kiwango cha sekta, uthibitishaji wa picha, na timu ya kusimamia 24/7 kuhakikisha uzoefu chanya na salama wa kutembelea."
-    },
-    "joinOurCommunity": {
-      "heading": "Jiunge na Jamii Yetu",
-      "description": "Kuwa mmoja wa maelfu waliokuta upendo, urafiki, na uhusiano wenye maana. Iwe unatafuta mahusiano makini au kukutana na marafiki wapya, DripLove ndipo safari yako inapoanza."
-    },
-    "contactUs": {
-      "heading": "Wasiliana Nasi",
-      "description": "Una maswali au maoni? Tungependa kusikia kutoka kwako."
-    },
+    "back": "Rudi",
+    "lastUpdated": "Ilisasishwa Mwisho: Julai 13, 2025",
     "sections": {
+      "mission": {
+        "title": "Dhamira Yetu",
+        "content": [
+          "DripLove si programu ya kutafuta mapenzi tu – ni jumuiya ya kimataifa inayojitoa kusaidia watu kupata uhusiano wa kweli na wenye maana. Dhamira yetu ni kuunda jukwaa salama, la kujumuisha, na lenye nguvu ambapo mapenzi hayana mipaka.",
+          "Iwe unatafuta mwenzi wako wa roho, mshirika wa maisha yote, au urafiki mpya, DripLove inatoa zana na jumuiya kukusaidia kugundua uhusiano wa kweli unaohusiana."
+        ]
+      },
+      "different": {
+        "title": "Kinachotufanya Kuwa Tofauti",
+        "intro": "DripLove inajitofautisha katika mazingira ya programu za kutafuta mapenzi kupitia kujitolea kwetu kwa:",
+        "points": [
+          "Uhusiano wa kweli kulingana na maadili na maslahi ya pamoja",
+          "Jumuiya ya kimataifa yenye utofauti unaofahamu asili zote",
+          "Kanuni za juu za kuoanisha zinazoweka vipaumbele upatanisho",
+          "Mazingira salama, yenye usalama, na bila unyanyasaji",
+          "Vipengele vya kujumuisha vilivyoundwa kwa kila mtu"
+        ]
+      },
+      "community": {
+        "title": "Jumuiya ya Kimataifa",
+        "content": [
+          "Kutoka New York hadi Nairobi, London hadi Lagos, Tokyo hadi Toronto – DripLove inaunganisha mioyo katika mabara. Jukwaa letu linaunganisha roho zenye nguvu kutoka nyanja zote za maisha, likifanya uzoefu wa kweli wa kimataifa wa kutafuta mapenzi.",
+          "Mapenzi hayatambui mipaka, na sisi pia hatutambui. Iwe unatafuta uhusiano wa karibu au mapenzi ya kimataifa, DripLove inafanya iwe inawezekana."
+        ]
+      },
+      "values": {
+        "title": "Maadili Yetu",
+        "authenticity": {
+          "title": "Uhalali",
+          "description": "Tunachochea uhusiano wa kweli na mazungumzo halisi."
+        },
+        "inclusivity": {
+          "title": "Ujumuishaji",
+          "description": "Kila mtu anakaribisha bila kujali asili, utambulisho, au imani."
+        },
+        "safety": {
+          "title": "Usalama",
+          "description": "Usalama na faragha yako ni kipaumbele chetu cha juu."
+        },
+        "innovation": {
+          "title": "Ubunifu",
+          "description": "Tunaboresha mara kwa mara ili kutoa uzoefu bora wa kutafuta mapenzi."
+        }
+      },
+      "journey": {
+        "title": "Safari Yetu",
+        "content": "Ilianzishwa mnamo 2024, DripLove ilizaliwa kutokana na imani rahisi: kila mtu anastahili kupata mapenzi. Timu yetu ina shauku ya kuunda teknolojia inayounganisha watu, sio kuwatenganisha."
+      },
+      "contact": {
+        "title": "Wasiliana Nasi",
+        "content": "Tunapenda kusikia kutoka kwa jumuiya yetu! Iwe una maswali, maoni, au unataka kusema habari tu, tuko hapa kwa ajili yako.",
+        "email": "Tutumie barua pepe kwa:",
+        "support": "Kwa maswali ya usaidizi:",
+        "social": "Tufuate kwenye mitandao ya kijamii ili kupata habari za hivi karibuni kuhusu vipengele vipya na hadithi za mafanikio."
+      },
       "company": {
         "title": "Kuhusu The ScREAte Ltd",
         "content": [
-          "DripLove imeundwa kwa fahari na The ScREAte Ltd, kampuni ya teknolojia iliyojitolea kujenga uzoefu wa kisasa wa kidijitali unaoleta watu pamoja. Tunataalam katika kuunda majukwaa yanayohamasisha uhusiano wa kweli wa kibinadamu.",
-          "Timu yetu inachanganya utaalamu wa kiufundi na uelewa wa kina wa mahusiano ya kibinadamu ili kuunda bidhaa zinazofanya tofauti muhimu katika maisha ya watu."
+          "DripLove imeundwa kwa fahari na The ScREAte Ltd, kampuni ya teknolojia inayojitoa kujenga uzoefu wa kidijitali wa ubunifu unaowaleta watu pamoja. Tunajisikitisha katika kuunda majukwaa yanayohimiza uhusiano wa kibinadamu halisi.",
+          "Timu yetu inaunganisha ujuzi wa kiufundi na uelewa wa kina wa mahusiano ya kibinadamu ili kuunda bidhaa zinazofanya tofauti yenye maana katika maisha ya watu."
         ]
       },
       "safety": {
         "title": "Usalama na Ulinzi",
-        "intro": "Usalama wako ni muhimu kwetu. DripLove inatekeleza hatua za kina za usalama ikijumuisha:",
+        "intro": "Usalama wako ni muhimu sana kwetu. DripLove inatekeleza hatua za kina za usalama ikiwa ni pamoja na:",
         "points": [
           "Mifumo ya uthibitishaji wa wasifu",
-          "Vipengele vya hali ya juu vya kuripoti na kuzuia",
+          "Vipengele vya juu vya kuripoti na kuzuia",
           "Usimamizi na usaidizi wa saa 24/7",
-          "Usimbaji wa mwisho-hadi-mwisho kwa ujumbe wa faragha",
+          "Usimbaji fiche wa mwisho hadi mwisho kwa ujumbe wa kibinafsi",
           "Udhibiti mkali wa faragha"
         ]
       }

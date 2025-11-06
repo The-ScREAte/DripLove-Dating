@@ -510,7 +510,7 @@ const ProfilePage = ({ currentUser, profile, onProfileUpdate, onLogout, onShowTe
                   onClick={() => setShowPremiumUpgrade(true)}
                   className="bg-gradient-to-r from-yellow-400 to-yellow-500 hover:from-yellow-500 hover:to-yellow-600 text-white font-semibold w-full sm:w-auto shadow-md hover:shadow-lg transition-all duration-200"
                 >
-                  {t('premium.upgrade')}
+                  {t('premium.upgradeToPremium')}
                 </Button>
               )}
               {/* Single toggle button - Edit becomes Cancel */}
@@ -636,19 +636,7 @@ const ProfilePage = ({ currentUser, profile, onProfileUpdate, onLogout, onShowTe
           />
           <div className="mb-2" />
           <CollapsibleSection
-            title={t('profile.language')}
-            isOpen={true}
-            onToggle={() => {}}
-          >
-            <LanguageSelector
-              value={editedProfile.preferred_language}
-              onChange={handleLanguageChange}
-              isEditing={isEditing}
-            />
-          </CollapsibleSection>
-          <div className="mb-2" />
-          <CollapsibleSection
-            title={t('profile.yourPhotos')}
+            title={t('profile.photos')}
             isOpen={showPhotoSection}
             onToggle={() => setShowPhotoSection(!showPhotoSection)}
           >
@@ -656,7 +644,7 @@ const ProfilePage = ({ currentUser, profile, onProfileUpdate, onLogout, onShowTe
           </CollapsibleSection>
           <div className="mb-2" />
           <CollapsibleSection
-            title={t('profile.locationAndPreferences')}
+            title={t('profile.location')}
             isOpen={showLocationSection}
             onToggle={() => setShowLocationSection(!showLocationSection)}
             className="mt-2"
@@ -697,7 +685,7 @@ const ProfilePage = ({ currentUser, profile, onProfileUpdate, onLogout, onShowTe
           </CollapsibleSection>
           <div className="mb-2" />
           <CollapsibleSection
-            title={t('profile.workAndEducation')}
+            title={t('profile.workEducation')}
             isOpen={showWorkEducationSection}
             onToggle={() => setShowWorkEducationSection(!showWorkEducationSection)}
           >
@@ -746,7 +734,7 @@ const ProfilePage = ({ currentUser, profile, onProfileUpdate, onLogout, onShowTe
           </CollapsibleSection>
           <div className="mb-2" />
           <CollapsibleSection
-            title={t('profile.myAdinkra')}
+            title={t('profile.adinkra')}
             isOpen={showAdinkraSection}
             onToggle={() => setShowAdinkraSection(!showAdinkraSection)}
           >
@@ -759,7 +747,7 @@ const ProfilePage = ({ currentUser, profile, onProfileUpdate, onLogout, onShowTe
           </CollapsibleSection>
           <div className="mb-2" />
           <CollapsibleSection
-            title={t('settings.accountActions')}
+            title={t('profile.accountActions')}
             isOpen={showAccountActionsSection}
             onToggle={() => setShowAccountActionsSection(!showAccountActionsSection)}
           >
@@ -773,27 +761,28 @@ const ProfilePage = ({ currentUser, profile, onProfileUpdate, onLogout, onShowTe
           <div className="mb-2" />
         </div>
         {/* Move Logout, Terms of Service, and Privacy Policy to the bottom of the page */}
-        <div className="mt-2 flex flex-col items-center gap-4">
-          <Button
-            onClick={onLogout}
-            className="w-full max-w-xs bg-gray-900 hover:bg-gray-800 text-white font-medium"
-          >
-            Log Out
-          </Button>
-          <div className="flex gap-4 text-sm text-gray-600">
-            <button
-              onClick={onShowTerms}
-              className="hover:underline focus:outline-none"
+        <div className="mt-2 flex flex-col items-center gap-4 w-full">
+          <div className="flex justify-center w-full">
+            <Button
+              onClick={onLogout}
+              className="w-full max-w-xs bg-gray-900 hover:bg-gray-800 text-white font-medium"
             >
-              Terms of Service
-            </button>
-            <span>|</span>
-            <button
-              onClick={onShowPrivacy}
-              className="hover:underline focus:outline-none"
-            >
-              Privacy Policy
-            </button>
+              Log Out
+            </Button>
+          </div>
+          <div className="flex flex-col items-center gap-3 w-full">
+            {/* Terms and Privacy links with Language Selector beside them */}
+            <div className="flex flex-wrap items-center justify-center gap-3 text-sm text-gray-600">
+              {/* Language Selector - compact inline version */}
+              <div className="inline-flex items-center min-w-[140px]">
+                <LanguageSelector
+                  value={editedProfile.preferred_language}
+                  onChange={handleLanguageChange}
+                  isEditing={true}
+                  showLabel={false}
+                />
+              </div>
+            </div>
           </div>
         </div>
       </div>
