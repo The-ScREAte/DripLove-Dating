@@ -14,6 +14,7 @@ import RatingDialog from '@/components/RatingDialog';
 import { supabase, SUPABASE_URL } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import { usePushNotifications } from '@/hooks/usePushNotifications';
+import { loadUserLanguage } from '@/utils/languageSync';
 
 // Import rating debug utilities for development
 if (import.meta.env.DEV) {
@@ -772,6 +773,9 @@ const MainApp = ({ user, onLogout }: MainAppProps) => {
   // Preload data as soon as app loads
   useEffect(() => {
     if (user?.id) {
+      // Load user's saved language preference
+      loadUserLanguage(user.id);
+      
       // Start preloading all main page data immediately in background
       preloadDiscoverData(user.id);
       preloadChatMatches(user.id);

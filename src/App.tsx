@@ -6,6 +6,8 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter } from "react-router-dom";
 import AppRoutes from "@/components/AppRoutes";
 import { initKeyboardHandler, destroyKeyboardHandler } from "@/utils/keyboardHandler";
+import { detectDeviceLanguage } from "@/utils/languageSync";
+import i18n from "@/i18n/config";
 
 const queryClient = new QueryClient();
 
@@ -20,6 +22,12 @@ const App = () => {
     return () => {
       destroyKeyboardHandler();
     };
+  }, []);
+
+  // Detect and set device language on app start
+  React.useEffect(() => {
+    const deviceLanguage = detectDeviceLanguage();
+    i18n.changeLanguage(deviceLanguage);
   }, []);
   
   const handleError = (error: Error) => {

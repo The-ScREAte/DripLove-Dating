@@ -15,6 +15,7 @@ import { signInWithAppleNativeModal, signInWithAppleFallback, isAppleSignInAvail
 import AppleAuthDebug from '@/components/AppleAuthDebug';
 import { Capacitor } from '@capacitor/core';
 import { useTranslation } from 'react-i18next';
+import { saveLanguageToProfile } from '@/utils/languageSync';
 
 interface AuthFormProps {
   isLogin: boolean;
@@ -128,6 +129,9 @@ const AuthForm = ({ isLogin, onToggle, onOAuthSuccess, onBack }: AuthFormProps) 
             // Handle profile completion flow (same as Google OAuth)
             const user = data?.user;
             if (user) {
+              // Save current language to user's profile
+              await saveLanguageToProfile(user.id);
+              
               if (data.needsProfileCompletion) {
                 // User needs to complete profile - redirect to completion
                 navigate('/complete-profile');
@@ -271,6 +275,10 @@ const AuthForm = ({ isLogin, onToggle, onOAuthSuccess, onBack }: AuthFormProps) 
                       profile.city === 'Unknown' ||
                       !profile.country;
                   }
+                  
+                  // Save current language to user's profile
+                  await saveLanguageToProfile(session.user.id);
+                  
                   // Navigation without toast message
                   await new Promise(resolve => setTimeout(resolve, 500));
                   setOauthLoading(null);
@@ -356,6 +364,11 @@ const AuthForm = ({ isLogin, onToggle, onOAuthSuccess, onBack }: AuthFormProps) 
               const result = await signInWithGoogleNative();
               
               console.log('✅ Native Google Sign-In completed:', result);
+              
+              // Save current language to user's profile
+              if (result?.user?.id) {
+                await saveLanguageToProfile(result.user.id);
+              }
               
               // Navigate based on profile completion
               if (result.needsProfileCompletion) {
@@ -655,6 +668,9 @@ const AuthForm = ({ isLogin, onToggle, onOAuthSuccess, onBack }: AuthFormProps) 
                       !profile.country;
                   }
                   
+                  // Save current language to user's profile
+                  await saveLanguageToProfile(session.user.id);
+                  
                   await new Promise(resolve => setTimeout(resolve, 500));
                   setOauthLoading(null);
                   
@@ -936,6 +952,9 @@ const AuthForm = ({ isLogin, onToggle, onOAuthSuccess, onBack }: AuthFormProps) 
         // Save profile ID to session
         sessionStorage.setItem('profile_id', profile.id);
 
+        // Save current language to user's profile
+        await saveLanguageToProfile(authData.user.id);
+
         // Always redirect to home page and let the main app handle routing
         // The auth state change will trigger the proper view (admin/app)
         navigate('/');
@@ -1034,6 +1053,9 @@ const AuthForm = ({ isLogin, onToggle, onOAuthSuccess, onBack }: AuthFormProps) 
             if (profileError) {
               console.error('[Registration] Profile creation error:', profileError);
               // Don't fail the registration, just log the error
+            } else {
+              // Save current language to user's profile
+              await saveLanguageToProfile(authData.user.id);
             }
 
             // Navigate to home - user can update their profile later from the main app
