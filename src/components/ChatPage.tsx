@@ -90,20 +90,28 @@ const ChatPage = ({ currentUser, onUnreadChange, onDetailViewChange }: ChatPageP
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [currentUser]);
 
-  // Handle deep linking from notifications - auto-select match if matchId in URL
+  // Handle deep linking from notifications - auto-select match if matchId in URL or hash
   useEffect(() => {
     if (!currentUser || !currentUser.id || matches.length === 0) return;
     
+    // Check both query params and hash for matchId
     const params = new URLSearchParams(window.location.search);
-    const matchIdFromUrl = params.get('matchId');
+    let matchIdFromUrl = params.get('matchId');
+    
+    // Also check hash (set by notification handler)
+    if (!matchIdFromUrl && window.location.hash) {
+      const hashParams = new URLSearchParams(window.location.hash.substring(1));
+      matchIdFromUrl = hashParams.get('matchId');
+    }
     
     if (matchIdFromUrl && !selectedMatch) {
       console.log('[ChatPage] 🔗 Opening match from notification:', matchIdFromUrl);
       const matchToOpen = matches.find(m => m.id === matchIdFromUrl);
       if (matchToOpen) {
         setSelectedMatch(matchToOpen);
-        // Clear the URL parameter
-        window.history.replaceState({}, '', '/chat');
+        // Clear the URL parameter and hash
+        window.history.replaceState({}, '', window.location.pathname);
+        window.location.hash = '';
       } else {
         console.warn('[ChatPage] ⚠️ Match not found in list:', matchIdFromUrl);
       }

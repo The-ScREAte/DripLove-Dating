@@ -237,6 +237,8 @@ serve(async (req) => {
                     },
                     sound: iosSound,
                     badge: 1,
+                    // No icon/image - iOS will show app icon by default without message bubble
+                    'mutable-content': 0,  // Disable notification service extension
                   },
                   // Put custom data at payload level, not inside aps
                   ...data,

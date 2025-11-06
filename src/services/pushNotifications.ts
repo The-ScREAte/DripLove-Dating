@@ -247,47 +247,51 @@ class SupabasePushNotificationService {
     // Check for specific action first
     if (data?.action === 'open_discover') {
       console.log('🎯 Opening discover page from broadcast notification');
-      window.location.href = '/discover';
+      window.location.href = '/';
       return;
     }
     
     if (data?.type === 'message' && data?.chatId) {
       // Navigate to specific chat conversation
-      console.log('💬 Opening chat:', data.chatId);
-      window.location.href = `/chat?matchId=${data.chatId}`;
+      console.log('💬 Opening chat with matchId:', data.chatId);
+      // Navigate to chat page with the matchId query parameter
+      window.location.href = `/?tab=chat&matchId=${data.chatId}`;
       return;
     }
     
     if (data?.type === 'match') {
       // Navigate to chat page (matches tab) 
       console.log('🎉 Opening matches/chat page');
-      window.location.href = '/chat';
+      window.location.href = '/?tab=chat';
       return;
     }
     
     if (data?.type === 'like') {
       // Navigate to liked me page
       console.log('💖 Opening likes page');
-      window.location.href = '/liked-me';
+      window.location.href = '/?tab=liked';
       return;
     }
     
     if (data?.type === 'system' || data?.type === 'admin') {
       // System/admin notifications go to discover page
       console.log('📢 Opening discover page from system notification');
-      window.location.href = '/discover';
+      window.location.href = '/';
       return;
     }
     
     // Default: go to chat page
     console.log('📱 Opening default chat page');
-    window.location.href = '/chat';
+    window.location.href = '/?tab=chat';
   }
 
   private showInAppNotification(payload: NotificationPayload): void {
     // Create and show in-app notification toast
     const toast = document.createElement('div');
     toast.className = 'fixed top-4 right-4 bg-purple-600 text-white px-4 py-2 rounded-lg shadow-lg z-50 max-w-sm cursor-pointer transition-all hover:bg-purple-700';
+    toast.style.transform = 'translateX(0)';
+    toast.style.transition = 'transform 0.3s ease-out, opacity 0.3s ease-out';
+    
     toast.innerHTML = `
       <div class="font-semibold">${payload.title}</div>
       <div class="text-sm opacity-90">${payload.body}</div>
@@ -298,27 +302,91 @@ class SupabasePushNotificationService {
     
     // Auto-remove after 5 seconds
     const timeout = setTimeout(() => {
-      if (toast.parentNode) {
-        toast.parentNode.removeChild(toast);
-      }
+      this.removeToast(toast);
     }, 5000);
+
+    // Add swipe gesture support
+    let startX = 0;
+    let startY = 0;
+    let currentX = 0;
+    let isSwiping = false;
+
+    const handleTouchStart = (e: TouchEvent) => {
+      startX = e.touches[0].clientX;
+      startY = e.touches[0].clientY;
+      isSwiping = false;
+      toast.style.transition = 'none'; // Disable transition during swipe
+    };
+
+    const handleTouchMove = (e: TouchEvent) => {
+      if (!startX) return;
+      
+      currentX = e.touches[0].clientX;
+      const currentY = e.touches[0].clientY;
+      const deltaX = currentX - startX;
+      const deltaY = currentY - startY;
+      
+      // Only allow horizontal swipes (prevent vertical scroll interference)
+      if (Math.abs(deltaX) > Math.abs(deltaY) && Math.abs(deltaX) > 10) {
+        isSwiping = true;
+        e.preventDefault();
+        
+        // Allow swipe right or up to dismiss
+        if (deltaX > 0 || deltaY < -10) {
+          toast.style.transform = `translateX(${deltaX}px) translateY(${Math.min(0, deltaY)}px)`;
+          toast.style.opacity = String(Math.max(0, 1 - Math.abs(deltaX) / 200));
+        }
+      }
+    };
+
+    const handleTouchEnd = () => {
+      const deltaX = currentX - startX;
+      
+      toast.style.transition = 'transform 0.3s ease-out, opacity 0.3s ease-out';
+      
+      // If swiped more than 100px or with velocity, dismiss
+      if (Math.abs(deltaX) > 100) {
+        clearTimeout(timeout);
+        toast.style.transform = `translateX(${deltaX > 0 ? '400px' : '-400px'})`;
+        toast.style.opacity = '0';
+        setTimeout(() => this.removeToast(toast), 300);
+      } else {
+        // Return to original position
+        toast.style.transform = 'translateX(0) translateY(0)';
+        toast.style.opacity = '1';
+      }
+      
+      startX = 0;
+      currentX = 0;
+    };
+
+    // Add touch event listeners for swipe
+    toast.addEventListener('touchstart', handleTouchStart, { passive: false });
+    toast.addEventListener('touchmove', handleTouchMove, { passive: false });
+    toast.addEventListener('touchend', handleTouchEnd);
 
     // Add click handler to dismiss and potentially navigate
     toast.addEventListener('click', () => {
+      if (isSwiping) return; // Don't navigate if user was swiping
+      
       clearTimeout(timeout);
-      if (toast.parentNode) {
-        toast.parentNode.removeChild(toast);
-      }
+      this.removeToast(toast);
       
       // Handle navigation based on notification type
       if (payload.data?.chatId) {
-        window.location.href = `/chat/${payload.data.chatId}`;
+        window.location.href = `/?tab=chat&matchId=${payload.data.chatId}`;
       } else if (payload.type === 'match') {
-        window.location.href = '/matches';
+        window.location.href = '/?tab=chat';
       } else if (payload.type === 'like') {
-        window.location.href = '/likes';
+        window.location.href = '/?tab=liked';
       }
     });
+  }
+
+  private removeToast(toast: HTMLElement): void {
+    if (toast.parentNode) {
+      toast.parentNode.removeChild(toast);
+    }
   }
 
   async sendNotification(payload: NotificationPayload): Promise<boolean> {

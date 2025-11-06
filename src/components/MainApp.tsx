@@ -91,6 +91,37 @@ const MainApp = ({ user, onLogout }: MainAppProps) => {
           console.error('[MainApp] Push registration error:', error);
         });
         
+        // Add notification tap listener (when app is closed/background)
+        PushNotifications.addListener('pushNotificationActionPerformed', async (notification) => {
+          console.log('[MainApp] 🔔 Notification tapped:', notification);
+          const data = notification.notification.data;
+          
+          // Wait a bit for app to fully load
+          setTimeout(() => {
+            if (data?.type === 'message' && data?.chatId) {
+              console.log('[MainApp] 💬 Opening specific chat:', data.chatId);
+              setActiveTab('chat');
+              // Use hash navigation to pass matchId to ChatPage
+              window.location.hash = `matchId=${data.chatId}`;
+            } else if (data?.type === 'match') {
+              console.log('[MainApp] 🎉 Opening chat page for new match');
+              setActiveTab('chat');
+            } else if (data?.type === 'like') {
+              console.log('[MainApp] 💖 Opening liked me page');
+              setActiveTab('liked');
+            } else {
+              console.log('[MainApp] 📱 Opening default chat page');
+              setActiveTab('chat');
+            }
+          }, 500);
+        });
+        
+        // Add foreground notification listener
+        PushNotifications.addListener('pushNotificationReceived', (notification) => {
+          console.log('[MainApp] 📬 Foreground notification received:', notification);
+          // Notification will be handled by the in-app toast
+        });
+        
         // Add token listener for APNS token (iOS needs this to trigger FCM)
         PushNotifications.addListener('registration', async (token) => {
           console.log('[MainApp] 📱 APNS token received:', token.value);
