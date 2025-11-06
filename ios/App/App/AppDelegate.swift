@@ -1,6 +1,8 @@
 import UIKit
 import Capacitor
 import UserNotifications
+import FirebaseCore
+import FirebaseMessaging
 
 @UIApplicationMain
 class AppDelegate: UIResponder, UIApplicationDelegate {
@@ -10,8 +12,14 @@ class AppDelegate: UIResponder, UIApplicationDelegate {
     func application(_ application: UIApplication, didFinishLaunchingWithOptions launchOptions: [UIApplication.LaunchOptionsKey: Any]?) -> Bool {
         // Override point for customization after application launch.
         
+        // Initialize Firebase
+        FirebaseApp.configure()
+        
         // Register for remote notifications
         UNUserNotificationCenter.current().delegate = self
+        
+        // Set Firebase Messaging delegate
+        Messaging.messaging().delegate = self
         
         return true
     }
@@ -53,6 +61,9 @@ class AppDelegate: UIResponder, UIApplicationDelegate {
     
     // MARK: - Push Notifications
     func application(_ application: UIApplication, didRegisterForRemoteNotificationsWithDeviceToken deviceToken: Data) {
+        // Pass APNs token to Firebase
+        Messaging.messaging().apnsToken = deviceToken
+        
         NotificationCenter.default.post(name: .capacitorDidRegisterForRemoteNotifications, object: deviceToken)
     }
     
@@ -73,5 +84,22 @@ extension AppDelegate: UNUserNotificationCenterDelegate {
     func userNotificationCenter(_ center: UNUserNotificationCenter, didReceive response: UNNotificationResponse, withCompletionHandler completionHandler: @escaping () -> Void) {
         NotificationCenter.default.post(name: NSNotification.Name.init(rawValue: "didReceiveRemoteNotification"), object: response)
         completionHandler()
+    }
+}
+
+// MARK: - MessagingDelegate
+extension AppDelegate: MessagingDelegate {
+    // Called when FCM token is refreshed
+    func messaging(_ messaging: Messaging, didReceiveRegistrationToken fcmToken: String?) {
+        print("📱 Firebase FCM token refreshed: \(fcmToken ?? "nil")")
+        
+        // Notify Capacitor about the new FCM token
+        if let token = fcmToken {
+            NotificationCenter.default.post(
+                name: Notification.Name("FCMTokenRefreshed"),
+                object: nil,
+                userInfo: ["token": token]
+            )
+        }
     }
 }

@@ -105,8 +105,9 @@ class SupabasePushNotificationService {
         return;
       }
 
-      // Add a small delay to ensure Firebase is initialized
-      await new Promise(resolve => setTimeout(resolve, 1000));
+      // Add delay to ensure Firebase is fully initialized (especially on iOS)
+      const delay = Capacitor.getPlatform() === 'ios' ? 2000 : 1000;
+      await new Promise(resolve => setTimeout(resolve, delay));
 
       // Request permission for push notifications
       const permissionStatus = await PushNotifications.requestPermissions();
