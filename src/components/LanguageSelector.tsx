@@ -41,11 +41,11 @@ const LanguageSelector: React.FC<LanguageSelectorProps> = ({
       )}
       {/* Always show selector - users should be able to change language anytime */}
       <Select value={value} onValueChange={onChange}>
-        <SelectTrigger className="w-full">
+        <SelectTrigger className={showLabel ? "w-full" : "w-auto min-w-[80px] h-8 text-xs px-2"}>
           <SelectValue>
-            <span className="flex items-center gap-2">
-              <Globe className="w-4 h-4" />
-              <span className="uppercase font-medium">{currentLanguage.code}</span>
+            <span className="flex items-center gap-1.5">
+              <Globe className={showLabel ? "w-4 h-4" : "w-3 h-3"} />
+              <span className="uppercase font-medium text-xs">{currentLanguage.code}</span>
             </span>
           </SelectValue>
         </SelectTrigger>

@@ -10,6 +10,7 @@ import { LogOut, AlertTriangle, Mail } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import RateAppButton from '@/components/RateAppButton';
+import LanguageSelector from '@/components/LanguageSelector';
 
 import { useEnhancedSubscription } from '@/hooks/useEnhancedSubscription';
 import { useNavigate } from 'react-router-dom';
@@ -20,9 +21,11 @@ interface AccountActionsProps {
   onShowTerms?: () => void;
   onShowPrivacy?: () => void;
   hideLogoutTermsPrivacy?: boolean;
+  preferredLanguage?: string;
+  onLanguageChange?: (language: string) => void;
 }
 
-const AccountActions = ({ currentUser, onLogout, onShowTerms, onShowPrivacy, hideLogoutTermsPrivacy }: AccountActionsProps) => {
+const AccountActions = ({ currentUser, onLogout, onShowTerms, onShowPrivacy, hideLogoutTermsPrivacy, preferredLanguage, onLanguageChange }: AccountActionsProps) => {
   const { t } = useTranslation();
   const [deletingAccount, setDeletingAccount] = useState(false);
   const [showPasswordDialog, setShowPasswordDialog] = useState(false);
@@ -118,6 +121,18 @@ const AccountActions = ({ currentUser, onLogout, onShowTerms, onShowPrivacy, hid
         <CardTitle>{t('settings.accountActions')}</CardTitle>
       </CardHeader>
       <CardContent className="space-y-4">
+        {/* Language Selector */}
+        {preferredLanguage && onLanguageChange && (
+          <div className="bg-gray-50 p-4 rounded-lg border">
+            <LanguageSelector
+              value={preferredLanguage}
+              onChange={onLanguageChange}
+              isEditing={true}
+              showLabel={true}
+            />
+          </div>
+        )}
+
         {/* Rate DripLove Button */}
         <div className="bg-yellow-50 p-4 rounded-lg border border-yellow-200">
           <div className="flex flex-col space-y-3">

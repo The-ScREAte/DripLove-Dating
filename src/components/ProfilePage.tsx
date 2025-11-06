@@ -756,11 +756,13 @@ const ProfilePage = ({ currentUser, profile, onProfileUpdate, onLogout, onShowTe
               currentUser={currentUser} 
               hideLogoutTermsPrivacy={true} // Pass a prop to hide these actions
               onLogout={onLogout}
+              preferredLanguage={editedProfile.preferred_language}
+              onLanguageChange={handleLanguageChange}
             />
           </CollapsibleSection>
           <div className="mb-2" />
         </div>
-        {/* Move Logout, Terms of Service, and Privacy Policy to the bottom of the page */}
+        {/* Move Logout to the bottom of the page */}
         <div className="mt-2 flex flex-col items-center gap-4 w-full">
           <div className="flex justify-center w-full">
             <Button
@@ -769,20 +771,6 @@ const ProfilePage = ({ currentUser, profile, onProfileUpdate, onLogout, onShowTe
             >
               Log Out
             </Button>
-          </div>
-          <div className="flex flex-col items-center gap-3 w-full">
-            {/* Terms and Privacy links with Language Selector beside them */}
-            <div className="flex flex-wrap items-center justify-center gap-3 text-sm text-gray-600">
-              {/* Language Selector - compact inline version */}
-              <div className="inline-flex items-center min-w-[140px]">
-                <LanguageSelector
-                  value={editedProfile.preferred_language}
-                  onChange={handleLanguageChange}
-                  isEditing={true}
-                  showLabel={false}
-                />
-              </div>
-            </div>
           </div>
         </div>
       </div>
