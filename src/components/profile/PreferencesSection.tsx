@@ -1,4 +1,5 @@
 import React from 'react';
+import { useTranslation } from 'react-i18next';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Label } from '@/components/ui/label';
 import { Slider } from '@/components/ui/slider';
@@ -13,37 +14,39 @@ interface PreferencesSectionProps {
 }
 
 const PreferencesSection = ({ editedProfile, isEditing, onSliderChange, onSelectChange, onAgeRangeChange }: PreferencesSectionProps) => {
+  const { t } = useTranslation();
+  
   return (
     <Card>
       <CardHeader>
-        <CardTitle>Preferences</CardTitle>
+        <CardTitle>{t('profile.preferences')}</CardTitle>
       </CardHeader>
       <CardContent>
         <div className="space-y-4">
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div>
-              <Label htmlFor="gender">Gender</Label>
+              <Label htmlFor="gender">{t('profile.gender')}</Label>
               <Select disabled={!isEditing} onValueChange={(value) => onSelectChange('gender', value)} value={editedProfile.gender}>
                 <SelectTrigger id="gender" className="w-full">
-                  <SelectValue placeholder="Select" />
+                  <SelectValue placeholder={t('common.select')} />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="male">Male</SelectItem>
-                  <SelectItem value="female">Female</SelectItem>
-                  <SelectItem value="other">Other</SelectItem>
+                  <SelectItem value="male">{t('profile.genderOptions.male')}</SelectItem>
+                  <SelectItem value="female">{t('profile.genderOptions.female')}</SelectItem>
+                  <SelectItem value="other">{t('profile.genderOptions.other')}</SelectItem>
                 </SelectContent>
               </Select>
             </div>
             <div>
-              <Label htmlFor="preference">Preference</Label>
+              <Label htmlFor="preference">{t('profile.lookingFor')}</Label>
               <Select disabled={!isEditing} onValueChange={(value) => onSelectChange('preference', value)} value={editedProfile.preference}>
                 <SelectTrigger id="preference" className="w-full">
-                  <SelectValue placeholder="Select" />
+                  <SelectValue placeholder={t('common.select')} />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="male">Male</SelectItem>
-                  <SelectItem value="female">Female</SelectItem>
-                  <SelectItem value="everyone">Both</SelectItem>
+                  <SelectItem value="male">{t('profile.genderOptions.male')}</SelectItem>
+                  <SelectItem value="female">{t('profile.genderOptions.female')}</SelectItem>
+                  <SelectItem value="everyone">{t('profile.genderOptions.both')}</SelectItem>
                   </SelectContent>
               </Select>
             </div>
@@ -51,7 +54,7 @@ const PreferencesSection = ({ editedProfile, isEditing, onSliderChange, onSelect
           
           {/* Age Range Preference */}
           <div className="space-y-3">
-            <Label>Age Range for Matches</Label>
+            <Label>{t('profile.ageRangeForMatches')}</Label>
             <div className="px-3">
               <div className="relative">
                 <Slider
@@ -84,16 +87,15 @@ const PreferencesSection = ({ editedProfile, isEditing, onSliderChange, onSelect
                 </div>
               </div>
               <div className="flex justify-between text-xs text-gray-500 mt-1">
-                <span>18 years</span>
+                <span>{t('profile.ageYears', { age: 18 })}</span>
                 <span className="font-medium">
-                  {editedProfile.min_age || 18} - {editedProfile.max_age || 99} years
+                  {t('profile.ageRange', { min: editedProfile.min_age || 18, max: editedProfile.max_age || 99 })}
                 </span>
-                <span>99 years</span>
+                <span>{t('profile.ageYears', { age: 99 })}</span>
               </div>
             </div>
             <div className="text-sm text-gray-600">
-              Set the age range for potential matches. 
-              You'll only see profiles within this age range.
+              {t('profile.ageRangeDescription')}
             </div>
           </div>
         </div>

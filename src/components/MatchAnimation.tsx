@@ -1,5 +1,6 @@
 
 import React, { useEffect, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { Heart, MessageCircle } from 'lucide-react';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -24,6 +25,7 @@ const MatchAnimation = ({
   onClose,
   onStartChat,
 }: MatchAnimationProps) => {
+  const { t } = useTranslation();
   const [isVisible, setIsVisible] = useState(false);
   const [isClosing, setIsClosing] = useState(false);
 
@@ -122,9 +124,9 @@ const MatchAnimation = ({
           </div>
 
           <div className="mb-4">
-            <h1 className="text-2xl font-bold text-pink-600 mb-1">It's a Match! 🎉</h1>
+            <h1 className="text-2xl font-bold text-pink-600 mb-1">{t('match.itsAMatch')}</h1>
             <p className="text-gray-600 text-base">
-              You and <span className="font-semibold text-pink-600">{matchedUserName}</span> liked each other!
+              {t('match.youAndLikedEachOther', { name: matchedUserName })}
             </p>
           </div>
 
@@ -141,10 +143,10 @@ const MatchAnimation = ({
               onClick={handleStartChat}
               className="w-full bg-gradient-to-r from-pink-500 to-purple-600 text-white font-semibold py-3"
             >
-              <MessageCircle className="w-5 h-5 mr-2 inline-block" /> Start Chatting
+              <MessageCircle className="w-5 h-5 mr-2 inline-block" /> {t('match.startChatting')}
             </Button>
             <Button onClick={handleClose} variant="outline" className="w-full">
-              Keep Swiping
+              {t('match.keepSwiping')}
             </Button>
           </div>
         </CardContent>

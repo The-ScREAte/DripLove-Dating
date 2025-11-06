@@ -1,5 +1,6 @@
 
 import React from 'react';
+import { useTranslation } from 'react-i18next';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
@@ -13,16 +14,18 @@ interface WorkEducationSectionProps {
 }
 
 const WorkEducationSection = ({ editedProfile, isEditing, onInputChange }: WorkEducationSectionProps) => {
+  const { t } = useTranslation();
+  
   return (
     <Card>
       <CardHeader>
-        <CardTitle>Work & Education</CardTitle>
+        <CardTitle>{t('profile.workEducation')}</CardTitle>
       </CardHeader>
       <CardContent>
         <div className="space-y-4">
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div>
-              <Label htmlFor="occupation">Occupation</Label>
+              <Label htmlFor="occupation">{t('profile.occupation')}</Label>
               <Select
                 value={editedProfile.occupation}
                 onValueChange={value => onInputChange({
@@ -31,7 +34,7 @@ const WorkEducationSection = ({ editedProfile, isEditing, onInputChange }: WorkE
                 disabled={!isEditing}
               >
                 <SelectTrigger className="w-full">
-                  <SelectValue placeholder="Select or type your occupation" />
+                  <SelectValue placeholder={t('profile.selectOccupation')} />
                 </SelectTrigger>
                 <SelectContent>
                   {occupationOptions.map(option => (
@@ -49,11 +52,11 @@ const WorkEducationSection = ({ editedProfile, isEditing, onInputChange }: WorkE
                 } as any)}
                 disabled={!isEditing}
                 className="w-full mt-2"
-                placeholder="Or enter your occupation"
+                placeholder={t('profile.enterOccupation')}
               />
             </div>
             <div>
-              <Label htmlFor="industry">Industry</Label>
+              <Label htmlFor="industry">{t('profile.industry')}</Label>
               <Select
                 value={editedProfile.industry}
                 onValueChange={value => onInputChange({
@@ -62,7 +65,7 @@ const WorkEducationSection = ({ editedProfile, isEditing, onInputChange }: WorkE
                 disabled={!isEditing}
               >
                 <SelectTrigger className="w-full">
-                  <SelectValue placeholder="Select or type your industry" />
+                  <SelectValue placeholder={t('profile.selectIndustry')} />
                 </SelectTrigger>
                 <SelectContent>
                   {industryOptions.map(option => (
@@ -80,12 +83,12 @@ const WorkEducationSection = ({ editedProfile, isEditing, onInputChange }: WorkE
                 } as any)}
                 disabled={!isEditing}
                 className="w-full mt-2"
-                placeholder="Or enter your industry"
+                placeholder={t('profile.enterIndustry')}
               />
             </div>
           </div>
           <div>
-            <Label htmlFor="education_level">Education Level</Label>
+            <Label htmlFor="education_level">{t('profile.education')}</Label>
             <Select
               value={editedProfile.education_level}
               onValueChange={value => onInputChange({
@@ -94,16 +97,16 @@ const WorkEducationSection = ({ editedProfile, isEditing, onInputChange }: WorkE
               disabled={!isEditing}
             >
               <SelectTrigger className="w-full">
-                <SelectValue placeholder="Select your education level" />
+                <SelectValue placeholder={t('profile.selectEducation')} />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="High School">High School</SelectItem>
-                <SelectItem value="Some College">Some College</SelectItem>
-                <SelectItem value="Associate Degree">Associate Degree</SelectItem>
-                <SelectItem value="Bachelor's Degree">Bachelor's Degree</SelectItem>
-                <SelectItem value="Master's Degree">Master's Degree</SelectItem>
-                <SelectItem value="Doctorate">Doctorate</SelectItem>
-                <SelectItem value="Other">Other</SelectItem>
+                <SelectItem value="High School">{t('profile.educationOptions.highSchool')}</SelectItem>
+                <SelectItem value="Some College">{t('profile.educationOptions.someCollege')}</SelectItem>
+                <SelectItem value="Associate Degree">{t('profile.educationOptions.associate')}</SelectItem>
+                <SelectItem value="Bachelor's Degree">{t('profile.educationOptions.bachelors')}</SelectItem>
+                <SelectItem value="Master's Degree">{t('profile.educationOptions.masters')}</SelectItem>
+                <SelectItem value="Doctorate">{t('profile.educationOptions.doctorate')}</SelectItem>
+                <SelectItem value="Other">{t('profile.educationOptions.other')}</SelectItem>
               </SelectContent>
             </Select>
             <Input
@@ -116,7 +119,7 @@ const WorkEducationSection = ({ editedProfile, isEditing, onInputChange }: WorkE
               } as React.ChangeEvent<HTMLInputElement>)}
               disabled={!isEditing}
               className="w-full mt-2"
-              placeholder="Or enter your education level"
+              placeholder={t('profile.enterEducation')}
             />
           </div>
         </div>

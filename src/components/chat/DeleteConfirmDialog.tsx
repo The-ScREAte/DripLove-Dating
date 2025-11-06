@@ -1,4 +1,5 @@
 import React from 'react';
+import { useTranslation } from 'react-i18next';
 
 interface DeleteConfirmDialogProps {
   isOpen: boolean;
@@ -13,6 +14,7 @@ const DeleteConfirmDialog: React.FC<DeleteConfirmDialogProps> = ({
   onConfirm,
   deleteType
 }) => {
+  const { t } = useTranslation();
   if (!isOpen) return null;
 
   const handleConfirm = () => {
@@ -24,7 +26,7 @@ const DeleteConfirmDialog: React.FC<DeleteConfirmDialogProps> = ({
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm" onClick={onClose}>
       <div className="bg-white rounded-xl shadow-xl w-64 p-4" onClick={(e) => e.stopPropagation()}>
         <p className="text-sm text-gray-700 mb-3 text-center">
-          Delete this message?
+          {t('deleteMessage.confirmTitle')}
         </p>
 
         <div className="flex gap-2">
@@ -32,13 +34,13 @@ const DeleteConfirmDialog: React.FC<DeleteConfirmDialogProps> = ({
             onClick={onClose}
             className="flex-1 px-3 py-1.5 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-lg text-sm font-medium transition-colors"
           >
-            Cancel
+            {t('deleteMessage.cancel')}
           </button>
           <button
             onClick={handleConfirm}
             className="flex-1 px-3 py-1.5 bg-red-500 hover:bg-red-600 text-white rounded-lg text-sm font-medium transition-colors"
           >
-            Delete
+            {t('deleteMessage.delete')}
           </button>
         </div>
       </div>

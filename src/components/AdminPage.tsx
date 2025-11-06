@@ -21,6 +21,7 @@ import ImageModerationPanel from './admin/ImageModerationPanel';
 import ManualPremiumManager from './admin/ManualPremiumManager';
 import AdsManagement from './admin/AdsManagement';
 import RedirectLinkCreator from './admin/RedirectLinkCreator';
+import BroadcastNotifications from './admin/BroadcastNotifications';
 import { debounce, userDataCache, createPagination } from '@/utils/performanceOptimizer';
 import { useSupabaseSubscription, useMemoryMonitor } from '@/hooks/usePerformance';
 import { CurrentUser, AdminStats } from '@/types';
@@ -1122,6 +1123,12 @@ const AdminPageComponent = ({ currentUser, onLogout }: AdminPageProps) => {
 
   const handleLogout = async () => {
     try {
+      // Remove push token before logging out
+      if (currentUser?.id) {
+        const { removePushToken } = await import('@/services/pushNotifications');
+        await removePushToken(currentUser.id);
+      }
+      
       await supabase.auth.signOut();
       onLogout();
     } catch (error) {
@@ -1237,34 +1244,39 @@ const AdminPageComponent = ({ currentUser, onLogout }: AdminPageProps) => {
           {/* Tabbed Interface with Error Boundaries for 1000+ users */}
           <AdminErrorBoundary>
             <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-              <TabsList className="grid w-full grid-cols-7 mb-4 h-11">
-                <TabsTrigger value="dashboard" className="text-xs flex flex-col gap-1 py-2">
+              <TabsList className="grid w-full grid-cols-8 mb-3 h-9">
+                <TabsTrigger value="dashboard" className="text-[11px] flex flex-col gap-0.5 py-1">
                   <BarChart3 className="w-4 h-4" />
-                  <span>Dashboard</span>
+                  <span>Dash</span>
                 </TabsTrigger>
-                <TabsTrigger value="users" className="text-xs flex flex-col gap-1 py-2">
+                <TabsTrigger value="users" className="text-[11px] flex flex-col gap-0.5 py-1">
                   <Users className="w-4 h-4" />
                   <span>Users</span>
                 </TabsTrigger>
-                <TabsTrigger value="content" className="text-xs flex flex-col gap-1 py-2">
+                <TabsTrigger value="content" className="text-[11px] flex flex-col gap-0.5 py-1">
                   <Image className="w-4 h-4" />
-                  <span>Content</span>
+                  <span>Cont..</span>
                 </TabsTrigger>
-                <TabsTrigger value="ads" className="text-xs flex flex-col gap-1 py-2">
+                <TabsTrigger value="broadcast" className="text-[11px] flex flex-col gap-0.5 py-1">
+                  <Megaphone className="w-4 h-4" />
+                  <span>Cast</span>
+                </TabsTrigger>
+
+                <TabsTrigger value="ads" className="text-[11px] flex flex-col gap-0.5 py-1">
                   <Megaphone className="w-4 h-4" />
                   <span>Ads</span>
                 </TabsTrigger>
-                <TabsTrigger value="redirects" className="text-xs flex flex-col gap-1 py-2">
+                <TabsTrigger value="redirects" className="text-[11px] flex flex-col gap-0.5 py-1">
                   <Link2 className="w-4 h-4" />
                   <span>Links</span>
                 </TabsTrigger>
-                <TabsTrigger value="debugger" className="text-xs flex flex-col gap-1 py-2">
+                <TabsTrigger value="debugger" className="text-[11px] flex flex-col gap-0.5 py-1">
                   <Search className="w-4 h-4" />
                   <span>Debug</span>
                 </TabsTrigger>
-                <TabsTrigger value="settings" className="text-xs flex flex-col gap-1 py-2">
+                <TabsTrigger value="settings" className="text-[11px] flex flex-col gap-0.5 py-1">
                   <Settings className="w-4 h-4" />
-                  <span>Settings</span>
+                  <span>Sett..</span>
                 </TabsTrigger>
               </TabsList>
 
@@ -1274,79 +1286,79 @@ const AdminPageComponent = ({ currentUser, onLogout }: AdminPageProps) => {
               {stats && (
                 <Card>
                   <CardHeader className="pb-3">
-                    <CardTitle className="flex items-center gap-2 text-lg">
-                      <BarChart3 className="w-5 h-5" />
+                    <CardTitle className="flex items-center gap-2 text-sm">
+                      <BarChart3 className="w-4 h-4" />
                       Platform Statistics
                     </CardTitle>
-                    <p className="text-sm text-gray-600 mt-1">
+                    <p className="text-xs text-gray-600 mt-1">
                       Real-time metrics including active premium subscriptions
                     </p>
                   </CardHeader>
                   <CardContent>
-                    <div className="grid grid-cols-2 gap-3">
-                      <div className="flex items-center justify-between p-3 bg-gradient-to-r from-blue-50 to-blue-100 rounded-lg border border-blue-200">
+                    <div className="grid grid-cols-2 gap-2">
+                      <div className="flex items-center justify-between p-2 bg-gradient-to-r from-blue-50 to-blue-100 rounded-lg border border-blue-200">
                         <div>
-                          <p className="text-xs text-blue-700 font-medium">Total Users</p>
-                          <p className="text-lg font-bold text-blue-900">{stats.total_users}</p>
+                          <p className="text-[11px] text-blue-700 font-medium">Total Users</p>
+                          <p className="text-base font-bold text-blue-900">{stats.total_users}</p>
                         </div>
-                        <Users className="w-6 h-6 text-blue-500" />
+                        <Users className="w-5 h-5 text-blue-500" />
                       </div>
-                      <div className="flex items-center justify-between p-3 bg-gradient-to-r from-pink-50 to-pink-100 rounded-lg border border-pink-200">
+                      <div className="flex items-center justify-between p-2 bg-gradient-to-r from-pink-50 to-pink-100 rounded-lg border border-pink-200">
                         <div>
-                          <p className="text-xs text-pink-700 font-medium">Total Matches</p>
-                          <p className="text-lg font-bold text-pink-900">{stats.total_matches}</p>
+                          <p className="text-[11px] text-pink-700 font-medium">Total Matches</p>
+                          <p className="text-base font-bold text-pink-900">{stats.total_matches}</p>
                         </div>
-                        <Heart className="w-6 h-6 text-pink-500" />
+                        <Heart className="w-5 h-5 text-pink-500" />
                       </div>
-                      <div className="flex items-center justify-between p-3 bg-gradient-to-r from-green-50 to-green-100 rounded-lg border border-green-200">
+                      <div className="flex items-center justify-between p-2 bg-gradient-to-r from-green-50 to-green-100 rounded-lg border border-green-200">
                         <div>
-                          <p className="text-xs text-green-700 font-medium">Messages Sent</p>
-                          <p className="text-lg font-bold text-green-900">{stats.total_messages}</p>
+                          <p className="text-[11px] text-green-700 font-medium">Messages Sent</p>
+                          <p className="text-base font-bold text-green-900">{stats.total_messages}</p>
                         </div>
-                        <MessageSquare className="w-6 h-6 text-green-500" />
+                        <MessageSquare className="w-5 h-5 text-green-500" />
                       </div>
-                      <div className="flex items-center justify-between p-3 bg-gradient-to-r from-purple-50 to-purple-100 rounded-lg border border-purple-200">
+                      <div className="flex items-center justify-between p-2 bg-gradient-to-r from-purple-50 to-purple-100 rounded-lg border border-purple-200">
                         <div>
-                          <p className="text-xs text-purple-700 font-medium">Active Today</p>
-                          <p className="text-lg font-bold text-purple-900">{stats.active_users_today}</p>
+                          <p className="text-[11px] text-purple-700 font-medium">Active Today</p>
+                          <p className="text-base font-bold text-purple-900">{stats.active_users_today}</p>
                         </div>
-                        <TrendingUp className="w-6 h-6 text-purple-500" />
+                        <TrendingUp className="w-5 h-5 text-purple-500" />
                       </div>
-                      <div className="flex items-center justify-between p-3 bg-gradient-to-r from-indigo-50 to-indigo-100 rounded-lg border border-indigo-200">
+                      <div className="flex items-center justify-between p-2 bg-gradient-to-r from-indigo-50 to-indigo-100 rounded-lg border border-indigo-200">
                         <div>
-                          <p className="text-xs text-indigo-700 font-medium">New This Week</p>
-                          <p className="text-lg font-bold text-indigo-900">{stats.new_users_this_week}</p>
+                          <p className="text-[11px] text-indigo-700 font-medium">New This Week</p>
+                          <p className="text-base font-bold text-indigo-900">{stats.new_users_this_week}</p>
                         </div>
-                        <Calendar className="w-6 h-6 text-indigo-500" />
+                        <Calendar className="w-5 h-5 text-indigo-500" />
                       </div>
-                      <div className="flex items-center justify-between p-3 bg-gradient-to-r from-yellow-50 to-yellow-100 rounded-lg border border-yellow-200">
+                      <div className="flex items-center justify-between p-2 bg-gradient-to-r from-yellow-50 to-yellow-100 rounded-lg border border-yellow-200">
                         <div>
-                          <p className="text-xs text-yellow-700 font-medium">Users On Hold</p>
-                          <p className="text-lg font-bold text-yellow-900">{stats.users_on_hold}</p>
+                          <p className="text-[11px] text-yellow-700 font-medium">Users On Hold</p>
+                          <p className="text-base font-bold text-yellow-900">{stats.users_on_hold}</p>
                         </div>
-                        <Pause className="w-6 h-6 text-yellow-500" />
+                        <Pause className="w-5 h-5 text-yellow-500" />
                       </div>
-                      <div className="flex items-center justify-between p-3 bg-gradient-to-r from-red-50 to-red-100 rounded-lg border border-red-200">
+                      <div className="flex items-center justify-between p-2 bg-gradient-to-r from-red-50 to-red-100 rounded-lg border border-red-200">
                         <div>
-                          <p className="text-xs text-red-700 font-medium">Blocked Users</p>
-                          <p className="text-lg font-bold text-red-900">{stats.blocked_users}</p>
+                          <p className="text-[11px] text-red-700 font-medium">Blocked Users</p>
+                          <p className="text-base font-bold text-red-900">{stats.blocked_users}</p>
                         </div>
-                        <UserX className="w-6 h-6 text-red-500" />
+                        <UserX className="w-5 h-5 text-red-500" />
                       </div>
-                      <div className="flex items-center justify-between p-3 bg-gradient-to-r from-gray-50 to-gray-100 rounded-lg border border-gray-200">
+                      <div className="flex items-center justify-between p-2 bg-gradient-to-r from-gray-50 to-gray-100 rounded-lg border border-gray-200">
                         <div>
-                          <p className="text-xs text-gray-700 font-medium">Total Admins</p>
-                          <p className="text-lg font-bold text-gray-900">{stats.total_admins}</p>
+                          <p className="text-[11px] text-gray-700 font-medium">Total Admins</p>
+                          <p className="text-base font-bold text-gray-900">{stats.total_admins}</p>
                         </div>
-                        <Shield className="w-6 h-6 text-gray-500" />
+                        <Shield className="w-5 h-5 text-gray-500" />
                       </div>
-                      <div className="flex items-center justify-between p-3 bg-gradient-to-r from-orange-50 to-orange-100 rounded-lg border border-orange-200">
+                      <div className="flex items-center justify-between p-2 bg-gradient-to-r from-orange-50 to-orange-100 rounded-lg border border-orange-200">
                         <div>
-                          <p className="text-xs text-orange-700 font-medium">Premium Users</p>
-                          <p className="text-lg font-bold text-orange-900">{stats.premium_users}</p>
-                          <p className="text-xs text-orange-600 opacity-75">Active subscriptions</p>
+                          <p className="text-[11px] text-orange-700 font-medium">Premium Users</p>
+                          <p className="text-base font-bold text-orange-900">{stats.premium_users}</p>
+                          <p className="text-[10px] text-orange-600 opacity-75">Active subscriptions</p>
                         </div>
-                        <Crown className="w-6 h-6 text-orange-500" />
+                        <Crown className="w-5 h-5 text-orange-500" />
                       </div>
                     </div>
                   </CardContent>
@@ -1356,8 +1368,8 @@ const AdminPageComponent = ({ currentUser, onLogout }: AdminPageProps) => {
               {/* Manual Match Creation */}
               <Card>
                 <CardHeader className="pb-3">
-                  <CardTitle className="flex items-center gap-2 text-lg">
-                    <UserPlus className="w-5 h-5" />
+                  <CardTitle className="flex items-center gap-2 text-sm">
+                    <UserPlus className="w-4 h-4" />
                     Create Manual Match
                   </CardTitle>
                 </CardHeader>
@@ -1368,12 +1380,12 @@ const AdminPageComponent = ({ currentUser, onLogout }: AdminPageProps) => {
                       matchUser1Ref.current = value;
                       setMatchUser1(value);
                     }}>
-                      <SelectTrigger className="text-sm">
+                      <SelectTrigger className="text-xs">
                         <SelectValue placeholder="Select User 1" />
                       </SelectTrigger>
                       <SelectContent>
                         {users.map((user, index) => (
-                          <SelectItem key={`${user.id}-${index}`} value={user.id}>
+                          <SelectItem key={`${user.id}-${index}`} value={user.id} className="text-xs">
                             {user.first_name} {user.last_name} (ID: {user.id.substring(0, 8)}...)
                           </SelectItem>
                         ))}
@@ -1384,19 +1396,19 @@ const AdminPageComponent = ({ currentUser, onLogout }: AdminPageProps) => {
                       matchUser2Ref.current = value;
                       setMatchUser2(value);
                     }}>
-                      <SelectTrigger className="text-sm">
+                      <SelectTrigger className="text-xs">
                         <SelectValue placeholder="Select User 2" />
                       </SelectTrigger>
                       <SelectContent>
                         {users.map((user, index) => (
-                          <SelectItem key={`${user.id}-${index}`} value={user.id}>
+                          <SelectItem key={`${user.id}-${index}`} value={user.id} className="text-xs">
                             {user.first_name} {user.last_name} (ID: {user.id.substring(0, 8)}...)
                           </SelectItem>
                         ))}
                       </SelectContent>
                     </Select>
                   </div>
-                  <Button onClick={createManualMatch} className="w-full" size="sm">
+                  <Button onClick={createManualMatch} className="w-full text-xs h-8" size="sm">
                     Create Match
                   </Button>
                 </CardContent>
@@ -1405,8 +1417,8 @@ const AdminPageComponent = ({ currentUser, onLogout }: AdminPageProps) => {
               {/* Manual Premium Management */}
               <Card>
                 <CardHeader className="pb-3">
-                  <CardTitle className="flex items-center gap-2 text-lg">
-                    <CreditCard className="w-5 h-5" />
+                  <CardTitle className="flex items-center gap-2 text-sm">
+                    <CreditCard className="w-4 h-4" />
                     Manual Premium Management
                   </CardTitle>
                 </CardHeader>
@@ -1416,14 +1428,19 @@ const AdminPageComponent = ({ currentUser, onLogout }: AdminPageProps) => {
               </Card>
             </TabsContent>
 
+            {/* Broadcast Notifications Tab */}
+            <TabsContent value="broadcast" className="space-y-4">
+              <BroadcastNotifications />
+            </TabsContent>
+
             {/* Users Tab */}
             <TabsContent value="users" className="space-y-4">
               {/* Admin Users */}
               {adminUsers.length > 0 && (
                 <Card>
                   <CardHeader className="pb-3">
-                    <CardTitle className="flex items-center gap-2 text-lg">
-                      <Shield className="w-5 h-5" />
+                    <CardTitle className="flex items-center gap-2 text-sm">
+                      <Shield className="w-4 h-4" />
                       Admin Users ({adminUsers.length})
                     </CardTitle>
                   </CardHeader>
@@ -1432,20 +1449,20 @@ const AdminPageComponent = ({ currentUser, onLogout }: AdminPageProps) => {
                       {adminUsers.map((admin) => (
                         <div key={admin.id} className="flex items-center justify-between p-2 bg-blue-50 rounded">
                           <div>
-                            <p className="font-medium text-sm">{admin.first_name} {admin.last_name}</p>
-                            <p className="text-xs text-gray-600">{admin.email}</p>
+                            <p className="font-medium text-xs">{admin.first_name} {admin.last_name}</p>
+                            <p className="text-[11px] text-gray-600">{admin.email}</p>
                           </div>
                           <div className="flex items-center gap-2">
                             <Button
                               size="sm"
                               variant="outline"
                               onClick={() => handleViewProfile(admin.id)}
-                              className="text-blue-600 hover:text-blue-700 text-xs px-2 py-1 h-7"
+                              className="text-blue-600 hover:text-blue-700 text-[11px] px-2 py-1 h-6"
                             >
                               <Eye className="w-3 h-3 mr-1" />
                               View
                             </Button>
-                            <Badge className="bg-blue-100 text-blue-800 text-xs">
+                            <Badge className="bg-blue-100 text-blue-800 text-[10px]">
                               ADMIN
                             </Badge>
                           </div>
@@ -1459,32 +1476,32 @@ const AdminPageComponent = ({ currentUser, onLogout }: AdminPageProps) => {
               {/* User Management */}
               <Card>
                 <CardHeader className="pb-3">
-                  <CardTitle className="flex items-center gap-2 text-lg">
-                    <Users className="w-5 h-5" />
+                  <CardTitle className="flex items-center gap-2 text-sm">
+                    <Users className="w-4 h-4" />
                     User Management ({filteredUsers.length})
                   </CardTitle>
                 </CardHeader>
                 <CardContent>
                   {/* Search and Filter */}
-                  <div className="flex gap-2 mb-4">
+                  <div className="flex gap-2 mb-3">
                     <div className="flex-1 relative">
-                      <Search className="absolute left-2 top-2.5 h-4 w-4 text-gray-400" />
+                      <Search className="absolute left-2 top-2 h-3 w-3 text-gray-400" />
                       <Input
                         placeholder="Search users..."
                         value={searchTerm}
                         onChange={(e) => setSearchTerm(e.target.value)}
-                        className="pl-8 text-sm"
+                        className="pl-7 text-xs h-8"
                       />
                     </div>
                     <Select value={statusFilter} onValueChange={setStatusFilter}>
-                      <SelectTrigger className="w-32">
+                      <SelectTrigger className="w-28 text-xs h-8">
                         <SelectValue />
                       </SelectTrigger>
                       <SelectContent>
-                        <SelectItem value="all">All</SelectItem>
-                        <SelectItem value="active">Active</SelectItem>
-                        <SelectItem value="on_hold">On Hold</SelectItem>
-                        <SelectItem value="blocked">Blocked</SelectItem>
+                        <SelectItem value="all" className="text-xs">All</SelectItem>
+                        <SelectItem value="active" className="text-xs">Active</SelectItem>
+                        <SelectItem value="on_hold" className="text-xs">On Hold</SelectItem>
+                        <SelectItem value="blocked" className="text-xs">Blocked</SelectItem>
                       </SelectContent>
                     </Select>
                   </div>
@@ -1492,20 +1509,20 @@ const AdminPageComponent = ({ currentUser, onLogout }: AdminPageProps) => {
                   {/* Users List Container */}
                   <div className="border rounded-lg bg-white">
                     {loading ? (
-                      <div className="flex justify-center py-8">
-                        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-pink-600"></div>
+                      <div className="flex justify-center py-6">
+                        <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-pink-600"></div>
                       </div>
                     ) : (
                       <div className="space-y-0 max-h-96 overflow-y-auto">
                         {paginatedUsers.map((user, index) => (
-                          <div key={user.id} className={`p-3 space-y-2 ${index !== paginatedUsers.length - 1 ? 'border-b' : ''}`}>
+                          <div key={user.id} className={`p-2 space-y-1 ${index !== paginatedUsers.length - 1 ? 'border-b' : ''}`}>
                             <div className="flex items-start justify-between">
                               <div className="flex-1 min-w-0">
-                                <h3 className="font-medium text-sm truncate">
+                                <h3 className="font-medium text-xs truncate">
                                   {user.first_name} {user.last_name}
                                 </h3>
-                                <p className="text-xs text-gray-600 truncate">{user.email}</p>
-                                <p className="text-xs text-gray-500">
+                                <p className="text-[11px] text-gray-600 truncate">{user.email}</p>
+                                <p className="text-[11px] text-gray-500">
                                   {user.city}, {user.country} • Age {user.age}
                                 </p>
                                 <p className="text-xs text-gray-500">
@@ -1617,8 +1634,8 @@ const AdminPageComponent = ({ currentUser, onLogout }: AdminPageProps) => {
               {/* Reported Chats Section */}
               <div className="bg-white border rounded-lg p-3">
                 <div className="flex items-center justify-between mb-3">
-                  <h3 className="text-lg font-medium">Reported Chats</h3>
-                  <div className="text-sm text-gray-500">{loadingReportedChats ? 'Loading...' : `${reportedChats.length} reports`}</div>
+                  <h3 className="text-sm font-medium">Reported Chats</h3>
+                  <div className="text-xs text-gray-500">{loadingReportedChats ? 'Loading...' : `${reportedChats.length} reports`}</div>
                 </div>
 
                 {loadingReportedChats ? (
@@ -1626,33 +1643,33 @@ const AdminPageComponent = ({ currentUser, onLogout }: AdminPageProps) => {
                     <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-pink-600"></div>
                   </div>
                 ) : reportedChats.length === 0 ? (
-                  <div className="text-center py-6 text-gray-500">No reported chats.</div>
+                  <div className="text-center py-6 text-gray-500 text-sm">No reported chats.</div>
                 ) : (
                   <div className="space-y-2 max-h-72 overflow-y-auto">
                     {reportedChats.map((r) => (
-                      <div key={r.id} className="p-3 border rounded-lg flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+                      <div key={r.id} className="p-2 border rounded-lg flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
                         <div className="flex-1 min-w-0">
-                          <p className="text-sm font-medium truncate">{r.message?.message || '[message deleted]'}</p>
-                          <p className="text-xs text-gray-600 truncate">
+                          <p className="text-xs font-medium truncate">{r.message?.message || '[message deleted]'}</p>
+                          <p className="text-[11px] text-gray-600 truncate">
                             Reported by: {r.reporter ? `${r.reporter.first_name} ${r.reporter.last_name}` : r.details?.reporter_id}
                             {' • '}
                             Reported user: {r.reportedUser ? `${r.reportedUser.first_name} ${r.reportedUser.last_name}` : r.details?.reported_user_id || r.details?.reportedUser}
                           </p>
-                          <p className="text-xs text-gray-500 mt-1">Reason: {r.details?.reason || '—'}</p>
-                          {r.details?.description && <p className="text-xs text-gray-500 mt-1">Notes: {r.details.description}</p>}
+                          <p className="text-[11px] text-gray-500 mt-1">Reason: {r.details?.reason || '—'}</p>
+                          {r.details?.description && <p className="text-[11px] text-gray-500 mt-1">Notes: {r.details.description}</p>}
                         </div>
 
                         <div className="flex gap-2">
-                          <Button size="sm" variant="outline" onClick={() => ignoreReport(r.id)} disabled={processingReportIds[r.id]}>
+                          <Button size="sm" variant="outline" onClick={() => ignoreReport(r.id)} disabled={processingReportIds[r.id]} className="text-xs h-7">
                             Ignore
                           </Button>
-                          <Button size="sm" variant="destructive" onClick={() => blockUserFromReport(r.id, r.reportedUser?.id || r.details?.reported_user_id)} disabled={processingReportIds[r.id]}>
+                          <Button size="sm" variant="destructive" onClick={() => blockUserFromReport(r.id, r.reportedUser?.id || r.details?.reported_user_id)} disabled={processingReportIds[r.id]} className="text-xs h-7">
                             Block
                           </Button>
-                          <Button size="sm" variant="ghost" onClick={() => deleteReportedMessage(r.id, r.message?.id)} disabled={processingReportIds[r.id]}>
+                          <Button size="sm" variant="ghost" onClick={() => deleteReportedMessage(r.id, r.message?.id)} disabled={processingReportIds[r.id]} className="text-xs h-7">
                             Delete
                           </Button>
-                          <Button size="sm" variant="secondary" onClick={() => openEmailModal(r)}>
+                          <Button size="sm" variant="secondary" onClick={() => openEmailModal(r)} className="text-xs h-7">
                             Email
                           </Button>
                         </div>
@@ -1661,7 +1678,7 @@ const AdminPageComponent = ({ currentUser, onLogout }: AdminPageProps) => {
                   </div>
                 )}
                 <div className="mt-3">
-                  <Button size="sm" variant="outline" onClick={() => fetchReportedChats(true)}>Refresh</Button>
+                  <Button size="sm" variant="outline" onClick={() => fetchReportedChats(true)} className="text-xs">Refresh</Button>
                 </div>
               </div>
             </TabsContent>
@@ -1670,8 +1687,8 @@ const AdminPageComponent = ({ currentUser, onLogout }: AdminPageProps) => {
             <TabsContent value="ads" className="space-y-4">
               <Card>
                 <CardHeader className="pb-3">
-                  <CardTitle className="flex items-center gap-2 text-lg">
-                    <Megaphone className="w-5 h-5" />
+                  <CardTitle className="flex items-center gap-2 text-sm">
+                    <Megaphone className="w-4 h-4" />
                     Ads Management
                   </CardTitle>
                 </CardHeader>

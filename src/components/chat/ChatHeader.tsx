@@ -8,6 +8,7 @@ import ReportModal from '@/components/ReportModal';
 import { useState } from 'react';
 import { useToast } from '@/hooks/use-toast';
 import { Capacitor } from '@capacitor/core';
+import { useTranslation } from 'react-i18next';
 
 interface ChatHeaderProps {
   selectedMatch: ChatMatch;
@@ -30,6 +31,7 @@ const ChatHeader: React.FC<ChatHeaderProps> = ({
   isMobile = false,
   currentUserId
 }) => {
+  const { t } = useTranslation();
   // Determine partner ID correctly
   const partnerId = selectedMatch.partner?.id ||
                    (selectedMatch.user1_id === currentUserId ? selectedMatch.user2_id : selectedMatch.user1_id);
@@ -77,7 +79,7 @@ const ChatHeader: React.FC<ChatHeaderProps> = ({
             size="sm" 
             onClick={onBack}
             className="p-2"
-            aria-label="Go back to chat list"
+            aria-label={t('chat.goBack')}
           >
             <ArrowLeft className="w-4 h-4" />
           </Button>
@@ -92,7 +94,7 @@ const ChatHeader: React.FC<ChatHeaderProps> = ({
           <h3 className="font-semibold text-gray-900">
             {selectedMatch.first_name} {selectedMatch.last_name}
           </h3>
-          <p className="text-sm text-gray-500">Active on DripLove</p>
+          <p className="text-sm text-gray-500">{t('chat.activeOnDripLove')}</p>
         </div>
   </div>
       
@@ -105,7 +107,7 @@ const ChatHeader: React.FC<ChatHeaderProps> = ({
           onContextMenu={(e) => e.preventDefault()}
           style={{ WebkitUserSelect: 'none', userSelect: 'none', WebkitTouchCallout: 'none', touchAction: 'manipulation' }}
         >
-          <span className="sr-only">More options</span>
+          <span className="sr-only">{t('chat.moreOptions')}</span>
           <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
             <path d="M10 6a2 2 0 110-4 2 2 0 010 4zM10 12a2 2 0 110-4 2 2 0 010 4zM10 18a2 2 0 110-4 2 2 0 010 4z" />
           </svg>
@@ -122,13 +124,13 @@ const ChatHeader: React.FC<ChatHeaderProps> = ({
                     onReport?.(selectedMatch.last_message_obj?.id);
                   }}
                 >
-                  Report
+                  {t('chat.report')}
                 </button>
                 <button
                   className="w-full text-left px-4 py-3 text-sm text-red-600"
                   onClick={() => { onBlockUser(selectedMatch); setMenuOpen(false); }}
                 >
-                  Block User
+                  {t('chat.blockUser')}
                 </button>
               </div>
             </div>

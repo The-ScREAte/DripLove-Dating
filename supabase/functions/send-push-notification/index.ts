@@ -234,10 +234,17 @@ serve(async (req) => {
                     alert: {
                       title,
                       body,
+                      // Remove subtitle to avoid cloud emoji
+                      'subtitle': '',
                     },
                     sound: iosSound,
                     badge: 1,
+                    'mutable-content': 0, // Disable notification service extension
                   },
+                },
+                headers: {
+                  'apns-priority': '10',
+                  'apns-collapse-id': type, // Group notifications by type
                 },
               },
             },

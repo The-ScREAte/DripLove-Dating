@@ -1,4 +1,5 @@
 import React from 'react';
+import { useTranslation } from 'react-i18next';
 import { Button } from '@/components/ui/button';
 import { ArrowLeft, Shield, Eye, Lock, Users, Globe, Database, FileText, Mail } from 'lucide-react';
 
@@ -7,6 +8,8 @@ interface PrivacyPolicyProps {
 }
 
 const PrivacyPolicy = ({ onBack }: PrivacyPolicyProps) => {
+  const { t } = useTranslation();
+  
   return (
     <div className="min-h-fill bg-gradient-to-br from-pink-400 via-purple-500 to-indigo-600 p-4">
       <div className="max-w-4xl mx-auto bg-white rounded-lg shadow-lg overflow-hidden">
@@ -19,10 +22,10 @@ const PrivacyPolicy = ({ onBack }: PrivacyPolicyProps) => {
             className="text-white hover:bg-white/20"
           >
             <ArrowLeft className="w-4 h-4 mr-2" />
-            Back
+            {t('common.back')}
           </Button>
-          <h1 className="text-3xl font-bold">DripLove Privacy Policy</h1>
-          <p className="text-purple-100 mt-2">Last Updated: July 13, 2025</p>
+          <h1 className="text-3xl font-bold">{t('privacyPolicy.title')}</h1>
+          <p className="text-purple-100 mt-2">{t('privacyPolicy.lastUpdated')}</p>
         </div>
 
         {/* Content */}

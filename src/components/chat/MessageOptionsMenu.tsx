@@ -1,5 +1,6 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { MoreVertical, Trash2 } from 'lucide-react';
+import { useTranslation } from 'react-i18next';
 
 interface MessageOptionsMenuProps {
   isOwnMessage: boolean;
@@ -12,6 +13,7 @@ const MessageOptionsMenu: React.FC<MessageOptionsMenuProps> = ({
   onDeleteForMe,
   onDeleteForEveryone,
 }) => {
+  const { t } = useTranslation();
   const [isOpen, setIsOpen] = useState(false);
   const [showBelow, setShowBelow] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
@@ -85,7 +87,7 @@ const MessageOptionsMenu: React.FC<MessageOptionsMenuProps> = ({
             className="w-full px-2.5 py-1.5 text-left text-gray-700 hover:bg-gray-50 flex items-center gap-1.5 transition-colors text-xs"
           >
             <Trash2 className="w-3 h-3" />
-            Delete for me
+            {t('chat.deleteForMe')}
           </button>
           
           {isOwnMessage && (
@@ -94,7 +96,7 @@ const MessageOptionsMenu: React.FC<MessageOptionsMenuProps> = ({
               className="w-full px-2.5 py-1.5 text-left text-red-600 hover:bg-red-50 flex items-center gap-1.5 transition-colors text-xs"
             >
               <Trash2 className="w-3 h-3" />
-              Delete for everyone
+              {t('chat.deleteForEveryone')}
             </button>
           )}
         </div>

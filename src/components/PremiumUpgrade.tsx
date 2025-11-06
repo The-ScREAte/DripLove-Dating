@@ -10,6 +10,7 @@ import { Crown, Heart, RotateCcw, Users, Check, X } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import { useEnhancedSubscription } from '@/hooks/useEnhancedSubscription';
+import { useTranslation } from 'react-i18next';
 
 interface PremiumUpgradeProps {
   currentUser: any;
@@ -18,7 +19,7 @@ interface PremiumUpgradeProps {
 }
 
 const PremiumUpgrade = ({ currentUser, onClose, preselectedPlan }: PremiumUpgradeProps) => {
-
+  const { t } = useTranslation();
   const [loading, setLoading] = useState(false);
   const { toast } = useToast();
   const [showPaymentModal, setShowPaymentModal] = useState(false);
@@ -310,10 +311,10 @@ const PremiumUpgrade = ({ currentUser, onClose, preselectedPlan }: PremiumUpgrad
   };
 
   const features = [
-    { name: 'Unlimited Daily Swipes', free: '12 per day', premium: 'Unlimited', icon: Heart },
-    { name: 'Reverse Dislikes', free: '2 per day', premium: 'Unlimited', icon: RotateCcw },
-    { name: 'See All Who Liked You', free: '1 visible', premium: 'All visible', icon: Users },
-    { name: 'Priority Support', free: 'Standard', premium: 'Priority', icon: Crown },
+    { name: t('premium.features.unlimitedSwipes.name'), free: t('premium.features.unlimitedSwipes.free'), premium: t('premium.features.unlimitedSwipes.premium'), icon: Heart },
+    { name: t('premium.features.reverseDislikes.name'), free: t('premium.features.reverseDislikes.free'), premium: t('premium.features.reverseDislikes.premium'), icon: RotateCcw },
+    { name: t('premium.features.seeWhoLiked.name'), free: t('premium.features.seeWhoLiked.free'), premium: t('premium.features.seeWhoLiked.premium'), icon: Users },
+    { name: t('premium.features.prioritySupport.name'), free: t('premium.features.prioritySupport.free'), premium: t('premium.features.prioritySupport.premium'), icon: Crown },
   ];
 
   return (
@@ -343,7 +344,7 @@ const PremiumUpgrade = ({ currentUser, onClose, preselectedPlan }: PremiumUpgrad
             className="mt-6 text-white hover:bg-white/20 transition-colors"
           >
             <X className="w-4 h-4 mr-2" />
-            Back
+            {t('premium.back')}
           </Button>
         )}
           
@@ -365,13 +366,13 @@ const PremiumUpgrade = ({ currentUser, onClose, preselectedPlan }: PremiumUpgrad
               <Card className="border-2 border-yellow-400 relative overflow-hidden shadow-xl bg-gradient-to-br from-white to-yellow-50 transition-all duration-300 w-full">
                 {/* Popular Badge */}
                 <div className="absolute -top-1 -right-1 bg-gradient-to-r from-yellow-400 to-orange-400 text-black px-2 md:px-3 py-1 md:py-1.5 text-xs md:text-sm font-bold rounded-bl-lg shadow-lg responsive-text">
-                  ⭐ MOST POPULAR
+                  {t('premium.mostPopular')}
                 </div>
               
               <CardHeader className="text-center pb-3 md:pb-5 pt-4 md:pt-7 px-2 md:px-4">
                 <CardTitle className="text-lg sm:text-xl md:text-2xl lg:text-3xl font-bold flex items-center justify-center text-gray-800 responsive-text">
                   <Crown className="w-5 h-5 sm:w-7 sm:h-7 md:w-8 md:h-8 text-yellow-500 mr-2 sm:mr-3" />
-                  Premium Plan
+                  {t('premium.premiumPlan')}
                 </CardTitle>
                 <div className="mt-2 md:mt-3">
                   <div className="space-y-2 md:space-y-3">
@@ -381,7 +382,7 @@ const PremiumUpgrade = ({ currentUser, onClose, preselectedPlan }: PremiumUpgrad
                         {price !== null ? `${currency} ${price}` : 'Loading...'}
                       </div>
                       {!isIOS() && (
-                        <div className="text-xs md:text-sm text-green-600 font-medium mt-1">✨ One-time payment - Lifetime access</div>
+                        <div className="text-xs md:text-sm text-green-600 font-medium mt-1">✨ {t('premium.oneTimePayment')}</div>
                       )}
                     </div>
                     
@@ -391,7 +392,7 @@ const PremiumUpgrade = ({ currentUser, onClose, preselectedPlan }: PremiumUpgrad
                         <div className="text-lg sm:text-xl md:text-2xl font-bold text-gray-800 responsive-text">
                           {currency} {monthlyPrice}/month
                         </div>
-                        <div className="text-xs md:text-sm text-blue-600 font-medium mt-1">📱 Monthly subscription - Cancel anytime</div>
+                        <div className="text-xs md:text-sm text-blue-600 font-medium mt-1">📱 {t('premium.monthlySubscription')}</div>
                       </div>
                     )}
                   </div>
@@ -418,8 +419,8 @@ const PremiumUpgrade = ({ currentUser, onClose, preselectedPlan }: PremiumUpgrad
                     <Crown className="w-4 h-4 md:w-5 md:h-5 text-yellow-600" />
                   </div>
                   <div className="flex-1 min-w-0">
-                    <div className="font-semibold text-gray-800 text-xs md:text-base responsive-text truncate">All Future Features</div>
-                    <div className="text-xs md:text-sm text-green-600 font-medium responsive-text">Included forever!</div>
+                    <div className="font-semibold text-gray-800 text-xs md:text-base responsive-text truncate">{t('premium.features.allFutureFeatures.name')}</div>
+                    <div className="text-xs md:text-sm text-green-600 font-medium responsive-text">{t('premium.features.allFutureFeatures.premium')}</div>
                   </div>
                   <Check className="w-4 h-4 md:w-5 md:h-5 text-green-500 flex-shrink-0" />
                 </div>
@@ -431,7 +432,7 @@ const PremiumUpgrade = ({ currentUser, onClose, preselectedPlan }: PremiumUpgrad
                     className="w-full bg-gradient-to-r from-yellow-400 via-yellow-500 to-orange-400 hover:from-yellow-500 hover:via-yellow-600 hover:to-orange-500 text-black font-bold py-2.5 md:py-4 px-4 md:px-8 rounded-xl text-base md:text-lg shadow-xl transition-all duration-200 responsive-text"
                   >
                     <Crown className="w-5 h-5 md:w-6 md:h-6 mr-2 md:mr-3" />
-                    Upgrade to Premium Now
+                    {t('premium.upgradeButton')}
                   </Button>
                   
                   {/* Restore Purchases Link for iOS */}
@@ -441,7 +442,7 @@ const PremiumUpgrade = ({ currentUser, onClose, preselectedPlan }: PremiumUpgrad
                       disabled={restoreLoading}
                       className="mt-3 text-xs md:text-sm text-gray-600 hover:text-gray-800 underline disabled:opacity-50 transition-colors"
                     >
-                      {restoreLoading ? 'Restoring purchases...' : 'Already purchased? Restore'}
+                      {restoreLoading ? t('premium.restoringPurchases') : t('premium.restorePurchases')}
                     </button>
                   )}
                 </div>
@@ -453,10 +454,10 @@ const PremiumUpgrade = ({ currentUser, onClose, preselectedPlan }: PremiumUpgrad
           <div className="order-2 md:order-2 w-full">
             <Card className="border-2 border-gray-200 shadow-md bg-white relative transition-all duration-300 w-full">
               <CardHeader className="text-center pb-3 md:pb-5 px-2 md:px-4">
-                <CardTitle className="text-lg sm:text-xl md:text-2xl font-bold text-gray-700 responsive-text">Free Plan</CardTitle>
+                <CardTitle className="text-lg sm:text-xl md:text-2xl font-bold text-gray-700 responsive-text">{t('premium.freePlan')}</CardTitle>
                 <div className="mt-2 md:mt-3">
                   <div className="text-2xl sm:text-3xl md:text-4xl font-bold text-gray-700 responsive-text">{currency} 0</div>
-                  <div className="text-xs md:text-sm text-gray-500 mt-1">Basic features only</div>
+                  <div className="text-xs md:text-sm text-gray-500 mt-1">{t('premium.basicFeaturesOnly')}</div>
                 </div>
               </CardHeader>
               <CardContent className="space-y-2 md:space-y-3 px-2 md:px-5 pb-4 md:pb-7">
@@ -474,7 +475,7 @@ const PremiumUpgrade = ({ currentUser, onClose, preselectedPlan }: PremiumUpgrad
                 ))}
                 <div className="pt-3 md:pt-5 text-center">
                   <p className="text-gray-500 text-xs md:text-sm mt-2 responsive-text">
-                    Limited features • Basic support
+                    {t('premium.limitedFeatures')}
                   </p>
                 </div>
               </CardContent>
@@ -485,12 +486,12 @@ const PremiumUpgrade = ({ currentUser, onClose, preselectedPlan }: PremiumUpgrad
         {/* Trust Indicators */}
         <div className="text-center mt-6 md:mt-10 mb-3 md:mb-5">
           <p className="text-white/80 text-xs md:text-sm mb-2 md:mb-3 responsive-text">
-            ✨ Join 10,000+ happy premium members
+            {t('premium.trustIndicators.joinMembers')}
           </p>
           <div className="flex flex-wrap justify-center items-center gap-2 md:gap-5 text-white/60">
-            <span className="text-xs">🔒 SSL Secured</span>
-            <span className="text-xs">💳 Safe Payments</span>
-            <span className="text-xs">📱 Mobile Optimized</span>
+            <span className="text-xs">{t('premium.trustIndicators.sslSecured')}</span>
+            <span className="text-xs">{t('premium.trustIndicators.safePayments')}</span>
+            <span className="text-xs">{t('premium.trustIndicators.mobileOptimized')}</span>
           </div>
         </div>
       </div>
@@ -506,7 +507,7 @@ const PremiumUpgrade = ({ currentUser, onClose, preselectedPlan }: PremiumUpgrad
               ✕
             </button>
             <h2 className="text-xl font-bold mb-4 text-center">
-              Choose Payment Option
+              {t('premium.paymentOptions.title')}
             </h2>
             <div className="space-y-4">
               {/* Apple IAP - show on iOS native when available */}
@@ -517,13 +518,13 @@ const PremiumUpgrade = ({ currentUser, onClose, preselectedPlan }: PremiumUpgrad
                     disabled={iapLoading}
                     className="w-full p-4 bg-gradient-to-r from-gray-800 to-black text-white rounded-lg hover:from-gray-700 hover:to-gray-900 transition-all duration-200 font-semibold disabled:opacity-50"
                   >
-                    <div className="text-lg">🍎 {iapLoading ? 'Processing...' : 'Subscribe Now'}</div>
-                    <div className="text-sm opacity-90">In-App Purchase • Secure & Fast</div>
+                    <div className="text-lg">{iapLoading ? t('premium.paymentOptions.iap.processing') : t('premium.paymentOptions.iap.button')}</div>
+                    <div className="text-sm opacity-90">{t('premium.paymentOptions.iap.subtitle')}</div>
                   </button>
                   
                   {/* Auto-renewal disclosure */}
                   <div className="text-xs text-gray-600 text-center px-2 -mt-2">
-                    Subscription automatically renews unless auto-renew is turned off at least 24 hours before the end of the current period. Payment will be charged to your Apple ID account at confirmation of purchase. You can manage and cancel your subscription in your account settings on the App Store after purchase.
+                    {t('premium.paymentOptions.iap.disclosure')}
                   </div>
                 </>
               )}
@@ -531,15 +532,15 @@ const PremiumUpgrade = ({ currentUser, onClose, preselectedPlan }: PremiumUpgrad
               {/* Loading message when IAP is not ready on iOS */}
               {isIOS() && isNativeApp() && !canBuy && !iapLoadingTimeout && (
                 <div className="text-center p-4 bg-blue-50 rounded-lg border border-blue-200">
-                  <div className="text-blue-600 mb-2 font-semibold">Connecting to App Store...</div>
-                  <div className="text-sm text-blue-500">Please wait while we check for in-app purchases.</div>
+                  <div className="text-blue-600 mb-2 font-semibold">{t('premium.paymentOptions.loading.title')}</div>
+                  <div className="text-sm text-blue-500">{t('premium.paymentOptions.loading.message')}</div>
                 </div>
               )}
               {isIOS() && isNativeApp() && !canBuy && iapLoadingTimeout && (
                 <div className="text-center p-4 bg-amber-50 rounded-lg border border-amber-200">
-                  <div className="text-amber-800 mb-2 font-semibold">In-App Purchase Temporarily Unavailable</div>
+                  <div className="text-amber-800 mb-2 font-semibold">{t('premium.paymentOptions.unavailable.title')}</div>
                   <div className="text-sm text-amber-700">
-                    We're having trouble connecting right now. Please try again in a moment, or contact support if the issue persists.
+                    {t('premium.paymentOptions.unavailable.message')}
                   </div>
                 </div>
               )}
@@ -551,16 +552,16 @@ const PremiumUpgrade = ({ currentUser, onClose, preselectedPlan }: PremiumUpgrad
                     onClick={() => handlePaymentTypeSelection('subscription')}
                     className="w-full p-4 bg-gradient-to-r from-green-500 to-emerald-600 text-white rounded-lg hover:from-green-600 hover:to-emerald-700 transition-all duration-200 font-semibold"
                   >
-                    <div className="text-lg">💳 Monthly Subscription</div>
-                    <div className="text-sm opacity-90">{currency} {monthlyPrice}/month • Cancel anytime</div>
+                    <div className="text-lg">{t('premium.paymentOptions.monthly.button')}</div>
+                    <div className="text-sm opacity-90">{currency} {monthlyPrice}/month • {t('premium.paymentOptions.monthly.subtitle')}</div>
                   </button>
                   
                   <button
                     onClick={() => handlePaymentTypeSelection('one-time')}
                     className="w-full p-4 bg-gradient-to-r from-blue-500 to-blue-600 text-white rounded-lg hover:from-blue-600 hover:to-blue-700 transition-all duration-200 font-semibold"
                   >
-                    <div className="text-lg">🎯 One-Time Payment</div>
-                    <div className="text-sm opacity-90">{currency} {price}/month • No auto-renewal</div>
+                    <div className="text-lg">{t('premium.paymentOptions.oneTime.button')}</div>
+                    <div className="text-sm opacity-90">{currency} {price}/month • {t('premium.paymentOptions.oneTime.subtitle')}</div>
                   </button>
                 </>
               )}

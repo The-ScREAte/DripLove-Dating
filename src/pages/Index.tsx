@@ -12,6 +12,7 @@ import ErrorBoundary from '@/components/ErrorBoundary';
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
 import { transformFormDataForSubmission } from '@/utils/formValidation';
+import { detectAndSetLanguage } from '@/utils/languageDetection';
 
 // Lazy load AdminPage (54KB) - only loads when admin features are accessed
 const LazyAdminPage = lazy(() => import('@/components/AdminPage'));
@@ -33,6 +34,9 @@ const Index = () => {
   const { toast } = useToast();
 
   useEffect(() => {
+    // Detect and set language for non-authenticated users
+    detectAndSetLanguage();
+    
     // Check for existing session
     supabase.auth.getSession().then(({ data: { session } }) => {
       if (session?.user) {
@@ -259,6 +263,12 @@ const Index = () => {
   };
 
   const handleLogout = async () => {
+    // Remove push token before logging out
+    if (user?.id) {
+      const { removePushToken } = await import('@/services/pushNotifications');
+      await removePushToken(user.id);
+    }
+    
     await supabase.auth.signOut();
     setUser(null);
     setCurrentView('welcome');

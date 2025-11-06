@@ -4,6 +4,7 @@ import ReactDOM from "react-dom/client";
 import App from "./App.tsx";
 import "./index.css";
 import { initializeGoogleAuth } from "./utils/googleNativeAuth";
+import "./i18n/config"; // Initialize i18n
 
 // Create a loading screen component
 const LoadingScreen = () => (

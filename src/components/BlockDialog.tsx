@@ -6,6 +6,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { Label } from '@/components/ui/label';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
+import { useTranslation } from 'react-i18next';
 
 interface BlockDialogProps {
   isOpen: boolean;
@@ -20,6 +21,7 @@ interface BlockDialogProps {
 }
 
 const BlockDialog = ({ isOpen, onClose, userToBlock, currentUserId, onBlockSuccess }: BlockDialogProps) => {
+  const { t } = useTranslation();
   const [reason, setReason] = useState('');
   const [isBlocking, setIsBlocking] = useState(false);
   const { toast } = useToast();
@@ -40,8 +42,8 @@ const BlockDialog = ({ isOpen, onClose, userToBlock, currentUserId, onBlockSucce
       if (error) throw error;
 
       toast({
-        title: "User blocked",
-        description: `${userToBlock.first_name} has been blocked`,
+        title: t('block.blocked'),
+        description: t('block.blockedDesc', { name: userToBlock.first_name }),
       });
 
       onBlockSuccess();
@@ -50,8 +52,8 @@ const BlockDialog = ({ isOpen, onClose, userToBlock, currentUserId, onBlockSucce
     } catch (error) {
       console.error('Error blocking user:', error);
       toast({
-        title: "Error",
-        description: "Failed to block user",
+        title: t('chat.error'),
+        description: t('block.errorFailed'),
         variant: "destructive",
       });
     } finally {
@@ -64,19 +66,19 @@ const BlockDialog = ({ isOpen, onClose, userToBlock, currentUserId, onBlockSucce
       <DialogContent>
         <DialogHeader>
           <DialogTitle>
-            Block {userToBlock?.first_name} {userToBlock?.last_name}?
+            {t('block.title', { name: `${userToBlock?.first_name} ${userToBlock?.last_name}` })}
           </DialogTitle>
           <DialogDescription>
-            This user will no longer be able to see your profile or contact you. You won't see them in your discover feed either.
+            {t('block.description')}
           </DialogDescription>
         </DialogHeader>
         
         <div className="space-y-4">
           <div>
-            <Label htmlFor="reason">Reason (optional)</Label>
+            <Label htmlFor="reason">{t('block.reasonOptional')}</Label>
             <Textarea
               id="reason"
-              placeholder="Tell us why you're blocking this user..."
+              placeholder={t('block.placeholder')}
               value={reason}
               onChange={(e) => setReason(e.target.value)}
               className="mt-1"
@@ -86,14 +88,14 @@ const BlockDialog = ({ isOpen, onClose, userToBlock, currentUserId, onBlockSucce
 
         <DialogFooter>
           <Button variant="outline" onClick={onClose} disabled={isBlocking}>
-            Cancel
+            {t('common.cancel')}
           </Button>
           <Button 
             onClick={handleBlock} 
             disabled={isBlocking}
             className="bg-red-500 hover:bg-red-600"
           >
-            {isBlocking ? 'Blocking...' : 'Block User'}
+            {isBlocking ? t('block.blocking') : t('block.blockUser')}
           </Button>
         </DialogFooter>
       </DialogContent>

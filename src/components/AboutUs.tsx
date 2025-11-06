@@ -1,12 +1,15 @@
 import React from 'react';
 import { Button } from '@/components/ui/button';
 import { ArrowLeft, Heart, Users, Globe, Sparkles, Mail, Shield, Target } from 'lucide-react';
+import { useTranslation } from 'react-i18next';
 
 interface AboutUsProps {
   onBack: () => void;
 }
 
 const AboutUs = ({ onBack }: AboutUsProps) => {
+  const { t } = useTranslation();
+  
   return (
     <div className="min-h-fill bg-gradient-to-br from-pink-400 via-purple-500 to-indigo-600 p-4">
       <div className="max-w-4xl mx-auto bg-white rounded-lg shadow-lg overflow-hidden">
@@ -19,10 +22,10 @@ const AboutUs = ({ onBack }: AboutUsProps) => {
             className="text-white hover:bg-white/20"
           >
             <ArrowLeft className="w-4 h-4 mr-2" />
-            Back
+            {t('aboutUs.back')}
           </Button>
-          <h1 className="text-3xl font-bold">DripLove About Us</h1>
-          <p className="text-purple-100 mt-2">Last Updated: July 13, 2025</p>
+          <h1 className="text-3xl font-bold">{t('aboutUs.title')}</h1>
+          <p className="text-purple-100 mt-2">{t('aboutUs.lastUpdated')}</p>
         </div>
 
         {/* Content */}
@@ -30,67 +33,67 @@ const AboutUs = ({ onBack }: AboutUsProps) => {
           <section>
             <h2 className="text-2xl font-semibold text-gray-800 mb-4 flex items-center">
               <Heart className="w-6 h-6 mr-2 text-pink-600" />
-              1. Our Mission
+              1. {t('aboutUs.sections.mission.title')}
             </h2>
             <p className="text-gray-600 leading-relaxed mb-4">
-              DripLove is more than just a dating app – we're a global community dedicated to helping people find authentic connections and meaningful relationships. Our mission is to create a safe, inclusive, and vibrant platform where love knows no boundaries.
+              {t('aboutUs.sections.mission.content.0')}
             </p>
             <p className="text-gray-600 leading-relaxed">
-              Whether you're looking for your soulmate, lifelong partner, or new friendships, DripLove provides the tools and community to help you discover genuine connections that matter.
+              {t('aboutUs.sections.mission.content.1')}
             </p>
           </section>
 
           <section>
             <h2 className="text-2xl font-semibold text-gray-800 mb-4 flex items-center">
               <Sparkles className="w-6 h-6 mr-2 text-purple-600" />
-              2. What Makes Us Different
+              2. {t('aboutUs.sections.different.title')}
             </h2>
             <p className="text-gray-600 leading-relaxed mb-3">
-              DripLove stands out in the crowded dating app landscape through our commitment to:
+              {t('aboutUs.sections.different.intro')}
             </p>
             <ul className="list-disc pl-6 space-y-2 text-gray-600">
-              <li>Authentic connections based on shared values and interests</li>
-              <li>A diverse, global community that celebrates all backgrounds</li>
-              <li>Advanced matching algorithms that prioritize compatibility</li>
-              <li>Safe, secure, and harassment-free environment</li>
-              <li>Inclusive features designed for everyone</li>
+              <li>{t('aboutUs.sections.different.points.0')}</li>
+              <li>{t('aboutUs.sections.different.points.1')}</li>
+              <li>{t('aboutUs.sections.different.points.2')}</li>
+              <li>{t('aboutUs.sections.different.points.3')}</li>
+              <li>{t('aboutUs.sections.different.points.4')}</li>
             </ul>
           </section>
 
           <section>
             <h2 className="text-2xl font-semibold text-gray-800 mb-4 flex items-center">
               <Globe className="w-6 h-6 mr-2 text-blue-600" />
-              3. Global Community
+              3. {t('aboutUs.sections.community.title')}
             </h2>
             <p className="text-gray-600 leading-relaxed mb-4">
-              From New York to Nairobi, London to Lagos, Tokyo to Toronto – DripLove connects hearts across continents. Our platform brings together vibrant souls from all walks of life, creating a truly global dating experience.
+              {t('aboutUs.sections.community.content.0')}
             </p>
             <p className="text-gray-600 leading-relaxed">
-              Love doesn't recognize borders, and neither do we. Whether you're seeking local connections or international romance, DripLove makes it possible.
+              {t('aboutUs.sections.community.content.1')}
             </p>
           </section>
 
           <section>
             <h2 className="text-2xl font-semibold text-gray-800 mb-4 flex items-center">
               <Users className="w-6 h-6 mr-2 text-green-600" />
-              4. Our Values
+              4. {t('aboutUs.sections.values.title')}
             </h2>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-gray-600">
               <div className="p-4 bg-pink-50 rounded-lg">
-                <h3 className="font-semibold text-pink-800 mb-2">Authenticity</h3>
-                <p className="text-sm">We encourage genuine connections and real conversations.</p>
+                <h3 className="font-semibold text-pink-800 mb-2">{t('aboutUs.sections.values.authenticity.title')}</h3>
+                <p className="text-sm">{t('aboutUs.sections.values.authenticity.description')}</p>
               </div>
               <div className="p-4 bg-purple-50 rounded-lg">
-                <h3 className="font-semibold text-purple-800 mb-2">Inclusivity</h3>
-                <p className="text-sm">Everyone is welcome regardless of background, identity, or beliefs.</p>
+                <h3 className="font-semibold text-purple-800 mb-2">{t('aboutUs.sections.values.inclusivity.title')}</h3>
+                <p className="text-sm">{t('aboutUs.sections.values.inclusivity.description')}</p>
               </div>
               <div className="p-4 bg-blue-50 rounded-lg">
-                <h3 className="font-semibold text-blue-800 mb-2">Safety</h3>
-                <p className="text-sm">Your security and privacy are our top priorities.</p>
+                <h3 className="font-semibold text-blue-800 mb-2">{t('aboutUs.sections.values.safety.title')}</h3>
+                <p className="text-sm">{t('aboutUs.sections.values.safety.description')}</p>
               </div>
               <div className="p-4 bg-green-50 rounded-lg">
-                <h3 className="font-semibold text-green-800 mb-2">Innovation</h3>
-                <p className="text-sm">We continuously improve to provide the best dating experience.</p>
+                <h3 className="font-semibold text-green-800 mb-2">{t('aboutUs.sections.values.innovation.title')}</h3>
+                <p className="text-sm">{t('aboutUs.sections.values.innovation.description')}</p>
               </div>
             </div>
           </section>
@@ -98,47 +101,47 @@ const AboutUs = ({ onBack }: AboutUsProps) => {
           <section>
             <h2 className="text-2xl font-semibold text-gray-800 mb-4 flex items-center">
               <Target className="w-6 h-6 mr-2 text-orange-600" />
-              5. About The ScREAte Ltd
+              5. {t('aboutUs.sections.company.title')}
             </h2>
             <p className="text-gray-600 leading-relaxed mb-4">
-              DripLove is proudly created by The ScREAte Ltd, a technology company dedicated to building innovative digital experiences that bring people together. We specialize in creating platforms that foster genuine human connections.
+              {t('aboutUs.sections.company.content.0')}
             </p>
             <p className="text-gray-600 leading-relaxed">
-              Our team combines technical expertise with a deep understanding of human relationships to create products that make a meaningful difference in people's lives.
+              {t('aboutUs.sections.company.content.1')}
             </p>
           </section>
 
           <section>
             <h2 className="text-2xl font-semibold text-gray-800 mb-4 flex items-center">
               <Shield className="w-6 h-6 mr-2 text-indigo-600" />
-              6. Safety & Security
+              6. {t('aboutUs.sections.safety.title')}
             </h2>
             <p className="text-gray-600 leading-relaxed mb-3">
-              Your safety is paramount to us. DripLove implements comprehensive security measures including:
+              {t('aboutUs.sections.safety.intro')}
             </p>
             <ul className="list-disc pl-6 space-y-2 text-gray-600">
-              <li>Profile verification systems</li>
-              <li>Advanced reporting and blocking features</li>
-              <li>24/7 moderation and support</li>
-              <li>End-to-end encryption for private messages</li>
-              <li>Strict privacy controls</li>
+              <li>{t('aboutUs.sections.safety.points.0')}</li>
+              <li>{t('aboutUs.sections.safety.points.1')}</li>
+              <li>{t('aboutUs.sections.safety.points.2')}</li>
+              <li>{t('aboutUs.sections.safety.points.3')}</li>
+              <li>{t('aboutUs.sections.safety.points.4')}</li>
             </ul>
           </section>
 
           <section>
             <h2 className="text-2xl font-semibold text-gray-800 mb-4 flex items-center">
               <Mail className="w-6 h-6 mr-2 text-pink-600" />
-              7. Contact Information
+              7. {t('aboutUs.sections.contact.title')}
             </h2>
             <p className="text-gray-600 mb-4">
-              Have questions, feedback, or need support? We're here to help:
+              {t('aboutUs.sections.contact.content')}
             </p>
             <div className="bg-pink-50 border border-pink-200 rounded-lg p-4 space-y-2">
               <p className="text-pink-800 font-semibold">
-                📧 <a href="mailto:support@driplove.com" className="hover:underline">support@driplove.com</a>
+                {t('aboutUs.sections.contact.email')} <a href="mailto:support@driplove.com" className="hover:underline">support@driplove.com</a>
               </p>
               <p className="text-pink-700">
-                📍 The ScREAte Ltd – Support Team
+                📍 {t('aboutUs.sections.contact.support')}
               </p>
             </div>
           </section>

@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Checkbox } from '@/components/ui/checkbox';
@@ -12,6 +13,7 @@ interface TermsAcceptanceProps {
 }
 
 const TermsAcceptance = ({ user, onAccept }: TermsAcceptanceProps) => {
+  const { t } = useTranslation();
   const [termsAccepted, setTermsAccepted] = useState(false);
   const [loading, setLoading] = useState(false);
   const { toast } = useToast();
@@ -19,8 +21,8 @@ const TermsAcceptance = ({ user, onAccept }: TermsAcceptanceProps) => {
   const handleAccept = async () => {
     if (!termsAccepted) {
       toast({
-        title: "Agreement Required",
-        description: "Please read and accept the terms and conditions to continue.",
+        title: t('termsAcceptance.mustAccept'),
+        description: t('termsAcceptance.subtitle'),
         variant: "destructive",
       });
       return;
@@ -42,16 +44,16 @@ const TermsAcceptance = ({ user, onAccept }: TermsAcceptanceProps) => {
       }
 
       toast({
-        title: "Terms Accepted",
-        description: "Thank you for accepting our terms of service. You may now proceed to use our platform.",
+        title: t('termsAcceptance.termsAccepted'),
+        description: t('termsAcceptance.thankYou'),
       });
 
       onAccept();
     } catch (error: any) {
       console.error('Terms acceptance error:', error);
       toast({
-        title: "Error",
-        description: "Failed to save your agreement. Please try again.",
+        title: t('termsAcceptance.error'),
+        description: t('termsAcceptance.failedToSave'),
         variant: "destructive",
       });
     } finally {
@@ -64,10 +66,10 @@ const TermsAcceptance = ({ user, onAccept }: TermsAcceptanceProps) => {
       <Card className="w-full max-w-4xl mx-auto backdrop-blur-sm bg-white/95 shadow-2xl border-0">
         <CardHeader className="text-center pb-6">
           <CardTitle className="text-3xl font-bold text-center text-gray-800 mb-2">
-            Terms and Conditions
+            {t('termsAcceptance.cardTitle')}
           </CardTitle>
           <CardDescription className="text-gray-600 text-lg">
-            Please review and accept our terms and conditions to continue using our service
+            {t('termsAcceptance.cardDescription')}
           </CardDescription>
         </CardHeader>
 
@@ -75,7 +77,7 @@ const TermsAcceptance = ({ user, onAccept }: TermsAcceptanceProps) => {
           {/* Terms and Conditions Content */}
           <div className="bg-white rounded-lg border border-gray-200 p-6 max-h-96 overflow-y-auto">
             <h3 className="text-xl font-semibold text-gray-800 mb-3">
-              Terms of Service
+              {t('termsAcceptance.termsOfService')}
             </h3>
             
             <div className="space-y-4 text-sm text-gray-600">
@@ -190,9 +192,7 @@ const TermsAcceptance = ({ user, onAccept }: TermsAcceptanceProps) => {
                 htmlFor="terms-acceptance"
                 className="text-sm text-gray-700 cursor-pointer leading-relaxed"
               >
-                I have read and understand the Terms and Conditions above. I agree to comply with all terms and acknowledge that 
-                violation of these terms may result in account suspension or termination. I am at least 18 years old and legally 
-                able to enter into this agreement.
+                {t('termsAcceptance.agreementText')}
               </label>
             </div>
           </div>
@@ -204,11 +204,11 @@ const TermsAcceptance = ({ user, onAccept }: TermsAcceptanceProps) => {
               disabled={loading || !termsAccepted}
               className="w-full bg-gray-900 hover:bg-gray-800 text-white font-semibold py-3 rounded-lg transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed"
             >
-              {loading ? 'Processing...' : 'Accept Terms & Continue'}
+              {loading ? t('termsAcceptance.processing') : t('termsAcceptance.accept')}
             </Button>
             
             <p className="text-xs text-gray-500 text-center">
-              By clicking "Accept Terms & Continue", you acknowledge that you have read, understood, and agree to be bound by these terms and conditions.
+              {t('termsAcceptance.acknowledgment')}
             </p>
           </div>
         </CardContent>

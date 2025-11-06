@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { useTranslation } from 'react-i18next';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import { Heart, ArrowLeft, Upload, Shield, CheckCircle, AlertTriangle } from 'lucide-react';
@@ -15,6 +16,7 @@ import AdinkraSymbolSelector from '@/components/forms/AdinkraSymbolSelector';
 import { moderateImage, ModerationResult } from '@/utils/photoModeration';
 import { compressImage } from '@/utils/imageCompression';
 import TermsAcceptance from './TermsAcceptance';
+import { getLanguageForCountry } from '@/i18n/config';
 
 interface ImageUpload {
   file: File;
@@ -27,6 +29,7 @@ interface ImageUpload {
 const ProfileCompletionPage = () => {
   const navigate = useNavigate();
   const { toast } = useToast();
+  const { t, i18n } = useTranslation();
   const [user, setUser] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [showTermsAcceptance, setShowTermsAcceptance] = useState(false);
@@ -164,6 +167,12 @@ const ProfileCompletionPage = () => {
       isCustomCity: location.isCustomCity || false
     }));
 
+    // Auto-detect and change language based on country
+    const detectedLanguage = getLanguageForCountry(location.country);
+    if (detectedLanguage) {
+      i18n.changeLanguage(detectedLanguage);
+    }
+
     // Clear location-related errors
     if (errors.country || errors.city || errors.zipCode) {
       setErrors(prev => ({
@@ -200,8 +209,8 @@ const ProfileCompletionPage = () => {
     for (const file of files) {
       if (!file.type.startsWith('image/')) {
         toast({
-          title: "Invalid file type",
-          description: `${file.name} is not an image file.`,
+          title: t('profileCompletion.invalidFileType'),
+          description: t('profileCompletion.notAnImageFile', { filename: file.name }),
           variant: "destructive"
         });
         continue;
@@ -209,8 +218,8 @@ const ProfileCompletionPage = () => {
 
       if (file.size > 10 * 1024 * 1024) {
         toast({
-          title: "File too large",
-          description: `${file.name} is larger than 10MB.`,
+          title: t('profileCompletion.fileTooLarge'),
+          description: t('profileCompletion.largerThan10MB', { filename: file.name }),
           variant: "destructive"
         });
         continue;
@@ -227,8 +236,8 @@ const ProfileCompletionPage = () => {
 
       if (isDuplicate) {
         toast({
-          title: "Duplicate image",
-          description: "This image has already been uploaded.",
+          title: t('profileCompletion.duplicateImage'),
+          description: t('profileCompletion.imageAlreadyUploaded'),
           variant: "destructive"
         });
         continue;
@@ -264,20 +273,20 @@ const ProfileCompletionPage = () => {
 
         if (!moderationResult.isApproved) {
           toast({
-            title: "Image rejected",
-            description: moderationResult.message || "This image violates our community guidelines.",
+            title: t('profileCompletion.imageRejected'),
+            description: moderationResult.message || t('profileCompletion.violatesGuidelines'),
             variant: "destructive"
           });
         } else if (moderationResult.details?.requiresReview) {
           toast({
-            title: "Image needs review",
-            description: "This image will be reviewed by our team before approval.",
+            title: t('profileCompletion.imageNeedsReview'),
+            description: t('profileCompletion.willBeReviewed'),
             variant: "default"
           });
         } else {
           toast({
-            title: "Image approved",
-            description: "Your image looks good and has been approved!",
+            title: t('profileCompletion.imageApproved'),
+            description: t('profileCompletion.imageLooksGood'),
             variant: "default"
           });
         }
@@ -315,7 +324,7 @@ const ProfileCompletionPage = () => {
           <div className="absolute inset-0 bg-black/50 flex items-center justify-center rounded-lg">
             <div className="text-white text-center">
               <Shield className="w-6 h-6 mx-auto mb-1 animate-pulse" />
-              <div className="text-xs">Checking...</div>
+              <div className="text-xs">{t('profileCompletion.moderating')}</div>
             </div>
           </div>
         );
@@ -328,7 +337,7 @@ const ProfileCompletionPage = () => {
       case 'pending':
         return (
           <div className="absolute top-2 left-2 bg-orange-500 text-white text-xs px-2 py-1 rounded-full">
-            Review
+            {t('profileCompletion.pending')}
           </div>
         );
       case 'rejected':
@@ -336,7 +345,7 @@ const ProfileCompletionPage = () => {
           <div className="absolute inset-0 bg-red-500/80 flex items-center justify-center rounded-lg pointer-events-none">
             <div className="text-white text-center">
               <AlertTriangle className="w-6 h-6 mx-auto mb-1" />
-              <div className="text-xs">Rejected</div>
+              <div className="text-xs">{t('profileCompletion.rejected')}</div>
             </div>
           </div>
         );
@@ -350,11 +359,27 @@ const ProfileCompletionPage = () => {
     setShowTermsAcceptance(true);
   };
 
-  const handleTermsAccept = () => {
+  const handleTermsAccept = async () => {
     toast({
       title: "Welcome to DripLove!",
       description: "Your profile has been completed and terms accepted. Welcome to the community!",
     });
+    
+    // Send welcome push notification
+    try {
+      const { sendPushNotification } = await import('@/services/pushNotifications');
+      await sendPushNotification({
+        title: "Welcome to DripLove! 💕",
+        body: t('profileCompletion.profileSetup'),
+        userId: user.id,
+        type: 'system',
+        data: { action: 'open_discover' }
+      });
+    } catch (error) {
+      console.error('Failed to send welcome notification:', error);
+      // Don't block user flow if notification fails
+    }
+    
     navigate('/');
   };
 
@@ -387,16 +412,16 @@ const ProfileCompletionPage = () => {
     if (!formData.gender) validationErrors.gender = 'Gender is required';
     if (!formData.preference) validationErrors.preference = 'Preference is required';
     if (!formData.relationshipIntent) validationErrors.relationshipIntent = 'Relationship intent is required';
-    if (!formData.occupation) validationErrors.occupation = 'Occupation is required';
-    if (!formData.industry) validationErrors.industry = 'Industry is required';
-    if (!formData.educationLevel) validationErrors.educationLevel = 'Education level is required';
+    if (!formData.occupation) validationErrors.occupation = t('profileCompletion.errors.occupationRequired');
+    if (!formData.industry) validationErrors.industry = t('profileCompletion.errors.industryRequired');
+    if (!formData.educationLevel) validationErrors.educationLevel = t('profileCompletion.errors.educationRequired');
     if (!formData.adinkraSymbols || formData.adinkraSymbols.length === 0) validationErrors.adinkraSymbols = 'Please select at least 1 Adinkra symbol';
 
     // Validate images
     const approvedImages = images.filter(img => img.status === 'approved' || img.status === 'pending');
     
     if (approvedImages.length < 2) {
-      validationErrors.images = 'You need at least 2 approved photos to complete your profile';
+      validationErrors.images = t('profileCompletion.errors.needTwoApprovedPhotos');
     }
 
     const rejectedImages = images.filter(img => img.status === 'rejected');
@@ -407,7 +432,7 @@ const ProfileCompletionPage = () => {
     // Check if we have valid files for approved images
     const imagesWithFiles = approvedImages.filter(img => img.file !== null);
     if (imagesWithFiles.length < 2) {
-      validationErrors.images = 'Please re-upload your 2 photos to complete your profile';
+      validationErrors.images = t('profileCompletion.errors.reuploadPhotos');
       // Clear images that don't have files and ask user to re-upload
       setImages(prev => prev.filter(img => img.file !== null));
     }
@@ -469,7 +494,8 @@ const ProfileCompletionPage = () => {
         is_custom_city: formData.isCustomCity || false,
         max_distance: formData.maxDistance || 50,
         country_code: formData.countryCode || '',
-        adinkra_symbols: formData.adinkraSymbols || []
+        adinkra_symbols: formData.adinkraSymbols || [],
+        preferred_language: getLanguageForCountry(formData.country) || i18n.language || 'en'
       };
 
       const { error } = await supabase
@@ -524,16 +550,16 @@ const ProfileCompletionPage = () => {
       }
 
       toast({
-        title: "Profile Completed!",
-        description: "Your profile has been successfully completed. Welcome to the app!",
+        title: t('profileCompletion.profileCompleted'),
+        description: t('profileCompletion.profileCompletedSuccess'),
       });
 
       handleProfileComplete();
     } catch (error: any) {
       console.error('Profile completion error:', error);
       toast({
-        title: "Profile Completion Error",
-        description: error.message || "Failed to complete profile. Please try again.",
+        title: t('profileCompletion.profileCompletionError'),
+        description: error.message || t('profileCompletion.failedToComplete'),
         variant: "destructive",
       });
     } finally {
@@ -546,7 +572,7 @@ const ProfileCompletionPage = () => {
     return (
       <div className="min-h-screen bg-gradient-to-br from-pink-400 via-purple-500 to-indigo-600 flex flex-col items-center justify-center">
         <img src="/driplove-logo.png" alt="DripLove Logo" className="w-32 h-32 mb-8 animate-bounce" />
-        <p className="text-white text-lg font-semibold tracking-wide">Loading DripLove...</p>
+        <p className="text-white text-lg font-semibold tracking-wide">{t('profileCompletion.loadingDripLove')}</p>
       </div>
     );
   }
@@ -577,10 +603,10 @@ const ProfileCompletionPage = () => {
       {/* Header - stays visible */}
       <div className="text-center py-4 px-4">
         <h1 className="text-3xl font-bold text-white mb-2">
-          Complete Your Profile
+          {t('profileCompletion.title')}
         </h1>
         <p className="text-white/90 text-lg">
-          Just a few more details to get started!
+          {t('profileCompletion.justAFewMoreDetails')}
         </p>
       </div>
 
@@ -604,38 +630,38 @@ const ProfileCompletionPage = () => {
                     className="flex items-center text-gray-600 hover:text-gray-800"
                   >
                     <ArrowLeft className="w-4 h-4 mr-1" />
-                    Back
+                    {t('profileCompletion.back')}
                   </Button>
                   <div className="w-16"></div> {/* Spacer for alignment */}
                 </div>
                 <form onSubmit={handleSubmit} className="space-y-4">
                   <div className="space-y-4">
-                    <h3 className="text-lg font-semibold text-gray-800">Basic Information</h3>
+                    <h3 className="text-lg font-semibold text-gray-800">{t('profileCompletion.basicInformation')}</h3>
                     
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                       <div className="space-y-2">
-                        <label className="text-sm font-medium text-gray-700">First Name *</label>
+                        <label className="text-sm font-medium text-gray-700">{t('profileCompletion.firstName')} *</label>
                         <input
                           name="firstName"
                           type="text"
                           value={formData.firstName}
                           onChange={handleInputChange}
                           className="w-full px-3 py-2 border border-gray-200 rounded-md focus:border-pink-400 focus:ring-pink-400"
-                          placeholder="Enter your first name"
+                          placeholder={t('profileCompletion.enterYourFirstName')}
                           required
                         />
                         {errors.firstName && <p className="text-sm text-red-500">{errors.firstName}</p>}
                       </div>
 
                       <div className="space-y-2">
-                        <label className="text-sm font-medium text-gray-700">Last Name *</label>
+                        <label className="text-sm font-medium text-gray-700">{t('profileCompletion.lastName')} *</label>
                         <input
                           name="lastName"
                           type="text"
                           value={formData.lastName}
                           onChange={handleInputChange}
                           className="w-full px-3 py-2 border border-gray-200 rounded-md focus:border-pink-400 focus:ring-pink-400"
-                          placeholder="Enter your last name"
+                          placeholder={t('profileCompletion.enterYourLastName')}
                           required
                         />
                         {errors.lastName && <p className="text-sm text-red-500">{errors.lastName}</p>}
@@ -643,7 +669,7 @@ const ProfileCompletionPage = () => {
                     </div>
 
                     <div className="space-y-2">
-                      <label className="text-sm font-medium text-gray-700">Date of Birth *</label>
+                      <label className="text-sm font-medium text-gray-700">{t('profileCompletion.dateOfBirth')} *</label>
                       <input
                         name="dateOfBirth"
                         type="date"
@@ -728,13 +754,13 @@ const ProfileCompletionPage = () => {
 
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <div className="space-y-2">
-                      <label className="text-sm font-medium text-gray-700">Occupation *</label>
+                      <label className="text-sm font-medium text-gray-700">{t('profileCompletion.occupation')} *</label>
                       <Select
                         value={formData.occupation}
                         onValueChange={(value) => handleSelectChange('occupation', value)}
                       >
                         <SelectTrigger className="border-gray-200 focus:border-pink-400">
-                          <SelectValue placeholder="Select your occupation" />
+                          <SelectValue placeholder={t('profileCompletion.selectOccupation')} />
                         </SelectTrigger>
                         <SelectContent>
                           {occupationOptions.map((option) => (
@@ -748,13 +774,13 @@ const ProfileCompletionPage = () => {
                     </div>
 
                     <div className="space-y-2">
-                      <label className="text-sm font-medium text-gray-700">Industry *</label>
+                      <label className="text-sm font-medium text-gray-700">{t('profileCompletion.industry')} *</label>
                       <Select
                         value={formData.industry}
                         onValueChange={(value) => handleSelectChange('industry', value)}
                       >
                         <SelectTrigger className="border-gray-200 focus:border-pink-400">
-                          <SelectValue placeholder="Select your industry" />
+                          <SelectValue placeholder={t('profileCompletion.selectIndustry')} />
                         </SelectTrigger>
                         <SelectContent>
                           {industryOptions.map((option) => (
@@ -769,13 +795,13 @@ const ProfileCompletionPage = () => {
                   </div>
 
                   <div className="space-y-2">
-                    <label className="text-sm font-medium text-gray-700">Education Level *</label>
+                    <label className="text-sm font-medium text-gray-700">{t('profileCompletion.education')} *</label>
                     <Select
                       value={formData.educationLevel}
                       onValueChange={(value) => handleSelectChange('educationLevel', value)}
                     >
                       <SelectTrigger className="border-gray-200 focus:border-pink-400">
-                        <SelectValue placeholder="Select your education level" />
+                        <SelectValue placeholder={t('profileCompletion.selectEducation')} />
                       </SelectTrigger>
                       <SelectContent>
                         <SelectItem value="High School">High School</SelectItem>
@@ -800,8 +826,8 @@ const ProfileCompletionPage = () => {
                   </div>
 
                   <div className="space-y-4">
-                    <h3 className="text-lg font-semibold text-gray-800">Profile Photos *</h3>
-                    <p className="text-sm text-gray-600">Upload at least 2 photos. All images are checked by AI for content moderation.</p>
+                    <h3 className="text-lg font-semibold text-gray-800">{t('profileCompletion.profilePhotos')} *</h3>
+                    <p className="text-sm text-gray-600">{t('profileCompletion.uploadAtLeastTwoPhotos')}</p>
                     
                     <div className="border-2 border-dashed border-gray-300 rounded-lg p-6 text-center hover:border-pink-400 transition-colors">
                       <Input
@@ -814,8 +840,8 @@ const ProfileCompletionPage = () => {
                       />
                       <Label htmlFor="image-upload" className="cursor-pointer">
                         <Upload className="mx-auto h-8 w-8 text-gray-400 mb-2" />
-                        <p className="text-sm text-gray-600">Click to upload images</p>
-                        <p className="text-xs text-gray-500">JPG, PNG up to 10MB each</p>
+                        <p className="text-sm text-gray-600">{t('profileCompletion.clickToUploadImages')}</p>
+                        <p className="text-xs text-gray-500">{t('profileCompletion.jpgPngUpTo10MB')}</p>
                       </Label>
                     </div>
 
@@ -852,7 +878,7 @@ const ProfileCompletionPage = () => {
                         disabled={isSubmitting}
                         className="w-full bg-gradient-to-r from-pink-500 to-purple-600 hover:from-pink-600 hover:to-purple-700 text-white font-semibold py-3 rounded-lg transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed"
                       >
-                        {isSubmitting ? 'Completing Profile...' : 'Complete Profile'}
+                        {isSubmitting ? t('profileCompletion.completingProfile') : t('profileCompletion.completeProfile')}
                       </Button>
                       
                       <Button
@@ -862,7 +888,7 @@ const ProfileCompletionPage = () => {
                         disabled={isSubmitting}
                         className="w-full border-gray-300 text-gray-700 hover:bg-gray-50 font-medium py-3 rounded-lg transition-all duration-200"
                       >
-                        Cancel
+                        {t('profileCompletion.cancel')}
                       </Button>
                     </div>
                 </form>

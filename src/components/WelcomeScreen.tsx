@@ -1,5 +1,7 @@
 import React from 'react';
 import { Button } from '@/components/ui/button';
+import { useTranslation } from 'react-i18next';
+import GlobalLanguageSelector from './GlobalLanguageSelector';
 
 interface WelcomeScreenProps {
   onLogin: () => void;
@@ -9,6 +11,8 @@ interface WelcomeScreenProps {
 }
 
 const WelcomeScreen: React.FC<WelcomeScreenProps> = ({ onLogin, onAbout, onTerms, onPrivacy }) => {
+  const { t } = useTranslation();
+  
   return (
   <div className="min-h-fill bg-gradient-to-br from-purple-500 to-pink-500 flex flex-col items-center justify-start text-center relative">
       {/* Background Bubbles */}
@@ -23,8 +27,8 @@ const WelcomeScreen: React.FC<WelcomeScreenProps> = ({ onLogin, onAbout, onTerms
       {/* Logo and Tagline */}
       <div className="mb-12 flex flex-col items-center relative z-10 mt-32">
         <img src="/driplove-logo.png" alt="DripLove Logo" className="w-50 h-40 mb-4" />
-        <p className="text-lg text-white">Feel the Spark. Drip in Love</p>
-        <p className="text-sm text-white/80">Real Vibes. Real People. Real Love.</p>
+        <p className="text-lg text-white">{t('welcome.tagline')}</p>
+        <p className="text-sm text-white/80">{t('welcome.subtitle')}</p>
       </div>
 
       {/* Login Button */}
@@ -33,34 +37,35 @@ const WelcomeScreen: React.FC<WelcomeScreenProps> = ({ onLogin, onAbout, onTerms
           onClick={onLogin}
           className="w-48 bg-white text-purple-600 font-semibold py-3 rounded-full shadow-lg hover:bg-gray-100"
         >
-          Get Started
+          {t('welcome.getStarted')}
         </Button>
       </div>
 
       {/* Footer Section */}
       <div className="absolute bottom-0 left-0 right-0 flex flex-col items-center space-y-1 z-10 pb-8">
         <div className="text-sm text-white/80 text-center">
-          Join thousands finding love across continents
+          {t('welcome.joinThousands')}
         </div>
         <button
           onClick={onAbout}
           className="text-white text-sm font-bold hover:text-white/80 transition-colors duration-200 bg-transparent border-none cursor-pointer"
         >
-          About DripLove
+          {t('welcome.aboutLink')}
         </button>
-        <div className="flex justify-center space-x-4 text-sm">
+        <div className="flex justify-center items-center space-x-4 text-sm">
           <button
             onClick={onTerms}
             className="text-white font-bold hover:text-white/80 transition-colors duration-200 bg-transparent border-none cursor-pointer"
           >
-            Terms of Service
+            {t('welcome.termsLink')}
           </button>
           <button
             onClick={onPrivacy}
             className="text-white font-bold hover:text-white/80 transition-colors duration-200 bg-transparent border-none cursor-pointer"
           >
-            Privacy Policy
+            {t('welcome.privacyLink')}
           </button>
+          <GlobalLanguageSelector variant="welcome" />
         </div>
       </div>
     </div>

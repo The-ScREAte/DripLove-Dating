@@ -7,6 +7,7 @@ import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
 import { Eye, Trash2, CheckCircle, XCircle, Clock, AlertTriangle, User } from 'lucide-react';
 import { usePushNotifications } from '@/hooks/usePushNotifications';
+import ImageViewer from '@/components/ImageViewer';
 
 interface PendingImage {
   id: string;
@@ -54,6 +55,9 @@ const ImageModerationPanel = () => {
   const [approvingImages, setApprovingImages] = useState<Record<string, boolean>>({});
   const [rejectingImages, setRejectingImages] = useState<Record<string, boolean>>({});
   const [processingReports, setProcessingReports] = useState<Record<string, boolean>>({});
+  const [viewerOpen, setViewerOpen] = useState(false);
+  const [viewerImages, setViewerImages] = useState<string[]>([]);
+  const [viewerInitialIndex, setViewerInitialIndex] = useState(0);
   const { toast } = useToast();
   
   // Get current admin user for push notifications
@@ -435,57 +439,71 @@ const ImageModerationPanel = () => {
     }
   };
 
+  const handleImageClick = (imageUrl: string) => {
+    setViewerImages([imageUrl]);
+    setViewerInitialIndex(0);
+    setViewerOpen(true);
+  };
+
   return (
-    <div className="space-y-6">
+    <div className="space-y-4">
       <div className="flex items-center gap-2">
-        <Eye className="w-5 h-5 text-blue-600" />
-        <h2 className="text-xl font-semibold">Image Moderation</h2>
+        <Eye className="w-4 h-4 text-blue-600" />
+        <h2 className="text-base font-semibold">Image Moderation</h2>
       </div>
 
+      <ImageViewer
+        isOpen={viewerOpen}
+        onClose={() => setViewerOpen(false)}
+        images={viewerImages}
+        initialIndex={viewerInitialIndex}
+      />
+
       <Tabs defaultValue="pending" className="w-full">
-        <TabsList className="grid w-full grid-cols-2">
-          <TabsTrigger value="pending" className="flex items-center gap-2">
-            <Clock className="w-4 h-4" />
+        <TabsList className="grid w-full grid-cols-2 h-9">
+          <TabsTrigger value="pending" className="flex items-center gap-2 text-xs">
+            <Clock className="w-3 h-3" />
             Pending Approval ({pendingImages.length})
           </TabsTrigger>
-          <TabsTrigger value="reported" className="flex items-center gap-2">
-            <AlertTriangle className="w-4 h-4" />
+          <TabsTrigger value="reported" className="flex items-center gap-2 text-xs">
+            <AlertTriangle className="w-3 h-3" />
             Reported Images ({reportedImages.filter(r => r.status === 'pending').length})
           </TabsTrigger>
         </TabsList>
 
-        <TabsContent value="pending" className="mt-6">
+        <TabsContent value="pending" className="mt-4">
           <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <Clock className="w-5 h-5" />
+            <CardHeader className="pb-3">
+              <CardTitle className="flex items-center gap-2 text-sm">
+                <Clock className="w-4 h-4" />
                 Images Pending Approval
               </CardTitle>
             </CardHeader>
             <CardContent>
               {loadingPending ? (
-                <div className="text-center py-8">Loading pending images...</div>
+                <div className="text-center py-6 text-sm">Loading pending images...</div>
               ) : pendingImages.length === 0 ? (
-                <div className="text-center py-8 text-gray-500">No images pending approval</div>
+                <div className="text-center py-6 text-gray-500 text-sm">No images pending approval</div>
               ) : (
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
                   {pendingImages.map((image) => (
                     <Card key={image.id} className="border-yellow-200">
-                      <CardContent className="p-4">
-                        <div className="relative mb-3">
+                      <CardContent className="p-3">
+                        <div className="relative mb-2">
                           <img
                             src={image.image_url}
                             alt="Pending approval"
-                            className="w-full h-40 object-cover rounded-lg"
+                            className="w-full h-40 object-cover rounded-lg cursor-pointer hover:opacity-90 transition-opacity"
+                            onClick={() => handleImageClick(image.image_url)}
                           />
-                          <Badge className="absolute top-2 right-2 bg-yellow-500">
+                          <Badge className="absolute top-2 right-2 bg-yellow-500 text-xs">
                             Pending
                           </Badge>
                         </div>
                         
-                        <div className="space-y-2 mb-3">
-                          <div className="flex items-center gap-2 text-sm">
-                            <User className="w-4 h-4" />
+                        <div className="space-y-1 mb-2">
+                          <div className="flex items-center gap-2 text-xs">
+                            <User className="w-3 h-3" />
                             <span className="font-medium">
                               {image.profile ? 
                                 `${image.profile.first_name} ${image.profile.last_name}` : 
@@ -493,7 +511,7 @@ const ImageModerationPanel = () => {
                               }
                             </span>
                           </div>
-                          <div className="text-xs text-gray-500">
+                          <div className="text-[11px] text-gray-500">
                             Uploaded: {new Date(image.created_at).toLocaleDateString()}
                           </div>
                         </div>
@@ -501,21 +519,21 @@ const ImageModerationPanel = () => {
                         <div className="flex gap-2">
                           <Button
                             size="sm"
-                            className="flex-1 bg-green-600 hover:bg-green-700"
+                            className="flex-1 bg-green-600 hover:bg-green-700 text-xs h-8"
                             onClick={() => handleApproveImage(image.id)}
                             disabled={approvingImages[image.id]}
                           >
-                            <CheckCircle className="w-4 h-4 mr-1" />
+                            <CheckCircle className="w-3 h-3 mr-1" />
                             {approvingImages[image.id] ? 'Approving...' : 'Approve'}
                           </Button>
                           <Button
                             size="sm"
                             variant="destructive"
-                            className="flex-1"
+                            className="flex-1 text-xs h-8"
                             onClick={() => handleRejectImage(image.id)}
                             disabled={rejectingImages[image.id]}
                           >
-                            <Trash2 className="w-4 h-4 mr-1" />
+                            <Trash2 className="w-3 h-3 mr-1" />
                             {rejectingImages[image.id] ? 'Rejecting...' : 'Reject'}
                           </Button>
                         </div>
@@ -528,37 +546,38 @@ const ImageModerationPanel = () => {
           </Card>
         </TabsContent>
 
-        <TabsContent value="reported" className="mt-6">
+        <TabsContent value="reported" className="mt-4">
           <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <AlertTriangle className="w-5 h-5" />
+            <CardHeader className="pb-3">
+              <CardTitle className="flex items-center gap-2 text-sm">
+                <AlertTriangle className="w-4 h-4" />
                 Reported Images
               </CardTitle>
             </CardHeader>
             <CardContent>
               {loadingReported ? (
-                <div className="text-center py-8">Loading reported images...</div>
+                <div className="text-center py-6 text-sm">Loading reported images...</div>
               ) : reportedImages.length === 0 ? (
-                <div className="text-center py-8 text-gray-500">No reported images</div>
+                <div className="text-center py-6 text-gray-500 text-sm">No reported images</div>
               ) : (
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
                   {reportedImages.map((report) => (
                     <Card key={report.id} className="border-red-200">
-                      <CardContent className="p-4">
-                        <div className="relative mb-3">
+                      <CardContent className="p-3">
+                        <div className="relative mb-2">
                           <img
                             src={report.image_url}
                             alt="Reported content"
-                            className="w-full h-40 object-cover rounded-lg"
+                            className="w-full h-40 object-cover rounded-lg cursor-pointer hover:opacity-90 transition-opacity"
+                            onClick={() => handleImageClick(report.image_url)}
                           />
                           {getStatusBadge(report.status)}
                         </div>
                         
-                        <div className="space-y-2 mb-3">
-                          <div className="text-sm">
+                        <div className="space-y-1 mb-2">
+                          <div className="text-xs">
                             <div className="font-medium text-red-600">Reported by:</div>
-                            <div className="text-xs">
+                            <div className="text-[11px]">
                               {report.reporter_profile ? 
                                 `${report.reporter_profile.first_name} ${report.reporter_profile.last_name}` : 
                                 'Unknown User'
@@ -566,9 +585,9 @@ const ImageModerationPanel = () => {
                             </div>
                           </div>
                           
-                          <div className="text-sm">
+                          <div className="text-xs">
                             <div className="font-medium text-gray-700">Image owner:</div>
-                            <div className="text-xs">
+                            <div className="text-[11px]">
                               {report.reported_user_profile ? 
                                 `${report.reported_user_profile.first_name} ${report.reported_user_profile.last_name}` : 
                                 'Unknown User'
@@ -576,17 +595,17 @@ const ImageModerationPanel = () => {
                             </div>
                           </div>
                           
-                          <div className="text-sm">
+                          <div className="text-xs">
                             <div className="font-medium">Reason:</div>
-                            <div className="text-xs">{report.reason || 'No reason provided'}</div>
+                            <div className="text-[11px]">{report.reason || 'No reason provided'}</div>
                           </div>
                           
-                          <div className="text-xs text-gray-500">
+                          <div className="text-[11px] text-gray-500">
                             Reported: {new Date(report.reported_at).toLocaleDateString()}
                           </div>
 
                           {report.reviewed_at && (
-                            <div className="text-xs text-gray-500">
+                            <div className="text-[11px] text-gray-500">
                               Reviewed: {new Date(report.reviewed_at).toLocaleDateString()}
                             </div>
                           )}
@@ -597,21 +616,21 @@ const ImageModerationPanel = () => {
                             <Button
                               size="sm"
                               variant="outline"
-                              className="flex-1"
+                              className="flex-1 text-xs h-8"
                               onClick={() => handleIgnoreReport(report.id)}
                               disabled={processingReports[report.id]}
                             >
-                              <XCircle className="w-4 h-4 mr-1" />
+                              <XCircle className="w-3 h-3 mr-1" />
                               {processingReports[report.id] ? 'Ignoring...' : 'Ignore'}
                             </Button>
                             <Button
                               size="sm"
                               variant="destructive"
-                              className="flex-1"
+                              className="flex-1 text-xs h-8"
                               onClick={() => handleDeleteReportedImage(report.id, report.image_url, report.reported_user_id)}
                               disabled={processingReports[report.id]}
                             >
-                              <Trash2 className="w-4 h-4 mr-1" />
+                              <Trash2 className="w-3 h-3 mr-1" />
                               {processingReports[report.id] ? 'Deleting...' : 'Delete'}
                             </Button>
                           </div>

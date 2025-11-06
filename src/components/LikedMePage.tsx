@@ -8,6 +8,7 @@ import { useToast } from '@/hooks/use-toast';
 import { useSubscription } from '@/hooks/useSubscription';
 import BlockDialog from './BlockDialog';
 import PremiumUpgrade from './PremiumUpgrade';
+import { useTranslation } from 'react-i18next';
 
 // Global cache for liked me data - persists across component mounts
 const likedMeCache = new Map<string, { 
@@ -28,6 +29,7 @@ interface LikedMePageProps {
 }
 
 const LikedMePage = ({ currentUser, isPremium = false }: LikedMePageProps) => {
+  const { t } = useTranslation();
   const [likers, setLikers] = useState<any[]>(() => {
     // Initialize with cached data immediately if available
     const cached = currentUser?.id ? likedMeCache.get(currentUser.id) : null;
@@ -270,8 +272,8 @@ const LikedMePage = ({ currentUser, isPremium = false }: LikedMePageProps) => {
   // ...removed log...
       if (showLoading) {
         toast({
-          title: "Error",
-          description: "Failed to refresh people who liked you",
+          title: t('matches.error'),
+          description: t('matches.failedToRefresh'),
           variant: "destructive",
         });
       }
@@ -686,7 +688,7 @@ const LikedMePage = ({ currentUser, isPremium = false }: LikedMePageProps) => {
                 : '16px'
             }}
           >
-            ← Back
+            ← {t('matches.back')}
           </Button>
 
           <Button
@@ -724,7 +726,7 @@ const LikedMePage = ({ currentUser, isPremium = false }: LikedMePageProps) => {
                 <div className="flex items-center space-x-4 text-sm">
                   <div className="flex items-center">
                     <Calendar className="w-4 h-4 mr-1" />
-                    <span>{calculateAge(selectedProfile.date_of_birth)} years old</span>
+                    <span>{calculateAge(selectedProfile.date_of_birth)} {t('matches.yearsOld')}</span>
                   </div>
                   <div className="flex items-center">
                     <MapPin className="w-4 h-4 mr-1" />
@@ -741,7 +743,7 @@ const LikedMePage = ({ currentUser, isPremium = false }: LikedMePageProps) => {
                   className="text-white p-0 h-auto font-normal text-left mb-2 hover:bg-transparent"
                 >
                   <span className="flex items-center text-sm">
-                    {showMoreInfo ? 'Show Less' : 'Show More'}
+                    {showMoreInfo ? t('matches.showLess') : t('matches.showMore')}
                     {showMoreInfo ? <ChevronUp className="w-4 h-4 ml-1" /> : <ChevronDown className="w-4 h-4 ml-1" />}
                   </span>
                 </Button>
@@ -750,7 +752,7 @@ const LikedMePage = ({ currentUser, isPremium = false }: LikedMePageProps) => {
                   <div className="space-y-3 bg-black/50 p-3 rounded-lg max-h-32 overflow-y-auto">
                     {selectedProfile.bio && (
                       <div>
-                        <h3 className="font-semibold mb-1 text-sm">About</h3>
+                        <h3 className="font-semibold mb-1 text-sm">{t('matches.about')}</h3>
                         <p className="text-xs leading-relaxed">{selectedProfile.bio}</p>
                       </div>
                     )}
@@ -774,7 +776,7 @@ const LikedMePage = ({ currentUser, isPremium = false }: LikedMePageProps) => {
 
                     {selectedProfile.interests && selectedProfile.interests.length > 0 && (
                       <div>
-                        <h3 className="font-semibold mb-2 text-sm">Interests</h3>
+                        <h3 className="font-semibold mb-2 text-sm">{t('matches.interests')}</h3>
                         <div className="flex flex-wrap gap-1">
                           {selectedProfile.interests.map((interest: string, index: number) => (
                             <span
@@ -844,7 +846,7 @@ const LikedMePage = ({ currentUser, isPremium = false }: LikedMePageProps) => {
           style={{ height: `${pullDistance}px` }}
         >
           <div className="text-pink-600 text-sm">
-            {pullDistance > 50 ? (isRefreshing ? '🔄 Refreshing...' : '↓ Release to refresh') : '↓ Pull to refresh'}
+            {pullDistance > 50 ? (isRefreshing ? `🔄 ${t('matches.refreshing')}` : `↓ ${t('matches.releaseToRefresh')}`) : `↓ ${t('matches.pullToRefresh')}`}
           </div>
         </div>
       )}
@@ -860,7 +862,7 @@ const LikedMePage = ({ currentUser, isPremium = false }: LikedMePageProps) => {
         <div className="flex items-center justify-between mb-2">
           <div className="flex items-center space-x-2">
             <Users className="w-6 h-6 text-pink-600" />
-            <h1 className="text-xl font-bold text-gray-800">People who liked you</h1>
+            <h1 className="text-xl font-bold text-gray-800">{t('matches.peopleWhoLikedYou')}</h1>
           </div>
           {!isPremium && (
             <Button
@@ -868,18 +870,18 @@ const LikedMePage = ({ currentUser, isPremium = false }: LikedMePageProps) => {
               className="bg-gradient-to-r from-yellow-400 to-yellow-600 hover:from-yellow-500 hover:to-yellow-700 text-black font-bold text-xs px-2 py-1"
             >
               <Crown className="w-4 h-4 mr-1" />
-              Upgrade
+              {t('matches.upgrade')}
             </Button>
           )}
         </div>
-        <p className="text-gray-600 text-sm">({likers.length} people)</p>
+        <p className="text-gray-600 text-sm">({t('matches.peopleCount', { count: likers.length })})</p>
         
         {!isPremium && (
           <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-3 mt-3">
             <div className="flex items-center space-x-2 text-yellow-800">
               <Lock className="w-4 h-4" />
               <span className="text-xs font-medium">
-                Upgrade to Premium to see who liked you and interact with them
+                {t('matches.upgradeToPremium')}
               </span>
             </div>
           </div>
@@ -891,8 +893,8 @@ const LikedMePage = ({ currentUser, isPremium = false }: LikedMePageProps) => {
           <div className="flex items-center justify-center h-full">
             <div className="text-center">
               <Users className="w-16 h-16 text-gray-400 mx-auto mb-4" />
-              <h3 className="text-xl font-semibold text-gray-800 mb-2">No new likes</h3>
-              <p className="text-gray-600">Keep swiping! Someone special is waiting to find you.</p>
+              <h3 className="text-xl font-semibold text-gray-800 mb-2">{t('matches.noNewLikes')}</h3>
+              <p className="text-gray-600">{t('matches.keepSwiping')}</p>
             </div>
           </div>
         ) : (

@@ -1,4 +1,5 @@
 import React from 'react';
+import { useTranslation } from 'react-i18next';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Label } from '@/components/ui/label';
 import { SELECTABLE_ADINKRA_SYMBOLS } from '@/constants/adinkraSymbols';
@@ -12,6 +13,7 @@ interface AdinkraSectionProps {
 }
 
 const AdinkraSection = ({ editedProfile, profile, isEditing, onAdinkraChange }: AdinkraSectionProps) => {
+  const { t } = useTranslation();
   const selectedSymbols = isEditing 
     ? (editedProfile.adinkra_symbols || []) 
     : (profile?.adinkra_symbols || []);
@@ -44,16 +46,16 @@ const AdinkraSection = ({ editedProfile, profile, isEditing, onAdinkraChange }: 
   return (
     <Card>
       <CardHeader>
-        <CardTitle>My Adinkra</CardTitle>
+        <CardTitle>{t('profile.myAdinkra')}</CardTitle>
       </CardHeader>
       <CardContent>
         <div className="space-y-4">
-          <Label>Your Adinkra Symbols (Select up to 10)</Label>
+          <Label>{t('profile.adinkraDescription')}</Label>
           
           {/* Selected Symbols */}
           {selectedSymbols.length > 0 && (
             <div className="space-y-2">
-              <p className="text-sm text-muted-foreground">Selected ({selectedSymbols.length}/10)</p>
+              <p className="text-sm text-muted-foreground">{t('profile.selected')} ({selectedSymbols.length}/10)</p>
               <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-3">
                 {selectedSymbols.map((symbolName: string) => {
                   const symbol = SELECTABLE_ADINKRA_SYMBOLS.find(s => s.name === symbolName);
@@ -92,7 +94,7 @@ const AdinkraSection = ({ editedProfile, profile, isEditing, onAdinkraChange }: 
           {/* Available Symbols */}
           {isEditing && (
             <div className="space-y-2">
-              <p className="text-sm text-muted-foreground">Available Symbols</p>
+              <p className="text-sm text-muted-foreground">{t('profile.availableSymbols')}</p>
               <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-3">
                 {SELECTABLE_ADINKRA_SYMBOLS.filter(symbol => !selectedSymbols.includes(symbol.name)).map((symbol) => (
                   <Card
@@ -112,7 +114,7 @@ const AdinkraSection = ({ editedProfile, profile, isEditing, onAdinkraChange }: 
           )}
 
           {!isEditing && selectedSymbols.length === 0 && (
-            <p className="text-sm text-muted-foreground">No Adinkra symbols selected yet.</p>
+            <p className="text-sm text-muted-foreground">{t('profile.noAdinkraSelected')}</p>
           )}
         </div>
       </CardContent>

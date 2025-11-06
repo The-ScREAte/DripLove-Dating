@@ -1,5 +1,6 @@
 
 import React from 'react';
+import { useTranslation } from 'react-i18next';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
@@ -32,17 +33,18 @@ const getSanitizedValue = (name: string, value: string) => {
 };
 
 const BasicInfoSection = ({ editedProfile, isEditing, onInputChange }: BasicInfoSectionProps) => {
+  const { t } = useTranslation();
   // ...existing code...
   return (
     <Card>
       <CardHeader>
-        <CardTitle>Basic Information</CardTitle>
+        <CardTitle>{t('profile.basicInfo')}</CardTitle>
       </CardHeader>
       <CardContent>
         <div className="space-y-4">
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div>
-              <Label htmlFor="first_name">First Name</Label>
+              <Label htmlFor="first_name">{t('profile.firstName')}</Label>
               <Input
                 type="text"
                 id="first_name"
@@ -71,7 +73,7 @@ const BasicInfoSection = ({ editedProfile, isEditing, onInputChange }: BasicInfo
               />
             </div>
             <div>
-              <Label htmlFor="last_name">Last Name</Label>
+              <Label htmlFor="last_name">{t('profile.lastName')}</Label>
               <Input
                 type="text"
                 id="last_name"
@@ -101,7 +103,7 @@ const BasicInfoSection = ({ editedProfile, isEditing, onInputChange }: BasicInfo
             </div>
           </div>
           <div>
-            <Label htmlFor="bio">Bio</Label>
+            <Label htmlFor="bio">{t('profile.bio')}</Label>
             <Textarea
               id="bio"
               name="bio"
@@ -129,7 +131,7 @@ const BasicInfoSection = ({ editedProfile, isEditing, onInputChange }: BasicInfo
               }}
               disabled={!isEditing}
               className="w-full min-h-[100px] resize-none"
-              placeholder="Tell us about yourself..."
+              placeholder={t('profile.bioPlaceholder')}
             />
           </div>
         </div>

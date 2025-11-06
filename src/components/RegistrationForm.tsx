@@ -18,6 +18,7 @@ import { occupationOptions, industryOptions } from '@/constants/professionOption
 import { moderateImage, ModerationResult } from '@/utils/photoModeration';
 import { compressImage } from '@/utils/imageCompression';
 import { useToast } from '@/hooks/use-toast';
+import { useTranslation } from 'react-i18next';
 
 interface RegistrationFormProps {
   onSubmit: (data: any) => void;
@@ -41,6 +42,7 @@ const RegistrationForm = ({ onSubmit, onBackToLogin }: RegistrationFormProps) =>
   const [images, setImages] = useState<ImageUpload[]>([]);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const { toast } = useToast();
+  const { t } = useTranslation();
 
   // Restore images from sessionStorage on mount
   React.useEffect(() => {
@@ -407,8 +409,8 @@ const RegistrationForm = ({ onSubmit, onBackToLogin }: RegistrationFormProps) =>
     
     if (approvedImages.length < 2) {
       toast({
-        title: "Photos required",
-        description: "Please upload at least 2 photos to complete registration.",
+        title: t('registration.errors.photosRequired'),
+        description: t('registration.uploadAtLeastTwoPhotos'),
         variant: "destructive"
       });
       return;
@@ -417,8 +419,8 @@ const RegistrationForm = ({ onSubmit, onBackToLogin }: RegistrationFormProps) =>
     const rejectedImages = images.filter(img => img.status === 'rejected');
     if (rejectedImages.length > 0) {
       toast({
-        title: "Some images were rejected",
-        description: "Please remove rejected images before continuing.",
+        title: t('registration.errors.someImagesRejected'),
+        description: t('registration.removeRejectedImages'),
         variant: "destructive"
       });
       return;
@@ -428,8 +430,8 @@ const RegistrationForm = ({ onSubmit, onBackToLogin }: RegistrationFormProps) =>
     const imagesWithFiles = approvedImages.filter(img => img.file !== null);
     if (imagesWithFiles.length < 2) {
       toast({
-        title: "Photos need to be re-uploaded",
-        description: "Please re-upload your 2 photos to complete registration.",
+        title: t('registration.errors.photosNeedReupload'),
+        description: t('registration.reuploadTwoPhotos'),
         variant: "destructive"
       });
       // Clear images that don't have files and ask user to re-upload
@@ -683,14 +685,14 @@ const RegistrationForm = ({ onSubmit, onBackToLogin }: RegistrationFormProps) =>
           </div>
         </div>
         <CardTitle className="text-2xl font-bold bg-gradient-to-r from-pink-600 to-purple-600 bg-clip-text text-transparent animate-fade-in">
-          {currentStep === 1 ? 'Create Your Account' : currentStep === 2 ? 'Tell Us More About You' : 'Add Your Photo'}
+          {currentStep === 1 ? t('registration.createAccount') : currentStep === 2 ? t('registration.tellUsMore') : t('registration.addPhotos')}
         </CardTitle>
         <CardDescription className="text-gray-600 animate-fade-in">
           {currentStep === 1 
-            ? 'Just a few details to get started. You can complete your profile later for better matches!'
+            ? t('registration.step1Description')
             : currentStep === 2
-            ? 'Help us find your perfect match with a few more details!'
-            : 'Upload at least 2 photos to complete your profile'
+            ? t('registration.step2Description')
+            : t('registration.step3Description')
           }
         </CardDescription>
       </CardHeader>
@@ -734,29 +736,29 @@ const RegistrationForm = ({ onSubmit, onBackToLogin }: RegistrationFormProps) =>
           {/* Gender and Preference */}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4 animate-scale-in">
             <div className="space-y-2">
-              <Label className="text-sm font-medium">I am *</Label>
+              <Label className="text-sm font-medium">{t('registration.iAm')} *</Label>
               <Select value={formData.gender} onValueChange={(value) => handleSelectChange('gender', value)}>
                 <SelectTrigger className={`border-gray-200 focus:border-pink-400 focus:ring-pink-400 ${errors.gender ? 'border-red-500' : ''}`}>
-                  <SelectValue placeholder="Select gender" />
+                  <SelectValue placeholder={t('registration.selectGender')} />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="male">Male</SelectItem>
-                  <SelectItem value="female">Female</SelectItem>
-                  <SelectItem value="other">Other</SelectItem>
+                  <SelectItem value="male">{t('registration.male')}</SelectItem>
+                  <SelectItem value="female">{t('registration.female')}</SelectItem>
+                  <SelectItem value="other">{t('registration.other')}</SelectItem>
                 </SelectContent>
               </Select>
               {errors.gender && <p className="text-red-500 text-xs mt-1">{errors.gender}</p>}
             </div>
             <div className="space-y-2">
-              <Label className="text-sm font-medium">Looking for *</Label>
+              <Label className="text-sm font-medium">{t('registration.lookingFor')} *</Label>
               <Select value={formData.preference} onValueChange={(value) => handleSelectChange('preference', value)}>
                 <SelectTrigger className={`border-gray-200 focus:border-pink-400 focus:ring-pink-400 ${errors.preference ? 'border-red-500' : ''}`}>
-                  <SelectValue placeholder="Select preference" />
+                  <SelectValue placeholder={t('registration.selectPreference')} />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="male">Male</SelectItem>
-                  <SelectItem value="female">Female</SelectItem>
-                  <SelectItem value="everyone">Everyone</SelectItem>
+                  <SelectItem value="male">{t('registration.male')}</SelectItem>
+                  <SelectItem value="female">{t('registration.female')}</SelectItem>
+                  <SelectItem value="everyone">{t('registration.everyone')}</SelectItem>
                 </SelectContent>
               </Select>
               {errors.preference && <p className="text-red-500 text-xs mt-1">{errors.preference}</p>}
@@ -765,15 +767,15 @@ const RegistrationForm = ({ onSubmit, onBackToLogin }: RegistrationFormProps) =>
 
           {/* Relationship Intent */}
           <div className="space-y-2 animate-scale-in">
-            <Label className="text-sm font-medium">Relationship Intent</Label>
+            <Label className="text-sm font-medium">{t('registration.relationshipIntent')}</Label>
             <Select value={formData.relationshipIntent} onValueChange={(value) => handleSelectChange('relationshipIntent', value)}>
               <SelectTrigger className={`border-gray-200 focus:border-pink-400 focus:ring-pink-400 ${errors.relationshipIntent ? 'border-red-500' : ''}`}>
-                <SelectValue placeholder="What are you looking for?" />
+                <SelectValue placeholder={t('registration.whatLookingFor')} />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="casual">Casual</SelectItem>
-                <SelectItem value="serious">Serious</SelectItem>
-                <SelectItem value="open_to_anything">Open to Anything</SelectItem>
+                <SelectItem value="casual">{t('registration.casual')}</SelectItem>
+                <SelectItem value="serious">{t('registration.serious')}</SelectItem>
+                <SelectItem value="open_to_anything">{t('registration.openToAnything')}</SelectItem>
               </SelectContent>
             </Select>
             {errors.relationshipIntent && <p className="text-red-500 text-xs mt-1">{errors.relationshipIntent}</p>}
@@ -781,13 +783,13 @@ const RegistrationForm = ({ onSubmit, onBackToLogin }: RegistrationFormProps) =>
 
           {/* Work & Education */}
           <div className="space-y-4 animate-scale-in">
-            <h4 className="text-lg font-semibold text-gray-800">Work & Education</h4>
+            <h4 className="text-lg font-semibold text-gray-800">{t('registration.workEducation')}</h4>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div className="space-y-2">
-                <Label className="text-sm font-medium">Occupation</Label>
+                <Label className="text-sm font-medium">{t('profile.occupation')}</Label>
                 <Select value={formData.occupation} onValueChange={(value) => handleSelectChange('occupation', value)}>
                   <SelectTrigger className={`border-gray-200 focus:border-pink-400 focus:ring-pink-400 ${errors.occupation ? 'border-red-500' : ''}`}>
-                    <SelectValue placeholder="Select your occupation" />
+                    <SelectValue placeholder={t('registration.selectOccupation')} />
                   </SelectTrigger>
                   <SelectContent>
                     {occupationOptions.map(option => (
@@ -798,10 +800,10 @@ const RegistrationForm = ({ onSubmit, onBackToLogin }: RegistrationFormProps) =>
                 {errors.occupation && <p className="text-red-500 text-xs mt-1">{errors.occupation}</p>}
               </div>
               <div className="space-y-2">
-                <Label className="text-sm font-medium">Industry</Label>
+                <Label className="text-sm font-medium">{t('profile.industry')}</Label>
                 <Select value={formData.industry} onValueChange={(value) => handleSelectChange('industry', value)}>
                   <SelectTrigger className={`border-gray-200 focus:border-pink-400 focus:ring-pink-400 ${errors.industry ? 'border-red-500' : ''}`}>
-                    <SelectValue placeholder="Select your industry" />
+                    <SelectValue placeholder={t('registration.selectIndustry')} />
                   </SelectTrigger>
                   <SelectContent>
                     {industryOptions.map(option => (
@@ -813,19 +815,19 @@ const RegistrationForm = ({ onSubmit, onBackToLogin }: RegistrationFormProps) =>
               </div>
             </div>
             <div className="space-y-2">
-              <Label className="text-sm font-medium">Education Level</Label>
+              <Label className="text-sm font-medium">{t('registration.educationLevel')}</Label>
               <Select value={formData.educationLevel} onValueChange={(value) => handleSelectChange('educationLevel', value)}>
                 <SelectTrigger className={`border-gray-200 focus:border-pink-400 focus:ring-pink-400 ${errors.educationLevel ? 'border-red-500' : ''}`}>
-                  <SelectValue placeholder="Select your education level" />
+                  <SelectValue placeholder={t('registration.selectEducation')} />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="High School">High School</SelectItem>
-                  <SelectItem value="Some College">Some College</SelectItem>
-                  <SelectItem value="Associate Degree">Associate Degree</SelectItem>
-                  <SelectItem value="Bachelor's Degree">Bachelor's Degree</SelectItem>
-                  <SelectItem value="Master's Degree">Master's Degree</SelectItem>
-                  <SelectItem value="Doctorate">Doctorate</SelectItem>
-                  <SelectItem value="Other">Other</SelectItem>
+                  <SelectItem value="High School">{t('registration.highSchool')}</SelectItem>
+                  <SelectItem value="Some College">{t('registration.someCollege')}</SelectItem>
+                  <SelectItem value="Associate Degree">{t('registration.associateDegree')}</SelectItem>
+                  <SelectItem value="Bachelor's Degree">{t('registration.bachelorsDegree')}</SelectItem>
+                  <SelectItem value="Master's Degree">{t('registration.mastersDegree')}</SelectItem>
+                  <SelectItem value="Doctorate">{t('registration.doctorate')}</SelectItem>
+                  <SelectItem value="Other">{t('registration.other')}</SelectItem>
                 </SelectContent>
               </Select>
               {errors.educationLevel && <p className="text-red-500 text-xs mt-1">{errors.educationLevel}</p>}
@@ -850,11 +852,11 @@ const RegistrationForm = ({ onSubmit, onBackToLogin }: RegistrationFormProps) =>
                   <Shield className="w-5 h-5 text-purple-600 mr-2" />
                   <span className="text-sm text-purple-600 font-medium">AI Content Moderation Active</span>
                 </div>
-                <p className="text-sm text-gray-600">All photos are automatically checked for appropriateness</p>
+                <p className="text-sm text-gray-600">{t('registration.photosChecked')}</p>
               </div>
 
               <div className="space-y-4">
-                <Label htmlFor="photos" className="text-lg font-medium">Upload Photos (Minimum 2 required)</Label>
+                <Label htmlFor="photos" className="text-lg font-medium">{t('registration.uploadPhotosLabel')}</Label>
                 <Input
                   id="photos"
                   type="file"
@@ -890,12 +892,12 @@ const RegistrationForm = ({ onSubmit, onBackToLogin }: RegistrationFormProps) =>
                 )}
 
                 <div className="bg-blue-50 p-4 rounded-lg">
-                  <h4 className="font-medium text-blue-900 mb-2">Photo Guidelines:</h4>
+                  <h4 className="font-medium text-blue-900 mb-2">{t('registration.photoGuidelines')}</h4>
                   <ul className="text-sm text-blue-800 space-y-1">
-                    <li>• Clear photo showing your face</li>
-                    <li>• Appropriate clothing required</li>
-                    <li>• No explicit or inappropriate content</li>
-                    <li>• Borderline content may require admin review</li>
+                    <li>• {t('registration.clearPhotoFace')}</li>
+                    <li>• {t('registration.appropriateClothing')}</li>
+                    <li>• {t('registration.noExplicit')}</li>
+                    <li>• {t('registration.borderlineMayReview')}</li>
                   </ul>
                 </div>
               </div>
@@ -910,7 +912,7 @@ const RegistrationForm = ({ onSubmit, onBackToLogin }: RegistrationFormProps) =>
                 onClick={() => setCurrentStep(currentStep - 1)}
                 className="w-full border-pink-400 text-pink-600 hover:bg-pink-50 transition-all duration-200 animate-fade-in"
               >
-                Back
+                {t('registration.back')}
               </Button>
             )}
             <Button 
@@ -919,12 +921,12 @@ const RegistrationForm = ({ onSubmit, onBackToLogin }: RegistrationFormProps) =>
               className="w-full bg-gradient-to-r from-pink-500 to-purple-600 hover:from-pink-600 hover:to-purple-700 text-white font-semibold py-3 rounded-lg transition-all duration-200 animate-fade-in disabled:opacity-50 disabled:cursor-not-allowed"
             >
               {isSubmitting 
-                ? 'Creating Account...' 
+                ? t('registration.creatingAccount')
                 : currentStep === 1 
-                  ? 'Continue' 
+                  ? t('registration.continue')
                   : currentStep === 2 
-                    ? 'Add Photo' 
-                    : 'Create Account'
+                    ? t('registration.addPhoto')
+                    : t('registration.createAccount')
               }
             </Button>
           </div>
@@ -934,7 +936,7 @@ const RegistrationForm = ({ onSubmit, onBackToLogin }: RegistrationFormProps) =>
               onClick={onBackToLogin}
               className="text-pink-600 hover:text-pink-700 font-semibold transition-colors story-link"
             >
-              Already have an account? Sign In
+              {t('registration.alreadyHaveAccount')}
             </button>
           </div>
         </form>

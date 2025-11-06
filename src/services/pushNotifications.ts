@@ -242,15 +242,35 @@ class SupabasePushNotificationService {
   private handleNotificationAction(notification: ActionPerformed): void {
     // Handle notification tap/action
     const data = notification.notification.data;
-    if (data?.type === 'message') {
-      // Navigate to chat
-      window.location.href = `/chat/${data.chatId}`;
+    console.log('🔔 Notification tapped, data:', data);
+    
+    // Check for specific action first
+    if (data?.action === 'open_discover') {
+      console.log('🎯 Opening discover page from broadcast notification');
+      window.location.href = '/discover';
+      return;
+    }
+    
+    if (data?.type === 'message' && data?.chatId) {
+      // Navigate to specific chat with the match ID
+      console.log('💬 Opening chat:', data.chatId);
+      window.location.href = `/chat?matchId=${data.chatId}`;
     } else if (data?.type === 'match') {
-      // Navigate to matches
-      window.location.href = '/matches';
+      // Navigate to chat page (matches tab)
+      console.log('🎉 Opening matches/chat page');
+      window.location.href = '/chat';
     } else if (data?.type === 'like') {
-      // Navigate to likes
-      window.location.href = '/likes';
+      // Navigate to liked me page
+      console.log('💖 Opening likes page');
+      window.location.href = '/liked-me';
+    } else if (data?.type === 'system' || data?.type === 'admin') {
+      // System/admin notifications go to discover page
+      console.log('📢 Opening discover page from system notification');
+      window.location.href = '/discover';
+    } else {
+      // Default: go to chat page
+      console.log('📱 Opening default chat page');
+      window.location.href = '/chat';
     }
   }
 
@@ -406,6 +426,31 @@ class SupabasePushNotificationService {
     }
   }
 
+  async removeToken(userId: string): Promise<void> {
+    try {
+      // Get the current device token before removing
+      const platform = Capacitor.getPlatform();
+      
+      // Delete the push token for this user and device from the database
+      const { error } = await supabase
+        .from('push_tokens')
+        .delete()
+        .eq('user_id', userId)
+        .eq('platform', platform);
+
+      if (error) {
+        console.error('❌ Failed to remove push token:', error);
+      } else {
+        console.log('✅ Push token removed for user:', userId, 'platform:', platform);
+      }
+      
+      // Clear the stored device token
+      this.deviceToken = null;
+    } catch (error) {
+      console.error('❌ Error removing push token:', error);
+    }
+  }
+
   cleanup(): void {
     if (this.realtimeChannel) {
       supabase.removeChannel(this.realtimeChannel);
@@ -430,4 +475,5 @@ export const sendPushNotification = (payload: NotificationPayload) => pushNotifi
 export const requestNotificationPermission = () => pushNotificationService.requestWebNotificationPermission();
 export const markNotificationRead = (notificationId: string) => pushNotificationService.markNotificationAsRead(notificationId);
 export const getUnreadNotifications = (userId: string) => pushNotificationService.getUnreadNotifications(userId);
+export const removePushToken = (userId: string) => pushNotificationService.removeToken(userId);
 export const cleanupPushNotifications = () => pushNotificationService.cleanup();

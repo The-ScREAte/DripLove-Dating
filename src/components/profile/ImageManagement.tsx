@@ -1,5 +1,6 @@
 
 import React, { useState, useEffect, useCallback } from 'react';
+import { useTranslation } from 'react-i18next';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -28,6 +29,7 @@ interface UserImage {
 }
 
 const ImageManagement = ({ currentUser }: ImageManagementProps) => {
+  const { t } = useTranslation();
   const [userImages, setUserImages] = useState<UserImage[]>([]);
   const [uploading, setUploading] = useState(false);
   const [deleting, setDeleting] = useState(false);
@@ -452,12 +454,12 @@ const ImageManagement = ({ currentUser }: ImageManagementProps) => {
     <Card>
       <CardHeader>
         <CardTitle className="flex items-center justify-between">
-          <span>Your Photos ({userImages.length}/7)</span>
+          <span>{t('profile.yourPhotos')} ({userImages.length}/7)</span>
           <div className="flex items-center space-x-2">
             <div className="relative group">
               <Shield className="w-4 h-4 text-purple-600" />
               <div className="absolute bottom-6 left-1/2 transform -translate-x-1/2 bg-gray-800 text-white text-xs rounded py-1 px-2 opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap">
-                AI Content Moderation Active
+                {t('profile.aiContentModeration')}
               </div>
             </div>
             <Upload className="w-5 h-5 text-pink-600" />
@@ -467,7 +469,7 @@ const ImageManagement = ({ currentUser }: ImageManagementProps) => {
       <CardContent>
         {userImages.length < 7 && (
           <div className="mb-6">
-            <Label htmlFor="image_upload" className="block mb-2">Upload Image</Label>
+            <Label htmlFor="image_upload" className="block mb-2">{t('profile.uploadImage')}</Label>
             
             {replacingImageUrl && (
               <div className="mb-2 p-2 bg-blue-50 border border-blue-200 rounded text-sm text-blue-700 flex items-center justify-between">

@@ -154,6 +154,7 @@ import ProfileCompletionModal from './ProfileCompletionModal';
 import SwipeCounter from './SwipeCounter';
 import AdCard from './discover/AdCard';
 import { CurrentUser, PotentialMatch } from '@/types';
+import { useTranslation } from 'react-i18next';
 
 interface AdData {
   id: string;
@@ -249,6 +250,8 @@ const createDeterministicShuffle = (array: any[], seed: string) => {
 };
 
 const DiscoverPage = ({ currentUser, onNavigateToChat, isPremium }: DiscoverPageProps) => {
+  const { t } = useTranslation();
+  
   // IAP: Track if buy is enabled
   const [canBuy, setCanBuy] = useState(false);
   useEffect(() => {
@@ -416,8 +419,8 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, isPremium }: DiscoverPage
     if (urlParams.get('premium') === 'activated') {
       refetchSubscription();
       toast({
-        title: 'Welcome to Premium!',
-        description: 'Your premium features are now active. Enjoy unlimited access!',
+        title: t('discover.welcomeToPremium.title'),
+        description: t('discover.welcomeToPremium.description'),
         duration: 5000,
       });
       // Clean up URL
@@ -956,8 +959,8 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, isPremium }: DiscoverPage
     } catch (error) {
   // ...removed log...
       toast({
-        title: 'Error',
-        description: 'Failed to load potential matches. Please try again.',
+        title: t('common.error'),
+        description: t('discover.errors.loadFailed'),
         variant: 'destructive'
       });
     } finally {
@@ -1451,8 +1454,8 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, isPremium }: DiscoverPage
     // Check profile completion restriction (70% after 5 swipes)
     if (profileCompletion < 70 && todaySwipeCount >= 5) {
       toast({
-        title: 'Complete Your Profile',
-        description: `You need ${70 - profileCompletion}% more to continue swiping. Complete your profile to unlock more swipes! `,
+        title: t('discover.errors.profileCompletionRequired'),
+        description: t('discover.errors.profileCompletionMessage', { percentage: 70 - profileCompletion }),
         variant: 'destructive'
       });
       setShowProfileCompletionModal(true);
@@ -1487,7 +1490,11 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, isPremium }: DiscoverPage
           setIsOutOfSwipes(true);
           updateCacheAfterRollback(prevIndex);
           
-          toast({ title: 'Daily Limit Reached', description: usageResult.message || 'You have reached your swipe limit.', variant: 'destructive' });
+          toast({ 
+            title: t('discover.errors.dailyLimitReached'), 
+            description: usageResult.message || t('discover.errors.dailyLimitMessage'), 
+            variant: 'destructive' 
+          });
           return;
         }
 
@@ -1554,7 +1561,11 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, isPremium }: DiscoverPage
             });
             setCurrentIndex(prevIndex);
             setTodaySwipeCount(prev => Math.max(0, prev - 1));
-            toast({ title: 'Error', description: 'Failed to record like.', variant: 'destructive' });
+            toast({ 
+              title: t('common.error'), 
+              description: t('discover.errors.likeFailed'), 
+              variant: 'destructive' 
+            });
             return;
           }
         } else {
@@ -1616,8 +1627,8 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, isPremium }: DiscoverPage
     // Check profile completion restriction (70% after 5 swipes)
     if (profileCompletion < 70 && todaySwipeCount >= 5) {
       toast({
-        title: 'Complete Your Profile',
-        description: `You need ${70 - profileCompletion}% more to continue swiping. Complete your profile to unlock more swipes!`,
+        title: t('discover.errors.profileCompletionRequired'),
+        description: t('discover.errors.profileCompletionMessage', { percentage: 70 - profileCompletion }),
         variant: 'destructive'
       });
       setShowProfileCompletionModal(true);
@@ -1672,7 +1683,11 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, isPremium }: DiscoverPage
             }
           }, 0);
           
-          toast({ title: 'Daily Limit Reached', description: usageResult.message || 'You have reached your swipe limit.', variant: 'destructive' });
+          toast({ 
+            title: t('discover.errors.dailyLimitReached'), 
+            description: usageResult.message || t('discover.errors.dailyLimitMessage'), 
+            variant: 'destructive' 
+          });
           return;
         }
 
@@ -1756,8 +1771,8 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, isPremium }: DiscoverPage
       if (deleteError) {
   // ...removed log...
         toast({
-          title: 'Error',
-          description: 'Could not reverse the dislike. Please try again.',
+          title: t('common.error'),
+          description: t('discover.errors.reverseFailed'),
           variant: 'destructive'
         });
         return;
@@ -1800,8 +1815,8 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, isPremium }: DiscoverPage
     } catch (error) {
   // ...removed log...
       toast({
-        title: 'Error',
-        description: 'Could not reverse the dislike. Please try again.',
+        title: t('common.error'),
+        description: t('discover.errors.reverseFailed'),
         variant: 'destructive'
       });
     }
@@ -1915,11 +1930,11 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, isPremium }: DiscoverPage
         <Card className="max-w-md w-full mx-4">
           <CardContent className="p-8 text-center">
             <Heart className="w-16 h-16 mx-auto mb-4 text-gray-300" />
-            <h2 className="text-xl font-semibold mb-2">You're out of swipes for today!</h2>
+            <h2 className="text-xl font-semibold mb-2">{t('discover.outOfSwipes.title')}</h2>
             <p className="text-gray-600 mb-4">
               {isPremium 
-                ? "Refreshing your matches..." 
-                : "Free users get 20 swipes per day. Come back tomorrow or upgrade to Premium for unlimited swipes!"
+                ? t('discover.outOfSwipes.premiumUserMessage')
+                : t('discover.outOfSwipes.freeUserMessage')
               }
             </p>
             <div className="space-y-3">
@@ -1929,7 +1944,7 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, isPremium }: DiscoverPage
                 className="w-full bg-gradient-to-r from-yellow-400 to-yellow-600 hover:from-yellow-500 hover:to-yellow-700 text-black font-bold"
               >
                 <Crown className="w-4 h-4 mr-2" />
-                Upgrade to Premium
+                {t('discover.outOfSwipes.upgradeButton')}
               </Button>
             )}
               <Button 
@@ -1941,7 +1956,7 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, isPremium }: DiscoverPage
                 variant="outline" 
                 className="w-full"
               >
-                OK
+                {t('discover.outOfSwipes.okButton')}
               </Button>
             </div>
           </CardContent>
@@ -2043,7 +2058,7 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, isPremium }: DiscoverPage
                 className="w-20 h-20"
               />
             </div>
-            <p className="text-gray-600">Finding your matches...</p>
+            <p className="text-gray-600">{t('discover.findingMatches')}</p>
           </div>
         </div>
       </>
@@ -2057,12 +2072,12 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, isPremium }: DiscoverPage
         <Card className="max-w-md w-full mx-4">
           <CardContent className="p-8 text-center">
             <Heart className="w-16 h-16 mx-auto mb-4 text-gray-300" />
-            <h2 className="text-xl font-semibold mb-2">No more profiles</h2>
+            <h2 className="text-xl font-semibold mb-2">{t('discover.noMoreProfiles')}</h2>
             <p className="text-gray-600 mb-4">
-              You've seen all available profiles.  Check back later for new matches! or Adjust your preference in settings for moreprofiles.
+              {t('discover.noProfilesDescription')}
             </p>
             <Button onClick={fetchPotentialMatches} className="w-full">
-              Refresh
+              {t('discover.refresh')}
             </Button>
           </CardContent>
         </Card>
@@ -2192,7 +2207,7 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, isPremium }: DiscoverPage
             }
           `}</style>
           <div className="swipe-card bg-gradient-to-br from-white to-pink-50 rounded-3xl px-8 py-8 flex flex-col items-center shadow-2xl border border-pink-100" style={{ maxWidth: 360, opacity: 0.97 }}>
-            <h3 className="text-lg font-bold text-gray-800 mb-4 text-center">💕 Start Swiping! 💕</h3>
+            <h3 className="text-lg font-bold text-gray-800 mb-4 text-center">{t('discover.swipeGuide.title')}</h3>
             <div className="flex flex-row gap-12 mb-4">
               {/* Swipe Left */}
               <div className="flex flex-col items-center">
@@ -2200,8 +2215,8 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, isPremium }: DiscoverPage
                   <span className="finger-left" role="img" aria-label="finger left">👆</span>
                 </div>
                 <div className="text-xl mb-1" style={{ color: '#ef4444' }}>← ← ←</div>
-                <span className="text-sm font-semibold text-red-600">Nope</span>
-                <span className="text-xs text-gray-500 mt-1">Swipe Left</span>
+                <span className="text-sm font-semibold text-red-600">{t('discover.swipeGuide.nope')}</span>
+                <span className="text-xs text-gray-500 mt-1">{t('discover.swipeGuide.swipeLeft')}</span>
               </div>
               {/* Swipe Right */}
               <div className="flex flex-col items-center">
@@ -2209,11 +2224,11 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, isPremium }: DiscoverPage
                   <span className="finger-right" role="img" aria-label="finger right">👆</span>
                 </div>
                 <div className="text-xl mb-1" style={{ color: '#10b981' }}>→ → →</div>
-                <span className="text-sm font-semibold text-green-600">Like</span>
-                <span className="text-xs text-gray-500 mt-1">Swipe Right</span>
+                <span className="text-sm font-semibold text-green-600">{t('discover.swipeGuide.like')}</span>
+                <span className="text-xs text-gray-500 mt-1">{t('discover.swipeGuide.swipeRight')}</span>
               </div>
             </div>
-            <p className="text-xs text-gray-600 text-center mt-2">Tap anywhere to close</p>
+            <p className="text-xs text-gray-600 text-center mt-2">{t('discover.swipeGuide.tapToClose')}</p>
           </div>
         </div>
       )}
@@ -2318,7 +2333,7 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, isPremium }: DiscoverPage
                         transition: 'none'
                       }}
                     >
-                      <span className="text-white font-bold text-2xl tracking-wider">LIKE</span>
+                      <span className="text-white font-bold text-2xl tracking-wider">{t('discover.likeOverlay')}</span>
                     </div>
                   </div>
                 )}
@@ -2355,7 +2370,7 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, isPremium }: DiscoverPage
                         transition: 'none'
                       }}
                     >
-                      <span className="text-white font-bold text-2xl tracking-wider">NOPE</span>
+                      <span className="text-white font-bold text-2xl tracking-wider">{t('discover.nopeOverlay')}</span>
                     </div>
                   </div>
                 )}

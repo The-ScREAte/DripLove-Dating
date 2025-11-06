@@ -1,5 +1,6 @@
 
 import React, { useState, useEffect } from 'react';
+import { useTranslation } from 'react-i18next';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Heart, MessageCircle, Users } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
@@ -9,6 +10,7 @@ interface ProfileSummaryCardProps {
 }
 
 const ProfileSummaryCard = ({ currentUser }: ProfileSummaryCardProps) => {
+  const { t } = useTranslation();
   const [stats, setStats] = useState({
     totalMatches: 0,
     activeChats: 0,
@@ -69,7 +71,7 @@ const ProfileSummaryCard = ({ currentUser }: ProfileSummaryCardProps) => {
         <CardHeader>
           <CardTitle className="flex items-center space-x-2">
             <Users className="w-5 h-5 text-pink-600" />
-            <span>Your DripLove Summary</span>
+            <span>{t('profile.yourDripLoveSummary')}</span>
           </CardTitle>
         </CardHeader>
         <CardContent>
@@ -79,7 +81,7 @@ const ProfileSummaryCard = ({ currentUser }: ProfileSummaryCardProps) => {
                 <Heart className="w-6 h-6 text-red-500" />
               </div>
               <div className="text-2xl font-bold text-red-500">{stats.totalMatches}</div>
-              <p className="text-xs text-gray-600">Total Matches</p>
+              <p className="text-xs text-gray-600">{t('profile.totalMatches')}</p>
             </div>
 
             <div className="space-y-2">
@@ -87,7 +89,7 @@ const ProfileSummaryCard = ({ currentUser }: ProfileSummaryCardProps) => {
                 <MessageCircle className="w-6 h-6 text-blue-500" />
               </div>
               <div className="text-2xl font-bold text-blue-500">{stats.activeChats}</div>
-              <p className="text-xs text-gray-600">Active Chats</p>
+              <p className="text-xs text-gray-600">{t('profile.activeChats')}</p>
             </div>
 
             <div className="space-y-2">
@@ -95,7 +97,7 @@ const ProfileSummaryCard = ({ currentUser }: ProfileSummaryCardProps) => {
                 <Users className="w-6 h-6 text-purple-500" />
               </div>
               <div className="text-2xl font-bold text-purple-500">{stats.totalLikes}</div>
-              <p className="text-xs text-gray-600">Likes Given</p>
+              <p className="text-xs text-gray-600">{t('profile.likesGiven')}</p>
             </div>
           </div>
         </CardContent>

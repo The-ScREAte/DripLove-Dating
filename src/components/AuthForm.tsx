@@ -14,6 +14,8 @@ import { cleanupSafariViewController } from '@/utils/safariViewController';
 import { signInWithAppleNativeModal, signInWithAppleFallback, isAppleSignInAvailable } from '@/utils/appleNativeModal';
 import AppleAuthDebug from '@/components/AppleAuthDebug';
 import { Capacitor } from '@capacitor/core';
+import { useTranslation } from 'react-i18next';
+import { saveLanguageToDatabase } from '@/utils/languageDetection';
 
 interface AuthFormProps {
   isLogin: boolean;
@@ -25,6 +27,7 @@ interface AuthFormProps {
 const AuthForm = ({ isLogin, onToggle, onOAuthSuccess, onBack }: AuthFormProps) => {
   const navigate = useNavigate();
   const { toast } = useToast();
+  const { t } = useTranslation();
   
   // Check if running on native platform and get platform
   const isNative = Capacitor.isNativePlatform();
@@ -57,24 +60,24 @@ const AuthForm = ({ isLogin, onToggle, onOAuthSuccess, onBack }: AuthFormProps) 
     // Email validation
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
     if (!formData.email) {
-      newErrors.email = 'Email is required';
+      newErrors.email = t('auth.errors.emailRequired');
     } else if (!emailRegex.test(formData.email)) {
-      newErrors.email = 'Please enter a valid email address';
+      newErrors.email = t('auth.errors.invalidEmail');
     }
     
     // Password validation
     if (!formData.password) {
-      newErrors.password = 'Password is required';
+      newErrors.password = t('auth.errors.passwordRequired');
     } else if (formData.password.length < 6) {
-      newErrors.password = 'Password must be at least 6 characters long';
+      newErrors.password = t('auth.errors.passwordTooShort');
     }
     
     // Confirm password validation (only for registration)
     if (!isLogin) {
       if (!formData.confirmPassword) {
-        newErrors.confirmPassword = 'Please confirm your password';
+        newErrors.confirmPassword = t('auth.errors.confirmPasswordRequired');
       } else if (formData.password !== formData.confirmPassword) {
-        newErrors.confirmPassword = 'Passwords do not match';
+        newErrors.confirmPassword = t('auth.errors.passwordsDontMatch');
       }
     }
     
@@ -140,14 +143,14 @@ const AuthForm = ({ isLogin, onToggle, onOAuthSuccess, onBack }: AuthFormProps) 
             // Handle user cancellation gracefully
             if (err.message?.includes('canceled') || err.message?.includes('cancelled')) {
               toast({
-                title: 'Sign-in Cancelled',
-                description: 'Apple Sign-In was cancelled.',
+                title: t('auth.authenticationCancelled'),
+                description: t('auth.googleSignInCancelled'),
                 variant: 'default',
               });
             } else {
               toast({
-                title: 'Authentication Error',
-                description: err?.message || 'Failed to sign in with Apple',
+                title: t('auth.authenticationError'),
+                description: err?.message || t('auth.errors.appleSignInFailed'),
                 variant: 'destructive',
               });
             }
@@ -308,8 +311,8 @@ const AuthForm = ({ isLogin, onToggle, onOAuthSuccess, onBack }: AuthFormProps) 
               // If still no session, show error
               if (!hasProcessedSession) {
                 toast({
-                  title: 'Authentication Cancelled',
-                  description: 'Google sign-in was cancelled.',
+                  title: t('auth.authenticationCancelled'),
+                  description: t('auth.googleSignInCancelled'),
                   variant: 'default',
                 });
               }
@@ -413,8 +416,8 @@ const AuthForm = ({ isLogin, onToggle, onOAuthSuccess, onBack }: AuthFormProps) 
                 // No session = user cancelled
                 console.log('❌ No session found, user cancelled');
                 toast({
-                  title: 'Authentication Cancelled',
-                  description: 'Google sign-in was cancelled.',
+                  title: t('auth.authenticationCancelled'),
+                  description: t('auth.googleSignInCancelled'),
                   variant: 'default',
                 });
               } else {
@@ -602,8 +605,8 @@ const AuthForm = ({ isLogin, onToggle, onOAuthSuccess, onBack }: AuthFormProps) 
                 
                 if (!hasProcessedSession) {
                   toast({
-                    title: 'Authentication Cancelled',
-                    description: 'Google sign-in was cancelled.',
+                    title: t('auth.authenticationCancelled'),
+                    description: t('auth.googleSignInCancelled'),
                     variant: 'default',
                   });
                   setOauthLoading(null);
@@ -912,8 +915,8 @@ const AuthForm = ({ isLogin, onToggle, onOAuthSuccess, onBack }: AuthFormProps) 
         if (profile.account_status === 'blocked') {
           await supabase.auth.signOut();
           toast({
-            title: "Account Blocked",
-            description: "Your account has been blocked.",
+            title: t('auth.accountBlocked'),
+            description: t('auth.accountBlockedDesc'),
             variant: "destructive",
           });
           setLoading(false);
@@ -923,8 +926,8 @@ const AuthForm = ({ isLogin, onToggle, onOAuthSuccess, onBack }: AuthFormProps) 
         if (profile.account_status === 'on_hold') {
           await supabase.auth.signOut();
           toast({
-            title: "Account On Hold",
-            description: "Your account is on hold. Please contact support.",
+            title: t('auth.accountOnHold'),
+            description: t('auth.accountOnHoldDesc'),
             variant: "destructive",
           });
           setLoading(false);
@@ -933,6 +936,16 @@ const AuthForm = ({ isLogin, onToggle, onOAuthSuccess, onBack }: AuthFormProps) 
 
         // Save profile ID to session
         sessionStorage.setItem('profile_id', profile.id);
+
+        // Save language preference to database on login
+        const sessionLanguage = sessionStorage.getItem('preferredLanguage');
+        if (sessionLanguage && sessionLanguage !== 'en') {
+          try {
+            await saveLanguageToDatabase(authData.user.id, sessionLanguage);
+          } catch (error) {
+            console.error('Error saving language preference on login:', error);
+          }
+        }
 
         // Always redirect to home page and let the main app handle routing
         // The auth state change will trigger the proper view (admin/app)
@@ -948,8 +961,8 @@ const AuthForm = ({ isLogin, onToggle, onOAuthSuccess, onBack }: AuthFormProps) 
         
         if (existingProfile) {
           toast({
-            title: "Account Already Exists",
-            description: "An account with this email already exists. Please sign in instead.",
+            title: t('auth.accountAlreadyExists'),
+            description: t('auth.accountAlreadyExists'),
             variant: "destructive",
           });
           setLoading(false);
@@ -971,7 +984,7 @@ const AuthForm = ({ isLogin, onToggle, onOAuthSuccess, onBack }: AuthFormProps) 
           if (authError) {
             console.error('[Registration] Auth error:', authError);
             toast({
-              title: "Registration Failed",
+              title: t('auth.registrationFailed'),
               description: authError.message,
               variant: "destructive",
             });
@@ -981,8 +994,8 @@ const AuthForm = ({ isLogin, onToggle, onOAuthSuccess, onBack }: AuthFormProps) 
 
           if (!authData.user) {
             toast({
-              title: "Registration Failed",
-              description: "Failed to create account. Please try again.",
+              title: t('auth.registrationFailed'),
+              description: t('auth.errors.signUpFailed'),
               variant: "destructive",
             });
             setLoading(false);
@@ -1053,8 +1066,8 @@ const AuthForm = ({ isLogin, onToggle, onOAuthSuccess, onBack }: AuthFormProps) 
     } catch (error: any) {
       console.error('Auth error:', error);
       toast({
-        title: isLogin ? "Login Error" : "Registration Error",
-        description: "An unexpected error occurred. Please try again.",
+        title: isLogin ? t('auth.loginError') : t('auth.registrationError'),
+        description: t('auth.unexpectedError'),
         variant: "destructive",
       });
       setLoading(false);
@@ -1085,10 +1098,10 @@ const AuthForm = ({ isLogin, onToggle, onOAuthSuccess, onBack }: AuthFormProps) 
         {(showForgotPassword || !isLogin) && (
           <>
             <CardTitle className="text-xl font-bold bg-gradient-to-r from-pink-600 to-purple-600 bg-clip-text text-transparent mb-2">
-              {showForgotPassword ? 'Reset Password' : 'Create Account'}
+              {showForgotPassword ? t('auth.resetPassword') : t('auth.createAccount')}
             </CardTitle>
             <CardDescription className="text-gray-600 text-sm">
-              {showForgotPassword ? 'Enter your email to receive reset instructions' : 'Join DripLove today'}
+              {showForgotPassword ? t('auth.enterEmailForReset') : t('auth.joinDripLoveToday')}
             </CardDescription>
           </>
         )}
@@ -1113,14 +1126,14 @@ const AuthForm = ({ isLogin, onToggle, onOAuthSuccess, onBack }: AuthFormProps) 
                   {oauthLoading === 'apple' ? (
                     <div className="flex items-center">
                       <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin mr-2"></div>
-                      Connecting...
+                      {t('auth.connecting')}
                     </div>
                   ) : (
                     <>
                       <svg className="w-5 h-5 mr-2.5 fill-white" viewBox="0 0 814 1000" aria-hidden="true">
                         <path d="M788.1 340.9c-5.8 4.5-108.2 62.2-108.2 190.5 0 148.4 130.3 200.9 134.2 202.2-.6 3.2-20.7 71.9-68.7 141.9-42.8 61.6-87.5 123.1-155.5 123.1s-85.5-39.5-164-39.5c-76.5 0-103.7 40.8-165.9 40.8s-105.6-57-155.5-127c-52.5-73.8-94.5-189.9-94.5-297.5 0-174.2 113.8-266.6 225.3-266.6 59.3 0 108.9 41.1 146.5 41.1s94.5-44.1 160.8-44.1c26.4 0 121.2 2.6 183.5 93.1zm-234.4-553.1c35.4-42.4 58-101.7 58-160.1 0-8.3-1.2-16.6-2.6-24.2-55.6 2.2-121.2 37.5-159.5 83.8-33.2 38.3-55.6 101.1-55.6 160.1 0 9.6 1.9 19.1 2.6 22.2 1.3.6 3.9.6 6.4.6 50.7 0 113.2-33.8 150.7-82.4z" />
                       </svg>
-                      Sign in with Apple
+                      {t('auth.signInWithApple')}
                     </>
                   )}
                 </Button>
@@ -1136,7 +1149,7 @@ const AuthForm = ({ isLogin, onToggle, onOAuthSuccess, onBack }: AuthFormProps) 
                 {oauthLoading === 'google' ? (
                   <div className="flex items-center">
                     <div className="w-4 h-4 border-2 border-gray-400 border-t-transparent rounded-full animate-spin mr-2"></div>
-                    Connecting...
+                    {t('auth.connecting')}
                   </div>
                 ) : (
                   <>
@@ -1146,7 +1159,7 @@ const AuthForm = ({ isLogin, onToggle, onOAuthSuccess, onBack }: AuthFormProps) 
                       <path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z"/>
                       <path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"/>
                     </svg>
-                    Continue with Google
+                    {t('auth.continueWithGoogle')}
                   </>
                 )}
               </Button>
@@ -1166,7 +1179,7 @@ const AuthForm = ({ isLogin, onToggle, onOAuthSuccess, onBack }: AuthFormProps) 
         {showForgotPassword ? (
           <div className="space-y-4">
             <div className="space-y-2">
-              <Label htmlFor="email" className="text-sm font-medium">Email</Label>
+              <Label htmlFor="email" className="text-sm font-medium">{t('auth.email')}</Label>
               <div className="relative">
                 <Mail className="absolute left-3 top-3 h-4 w-4 text-gray-400" />
                 <Input
@@ -1181,7 +1194,7 @@ const AuthForm = ({ isLogin, onToggle, onOAuthSuccess, onBack }: AuthFormProps) 
                     errors.email ? 'border-red-500 focus:border-red-500' : ''
                   }`}
                   style={getInputStyles()}
-                  placeholder="Enter your email"
+                  placeholder={t('auth.enterYourEmail')}
                   required
                 />
                 {errors.email && (
@@ -1197,7 +1210,7 @@ const AuthForm = ({ isLogin, onToggle, onOAuthSuccess, onBack }: AuthFormProps) 
                 disabled={loading}
                 className="w-64 bg-gradient-to-r from-pink-500 to-purple-600 hover:from-pink-600 hover:to-purple-700 text-white font-medium py-3 rounded-full transition-all duration-200 shadow-md hover:shadow-lg"
               >
-                {loading ? 'Sending Reset Email...' : 'Send Reset Email'}
+                {loading ? t('auth.sendingResetEmail') : t('auth.sendResetEmail')}
               </Button>
             </div>
 
@@ -1206,7 +1219,7 @@ const AuthForm = ({ isLogin, onToggle, onOAuthSuccess, onBack }: AuthFormProps) 
                 onClick={() => setShowForgotPassword(false)}
                 className="text-pink-600 hover:text-pink-700 font-semibold transition-colors"
               >
-                Back to Sign In
+                {t('auth.backToSignIn')}
               </button>
             </div>
           </div>
@@ -1214,7 +1227,7 @@ const AuthForm = ({ isLogin, onToggle, onOAuthSuccess, onBack }: AuthFormProps) 
           <div>
             <form onSubmit={handleSubmit} className="space-y-4">
               <div className="space-y-3">
-                <Label htmlFor="email" className="text-sm font-semibold text-gray-700">Email</Label>
+                <Label htmlFor="email" className="text-sm font-semibold text-gray-700">{t('auth.email')}</Label>
                 <div className="relative">
                   <Input
                     id="email"
@@ -1228,7 +1241,7 @@ const AuthForm = ({ isLogin, onToggle, onOAuthSuccess, onBack }: AuthFormProps) 
                       errors.email ? 'border-red-500 focus:border-red-500' : ''
                     }`}
                     style={getInputStyles()}
-                    placeholder="Enter your email"
+                    placeholder={t('auth.enterYourEmail')}
                     required
                   />
                   {errors.email && (
@@ -1239,14 +1252,14 @@ const AuthForm = ({ isLogin, onToggle, onOAuthSuccess, onBack }: AuthFormProps) 
 
               <div className="space-y-3">
                 <div className="flex justify-between items-center">
-                  <Label htmlFor="password" className="text-sm font-semibold text-gray-700">Password</Label>
+                  <Label htmlFor="password" className="text-sm font-semibold text-gray-700">{t('auth.password')}</Label>
                   {isLogin && (
                     <button
                       type="button"
                       onClick={() => setShowForgotPassword(true)}
                       className="text-sm text-pink-600 hover:text-pink-700 font-medium transition-colors"
                     >
-                      Forgot password?
+                      {t('auth.forgotPassword')}
                     </button>
                   )}
                 </div>
@@ -1263,7 +1276,7 @@ const AuthForm = ({ isLogin, onToggle, onOAuthSuccess, onBack }: AuthFormProps) 
                       errors.password ? 'border-red-500 focus:border-red-500' : ''
                     }`}
                     style={getInputStyles()}
-                    placeholder="Enter your password"
+                    placeholder={t('auth.enterYourPassword')}
                     required
                   />
                   <button
@@ -1281,7 +1294,7 @@ const AuthForm = ({ isLogin, onToggle, onOAuthSuccess, onBack }: AuthFormProps) 
 
               {!isLogin && (
                 <div className="space-y-2">
-                  <Label htmlFor="confirmPassword" className="text-sm font-medium">Confirm Password</Label>
+                  <Label htmlFor="confirmPassword" className="text-sm font-medium">{t('auth.confirmPassword')}</Label>
                   <div className="relative">
                     <Lock className="absolute left-3 top-3 h-4 w-4 text-gray-400" />
                     <Input
@@ -1296,7 +1309,7 @@ const AuthForm = ({ isLogin, onToggle, onOAuthSuccess, onBack }: AuthFormProps) 
                         errors.confirmPassword ? 'border-red-500 focus:border-red-500' : ''
                       }`}
                       style={getInputStyles()}
-                      placeholder="Confirm your password"
+                      placeholder={t('auth.confirmYourPassword')}
                       required
                     />
                     <button
@@ -1322,21 +1335,21 @@ const AuthForm = ({ isLogin, onToggle, onOAuthSuccess, onBack }: AuthFormProps) 
                   {loading ? (
                     <div className="flex items-center">
                       <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin mr-2"></div>
-                      Processing...
+                      {t('auth.processing')}
                     </div>
-                  ) : isLogin ? 'Sign In' : 'Create Account'}
+                  ) : isLogin ? t('auth.signIn') : t('auth.createAccount')}
                 </Button>
               </div>
             </form>
 
             <div className="mt-8 text-center">
               <p className="text-base text-gray-600">
-                {isLogin ? "Don't have an account?" : "Already have an account?"}
+                {isLogin ? t('auth.dontHaveAccount') : t('auth.alreadyHaveAccount')}
                 <button
                   onClick={onToggle}
                   className="ml-2 text-pink-600 hover:text-pink-700 font-bold transition-colors"
                 >
-                  {isLogin ? 'Sign Up' : 'Sign In'}
+                  {isLogin ? t('auth.signUp') : t('auth.signIn')}
                 </button>
               </p>
             </div>

@@ -37,47 +37,47 @@ export const calculateProfileCompletion = (
     photos: {
       weight: 15,
       completed: false,
-      description: "Upload 3 approved photos"
+      description: "profile.completionCriteria.photos"
     },
     basicInfo: {
       weight: 15,
       completed: false,
-      description: "Complete basic information"
+      description: "profile.completionCriteria.basicInfo"
     },
     location: {
       weight: 10,
       completed: false,
-      description: "Set location and distance preferences"
+      description: "profile.completionCriteria.location"
     },
     preferences: {
       weight: 10,
       completed: false,
-      description: "Set gender preferences"
+      description: "profile.completionCriteria.preferences"
     },
     lifestyle: {
       weight: 10,
       completed: false,
-      description: "Complete lifestyle preferences"
+      description: "profile.completionCriteria.lifestyle"
     },
     workEducation: {
       weight: 10,
       completed: false,
-      description: "Add work and education details"
+      description: "profile.completionCriteria.workEducation"
     },
     personality: {
       weight: 10,
       completed: false,
-      description: "Complete personality sliders"
+      description: "profile.completionCriteria.personality"
     },
     funQuestions: {
       weight: 10,
       completed: false,
-      description: "Answer fun questions"
+      description: "profile.completionCriteria.funQuestions"
     },
     interests: {
       weight: 10,
       completed: false,
-      description: "Select at least 3 interests"
+      description: "profile.completionCriteria.interests"
     }
   };
 

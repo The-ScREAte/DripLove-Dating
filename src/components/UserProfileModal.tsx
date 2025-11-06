@@ -6,6 +6,7 @@ import { MapPin, Heart, Briefcase, GraduationCap, User, Trash2 } from 'lucide-re
 import { supabase } from '@/integrations/supabase/client';
 import { Avatar, AvatarImage, AvatarFallback } from '@/components/ui/avatar';
 import ImageViewer from './ImageViewer';
+import { useTranslation } from 'react-i18next';
 
 
 interface UserProfileModalProps {
@@ -16,6 +17,7 @@ interface UserProfileModalProps {
 }
 
 const UserProfileModal = ({ isOpen, onClose, userId, isAdmin = false }: UserProfileModalProps) => {
+  const { t } = useTranslation();
   const [profile, setProfile] = useState<any>(null);
   const [userImages, setUserImages] = useState<string[]>([]);
   const [deletingImageIndex, setDeletingImageIndex] = useState<number | null>(null);
@@ -128,12 +130,12 @@ const UserProfileModal = ({ isOpen, onClose, userId, isAdmin = false }: UserProf
       <Dialog open={isOpen} onOpenChange={onClose}>
         <DialogContent className="max-w-2xl max-h-[80vh] overflow-y-auto">
           <DialogHeader>
-            <DialogTitle>User Profile</DialogTitle>
-            <DialogDescription>Loading user profile information...</DialogDescription>
+            <DialogTitle>{t('userProfileModal.title', { name: '' })}</DialogTitle>
+            <DialogDescription>{t('userProfileModal.description')}</DialogDescription>
           </DialogHeader>
           <div className="flex items-center justify-center py-8">
             <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
-            <span className="ml-3 text-gray-600">Loading profile...</span>
+            <span className="ml-3 text-gray-600">{t('userProfileModal.loading')}</span>
           </div>
         </DialogContent>
       </Dialog>
@@ -145,15 +147,15 @@ const UserProfileModal = ({ isOpen, onClose, userId, isAdmin = false }: UserProf
       <Dialog open={isOpen} onOpenChange={onClose}>
         <DialogContent className="max-w-2xl max-h-[80vh] overflow-y-auto">
           <DialogHeader>
-            <DialogTitle>User Profile</DialogTitle>
-            <DialogDescription>This user's profile is not available.</DialogDescription>
+            <DialogTitle>{t('userProfileModal.title', { name: '' })}</DialogTitle>
+            <DialogDescription>{t('userProfileModal.unavailable')}</DialogDescription>
           </DialogHeader>
           <div className="text-center py-8">
             <div className="w-16 h-16 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-4">
               <User className="w-8 h-8 text-gray-400" />
             </div>
-            <p className="text-gray-500 mb-2">Profile not found</p>
-            <p className="text-sm text-gray-400">This user's profile is not available or has been removed.</p>
+            <p className="text-gray-500 mb-2">{t('userProfileModal.notFound')}</p>
+            <p className="text-sm text-gray-400">{t('userProfileModal.unavailable')}</p>
           </div>
         </DialogContent>
       </Dialog>
@@ -166,10 +168,10 @@ const UserProfileModal = ({ isOpen, onClose, userId, isAdmin = false }: UserProf
         <DialogContent className="max-w-2xl max-h-[80vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle className="text-xl text-gray-800">
-              {profile?.first_name} {profile?.last_name}'s Profile
+              {t('userProfileModal.title', { name: `${profile?.first_name} ${profile?.last_name}` })}
             </DialogTitle>
             <DialogDescription>
-              View detailed profile information, photos, and interests.
+              {t('userProfileModal.description')}
             </DialogDescription>
           </DialogHeader>
           
@@ -213,7 +215,7 @@ const UserProfileModal = ({ isOpen, onClose, userId, isAdmin = false }: UserProf
                 
                 {profile?.date_of_birth && (
                   <p className="text-gray-600 mb-2">
-                    {calculateAge(profile.date_of_birth)} years old
+                    {t('userProfileModal.yearsOld', { age: calculateAge(profile.date_of_birth) })}
                   </p>
                 )}
                 
@@ -231,7 +233,7 @@ const UserProfileModal = ({ isOpen, onClose, userId, isAdmin = false }: UserProf
                   <CardContent className="pt-6">
                     <h3 className="font-semibold text-gray-800 mb-4 flex items-center">
                       <User className="w-4 h-4 mr-2" />
-                      Photos ({userImages.length})
+                      {t('userProfileModal.photos', { count: userImages.length })}
                     </h3>
                     <div className="grid grid-cols-3 gap-2">
                       {userImages.slice(0, 6).map((image, index) => (
@@ -279,18 +281,18 @@ const UserProfileModal = ({ isOpen, onClose, userId, isAdmin = false }: UserProf
                 <CardContent className="pt-6">
                   <h3 className="font-semibold mb-3 flex items-center">
                     <Heart className="w-4 h-4 mr-2 text-blue-600" />
-                    Looking For
+                    {t('userProfileModal.sections.lookingFor')}
                   </h3>
                   <div className="space-y-2">
                     {profile?.preference && (
                       <div className="flex justify-between">
-                        <span className="text-gray-600">Interested in:</span>
+                        <span className="text-gray-600">{t('userProfileModal.lookingFor.interestedIn')}</span>
                         <Badge variant="secondary" className="capitalize bg-blue-50 text-blue-700 border-blue-200">{profile.preference}</Badge>
                       </div>
                     )}
                     {profile?.relationship_intent && (
                       <div className="flex justify-between">
-                        <span className="text-gray-600">Looking for:</span>
+                        <span className="text-gray-600">{t('userProfileModal.lookingFor.lookingFor')}</span>
                         <Badge variant="secondary" className="capitalize bg-blue-50 text-blue-700 border-blue-200">{profile.relationship_intent}</Badge>
                       </div>
                     )}
@@ -302,29 +304,29 @@ const UserProfileModal = ({ isOpen, onClose, userId, isAdmin = false }: UserProf
               {(profile?.smoking || profile?.drinking || profile?.exercise_level || profile?.sleeping_schedule) && (
                 <Card>
                   <CardContent className="pt-6">
-                    <h3 className="font-semibold mb-3">Lifestyle</h3>
+                    <h3 className="font-semibold mb-3">{t('userProfileModal.sections.lifestyle')}</h3>
                     <div className="grid grid-cols-2 gap-y-2 gap-x-4">
                       {profile?.smoking && (
                         <div>
-                          <span className="text-gray-600">Smoking:</span>
+                          <span className="text-gray-600">{t('userProfileModal.lifestyle.smoking')}</span>
                           <span className="block font-medium">{profile.smoking}</span>
                         </div>
                       )}
                       {profile?.drinking && (
                         <div>
-                          <span className="text-gray-600">Drinking:</span>
+                          <span className="text-gray-600">{t('userProfileModal.lifestyle.drinking')}</span>
                           <span className="block font-medium">{profile.drinking}</span>
                         </div>
                       )}
                       {profile?.exercise_level && (
                         <div>
-                          <span className="text-gray-600">Exercise:</span>
+                          <span className="text-gray-600">{t('userProfileModal.lifestyle.exercise')}</span>
                           <span className="block font-medium">{profile.exercise_level}</span>
                         </div>
                       )}
                       {profile?.sleeping_schedule && (
                         <div>
-                          <span className="text-gray-600">Sleep:</span>
+                          <span className="text-gray-600">{t('userProfileModal.lifestyle.sleep')}</span>
                           <span className="block font-medium">{profile.sleeping_schedule}</span>
                         </div>
                       )}
@@ -339,25 +341,25 @@ const UserProfileModal = ({ isOpen, onClose, userId, isAdmin = false }: UserProf
                   <CardContent className="pt-6">
                     <h3 className="font-semibold mb-3 flex items-center">
                       <Briefcase className="w-4 h-4 mr-2 text-blue-600" />
-                      Work & Education
+                      {t('userProfileModal.sections.workEducation')}
                     </h3>
                     <div className="space-y-3">
                       {profile?.occupation && (
                         <div>
-                          <span className="text-gray-600">Occupation:</span>
+                          <span className="text-gray-600">{t('userProfileModal.workEducation.occupation')}</span>
                           <span className="block font-medium">{profile.occupation}</span>
                         </div>
                       )}
                       {profile?.industry && (
                         <div>
-                          <span className="text-gray-600">Industry:</span>
+                          <span className="text-gray-600">{t('userProfileModal.workEducation.industry')}</span>
                           <span className="block font-medium">{profile.industry}</span>
                         </div>
                       )}
                       {profile?.education_level && (
                         <div>
                           <span className="text-gray-600 flex items-center">
-                            <GraduationCap className="w-4 h-4 mr-1" /> Education:
+                            <GraduationCap className="w-4 h-4 mr-1" /> {t('userProfileModal.workEducation.education')}
                           </span>
                           <span className="block font-medium">{profile.education_level}</span>
                         </div>
@@ -371,13 +373,13 @@ const UserProfileModal = ({ isOpen, onClose, userId, isAdmin = false }: UserProf
               {(typeof profile?.introvert_extrovert === 'number' || typeof profile?.spontaneous_planner === 'number' || typeof profile?.messy_organized === 'number') && (
                 <Card>
                   <CardContent className="pt-6">
-                    <h3 className="font-semibold mb-3">Personality</h3>
+                    <h3 className="font-semibold mb-3">{t('userProfileModal.sections.personality')}</h3>
                     <div className="space-y-3">
                       {typeof profile?.introvert_extrovert === 'number' && (
                         <div>
                           <div className="flex justify-between text-sm mb-1">
-                            <span>Introvert</span>
-                            <span>Extrovert</span>
+                            <span>{t('userProfileModal.personality.introvert')}</span>
+                            <span>{t('userProfileModal.personality.extrovert')}</span>
                           </div>
                           <div className="w-full bg-gray-200 rounded-full h-2">
                             <div 
@@ -390,8 +392,8 @@ const UserProfileModal = ({ isOpen, onClose, userId, isAdmin = false }: UserProf
                       {typeof profile?.spontaneous_planner === 'number' && (
                         <div>
                           <div className="flex justify-between text-sm mb-1">
-                            <span>Planner</span>
-                            <span>Spontaneous</span>
+                            <span>{t('userProfileModal.personality.planner')}</span>
+                            <span>{t('userProfileModal.personality.spontaneous')}</span>
                           </div>
                           <div className="w-full bg-gray-200 rounded-full h-2">
                             <div 
@@ -404,8 +406,8 @@ const UserProfileModal = ({ isOpen, onClose, userId, isAdmin = false }: UserProf
                       {typeof profile?.messy_organized === 'number' && (
                         <div>
                           <div className="flex justify-between text-sm mb-1">
-                            <span>Organized</span>
-                            <span>Messy</span>
+                            <span>{t('userProfileModal.personality.organized')}</span>
+                            <span>{t('userProfileModal.personality.messy')}</span>
                           </div>
                           <div className="w-full bg-gray-200 rounded-full h-2">
                             <div 
@@ -424,23 +426,23 @@ const UserProfileModal = ({ isOpen, onClose, userId, isAdmin = false }: UserProf
               {(profile?.fun_fact || profile?.perfect_first_date || profile?.last_googled) && (
                 <Card>
                   <CardContent className="pt-6">
-                    <h3 className="font-semibold mb-3">Fun Facts</h3>
+                    <h3 className="font-semibold mb-3">{t('userProfileModal.sections.funFacts')}</h3>
                     <div className="space-y-4">
                       {profile?.fun_fact && (
                         <div>
-                          <span className="text-gray-600 font-medium">Fun fact about me:</span>
+                          <span className="text-gray-600 font-medium">{t('userProfileModal.funFacts.funFact')}</span>
                           <p className="text-gray-800">{profile.fun_fact}</p>
                         </div>
                       )}
                       {profile?.perfect_first_date && (
                         <div>
-                          <span className="text-gray-600 font-medium">My perfect first date:</span>
+                          <span className="text-gray-600 font-medium">{t('userProfileModal.funFacts.perfectDate')}</span>
                           <p className="text-gray-800">{profile.perfect_first_date}</p>
                         </div>
                       )}
                       {profile?.last_googled && (
                         <div>
-                          <span className="text-gray-600 font-medium">Last thing I googled:</span>
+                          <span className="text-gray-600 font-medium">{t('userProfileModal.funFacts.lastGoogled')}</span>
                           <p className="text-gray-800">{profile.last_googled}</p>
                         </div>
                       )}
@@ -453,7 +455,7 @@ const UserProfileModal = ({ isOpen, onClose, userId, isAdmin = false }: UserProf
               {profile?.interests && profile.interests.length > 0 && (
                 <Card>
                   <CardContent className="pt-6">
-                    <h3 className="font-semibold mb-3">Interests</h3>
+                    <h3 className="font-semibold mb-3">{t('userProfileModal.sections.interests')}</h3>
                     <div className="flex flex-wrap gap-2">
                       {profile.interests.map((interest: string) => (
                         <Badge key={interest} variant="outline" className="bg-blue-50 text-blue-800 border-blue-200">

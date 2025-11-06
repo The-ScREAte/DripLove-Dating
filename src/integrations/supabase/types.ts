@@ -410,6 +410,7 @@ export type Database = {
           occupation: string | null
           perfect_first_date: string | null
           preference: string
+          preferred_language: string | null
           relationship_intent: string | null
           sleeping_schedule: string | null
           smoking: string | null
@@ -454,6 +455,7 @@ export type Database = {
           occupation?: string | null
           perfect_first_date?: string | null
           preference: string
+          preferred_language?: string | null
           relationship_intent?: string | null
           sleeping_schedule?: string | null
           smoking?: string | null
@@ -498,6 +500,7 @@ export type Database = {
           occupation?: string | null
           perfect_first_date?: string | null
           preference?: string
+          preferred_language?: string | null
           relationship_intent?: string | null
           sleeping_schedule?: string | null
           smoking?: string | null

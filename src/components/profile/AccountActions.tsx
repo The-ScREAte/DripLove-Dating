@@ -1,5 +1,6 @@
 
 import React, { useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -22,6 +23,7 @@ interface AccountActionsProps {
 }
 
 const AccountActions = ({ currentUser, onLogout, onShowTerms, onShowPrivacy, hideLogoutTermsPrivacy }: AccountActionsProps) => {
+  const { t } = useTranslation();
   const [deletingAccount, setDeletingAccount] = useState(false);
   const [showPasswordDialog, setShowPasswordDialog] = useState(false);
   const [password, setPassword] = useState('');
@@ -32,6 +34,12 @@ const AccountActions = ({ currentUser, onLogout, onShowTerms, onShowPrivacy, hid
 
   const handleLogout = async () => {
     try {
+      // Remove push token before logging out
+      if (currentUser?.id) {
+        const { removePushToken } = await import('@/services/pushNotifications');
+        await removePushToken(currentUser.id);
+      }
+      
       await supabase.auth.signOut();
       onLogout();
       toast({
@@ -83,6 +91,12 @@ const AccountActions = ({ currentUser, onLogout, onShowTerms, onShowPrivacy, hid
         description: "Your account and all associated data have been permanently deleted.",
       });
 
+      // Remove push token before logging out
+      if (currentUser?.id) {
+        const { removePushToken } = await import('@/services/pushNotifications');
+        await removePushToken(currentUser.id);
+      }
+
       await supabase.auth.signOut();
       onLogout();
     } catch (error: any) {
@@ -101,15 +115,15 @@ const AccountActions = ({ currentUser, onLogout, onShowTerms, onShowPrivacy, hid
   return (
     <Card>
       <CardHeader>
-        <CardTitle>Account Actions</CardTitle>
+        <CardTitle>{t('settings.accountActions')}</CardTitle>
       </CardHeader>
       <CardContent className="space-y-4">
         {/* Rate DripLove Button */}
         <div className="bg-yellow-50 p-4 rounded-lg border border-yellow-200">
           <div className="flex flex-col space-y-3">
-            <span className="font-medium text-gray-900">⭐ Enjoying DripLove?</span>
+            <span className="font-medium text-gray-900">{t('settings.enjoyingDripLove')}</span>
             <p className="text-sm text-gray-600">
-              Rate your experience and help us grow!
+              {t('settings.rateExperience')}
             </p>
             <RateAppButton className="w-full sm:w-auto" />
           </div>
@@ -119,10 +133,10 @@ const AccountActions = ({ currentUser, onLogout, onShowTerms, onShowPrivacy, hid
         <div className="bg-gray-50 p-4 rounded-lg border">
           <div className="flex items-center space-x-2 mb-2">
             <Mail className="w-4 h-4 text-pink-600" />
-            <span className="font-medium text-gray-700">Need Help?</span>
+            <span className="font-medium text-gray-700">{t('settings.needHelp')}</span>
           </div>
           <p className="text-sm text-gray-600 mb-2">
-            Contact our support team for any questions or assistance:
+            {t('settings.contactSupport')}
           </p>
           <a 
             href="mailto:support@driplove.com" 
@@ -143,7 +157,7 @@ const AccountActions = ({ currentUser, onLogout, onShowTerms, onShowPrivacy, hid
                       onClick={onShowTerms}
                       className="text-purple-600 hover:text-purple-700 hover:underline transition-colors"
                     >
-                      Terms of Service
+                      {t('settings.termsOfService')}
                     </button>
                   )}
                   {onShowTerms && onShowPrivacy && (
@@ -154,7 +168,7 @@ const AccountActions = ({ currentUser, onLogout, onShowTerms, onShowPrivacy, hid
                       onClick={onShowPrivacy}
                       className="text-purple-600 hover:text-purple-700 hover:underline transition-colors"
                     >
-                      Privacy Policy
+                      {t('settings.privacyPolicy')}
                     </button>
                   )}
                 </div>
@@ -167,7 +181,7 @@ const AccountActions = ({ currentUser, onLogout, onShowTerms, onShowPrivacy, hid
                 className="flex items-center justify-center space-x-2 border-gray-300 text-gray-700 hover:bg-gray-50 w-full sm:w-auto"
               >
                 <LogOut className="w-4 h-4" />
-                <span>Logout</span>
+                <span>{t('common.logout')}</span>
               </Button>
             </div>
           </>
@@ -181,7 +195,7 @@ const AccountActions = ({ currentUser, onLogout, onShowTerms, onShowPrivacy, hid
               className="flex items-center justify-center space-x-2 w-full sm:w-auto border-red-400 text-red-600 hover:bg-red-50"
               onClick={() => navigate('/unsubscribe')}
             >
-              Cancel Subscription
+              {t('settings.cancelSubscription')}
             </Button>
           </div>
         )}

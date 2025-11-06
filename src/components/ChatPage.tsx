@@ -14,6 +14,7 @@ import MessageInput from './chat/MessageInput';
 import ChatHeader from './chat/ChatHeader';
 import ChatUserAvatar from './ChatUserAvatar';
 import { CurrentUser, ChatMatch, ChatMessage } from '@/types';
+import { useTranslation } from 'react-i18next';
 
 interface ChatPageProps {
   currentUser: CurrentUser;
@@ -36,6 +37,7 @@ if (typeof window !== 'undefined') {
 }
 
 const ChatPage = ({ currentUser, onUnreadChange, onDetailViewChange }: ChatPageProps) => {
+  const { t } = useTranslation();
   const [matches, setMatches] = useState<ChatMatch[]>(() => {
     // If there's no current user yet (e.g. during app bootstrap), don't try to access id
     if (!currentUser || !currentUser.id) return [];
@@ -87,6 +89,26 @@ const ChatPage = ({ currentUser, onUnreadChange, onDetailViewChange }: ChatPageP
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [currentUser]);
+
+  // Handle deep linking from notifications - auto-select match if matchId in URL
+  useEffect(() => {
+    if (!currentUser || !currentUser.id || matches.length === 0) return;
+    
+    const params = new URLSearchParams(window.location.search);
+    const matchIdFromUrl = params.get('matchId');
+    
+    if (matchIdFromUrl && !selectedMatch) {
+      console.log('[ChatPage] 🔗 Opening match from notification:', matchIdFromUrl);
+      const matchToOpen = matches.find(m => m.id === matchIdFromUrl);
+      if (matchToOpen) {
+        setSelectedMatch(matchToOpen);
+        // Clear the URL parameter
+        window.history.replaceState({}, '', '/chat');
+      } else {
+        console.warn('[ChatPage] ⚠️ Match not found in list:', matchIdFromUrl);
+      }
+    }
+  }, [currentUser, matches, selectedMatch]);
 
   // Keep matchesRef in sync
   useEffect(() => {
@@ -579,8 +601,8 @@ const ChatPage = ({ currentUser, onUnreadChange, onDetailViewChange }: ChatPageP
 
     if (selectedMatch.partner?.is_admin) {
       toast({
-        title: "Cannot send message",
-        description: "You cannot send messages to admin accounts.",
+        title: t('chat.cannotSendToAdmin'),
+        description: t('chat.cannotSendToAdminDesc'),
         variant: "destructive"
       });
       return;
@@ -680,8 +702,8 @@ const ChatPage = ({ currentUser, onUnreadChange, onDetailViewChange }: ChatPageP
       });
       
       toast({
-        title: 'Error',
-        description: 'Failed to send message. Please try again.',
+        title: t('chat.error'),
+        description: t('chat.failedToSend'),
         variant: 'destructive'
       });
       return;
@@ -731,8 +753,8 @@ const ChatPage = ({ currentUser, onUnreadChange, onDetailViewChange }: ChatPageP
     } catch (error) {
   // ...removed log...
       toast({
-        title: 'Error',
-        description: 'Failed to send message. Please try again.',
+        title: t('chat.error'),
+        description: t('chat.failedToSend'),
         variant: 'destructive'
       });
     }
@@ -853,8 +875,8 @@ const ChatPage = ({ currentUser, onUnreadChange, onDetailViewChange }: ChatPageP
       // First check if browser supports notifications
       if (!('Notification' in window)) {
         toast({
-          title: 'Not Supported',
-          description: 'This browser does not support notifications.',
+          title: t('chat.notSupported'),
+          description: t('chat.notSupportedDesc'),
           variant: 'destructive'
         });
         return;
@@ -863,8 +885,8 @@ const ChatPage = ({ currentUser, onUnreadChange, onDetailViewChange }: ChatPageP
       // Check current permission
       if (Notification.permission === 'denied') {
         toast({
-          title: 'Permission Denied',
-          description: 'Notifications are blocked. Please enable them in your browser settings.',
+          title: t('chat.permissionDenied'),
+          description: t('chat.permissionDeniedDesc'),
           variant: 'destructive'
         });
         return;
@@ -875,8 +897,8 @@ const ChatPage = ({ currentUser, onUnreadChange, onDetailViewChange }: ChatPageP
         const granted = await requestNotificationPermission();
         if (!granted) {
           toast({
-            title: 'Permission Required',
-            description: 'Please allow notifications to receive message alerts.',
+            title: t('chat.permissionRequired'),
+            description: t('chat.permissionRequiredDesc'),
             variant: 'destructive'
           });
           return;
@@ -891,14 +913,14 @@ const ChatPage = ({ currentUser, onUnreadChange, onDetailViewChange }: ChatPageP
         });
         
         toast({
-          title: 'Test Successful! 🎉',
-          description: 'You should see a notification. Message alerts are now enabled.',
+          title: t('chat.testSuccessful'),
+          description: t('chat.testSuccessfulDesc'),
         });
       }
     } catch (error) {
       toast({
-        title: 'Test Failed',
-        description: 'Something went wrong testing notifications.',
+        title: t('chat.testFailed'),
+        description: t('chat.testFailedDesc'),
         variant: 'destructive'
       });
     }
@@ -1046,7 +1068,7 @@ const ChatPage = ({ currentUser, onUnreadChange, onDetailViewChange }: ChatPageP
                   : '0px'
             }}
           >
-            <h3 className="text-sm font-semibold text-gray-900 mb-3">New Matches</h3>
+            <h3 className="text-sm font-semibold text-gray-900 mb-3">{t('chat.newMatches')}</h3>
             <div className="flex gap-4 overflow-x-auto pb-2 scrollbar-hide">
               {newMatchList.map((match) => {
                 const partnerId = match.partner?.id || 
@@ -1100,13 +1122,13 @@ const ChatPage = ({ currentUser, onUnreadChange, onDetailViewChange }: ChatPageP
         style={{ height: `${pullDistance}px` }}
       >
         <div className="text-pink-600 text-sm">
-          {pullDistance > 50 ? (isRefreshing ? '🔄 Refreshing...' : '↓ Release to refresh') : '↓ Pull to refresh'}
+          {pullDistance > 50 ? (isRefreshing ? `🔄 ${t('chat.refreshing')}` : `↓ ${t('chat.releaseToRefresh')}`) : `↓ ${t('chat.pullToRefresh')}`}
         </div>
       </div>
     )}
           {conversationList.length === 0 ? (
             <div className="p-4 text-center text-gray-500">
-              No conversations yet
+              {t('chat.noConversations')}
             </div>
           ) : (
             conversationList.map((match) => {

@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Capacitor } from '@capacitor/core';
+import { useTranslation } from 'react-i18next';
 // import { PushNotifications } from '@capacitor/push-notifications'; // Uncomment if you use PushNotifications
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -20,10 +21,12 @@ import ImageManagement from './profile/ImageManagement';
 import AccountActions from './profile/AccountActions';
 import ProfileSummaryCard from './ProfileSummaryCard';
 import ReportButton from './ReportButton';
+import LanguageSelector from './LanguageSelector';
 
 import { calculateProfileCompletion } from '@/utils/profileCompletion';
 import PremiumUpgrade from './PremiumUpgrade';
 import CollapsibleSection from './ui/CollapsibleSection';
+import { getLanguageForCountry } from '@/i18n/config';
 
 interface ProfilePageProps {
   currentUser: any;
@@ -36,6 +39,7 @@ interface ProfilePageProps {
 }
 
 const ProfilePage = ({ currentUser, profile, onProfileUpdate, onLogout, onShowTerms, onShowPrivacy, isPremium }: ProfilePageProps) => {
+  const { t, i18n } = useTranslation();
   const [isEditing, setIsEditing] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const [showPremiumUpgrade, setShowPremiumUpgrade] = useState(false);
@@ -88,6 +92,7 @@ const ProfilePage = ({ currentUser, profile, onProfileUpdate, onLogout, onShowTe
     last_googled: '',
     interests: [] as string[],
     adinkra_symbols: [] as string[],
+    preferred_language: 'en',
   });
 
   // Initialize userImages state
@@ -96,6 +101,12 @@ const ProfilePage = ({ currentUser, profile, onProfileUpdate, onLogout, onShowTe
   useEffect(() => {
     if (profile) {
       try {
+        // Auto-detect language based on country if not set
+        const detectedLanguage = profile.preferred_language || getLanguageForCountry(profile.country) || 'en';
+        
+        // Update i18n language
+        i18n.changeLanguage(detectedLanguage);
+        
         setEditedProfile({
           first_name: profile.first_name || '',
           last_name: profile.last_name || '',
@@ -128,6 +139,7 @@ const ProfilePage = ({ currentUser, profile, onProfileUpdate, onLogout, onShowTe
           last_googled: profile.last_googled || '',
           interests: Array.isArray(profile.interests) ? profile.interests : [],
           adinkra_symbols: Array.isArray(profile.adinkra_symbols) ? profile.adinkra_symbols : [],
+          preferred_language: detectedLanguage,
         });
       } catch (error) {
         console.error('Error initializing profile data:', error);
@@ -164,6 +176,7 @@ const ProfilePage = ({ currentUser, profile, onProfileUpdate, onLogout, onShowTe
           last_googled: '',
           interests: [],
           adinkra_symbols: [],
+          preferred_language: 'en',
         });
       }
     }
@@ -223,6 +236,38 @@ const ProfilePage = ({ currentUser, profile, onProfileUpdate, onLogout, onShowTe
     }
   };
 
+  const handleLanguageChange = async (language: string) => {
+    setEditedProfile(prev => ({ ...prev, preferred_language: language }));
+    // Immediately change the app language when user selects
+    i18n.changeLanguage(language);
+    
+    // Save to database immediately (no need to wait for "Save" button)
+    try {
+      const { error } = await supabase
+        .from('profiles')
+        .update({ preferred_language: language })
+        .eq('id', currentUser.id);
+      
+      if (error) {
+        console.error('Error saving language:', error);
+        toast({
+          title: "Error",
+          description: "Failed to save language preference",
+          variant: "destructive",
+        });
+      } else {
+        console.log('Language saved successfully:', language);
+        toast({
+          title: "Language Updated! 🌍",
+          description: "Your language preference has been saved.",
+          duration: 2000,
+        });
+      }
+    } catch (error) {
+      console.error('Error saving language:', error);
+    }
+  };
+
   const handleSave = async () => {
     if (isSaving) return;
     setIsSaving(true);
@@ -277,6 +322,7 @@ const ProfilePage = ({ currentUser, profile, onProfileUpdate, onLogout, onShowTe
         last_googled: editedProfile.last_googled?.trim() || null,
         interests: Array.isArray(editedProfile.interests) ? editedProfile.interests : [],
         adinkra_symbols: Array.isArray(editedProfile.adinkra_symbols) ? editedProfile.adinkra_symbols : [],
+        preferred_language: editedProfile.preferred_language || 'en',
         updated_at: new Date().toISOString(),
       };
 
@@ -330,6 +376,7 @@ const ProfilePage = ({ currentUser, profile, onProfileUpdate, onLogout, onShowTe
 
   const handleCancel = () => {
     if (profile) {
+      const detectedLanguage = profile.preferred_language || getLanguageForCountry(profile.country) || 'en';
       setEditedProfile({
         first_name: profile.first_name || '',
         last_name: profile.last_name || '',
@@ -362,6 +409,7 @@ const ProfilePage = ({ currentUser, profile, onProfileUpdate, onLogout, onShowTe
         last_googled: profile.last_googled || '',
         interests: profile.interests || [],
         adinkra_symbols: profile.adinkra_symbols || [],
+        preferred_language: detectedLanguage,
       });
     }
     setIsEditing(false);
@@ -430,7 +478,7 @@ const ProfilePage = ({ currentUser, profile, onProfileUpdate, onLogout, onShowTe
       <div className="min-h-screen bg-gray-50 flex items-center justify-center">
         <div className="text-center">
           <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-500 mx-auto mb-4"></div>
-          <p className="text-gray-600">Loading profile...</p>
+          <p className="text-gray-600">{t('common.loading')}</p>
         </div>
       </div>
     );
@@ -462,7 +510,7 @@ const ProfilePage = ({ currentUser, profile, onProfileUpdate, onLogout, onShowTe
                   onClick={() => setShowPremiumUpgrade(true)}
                   className="bg-gradient-to-r from-yellow-400 to-yellow-500 hover:from-yellow-500 hover:to-yellow-600 text-white font-semibold w-full sm:w-auto shadow-md hover:shadow-lg transition-all duration-200"
                 >
-                  Upgrade
+                  {t('premium.upgrade')}
                 </Button>
               )}
               {/* Single toggle button - Edit becomes Cancel */}
@@ -479,12 +527,12 @@ const ProfilePage = ({ currentUser, profile, onProfileUpdate, onLogout, onShowTe
                 {isEditing ? (
                   <>
                     <X className="w-4 h-4 mr-2" /> 
-                    Cancel
+                    {t('common.cancel')}
                   </>
                 ) : (
                   <>
                     <Edit className="w-4 h-4 mr-2" /> 
-                    Edit
+                    {t('common.edit')}
                   </>
                 )}
               </Button>
@@ -496,7 +544,7 @@ const ProfilePage = ({ currentUser, profile, onProfileUpdate, onLogout, onShowTe
                   className="w-full sm:w-auto bg-emerald-600 hover:bg-emerald-700 text-white font-medium disabled:opacity-50"
                 >
                   <Save className="w-4 h-4 mr-2" /> 
-                  {isSaving ? 'Saving...' : 'Save'}
+                  {isSaving ? t('common.saving') : t('common.save')}
                 </Button>
               )}
             </div>
@@ -538,17 +586,17 @@ const ProfilePage = ({ currentUser, profile, onProfileUpdate, onLogout, onShowTe
                   ×
                 </button>
                 <div className="pr-8">
-                  <h4 className="font-semibold text-blue-900 mb-2">Complete your profile to get better matches:</h4>
+                  <h4 className="font-semibold text-blue-900 mb-2">{t('profile.completeProfilePrompt')}</h4>
                   <ul className="text-sm text-blue-800 space-y-1">
                     {missingFields.slice(0, 3).map((field, index) => (
                       <li key={index} className="flex items-start">
                         <span className="text-blue-500 mr-2">•</span>
-                        {field}
+                        {t(field)}
                       </li>
                     ))}
                     {missingFields.length > 3 && (
                       <li className="text-blue-600 font-medium">
-                        +{missingFields.length - 3} more items
+                        +{missingFields.length - 3} {t('profile.moreItems')}
                       </li>
                     )}
                   </ul>
@@ -588,7 +636,19 @@ const ProfilePage = ({ currentUser, profile, onProfileUpdate, onLogout, onShowTe
           />
           <div className="mb-2" />
           <CollapsibleSection
-            title="Your Photos"
+            title={t('profile.language')}
+            isOpen={true}
+            onToggle={() => {}}
+          >
+            <LanguageSelector
+              value={editedProfile.preferred_language}
+              onChange={handleLanguageChange}
+              isEditing={isEditing}
+            />
+          </CollapsibleSection>
+          <div className="mb-2" />
+          <CollapsibleSection
+            title={t('profile.yourPhotos')}
             isOpen={showPhotoSection}
             onToggle={() => setShowPhotoSection(!showPhotoSection)}
           >
@@ -596,7 +656,7 @@ const ProfilePage = ({ currentUser, profile, onProfileUpdate, onLogout, onShowTe
           </CollapsibleSection>
           <div className="mb-2" />
           <CollapsibleSection
-            title="Location & Matching Preferences"
+            title={t('profile.locationAndPreferences')}
             isOpen={showLocationSection}
             onToggle={() => setShowLocationSection(!showLocationSection)}
             className="mt-2"
@@ -611,7 +671,7 @@ const ProfilePage = ({ currentUser, profile, onProfileUpdate, onLogout, onShowTe
           </CollapsibleSection>
           <div className="mb-2" />
           <CollapsibleSection
-            title="Preferences"
+            title={t('profile.preferences')}
             isOpen={showPreferencesSection}
             onToggle={() => setShowPreferencesSection(!showPreferencesSection)}
           >
@@ -625,7 +685,7 @@ const ProfilePage = ({ currentUser, profile, onProfileUpdate, onLogout, onShowTe
           </CollapsibleSection>
           <div className="mb-2" />
           <CollapsibleSection
-            title="Lifestyle"
+            title={t('profile.lifestyle')}
             isOpen={showLifestyleSection}
             onToggle={() => setShowLifestyleSection(!showLifestyleSection)}
           >
@@ -637,7 +697,7 @@ const ProfilePage = ({ currentUser, profile, onProfileUpdate, onLogout, onShowTe
           </CollapsibleSection>
           <div className="mb-2" />
           <CollapsibleSection
-            title="Work & Education"
+            title={t('profile.workAndEducation')}
             isOpen={showWorkEducationSection}
             onToggle={() => setShowWorkEducationSection(!showWorkEducationSection)}
           >
@@ -649,7 +709,7 @@ const ProfilePage = ({ currentUser, profile, onProfileUpdate, onLogout, onShowTe
           </CollapsibleSection>
           <div className="mb-2" />
           <CollapsibleSection
-            title="Personality"
+            title={t('profile.personality')}
             isOpen={showPersonalitySection}
             onToggle={() => setShowPersonalitySection(!showPersonalitySection)}
           >
@@ -661,7 +721,7 @@ const ProfilePage = ({ currentUser, profile, onProfileUpdate, onLogout, onShowTe
           </CollapsibleSection>
           <div className="mb-2" />
           <CollapsibleSection
-            title="Fun Questions"
+            title={t('profile.funQuestions')}
             isOpen={showFunQuestionsSection}
             onToggle={() => setShowFunQuestionsSection(!showFunQuestionsSection)}
           >
@@ -673,7 +733,7 @@ const ProfilePage = ({ currentUser, profile, onProfileUpdate, onLogout, onShowTe
           </CollapsibleSection>
           <div className="mb-2" />
           <CollapsibleSection
-            title="Interests"
+            title={t('profile.interests')}
             isOpen={showInterestsSection}
             onToggle={() => setShowInterestsSection(!showInterestsSection)}
           >
@@ -686,7 +746,7 @@ const ProfilePage = ({ currentUser, profile, onProfileUpdate, onLogout, onShowTe
           </CollapsibleSection>
           <div className="mb-2" />
           <CollapsibleSection
-            title="My Adinkra"
+            title={t('profile.myAdinkra')}
             isOpen={showAdinkraSection}
             onToggle={() => setShowAdinkraSection(!showAdinkraSection)}
           >
@@ -699,7 +759,7 @@ const ProfilePage = ({ currentUser, profile, onProfileUpdate, onLogout, onShowTe
           </CollapsibleSection>
           <div className="mb-2" />
           <CollapsibleSection
-            title="Account Actions"
+            title={t('settings.accountActions')}
             isOpen={showAccountActionsSection}
             onToggle={() => setShowAccountActionsSection(!showAccountActionsSection)}
           >

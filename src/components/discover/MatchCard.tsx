@@ -5,6 +5,7 @@ import ReportModal from '../modals/ReportModal';
 import styles from './MatchCard.module.css';
 import { MapPin, Briefcase, GraduationCap, Calendar, Crown, Shield, ChevronDown, ChevronUp, User, Quote, Heart, Coffee, Search, Loader2 } from 'lucide-react';
 import { PotentialMatch } from '@/types';
+import { useTranslation } from 'react-i18next';
 
 interface MatchCardProps {
   match: PotentialMatch;
@@ -49,6 +50,8 @@ const MatchCard: React.FC<MatchCardProps> = ({
   preCalculatedDistance
   , imageStatus
 }) => {
+  const { t } = useTranslation();
+  
   // imageStatus: map of url => 'idle' | 'loading' | 'loaded' | 'error'
   // (passed from parent component)
   // ...existing code...
@@ -241,12 +244,12 @@ const MatchCard: React.FC<MatchCardProps> = ({
   const [isBlockSuccess, setIsBlockSuccess] = useState(false);
 
   const reportReasons = [
-    "Inappropriate content",
-    "Nudity or sexual content", 
-    "Spam or fake profile",
-    "Harassment or bullying",
-    "Violence or threats",
-    "Other"
+    t('reportModal.reasons.inappropriate'),
+    t('reportModal.reasons.fake'),
+    t('reportModal.reasons.spam'),
+    t('reportModal.reasons.offensive'),
+    t('reportModal.reasons.harassment'),
+    t('reportModal.reasons.other')
   ];
 
   // Prevent body scrolling when modal is open
@@ -274,7 +277,7 @@ const MatchCard: React.FC<MatchCardProps> = ({
   // Handle report submit
   const handleReportImage = async () => {
     if (!selectedReason) {
-      setReportError("Please select a reason for reporting");
+      setReportError(t('reportModal.selectReason'));
       return;
     }
     
@@ -305,7 +308,7 @@ const MatchCard: React.FC<MatchCardProps> = ({
         setSelectedReason("");
       }, 1500);
     } catch (err: any) {
-      setReportError(err.message || "Failed to report image");
+      setReportError(err.message || t('reportModal.error'));
     } finally {
       setReporting(false);
     }
@@ -418,7 +421,7 @@ const MatchCard: React.FC<MatchCardProps> = ({
                         <Quote className="w-8 h-8 text-white" />
                       </div>
                     </div>
-                    <h3 className="text-2xl font-bold text-white mb-6">About {match.first_name}</h3>
+                    <h3 className="text-2xl font-bold text-white mb-6">{t('discover.matchCard.aboutUser', { name: match.first_name })}</h3>
                     <p className="text-white text-lg leading-relaxed font-medium">
                       {slides[currentSlide].content}
                     </p>
@@ -593,7 +596,7 @@ const MatchCard: React.FC<MatchCardProps> = ({
                       </svg>
                     </button>
                     
-                    <h3 className="text-xl font-bold text-red-600 pr-8">Report Image</h3>
+                    <h3 className="text-xl font-bold text-red-600 pr-8">{t('reportModal.title')}</h3>
                   </div>
 
                   {/* Modal content */}
@@ -601,17 +604,17 @@ const MatchCard: React.FC<MatchCardProps> = ({
                     {isBlockSuccess ? (
                       <div className="text-green-600 font-semibold text-center py-8">
                         <div className="mb-2 text-3xl">🚫</div>
-                        <div className="text-lg mb-2">Blocked!</div>
-                        <div className="text-sm text-gray-600">Now swipe away and they won't show again.</div>
+                        <div className="text-lg mb-2">{t('reportModal.blockSuccess.title')}</div>
+                        <div className="text-sm text-gray-600">{t('reportModal.blockSuccess.message')}</div>
                       </div>
                     ) : reportSuccess ? (
                       <div className="text-green-600 font-semibold text-center py-8">
                         <div className="mb-2 text-2xl">✓</div>
-                        <div>Reported! Thank you.</div>
+                        <div>{t('reportModal.success')}</div>
                       </div>
                     ) : (
                       <>
-                        <p className="text-gray-700 mb-4 text-sm font-semibold">Please select a reason for reporting this image:</p>
+                        <p className="text-gray-700 mb-4 text-sm font-semibold">{t('reportModal.instruction')}</p>
                         
                         {/* Reason selection with stable layout */}
                         <div className="space-y-3 mb-6">
@@ -638,9 +641,9 @@ const MatchCard: React.FC<MatchCardProps> = ({
 
                         {/* Block section */}
                         <div className="mb-6 p-4 bg-gray-50 rounded-lg border border-gray-200">
-                          <p className="text-gray-700 mb-3 text-sm font-semibold">Block this user (optional):</p>
+                          <p className="text-gray-700 mb-3 text-sm font-semibold">{t('reportModal.blockSection.title')}</p>
                           <textarea
-                            placeholder="Reason for blocking (optional)"
+                            placeholder={t('reportModal.blockSection.placeholder')}
                             value={blockReason}
                             onChange={(e) => setBlockReason(e.target.value)}
                             disabled={reporting || isBlocking}
@@ -652,7 +655,7 @@ const MatchCard: React.FC<MatchCardProps> = ({
                             onClick={handleBlockUser}
                             disabled={isBlocking || reporting}
                           >
-                            {isBlocking ? 'Blocking...' : 'Block User'}
+                            {isBlocking ? t('reportModal.blockSection.blocking') : t('reportModal.blockSection.blockButton')}
                           </button>
                         </div>
 
@@ -663,7 +666,7 @@ const MatchCard: React.FC<MatchCardProps> = ({
                             onClick={handleReportImage}
                             disabled={reporting || !selectedReason || isBlocking}
                           >
-                            {reporting ? 'Reporting...' : 'Report Image'}
+                            {reporting ? t('reportModal.reporting') : t('reportModal.reportButton')}
                           </button>
                           
                           <button
@@ -671,7 +674,7 @@ const MatchCard: React.FC<MatchCardProps> = ({
                             onClick={closeReportModal}
                             disabled={reporting || isBlocking}
                           >
-                            Cancel
+                            {t('reportModal.cancel')}
                           </button>
                         </div>
                         
@@ -780,7 +783,7 @@ const MatchCard: React.FC<MatchCardProps> = ({
             {/* About (Bio) */}
             {match.bio && (
               <div className="bg-gray-50 rounded-lg p-3">
-                <h4 className="font-semibold text-pink-600 mb-1">About</h4>
+                <h4 className="font-semibold text-pink-600 mb-1">{t('discover.matchCard.about')}</h4>
                 <p className="text-gray-700 text-sm leading-relaxed">{match.bio}</p>
               </div>
             )}
@@ -793,29 +796,29 @@ const MatchCard: React.FC<MatchCardProps> = ({
               match.sleeping_schedule
             ].some(val => val && val !== 'not_specified')) && (
               <div className="bg-gray-50 rounded-lg p-3">
-                <h4 className="font-semibold text-pink-600 mb-2">Lifestyle</h4>
+                <h4 className="font-semibold text-pink-600 mb-2">{t('discover.matchCard.lifestyle')}</h4>
                 <div className="space-y-2">
                   {match.smoking && match.smoking !== 'not_specified' && (
                     <div className="flex items-center text-sm">
-                      <span className="font-semibold mr-2">Smoking:</span>
+                      <span className="font-semibold mr-2">{t('discover.matchCard.smoking')}:</span>
                       <span className="text-gray-700">{match.smoking}</span>
                     </div>
                   )}
                   {match.drinking && match.drinking !== 'not_specified' && (
                     <div className="flex items-center text-sm">
-                      <span className="font-semibold mr-2">Drinking:</span>
+                      <span className="font-semibold mr-2">{t('discover.matchCard.drinking')}:</span>
                       <span className="text-gray-700">{match.drinking}</span>
                     </div>
                   )}
                   {match.exercise_level && match.exercise_level !== 'not_specified' && (
                     <div className="flex items-center text-sm">
-                      <span className="font-semibold mr-2">Exercise:</span>
+                      <span className="font-semibold mr-2">{t('discover.matchCard.exercise')}:</span>
                       <span className="text-gray-700">{match.exercise_level}</span>
                     </div>
                   )}
                   {match.sleeping_schedule && match.sleeping_schedule !== 'not_specified' && (
                     <div className="flex items-center text-sm">
-                      <span className="font-semibold mr-2">Sleep:</span>
+                      <span className="font-semibold mr-2">{t('discover.matchCard.sleep')}:</span>
                       <span className="text-gray-700">{match.sleeping_schedule}</span>
                     </div>
                   )}
@@ -826,7 +829,7 @@ const MatchCard: React.FC<MatchCardProps> = ({
             {/* Work & Education */}
             {(match.occupation || match.education_level) && (
               <div className="bg-gray-50 rounded-lg p-3">
-                <h4 className="font-semibold text-pink-600 mb-2">Work & Education</h4>
+                <h4 className="font-semibold text-pink-600 mb-2">{t('discover.matchCard.workEducation')}</h4>
                 <div className="space-y-2">
                   {match.occupation && (
                     <div className="flex items-center text-sm">
@@ -847,51 +850,51 @@ const MatchCard: React.FC<MatchCardProps> = ({
             {/* Personality */}
             {(typeof match.introvert_extrovert === 'number' || typeof match.spontaneous_planner === 'number' || typeof match.messy_organized === 'number') && (
               <div className="bg-gray-50 rounded-lg p-3">
-                <h4 className="font-semibold text-pink-600 mb-3">Personality</h4>
+                <h4 className="font-semibold text-pink-600 mb-3">{t('discover.matchCard.personality')}</h4>
                 <div className="space-y-4">
                   {typeof match.introvert_extrovert === 'number' && (
                     <div className="flex items-center space-x-2">
-                      <span className="text-sm text-gray-500">Introvert</span>
+                      <span className="text-sm text-gray-500">{t('discover.matchCard.introvert')}</span>
                       <div className="flex-1 bg-gray-200 rounded-full h-2">
                         <div 
                           className={`bg-gradient-to-r from-blue-400 to-blue-600 h-2 rounded-full ${styles.dynamicWidth}`}
                           style={{ width: `${match.introvert_extrovert}%` }}
                         ></div>
                       </div>
-                      <span className="text-sm text-gray-500">Extrovert</span>
+                      <span className="text-sm text-gray-500">{t('discover.matchCard.extrovert')}</span>
                     </div>
                   )}
                   {typeof match.spontaneous_planner === 'number' && (
                     <div>
                       <div className="flex justify-between items-center mb-1">
-                        <span className="text-sm font-medium text-gray-600">Spontaneous vs Planner: {match.spontaneous_planner}%</span>
+                        <span className="text-sm font-medium text-gray-600">{t('discover.matchCard.spontaneousVsPlanner', { percentage: match.spontaneous_planner })}</span>
                       </div>
                       <div className="flex items-center space-x-2">
-                        <span className="text-sm text-gray-500">Spontaneous</span>
+                        <span className="text-sm text-gray-500">{t('discover.matchCard.spontaneous')}</span>
                         <div className="flex-1 bg-gray-200 rounded-full h-2">
                           <div 
                             className={`bg-gradient-to-r from-green-400 to-green-600 h-2 rounded-full ${styles.dynamicWidth}`}
                             style={{ width: `${match.spontaneous_planner}%` }}
                           ></div>
                         </div>
-                        <span className="text-sm text-gray-500">Planner</span>
+                        <span className="text-sm text-gray-500">{t('discover.matchCard.planner')}</span>
                       </div>
                     </div>
                   )}
                   {typeof match.messy_organized === 'number' && (
                     <div>
                       <div className="flex justify-between items-center mb-1">
-                        <span className="text-sm font-medium text-gray-600">Messy vs Organized: {match.messy_organized}%</span>
+                        <span className="text-sm font-medium text-gray-600">{t('discover.matchCard.messyVsOrganized', { percentage: match.messy_organized })}</span>
                       </div>
                       <div className="flex items-center space-x-2">
-                        <span className="text-sm text-gray-500">Messy</span>
+                        <span className="text-sm text-gray-500">{t('discover.matchCard.messy')}</span>
                         <div className="flex-1 bg-gray-200 rounded-full h-2">
                           <div 
                             className={`bg-gradient-to-r from-purple-400 to-purple-600 h-2 rounded-full ${styles.dynamicWidth}`}
                             style={{ width: `${match.messy_organized}%` }}
                           ></div>
                         </div>
-                        <span className="text-sm text-gray-500">Organized</span>
+                        <span className="text-sm text-gray-500">{t('discover.matchCard.organized')}</span>
                       </div>
                     </div>
                   )}
@@ -902,7 +905,7 @@ const MatchCard: React.FC<MatchCardProps> = ({
             {/* Interests */}
             {match.interests?.length > 0 && (
               <div className="bg-gray-50 rounded-lg p-3">
-                <h4 className="font-semibold text-pink-600 mb-2">Interests</h4>
+                <h4 className="font-semibold text-pink-600 mb-2">{t('discover.matchCard.interests')}</h4>
                 <div className="flex flex-wrap gap-1">
                   {match.interests.map((interest, index) => (
                     <span

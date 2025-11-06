@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { useTranslation } from 'react-i18next';
 import { Button } from '@/components/ui/button';
 import { Heart, MessageCircle, Users, User } from 'lucide-react';
 import { Capacitor } from '@capacitor/core';
@@ -13,6 +14,7 @@ import RatingDialog from '@/components/RatingDialog';
 import { supabase, SUPABASE_URL } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import { usePushNotifications } from '@/hooks/usePushNotifications';
+import { loadUserLanguagePreference, saveLanguageToDatabase } from '@/utils/languageDetection';
 
 // Import rating debug utilities for development
 if (import.meta.env.DEV) {
@@ -27,20 +29,22 @@ interface MainAppProps {
 }
 
 const MainApp = ({ user, onLogout }: MainAppProps) => {
+  const { t, i18n } = useTranslation();
+  
   // Safety check - if no user data, show error
   if (!user || !user.id) {
     return (
       <div className="min-h-fill flex items-center justify-center bg-gradient-to-br from-pink-50 to-purple-50 p-4">
         <div className="text-center bg-white rounded-lg p-8 shadow-lg max-w-md w-full">
-          <h2 className="text-xl font-bold text-gray-800 mb-4">No User Data</h2>
+          <h2 className="text-xl font-bold text-gray-800 mb-4">{t('errors.noUserData')}</h2>
           <p className="text-gray-600 mb-6">
-            Unable to load user information. Please log in again.
+            {t('errors.unableToLoadUser')}
           </p>
           <button 
             onClick={onLogout}
             className="bg-pink-500 hover:bg-pink-600 text-white px-6 py-2 rounded-lg font-medium"
           >
-            Back to Login
+            {t('auth.backToLogin')}
           </button>
         </div>
       </div>
@@ -184,6 +188,36 @@ const MainApp = ({ user, onLogout }: MainAppProps) => {
   const [isPremium, setIsPremium] = useState(false);
   const [unreadCount, setUnreadCount] = useState(0);
   const { toast } = useToast();
+
+  // Load user's language preference on mount
+  useEffect(() => {
+    const loadUserLanguage = async () => {
+      if (!user?.id) return;
+      
+      try {
+        // Try to load from database first
+        const savedLanguage = await loadUserLanguagePreference(user.id);
+        
+        if (savedLanguage) {
+          console.log('Loading user language preference from DB:', savedLanguage);
+          await i18n.changeLanguage(savedLanguage);
+          // Also save to session storage for consistency
+          sessionStorage.setItem('preferredLanguage', savedLanguage);
+        } else {
+          // If no saved preference, check if there's a session preference to save
+          const sessionLanguage = sessionStorage.getItem('preferredLanguage');
+          if (sessionLanguage && sessionLanguage !== 'en') {
+            console.log('Saving session language to DB:', sessionLanguage);
+            await saveLanguageToDatabase(user.id, sessionLanguage);
+          }
+        }
+      } catch (error) {
+        console.error('Error loading language preference:', error);
+      }
+    };
+    
+    loadUserLanguage();
+  }, [user?.id, i18n]);
 
   /**
    * PROGRESSIVE LOADING SYSTEM FOR DISCOVER PAGE
@@ -1026,8 +1060,8 @@ const MainApp = ({ user, onLogout }: MainAppProps) => {
                 <img src="/driplove-logo.png" alt="DripLove Logo" className="h-10" />
                 <div className="text-right">
                   <div className="text-sm font-bold text-black leading-tight">
-                    <div>Find Your</div>
-                    <div>Perfect Match 💖</div>
+                    <div>{t('common.findYour')}</div>
+                    <div>{t('common.perfectMatch')}</div>
                   </div>
                 </div>
               </div>
@@ -1076,25 +1110,25 @@ const MainApp = ({ user, onLogout }: MainAppProps) => {
           >
             <div className={`flex justify-around items-center ${Capacitor.getPlatform() === 'ios' ? 'pb-5' : ''}`}>
               {[
-                { label: 'DripCheck', icon: DripCoupleIcon }, 
-                { label: 'Chat', icon: MessageCircle }, 
-                { label: 'Liked', icon: Users }, 
-                { label: 'Profile', icon: User }
-              ].map(({ label, icon: Icon }) => (
+                { label: t('discover.title'), value: 'dripcheck', icon: DripCoupleIcon }, 
+                { label: t('chat.title'), value: 'chat', icon: MessageCircle }, 
+                { label: t('matches.liked'), value: 'liked', icon: Users }, 
+                { label: t('profile.title'), value: 'profile', icon: User }
+              ].map(({ label, value, icon: Icon }) => (
                 <button
-                  key={label}
-                  onClick={() => setActiveTab(label.toLowerCase())}
+                  key={value}
+                  onClick={() => setActiveTab(value)}
                   className={`flex flex-col items-center space-y-1 py-1 px-2 rounded-lg transition-colors relative ${
-                    activeTab === label.toLowerCase() ? 'text-pink-600' : 'text-gray-500'
+                    activeTab === value ? 'text-pink-600' : 'text-gray-500'
                   }`}
                 >
-                  {label === 'DripCheck' ? (
-                    <Icon className={`w-7 h-7 ${activeTab === label.toLowerCase() ? 'fill-current' : ''}`} />
+                  {value === 'dripcheck' ? (
+                    <Icon className={`w-7 h-7 ${activeTab === value ? 'fill-current' : ''}`} />
                   ) : (
-                    <Icon className={`w-6 h-6 ${activeTab === label.toLowerCase() ? 'fill-current' : ''}`} />
+                    <Icon className={`w-6 h-6 ${activeTab === value ? 'fill-current' : ''}`} />
                   )}
                   <span className="text-xs font-medium">{label}</span>
-                   {label === 'Chat' && unreadCount > 0 && (
+                   {value === 'chat' && unreadCount > 0 && (
                      <div className="absolute -top-1 -right-1 h-5 w-5 rounded-full bg-red-500 border-2 border-white z-10 flex items-center justify-center">
                        <span className="text-xs text-white font-bold">
                          {unreadCount > 9 ? '9+' : unreadCount}

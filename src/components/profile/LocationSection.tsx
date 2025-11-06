@@ -1,5 +1,6 @@
 
 import React from 'react';
+import { useTranslation } from 'react-i18next';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -29,10 +30,11 @@ const LocationSection = ({
   onLocationChange,
   onDistanceChange 
 }: LocationSectionProps) => {
+  const { t } = useTranslation();
   return (
     <Card>
       <CardHeader>
-        <CardTitle>Location & Matching Preferences</CardTitle>
+        <CardTitle>{t('profile.locationAndPreferences')}</CardTitle>
       </CardHeader>
       <CardContent>
         <div className="space-y-6">
@@ -49,7 +51,7 @@ const LocationSection = ({
             <div className="space-y-4">
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div>
-                  <Label htmlFor="city">City</Label>
+                  <Label htmlFor="city">{t('profile.city')}</Label>
                   <Input
                     type="text"
                     id="city"
@@ -61,7 +63,7 @@ const LocationSection = ({
                   />
                 </div>
                 <div>
-                  <Label htmlFor="country">Country</Label>
+                  <Label htmlFor="country">{t('profile.country')}</Label>
                   <Input
                     type="text"
                     id="country"
@@ -74,7 +76,7 @@ const LocationSection = ({
                 </div>
               </div>
               <div>
-                <Label htmlFor="zip_code">ZIP/Postal Code</Label>
+                <Label htmlFor="zip_code">{t('profile.zipCode')}</Label>
                 <Input
                   type="text"
                   id="zip_code"
@@ -90,7 +92,7 @@ const LocationSection = ({
 
           {/* Distance Preference */}
           <div className="space-y-3">
-            <Label>Maximum Distance for Matches</Label>
+            <Label>{t('profile.maxDistance')}</Label>
             <div className="px-3">
             <Slider
                 value={[editedProfile.max_distance || 50]}

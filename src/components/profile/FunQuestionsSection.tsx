@@ -1,5 +1,6 @@
 
 import React, { useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -15,6 +16,7 @@ interface FunQuestionsSectionProps {
 }
 
 const FunQuestionsSection = ({ editedProfile, isEditing, onInputChange }: FunQuestionsSectionProps) => {
+  const { t } = useTranslation();
   const [showSuggestions, setShowSuggestions] = useState<{ [key: string]: boolean }>({});
 
   const handleSelectSuggestion = (questionType: QuestionType, suggestion: string) => {
@@ -54,7 +56,7 @@ const FunQuestionsSection = ({ editedProfile, isEditing, onInputChange }: FunQue
             className="text-xs h-7 px-2"
           >
             <Shuffle className="w-3 h-3 mr-1" />
-            Suggestions
+            {t('profile.suggestions')}
           </Button>
         )}
       </div>
@@ -73,7 +75,7 @@ const FunQuestionsSection = ({ editedProfile, isEditing, onInputChange }: FunQue
       {isEditing && showSuggestions[questionType] && (
         <div className="mt-2 border rounded-lg bg-gray-50 max-h-40 overflow-y-auto">
           <div className="p-2 text-xs font-medium text-gray-700 border-b bg-gray-100">
-            Select a suggestion or type your own:
+            {t('profile.selectSuggestion')}
           </div>
           {FUN_QUESTIONS[questionType].map((suggestion, index) => (
             <button
@@ -93,27 +95,27 @@ const FunQuestionsSection = ({ editedProfile, isEditing, onInputChange }: FunQue
   return (
     <Card>
       <CardHeader>
-        <CardTitle>Fun Questions</CardTitle>
+        <CardTitle>{t('profile.funQuestions')}</CardTitle>
         <p className="text-sm text-gray-600">
-          Share something interesting about yourself. You can use our suggestions or write your own!
+          {t('profile.funQuestionsDescription')}
         </p>
       </CardHeader>
       <CardContent>
         <div className="space-y-4">
           {renderQuestionField(
             'fun_fact',
-            'Fun Fact',
-            'Share something interesting about yourself...'
+            t('profile.funFact'),
+            t('profile.funFactPlaceholder')
           )}
           {renderQuestionField(
             'perfect_first_date',
-            'Perfect First Date',
-            'Describe your ideal first date...'
+            t('profile.perfectFirstDate'),
+            t('profile.perfectFirstDatePlaceholder')
           )}
           {renderQuestionField(
             'last_googled',
-            'Last Googled',
-            'What did you last search for?'
+            t('profile.lastGoogled'),
+            t('profile.lastGoogledPlaceholder')
           )}
         </div>
       </CardContent>

@@ -6,6 +6,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { User, Mail, Lock, Calendar, MapPin, Globe, Eye, EyeOff } from 'lucide-react';
 import { countries } from '@/constants/formData';
 import { handleInputFocus, handleInputBlur, getInputStyles } from '@/utils/inputUtils';
+import { useTranslation } from 'react-i18next';
 
 interface BasicInfoSectionProps {
   formData: any;
@@ -28,13 +29,15 @@ const BasicInfoSection = ({
   onTogglePassword,
   onToggleConfirmPassword
 }: BasicInfoSectionProps) => {
+  const { t } = useTranslation();
+  
   return (
     <div className="space-y-4">
-      <h3 className="text-lg font-semibold text-gray-800">Basic Information</h3>
+      <h3 className="text-lg font-semibold text-gray-800">{t('registration.step1Description')}</h3>
       
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
         <div className="space-y-2">
-          <Label htmlFor="firstName" className="text-sm font-medium">First Name *</Label>
+          <Label htmlFor="firstName" className="text-sm font-medium">{t('registration.firstName')} *</Label>
           <div className="relative">
             <User className="absolute left-3 top-3 h-4 w-4 text-gray-400" />
             <Input
@@ -47,14 +50,14 @@ const BasicInfoSection = ({
               onBlur={handleInputBlur}
               className={`mobile-input-field pl-10 border-gray-200 focus:border-pink-400 focus:ring-pink-400 ${errors.firstName ? 'border-red-500' : ''}`}
               style={getInputStyles()}
-              placeholder="Enter your first name"
+              placeholder={t('registration.firstName')}
             />
             {errors.firstName && <p className="text-red-500 text-xs mt-1">{errors.firstName}</p>}
           </div>
         </div>
         
         <div className="space-y-2">
-          <Label htmlFor="lastName" className="text-sm font-medium">Last Name *</Label>
+          <Label htmlFor="lastName" className="text-sm font-medium">{t('registration.lastName')} *</Label>
           <div className="relative">
             <User className="absolute left-3 top-3 h-4 w-4 text-gray-400" />
             <Input
@@ -67,7 +70,7 @@ const BasicInfoSection = ({
               onBlur={handleInputBlur}
               className={`mobile-input-field pl-10 border-gray-200 focus:border-pink-400 focus:ring-pink-400 ${errors.lastName ? 'border-red-500' : ''}`}
               style={getInputStyles()}
-              placeholder="Enter your last name"
+              placeholder={t('registration.lastName')}
             />
             {errors.lastName && <p className="text-red-500 text-xs mt-1">{errors.lastName}</p>}
           </div>
@@ -75,7 +78,7 @@ const BasicInfoSection = ({
       </div>
       
       <div className="space-y-2">
-        <Label htmlFor="email" className="text-sm font-medium">Email *</Label>
+        <Label htmlFor="email" className="text-sm font-medium">{t('auth.email')} *</Label>
         <div className="relative">
           <Mail className="absolute left-3 top-3 h-4 w-4 text-gray-400" />
           <Input
@@ -88,7 +91,7 @@ const BasicInfoSection = ({
             onBlur={handleInputBlur}
             className={`mobile-input-field pl-10 border-gray-200 focus:border-pink-400 focus:ring-pink-400 ${errors.email ? 'border-red-500' : ''}`}
             style={getInputStyles()}
-            placeholder="Enter your email"
+            placeholder={t('auth.email')}
           />
           {errors.email && <p className="text-red-500 text-xs mt-1">{errors.email}</p>}
         </div>
@@ -96,7 +99,7 @@ const BasicInfoSection = ({
       
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
         <div className="space-y-2">
-          <Label htmlFor="password" className="text-sm font-medium">Password *</Label>
+          <Label htmlFor="password" className="text-sm font-medium">{t('auth.password')} *</Label>
           <div className="relative">
             <Lock className="absolute left-3 top-3 h-4 w-4 text-gray-400" />
             <Input
@@ -109,7 +112,7 @@ const BasicInfoSection = ({
               onBlur={handleInputBlur}
               className={`mobile-input-field pl-10 pr-10 border-gray-200 focus:border-pink-400 focus:ring-pink-400 ${errors.password ? 'border-red-500' : ''}`}
               style={getInputStyles()}
-              placeholder="Enter your password"
+              placeholder={t('auth.password')}
             />
             <button
               type="button"
@@ -123,7 +126,7 @@ const BasicInfoSection = ({
         </div>
         
         <div className="space-y-2">
-          <Label htmlFor="confirmPassword" className="text-sm font-medium">Confirm Password *</Label>
+          <Label htmlFor="confirmPassword" className="text-sm font-medium">{t('auth.confirmPassword')} *</Label>
           <div className="relative">
             <Lock className="absolute left-3 top-3 h-4 w-4 text-gray-400" />
             <Input
@@ -133,7 +136,7 @@ const BasicInfoSection = ({
               value={formData.confirmPassword}
               onChange={onInputChange}
               className={`pl-10 pr-10 border-gray-200 focus:border-pink-400 focus:ring-pink-400 ${errors.confirmPassword ? 'border-red-500' : ''}`}
-              placeholder="Confirm your password"
+              placeholder={t('auth.confirmPassword')}
             />
             <button
               type="button"
@@ -148,7 +151,7 @@ const BasicInfoSection = ({
       </div>
       
       <div className="space-y-2">
-        <Label htmlFor="dateOfBirth" className="text-sm font-medium">Date of Birth *</Label>
+        <Label htmlFor="dateOfBirth" className="text-sm font-medium">{t('registration.dateOfBirth')} *</Label>
         <div className="relative">
           <Calendar className="absolute left-3 top-3 h-4 w-4 text-gray-400" />
           <Input
