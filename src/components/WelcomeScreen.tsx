@@ -25,10 +25,10 @@ const WelcomeScreen: React.FC<WelcomeScreenProps> = ({ onLogin, onAbout, onTerms
       </div>
 
       {/* Logo and Tagline */}
-      <div className="mb-12 flex flex-col items-center relative z-10 mt-32">
+      <div className="mb-12 flex flex-col items-center relative z-10 mt-32 px-6 w-full max-w-md">
         <img src="/driplove-logo.png" alt="DripLove Logo" className="w-50 h-40 mb-4" />
-        <p className="text-lg text-white">{t('welcome.tagline')}</p>
-        <p className="text-sm text-white/80">{t('welcome.subtitle')}</p>
+        <p className="text-lg text-white font-semibold text-center break-words">{t('welcome.tagline')}</p>
+        <p className="text-sm text-white/80 text-center break-words mt-2">{t('welcome.subtitle')}</p>
       </div>
 
       {/* Login Button */}
@@ -42,8 +42,8 @@ const WelcomeScreen: React.FC<WelcomeScreenProps> = ({ onLogin, onAbout, onTerms
       </div>
 
       {/* Footer Section */}
-      <div className="absolute bottom-0 left-0 right-0 flex flex-col items-center space-y-1 z-10 pb-8">
-        <div className="text-sm text-white/80 text-center">
+      <div className="absolute bottom-0 left-0 right-0 flex flex-col items-center space-y-2 z-10 pb-8 px-6">
+        <div className="text-sm text-white/80 text-center max-w-md break-words">
           {t('welcome.joinThousands')}
         </div>
         <button
@@ -52,16 +52,16 @@ const WelcomeScreen: React.FC<WelcomeScreenProps> = ({ onLogin, onAbout, onTerms
         >
           {t('welcome.aboutLink')}
         </button>
-        <div className="flex justify-center items-center space-x-4 text-sm">
+        <div className="flex flex-wrap justify-center items-center gap-3 text-sm">
           <button
             onClick={onTerms}
-            className="text-white font-bold hover:text-white/80 transition-colors duration-200 bg-transparent border-none cursor-pointer"
+            className="text-white font-bold hover:text-white/80 transition-colors duration-200 bg-transparent border-none cursor-pointer whitespace-nowrap"
           >
             {t('welcome.termsLink')}
           </button>
           <button
             onClick={onPrivacy}
-            className="text-white font-bold hover:text-white/80 transition-colors duration-200 bg-transparent border-none cursor-pointer"
+            className="text-white font-bold hover:text-white/80 transition-colors duration-200 bg-transparent border-none cursor-pointer whitespace-nowrap"
           >
             {t('welcome.privacyLink')}
           </button>

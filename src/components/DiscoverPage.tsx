@@ -1,6 +1,7 @@
 // Use shared IAP actions
 import { buyMonthly, restorePurchases } from '../iap';
 import { Capacitor } from '@capacitor/core';
+import { useTranslation } from 'react-i18next';
 
 function DominantColorImageBg({ imageUrl, children }) {
   // Use lightweight static background color instead of expensive pixel scanning
@@ -81,6 +82,7 @@ const adinkraSymbols = [
 
 const ROTATE_INTERVAL_MS = 2 * 60 * 1000; // 2 minutes
 const AdinkraBar: React.FC = () => {
+  const { t } = useTranslation();
   const SYMBOLS_PER_SET = 4;
   const [tooltipIdx, setTooltipIdx] = useState<number | null>(null);
   const [setIndex, setSetIndex] = useState(() => Math.floor(Math.random() * Math.ceil(adinkraSymbols.length / SYMBOLS_PER_SET)));
@@ -125,7 +127,7 @@ const AdinkraBar: React.FC = () => {
           onClick={() => setTooltipIdx(null)}
         >
           <strong className="text-base mb-1">{adinkraSymbols[tooltipIdx].name}</strong>
-          <div className="mt-1 text-center">{adinkraSymbols[tooltipIdx].meaning}</div>
+          <div className="mt-1 text-center">{t(`adinkraMeanings.${adinkraSymbols[tooltipIdx].name}`)}</div>
           <div className="text-[10px] text-gray-400 mt-2">(Click to close)</div>
         </div>
       )}
