@@ -80,16 +80,40 @@ const MainApp = ({ user, onLogout }: MainAppProps) => {
 
         console.log('[MainApp] Attempting to setup push notifications...');
         const { PushNotifications } = await import('@capacitor/push-notifications');
+        const { FirebaseMessaging } = await import('@capacitor-firebase/messaging');
         
         // Add ALL listeners FIRST before calling register()
         PushNotifications.addListener('registrationError', (error) => {
           console.error('[MainApp] Push registration error:', error);
         });
         
-        // Add token listener BEFORE registering
+        // Add token listener for APNS token (iOS needs this to trigger FCM)
         PushNotifications.addListener('registration', async (token) => {
-          console.log('[MainApp] 📱 Push token received:', token.value);
+          console.log('[MainApp] 📱 APNS token received:', token.value);
           
+          // For iOS, we need to get the FCM token from Firebase Messaging
+          if (Capacitor.getPlatform() === 'ios') {
+            try {
+              console.log('[MainApp] 🔥 Getting FCM token from Firebase...');
+              const { token: fcmToken } = await FirebaseMessaging.getToken();
+              console.log('[MainApp] ✅ FCM token received:', fcmToken);
+              
+              // Save FCM token to database
+              await savePushToken(fcmToken);
+            } catch (error) {
+              console.error('[MainApp] ❌ Failed to get FCM token:', error);
+              // Fallback to APNS token (won't work with FCM but better than nothing)
+              await savePushToken(token.value);
+            }
+          } else {
+            // Android token is already FCM token
+            console.log('[MainApp] 📱 FCM token received (Android):', token.value);
+            await savePushToken(token.value);
+          }
+        });
+        
+        // Helper function to save token
+        const savePushToken = async (tokenValue: string) => {
           // Verify user is authenticated before saving
           const { data: { user: currentUser } } = await supabase.auth.getUser();
           
@@ -104,7 +128,7 @@ const MainApp = ({ user, onLogout }: MainAppProps) => {
           try {
             const { data, error } = await supabase.from('push_tokens').upsert({
               user_id: currentUser.id,
-              token: token.value,
+              token: tokenValue,
               platform: Capacitor.getPlatform(),
               updated_at: new Date().toISOString()
             }, {
@@ -127,7 +151,7 @@ const MainApp = ({ user, onLogout }: MainAppProps) => {
           } catch (error) {
             console.error('[MainApp] 💥 Exception saving push token:', error);
           }
-        });
+        };
         
         // Request permission
         console.log('[MainApp] Requesting push notification permissions...');
