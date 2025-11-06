@@ -1,14 +1,15 @@
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { ArrowLeft } from 'lucide-react';
 import { ChatMatch } from '@/types';
 import ChatUserAvatar from '../ChatUserAvatar';
 import { createPortal } from 'react-dom';
 import ReportModal from '@/components/ReportModal';
-import { useState } from 'react';
 import { useToast } from '@/hooks/use-toast';
 import { Capacitor } from '@capacitor/core';
 import { useTranslation } from 'react-i18next';
+import { supabase } from '@/integrations/supabase/client';
+import { getLanguageName } from '@/utils/languageNames';
 
 interface ChatHeaderProps {
   selectedMatch: ChatMatch;
@@ -37,8 +38,33 @@ const ChatHeader: React.FC<ChatHeaderProps> = ({
                    (selectedMatch.user1_id === currentUserId ? selectedMatch.user2_id : selectedMatch.user1_id);
   const [openReport, setOpenReport] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
+  const [partnerLanguage, setPartnerLanguage] = useState<string | null>(null);
   const { toast } = useToast();
   const menuRef = React.useRef<HTMLDivElement>(null);
+
+  // Fetch partner's preferred language
+  useEffect(() => {
+    const fetchPartnerLanguage = async () => {
+      if (!partnerId) return;
+      
+      try {
+        const { data, error } = await supabase
+          .from('profiles')
+          .select('preferred_language')
+          .eq('id', partnerId)
+          .single();
+        
+        if (!error && data?.preferred_language) {
+          const languageName = getLanguageName(data.preferred_language);
+          setPartnerLanguage(languageName);
+        }
+      } catch (err) {
+        console.error('Error fetching partner language:', err);
+      }
+    };
+
+    fetchPartnerLanguage();
+  }, [partnerId]);
   // Platform-specific safe area padding
   const platform = Capacitor.getPlatform();
   const paddingTopValue = platform === 'ios' 
@@ -94,7 +120,9 @@ const ChatHeader: React.FC<ChatHeaderProps> = ({
           <h3 className="font-semibold text-gray-900">
             {selectedMatch.first_name} {selectedMatch.last_name}
           </h3>
-          <p className="text-sm text-gray-500">{t('chat.activeOnDripLove')}</p>
+          <p className="text-sm text-gray-500">
+            {partnerLanguage ? t('chat.speaks', { language: partnerLanguage }) : t('chat.activeOnDripLove')}
+          </p>
         </div>
   </div>
       

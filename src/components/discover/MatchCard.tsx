@@ -3,9 +3,11 @@ import ReportButton from '../ReportButton';
 import UserAdinkraDisplay from './UserAdinkraDisplay';
 import ReportModal from '../modals/ReportModal';
 import styles from './MatchCard.module.css';
-import { MapPin, Briefcase, GraduationCap, Calendar, Crown, Shield, ChevronDown, ChevronUp, User, Quote, Heart, Coffee, Search, Loader2 } from 'lucide-react';
+import { MapPin, Briefcase, GraduationCap, Calendar, Crown, Shield, ChevronDown, ChevronUp, User, Quote, Heart, Coffee, Search, Loader2, Languages } from 'lucide-react';
 import { PotentialMatch } from '@/types';
 import { useTranslation } from 'react-i18next';
+import { getLanguageName } from '@/utils/languageNames';
+import { supabase } from '@/integrations/supabase/client';
 
 interface MatchCardProps {
   match: PotentialMatch;
@@ -57,10 +59,35 @@ const MatchCard: React.FC<MatchCardProps> = ({
   // ...existing code...
   const [currentSlide, setCurrentSlide] = useState(0);
   const [imageLoading, setImageLoading] = useState(false);
+  const [userLanguage, setUserLanguage] = useState<string | null>(null);
   
   // Use ref for internal state that doesn't need to trigger re-renders
   const lastSlideInteraction = useRef<number>(0);
   const slideTransitionInProgress = useRef<boolean>(false);
+
+  // Fetch user's preferred language
+  useEffect(() => {
+    const fetchUserLanguage = async () => {
+      if (!match.id) return;
+      
+      try {
+        const { data, error } = await supabase
+          .from('profiles')
+          .select('preferred_language')
+          .eq('id', match.id)
+          .single();
+        
+        if (!error && data?.preferred_language) {
+          const languageName = getLanguageName(data.preferred_language);
+          setUserLanguage(languageName);
+        }
+      } catch (err) {
+        console.error('Error fetching user language:', err);
+      }
+    };
+
+    fetchUserLanguage();
+  }, [match.id]);
   
   // Memoize image loading callbacks to prevent unnecessary re-renders
   const handleImageLoadStart = useCallback(() => setImageLoading(true), []);
@@ -915,6 +942,17 @@ const MatchCard: React.FC<MatchCardProps> = ({
                       {interest}
                     </span>
                   ))}
+                </div>
+              </div>
+            )}
+
+            {/* Language */}
+            {userLanguage && (
+              <div className="bg-gray-50 rounded-lg p-3">
+                <h4 className="font-semibold text-pink-600 mb-2">{t('discover.matchCard.language')}</h4>
+                <div className="flex items-center text-sm">
+                  <Languages className="w-4 h-4 mr-2 text-pink-500" />
+                  <span className="text-gray-700">{userLanguage}</span>
                 </div>
               </div>
             )}

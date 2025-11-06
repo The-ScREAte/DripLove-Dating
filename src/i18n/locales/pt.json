@@ -320,7 +320,8 @@
       "organized": "Organizado",
       "spontaneousVsPlanner": "Espontâneo vs Planejador: {{percentage}}%",
       "messyVsOrganized": "Desorganizado vs Organizado: {{percentage}}%",
-      "interests": "Interesses"
+      "interests": "Interesses",
+      "language": "Idioma"
     }
   },
   "matches": {
@@ -400,7 +401,8 @@
     "addEmoji": "Adicionar emoji",
     "sendMessage": "Enviar mensagem",
     "moreOptions": "Mais opções",
-    "goBack": "Voltar à lista de conversas"
+    "goBack": "Voltar à lista de conversas",
+    "speaks": "Fala {{language}}"
   },
   "premium": {
     "goPremium": "Assinar Premium",

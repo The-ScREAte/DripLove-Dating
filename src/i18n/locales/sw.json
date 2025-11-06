@@ -320,7 +320,8 @@
       "organized": "Mpangilio",
       "spontaneousVsPlanner": "Wa Ghafla vs Mpangaji: {{percentage}}%",
       "messyVsOrganized": "Uchafu vs Mpangilio: {{percentage}}%",
-      "interests": "Mambo Yanayopendeza"
+      "interests": "Mambo Yanayopendeza",
+      "language": "Lugha"
     }
   },
   "matches": {
@@ -400,7 +401,8 @@
     "addEmoji": "Ongeza emoji",
     "sendMessage": "Tuma ujumbe",
     "moreOptions": "Chaguo zaidi",
-    "goBack": "Rudi kwenye orodha ya mazungumzo"
+    "goBack": "Rudi kwenye orodha ya mazungumzo",
+    "speaks": "Anazungumza {{language}}"
   },
   "premium": {
     "goPremium": "Pata Premium",

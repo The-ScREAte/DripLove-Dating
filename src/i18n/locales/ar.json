@@ -320,7 +320,8 @@
       "organized": "منظم",
       "spontaneousVsPlanner": "عفوي vs مخطط: {{percentage}}%",
       "messyVsOrganized": "فوضوي vs منظم: {{percentage}}%",
-      "interests": "الاهتمامات"
+      "interests": "الاهتمامات",
+      "language": "اللغة"
     }
   },
   "matches": {
@@ -400,7 +401,8 @@
     "addEmoji": "إضافة رمز تعبيري",
     "sendMessage": "إرسال رسالة",
     "moreOptions": "المزيد من الخيارات",
-    "goBack": "العودة إلى قائمة الدردشة"
+    "goBack": "العودة إلى قائمة الدردشة",
+    "speaks": "يتحدث {{language}}"
   },
   "premium": {
     "goPremium": "الترقية إلى Premium",
