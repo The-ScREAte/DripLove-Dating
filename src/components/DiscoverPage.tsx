@@ -156,7 +156,6 @@ import ProfileCompletionModal from './ProfileCompletionModal';
 import SwipeCounter from './SwipeCounter';
 import AdCard from './discover/AdCard';
 import { CurrentUser, PotentialMatch } from '@/types';
-import { useTranslation } from 'react-i18next';
 
 interface AdData {
   id: string;
