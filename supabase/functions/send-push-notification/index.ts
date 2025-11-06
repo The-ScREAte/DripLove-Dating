@@ -234,17 +234,17 @@ serve(async (req) => {
                     alert: {
                       title,
                       body,
-                      // Remove subtitle to avoid cloud emoji
-                      'subtitle': '',
                     },
                     sound: iosSound,
                     badge: 1,
-                    'mutable-content': 0, // Disable notification service extension
                   },
+                  // Put custom data at payload level, not inside aps
+                  ...data,
+                  type,
                 },
                 headers: {
                   'apns-priority': '10',
-                  'apns-collapse-id': type, // Group notifications by type
+                  'apns-collapse-id': type,
                 },
               },
             },

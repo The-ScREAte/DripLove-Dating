@@ -252,26 +252,36 @@ class SupabasePushNotificationService {
     }
     
     if (data?.type === 'message' && data?.chatId) {
-      // Navigate to specific chat with the match ID
+      // Navigate to specific chat conversation
       console.log('💬 Opening chat:', data.chatId);
       window.location.href = `/chat?matchId=${data.chatId}`;
-    } else if (data?.type === 'match') {
-      // Navigate to chat page (matches tab)
+      return;
+    }
+    
+    if (data?.type === 'match') {
+      // Navigate to chat page (matches tab) 
       console.log('🎉 Opening matches/chat page');
       window.location.href = '/chat';
-    } else if (data?.type === 'like') {
+      return;
+    }
+    
+    if (data?.type === 'like') {
       // Navigate to liked me page
       console.log('💖 Opening likes page');
       window.location.href = '/liked-me';
-    } else if (data?.type === 'system' || data?.type === 'admin') {
+      return;
+    }
+    
+    if (data?.type === 'system' || data?.type === 'admin') {
       // System/admin notifications go to discover page
       console.log('📢 Opening discover page from system notification');
       window.location.href = '/discover';
-    } else {
-      // Default: go to chat page
-      console.log('📱 Opening default chat page');
-      window.location.href = '/chat';
+      return;
     }
+    
+    // Default: go to chat page
+    console.log('📱 Opening default chat page');
+    window.location.href = '/chat';
   }
 
   private showInAppNotification(payload: NotificationPayload): void {
