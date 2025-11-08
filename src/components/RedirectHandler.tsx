@@ -105,8 +105,7 @@ const RedirectHandler = () => {
               <img 
                 src="/driplove-logo.png" 
                 alt="DripLove" 
-                className="w-20 h-20 animate-spin"
-                style={{ animationDuration: '2s' }}
+                className="w-20 h-20 animate-bounce"
               />
             </div>
             <p className="text-sm text-gray-600">Redirecting...</p>
