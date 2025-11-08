@@ -100,8 +100,15 @@ const RedirectHandler = () => {
         </div>
       ) : (
         <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-pink-50 to-purple-50">
-          <div className="text-center space-y-2 p-8">
-            <div className="text-4xl animate-spin">�</div>
+          <div className="text-center space-y-4 p-8">
+            <div className="flex justify-center">
+              <img 
+                src="/driplove-logo.png" 
+                alt="DripLove" 
+                className="w-20 h-20 animate-spin"
+                style={{ animationDuration: '2s' }}
+              />
+            </div>
             <p className="text-sm text-gray-600">Redirecting...</p>
           </div>
         </div>
