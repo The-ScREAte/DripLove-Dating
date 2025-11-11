@@ -28,8 +28,9 @@ target 'App' do
   capacitor_pods
   # Add your Pods here
   
-  # Override GoogleSignIn to use latest version with privacy manifests
+  # Override GoogleSignIn to use latest 7.x version with privacy manifests
   # This fixes Apple's ITMS-91061 privacy manifest requirement
+  # GoogleSignIn 7.1.0+ includes the required privacy manifest for App Store
   pod 'GoogleSignIn', '~> 7.1'
   pod 'GTMAppAuth', '~> 4.1'
   pod 'GTMSessionFetcher', '~> 3.5'
