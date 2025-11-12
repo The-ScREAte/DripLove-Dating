@@ -28,27 +28,19 @@ const BlockDialog = ({ isOpen, onClose, userToBlock, currentUserId, onBlockSucce
 
   const handleBlock = async () => {
     if (!userToBlock) return;
+    
+    // Validate we're not trying to block ourselves
+    if (currentUserId === userToBlock.id) {
+      toast({
+        title: t('chat.error'),
+        description: 'Cannot block yourself',
+        variant: "destructive",
+      });
+      return;
+    }
 
     setIsBlocking(true);
     try {
-      // First verify the user exists in profiles
-      const { data: profileExists, error: checkError } = await supabase
-        .from('profiles')
-        .select('id')
-        .eq('id', userToBlock.id)
-        .single();
-
-      if (checkError || !profileExists) {
-        toast({
-          title: t('chat.error'),
-          description: 'This user account no longer exists.',
-          variant: "destructive",
-        });
-        setIsBlocking(false);
-        onClose();
-        return;
-      }
-
       const { error } = await supabase
         .from('blocks')
         .insert({
@@ -57,7 +49,16 @@ const BlockDialog = ({ isOpen, onClose, userToBlock, currentUserId, onBlockSucce
           reason: reason.trim() || null
         });
 
-      if (error) throw error;
+      if (error) {
+        console.error('Block error details:', {
+          code: error.code,
+          message: error.message,
+          details: error.details,
+          blocker_id: currentUserId,
+          blocked_id: userToBlock.id
+        });
+        throw error;
+      }
 
       toast({
         title: t('block.blocked'),
@@ -67,11 +68,11 @@ const BlockDialog = ({ isOpen, onClose, userToBlock, currentUserId, onBlockSucce
       onBlockSuccess();
       onClose();
       setReason('');
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error blocking user:', error);
       toast({
         title: t('chat.error'),
-        description: t('block.errorFailed'),
+        description: error?.message || t('block.errorFailed'),
         variant: "destructive",
       });
     } finally {
