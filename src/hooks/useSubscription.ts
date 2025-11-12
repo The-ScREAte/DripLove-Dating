@@ -61,7 +61,7 @@ export const useSubscription = (userId: string | undefined) => {
           reverse_dislikes: -1, // Unlimited
           liked_me_visible: -1 // Unlimited
         } : {
-          daily_swipes: 13,
+          daily_swipes: 20, // Free users get 20 swipes per day
           reverse_dislikes: 1,
           liked_me_visible: 1
         }
@@ -76,7 +76,7 @@ export const useSubscription = (userId: string | undefined) => {
         status: 'active',
         expires_at: null,
         features: {
-          daily_swipes: 13,
+          daily_swipes: 20, // Free users get 20 swipes per day
           reverse_dislikes: 1,
           liked_me_visible: 1
         }
@@ -103,7 +103,7 @@ export const useSubscription = (userId: string | undefined) => {
     } catch (error) {
       console.error('Error checking usage limit:', error);
       // Fallback: allow the action but with basic limits
-      const defaultLimit = usageType === 'swipe' ? 13 : 1;
+      const defaultLimit = usageType === 'swipe' ? 20 : 1;
       return { 
         success: true, 
         message: 'Action allowed (fallback mode)', 

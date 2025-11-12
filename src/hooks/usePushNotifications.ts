@@ -122,6 +122,20 @@ export const usePushNotifications = (userId?: string) => {
     });
   };
 
+  const sendMultipleLikesNotification = async (targetUserId: string, likeCount: number) => {
+    const message = likeCount === 1 
+      ? "Someone is showing interest in you. Check them out!"
+      : `${likeCount} people are showing interest in you. Check them out!`;
+    
+    return sendNotification({
+      title: "💕 Others are showing interest!",
+      body: message,
+      userId: targetUserId,
+      type: 'like',
+      data: { likeCount: likeCount.toString() }
+    });
+  };
+
   const sendAdminNotification = async (title: string, message: string, targetUserId: string) => {
     return sendNotification({
       title,
@@ -165,6 +179,7 @@ export const usePushNotifications = (userId?: string) => {
     sendMatchNotification,
     sendMessageNotification,
     sendLikeNotification,
+    sendMultipleLikesNotification,
     sendAdminNotification,
     markAsRead,
     refreshUnreadCount

@@ -411,7 +411,12 @@
     "moreYouSwipe": "كلما قمت بالسحب أكثر، كلما حصلت على مطابقات أكثر 💕",
     "startSwipingInDripCheck": "ابدأ السحب في DripCheck",
     "newMatchesWaiting": "مطابقات جديدة في الانتظار!",
-    "tapMatchToMessage": "انقر على مطابقة أعلاه لإرسال رسالتك الأولى"
+    "tapMatchToMessage": "انقر على مطابقة أعلاه لإرسال رسالتك الأولى",
+    "matchExpired": "انتهت صلاحية المطابقة",
+    "matchExpiredDescription": "انتهت صلاحية هذه المطابقة بسبب عدم النشاط. ابدأ المحادثات خلال 10 أيام للحفاظ على مطابقاتك!",
+    "matchExpiringTitle": "المطابقة ستنتهي قريباً!",
+    "matchExpiringBody": "مطابقتك مع {{name}} ستنتهي غداً. أرسل رسالة للحفاظ على الاتصال! 💬",
+    "daysLeft": "{{days}} أيام متبقية"
   },
   "premium": {
     "goPremium": "الترقية إلى Premium",

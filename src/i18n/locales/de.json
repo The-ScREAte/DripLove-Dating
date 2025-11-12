@@ -415,7 +415,12 @@
     "moreYouSwipe": "Je mehr Sie wischen, desto mehr Matches erhalten Sie 💕",
     "startSwipingInDripCheck": "Beginnen Sie mit dem Wischen in DripCheck",
     "newMatchesWaiting": "Neue Matches warten!",
-    "tapMatchToMessage": "Tippen Sie auf ein Match oben, um Ihre erste Nachricht zu senden"
+    "tapMatchToMessage": "Tippen Sie auf ein Match oben, um Ihre erste Nachricht zu senden",
+    "matchExpired": "Match Abgelaufen",
+    "matchExpiredDescription": "Dieses Match ist aufgrund von Inaktivität abgelaufen. Beginnen Sie Gespräche innerhalb von 10 Tagen, um Ihre Matches zu behalten!",
+    "matchExpiringTitle": "Match läuft bald ab!",
+    "matchExpiringBody": "Ihr Match mit {{name}} läuft morgen ab. Senden Sie eine Nachricht, um die Verbindung aufrechtzuerhalten! 💬",
+    "daysLeft": "{{days}} Tage übrig"
   },
   "premium": {
     "upgrade": "Upgrade",

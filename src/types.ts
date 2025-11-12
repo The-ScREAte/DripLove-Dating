@@ -47,6 +47,7 @@ export interface ChatMatch {
   unread_messages?: number;
   last_message?: string;
   last_message_time?: string;
+  created_at: string; // When the match was created
   user1_id: string;
   user2_id: string;
   partner?: {

@@ -411,7 +411,12 @@
     "moreYouSwipe": "Kadiri unavyoswipe zaidi, ndivyo utapata mechi zaidi 💕",
     "startSwipingInDripCheck": "Anza kuswipe katika DripCheck",
     "newMatchesWaiting": "Mechi Mpya Zinasubiri!",
-    "tapMatchToMessage": "Gusa mechi hapo juu ili kutuma ujumbe wako wa kwanza"
+    "tapMatchToMessage": "Gusa mechi hapo juu ili kutuma ujumbe wako wa kwanza",
+    "matchExpired": "Mechi Imeisha",
+    "matchExpiredDescription": "Mechi hii imeisha kwa sababu ya kutokuwa na shughuli. Anza mazungumzo ndani ya siku 10 ili kuweka mechi zako!",
+    "matchExpiringTitle": "Mechi Inaisha Hivi Karibuni!",
+    "matchExpiringBody": "Mechi yako na {{name}} inaisha kesho. Tuma ujumbe ili kuweka muunganisho! 💬",
+    "daysLeft": "Siku {{days}} zimebaki"
   },
   "premium": {
     "goPremium": "Pata Premium",

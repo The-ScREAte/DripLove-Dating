@@ -2,7 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import { usePushNotifications } from '@/hooks/usePushNotifications';
-import { requestNotificationPermission } from '@/services/pushNotifications';
+import { requestNotificationPermission, sendPushNotification } from '@/services/pushNotifications';
 import { Capacitor } from '@capacitor/core';
 // SafeAreaView removed — use plain divs with env(...) padding where necessary
 import UserProfileModal from './UserProfileModal';
@@ -13,6 +13,7 @@ import MessageBubble from './chat/MessageBubble';
 import MessageInput from './chat/MessageInput';
 import ChatHeader from './chat/ChatHeader';
 import ChatUserAvatar from './ChatUserAvatar';
+import MatchExpirationAvatar from './chat/MatchExpirationAvatar';
 import { CurrentUser, ChatMatch, ChatMessage } from '@/types';
 import { useTranslation } from 'react-i18next';
 
@@ -87,6 +88,16 @@ const ChatPage = ({ currentUser, onUnreadChange, onDetailViewChange }: ChatPageP
       console.log('[ChatPage] 🔄 No cached data, fetching matches');
       fetchMatches();
     }
+    
+    // Force cleanup of expired matches on mount
+    setTimeout(() => {
+      if (currentUser?.id) {
+        const cachedData = chatMatchesCache.get(currentUser.id);
+        if (cachedData?.matches) {
+          checkExpiredMatches(cachedData.matches);
+        }
+      }
+    }, 1000);
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [currentUser]);
 
@@ -440,6 +451,9 @@ const ChatPage = ({ currentUser, onUnreadChange, onDetailViewChange }: ChatPageP
       setMatches(processedMatches);
       // Clear the refresh flag when we've just fetched
       matchesNeedsRefreshRef.current = false;
+      
+      // Check for expired matches and send notifications
+      checkExpiredMatches(processedMatches);
     } catch (error) {
       toast({
         title: 'Error',
@@ -451,6 +465,71 @@ const ChatPage = ({ currentUser, onUnreadChange, onDetailViewChange }: ChatPageP
       if (showLoading) {
         setIsRefreshing(false);
         setPullDistance(0);
+      }
+    }
+  };
+
+  // Check for expired matches and handle dissolution/notifications
+  const checkExpiredMatches = async (matchesList: ChatMatch[]) => {
+    if (!currentUser || !currentUser.id) return;
+
+    const EXPIRATION_DAYS = 10;
+    const WARNING_DAYS = 9; // Send notification after 9 days (1 day before expiration)
+    const MS_PER_DAY = 24 * 60 * 60 * 1000;
+    const now = new Date();
+    
+    const expiredMatchIds: string[] = [];
+
+    for (const match of matchesList) {
+      const hasMessages = !!match.last_message;
+      if (hasMessages) continue; // Skip matches with messages
+
+      const matchCreated = new Date(match.created_at);
+      const daysSinceMatch = (now.getTime() - matchCreated.getTime()) / MS_PER_DAY;
+
+      // Dissolve match if 10 days have passed
+      if (daysSinceMatch >= EXPIRATION_DAYS) {
+        expiredMatchIds.push(match.id);
+      }
+      // Send warning notification if 9 days have passed
+      else if (daysSinceMatch >= WARNING_DAYS && daysSinceMatch < WARNING_DAYS + 0.1) {
+        const partnerId = match.user1_id === currentUser.id ? match.user2_id : match.user1_id;
+        const partnerName = match.first_name;
+        
+        try {
+          // Send notification via push notification service
+          await sendPushNotification({
+            title: t('chat.matchExpiringTitle'),
+            body: t('chat.matchExpiringBody', { name: partnerName }),
+            userId: currentUser.id,
+            type: 'match',
+            data: { matchId: match.id, partnerId }
+          });
+
+          console.log(`⏰ Sent expiration warning for match: ${match.id}`);
+        } catch (error) {
+          console.error('Error sending expiration notification:', error);
+        }
+      }
+    }
+    
+    // Delete all expired matches in one batch
+    if (expiredMatchIds.length > 0) {
+      try {
+        const { error } = await supabase
+          .from('matches')
+          .delete()
+          .in('id', expiredMatchIds);
+
+        if (!error) {
+          console.log(`🗑️ Deleted ${expiredMatchIds.length} expired matches from database`);
+          // Clear cache so next fetch gets fresh data without expired matches
+          chatMatchesCache.delete(currentUser.id);
+        } else {
+          console.error('Error deleting expired matches:', error);
+        }
+      } catch (error) {
+        console.error('Error in batch deletion:', error);
       }
     }
   };
@@ -758,6 +837,11 @@ const ChatPage = ({ currentUser, onUnreadChange, onDetailViewChange }: ChatPageP
       }
 
       onUnreadChange?.();
+      
+      // IMPORTANT: Refresh matches immediately when first message is sent
+      // This moves the match from "New Matches" to "Conversations" instantly
+      chatMatchesCache.delete(currentUser.id);
+      await fetchMatches();
     } catch (error) {
   // ...removed log...
       toast({
@@ -1081,6 +1165,7 @@ const ChatPage = ({ currentUser, onUnreadChange, onDetailViewChange }: ChatPageP
               {newMatchList.map((match) => {
                 const partnerId = match.partner?.id || 
                                  (match.user1_id === currentUser.id ? match.user2_id : match.user1_id);
+                const hasMessages = !!match.last_message;
                 
                 return (
                   <div
@@ -1089,18 +1174,16 @@ const ChatPage = ({ currentUser, onUnreadChange, onDetailViewChange }: ChatPageP
                     onClick={() => setSelectedMatch(match)}
                   >
                     <div className="relative mb-2">
-                      <div className="w-16 h-16 rounded-full p-[3px] bg-gradient-to-br from-pink-500 to-purple-600 flex items-center justify-center">
-                        <div className="w-full h-full rounded-full overflow-hidden bg-white">
-                          <ChatUserAvatar
-                            userId={partnerId}
-                            firstName={match.first_name}
-                            lastName={match.last_name}
-                            size="custom"
-                            className="w-full h-full"
-                            onClick={() => handleUserProfileClick(partnerId)}
-                          />
-                        </div>
-                      </div>
+                      <MatchExpirationAvatar
+                        userId={partnerId}
+                        matchId={match.id}
+                        matchCreatedAt={match.created_at}
+                        hasMessages={hasMessages}
+                        firstName={match.first_name}
+                        lastName={match.last_name}
+                        size="md"
+                        onClick={() => handleUserProfileClick(partnerId)}
+                      />
                     </div>
                     <span className="text-xs text-gray-900 text-center truncate w-full">
                       {match.first_name}

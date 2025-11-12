@@ -411,7 +411,12 @@
     "moreYouSwipe": "你滑动得越多，你会得到越多的匹配 💕",
     "startSwipingInDripCheck": "在DripCheck中开始滑动",
     "newMatchesWaiting": "新匹配等待中！",
-    "tapMatchToMessage": "点击上面的匹配以发送您的第一条消息"
+    "tapMatchToMessage": "点击上面的匹配以发送您的第一条消息",
+    "matchExpired": "匹配已过期",
+    "matchExpiredDescription": "此匹配由于不活跃而过期。在10天内开始对话以保持您的匹配！",
+    "matchExpiringTitle": "匹配即将过期！",
+    "matchExpiringBody": "您与{{name}}的匹配明天过期。发送消息以保持联系！💬",
+    "daysLeft": "剩余{{days}}天"
   },
   "premium": {
     "goPremium": "升级到高级版",

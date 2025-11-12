@@ -410,7 +410,12 @@
     "moreYouSwipe": "The more you swipe, the more matches you'll get 💕",
     "startSwipingInDripCheck": "Start swiping in DripCheck",
     "newMatchesWaiting": "New Matches Waiting!",
-    "tapMatchToMessage": "Tap on a match above to send your first message"
+    "tapMatchToMessage": "Tap on a match above to send your first message",
+    "matchExpired": "Match Expired",
+    "matchExpiredDescription": "This match has expired due to inactivity. Start conversations within 10 days to keep your matches!",
+    "matchExpiringTitle": "Match Expiring Soon!",
+    "matchExpiringBody": "Your match with {{name}} expires tomorrow. Send a message to keep the connection! 💬",
+    "daysLeft": "{{days}} days left"
   },
   "premium": {
     "goPremium": "Go Premium",
