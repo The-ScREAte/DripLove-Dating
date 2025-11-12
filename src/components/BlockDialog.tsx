@@ -41,6 +41,7 @@ const BlockDialog = ({ isOpen, onClose, userToBlock, currentUserId, onBlockSucce
 
     setIsBlocking(true);
     try {
+      // Try to insert the block
       const { error } = await supabase
         .from('blocks')
         .insert({
@@ -50,13 +51,26 @@ const BlockDialog = ({ isOpen, onClose, userToBlock, currentUserId, onBlockSucce
         });
 
       if (error) {
-        console.error('Block error details:', {
-          code: error.code,
-          message: error.message,
-          details: error.details,
-          blocker_id: currentUserId,
-          blocked_id: userToBlock.id
-        });
+        // If foreign key error (user profile doesn't exist), still proceed with cleanup
+        if (error.code === '23503') {
+          console.warn('User profile missing, cleaning up match instead');
+          
+          // Delete the match to prevent future interactions
+          await supabase
+            .from('matches')
+            .delete()
+            .or(`and(user1_id.eq.${currentUserId},user2_id.eq.${userToBlock.id}),and(user1_id.eq.${userToBlock.id},user2_id.eq.${currentUserId})`);
+          
+          toast({
+            title: t('block.blocked'),
+            description: 'User has been removed from your matches',
+          });
+          
+          onBlockSuccess();
+          onClose();
+          setReason('');
+          return;
+        }
         throw error;
       }
 
