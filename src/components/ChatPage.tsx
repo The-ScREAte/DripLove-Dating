@@ -962,6 +962,33 @@ const ChatPage = ({ currentUser, onUnreadChange, onDetailViewChange }: ChatPageP
     }
   };
 
+  const handleDormancyResponse = async (response: boolean) => {
+    if (!selectedMatch) return;
+
+    try {
+      const isUser1 = selectedMatch.user1_id === currentUser.id;
+      const updateField = isUser1 ? 'user1_heading_somewhere' : 'user2_heading_somewhere';
+      
+      const { error } = await supabase
+        .from('matches')
+        .update({ [updateField]: response })
+        .eq('id', selectedMatch.id);
+
+      if (error) throw error;
+
+      toast({
+        title: response ? t('chat.thankYouYes') : t('chat.thankYouNo'),
+        description: response 
+          ? t('chat.keepTheConversationGoing') 
+          : t('chat.weWillCleanThingsUp'),
+      });
+
+      console.log(`[ChatPage] Dormancy response recorded: ${response ? 'YES' : 'NO'}`);
+    } catch (error) {
+      console.error('Error recording dormancy response:', error);
+    }
+  };
+
   const testNotification = async () => {
     try {
       // First check if browser supports notifications
@@ -1395,6 +1422,7 @@ const ChatPage = ({ currentUser, onUnreadChange, onDetailViewChange }: ChatPageP
                   isConsecutive={isConsecutive}
                   onDeleteForMe={deleteMessageForMe}
                   onDeleteForEveryone={deleteMessageForEveryone}
+                  onDormancyResponse={handleDormancyResponse}
                 />
               );
             })}

@@ -23,3 +23,6 @@ verify_jwt = false
 
 [functions.cleanup-expired-matches]
 verify_jwt = false
+
+[functions.check-dormant-chats]
+verify_jwt = false

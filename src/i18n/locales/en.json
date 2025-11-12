@@ -415,7 +415,11 @@
     "matchExpiredDescription": "This match has expired due to inactivity. Start conversations within 10 days to keep your matches!",
     "matchExpiringTitle": "Match Expiring Soon!",
     "matchExpiringBody": "Your match with {{name}} expires tomorrow. Send a message to keep the connection! 💬",
-    "daysLeft": "{{days}} days left"
+    "daysLeft": "{{days}} days left",
+    "thankYouYes": "Great! 💖",
+    "thankYouNo": "Understood",
+    "keepTheConversationGoing": "Keep the conversation going and see where it leads!",
+    "weWillCleanThingsUp": "No worries! We'll help you find better connections."
   },
   "premium": {
     "goPremium": "Go Premium",

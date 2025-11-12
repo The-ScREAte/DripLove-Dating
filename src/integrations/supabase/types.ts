@@ -209,28 +209,40 @@ export type Database = {
       matches: {
         Row: {
           created_at: string
+          dormancy_check_asked_at: string | null
+          first_message_at: string | null
           id: string
           last_msg_at: string | null
+          user1_heading_somewhere: boolean | null
           user1_id: string
           user1_unread_count: number | null
+          user2_heading_somewhere: boolean | null
           user2_id: string
           user2_unread_count: number | null
         }
         Insert: {
           created_at?: string
+          dormancy_check_asked_at?: string | null
+          first_message_at?: string | null
           id?: string
           last_msg_at?: string | null
+          user1_heading_somewhere?: boolean | null
           user1_id: string
           user1_unread_count?: number | null
+          user2_heading_somewhere?: boolean | null
           user2_id: string
           user2_unread_count?: number | null
         }
         Update: {
           created_at?: string
+          dormancy_check_asked_at?: string | null
+          first_message_at?: string | null
           id?: string
           last_msg_at?: string | null
+          user1_heading_somewhere?: boolean | null
           user1_id?: string
           user1_unread_count?: number | null
+          user2_heading_somewhere?: boolean | null
           user2_id?: string
           user2_unread_count?: number | null
         }
@@ -883,6 +895,30 @@ export type Database = {
           },
         ]
       }
+      web_ratings: {
+        Row: {
+          created_at: string
+          id: number
+          platform: string
+          rating_value: number
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: never
+          platform?: string
+          rating_value: number
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: never
+          platform?: string
+          rating_value?: number
+          user_id?: string
+        }
+        Relationships: []
+      }
     }
     Views: {
       [_ in never]: never
@@ -894,7 +930,7 @@ export type Database = {
       }
       admin_create_match: {
         Args: { p_user1_id: string; p_user2_id: string }
-        Returns: undefined
+        Returns: Json
       }
       admin_get_user_premium_status: {
         Args: { target_user_id: string }
@@ -922,6 +958,13 @@ export type Database = {
         Returns: number
       }
       cancel_user_subscription: { Args: never; Returns: undefined }
+      check_and_dissolve_expired_matches: {
+        Args: never
+        Returns: {
+          dissolved_count: number
+          notified_count: number
+        }[]
+      }
       cleanup_incomplete_users: { Args: never; Returns: undefined }
       create_admin_user: {
         Args: {
