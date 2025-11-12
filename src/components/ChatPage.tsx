@@ -694,7 +694,36 @@ const ChatPage = ({ currentUser, onUnreadChange, onDetailViewChange }: ChatPageP
         description: t('chat.cannotSendToAdminDesc'),
         variant: "destructive"
       });
+      setIsSending(false);
       return;
+    }
+
+    // Check if either user has blocked the other
+    try {
+      const partnerId = selectedMatch.user1_id === currentUser.id 
+        ? selectedMatch.user2_id 
+        : selectedMatch.user1_id;
+
+      const { data: blockData, error: blockError } = await supabase
+        .from('blocks')
+        .select('id')
+        .or(`and(blocker_id.eq.${currentUser.id},blocked_id.eq.${partnerId}),and(blocker_id.eq.${partnerId},blocked_id.eq.${currentUser.id})`)
+        .limit(1);
+
+      if (blockError) throw blockError;
+
+      if (blockData && blockData.length > 0) {
+        toast({
+          title: t('chat.cannotSend'),
+          description: 'Cannot send messages to this user',
+          variant: "destructive"
+        });
+        setIsSending(false);
+        return;
+      }
+    } catch (error) {
+      console.error('Error checking blocks:', error);
+      // Continue with sending message if block check fails
     }
 
     const messageText = newMessage.trim();
