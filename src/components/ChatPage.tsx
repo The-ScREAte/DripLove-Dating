@@ -1151,6 +1151,39 @@ const ChatPage = ({ currentUser, onUnreadChange, onDetailViewChange }: ChatPageP
     });
   };
 
+  const handleDeleteChat = async () => {
+    if (!selectedMatch) return;
+
+    try {
+      // Delete the match from database
+      const { error } = await supabase
+        .from('matches')
+        .delete()
+        .eq('id', selectedMatch.id);
+
+      if (error) throw error;
+
+      // Remove from local state
+      setMatches(prev => prev.filter(match => match.id !== selectedMatch.id));
+      setSelectedMatch(null);
+
+      // Clear cache
+      chatMatchesCache.delete(currentUser.id);
+
+      toast({
+        title: t('chat.chatDeleted'),
+        description: t('chat.chatDeletedDescription'),
+      });
+    } catch (error) {
+      console.error('Error deleting chat:', error);
+      toast({
+        title: t('chat.error'),
+        description: t('chat.failedToDeleteChat'),
+        variant: 'destructive'
+      });
+    }
+  };
+
   if (!selectedMatch) {
     const newMatchList = matches.filter(m => !m.last_message);
     const conversationList = matches.filter(m => m.last_message);
@@ -1362,6 +1395,7 @@ const ChatPage = ({ currentUser, onUnreadChange, onDetailViewChange }: ChatPageP
           onBack={() => setSelectedMatch(null)}
           onUserProfileOpen={handleUserProfileClick}
           onBlockUser={handleBlockClick}
+          onDeleteChat={handleDeleteChat}
           onReport={(messageId?: string) => {
             setReportMessageId(messageId);
             setIsReportDialogOpen(true);

@@ -16,6 +16,7 @@ interface ChatHeaderProps {
   onBack: () => void;
   onUserProfileOpen: (userId: string) => void;
   onBlockUser: (user: ChatMatch) => void;
+  onDeleteChat: () => void;
   onReport?: (messageId?: string) => void;
   onTestNotification?: () => void;
   isMobile?: boolean;
@@ -27,6 +28,7 @@ const ChatHeader: React.FC<ChatHeaderProps> = ({
   onBack,
   onUserProfileOpen,
   onBlockUser,
+  onDeleteChat,
   onReport,
   onTestNotification,
   isMobile = false,
@@ -145,7 +147,7 @@ const ChatHeader: React.FC<ChatHeaderProps> = ({
             <div className="absolute top-16 right-4 z-[999999]">
               <div className="min-w-[160px] overflow-hidden rounded-md border bg-white p-4 shadow-lg space-y-1">
                 <button
-                  className="w-full text-left px-4 py-3 text-sm"
+                  className="w-full text-left px-4 py-3 text-sm hover:bg-gray-50"
                   onClick={() => {
                     setMenuOpen(false);
                     // delegate to parent to open the report dialog; allow undefined message id
@@ -155,7 +157,16 @@ const ChatHeader: React.FC<ChatHeaderProps> = ({
                   {t('chat.report')}
                 </button>
                 <button
-                  className="w-full text-left px-4 py-3 text-sm text-red-600"
+                  className="w-full text-left px-4 py-3 text-sm hover:bg-gray-50"
+                  onClick={() => { 
+                    setMenuOpen(false);
+                    onDeleteChat();
+                  }}
+                >
+                  {t('chat.deleteChat')}
+                </button>
+                <button
+                  className="w-full text-left px-4 py-3 text-sm text-red-600 hover:bg-red-50"
                   onClick={() => { onBlockUser(selectedMatch); setMenuOpen(false); }}
                 >
                   {t('chat.blockUser')}
