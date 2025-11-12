@@ -31,6 +31,24 @@ const BlockDialog = ({ isOpen, onClose, userToBlock, currentUserId, onBlockSucce
 
     setIsBlocking(true);
     try {
+      // First verify the user exists in profiles
+      const { data: profileExists, error: checkError } = await supabase
+        .from('profiles')
+        .select('id')
+        .eq('id', userToBlock.id)
+        .single();
+
+      if (checkError || !profileExists) {
+        toast({
+          title: t('chat.error'),
+          description: 'This user account no longer exists.',
+          variant: "destructive",
+        });
+        setIsBlocking(false);
+        onClose();
+        return;
+      }
+
       const { error } = await supabase
         .from('blocks')
         .insert({
