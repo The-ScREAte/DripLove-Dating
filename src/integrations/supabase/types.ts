@@ -974,6 +974,10 @@ export type Database = {
         }
         Returns: Json
       }
+      delete_match_with_chats: {
+        Args: { match_id_param: string }
+        Returns: undefined
+      }
       delete_old_messages: { Args: never; Returns: undefined }
       delete_user_and_data: {
         Args: { user_id_to_delete: string }

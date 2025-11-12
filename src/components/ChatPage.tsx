@@ -8,6 +8,7 @@ import { Capacitor } from '@capacitor/core';
 import UserProfileModal from './UserProfileModal';
 import BlockDialog from './BlockDialog';
 import ReportDialog from '@/components/ReportDialog';
+import DeleteChatDialog from './chat/DeleteChatDialog';
 import ChatUserList from './chat/ChatUserList';
 import MessageBubble from './chat/MessageBubble';
 import MessageInput from './chat/MessageInput';
@@ -60,6 +61,7 @@ const ChatPage = ({ currentUser, onUnreadChange, onDetailViewChange }: ChatPageP
   const [userToBlock, setUserToBlock] = useState<ChatMatch | null>(null);
   const [isReportDialogOpen, setIsReportDialogOpen] = useState(false);
   const [reportMessageId, setReportMessageId] = useState<string | undefined>(undefined);
+  const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
   const { toast } = useToast();
   const { sendMessageNotification, isInitialized, isSupported } = usePushNotifications(currentUser?.id);
   const messagesEndRef = useRef<HTMLDivElement>(null);
@@ -1151,15 +1153,18 @@ const ChatPage = ({ currentUser, onUnreadChange, onDetailViewChange }: ChatPageP
     });
   };
 
-  const handleDeleteChat = async () => {
+  const handleDeleteChatClick = () => {
+    setIsDeleteDialogOpen(true);
+  };
+
+  const handleDeleteChatConfirm = async () => {
     if (!selectedMatch) return;
 
     try {
-      // Delete the match from database
-      const { error } = await supabase
-        .from('matches')
-        .delete()
-        .eq('id', selectedMatch.id);
+      // Use the database function to delete match and all related chats
+      const { error } = await supabase.rpc('delete_match_with_chats', {
+        match_id_param: selectedMatch.id
+      });
 
       if (error) throw error;
 
@@ -1169,6 +1174,7 @@ const ChatPage = ({ currentUser, onUnreadChange, onDetailViewChange }: ChatPageP
 
       // Clear cache
       chatMatchesCache.delete(currentUser.id);
+      chatMessagesCache.delete(selectedMatch.id);
 
       toast({
         title: t('chat.chatDeleted'),
@@ -1181,6 +1187,8 @@ const ChatPage = ({ currentUser, onUnreadChange, onDetailViewChange }: ChatPageP
         description: t('chat.failedToDeleteChat'),
         variant: 'destructive'
       });
+    } finally {
+      setIsDeleteDialogOpen(false);
     }
   };
 
@@ -1395,7 +1403,7 @@ const ChatPage = ({ currentUser, onUnreadChange, onDetailViewChange }: ChatPageP
           onBack={() => setSelectedMatch(null)}
           onUserProfileOpen={handleUserProfileClick}
           onBlockUser={handleBlockClick}
-          onDeleteChat={handleDeleteChat}
+          onDeleteChat={handleDeleteChatClick}
           onReport={(messageId?: string) => {
             setReportMessageId(messageId);
             setIsReportDialogOpen(true);
@@ -1503,6 +1511,13 @@ const ChatPage = ({ currentUser, onUnreadChange, onDetailViewChange }: ChatPageP
         onReportSuccess={() => {
           // optional: any post-report actions
         }}
+      />
+
+      <DeleteChatDialog
+        isOpen={isDeleteDialogOpen}
+        onClose={() => setIsDeleteDialogOpen(false)}
+        onConfirm={handleDeleteChatConfirm}
+        matchName={selectedMatch ? `${selectedMatch.first_name} ${selectedMatch.last_name}` : ''}
       />
     </div>
   );
