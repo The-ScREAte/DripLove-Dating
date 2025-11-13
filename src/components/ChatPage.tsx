@@ -740,47 +740,16 @@ const ChatPage = ({ currentUser, onUnreadChange, onDetailViewChange }: ChatPageP
           match_id: selectedMatch.id,
           sender_id: currentUser.id,
           message: messageText
-        })
-        .select()
-        .single();
-
-      if (error) throw error;
-
-      // Replace optimistic message with real one
-      if (data) {
-        setMessages(prev => {
-          const serverMsg: ChatMessage = { ...data, sent_at: data.created_at, receiver_id: optimisticMessage.receiver_id } as ChatMessage;
-
-          const hasServer = prev.some(m => m.id === data.id);
-          const hasTemp = prev.some(m => m.id === tempId);
-
-          // If temp exists, replace it with server message
-          if (hasTemp) {
-            const replaced = prev.map(m => (m.id === tempId ? serverMsg : m));
-            // Ensure uniqueness by id (in case server message was already appended by realtime)
-            const unique: ChatMessage[] = [];
-            const seen = new Set<string>();
-            for (const m of replaced) {
-              if (!seen.has(m.id)) {
-                unique.push(m);
-                seen.add(m.id);
-              }
-            }
-            chatMessagesCache.set(selectedMatch.id, { messages: unique, timestamp: Date.now() });
-            return unique;
-          }
-
-          // If temp doesn't exist and server message not present, append server message
-          if (!hasServer) {
-            const updated = [...prev, serverMsg];
-            chatMessagesCache.set(selectedMatch.id, { messages: updated, timestamp: Date.now() });
-            return updated;
-          }
-
-          // Server message already present and no temp to replace — keep as-is
-          return prev;
         });
+
+      if (error) {
+        console.error('Supabase insert error:', error);
+        throw error;
       }
+
+      // Since we're using optimistic updates, we don't need the returned data
+      // The realtime subscription will handle updating the UI with the server message
+      // The optimistic message stays in the UI until realtime provides the actual server message
     } catch (error) {
       // Remove optimistic message on error
       setMessages(prev => {
@@ -792,69 +761,69 @@ const ChatPage = ({ currentUser, onUnreadChange, onDetailViewChange }: ChatPageP
         return updated;
       });
       
+      console.error('Error sending message:', error);
       toast({
         title: t('chat.error'),
         description: t('chat.failedToSend'),
         variant: 'destructive'
       });
+      setIsSending(false);
       return;
     }
 
-    try {
-
-      // Send push notification to the recipient
-      const recipientId = selectedMatch.user1_id === currentUser.id 
-        ? selectedMatch.user2_id 
-        : selectedMatch.user1_id;
-      const senderName = `${currentUser.first_name || ''} ${currentUser.last_name || ''}`.trim() || 'Someone';
-
-      // Use the proper notification service
+    // Send push notification and update unread count (non-blocking)
+    // These operations should not block message sending or show errors to user
+    (async () => {
       try {
-        const result = await sendMessageNotification(senderName, messageText, recipientId, selectedMatch.id);
-      } catch (notificationError) {
-        console.error('💬 Message notification error:', notificationError);
-      }
+        // Send push notification to the recipient
+        const recipientId = selectedMatch.user1_id === currentUser.id 
+          ? selectedMatch.user2_id 
+          : selectedMatch.user1_id;
+        const senderName = `${currentUser.first_name || ''} ${currentUser.last_name || ''}`.trim() || 'Someone';
 
-      // Try to update unread count (only if field exists)
-      try {
-        const isUser1 = selectedMatch.user1_id === currentUser.id;
-        const unreadField = isUser1 ? 'user2_unread_count' : 'user1_unread_count';
-        // Get current unread count for the other user
-        const { data: matchData, error: matchError } = await supabase
-          .from('matches')
-          .select(unreadField)
-          .eq('id', selectedMatch.id)
-          .single();
-        let newCount = 1;
-        if (!matchError && matchData && typeof matchData[unreadField] === 'number') {
-          newCount = matchData[unreadField] + 1;
+        // Use the proper notification service
+        try {
+          const result = await sendMessageNotification(senderName, messageText, recipientId, selectedMatch.id);
+        } catch (notificationError) {
+          console.error('💬 Message notification error:', notificationError);
         }
-        const updateData = { [unreadField]: newCount };
-        await supabase
-          .from('matches')
-          .update(updateData)
-          .eq('id', selectedMatch.id);
-      } catch (unreadError) {
-        // Silently handle if unread fields don't exist
-      }
 
-      onUnreadChange?.();
-      
-      // IMPORTANT: Refresh matches immediately when first message is sent
-      // This moves the match from "New Matches" to "Conversations" instantly
-      chatMatchesCache.delete(currentUser.id);
-      await fetchMatches();
-    } catch (error) {
-  // ...removed log...
-      toast({
-        title: t('chat.error'),
-        description: t('chat.failedToSend'),
-        variant: 'destructive'
-      });
-    }
-    finally {
-      setIsSending(false);
-    }
+        // Try to update unread count (only if field exists)
+        try {
+          const isUser1 = selectedMatch.user1_id === currentUser.id;
+          const unreadField = isUser1 ? 'user2_unread_count' : 'user1_unread_count';
+          // Get current unread count for the other user
+          const { data: matchData, error: matchError } = await supabase
+            .from('matches')
+            .select(unreadField)
+            .eq('id', selectedMatch.id)
+            .single();
+          let newCount = 1;
+          if (!matchError && matchData && typeof matchData[unreadField] === 'number') {
+            newCount = matchData[unreadField] + 1;
+          }
+          const updateData = { [unreadField]: newCount };
+          await supabase
+            .from('matches')
+            .update(updateData)
+            .eq('id', selectedMatch.id);
+        } catch (unreadError) {
+          // Silently handle if unread fields don't exist
+        }
+
+        onUnreadChange?.();
+        
+        // IMPORTANT: Refresh matches immediately when first message is sent
+        // This moves the match from "New Matches" to "Conversations" instantly
+        chatMatchesCache.delete(currentUser.id);
+        await fetchMatches();
+      } catch (error) {
+        // Log but don't show error to user - message was already sent successfully
+        console.error('Post-send operations error:', error);
+      }
+    })();
+
+    setIsSending(false);
   };
 
   const deleteMessage = async (messageId: string) => {
