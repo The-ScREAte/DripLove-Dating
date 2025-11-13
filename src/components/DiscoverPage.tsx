@@ -856,13 +856,18 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, isPremium }: DiscoverPage
           timestamp: Date.now()
         });
 
+        // Set profiles FIRST before marking fetch complete
         setPotentialMatches(matchesWithAds);
         setUserImages(images);
         setUserDistances(distances);
         setCurrentIndex(index);
         setLastShuffleTime(Date.now());
-        setIsLoading(false);
-        setHasCompletedInitialFetch(true);
+        
+        // Use setTimeout to ensure state updates are processed before marking complete
+        setTimeout(() => {
+          setIsLoading(false);
+          setHasCompletedInitialFetch(true);
+        }, 0);
 
         // Fetch verification status for each profile (NO calculation!)
         matches.forEach(profile => {
@@ -1062,15 +1067,20 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, isPremium }: DiscoverPage
       if (cached && Date.now() - cached.timestamp < DISCOVER_CACHE_DURATION) {
         console.log('✅ Using cached profiles for consistent experience');
         // Cache already has ads injected, use directly
+        // Set profiles FIRST before marking fetch complete
         setPotentialMatches(cached.potentialMatches);
         setUserImages(cached.userImages);
         setUserDistances(cached.userDistances);
         // CRITICAL: Always use the cached currentIndex to maintain position
-        // This ensures the user sees the same profile even after refresh
         const savedIndex = Math.max(0, Math.min(cached.currentIndex, cached.potentialMatches.length - 1));
         setCurrentIndex(savedIndex);
-        setIsLoading(false);
-        setHasCompletedInitialFetch(true);
+        
+        // Use setTimeout to ensure state updates are processed before marking complete
+        setTimeout(() => {
+          setIsLoading(false);
+          setHasCompletedInitialFetch(true);
+        }, 0);
+        
         // COMPLETELY DISABLE background refresh to prevent profile changes
         suppressFetchRef.current = true;
         // Mark this user+date as initialized
