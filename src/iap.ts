@@ -2,18 +2,15 @@ import 'cordova-plugin-purchase';
 
 export function initIAP() {
   return new Promise<void>((resolve, reject) => {
-    console.log('[IAP] initIAP called');
     
     // If not a Cordova app, resolve immediately
     if (typeof window.cordova === 'undefined') {
-      console.log('[IAP] Not a Cordova app (no window.cordova), skipping IAP initialization');
       resolve();
       return;
     }
 
     // Function to initialize the store
     const initializeStore = () => {
-      console.log('[IAP] Initializing store...');
       
       // @ts-ignore
       const { store, LogLevel, Platform, ProductType, log } = window.CdvPurchase || {};
@@ -23,8 +20,6 @@ export function initIAP() {
         resolve(); // Resolve to not block app
         return;
       }
-      
-      console.log('[IAP] CdvPurchase.store found, configuring...');
       
       // Set log level to ERROR in production to hide technical messages from users
       if (log && LogLevel && typeof log.setLevel === 'function') {
@@ -58,7 +53,6 @@ export function initIAP() {
         platform: Platform.APPLE_APPSTORE,
         type: ProductType.PAID_SUBSCRIPTION
       })));
-      console.log('[IAP] Registered products:', PRODUCT_IDS);
     } else {
       console.error('[IAP] store.register not available');
       clearTimeout(initializationTimeout);
@@ -93,11 +87,6 @@ export function initIAP() {
           if (p && isOurProduct) {
             clearTimeout(initializationTimeout);
             window.iapInitializationFailed = false;
-            console.log('[IAP] Product loaded successfully:', {
-              id: p.id,
-              state: p.state,
-              hasOffer: !!p.getOffer?.()
-            });
           }
         })
         .approved(t => {
@@ -273,13 +262,11 @@ export function initIAP() {
     if (store.initialize && typeof store.initialize === 'function') {
       try {
         store.initialize([{ platform: Platform.APPLE_APPSTORE, options: { needAppReceipt: true } }]);
-        console.log('[IAP] Store initialized successfully');
         
         // Add a ready state handler to clear timeout and resolve promise
         if (store.ready && typeof store.ready === 'function') {
           store.ready(() => {
             clearTimeout(initializationTimeout);
-            console.log('[IAP] Store ready');
             window.iapInitializationFailed = false;
             resolve(); // Resolve when store is ready
           });
@@ -308,7 +295,6 @@ export function initIAP() {
     if (store.refresh && typeof store.refresh === 'function') {
       try {
         store.refresh();
-        console.log('[IAP] Store refresh initiated');
       } catch (error) {
         console.error('[IAP] Store refresh error:', error);
       }
@@ -320,10 +306,8 @@ export function initIAP() {
     // Check if deviceready already fired
     // @ts-ignore
     if (window.cordova && window.cordova.platformId) {
-      console.log('[IAP] Device already ready, initializing immediately');
       initializeStore();
     } else {
-      console.log('[IAP] Waiting for deviceready event...');
       // Set a timeout for deviceready event (10 seconds)
       const deviceReadyTimeout = setTimeout(() => {
         console.error('[IAP] deviceready event timeout after 10 seconds');
@@ -333,7 +317,6 @@ export function initIAP() {
 
       document.addEventListener('deviceready', () => {
         clearTimeout(deviceReadyTimeout);
-        console.log('[IAP] deviceready event fired');
         initializeStore();
       }, { once: true });
     }
@@ -347,8 +330,6 @@ export const buyMonthly = async () => {
     'com.driplove.dating.premium.monthlysub2',
     'com.driplove.dating.premium.monthlysub3'
   ];
-
-  console.log('[IAP] buyMonthly called. Checking available product...');
   
   // @ts-ignore
   const store = window.CdvPurchase?.store;
@@ -358,20 +339,15 @@ export const buyMonthly = async () => {
   }
   
   window.iapPurchaseInitiated = true;
-  console.log('[IAP] Purchase initiated by user');
 
   // Try to find the first valid product that can be purchased
   let product;
   for (const id of PRODUCT_IDS) {
     try {
-      console.log(`[IAP] Checking product ${id}...`);
       const p = store.get ? store.get(id) : null;
       if (p && p.canPurchase) {
         product = p;
-        console.log('[IAP] Using available product:', id);
         break;
-      } else {
-        console.log(`[IAP] Product ${id} not available or can't purchase`, { exists: !!p, canPurchase: p?.canPurchase });
       }
     } catch (err) {
       console.warn(`[IAP] Could not load product ${id}:`, err);
@@ -385,12 +361,10 @@ export const buyMonthly = async () => {
   }
 
   // Continue with existing order logic
-  console.log('[IAP] Initiating order for product:', product.id);
   try {
     const offer = product.getOffer?.();
     if (offer && typeof offer.order === 'function') {
       await offer.order();
-      console.log('[IAP] Order initiated successfully');
     } else {
       console.error('[IAP] No valid offer found');
       window.iapPurchaseInitiated = false;
@@ -415,11 +389,8 @@ export function restorePurchases(): Promise<void> {
       return;
     }
     
-    console.log('[IAP] Starting restore purchases...');
-    
     // Set a timeout for the restore operation
     const timeoutId = setTimeout(() => {
-      console.log('[IAP] Restore completed (timeout reached)');
       resolve();
     }, 5000);
     
@@ -428,7 +399,6 @@ export function restorePurchases(): Promise<void> {
     const onProductUpdated = (product: any) => {
       if (product && product.owned) {
         restoredCount++;
-        console.log('[IAP] Restored product:', product.id);
       }
     };
     
@@ -443,23 +413,19 @@ export function restorePurchases(): Promise<void> {
     
     // Trigger the refresh
     if (store.restorePurchases && typeof store.restorePurchases === 'function') {
-      console.log('[IAP] Calling store.restorePurchases()');
       store.restorePurchases();
       
       // Wait a bit for restoration to complete
       setTimeout(() => {
         clearTimeout(timeoutId);
-        console.log('[IAP] Restore process completed, products restored:', restoredCount);
         resolve();
       }, 3000);
     } else if (store.refresh && typeof store.refresh === 'function') {
-      console.log('[IAP] Calling store.refresh()');
       store.refresh();
       
       // Wait a bit for refresh to complete
       setTimeout(() => {
         clearTimeout(timeoutId);
-        console.log('[IAP] Refresh completed');
         resolve();
       }, 3000);
     } else {
@@ -487,29 +453,6 @@ export function debugIAPState() {
     console.error('[IAP Debug] Error getting product:', error);
   }
   
-  console.log('[IAP Debug] Current state:', {
-    storeAvailable: !!store,
-    getMethodAvailable: !!store.get,
-    productLoaded: !!product,
-    productId: product?.id,
-    productTitle: product?.title,
-    productPrice: product?.pricing?.price,
-    productState: product?.state,
-    offerAvailable: !!offer,
-    offerType: offer?.constructor?.name,
-    purchaseInitiated: !!window.iapPurchaseInitiated,
-    cdvPurchaseGlobal: !!window.CdvPurchase
-  });
-  
-  // Also log all products
-  try {
-    const allProducts = store.products || [];
-    console.log('[IAP Debug] All products:', allProducts.map((p: any) => ({
-      id: p.id,
-      state: p.state,
-      hasOffer: !!p.getOffer?.()
-    })));
-  } catch (error) {
-    console.warn('[IAP Debug] Error getting all products:', error);
-  }
+  // Debug function - logs removed for production
+  // Can be re-enabled for debugging if needed
 }

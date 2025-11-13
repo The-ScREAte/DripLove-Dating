@@ -87,7 +87,6 @@ const ChatPage = ({ currentUser, onUnreadChange, onDetailViewChange }: ChatPageP
       fetchMatchesInBackground();
     } else {
       // No cache or stale cache, fetch immediately but don't show loading
-      console.log('[ChatPage] 🔄 No cached data, fetching matches');
       fetchMatches();
     }
     
@@ -118,15 +117,12 @@ const ChatPage = ({ currentUser, onUnreadChange, onDetailViewChange }: ChatPageP
     }
     
     if (matchIdFromUrl && !selectedMatch) {
-      console.log('[ChatPage] 🔗 Opening match from notification:', matchIdFromUrl);
       const matchToOpen = matches.find(m => m.id === matchIdFromUrl);
       if (matchToOpen) {
         setSelectedMatch(matchToOpen);
         // Clear the URL parameter and hash
         window.history.replaceState({}, '', window.location.pathname);
         window.location.hash = '';
-      } else {
-        console.warn('[ChatPage] ⚠️ Match not found in list:', matchIdFromUrl);
       }
     }
   }, [currentUser, matches, selectedMatch]);
@@ -140,8 +136,6 @@ const ChatPage = ({ currentUser, onUnreadChange, onDetailViewChange }: ChatPageP
   useEffect(() => {
     if (!currentUser || !currentUser.id) return;
     
-    console.log('[ChatPage] 🔔 Setting up matches realtime subscription');
-    
     const channel = supabase
       .channel('chat-matches')
       .on(
@@ -152,7 +146,6 @@ const ChatPage = ({ currentUser, onUnreadChange, onDetailViewChange }: ChatPageP
           table: 'matches',
         },
         (payload) => {
-            console.log('[ChatPage] 📨 Realtime match change:', payload.eventType, payload.new);
             // Mark that matches have changed. We'll refresh the UI only when appropriate.
             matchesNeedsRefreshRef.current = true;
             // Still update cache in background so data is fresh when the user returns
@@ -161,12 +154,9 @@ const ChatPage = ({ currentUser, onUnreadChange, onDetailViewChange }: ChatPageP
             onUnreadChange?.();
           }
       )
-      .subscribe((status) => {
-        console.log('[ChatPage] 🔌 Matches subscription status:', status);
-      });
+      .subscribe();
 
     return () => {
-      console.log('[ChatPage] 🔌 Cleaning up matches subscription');
       supabase.removeChannel(channel);
     };
   }, [currentUser?.id]);
@@ -176,9 +166,7 @@ const ChatPage = ({ currentUser, onUnreadChange, onDetailViewChange }: ChatPageP
     if (!currentUser || !currentUser.id) return;
     
     const handleNewMatch = (event: CustomEvent) => {
-      console.log('[ChatPage] 💬 New match event received:', event.detail);
       if (event.detail.userId === currentUser.id) {
-        console.log('[ChatPage] 💬 Refreshing matches due to new match');
         // Clear cache
         chatMatchesCache.delete(currentUser.id);
         // Fetch fresh data in background
@@ -207,7 +195,6 @@ const ChatPage = ({ currentUser, onUnreadChange, onDetailViewChange }: ChatPageP
       // Refresh the matches list when there were changes while inside the conversation
       // OR when we're returning to the chat list view
       if (matchesNeedsRefreshRef.current) {
-        console.log('[ChatPage] 🔄 Refreshing matches due to changes');
         void fetchMatches();
       }
     }
@@ -221,8 +208,6 @@ const ChatPage = ({ currentUser, onUnreadChange, onDetailViewChange }: ChatPageP
   useEffect(() => {
     if (!currentUser || !currentUser.id) return;
     if (selectedMatch) {
-      console.log('[ChatPage] 🔔 Setting up chats realtime subscription for match:', selectedMatch.id);
-      
       const channel = supabase
         .channel(`chats:${selectedMatch.id}`)
         .on(
@@ -234,7 +219,6 @@ const ChatPage = ({ currentUser, onUnreadChange, onDetailViewChange }: ChatPageP
             filter: `match_id=eq.${selectedMatch.id}`,
           },
           (payload) => {
-            console.log('[ChatPage] 📨 Realtime new message:', payload.new);
             const newMsg = payload.new as ChatMessage;
             
             // Ensure sent_at is set for proper date display
@@ -244,7 +228,6 @@ const ChatPage = ({ currentUser, onUnreadChange, onDetailViewChange }: ChatPageP
             
             // Check if message is deleted for current user
             if (newMsg.deleted_for && newMsg.deleted_for.includes(currentUser.id)) {
-              console.log('[ChatPage] ⚠️ New message is deleted for current user, skipping');
               return;
             }
             
@@ -252,10 +235,8 @@ const ChatPage = ({ currentUser, onUnreadChange, onDetailViewChange }: ChatPageP
               setMessages((prev) => {
                 // Dedupe: if message id already exists, ignore (prevents duplicates from optimistic + realtime)
                 if (prev.some(m => m.id === newMsg.id)) {
-                  console.log('[ChatPage] ⚠️ Duplicate message detected, skipping');
                   return prev;
                 }
-                console.log('[ChatPage] ✅ Adding new message to state');
                 const updated = [...prev, newMsg];
                 // Update cache with new message
                 chatMessagesCache.set(selectedMatch.id, {
@@ -282,12 +263,10 @@ const ChatPage = ({ currentUser, onUnreadChange, onDetailViewChange }: ChatPageP
             filter: `match_id=eq.${selectedMatch.id}`,
           },
           (payload) => {
-            console.log('[ChatPage] 📝 Realtime message update:', payload.new);
             const updatedMsg = payload.new as ChatMessage;
             
             // Check if message was deleted for current user
             if (updatedMsg.deleted_for && updatedMsg.deleted_for.includes(currentUser.id)) {
-              console.log('[ChatPage] 🗑️ Message deleted for current user, removing from UI');
               setMessages((prev) => {
                 const updated = prev.filter(m => m.id !== updatedMsg.id);
                 // Update cache
@@ -323,7 +302,6 @@ const ChatPage = ({ currentUser, onUnreadChange, onDetailViewChange }: ChatPageP
             filter: `match_id=eq.${selectedMatch.id}`,
           },
           (payload) => {
-            console.log('[ChatPage] 🗑️ Realtime message delete:', payload.old);
             const deletedMsg = payload.old as { id: string };
             
             // Remove the message from state
@@ -338,12 +316,9 @@ const ChatPage = ({ currentUser, onUnreadChange, onDetailViewChange }: ChatPageP
             });
           }
         )
-        .subscribe((status) => {
-          console.log('[ChatPage] 🔌 Chats subscription status:', status);
-        });
+        .subscribe();
 
       return () => {
-        console.log('[ChatPage] 🔌 Cleaning up chats subscription for match:', selectedMatch.id);
         supabase.removeChannel(channel);
       };
     }
@@ -508,7 +483,6 @@ const ChatPage = ({ currentUser, onUnreadChange, onDetailViewChange }: ChatPageP
             data: { matchId: match.id, partnerId }
           });
 
-          console.log(`⏰ Sent expiration warning for match: ${match.id}`);
         } catch (error) {
           console.error('Error sending expiration notification:', error);
         }
@@ -524,7 +498,6 @@ const ChatPage = ({ currentUser, onUnreadChange, onDetailViewChange }: ChatPageP
           .in('id', expiredMatchIds);
 
         if (!error) {
-          console.log(`🗑️ Deleted ${expiredMatchIds.length} expired matches from database`);
           // Clear cache so next fetch gets fresh data without expired matches
           chatMatchesCache.delete(currentUser.id);
         } else {
@@ -837,9 +810,7 @@ const ChatPage = ({ currentUser, onUnreadChange, onDetailViewChange }: ChatPageP
 
       // Use the proper notification service
       try {
-        console.log('💬 Sending message notification to:', recipientId, 'from:', senderName);
         const result = await sendMessageNotification(senderName, messageText, recipientId, selectedMatch.id);
-        console.log('💬 Message notification result:', result);
       } catch (notificationError) {
         console.error('💬 Message notification error:', notificationError);
       }
@@ -1014,7 +985,6 @@ const ChatPage = ({ currentUser, onUnreadChange, onDetailViewChange }: ChatPageP
           : t('chat.weWillCleanThingsUp'),
       });
 
-      console.log(`[ChatPage] Dormancy response recorded: ${response ? 'YES' : 'NO'}`);
     } catch (error) {
       console.error('Error recording dormancy response:', error);
     }

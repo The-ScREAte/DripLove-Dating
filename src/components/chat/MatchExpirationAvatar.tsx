@@ -71,30 +71,13 @@ const MatchExpirationAvatar = ({
       const expirationDate = new Date(createdDate.getTime() + (EXPIRATION_DAYS * MS_PER_DAY));
       const timeLeft = expirationDate.getTime() - now.getTime();
       
-      console.log(`[MatchExpiration] Match ${matchId}:`, {
-        createdAt: matchCreatedAt,
-        createdDate: createdDate.toISOString(),
-        now: now.toISOString(),
-        expirationDate: expirationDate.toISOString(),
-        timeLeft: timeLeft,
-        timeLeftDays: timeLeft / MS_PER_DAY,
-        hasMessages
-      });
-      
       if (timeLeft <= 0) {
         // Match has expired
-        console.log(`[MatchExpiration] Match ${matchId} has EXPIRED`);
         return { daysLeft: 0, progress: 1 };
       }
 
       const daysRemaining = Math.ceil(timeLeft / MS_PER_DAY);
       const progressValue = 1 - (timeLeft / (EXPIRATION_DAYS * MS_PER_DAY));
-      
-      console.log(`[MatchExpiration] Match ${matchId} countdown:`, {
-        daysRemaining,
-        progressValue,
-        progressPercent: (progressValue * 100).toFixed(1) + '%'
-      });
       
       return { daysLeft: daysRemaining, progress: progressValue };
     };
@@ -149,14 +132,6 @@ const MatchExpirationAvatar = ({
 
   // Pink color stays constant - it's the fill that reduces
   const borderColor = 'rgb(236, 72, 153)'; // Pink-500
-  
-  console.log(`[MatchExpiration] Render ${matchId}:`, {
-    hasMessages,
-    progress,
-    circumference: circumference.toFixed(2),
-    strokeDashoffset: strokeDashoffset.toFixed(2),
-    fillPercent: ((1 - progress) * 100).toFixed(1) + '%'
-  });
 
   return (
     <div className="relative inline-flex items-center justify-center" style={{ width: circleSize[size], height: circleSize[size] }}>

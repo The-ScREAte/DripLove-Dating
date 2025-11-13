@@ -35,8 +35,6 @@ export const saveLanguageToProfile = async (userId: string) => {
     
     if (error) {
       console.error('Error saving language to profile:', error);
-    } else {
-      console.log('✅ Language saved to profile:', currentLanguage);
     }
   } catch (error) {
     console.error('Exception saving language:', error);
@@ -61,7 +59,6 @@ export const loadUserLanguage = async (userId: string) => {
     
     if (profile?.preferred_language) {
       await i18n.changeLanguage(profile.preferred_language);
-      console.log('✅ User language loaded:', profile.preferred_language);
     }
   } catch (error) {
     console.error('Exception loading user language:', error);

@@ -279,6 +279,7 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, isPremium }: DiscoverPage
   const [imageIndex, setImageIndex] = useState(0);
   const [isLoading, setIsLoading] = useState(true);
   const [isLoadingMore, setIsLoadingMore] = useState(false);
+  const [hasCompletedInitialFetch, setHasCompletedInitialFetch] = useState(false);
   const [passedUsers, setPassedUsers] = useState<PassedUser[]>([]);
   const [showMoreInfo, setShowMoreInfo] = useState(false);
   const [showPremiumUpgrade, setShowPremiumUpgrade] = useState(false);
@@ -309,6 +310,8 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, isPremium }: DiscoverPage
   const suppressFetchRef = useRef(false);
   // Track optimistic/pending swipes to avoid local overshoot while background RPCs complete
   const pendingSwipesRef = useRef(0);
+  // Track locally swiped profile IDs to prevent re-showing them before DB sync
+  const locallySwipedProfileIds = useRef<Set<string>>(new Set());
   
   const { toast } = useToast();
   const { sendMatchNotification, sendMultipleLikesNotification } = usePushNotifications(currentUser?.id);
@@ -769,18 +772,7 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, isPremium }: DiscoverPage
     // Include profile count in seed for extra stability
     const profileHash = profilesWithImages.map(p => p.id).sort().join('');
     const shuffleSeed = `${userId}_${today}_${profileHash.slice(0, 10)}`;
-    console.log('🔀 Creating deterministic shuffle:', {
-      userId,
-      today,
-      profileCount: profilesWithImages.length,
-      profileHash: profileHash.slice(0, 20),
-      shuffleSeed,
-      firstThreeProfiles: profilesWithImages.slice(0, 3).map(p => ({ id: p.id, name: p.first_name }))
-    });
     const shuffled = createDeterministicShuffle(profilesWithImages, shuffleSeed);
-    console.log('🎯 Shuffled result:', {
-      firstThreeShuffled: shuffled.slice(0, 3).map(p => ({ id: p.id, name: p.first_name }))
-    });
 
     // Load last profile ID and time from localStorage
     const savedId = localStorage.getItem('driplove_last_profile_id');
@@ -975,6 +967,7 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, isPremium }: DiscoverPage
       });
     } finally {
       setIsLoading(false);
+      setHasCompletedInitialFetch(true);
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [currentUser, allowedGenders, toast]);
@@ -1051,24 +1044,19 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, isPremium }: DiscoverPage
     // Create cache key that includes date to ensure daily consistency
     const today = new Date().toISOString().split('T')[0]; // "2025-10-08"
     const cacheKey = `${currentUser.id}_${today}`;
-    console.log('🔑 Cache key generated:', cacheKey, 'Cache size:', discoverCache.size);
 
     // Prevent re-initialization for the same user+date
     if (initializedUserRef.current === cacheKey) {
       return; // Already initialized for this user today
     }
 
+    // Clear local swipe tracking when starting a new session or new day
+    locallySwipedProfileIds.current.clear();
+
     // Start loading immediately - don't wait for ads
     const initializeProfiles = async () => {
       // Check if we have fresh cached data first (with date-based key)
       const cached = discoverCache.get(cacheKey);
-      console.log(`🔍 Cache check for ${cacheKey}:`, {
-        hasCached: !!cached,
-        cacheAge: cached ? Date.now() - cached.timestamp : 'N/A',
-        cacheDuration: DISCOVER_CACHE_DURATION,
-        cacheValid: cached && Date.now() - cached.timestamp < DISCOVER_CACHE_DURATION,
-        currentProfilesLength: potentialMatches.length
-      });
 
       if (cached && Date.now() - cached.timestamp < DISCOVER_CACHE_DURATION) {
         console.log('✅ Using cached profiles for consistent experience');
@@ -1081,12 +1069,12 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, isPremium }: DiscoverPage
         const savedIndex = Math.max(0, Math.min(cached.currentIndex, cached.potentialMatches.length - 1));
         setCurrentIndex(savedIndex);
         setIsLoading(false);
+        setHasCompletedInitialFetch(true);
         // COMPLETELY DISABLE background refresh to prevent profile changes
         suppressFetchRef.current = true;
         // Mark this user+date as initialized
         initializedUserRef.current = cacheKey;
       } else {
-        console.log('🔄 No valid cache, fetching fresh profiles');
         // No cache or stale cache, fetch immediately
         await fetchPotentialMatches();
         // Mark this user+date as initialized
@@ -1344,11 +1332,13 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, isPremium }: DiscoverPage
     try {
       setIsLoadingMore(true);
       
-      // Get additional profiles (exclude current ones)
+      // Get additional profiles (exclude current ones AND ones we've already seen)
       const currentIds = potentialMatches.map(match => match.id);
-      const excludedIds = [...currentIds, currentUser.id];
+      // CRITICAL: Include locally swiped profiles in exclusion list
+      const locallySwipedIds = Array.from(locallySwipedProfileIds.current);
+      const excludedIds = [...currentIds, ...locallySwipedIds, currentUser.id];
       
-      // Get recently interacted users to exclude
+      // Get recently interacted users to exclude (likes, blocks, passes)
       const [
         { data: likedUsers },
         { data: blockedUsers },
@@ -1381,15 +1371,20 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, isPremium }: DiscoverPage
         .in('gender', allowedGenders)
         .eq('account_status', 'active')
         .eq('is_admin', false)
-        .limit(25); // Load 25 profiles at a time for continuous buffer
+        .limit(15); // Load 15 profiles at a time (reduced from 25 for better performance)
 
       if (error) throw error;
+      
+      // If no new profiles found, we've exhausted the pool
+      if (!newProfiles || newProfiles.length === 0) {
+        return;
+      }
 
       // Apply same filtering logic as original fetch using location service
-      let filteredProfiles = newProfiles || [];
+      let filteredProfiles = newProfiles;
       const userMaxDistance = currentUser.max_distance || currentUser.distance_preference || 50;
       
-      // Get location-based matches for distance filtering (same as fetchPotentialMatchesData)
+      // Get location-based matches for distance filtering
       const locationMatches = await locationService.getLocationBasedMatches(currentUser.id, userMaxDistance * 2);
       const locationProfileIds = locationMatches.map(match => match.profile_id);
       const distanceMap: { [key: string]: number } = {};
@@ -1419,27 +1414,31 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, isPremium }: DiscoverPage
       const profilesWithImages = filteredProfiles.map(profile => ({
         ...profile,
         images: [],
-        distance: distanceMap[profile.id] // Precomputed distance from locationService
+        distance: distanceMap[profile.id]
       }));
 
-      // Use a different seed for additional profiles to avoid exact duplicates but maintain consistency
-      const today = new Date().toDateString();
-      const loadMoreSeed = `${currentUser.id}_${today}_batch_${Math.floor(Date.now() / (1000 * 60 * 60))}`; // Changes every hour
+      // Use a consistent seed per hour to maintain order but allow fresh profiles hourly
+      const today = new Date().toISOString().split('T')[0];
+      const hourBlock = Math.floor(Date.now() / (1000 * 60 * 60)); // Changes every hour
+      const loadMoreSeed = `${currentUser.id}_${today}_refill_${hourBlock}`;
       const shuffled = createDeterministicShuffle(profilesWithImages, loadMoreSeed);
       
-      // Simply add new profiles with ads to existing array (don't re-inject into existing)
-      setPotentialMatches(prev => [...prev, ...injectAds(shuffled)]);
+      // Add new profiles to the END of the array (with ads injected)
+      const newProfilesWithAds = injectAds(shuffled);
+      setPotentialMatches(prev => [...prev, ...newProfilesWithAds]);
       
-      // Preload images for the new profiles
+      // Preload images for the new profiles in background
       if (shuffled.length > 0) {
-        await preloadNextProfileImages(shuffled, userImages, 0);
+        setTimeout(() => {
+          preloadNextProfileImages(shuffled, userImages, 0);
+        }, 500);
       }
     } catch (error) {
-  // ...removed log...
+      console.error('Error loading more matches:', error);
     } finally {
       setIsLoadingMore(false);
     }
-  }, [currentUser, allowedGenders, potentialMatches, calculateAge, isLoadingMore, userImages, preloadNextProfileImages, loadFullImages, injectAds, isAd]);
+  }, [currentUser, allowedGenders, potentialMatches, calculateAge, isLoadingMore, userImages, preloadNextProfileImages, injectAds]);
 
   // Auto-load more matches DISABLED to prevent profile shuffling issues
   // TODO: Re-enable with better stability once caching is fully working
@@ -1477,6 +1476,9 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, isPremium }: DiscoverPage
     // Optimistic path: advance UI immediately, then persist the action in background.
     const prevIndex = currentIndex;
     const prevMatch = currentMatch;
+
+    // CRITICAL: Add to local exclusion list immediately to prevent re-showing
+    locallySwipedProfileIds.current.add(prevMatch.id);
 
     // Increment local/pending counters immediately for a snappy feel
     pendingSwipesRef.current += 1;
@@ -1689,6 +1691,9 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, isPremium }: DiscoverPage
     const prevIndex = currentIndex;
     const prevMatch = currentMatch;
 
+    // CRITICAL: Add to local exclusion list immediately to prevent re-showing
+    locallySwipedProfileIds.current.add(prevMatch.id);
+
     // Optimistically add to passed list and increment counters
     setPassedUsers(prev => [{ user_id: prevMatch.id, passed_at: new Date() }, ...prev.slice(0, 9)]);
     pendingSwipesRef.current += 1;
@@ -1898,18 +1903,22 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, isPremium }: DiscoverPage
     if (currentIndex < potentialMatches.length - 1) {
       setCurrentIndex(currentIndex + 1);
       
-      // Progressive Refill System Integration
+      // Progressive Refill System Integration - load more profiles in background when running low
       const newIndex = currentIndex + 1;
       checkAndTriggerRefill(currentUser.id, newIndex);
       
-      // Backup: Legacy loading system (less aggressive now)
+      // Background refill: Load more profiles when approaching the end (but don't shuffle existing ones)
       const remainingProfiles = potentialMatches.length - newIndex;
-      if (remainingProfiles <= 3) { // Much smaller buffer since progressive system handles most loading
-        setTimeout(() => loadMoreMatches(), 1000); // Longer delay
+      if (remainingProfiles <= 5 && !isLoadingMore) {
+        // Load more profiles in background to maintain continuous swiping
+        setTimeout(() => loadMoreMatches(), 500);
       }
       
     } else {
-      fetchPotentialMatches();
+      // Reached the end - load more profiles instead of refreshing
+      if (!isLoadingMore) {
+        loadMoreMatches();
+      }
       setCurrentIndex(0);
     }
 
@@ -2080,8 +2089,8 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, isPremium }: DiscoverPage
     );
   }
 
-  // Show loading state while data is being fetched
-  if (isLoading) {
+  // Show loading state while initial fetch hasn't completed yet
+  if (!hasCompletedInitialFetch) {
     return (
       <>
         <style>
@@ -2115,8 +2124,9 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, isPremium }: DiscoverPage
     );
   }
 
-  // Show no profiles message only when not loading and no current match
-  if (!currentMatch) {
+  // At this point, initial fetch is complete
+  // Show no profiles message only if we truly have no profiles after fetching
+  if (potentialMatches.length === 0) {
     return (
       <div className="min-h-screen w-full flex items-center justify-center" style={{ minHeight: 'calc(100vh - 152px)' }}>
         <Card className="max-w-md w-full mx-4">

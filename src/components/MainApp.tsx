@@ -82,7 +82,6 @@ const MainApp = ({ user, onLogout }: MainAppProps) => {
           return;
         }
 
-        console.log('[MainApp] Attempting to setup push notifications...');
         const { PushNotifications } = await import('@capacitor/push-notifications');
         const { FirebaseMessaging } = await import('@capacitor-firebase/messaging');
         
@@ -93,24 +92,19 @@ const MainApp = ({ user, onLogout }: MainAppProps) => {
         
         // Add notification tap listener (when app is closed/background)
         PushNotifications.addListener('pushNotificationActionPerformed', async (notification) => {
-          console.log('[MainApp] 🔔 Notification tapped:', notification);
           const data = notification.notification.data;
           
           // Wait a bit for app to fully load
           setTimeout(() => {
             if (data?.type === 'message' && data?.chatId) {
-              console.log('[MainApp] 💬 Opening specific chat:', data.chatId);
               setActiveTab('chat');
               // Use hash navigation to pass matchId to ChatPage
               window.location.hash = `matchId=${data.chatId}`;
             } else if (data?.type === 'match') {
-              console.log('[MainApp] 🎉 Opening chat page for new match');
               setActiveTab('chat');
             } else if (data?.type === 'like') {
-              console.log('[MainApp] 💖 Opening liked me page');
               setActiveTab('liked');
             } else {
-              console.log('[MainApp] 📱 Opening default chat page');
               setActiveTab('chat');
             }
           }, 500);
@@ -118,20 +112,16 @@ const MainApp = ({ user, onLogout }: MainAppProps) => {
         
         // Add foreground notification listener
         PushNotifications.addListener('pushNotificationReceived', (notification) => {
-          console.log('[MainApp] 📬 Foreground notification received:', notification);
           // Notification will be handled by the in-app toast
         });
         
         // Add token listener for APNS token (iOS needs this to trigger FCM)
         PushNotifications.addListener('registration', async (token) => {
-          console.log('[MainApp] 📱 APNS token received:', token.value);
           
           // For iOS, we need to get the FCM token from Firebase Messaging
           if (Capacitor.getPlatform() === 'ios') {
             try {
-              console.log('[MainApp] 🔥 Getting FCM token from Firebase...');
               const { token: fcmToken } = await FirebaseMessaging.getToken();
-              console.log('[MainApp] ✅ FCM token received:', fcmToken);
               
               // Save FCM token to database
               await savePushToken(fcmToken);
@@ -142,7 +132,6 @@ const MainApp = ({ user, onLogout }: MainAppProps) => {
             }
           } else {
             // Android token is already FCM token
-            console.log('[MainApp] 📱 FCM token received (Android):', token.value);
             await savePushToken(token.value);
           }
         });
@@ -157,9 +146,6 @@ const MainApp = ({ user, onLogout }: MainAppProps) => {
             return;
           }
           
-          console.log('[MainApp] 🔐 Authenticated user ID:', currentUser.id);
-          console.log('[MainApp] 🌐 Supabase URL:', SUPABASE_URL);
-          
           try {
             const { data, error } = await supabase.from('push_tokens').upsert({
               user_id: currentUser.id,
@@ -170,18 +156,11 @@ const MainApp = ({ user, onLogout }: MainAppProps) => {
               onConflict: 'user_id,platform' // Match the unique constraint
             }).select();
             
-            console.log('[MainApp] 📊 Push token save response:', { data, error });
-            
             if (error) {
               console.error('[MainApp] ❌ Failed to save push token:', error);
               console.error('[MainApp] Error code:', error.code);
               console.error('[MainApp] Error details:', error.details);
               console.error('[MainApp] Error hint:', error.hint);
-            } else {
-              console.log('[MainApp] ✅ Push token saved successfully!');
-              console.log('[MainApp] ✅ User:', currentUser.id);
-              console.log('[MainApp] ✅ Platform:', Capacitor.getPlatform());
-              console.log('[MainApp] ✅ Data returned:', data);
             }
           } catch (error) {
             console.error('[MainApp] 💥 Exception saving push token:', error);
@@ -189,20 +168,14 @@ const MainApp = ({ user, onLogout }: MainAppProps) => {
         };
         
         // Request permission
-        console.log('[MainApp] Requesting push notification permissions...');
         const permissionResult = await PushNotifications.requestPermissions();
         
         if (permissionResult.receive === 'granted') {
-          console.log('[MainApp] Permission granted, registering device...');
-          
           try {
             await PushNotifications.register();
-            console.log('[MainApp] ✅ Push notification registration call completed');
           } catch (regError) {
             console.error('[MainApp] Push registration failed:', regError);
           }
-        } else {
-          console.log('[MainApp] Push notification permission denied');
         }
       } catch (err) {
         console.error('[MainApp] Push notification setup error:', err);
@@ -835,7 +808,6 @@ const MainApp = ({ user, onLogout }: MainAppProps) => {
       // Check if discover cache exists
       const cache = typeof window !== 'undefined' && (window as any).discoverCache?.get(user.id);
       if (!cache) {
-        console.log('🔄 Discover cache missing, reloading data...');
         preloadDiscoverData(user.id);
       }
     }
@@ -846,9 +818,7 @@ const MainApp = ({ user, onLogout }: MainAppProps) => {
     if (!user?.id) return;
     
     const handleNewMatch = (event: CustomEvent) => {
-      console.log('[MainApp] 💬 New match event received:', event.detail);
       if (event.detail.userId === user.id) {
-        console.log('[MainApp] 💬 Preloading chat matches due to new match');
         // Reload chat matches in background
         preloadChatMatches(user.id);
         // Update unread count
@@ -873,7 +843,6 @@ const MainApp = ({ user, onLogout }: MainAppProps) => {
   useEffect(() => {
     if (!user?.id) return;
 
-    console.log('[MainApp] 🔔 Setting up realtime subscription for matches table');
     const channel = supabase
       .channel('nav-matches')
       .on('postgres_changes', {
@@ -881,15 +850,11 @@ const MainApp = ({ user, onLogout }: MainAppProps) => {
         schema: 'public',
         table: 'matches',
       }, (payload) => {
-        console.log('[MainApp] 🔔 Realtime match change detected:', payload.eventType, payload.new);
         fetchUnreadCount();
       })
-      .subscribe((status) => {
-        console.log('[MainApp] 🔔 Realtime subscription status:', status);
-      });
+      .subscribe();
 
     return () => {
-      console.log('[MainApp] 🔔 Cleaning up realtime subscription');
       supabase.removeChannel(channel);
     };
   }, [user?.id]); // Depend on user.id rather than full user object
@@ -965,7 +930,6 @@ const MainApp = ({ user, onLogout }: MainAppProps) => {
   const fetchUnreadCount = async () => {
     if (!user?.id) return;
 
-    console.log('[MainApp] 📊 Fetching unread count for user:', user.id);
     try {
       // Always use matches table for unread count
       const { data, error } = await supabase
@@ -981,7 +945,6 @@ const MainApp = ({ user, onLogout }: MainAppProps) => {
         return sum + (Number.isFinite(unread) && unread > 0 ? unread : 0);
       }, 0) || 0;
 
-      console.log('[MainApp] 📊 Unread count updated:', total, 'from', data?.length, 'matches');
       setUnreadCount(total);
     } catch (error) {
       console.error('[MainApp] ❌ Error fetching unread count:', error);

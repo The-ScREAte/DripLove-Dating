@@ -391,8 +391,6 @@ class SupabasePushNotificationService {
 
   async sendNotification(payload: NotificationPayload): Promise<boolean> {
     try {
-      console.log('📤 Sending notification:', payload);
-      
       // Call Supabase Edge Function to send push notification
       const { data, error } = await supabase.functions.invoke('send-push-notification', {
         body: {
@@ -409,13 +407,10 @@ class SupabasePushNotificationService {
         // Don't return false immediately - the notification might still be stored for real-time
       }
 
-      console.log('📤 Notification response:', data);
-      
       // Check if notification was processed successfully (either via push or real-time)
       const success = data?.success || data?.realTimeStored;
       
       if (success) {
-        console.log('✅ Notification sent successfully');
         return true;
       } else {
         console.error('❌ Notification failed:', data);

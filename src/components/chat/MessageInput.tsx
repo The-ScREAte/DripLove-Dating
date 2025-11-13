@@ -81,7 +81,6 @@ const MessageInput: React.FC<MessageInputProps> = ({
         const rawOffset = window.innerHeight - viewport.height;
         // Subtract a small amount to sit directly on top of keyboard with minimal gap
         const adjustedOffset = rawOffset > 0 ? rawOffset - 5 : 0;
-        console.log('Viewport resize - raw offset:', rawOffset, 'adjusted:', adjustedOffset, 'viewport.height:', viewport.height, 'window.innerHeight:', window.innerHeight);
         setKeyboardOffset(adjustedOffset);
       };
 
@@ -89,7 +88,6 @@ const MessageInput: React.FC<MessageInputProps> = ({
         const rawOffset = window.innerHeight - viewport.height - (viewport.offsetTop || 0);
         // Subtract a small amount to sit directly on top of keyboard with minimal gap
         const adjustedOffset = rawOffset > 0 ? rawOffset - 5 : 0;
-        console.log('Viewport scroll - raw offset:', rawOffset, 'adjusted:', adjustedOffset);
         setKeyboardOffset(adjustedOffset);
       };
 

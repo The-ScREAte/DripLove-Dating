@@ -53,8 +53,6 @@ if (typeof window !== 'undefined') {
     forceShow: debugForceShowRating
   };
   
-  console.log('💡 Rating Debug Utils loaded! Use:');
-  console.log('  window.debugRating.status() - Check current status');
-  console.log('  window.debugRating.reset() - Reset rating data');
-  console.log('  window.debugRating.forceShow() - Force show on next load');
+  // Debug utils loaded - available as window.debugRating
+  // Use: window.debugRating.status(), reset(), or forceShow()
 }
