@@ -861,6 +861,8 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, isPremium }: DiscoverPage
         setUserDistances(distances);
         setCurrentIndex(index);
         setLastShuffleTime(Date.now());
+        setIsLoading(false);
+        setHasCompletedInitialFetch(true);
 
         // Fetch verification status for each profile (NO calculation!)
         matches.forEach(profile => {
@@ -965,7 +967,6 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, isPremium }: DiscoverPage
         description: t('discover.errors.loadFailed'),
         variant: 'destructive'
       });
-    } finally {
       setIsLoading(false);
       setHasCompletedInitialFetch(true);
     }
