@@ -2125,9 +2125,8 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, isPremium }: DiscoverPage
     );
   }
 
-  // At this point, initial fetch is complete
-  // Show no profiles message only if we truly have no profiles after fetching
-  if (potentialMatches.length === 0) {
+  // Show no profiles only if truly no profiles after initial fetch completes and not loading
+  if (potentialMatches.length === 0 && hasCompletedInitialFetch && !isLoading) {
     return (
       <div className="min-h-screen w-full flex items-center justify-center" style={{ minHeight: 'calc(100vh - 152px)' }}>
         <Card className="max-w-md w-full mx-4">
