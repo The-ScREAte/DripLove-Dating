@@ -242,7 +242,7 @@ const ChatPage = ({ currentUser, onUnreadChange, onDetailViewChange }: ChatPageP
             table: 'chats',
             filter: `match_id=eq.${selectedMatch.id}`,
           },
-          (payload) => {
+          async (payload) => {
             const newMsg = payload.new as ChatMessage;
             
             // Ensure sent_at is set for proper date display
@@ -253,6 +253,30 @@ const ChatPage = ({ currentUser, onUnreadChange, onDetailViewChange }: ChatPageP
             // Check if message is deleted for current user
             if (newMsg.deleted_for && newMsg.deleted_for.includes(currentUser.id)) {
               return;
+            }
+            
+            // Fetch sender profile data if not present
+            if (!newMsg.sender) {
+              try {
+                const { data: senderData } = await supabase
+                  .from('profiles')
+                  .select('first_name, last_name')
+                  .eq('id', newMsg.sender_id)
+                  .single();
+                
+                if (senderData) {
+                  newMsg.sender = senderData;
+                }
+              } catch (error) {
+                console.error('Error fetching sender profile:', error);
+              }
+            }
+            
+            // Set receiver_id
+            if (!newMsg.receiver_id) {
+              newMsg.receiver_id = newMsg.sender_id === currentUser.id 
+                ? (selectedMatch.user1_id === currentUser.id ? selectedMatch.user2_id : selectedMatch.user1_id)
+                : currentUser.id;
             }
             
             // Update messages state
