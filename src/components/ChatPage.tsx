@@ -242,7 +242,7 @@ const ChatPage = ({ currentUser, onUnreadChange, onDetailViewChange }: ChatPageP
             table: 'chats',
             filter: `match_id=eq.${selectedMatch.id}`,
           },
-          async (payload) => {
+          (payload) => {
             const newMsg = payload.new as ChatMessage;
             
             // Ensure sent_at is set for proper date display
@@ -253,30 +253,6 @@ const ChatPage = ({ currentUser, onUnreadChange, onDetailViewChange }: ChatPageP
             // Check if message is deleted for current user
             if (newMsg.deleted_for && newMsg.deleted_for.includes(currentUser.id)) {
               return;
-            }
-            
-            // Fetch sender profile data if not present
-            if (!newMsg.sender) {
-              try {
-                const { data: senderData } = await supabase
-                  .from('profiles')
-                  .select('first_name, last_name')
-                  .eq('id', newMsg.sender_id)
-                  .single();
-                
-                if (senderData) {
-                  newMsg.sender = senderData;
-                }
-              } catch (error) {
-                console.error('Error fetching sender profile:', error);
-              }
-            }
-            
-            // Set receiver_id
-            if (!newMsg.receiver_id) {
-              newMsg.receiver_id = newMsg.sender_id === currentUser.id 
-                ? (selectedMatch.user1_id === currentUser.id ? selectedMatch.user2_id : selectedMatch.user1_id)
-                : currentUser.id;
             }
             
             // Update messages state
@@ -798,16 +774,57 @@ const ChatPage = ({ currentUser, onUnreadChange, onDetailViewChange }: ChatPageP
           match_id: selectedMatch.id,
           sender_id: currentUser.id,
           message: messageText
-        });
+        })
+        .select(`
+          *,
+          sender:profiles!chats_sender_id_fkey(first_name, last_name)
+        `)
+        .single();
 
       if (error) {
         console.error('Supabase insert error:', error);
         throw error;
       }
 
-      // Since we're using optimistic updates, we don't need the returned data
-      // The realtime subscription will handle updating the UI with the server message
-      // The optimistic message stays in the UI until realtime provides the actual server message
+      // Replace optimistic message with real one from server
+      if (data) {
+        setMessages(prev => {
+          const serverMsg: ChatMessage = { 
+            ...data, 
+            sent_at: data.created_at, 
+            receiver_id: optimisticMessage.receiver_id 
+          } as ChatMessage;
+
+          const hasServer = prev.some(m => m.id === data.id);
+          const hasTemp = prev.some(m => m.id === tempId);
+
+          // If temp exists, replace it with server message
+          if (hasTemp) {
+            const replaced = prev.map(m => (m.id === tempId ? serverMsg : m));
+            // Ensure uniqueness by id (in case server message was already appended by realtime)
+            const unique: ChatMessage[] = [];
+            const seen = new Set<string>();
+            for (const m of replaced) {
+              if (!seen.has(m.id)) {
+                unique.push(m);
+                seen.add(m.id);
+              }
+            }
+            chatMessagesCache.set(selectedMatch.id, { messages: unique, timestamp: Date.now() });
+            return unique;
+          }
+
+          // If temp doesn't exist and server message not present, append server message
+          if (!hasServer) {
+            const updated = [...prev, serverMsg];
+            chatMessagesCache.set(selectedMatch.id, { messages: updated, timestamp: Date.now() });
+            return updated;
+          }
+
+          // Server message already present and no temp to replace — keep as-is
+          return prev;
+        });
+      }
     } catch (error) {
       // Remove optimistic message on error
       setMessages(prev => {
