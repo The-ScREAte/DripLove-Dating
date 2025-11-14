@@ -343,11 +343,14 @@ const ChatPage = ({ currentUser, onUnreadChange, onDetailViewChange }: ChatPageP
             filter: `match_id=eq.${selectedMatch.id}`,
           },
           (payload) => {
+            console.log('[ChatPage] 🗑️ Realtime DELETE event received:', payload);
             const deletedMsg = payload.old as { id: string };
+            console.log('[ChatPage] 🔄 Removing deleted message from UI:', deletedMsg.id);
             
             // Remove the message from state
             setMessages((prev) => {
               const updated = prev.filter(m => m.id !== deletedMsg.id);
+              console.log('[ChatPage] ✅ Message removed, remaining:', updated.length);
               // Update cache
               chatMessagesCache.set(selectedMatch.id, {
                 messages: updated,
@@ -1033,28 +1036,47 @@ const ChatPage = ({ currentUser, onUnreadChange, onDetailViewChange }: ChatPageP
     if (!selectedMatch) return;
 
     try {
+      console.log('[ChatPage] 🗑️ Delete for everyone requested', { messageId });
+      
       // Get the message to check if user is the sender
       const message = messages.find(msg => msg.id === messageId);
+      console.log('[ChatPage] 📝 Message found', { 
+        found: !!message, 
+        isSender: message?.sender_id === currentUser.id,
+        messageId,
+        senderId: message?.sender_id,
+        currentUserId: currentUser.id
+      });
+      
       if (!message || message.sender_id !== currentUser.id) {
+        console.log('[ChatPage] ❌ Cannot delete - not sender or message not found');
         return;
       }
 
+      console.log('[ChatPage] 🔄 Deleting from database...');
       // Delete from database completely
-      const { error: deleteError } = await supabase
+      const { error: deleteError, data } = await supabase
         .from('chats')
         .delete()
         .eq('id', messageId)
-        .eq('sender_id', currentUser.id); // Double-check it's their message
+        .eq('sender_id', currentUser.id) // Double-check it's their message
+        .select(); // Return deleted rows to confirm deletion
 
-      if (deleteError) throw deleteError;
+      if (deleteError) {
+        console.error('[ChatPage] ❌ Delete error:', deleteError);
+        throw deleteError;
+      }
+
+      console.log('[ChatPage] ✅ Message deleted from DB', { deletedCount: data?.length || 0, data });
 
       // Clear cache to force fresh fetch next time
       chatMessagesCache.delete(selectedMatch.id);
 
       // Remove from UI immediately
       setMessages(prev => prev.filter(msg => msg.id !== messageId));
+      console.log('[ChatPage] ✅ Message removed from UI');
     } catch (error) {
-      console.error('Error deleting message for everyone:', error);
+      console.error('[ChatPage] ❌ Error deleting message for everyone:', error);
     }
   };
 
