@@ -1246,7 +1246,13 @@ const ChatPage = ({ currentUser, onUnreadChange, onDetailViewChange }: ChatPageP
     className="flex-1 overflow-y-auto pb-35"
     style={{ 
       WebkitOverflowScrolling: 'touch',
-      marginTop: '0px'
+      marginTop: newMatchList.length > 0 
+        ? '0px'
+        : Capacitor.getPlatform() === 'web'
+          ? '8px'
+          : Capacitor.getPlatform() === 'ios'
+            ? 'clamp(30px, calc(env(safe-area-inset-top, 30px) + 15px), 45px)'
+            : '0px'
     }}
     onTouchStart={handleTouchStart}
     onTouchMove={handleTouchMove}
