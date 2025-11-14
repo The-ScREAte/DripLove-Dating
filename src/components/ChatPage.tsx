@@ -237,7 +237,17 @@ const ChatPage = ({ currentUser, onUnreadChange, onDetailViewChange }: ChatPageP
                 if (prev.some(m => m.id === newMsg.id)) {
                   return prev;
                 }
-                const updated = [...prev, newMsg];
+                
+                // Remove any temp message with same content (optimistic update)
+                // This handles the case where we added an optimistic message and now the real one arrived
+                const withoutTemp = prev.filter(m => {
+                  // Keep all non-temp messages
+                  if (!m.id.startsWith('temp_')) return true;
+                  // Remove temp message if it matches the incoming real message
+                  return !(m.message === newMsg.message && m.sender_id === newMsg.sender_id);
+                });
+                
+                const updated = [...withoutTemp, newMsg];
                 // Update cache with new message
                 chatMessagesCache.set(selectedMatch.id, {
                   messages: updated,
