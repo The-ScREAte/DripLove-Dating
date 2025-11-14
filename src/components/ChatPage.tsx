@@ -31,7 +31,7 @@ const CACHE_DURATION = 10000; // 10 seconds - faster updates for live feel
 
 // Global cache for individual chat messages
 const chatMessagesCache = new Map<string, { messages: ChatMessage[], timestamp: number }>();
-const MESSAGE_CACHE_DURATION = 30000; // 30 seconds
+const MESSAGE_CACHE_DURATION = 15000; // 15 seconds - faster message updates
 
 // Make caches globally accessible for preloading
 if (typeof window !== 'undefined') {
@@ -155,7 +155,6 @@ const ChatPage = ({ currentUser, onUnreadChange, onDetailViewChange }: ChatPageP
           table: 'matches',
         },
         (payload) => {
-            console.log('[ChatPage] 🔄 Matches table changed - refreshing immediately');
             // Clear cache and refresh immediately for instant updates
             chatMatchesCache.delete(currentUser.id);
             fetchMatches();
@@ -171,11 +170,40 @@ const ChatPage = ({ currentUser, onUnreadChange, onDetailViewChange }: ChatPageP
           table: 'chats',
         },
         (payload) => {
-          console.log('[ChatPage] 📨 New message detected - refreshing match list');
-          // When a new message is inserted, refresh the match list immediately
-          // to update the last message preview in the chat list
-          chatMatchesCache.delete(currentUser.id);
-          fetchMatches();
+          const newMsg = payload.new as ChatMessage;
+          
+          // INSTANT UPDATE: Update specific match in the list immediately
+          if (newMsg.match_id) {
+            setMatches(prev => {
+              const updated = prev.map(match => {
+                if (match.id === newMsg.match_id) {
+                  return {
+                    ...match,
+                    last_message: newMsg.message,
+                    last_message_time: newMsg.created_at,
+                  };
+                }
+                return match;
+              });
+              
+              // Re-sort by most recent message
+              const sorted = updated.sort((a, b) => {
+                const aTime = new Date(a.last_message_time || a.created_at).getTime();
+                const bTime = new Date(b.last_message_time || b.created_at).getTime();
+                return bTime - aTime;
+              });
+              
+              // Update cache with new data
+              chatMatchesCache.set(currentUser.id, {
+                matches: sorted,
+                timestamp: Date.now()
+              });
+              
+              return sorted;
+            });
+          }
+          
+          // Also trigger unread count update
           onUnreadChange?.();
         }
       )
@@ -187,7 +215,6 @@ const ChatPage = ({ currentUser, onUnreadChange, onDetailViewChange }: ChatPageP
           table: 'chats',
         },
         (payload) => {
-          console.log('[ChatPage] 🔄 Message updated - refreshing match list');
           // When a message is updated (deleted_for, etc), refresh match list
           chatMatchesCache.delete(currentUser.id);
           fetchMatches();
@@ -201,7 +228,6 @@ const ChatPage = ({ currentUser, onUnreadChange, onDetailViewChange }: ChatPageP
           table: 'chats',
         },
         (payload) => {
-          console.log('[ChatPage] 🗑️ Message deleted - refreshing match list');
           // When a message is deleted, refresh match list
           chatMatchesCache.delete(currentUser.id);
           fetchMatches();
@@ -218,18 +244,15 @@ const ChatPage = ({ currentUser, onUnreadChange, onDetailViewChange }: ChatPageP
   useEffect(() => {
     if (!currentUser?.id || selectedMatch) return;
     
-    console.log('[ChatPage] 🔄 Starting periodic refresh (every 5 seconds)');
     const interval = setInterval(() => {
-      console.log('[ChatPage] ⏰ Periodic refresh triggered');
       // Only refresh if cache is stale
       const cached = chatMatchesCache.get(currentUser.id);
       if (!cached || Date.now() - cached.timestamp > CACHE_DURATION) {
         fetchMatches();
       }
-    }, 5000); // Refresh every 5 seconds when viewing match list
+    }, 2000); // Ultra-fast refresh every 2 seconds for instant updates
 
     return () => {
-      console.log('[ChatPage] 🛑 Stopping periodic refresh');
       clearInterval(interval);
     };
   }, [currentUser?.id, selectedMatch]);
@@ -292,7 +315,6 @@ const ChatPage = ({ currentUser, onUnreadChange, onDetailViewChange }: ChatPageP
             filter: `match_id=eq.${selectedMatch.id}`,
           },
           (payload) => {
-            console.log('[ChatPage] 📨 Realtime INSERT event received:', payload);
             const newMsg = payload.new as ChatMessage;
             
             // Ensure sent_at is set for proper date display
@@ -302,17 +324,21 @@ const ChatPage = ({ currentUser, onUnreadChange, onDetailViewChange }: ChatPageP
             
             // Check if message is deleted for current user
             if (newMsg.deleted_for && newMsg.deleted_for.includes(currentUser.id)) {
-              console.log('[ChatPage] ⚠️ Message deleted for current user, skipping');
               return;
             }
             
-            console.log('[ChatPage] 💬 Processing realtime message:', { id: newMsg.id, sender: newMsg.sender_id, message: newMsg.message });
+            // INSTANT: Populate sender info from partner data for immediate display
+            if (!newMsg.sender && selectedMatch.partner) {
+              newMsg.sender = {
+                first_name: selectedMatch.partner.first_name,
+                last_name: selectedMatch.partner.last_name
+              };
+            }
             
             // Update messages state
               setMessages((prev) => {
                 // Dedupe: if message id already exists, ignore (prevents duplicates from optimistic + realtime)
                 if (prev.some(m => m.id === newMsg.id)) {
-                  console.log('[ChatPage] ⚠️ Message already exists, skipping realtime update');
                   return prev;
                 }
                 
@@ -325,19 +351,16 @@ const ChatPage = ({ currentUser, onUnreadChange, onDetailViewChange }: ChatPageP
                   return !(m.message === newMsg.message && m.sender_id === newMsg.sender_id);
                 });
                 
-                console.log('[ChatPage] ✅ Adding realtime message to state');
                 const updated = [...withoutTemp, newMsg];
                 // Update cache with new message
                 chatMessagesCache.set(selectedMatch.id, {
                   messages: updated,
                   timestamp: Date.now()
                 });
-                console.log('[ChatPage] 📊 Messages after realtime update:', updated.length);
                 return updated;
               });
             
             // INSTANT UPDATE: Update the match list in the background immediately
-            console.log('[ChatPage] 🔄 Updating match list with new message...');
             updateMatchInBackground(selectedMatch.id, newMsg);
             
             if (newMsg.sender_id !== currentUser.id) {
@@ -357,9 +380,7 @@ const ChatPage = ({ currentUser, onUnreadChange, onDetailViewChange }: ChatPageP
             filter: `match_id=eq.${selectedMatch.id}`,
           },
           (payload) => {
-            console.log('[ChatPage] 🔄 Realtime UPDATE event received:', payload);
             const updatedMsg = payload.new as ChatMessage;
-            console.log('[ChatPage] 🔍 Updated message deleted_for:', updatedMsg.deleted_for);
             
             // Always update the message in the cache (store full data)
             const cachedData = chatMessagesCache.get(selectedMatch.id);
@@ -371,21 +392,17 @@ const ChatPage = ({ currentUser, onUnreadChange, onDetailViewChange }: ChatPageP
                 messages: updatedCacheMessages,
                 timestamp: Date.now()
               });
-              console.log('[ChatPage] 📦 Cache updated with message change');
             }
             
             // Check if message was deleted for current user
             if (updatedMsg.deleted_for && updatedMsg.deleted_for.includes(currentUser.id)) {
-              console.log('[ChatPage] 🗑️ Message deleted for me - removing from UI:', updatedMsg.id);
               setMessages((prev) => {
                 const updated = prev.filter(m => m.id !== updatedMsg.id);
-                console.log('[ChatPage] ✅ Messages after delete for me:', updated.length);
                 return updated;
               });
               return;
             }
             
-            console.log('[ChatPage] 📝 Updating message in state:', updatedMsg.id);
             // Update the specific message in state
             setMessages((prev) => {
               const updated = prev.map(m => 
@@ -404,14 +421,11 @@ const ChatPage = ({ currentUser, onUnreadChange, onDetailViewChange }: ChatPageP
             filter: `match_id=eq.${selectedMatch.id}`,
           },
           (payload) => {
-            console.log('[ChatPage] 🗑️ Realtime DELETE event received:', payload);
             const deletedMsg = payload.old as { id: string };
-            console.log('[ChatPage] 🔄 Removing deleted message from UI:', deletedMsg.id);
             
             // Remove the message from state
             setMessages((prev) => {
               const updated = prev.filter(m => m.id !== deletedMsg.id);
-              console.log('[ChatPage] ✅ Message removed, remaining:', updated.length);
               // Update cache
               chatMessagesCache.set(selectedMatch.id, {
                 messages: updated,
@@ -492,7 +506,6 @@ const ChatPage = ({ currentUser, onUnreadChange, onDetailViewChange }: ChatPageP
         timestamp: Date.now()
       });
       
-      console.log('[ChatPage] ⚡ Match list updated instantly with new message');
       return sorted;
     });
   };
@@ -624,7 +637,6 @@ const ChatPage = ({ currentUser, onUnreadChange, onDetailViewChange }: ChatPageP
           });
 
         } catch (error) {
-          console.error('Error sending expiration notification:', error);
         }
       }
     }
@@ -641,43 +653,34 @@ const ChatPage = ({ currentUser, onUnreadChange, onDetailViewChange }: ChatPageP
           // Clear cache so next fetch gets fresh data without expired matches
           chatMatchesCache.delete(currentUser.id);
         } else {
-          console.error('Error deleting expired matches:', error);
         }
       } catch (error) {
-        console.error('Error in batch deletion:', error);
       }
     }
   };
 
   const fetchMessages = async () => {
     if (!selectedMatch) {
-      console.log('[ChatPage] ⚠️ fetchMessages called but no selectedMatch');
       return;
     }
 
-    console.log('[ChatPage] 📥 Fetching messages for match:', selectedMatch.id);
 
     // Check cache first
     const cached = chatMessagesCache.get(selectedMatch.id);
     if (cached && Date.now() - cached.timestamp < MESSAGE_CACHE_DURATION) {
-      console.log('[ChatPage] 💾 Using cached messages:', cached.messages.length);
-      console.log('[ChatPage] 🔍 Current user ID:', currentUser.id);
       // Filter out messages deleted for current user
       const visibleMessages = cached.messages.filter(msg => {
         const isDeletedForMe = msg.deleted_for && msg.deleted_for.includes(currentUser.id);
         if (msg.deleted_for && msg.deleted_for.length > 0) {
-          console.log('[ChatPage] 🔍 Cached message', msg.id, 'deleted_for:', msg.deleted_for, 'isDeletedForMe:', isDeletedForMe);
         }
         return !isDeletedForMe;
       });
-      console.log('[ChatPage] ✅ Visible messages from cache:', visibleMessages.length);
       setMessages(visibleMessages);
       // Still fetch in background for updates
       fetchMessagesInBackground(selectedMatch.id);
       return;
     }
 
-    console.log('[ChatPage] 🔄 Cache miss or stale, fetching from database...');
 
     try {
       const { data, error } = await supabase
@@ -690,12 +693,9 @@ const ChatPage = ({ currentUser, onUnreadChange, onDetailViewChange }: ChatPageP
         .order('created_at', { ascending: true });
 
       if (error) {
-        console.error('[ChatPage] ❌ Error fetching messages:', error);
         throw error;
       }
 
-      console.log('[ChatPage] 📨 Fetched messages from DB:', data?.length || 0);
-      console.log('[ChatPage] 🔍 Current user ID:', currentUser.id);
 
       const mappedMessages = data?.map(msg => ({
         ...msg,
@@ -711,12 +711,10 @@ const ChatPage = ({ currentUser, onUnreadChange, onDetailViewChange }: ChatPageP
       const visibleMessages = processedMessages.filter(msg => {
         const isDeletedForMe = msg.deleted_for && msg.deleted_for.includes(currentUser.id);
         if (msg.deleted_for && msg.deleted_for.length > 0) {
-          console.log('[ChatPage] 🔍 Message', msg.id, 'deleted_for:', msg.deleted_for, 'isDeletedForMe:', isDeletedForMe);
         }
         return !isDeletedForMe;
       });
       
-      console.log('[ChatPage] 📊 Processed messages:', processedMessages.length, 'Visible:', visibleMessages.length);
       
       // Update cache with all messages
       chatMessagesCache.set(selectedMatch.id, {
@@ -724,10 +722,8 @@ const ChatPage = ({ currentUser, onUnreadChange, onDetailViewChange }: ChatPageP
         timestamp: Date.now()
       });
 
-      console.log('[ChatPage] ✅ Setting messages to state');
       setMessages(visibleMessages);
     } catch (error) {
-      console.error('[ChatPage] ❌ Error in fetchMessages:', error);
     }
   };
 
@@ -862,14 +858,12 @@ const ChatPage = ({ currentUser, onUnreadChange, onDetailViewChange }: ChatPageP
         return;
       }
     } catch (error) {
-      console.error('Error checking blocks:', error);
       // Continue with sending message if block check fails
     }
 
     const messageText = newMessage.trim();
     const tempId = `temp_${Date.now()}`;
     
-    console.log('[ChatPage] 📤 Sending message:', { messageText, tempId, matchId: selectedMatch.id });
     
     // Optimistic update - show message immediately
     const optimisticMessage: ChatMessage = {
@@ -887,7 +881,6 @@ const ChatPage = ({ currentUser, onUnreadChange, onDetailViewChange }: ChatPageP
       }
     } as ChatMessage;
 
-    console.log('[ChatPage] 💬 Optimistic message created:', optimisticMessage);
 
     // INSTANT OPTIMISTIC UPDATE: Update match list immediately even before server confirms
     updateMatchInBackground(selectedMatch.id, optimisticMessage);
@@ -900,7 +893,6 @@ const ChatPage = ({ currentUser, onUnreadChange, onDetailViewChange }: ChatPageP
         messages: updated,
         timestamp: Date.now()
       });
-      console.log('[ChatPage] ✅ Optimistic message added to state, total messages:', updated.length);
       return updated;
     });
 
@@ -908,7 +900,6 @@ const ChatPage = ({ currentUser, onUnreadChange, onDetailViewChange }: ChatPageP
     setNewMessage('');
 
     try {
-      console.log('[ChatPage] 🔄 Inserting message to database...');
       // Send the message to server
       const { data, error } = await supabase
         .from('chats')
@@ -924,16 +915,13 @@ const ChatPage = ({ currentUser, onUnreadChange, onDetailViewChange }: ChatPageP
         .single();
 
       if (error) {
-        console.error('[ChatPage] ❌ Supabase insert error:', error);
         throw error;
       }
 
-      console.log('[ChatPage] ✅ Message inserted successfully, server data:', data);
 
       // Replace optimistic message with real one from server
       if (data) {
         // INSTANT UPDATE: Update match list immediately with new message
-        console.log('[ChatPage] ⚡ Updating match list instantly...');
         updateMatchInBackground(selectedMatch.id, data);
         
         setMessages(prev => {
@@ -946,11 +934,9 @@ const ChatPage = ({ currentUser, onUnreadChange, onDetailViewChange }: ChatPageP
           const hasServer = prev.some(m => m.id === data.id);
           const hasTemp = prev.some(m => m.id === tempId);
 
-          console.log('[ChatPage] 🔄 Replacing temp message:', { hasServer, hasTemp, serverId: data.id, tempId });
 
           // If temp exists, replace it with server message
           if (hasTemp) {
-            console.log('[ChatPage] ♻️ Replacing temp message with server message');
             const replaced = prev.map(m => (m.id === tempId ? serverMsg : m));
             // Ensure uniqueness by id (in case server message was already appended by realtime)
             const unique: ChatMessage[] = [];
@@ -962,26 +948,22 @@ const ChatPage = ({ currentUser, onUnreadChange, onDetailViewChange }: ChatPageP
               }
             }
             chatMessagesCache.set(selectedMatch.id, { messages: unique, timestamp: Date.now() });
-            console.log('[ChatPage] ✅ Temp replaced, unique messages:', unique.length);
             return unique;
           }
 
           // If temp doesn't exist and server message not present, append server message
           if (!hasServer) {
-            console.log('[ChatPage] ➕ Adding server message (temp not found)');
             const updated = [...prev, serverMsg];
             chatMessagesCache.set(selectedMatch.id, { messages: updated, timestamp: Date.now() });
             return updated;
           }
 
           // Server message already present and no temp to replace — keep as-is
-          console.log('[ChatPage] ⚠️ Server message already exists, keeping current state');
           return prev;
         });
       }
     } catch (error) {
       // Remove optimistic message on error
-      console.error('[ChatPage] ❌ Error sending message, removing optimistic message:', error);
       setMessages(prev => {
         const updated = prev.filter(msg => msg.id !== tempId);
         chatMessagesCache.set(selectedMatch.id, {
@@ -991,7 +973,6 @@ const ChatPage = ({ currentUser, onUnreadChange, onDetailViewChange }: ChatPageP
         return updated;
       });
       
-      console.error('Error sending message:', error);
       toast({
         title: t('chat.error'),
         description: t('chat.failedToSend'),
@@ -1001,7 +982,6 @@ const ChatPage = ({ currentUser, onUnreadChange, onDetailViewChange }: ChatPageP
       return;
     }
 
-    console.log('[ChatPage] 🔔 Starting notification and unread count updates...');
     // Send push notification and update unread count (non-blocking)
     // These operations should not block message sending or show errors to user
     (async () => {
@@ -1012,21 +992,17 @@ const ChatPage = ({ currentUser, onUnreadChange, onDetailViewChange }: ChatPageP
           : selectedMatch.user1_id;
         const senderName = `${currentUser.first_name || ''} ${currentUser.last_name || ''}`.trim() || 'Someone';
 
-        console.log('[ChatPage] 📲 Sending push notification to:', recipientId, 'from:', senderName);
 
         // Use the proper notification service
         try {
           const result = await sendMessageNotification(senderName, messageText, recipientId, selectedMatch.id);
-          console.log('[ChatPage] ✅ Push notification sent successfully:', result);
         } catch (notificationError) {
-          console.error('[ChatPage] ❌ Message notification error:', notificationError);
         }
 
         // Try to update unread count (only if field exists)
         try {
           const isUser1 = selectedMatch.user1_id === currentUser.id;
           const unreadField = isUser1 ? 'user2_unread_count' : 'user1_unread_count';
-          console.log('[ChatPage] 🔢 Updating unread count for field:', unreadField);
           
           // Get current unread count for the other user
           const { data: matchData, error: matchError } = await supabase
@@ -1039,7 +1015,6 @@ const ChatPage = ({ currentUser, onUnreadChange, onDetailViewChange }: ChatPageP
           if (!matchError && matchData && typeof matchData[unreadField] === 'number') {
             newCount = matchData[unreadField] + 1;
           }
-          console.log('[ChatPage] 📊 Current unread:', matchData?.[unreadField], 'New count:', newCount);
           
           const updateData = { [unreadField]: newCount };
           await supabase
@@ -1047,7 +1022,6 @@ const ChatPage = ({ currentUser, onUnreadChange, onDetailViewChange }: ChatPageP
             .update(updateData)
             .eq('id', selectedMatch.id);
           
-          console.log('[ChatPage] ✅ Unread count updated successfully');
         } catch (unreadError) {
           // Silently handle if unread fields don't exist
         }
@@ -1060,7 +1034,6 @@ const ChatPage = ({ currentUser, onUnreadChange, onDetailViewChange }: ChatPageP
         await fetchMatches();
       } catch (error) {
         // Log but don't show error to user - message was already sent successfully
-        console.error('Post-send operations error:', error);
       }
     })();
 
@@ -1086,7 +1059,6 @@ const ChatPage = ({ currentUser, onUnreadChange, onDetailViewChange }: ChatPageP
       // Remove from UI immediately
       setMessages(prev => prev.filter(msg => msg.id !== messageId));
     } catch (error) {
-      console.error('Error deleting message:', error);
     }
   };
 
@@ -1094,8 +1066,6 @@ const ChatPage = ({ currentUser, onUnreadChange, onDetailViewChange }: ChatPageP
     if (!selectedMatch) return;
 
     try {
-      console.log('[ChatPage] 🗑️ Delete for me requested', { messageId });
-      
       // Fetch fresh data from database
       const { data: currentMsg, error: fetchError } = await supabase
         .from('chats')
@@ -1104,28 +1074,18 @@ const ChatPage = ({ currentUser, onUnreadChange, onDetailViewChange }: ChatPageP
         .single();
 
       if (fetchError) {
-        console.error('[ChatPage] ❌ Error fetching message:', fetchError);
         throw fetchError;
       }
       if (!currentMsg) {
-        console.log('[ChatPage] ⚠️ Message not found');
         return;
       }
 
-      console.log('[ChatPage] 📝 Current message:', { 
-        id: currentMsg.id, 
-        deleted_for: currentMsg.deleted_for 
-      });
-
       // Get current deleted_for array or initialize empty
       const deletedFor = (currentMsg.deleted_for || []) as string[];
-      
       // Add current user to deleted_for array if not already there
       if (!deletedFor.includes(currentUser.id)) {
         deletedFor.push(currentUser.id);
       }
-
-      console.log('[ChatPage] 📋 Updated deleted_for array:', deletedFor);
 
       // Get the other user ID
       const otherUserId = selectedMatch.user1_id === currentUser.id 
@@ -1134,66 +1094,40 @@ const ChatPage = ({ currentUser, onUnreadChange, onDetailViewChange }: ChatPageP
 
       // If both users have deleted, remove from database completely
       if (deletedFor.includes(otherUserId)) {
-        console.log('[ChatPage] 🗑️ Both users deleted - removing from DB completely');
         const { error: deleteError } = await supabase
           .from('chats')
           .delete()
           .eq('id', messageId);
-
         if (deleteError) {
-          console.error('[ChatPage] ❌ Delete error:', deleteError);
           throw deleteError;
         }
-        console.log('[ChatPage] ✅ Message deleted from DB');
       } else {
-        console.log('[ChatPage] 🔄 Updating deleted_for field');
         // Otherwise just update the deleted_for field
         const { error: updateError } = await supabase
           .from('chats')
           .update({ deleted_for: deletedFor })
           .eq('id', messageId);
-
         if (updateError) {
-          console.error('[ChatPage] ❌ Update error:', updateError);
           throw updateError;
         }
-        console.log('[ChatPage] ✅ Message updated with deleted_for');
       }
 
       // Clear cache to force fresh fetch next time
       chatMessagesCache.delete(selectedMatch.id);
-      console.log('[ChatPage] 🔄 Cache cleared');
-
       // Remove from UI immediately
       setMessages(prev => prev.filter(msg => msg.id !== messageId));
-      console.log('[ChatPage] ✅ Message removed from UI');
-    } catch (error) {
-      console.error('Error deleting message for me:', error);
-    }
+    } catch (error) {}
   };
 
   const deleteMessageForEveryone = async (messageId: string) => {
     if (!selectedMatch) return;
 
     try {
-      console.log('[ChatPage] 🗑️ Delete for everyone requested', { messageId });
-      
       // Get the message to check if user is the sender
       const message = messages.find(msg => msg.id === messageId);
-      console.log('[ChatPage] 📝 Message found', { 
-        found: !!message, 
-        isSender: message?.sender_id === currentUser.id,
-        messageId,
-        senderId: message?.sender_id,
-        currentUserId: currentUser.id
-      });
-      
       if (!message || message.sender_id !== currentUser.id) {
-        console.log('[ChatPage] ❌ Cannot delete - not sender or message not found');
         return;
       }
-
-      console.log('[ChatPage] 🔄 Deleting from database...');
       // Delete from database completely
       const { error: deleteError, data } = await supabase
         .from('chats')
@@ -1201,23 +1135,14 @@ const ChatPage = ({ currentUser, onUnreadChange, onDetailViewChange }: ChatPageP
         .eq('id', messageId)
         .eq('sender_id', currentUser.id) // Double-check it's their message
         .select(); // Return deleted rows to confirm deletion
-
       if (deleteError) {
-        console.error('[ChatPage] ❌ Delete error:', deleteError);
         throw deleteError;
       }
-
-      console.log('[ChatPage] ✅ Message deleted from DB', { deletedCount: data?.length || 0, data });
-
       // Clear cache to force fresh fetch next time
       chatMessagesCache.delete(selectedMatch.id);
-
       // Remove from UI immediately
       setMessages(prev => prev.filter(msg => msg.id !== messageId));
-      console.log('[ChatPage] ✅ Message removed from UI');
-    } catch (error) {
-      console.error('[ChatPage] ❌ Error deleting message for everyone:', error);
-    }
+    } catch (error) {}
   };
 
   const handleDormancyResponse = async (response: boolean) => {
@@ -1242,7 +1167,6 @@ const ChatPage = ({ currentUser, onUnreadChange, onDetailViewChange }: ChatPageP
       });
 
     } catch (error) {
-      console.error('Error recording dormancy response:', error);
     }
   };
 
@@ -1436,7 +1360,6 @@ const ChatPage = ({ currentUser, onUnreadChange, onDetailViewChange }: ChatPageP
         description: t('chat.chatDeletedDescription'),
       });
     } catch (error) {
-      console.error('Error deleting chat:', error);
       toast({
         title: t('chat.error'),
         description: t('chat.failedToDeleteChat'),
@@ -1659,7 +1582,6 @@ const ChatPage = ({ currentUser, onUnreadChange, onDetailViewChange }: ChatPageP
   }
 
   const handleBackClick = () => {
-    console.log('[ChatPage] 🔙 Back button clicked - refreshing match list');
     // Clear cache to force fresh data
     chatMatchesCache.delete(currentUser.id);
     // Refresh matches immediately
