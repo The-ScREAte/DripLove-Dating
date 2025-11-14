@@ -304,12 +304,15 @@ const ChatPage = ({ currentUser, onUnreadChange, onDetailViewChange }: ChatPageP
             filter: `match_id=eq.${selectedMatch.id}`,
           },
           (payload) => {
+            console.log('[ChatPage] 🔄 Realtime UPDATE event received:', payload);
             const updatedMsg = payload.new as ChatMessage;
             
             // Check if message was deleted for current user
             if (updatedMsg.deleted_for && updatedMsg.deleted_for.includes(currentUser.id)) {
+              console.log('[ChatPage] 🗑️ Message deleted for me - removing from UI:', updatedMsg.id);
               setMessages((prev) => {
                 const updated = prev.filter(m => m.id !== updatedMsg.id);
+                console.log('[ChatPage] ✅ Messages after delete for me:', updated.length);
                 // Update cache
                 chatMessagesCache.set(selectedMatch.id, {
                   messages: updated,
@@ -320,6 +323,7 @@ const ChatPage = ({ currentUser, onUnreadChange, onDetailViewChange }: ChatPageP
               return;
             }
             
+            console.log('[ChatPage] 📝 Updating message in state:', updatedMsg.id);
             // Update the specific message in state
             setMessages((prev) => {
               const updated = prev.map(m => 
@@ -981,6 +985,8 @@ const ChatPage = ({ currentUser, onUnreadChange, onDetailViewChange }: ChatPageP
     if (!selectedMatch) return;
 
     try {
+      console.log('[ChatPage] 🗑️ Delete for me requested', { messageId });
+      
       // Fetch fresh data from database
       const { data: currentMsg, error: fetchError } = await supabase
         .from('chats')
@@ -988,8 +994,19 @@ const ChatPage = ({ currentUser, onUnreadChange, onDetailViewChange }: ChatPageP
         .eq('id', messageId)
         .single();
 
-      if (fetchError) throw fetchError;
-      if (!currentMsg) return;
+      if (fetchError) {
+        console.error('[ChatPage] ❌ Error fetching message:', fetchError);
+        throw fetchError;
+      }
+      if (!currentMsg) {
+        console.log('[ChatPage] ⚠️ Message not found');
+        return;
+      }
+
+      console.log('[ChatPage] 📝 Current message:', { 
+        id: currentMsg.id, 
+        deleted_for: currentMsg.deleted_for 
+      });
 
       // Get current deleted_for array or initialize empty
       const deletedFor = (currentMsg.deleted_for || []) as string[];
@@ -999,6 +1016,8 @@ const ChatPage = ({ currentUser, onUnreadChange, onDetailViewChange }: ChatPageP
         deletedFor.push(currentUser.id);
       }
 
+      console.log('[ChatPage] 📋 Updated deleted_for array:', deletedFor);
+
       // Get the other user ID
       const otherUserId = selectedMatch.user1_id === currentUser.id 
         ? selectedMatch.user2_id 
@@ -1006,27 +1025,39 @@ const ChatPage = ({ currentUser, onUnreadChange, onDetailViewChange }: ChatPageP
 
       // If both users have deleted, remove from database completely
       if (deletedFor.includes(otherUserId)) {
+        console.log('[ChatPage] 🗑️ Both users deleted - removing from DB completely');
         const { error: deleteError } = await supabase
           .from('chats')
           .delete()
           .eq('id', messageId);
 
-        if (deleteError) throw deleteError;
+        if (deleteError) {
+          console.error('[ChatPage] ❌ Delete error:', deleteError);
+          throw deleteError;
+        }
+        console.log('[ChatPage] ✅ Message deleted from DB');
       } else {
+        console.log('[ChatPage] 🔄 Updating deleted_for field');
         // Otherwise just update the deleted_for field
         const { error: updateError } = await supabase
           .from('chats')
           .update({ deleted_for: deletedFor })
           .eq('id', messageId);
 
-        if (updateError) throw updateError;
+        if (updateError) {
+          console.error('[ChatPage] ❌ Update error:', updateError);
+          throw updateError;
+        }
+        console.log('[ChatPage] ✅ Message updated with deleted_for');
       }
 
       // Clear cache to force fresh fetch next time
       chatMessagesCache.delete(selectedMatch.id);
+      console.log('[ChatPage] 🔄 Cache cleared');
 
       // Remove from UI immediately
       setMessages(prev => prev.filter(msg => msg.id !== messageId));
+      console.log('[ChatPage] ✅ Message removed from UI');
     } catch (error) {
       console.error('Error deleting message for me:', error);
     }
