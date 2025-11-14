@@ -377,23 +377,27 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, isPremium }: DiscoverPage
   const suppressFetchRef = useRef(false);
   // Track optimistic/pending swipes to avoid local overshoot while background RPCs complete
   const pendingSwipesRef = useRef(0);
-  // Track locally swiped profile IDs to prevent re-showing them before DB sync
-  // ⭐ CRITICAL FIX: Load from sessionStorage to persist across component remounts
-  const getStoredSwipedIds = (): Set<string> => {
+  // Track locally swiped profile IDs with action type and timestamp
+  // ⭐ Structure: { userId: { action: 'like' | 'pass', timestamp: number } }
+  // ⭐ Only 'pass' actions can reappear after 6 days, 'like' actions are permanent
+  const getStoredSwipedIds = (): Map<string, { action: 'like' | 'pass', timestamp: number }> => {
     try {
       const stored = sessionStorage.getItem(`swiped_profiles_${currentUser?.id}`);
-      return stored ? new Set(JSON.parse(stored)) : new Set();
+      if (!stored) return new Map();
+      
+      const data = JSON.parse(stored);
+      return new Map(Object.entries(data));
     } catch {
-      return new Set();
+      return new Map();
     }
   };
-  const locallySwipedProfileIds = useRef<Set<string>>(getStoredSwipedIds());
+  const locallySwipedProfileIds = useRef<Map<string, { action: 'like' | 'pass', timestamp: number }>>(getStoredSwipedIds());
   
   // Persist swiped IDs to sessionStorage whenever they change
   const persistSwipedIds = useCallback(() => {
     try {
-      const ids = Array.from(locallySwipedProfileIds.current);
-      sessionStorage.setItem(`swiped_profiles_${currentUser?.id}`, JSON.stringify(ids));
+      const obj = Object.fromEntries(locallySwipedProfileIds.current);
+      sessionStorage.setItem(`swiped_profiles_${currentUser?.id}`, JSON.stringify(obj));
     } catch (error) {
       console.error('Failed to persist swiped IDs:', error);
     }
@@ -781,8 +785,17 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, isPremium }: DiscoverPage
     const likedUserIds = likedUsers?.map(like => like.liked_id) || [];
     const blockedUserIds = blockedUsers?.flatMap(block => [block.blocked_id, block.blocker_id]) || [];
     const passedUserIds = recentPasses?.map(p => p.passed_id) || [];
-    // ⭐ CRITICAL: Also exclude locally swiped IDs to prevent immediate duplicates
-    const locallySwipedIds = Array.from(locallySwipedProfileIds.current);
+    // ⭐ CRITICAL: Exclude locally swiped IDs, filtering out passed profiles older than 6 days
+    const now = Date.now();
+    const sixDaysMs = 6 * 24 * 60 * 60 * 1000;
+    const locallySwipedIds = Array.from(locallySwipedProfileIds.current.entries())
+      .filter(([_, data]) => {
+        // Always exclude liked profiles
+        if (data.action === 'like') return true;
+        // Only exclude passed profiles if less than 6 days old
+        return (now - data.timestamp) < sixDaysMs;
+      })
+      .map(([id, _]) => id);
     const excludedIds = [...likedUserIds, ...blockedUserIds, ...passedUserIds, ...locallySwipedIds, userId];
     
     const userMaxDistance = currentUserData?.max_distance || currentUserData?.distance_preference || 50;
@@ -1206,18 +1219,22 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, isPremium }: DiscoverPage
     // to prevent them from reappearing in new fetches
     // locallySwipedProfileIds.current.clear(); // REMOVED
     
-    // ⭐ Clean up sessionStorage: Remove swiped IDs older than 30 days
-    // Check if we have a timestamp for when swiped IDs were last reset
-    const lastResetKey = `swiped_reset_${currentUser.id}`;
-    const lastReset = sessionStorage.getItem(lastResetKey);
+    // ⭐ Clean up sessionStorage: Remove passed profiles older than 6 days
+    // Keep liked profiles permanently (they won't show until unmatched)
     const now = Date.now();
-    const thirtyDaysMs = 30 * 24 * 60 * 60 * 1000;
+    const sixDaysMs = 6 * 24 * 60 * 60 * 1000;
     
-    if (!lastReset || now - parseInt(lastReset) > thirtyDaysMs) {
-      // Clear old swiped IDs and reset timestamp
-      locallySwipedProfileIds.current.clear();
-      sessionStorage.setItem(lastResetKey, now.toString());
-      sessionStorage.removeItem(`swiped_profiles_${currentUser.id}`);
+    let needsUpdate = false;
+    for (const [id, data] of locallySwipedProfileIds.current.entries()) {
+      // Remove passed profiles older than 6 days
+      if (data.action === 'pass' && (now - data.timestamp) > sixDaysMs) {
+        locallySwipedProfileIds.current.delete(id);
+        needsUpdate = true;
+      }
+    }
+    
+    if (needsUpdate) {
+      persistSwipedIds();
     }
 
     // Start loading immediately - always fetch fresh to exclude swiped profiles
@@ -1458,8 +1475,15 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, isPremium }: DiscoverPage
       
       // Get additional profiles (exclude current ones AND ones we've already seen)
       const currentIds = potentialMatches.map(match => match.id);
-      // CRITICAL: Include locally swiped profiles in exclusion list
-      const locallySwipedIds = Array.from(locallySwipedProfileIds.current);
+      // CRITICAL: Include locally swiped profiles, filtering out passed profiles older than 6 days
+      const now = Date.now();
+      const sixDaysMs = 6 * 24 * 60 * 60 * 1000;
+      const locallySwipedIds = Array.from(locallySwipedProfileIds.current.entries())
+        .filter(([_, data]) => {
+          if (data.action === 'like') return true;
+          return (now - data.timestamp) < sixDaysMs;
+        })
+        .map(([id, _]) => id);
       const excludedIds = [...currentIds, ...locallySwipedIds, currentUser.id];
       
       // Get recently interacted users to exclude (likes, blocks, passes)
@@ -1636,8 +1660,8 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, isPremium }: DiscoverPage
     const prevIndex = currentIndex;
     const prevMatch = currentMatch;
 
-    // CRITICAL: Add to local exclusion list immediately to prevent re-showing
-    locallySwipedProfileIds.current.add(prevMatch.id);
+    // CRITICAL: Add to local exclusion list immediately with 'pass' action
+    locallySwipedProfileIds.current.set(prevMatch.id, { action: 'pass', timestamp: Date.now() });
     persistSwipedIds(); // ⭐ Persist to sessionStorage
 
     // Remove from cache to prevent re-showing
@@ -1867,8 +1891,8 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, isPremium }: DiscoverPage
     const prevIndex = currentIndex;
     const prevMatch = currentMatch;
 
-    // CRITICAL: Add to local exclusion list immediately to prevent re-showing
-    locallySwipedProfileIds.current.add(prevMatch.id);
+    // CRITICAL: Add to local exclusion list immediately with 'like' action (permanent)
+    locallySwipedProfileIds.current.set(prevMatch.id, { action: 'like', timestamp: Date.now() });
     persistSwipedIds(); // ⭐ Persist to sessionStorage
 
     // Remove from cache to prevent re-showing
