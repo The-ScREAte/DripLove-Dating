@@ -4,6 +4,7 @@ import { useToast } from '@/hooks/use-toast';
 import { usePushNotifications } from '@/hooks/usePushNotifications';
 import { requestNotificationPermission, sendPushNotification } from '@/services/pushNotifications';
 import { Capacitor } from '@capacitor/core';
+import { PushNotifications } from '@capacitor/push-notifications';
 // SafeAreaView removed — use plain divs with env(...) padding where necessary
 import UserProfileModal from './UserProfileModal';
 import BlockDialog from './BlockDialog';
@@ -79,6 +80,14 @@ const ChatPage = ({ currentUser, onUnreadChange, onDetailViewChange }: ChatPageP
 
   useEffect(() => {
     if (!currentUser || !currentUser.id) return;
+    
+    // Clear badge count when user opens chat page
+    if (Capacitor.isNativePlatform()) {
+      PushNotifications.removeAllDeliveredNotifications().catch(() => {
+        // Ignore errors
+      });
+    }
+    
     // Check if we have fresh cached data first
     const cached = chatMatchesCache.get(currentUser.id);
     if (cached && Date.now() - cached.timestamp < CACHE_DURATION) {
@@ -1263,7 +1272,9 @@ const ChatPage = ({ currentUser, onUnreadChange, onDetailViewChange }: ChatPageP
       WebkitOverflowScrolling: 'touch',
       paddingTop: newMatchList.length > 0 
         ? '0px'
-        : '60px'
+        : Capacitor.getPlatform() === 'ios'
+          ? 'calc(0px + env(safe-area-inset-top))'
+          : '50px'
     }}
     onTouchStart={handleTouchStart}
     onTouchMove={handleTouchMove}
