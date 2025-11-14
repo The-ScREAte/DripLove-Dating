@@ -27,11 +27,11 @@ interface ChatPageProps {
 
 // Global cache for chat matches - persists across component mounts
 const chatMatchesCache = new Map<string, { matches: ChatMatch[], timestamp: number }>();
-const CACHE_DURATION = 30000; // 30 seconds
+const CACHE_DURATION = 10000; // 10 seconds - faster updates for live feel
 
 // Global cache for individual chat messages
 const chatMessagesCache = new Map<string, { messages: ChatMessage[], timestamp: number }>();
-const MESSAGE_CACHE_DURATION = 60000; // 1 minute
+const MESSAGE_CACHE_DURATION = 30000; // 30 seconds
 
 // Make caches globally accessible for preloading
 if (typeof window !== 'undefined') {
@@ -155,10 +155,10 @@ const ChatPage = ({ currentUser, onUnreadChange, onDetailViewChange }: ChatPageP
           table: 'matches',
         },
         (payload) => {
-            // Mark that matches have changed. We'll refresh the UI only when appropriate.
-            matchesNeedsRefreshRef.current = true;
-            // Still update cache in background so data is fresh when the user returns
-            fetchMatchesInBackground();
+            console.log('[ChatPage] 🔄 Matches table changed - refreshing immediately');
+            // Clear cache and refresh immediately for instant updates
+            chatMatchesCache.delete(currentUser.id);
+            fetchMatches();
             // Update unread count badge in tab bar
             onUnreadChange?.();
           }
@@ -171,11 +171,40 @@ const ChatPage = ({ currentUser, onUnreadChange, onDetailViewChange }: ChatPageP
           table: 'chats',
         },
         (payload) => {
+          console.log('[ChatPage] 📨 New message detected - refreshing match list');
           // When a new message is inserted, refresh the match list immediately
           // to update the last message preview in the chat list
           chatMatchesCache.delete(currentUser.id);
           fetchMatches();
           onUnreadChange?.();
+        }
+      )
+      .on(
+        'postgres_changes',
+        {
+          event: 'UPDATE',
+          schema: 'public',
+          table: 'chats',
+        },
+        (payload) => {
+          console.log('[ChatPage] 🔄 Message updated - refreshing match list');
+          // When a message is updated (deleted_for, etc), refresh match list
+          chatMatchesCache.delete(currentUser.id);
+          fetchMatches();
+        }
+      )
+      .on(
+        'postgres_changes',
+        {
+          event: 'DELETE',
+          schema: 'public',
+          table: 'chats',
+        },
+        (payload) => {
+          console.log('[ChatPage] 🗑️ Message deleted - refreshing match list');
+          // When a message is deleted, refresh match list
+          chatMatchesCache.delete(currentUser.id);
+          fetchMatches();
         }
       )
       .subscribe();
@@ -184,6 +213,26 @@ const ChatPage = ({ currentUser, onUnreadChange, onDetailViewChange }: ChatPageP
       supabase.removeChannel(channel);
     };
   }, [currentUser?.id]);
+
+  // Periodic refresh for live updates when NOT in a chat
+  useEffect(() => {
+    if (!currentUser?.id || selectedMatch) return;
+    
+    console.log('[ChatPage] 🔄 Starting periodic refresh (every 5 seconds)');
+    const interval = setInterval(() => {
+      console.log('[ChatPage] ⏰ Periodic refresh triggered');
+      // Only refresh if cache is stale
+      const cached = chatMatchesCache.get(currentUser.id);
+      if (!cached || Date.now() - cached.timestamp > CACHE_DURATION) {
+        fetchMatches();
+      }
+    }, 5000); // Refresh every 5 seconds when viewing match list
+
+    return () => {
+      console.log('[ChatPage] 🛑 Stopping periodic refresh');
+      clearInterval(interval);
+    };
+  }, [currentUser?.id, selectedMatch]);
 
   // Listen for new match events from DiscoverPage
   useEffect(() => {
@@ -287,6 +336,10 @@ const ChatPage = ({ currentUser, onUnreadChange, onDetailViewChange }: ChatPageP
                 return updated;
               });
             
+            // INSTANT UPDATE: Update the match list in the background immediately
+            console.log('[ChatPage] 🔄 Updating match list with new message...');
+            updateMatchInBackground(selectedMatch.id, newMsg);
+            
             if (newMsg.sender_id !== currentUser.id) {
               markMessagesAsRead();
             } else {
@@ -306,6 +359,20 @@ const ChatPage = ({ currentUser, onUnreadChange, onDetailViewChange }: ChatPageP
           (payload) => {
             console.log('[ChatPage] 🔄 Realtime UPDATE event received:', payload);
             const updatedMsg = payload.new as ChatMessage;
+            console.log('[ChatPage] 🔍 Updated message deleted_for:', updatedMsg.deleted_for);
+            
+            // Always update the message in the cache (store full data)
+            const cachedData = chatMessagesCache.get(selectedMatch.id);
+            if (cachedData) {
+              const updatedCacheMessages = cachedData.messages.map(m =>
+                m.id === updatedMsg.id ? { ...m, ...updatedMsg } : m
+              );
+              chatMessagesCache.set(selectedMatch.id, {
+                messages: updatedCacheMessages,
+                timestamp: Date.now()
+              });
+              console.log('[ChatPage] 📦 Cache updated with message change');
+            }
             
             // Check if message was deleted for current user
             if (updatedMsg.deleted_for && updatedMsg.deleted_for.includes(currentUser.id)) {
@@ -313,11 +380,6 @@ const ChatPage = ({ currentUser, onUnreadChange, onDetailViewChange }: ChatPageP
               setMessages((prev) => {
                 const updated = prev.filter(m => m.id !== updatedMsg.id);
                 console.log('[ChatPage] ✅ Messages after delete for me:', updated.length);
-                // Update cache
-                chatMessagesCache.set(selectedMatch.id, {
-                  messages: updated,
-                  timestamp: Date.now()
-                });
                 return updated;
               });
               return;
@@ -329,11 +391,6 @@ const ChatPage = ({ currentUser, onUnreadChange, onDetailViewChange }: ChatPageP
               const updated = prev.map(m => 
                 m.id === updatedMsg.id ? { ...m, ...updatedMsg } : m
               );
-              // Update cache
-              chatMessagesCache.set(selectedMatch.id, {
-                messages: updated,
-                timestamp: Date.now()
-              });
               return updated;
             });
           }
@@ -403,6 +460,41 @@ const ChatPage = ({ currentUser, onUnreadChange, onDetailViewChange }: ChatPageP
       });
 
     return matchesWithPartner as unknown as ChatMatch[];
+  };
+
+  // Optimistically update a specific match in the cached list (for instant UI updates)
+  const updateMatchInBackground = (matchId: string, newMessage: ChatMessage) => {
+    if (!currentUser?.id) return;
+    
+    // Update the matches state immediately (optimistic update)
+    setMatches(prev => {
+      const updated = prev.map(match => {
+        if (match.id === matchId) {
+          return {
+            ...match,
+            last_message: newMessage.message,
+            last_message_time: newMessage.created_at,
+          };
+        }
+        return match;
+      });
+      
+      // Re-sort by most recent message
+      const sorted = updated.sort((a, b) => {
+        const aTime = new Date(a.last_message_time || a.created_at).getTime();
+        const bTime = new Date(b.last_message_time || b.created_at).getTime();
+        return bTime - aTime;
+      });
+      
+      // Update cache with optimistic data
+      chatMatchesCache.set(currentUser.id, {
+        matches: sorted,
+        timestamp: Date.now()
+      });
+      
+      console.log('[ChatPage] ⚡ Match list updated instantly with new message');
+      return sorted;
+    });
   };
 
   const fetchMatchesInBackground = async () => {
@@ -569,10 +661,15 @@ const ChatPage = ({ currentUser, onUnreadChange, onDetailViewChange }: ChatPageP
     const cached = chatMessagesCache.get(selectedMatch.id);
     if (cached && Date.now() - cached.timestamp < MESSAGE_CACHE_DURATION) {
       console.log('[ChatPage] 💾 Using cached messages:', cached.messages.length);
+      console.log('[ChatPage] 🔍 Current user ID:', currentUser.id);
       // Filter out messages deleted for current user
-      const visibleMessages = cached.messages.filter(msg => 
-        !msg.deleted_for || !msg.deleted_for.includes(currentUser.id)
-      );
+      const visibleMessages = cached.messages.filter(msg => {
+        const isDeletedForMe = msg.deleted_for && msg.deleted_for.includes(currentUser.id);
+        if (msg.deleted_for && msg.deleted_for.length > 0) {
+          console.log('[ChatPage] 🔍 Cached message', msg.id, 'deleted_for:', msg.deleted_for, 'isDeletedForMe:', isDeletedForMe);
+        }
+        return !isDeletedForMe;
+      });
       console.log('[ChatPage] ✅ Visible messages from cache:', visibleMessages.length);
       setMessages(visibleMessages);
       // Still fetch in background for updates
@@ -598,6 +695,7 @@ const ChatPage = ({ currentUser, onUnreadChange, onDetailViewChange }: ChatPageP
       }
 
       console.log('[ChatPage] 📨 Fetched messages from DB:', data?.length || 0);
+      console.log('[ChatPage] 🔍 Current user ID:', currentUser.id);
 
       const mappedMessages = data?.map(msg => ({
         ...msg,
@@ -610,9 +708,13 @@ const ChatPage = ({ currentUser, onUnreadChange, onDetailViewChange }: ChatPageP
       const processedMessages = mappedMessages as unknown as ChatMessage[];
       
       // Filter out messages deleted for current user
-      const visibleMessages = processedMessages.filter(msg => 
-        !msg.deleted_for || !msg.deleted_for.includes(currentUser.id)
-      );
+      const visibleMessages = processedMessages.filter(msg => {
+        const isDeletedForMe = msg.deleted_for && msg.deleted_for.includes(currentUser.id);
+        if (msg.deleted_for && msg.deleted_for.length > 0) {
+          console.log('[ChatPage] 🔍 Message', msg.id, 'deleted_for:', msg.deleted_for, 'isDeletedForMe:', isDeletedForMe);
+        }
+        return !isDeletedForMe;
+      });
       
       console.log('[ChatPage] 📊 Processed messages:', processedMessages.length, 'Visible:', visibleMessages.length);
       
@@ -787,6 +889,9 @@ const ChatPage = ({ currentUser, onUnreadChange, onDetailViewChange }: ChatPageP
 
     console.log('[ChatPage] 💬 Optimistic message created:', optimisticMessage);
 
+    // INSTANT OPTIMISTIC UPDATE: Update match list immediately even before server confirms
+    updateMatchInBackground(selectedMatch.id, optimisticMessage);
+
     // Add to messages immediately
     setMessages(prev => {
       const updated = [...prev, optimisticMessage];
@@ -827,6 +932,10 @@ const ChatPage = ({ currentUser, onUnreadChange, onDetailViewChange }: ChatPageP
 
       // Replace optimistic message with real one from server
       if (data) {
+        // INSTANT UPDATE: Update match list immediately with new message
+        console.log('[ChatPage] ⚡ Updating match list instantly...');
+        updateMatchInBackground(selectedMatch.id, data);
+        
         setMessages(prev => {
           const serverMsg: ChatMessage = { 
             ...data, 
@@ -1549,13 +1658,23 @@ const ChatPage = ({ currentUser, onUnreadChange, onDetailViewChange }: ChatPageP
     );
   }
 
+  const handleBackClick = () => {
+    console.log('[ChatPage] 🔙 Back button clicked - refreshing match list');
+    // Clear cache to force fresh data
+    chatMatchesCache.delete(currentUser.id);
+    // Refresh matches immediately
+    fetchMatches();
+    // Close the chat
+    setSelectedMatch(null);
+  };
+
   return (
   <div className="fixed inset-0 flex flex-col bg-gray-50">
       {/* Chat Header (below global header) */}
   <div className="shrink-0 bg-white border-b border-gray-200 shadow-sm z-20 m-0 p-0">
         <ChatHeader
           selectedMatch={selectedMatch}
-          onBack={() => setSelectedMatch(null)}
+          onBack={handleBackClick}
           onUserProfileOpen={handleUserProfileClick}
           onBlockUser={handleBlockClick}
           onDeleteChat={handleDeleteChatClick}
