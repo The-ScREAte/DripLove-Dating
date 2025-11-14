@@ -243,6 +243,7 @@ const ChatPage = ({ currentUser, onUnreadChange, onDetailViewChange }: ChatPageP
             filter: `match_id=eq.${selectedMatch.id}`,
           },
           (payload) => {
+            console.log('[ChatPage] 📨 Realtime INSERT event received:', payload);
             const newMsg = payload.new as ChatMessage;
             
             // Ensure sent_at is set for proper date display
@@ -252,13 +253,17 @@ const ChatPage = ({ currentUser, onUnreadChange, onDetailViewChange }: ChatPageP
             
             // Check if message is deleted for current user
             if (newMsg.deleted_for && newMsg.deleted_for.includes(currentUser.id)) {
+              console.log('[ChatPage] ⚠️ Message deleted for current user, skipping');
               return;
             }
+            
+            console.log('[ChatPage] 💬 Processing realtime message:', { id: newMsg.id, sender: newMsg.sender_id, message: newMsg.message });
             
             // Update messages state
               setMessages((prev) => {
                 // Dedupe: if message id already exists, ignore (prevents duplicates from optimistic + realtime)
                 if (prev.some(m => m.id === newMsg.id)) {
+                  console.log('[ChatPage] ⚠️ Message already exists, skipping realtime update');
                   return prev;
                 }
                 
@@ -271,12 +276,14 @@ const ChatPage = ({ currentUser, onUnreadChange, onDetailViewChange }: ChatPageP
                   return !(m.message === newMsg.message && m.sender_id === newMsg.sender_id);
                 });
                 
+                console.log('[ChatPage] ✅ Adding realtime message to state');
                 const updated = [...withoutTemp, newMsg];
                 // Update cache with new message
                 chatMessagesCache.set(selectedMatch.id, {
                   messages: updated,
                   timestamp: Date.now()
                 });
+                console.log('[ChatPage] 📊 Messages after realtime update:', updated.length);
                 return updated;
               });
             
@@ -544,20 +551,29 @@ const ChatPage = ({ currentUser, onUnreadChange, onDetailViewChange }: ChatPageP
   };
 
   const fetchMessages = async () => {
-    if (!selectedMatch) return;
+    if (!selectedMatch) {
+      console.log('[ChatPage] ⚠️ fetchMessages called but no selectedMatch');
+      return;
+    }
+
+    console.log('[ChatPage] 📥 Fetching messages for match:', selectedMatch.id);
 
     // Check cache first
     const cached = chatMessagesCache.get(selectedMatch.id);
     if (cached && Date.now() - cached.timestamp < MESSAGE_CACHE_DURATION) {
+      console.log('[ChatPage] 💾 Using cached messages:', cached.messages.length);
       // Filter out messages deleted for current user
       const visibleMessages = cached.messages.filter(msg => 
         !msg.deleted_for || !msg.deleted_for.includes(currentUser.id)
       );
+      console.log('[ChatPage] ✅ Visible messages from cache:', visibleMessages.length);
       setMessages(visibleMessages);
       // Still fetch in background for updates
       fetchMessagesInBackground(selectedMatch.id);
       return;
     }
+
+    console.log('[ChatPage] 🔄 Cache miss or stale, fetching from database...');
 
     try {
       const { data, error } = await supabase
@@ -569,7 +585,12 @@ const ChatPage = ({ currentUser, onUnreadChange, onDetailViewChange }: ChatPageP
         .eq('match_id', selectedMatch.id)
         .order('created_at', { ascending: true });
 
-      if (error) throw error;
+      if (error) {
+        console.error('[ChatPage] ❌ Error fetching messages:', error);
+        throw error;
+      }
+
+      console.log('[ChatPage] 📨 Fetched messages from DB:', data?.length || 0);
 
       const mappedMessages = data?.map(msg => ({
         ...msg,
@@ -586,15 +607,18 @@ const ChatPage = ({ currentUser, onUnreadChange, onDetailViewChange }: ChatPageP
         !msg.deleted_for || !msg.deleted_for.includes(currentUser.id)
       );
       
+      console.log('[ChatPage] 📊 Processed messages:', processedMessages.length, 'Visible:', visibleMessages.length);
+      
       // Update cache with all messages
       chatMessagesCache.set(selectedMatch.id, {
         messages: processedMessages,
         timestamp: Date.now()
       });
 
+      console.log('[ChatPage] ✅ Setting messages to state');
       setMessages(visibleMessages);
     } catch (error) {
-      // ...removed log...
+      console.error('[ChatPage] ❌ Error in fetchMessages:', error);
     }
   };
 
@@ -736,6 +760,8 @@ const ChatPage = ({ currentUser, onUnreadChange, onDetailViewChange }: ChatPageP
     const messageText = newMessage.trim();
     const tempId = `temp_${Date.now()}`;
     
+    console.log('[ChatPage] 📤 Sending message:', { messageText, tempId, matchId: selectedMatch.id });
+    
     // Optimistic update - show message immediately
     const optimisticMessage: ChatMessage = {
       id: tempId,
@@ -752,6 +778,8 @@ const ChatPage = ({ currentUser, onUnreadChange, onDetailViewChange }: ChatPageP
       }
     } as ChatMessage;
 
+    console.log('[ChatPage] 💬 Optimistic message created:', optimisticMessage);
+
     // Add to messages immediately
     setMessages(prev => {
       const updated = [...prev, optimisticMessage];
@@ -760,6 +788,7 @@ const ChatPage = ({ currentUser, onUnreadChange, onDetailViewChange }: ChatPageP
         messages: updated,
         timestamp: Date.now()
       });
+      console.log('[ChatPage] ✅ Optimistic message added to state, total messages:', updated.length);
       return updated;
     });
 
@@ -767,6 +796,7 @@ const ChatPage = ({ currentUser, onUnreadChange, onDetailViewChange }: ChatPageP
     setNewMessage('');
 
     try {
+      console.log('[ChatPage] 🔄 Inserting message to database...');
       // Send the message to server
       const { data, error } = await supabase
         .from('chats')
@@ -782,9 +812,11 @@ const ChatPage = ({ currentUser, onUnreadChange, onDetailViewChange }: ChatPageP
         .single();
 
       if (error) {
-        console.error('Supabase insert error:', error);
+        console.error('[ChatPage] ❌ Supabase insert error:', error);
         throw error;
       }
+
+      console.log('[ChatPage] ✅ Message inserted successfully, server data:', data);
 
       // Replace optimistic message with real one from server
       if (data) {
@@ -798,8 +830,11 @@ const ChatPage = ({ currentUser, onUnreadChange, onDetailViewChange }: ChatPageP
           const hasServer = prev.some(m => m.id === data.id);
           const hasTemp = prev.some(m => m.id === tempId);
 
+          console.log('[ChatPage] 🔄 Replacing temp message:', { hasServer, hasTemp, serverId: data.id, tempId });
+
           // If temp exists, replace it with server message
           if (hasTemp) {
+            console.log('[ChatPage] ♻️ Replacing temp message with server message');
             const replaced = prev.map(m => (m.id === tempId ? serverMsg : m));
             // Ensure uniqueness by id (in case server message was already appended by realtime)
             const unique: ChatMessage[] = [];
@@ -811,22 +846,26 @@ const ChatPage = ({ currentUser, onUnreadChange, onDetailViewChange }: ChatPageP
               }
             }
             chatMessagesCache.set(selectedMatch.id, { messages: unique, timestamp: Date.now() });
+            console.log('[ChatPage] ✅ Temp replaced, unique messages:', unique.length);
             return unique;
           }
 
           // If temp doesn't exist and server message not present, append server message
           if (!hasServer) {
+            console.log('[ChatPage] ➕ Adding server message (temp not found)');
             const updated = [...prev, serverMsg];
             chatMessagesCache.set(selectedMatch.id, { messages: updated, timestamp: Date.now() });
             return updated;
           }
 
           // Server message already present and no temp to replace — keep as-is
+          console.log('[ChatPage] ⚠️ Server message already exists, keeping current state');
           return prev;
         });
       }
     } catch (error) {
       // Remove optimistic message on error
+      console.error('[ChatPage] ❌ Error sending message, removing optimistic message:', error);
       setMessages(prev => {
         const updated = prev.filter(msg => msg.id !== tempId);
         chatMessagesCache.set(selectedMatch.id, {
@@ -846,6 +885,7 @@ const ChatPage = ({ currentUser, onUnreadChange, onDetailViewChange }: ChatPageP
       return;
     }
 
+    console.log('[ChatPage] 🔔 Starting notification and unread count updates...');
     // Send push notification and update unread count (non-blocking)
     // These operations should not block message sending or show errors to user
     (async () => {
@@ -856,32 +896,42 @@ const ChatPage = ({ currentUser, onUnreadChange, onDetailViewChange }: ChatPageP
           : selectedMatch.user1_id;
         const senderName = `${currentUser.first_name || ''} ${currentUser.last_name || ''}`.trim() || 'Someone';
 
+        console.log('[ChatPage] 📲 Sending push notification to:', recipientId, 'from:', senderName);
+
         // Use the proper notification service
         try {
           const result = await sendMessageNotification(senderName, messageText, recipientId, selectedMatch.id);
+          console.log('[ChatPage] ✅ Push notification sent successfully:', result);
         } catch (notificationError) {
-          console.error('💬 Message notification error:', notificationError);
+          console.error('[ChatPage] ❌ Message notification error:', notificationError);
         }
 
         // Try to update unread count (only if field exists)
         try {
           const isUser1 = selectedMatch.user1_id === currentUser.id;
           const unreadField = isUser1 ? 'user2_unread_count' : 'user1_unread_count';
+          console.log('[ChatPage] 🔢 Updating unread count for field:', unreadField);
+          
           // Get current unread count for the other user
           const { data: matchData, error: matchError } = await supabase
             .from('matches')
             .select(unreadField)
             .eq('id', selectedMatch.id)
             .single();
+          
           let newCount = 1;
           if (!matchError && matchData && typeof matchData[unreadField] === 'number') {
             newCount = matchData[unreadField] + 1;
           }
+          console.log('[ChatPage] 📊 Current unread:', matchData?.[unreadField], 'New count:', newCount);
+          
           const updateData = { [unreadField]: newCount };
           await supabase
             .from('matches')
             .update(updateData)
             .eq('id', selectedMatch.id);
+          
+          console.log('[ChatPage] ✅ Unread count updated successfully');
         } catch (unreadError) {
           // Silently handle if unread fields don't exist
         }
