@@ -1263,11 +1263,7 @@ const ChatPage = ({ currentUser, onUnreadChange, onDetailViewChange }: ChatPageP
       WebkitOverflowScrolling: 'touch',
       paddingTop: newMatchList.length > 0 
         ? '0px'
-        : Capacitor.getPlatform() === 'web'
-          ? '8px'
-          : Capacitor.getPlatform() === 'ios'
-            ? 'max(60px, env(safe-area-inset-top, 44px))'
-            : '50px'
+        : '60px'
     }}
     onTouchStart={handleTouchStart}
     onTouchMove={handleTouchMove}
