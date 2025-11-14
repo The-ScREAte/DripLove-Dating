@@ -378,7 +378,26 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, isPremium }: DiscoverPage
   // Track optimistic/pending swipes to avoid local overshoot while background RPCs complete
   const pendingSwipesRef = useRef(0);
   // Track locally swiped profile IDs to prevent re-showing them before DB sync
-  const locallySwipedProfileIds = useRef<Set<string>>(new Set());
+  // ⭐ CRITICAL FIX: Load from sessionStorage to persist across component remounts
+  const getStoredSwipedIds = (): Set<string> => {
+    try {
+      const stored = sessionStorage.getItem(`swiped_profiles_${currentUser?.id}`);
+      return stored ? new Set(JSON.parse(stored)) : new Set();
+    } catch {
+      return new Set();
+    }
+  };
+  const locallySwipedProfileIds = useRef<Set<string>>(getStoredSwipedIds());
+  
+  // Persist swiped IDs to sessionStorage whenever they change
+  const persistSwipedIds = useCallback(() => {
+    try {
+      const ids = Array.from(locallySwipedProfileIds.current);
+      sessionStorage.setItem(`swiped_profiles_${currentUser?.id}`, JSON.stringify(ids));
+    } catch (error) {
+      console.error('Failed to persist swiped IDs:', error);
+    }
+  }, [currentUser?.id]);
   
   const { toast } = useToast();
   const { sendMatchNotification, sendMultipleLikesNotification } = usePushNotifications(currentUser?.id);
@@ -1186,6 +1205,20 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, isPremium }: DiscoverPage
     // ⭐ CRITICAL: DO NOT clear locallySwipedProfileIds - we need to remember swiped profiles
     // to prevent them from reappearing in new fetches
     // locallySwipedProfileIds.current.clear(); // REMOVED
+    
+    // ⭐ Clean up sessionStorage: Remove swiped IDs older than 30 days
+    // Check if we have a timestamp for when swiped IDs were last reset
+    const lastResetKey = `swiped_reset_${currentUser.id}`;
+    const lastReset = sessionStorage.getItem(lastResetKey);
+    const now = Date.now();
+    const thirtyDaysMs = 30 * 24 * 60 * 60 * 1000;
+    
+    if (!lastReset || now - parseInt(lastReset) > thirtyDaysMs) {
+      // Clear old swiped IDs and reset timestamp
+      locallySwipedProfileIds.current.clear();
+      sessionStorage.setItem(lastResetKey, now.toString());
+      sessionStorage.removeItem(`swiped_profiles_${currentUser.id}`);
+    }
 
     // Start loading immediately - always fetch fresh to exclude swiped profiles
     const initializeProfiles = async () => {
@@ -1605,6 +1638,7 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, isPremium }: DiscoverPage
 
     // CRITICAL: Add to local exclusion list immediately to prevent re-showing
     locallySwipedProfileIds.current.add(prevMatch.id);
+    persistSwipedIds(); // ⭐ Persist to sessionStorage
 
     // Remove from cache to prevent re-showing
     setUserImages(prev => {
@@ -1633,6 +1667,7 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, isPremium }: DiscoverPage
         if (!usageResult.success) {
           // rollback: restore the card at front and remove from exclusion list
           locallySwipedProfileIds.current.delete(prevMatch.id);
+          persistSwipedIds(); // Keep sessionStorage in sync
           setPotentialMatches(prev => [prevMatch, ...prev]);
           setCurrentIndex(0);
           setTodaySwipeCount(prev => Math.max(0, prev - 1));
@@ -1722,6 +1757,7 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, isPremium }: DiscoverPage
           } catch (fallbackErr) {
             // If even fallback fails, rollback to keep UI consistent
             locallySwipedProfileIds.current.delete(prevMatch.id);
+            persistSwipedIds(); // Keep sessionStorage in sync
             setPotentialMatches(prev => [prevMatch, ...prev]);
             setCurrentIndex(0);
             setTodaySwipeCount(prev => Math.max(0, prev - 1));
@@ -1784,6 +1820,7 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, isPremium }: DiscoverPage
       } catch (jobErr) {
         // On unexpected errors, attempt a rollback to keep UX consistent
         locallySwipedProfileIds.current.delete(prevMatch.id);
+        persistSwipedIds(); // Keep sessionStorage in sync
         setPotentialMatches(prev => [prevMatch, ...prev]);
         setCurrentIndex(0);
         setTodaySwipeCount(prev => Math.max(0, prev - 1));
@@ -1832,6 +1869,7 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, isPremium }: DiscoverPage
 
     // CRITICAL: Add to local exclusion list immediately to prevent re-showing
     locallySwipedProfileIds.current.add(prevMatch.id);
+    persistSwipedIds(); // ⭐ Persist to sessionStorage
 
     // Remove from cache to prevent re-showing
     setUserImages(prev => {
@@ -1860,6 +1898,7 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, isPremium }: DiscoverPage
         if (!usageResult.success) {
           // rollback: restore the card at front and remove from exclusion lists
           locallySwipedProfileIds.current.delete(prevMatch.id);
+          persistSwipedIds(); // Keep sessionStorage in sync
           setPotentialMatches(prev => [prevMatch, ...prev]);
           setCurrentIndex(0);
           setPassedUsers(prev => prev.filter(p => p.user_id !== prevMatch.id));
@@ -1896,6 +1935,7 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, isPremium }: DiscoverPage
           } catch (fallbackErr) {
             // On fallback failure, rollback
             locallySwipedProfileIds.current.delete(prevMatch.id);
+            persistSwipedIds(); // Keep sessionStorage in sync
             setPotentialMatches(prev => [prevMatch, ...prev]);
             setCurrentIndex(0);
             setPassedUsers(prev => prev.filter(p => p.user_id !== prevMatch.id));
@@ -1907,6 +1947,7 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, isPremium }: DiscoverPage
       } catch (jobErr) {
         // Unexpected error: rollback
         locallySwipedProfileIds.current.delete(prevMatch.id);
+        persistSwipedIds(); // Keep sessionStorage in sync
         setPotentialMatches(prev => [prevMatch, ...prev]);
         setCurrentIndex(0);
         setPassedUsers(prev => prev.filter(p => p.user_id !== prevMatch.id));
@@ -1983,6 +2024,10 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, isPremium }: DiscoverPage
 
       // Remove from passed users list
       setPassedUsers(prev => prev.slice(1));
+      
+      // ⭐ CRITICAL: Remove from locally swiped IDs so profile can reappear
+      locallySwipedProfileIds.current.delete(lastPassedUser.user_id);
+      persistSwipedIds(); // Persist to sessionStorage
 
       // Update reverse usage count if not premium
       if (!isPremium) {
