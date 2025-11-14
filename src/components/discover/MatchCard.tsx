@@ -18,6 +18,8 @@ interface MatchCardProps {
   currentUserLatitude?: number;
   currentUserLongitude?: number;
   userImages: string[]; // New prop for user images
+  preloadedBlobImages?: { [url: string]: string }; // ⭐ Blob URLs for instant rendering
+  preferredLanguageName?: string; // ⭐ Pre-fetched language name (no DB call needed)
   onImageClick: () => void;
   onToggleInfo: () => void;
   calculateAge: (dateOfBirth: string) => number;
@@ -40,6 +42,8 @@ const MatchCard: React.FC<MatchCardProps> = ({
   currentUserLatitude,
   currentUserLongitude,
   userImages,
+  preloadedBlobImages = {}, // ⭐ Blob URLs for instant image loading
+  preferredLanguageName, // ⭐ Pre-fetched language (no DB call)
   onImageClick,
   onToggleInfo,
   calculateAge,
@@ -59,35 +63,12 @@ const MatchCard: React.FC<MatchCardProps> = ({
   // ...existing code...
   const [currentSlide, setCurrentSlide] = useState(0);
   const [imageLoading, setImageLoading] = useState(false);
-  const [userLanguage, setUserLanguage] = useState<string | null>(null);
   
   // Use ref for internal state that doesn't need to trigger re-renders
   const lastSlideInteraction = useRef<number>(0);
   const slideTransitionInProgress = useRef<boolean>(false);
 
-  // Fetch user's preferred language
-  useEffect(() => {
-    const fetchUserLanguage = async () => {
-      if (!match.id) return;
-      
-      try {
-        const { data, error } = await supabase
-          .from('profiles')
-          .select('preferred_language')
-          .eq('id', match.id)
-          .single();
-        
-        if (!error && data?.preferred_language) {
-          const languageName = getLanguageName(data.preferred_language);
-          setUserLanguage(languageName);
-        }
-      } catch (err) {
-        console.error('Error fetching user language:', err);
-      }
-    };
-
-    fetchUserLanguage();
-  }, [match.id]);
+  // ⭐ REMOVED: Language fetching (now passed as prop from parent to eliminate DB calls)
   
   // Memoize image loading callbacks to prevent unnecessary re-renders
   const handleImageLoadStart = useCallback(() => setImageLoading(true), []);
@@ -190,28 +171,53 @@ const MatchCard: React.FC<MatchCardProps> = ({
 
     // Mix images with non-image content deterministically
     const mixedSlides: Array<any> = [];
-    mixedSlides.push(imageSlides[0]); // always start with first image
-
-    const shuffledNonImage = seededShuffle(nonImageContent);
-    let nonImageIndex = 0;
-
-    for (let i = 1; i < imageSlides.length; i++) {
-      // Decide deterministically whether to insert non-image content (30% chance)
-      if (nonImageIndex < shuffledNonImage.length && rand() > 0.3) {
-        mixedSlides.push(shuffledNonImage[nonImageIndex]);
-        nonImageIndex++;
-      }
-      mixedSlides.push(imageSlides[i]);
+    
+    if (imageSlides.length === 0) {
+      // No images, show all non-image content
+      return nonImageContent.length > 0 
+        ? [...seededShuffle(nonImageContent), { type: 'placeholder' as const, content: '', index: -1 }]
+        : [{ type: 'placeholder' as const, content: '', index: -1 }];
     }
 
-    // Append any remaining non-image content
-    while (nonImageIndex < shuffledNonImage.length) {
-      mixedSlides.push(shuffledNonImage[nonImageIndex]);
-      nonImageIndex++;
+    // Start with first image
+    mixedSlides.push(imageSlides[0]);
+
+    const shuffledNonImage = seededShuffle(nonImageContent);
+    
+    // ⭐ CRITICAL: Always show bio/fun facts - insert after 2nd image or at position 2
+    if (shuffledNonImage.length > 0) {
+      if (imageSlides.length > 1) {
+        mixedSlides.push(imageSlides[1]); // 2nd image
+        mixedSlides.push(shuffledNonImage[0]); // First text content (bio or fun fact)
+        
+        // Add remaining images
+        let nonImageIndex = 1;
+        for (let i = 2; i < imageSlides.length; i++) {
+          if (nonImageIndex < shuffledNonImage.length && (i % 2 === 0)) {
+            mixedSlides.push(shuffledNonImage[nonImageIndex]);
+            nonImageIndex++;
+          }
+          mixedSlides.push(imageSlides[i]);
+        }
+        
+        // Add any remaining text content at the end
+        while (nonImageIndex < shuffledNonImage.length) {
+          mixedSlides.push(shuffledNonImage[nonImageIndex]);
+          nonImageIndex++;
+        }
+      } else {
+        // Only 1 image, add all text content after it
+        shuffledNonImage.forEach(content => mixedSlides.push(content));
+      }
+    } else {
+      // No text content, just add remaining images
+      for (let i = 1; i < imageSlides.length; i++) {
+        mixedSlides.push(imageSlides[i]);
+      }
     }
 
     return mixedSlides;
-  }, [JSON.stringify(match), userImages]);
+  }, [match.id, userImages.join('|')]); // ⭐ FIX #4: Detect content changes (not just length)
 
   // Use lightweight static edge color instead of expensive pixel scanning
   const edgeColor = '#f6f6f6';
@@ -339,7 +345,7 @@ const MatchCard: React.FC<MatchCardProps> = ({
     } finally {
       setReporting(false);
     }
-  };
+  }; 
 
   // Reset modal state when closing
   const closeReportModal = () => {
@@ -423,13 +429,23 @@ const MatchCard: React.FC<MatchCardProps> = ({
                     </div>
                   )}
                   {(() => {
-                    const url = slides[currentSlide].content;
-                    const full = getOptimizedUrl(url);
-                    const status = imageStatus?.[url] || 'idle';
+                    // ⭐ CRITICAL FIX: Use ORIGINAL URL as key for blob lookup
+                    const originalUrl = slides[currentSlide].content;
+                    const blobUrl = preloadedBlobImages?.[originalUrl];
+                    
+                    // Priority: blob URL → optimized URL → original URL
+                    let imageSrc: string;
+                    if (blobUrl && blobUrl.startsWith('blob:')) {
+                      imageSrc = blobUrl; // ⭐ INSTANT loading from memory
+                    } else {
+                      imageSrc = getOptimizedUrl(originalUrl); // Fallback to optimized
+                    }
+                    
+                    const status = imageStatus?.[originalUrl] || 'idle';
 
                     return (
                       <img
-                        src={full}
+                        src={imageSrc}
                         alt={`${match.first_name} ${match.last_name}`}
                         className={`w-full h-full object-contain transition-opacity duration-300 relative z-10 ${styles.optimizedImage}`}
                         draggable={false}
@@ -947,12 +963,12 @@ const MatchCard: React.FC<MatchCardProps> = ({
             )}
 
             {/* Language */}
-            {userLanguage && (
+            {preferredLanguageName && (
               <div className="bg-gray-50 rounded-lg p-3">
                 <h4 className="font-semibold text-pink-600 mb-2">{t('discover.matchCard.language')}</h4>
                 <div className="flex items-center text-sm">
                   <Languages className="w-4 h-4 mr-2 text-pink-500" />
-                  <span className="text-gray-700">{userLanguage}</span>
+                  <span className="text-gray-700">{preferredLanguageName}</span>
                 </div>
               </div>
             )}

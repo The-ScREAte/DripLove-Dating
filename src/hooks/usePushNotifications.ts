@@ -104,7 +104,7 @@ export const usePushNotifications = (userId?: string) => {
 
   const sendMessageNotification = async (senderName: string, message: string, targetUserId: string, chatId: string) => {
     return sendNotification({
-      title: `💬 ${senderName}`,
+      title: ` ${senderName}`,
       body: message,
       userId: targetUserId,
       type: 'message',

@@ -19,8 +19,8 @@ const SwipeCounter: React.FC<SwipeCounterProps> = ({
   if (isPremium) return null; // Premium users don't have restrictions
 
   const remainingSwipes = swipeLimit - swipesUsedToday;
-  const showWarning = swipesUsedToday >= 4 && profileCompletion < 70;
-  const isRestricted = swipesUsedToday >= 7 && profileCompletion < 70;
+  const showWarning = swipesUsedToday >= 5 && profileCompletion < 70;
+  const isRestricted = swipesUsedToday >= 8 && profileCompletion < 70;
 
   if (swipesUsedToday === 0) return null; // Don't show until user starts swiping
 
@@ -40,22 +40,16 @@ const SwipeCounter: React.FC<SwipeCounterProps> = ({
         <Progress value={(swipesUsedToday / swipeLimit) * 100} className="h-2 mb-2" />
         
         {showWarning && (
-          <div className={`flex items-start gap-2 p-2 rounded-lg text-xs ${
-            isRestricted 
-              ? 'bg-red-50 border border-red-200' 
-              : 'bg-orange-50 border border-orange-200'
-          }`}>
-            <AlertTriangle className={`w-3 h-3 mt-0.5 flex-shrink-0 ${
-              isRestricted ? 'text-red-500' : 'text-orange-500'
-            }`} />
+          <div className="flex items-start gap-2 p-3 rounded-lg text-xs bg-white border-2 border-gray-300 shadow-md">
+            <AlertTriangle className="w-4 h-4 mt-0.5 flex-shrink-0 text-gray-800" />
             <div>
               {isRestricted ? (
-                <p className="text-red-700 font-medium">
-                  Complete your profile to {profileCompletion}% to continue swiping
+                <p className="text-gray-900 font-medium">
+                  Complete your profile to 70% to continue swiping
                 </p>
               ) : (
-                <p className="text-orange-700">
-                  After {5 - swipesUsedToday} more swipes, you'll need 70% profile completion to continue
+                <p className="text-gray-900">
+                  After {8 - swipesUsedToday} more swipes, you'll need 70% profile completion to continue
                 </p>
               )}
             </div>
