@@ -154,6 +154,21 @@ const ChatPage = ({ currentUser, onUnreadChange, onDetailViewChange }: ChatPageP
             onUnreadChange?.();
           }
       )
+      .on(
+        'postgres_changes',
+        {
+          event: 'INSERT',
+          schema: 'public',
+          table: 'chats',
+        },
+        (payload) => {
+          // When a new message is inserted, refresh the match list immediately
+          // to update the last message preview in the chat list
+          chatMatchesCache.delete(currentUser.id);
+          fetchMatches();
+          onUnreadChange?.();
+        }
+      )
       .subscribe();
 
     return () => {
@@ -1246,13 +1261,13 @@ const ChatPage = ({ currentUser, onUnreadChange, onDetailViewChange }: ChatPageP
     className="flex-1 overflow-y-auto pb-35"
     style={{ 
       WebkitOverflowScrolling: 'touch',
-      marginTop: newMatchList.length > 0 
+      paddingTop: newMatchList.length > 0 
         ? '0px'
         : Capacitor.getPlatform() === 'web'
           ? '8px'
           : Capacitor.getPlatform() === 'ios'
-            ? 'clamp(30px, calc(env(safe-area-inset-top, 30px) + 15px), 45px)'
-            : '0px'
+            ? 'max(60px, env(safe-area-inset-top, 44px))'
+            : '50px'
     }}
     onTouchStart={handleTouchStart}
     onTouchMove={handleTouchMove}
@@ -1305,7 +1320,7 @@ const ChatPage = ({ currentUser, onUnreadChange, onDetailViewChange }: ChatPageP
               </p>
             </div>
           ) : (
-            conversationList.map((match) => {
+            conversationList.map((match, index) => {
               // Determine the correct partner ID for avatar
               const partnerId = match.partner?.id || 
                                (match.user1_id === currentUser.id ? match.user2_id : match.user1_id);
@@ -1316,6 +1331,11 @@ const ChatPage = ({ currentUser, onUnreadChange, onDetailViewChange }: ChatPageP
                   className={`p-4 border-b border-gray-200 cursor-pointer hover:bg-gray-100 transition-colors ${
                     selectedMatch?.id === match.id ? 'bg-pink-50 border-pink-200' : 'bg-white'
                   } ${match.unread_messages > 0 ? 'font-bold bg-purple-50' : ''}`}
+                  style={{
+                    marginTop: index === 0 && newMatchList.length === 0 && Capacitor.getPlatform() === 'ios' 
+                      ? '0px' 
+                      : undefined
+                  }}
                   onClick={() => setSelectedMatch(match)}
                 >
                   <div className="flex items-center space-x-3">
