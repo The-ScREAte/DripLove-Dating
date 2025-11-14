@@ -95,7 +95,7 @@ const LocationSection = ({
             <Label>{t('profile.maxDistance')}</Label>
             <div className="px-3">
             <Slider
-                value={[editedProfile.max_distance || 50]}
+                value={[editedProfile.max_distance || 250]}
                 onValueChange={onDistanceChange || (() => {})}
                 max={500}
                 min={1}
@@ -105,7 +105,7 @@ const LocationSection = ({
               />
               <div className="flex justify-between text-xs text-gray-500 mt-1">
                 <span>1 km</span>
-                <span className="font-medium">{editedProfile.max_distance || 50} km</span>
+                <span className="font-medium">{editedProfile.max_distance || 250} km</span>
                 <span>500 km</span>
               </div>
             </div>

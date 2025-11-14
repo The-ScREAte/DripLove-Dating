@@ -25,7 +25,7 @@ export const initialFormData = {
   latitude: undefined as number | undefined,
   longitude: undefined as number | undefined,
   isCustomCity: false,
-  maxDistance: 50, // Default 50km radius for matching
+  maxDistance: 250, // Default 250km radius for matching
   bio: '',
   preference: '',
   interests: [] as string[],

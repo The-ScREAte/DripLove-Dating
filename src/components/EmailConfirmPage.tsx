@@ -28,7 +28,7 @@ const completeRegistration = async (userId: string, formData: any, images: any[]
     latitude: formData.latitude,
     longitude: formData.longitude,
     is_custom_city: formData.isCustomCity || false,
-    max_distance: formData.maxDistance || 50,
+    max_distance: formData.maxDistance || 250,
     country_code: formData.countryCode || ''
   };
 

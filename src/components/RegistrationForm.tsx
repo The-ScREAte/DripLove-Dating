@@ -545,7 +545,7 @@ const RegistrationForm = ({ onSubmit, onBackToLogin }: RegistrationFormProps) =>
         latitude: formData.latitude,
         longitude: formData.longitude,
         is_custom_city: formData.isCustomCity || false,
-        max_distance: formData.maxDistance || 50,
+        max_distance: formData.maxDistance || 250,
         country_code: formData.countryCode || '',
         adinkra_symbols: formData.adinkraSymbols || []
       };
