@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Users, Heart, X, Calendar, MapPin, Shield, ChevronDown, ChevronUp, Briefcase, GraduationCap, Crown, Lock, Clock } from 'lucide-react';
+import { Users, Heart, X, Calendar, MapPin, Shield, ChevronDown, ChevronUp, Briefcase, GraduationCap, Crown, Lock, Clock, User, Quote, Coffee, Search } from 'lucide-react';
 import { Capacitor } from '@capacitor/core';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
@@ -54,6 +54,7 @@ const LikedMePage = ({ currentUser, isPremium = false }: LikedMePageProps) => {
   });
   const [blockDialogOpen, setBlockDialogOpen] = useState(false);
   const [imageIndex, setImageIndex] = useState(0);
+  const [currentSlide, setCurrentSlide] = useState(0); // For image + about + fun fact slides
   const [showMoreInfo, setShowMoreInfo] = useState(false);
   const [showPremiumUpgrade, setShowPremiumUpgrade] = useState(false);
   const [lockoutEndDate, setLockoutEndDate] = useState<Date | null>(null);
@@ -392,15 +393,78 @@ const LikedMePage = ({ currentUser, isPremium = false }: LikedMePageProps) => {
     }
   };
 
-  const handleTouch = (e: React.TouchEvent<HTMLDivElement>) => {
-    const { clientX } = e.changedTouches[0];
-    const screenWidth = window.innerWidth;
-    const profileImages = userImages[selectedProfile.id] || [];
+    const handleTouch = (e: React.TouchEvent) => {
+    // Don't navigate if clicking on buttons or interactive elements
+    const target = e.target as HTMLElement;
+    if (target.closest('button') || target.closest('[role="button"]')) {
+      return;
+    }
 
-    if (clientX < screenWidth / 2) {
-      setImageIndex(prev => (prev > 0 ? prev - 1 : prev));
+    const touch = e.changedTouches[0] || e.touches[0];
+    if (!touch) return;
+    
+    const x = touch.clientX;
+    const screenWidth = window.innerWidth;
+    
+    if (!selectedProfile) return;
+    
+    // Build the same slide sequence to get total count
+    const profileImages = userImages[selectedProfile.id] || [];
+    const slides: Array<{ type: string, imageIndex?: number }> = [];
+    
+    if (profileImages.length > 0) {
+      for (let i = 0; i < profileImages.length; i++) {
+        slides.push({ type: 'image', imageIndex: i });
+        slides.push({ type: i % 2 === 0 ? 'about' : 'funfact' });
+      }
     } else {
-      setImageIndex(prev => (prev < profileImages.length - 1 ? prev + 1 : prev));
+      slides.push({ type: 'about' });
+      slides.push({ type: 'funfact' });
+    }
+    
+    const totalSlides = slides.length;
+    
+    // Larger tap zones - left 40% and right 40%
+    if (x < screenWidth * 0.4 && currentSlide > 0) {
+      setCurrentSlide(prev => prev - 1);
+    } else if (x > screenWidth * 0.6 && currentSlide < totalSlides - 1) {
+      setCurrentSlide(prev => prev + 1);
+    }
+  };
+
+  const handleClick = (e: React.MouseEvent) => {
+    // Don't navigate if clicking on buttons or interactive elements
+    const target = e.target as HTMLElement;
+    if (target.closest('button') || target.closest('[role="button"]')) {
+      return;
+    }
+
+    const x = e.clientX;
+    const screenWidth = window.innerWidth;
+    
+    if (!selectedProfile) return;
+    
+    // Build the same slide sequence to get total count
+    const profileImages = userImages[selectedProfile.id] || [];
+    const slides: Array<{ type: string, imageIndex?: number }> = [];
+    
+    if (profileImages.length > 0) {
+      for (let i = 0; i < profileImages.length; i++) {
+        slides.push({ type: 'image', imageIndex: i });
+        slides.push({ type: i % 2 === 0 ? 'about' : 'funfact' });
+      }
+    } else {
+      slides.push({ type: 'about' });
+      slides.push({ type: 'funfact' });
+    }
+    
+    const totalSlides = slides.length;
+    
+    // Larger tap zones - left 40% and right 40%
+    if (x < screenWidth * 0.4 && currentSlide > 0) {
+      setCurrentSlide(prev => prev - 1);
+    } else if (x > screenWidth * 0.6 && currentSlide < totalSlides - 1) {
+      setCurrentSlide(prev => prev + 1);
     }
   };
 
@@ -626,24 +690,81 @@ const LikedMePage = ({ currentUser, isPremium = false }: LikedMePageProps) => {
 
   if (selectedProfile) {
     const profileImages = userImages[selectedProfile.id] || [];
+    
+    // Build slide sequence: alternate between images and info cards
+    // Pattern: Image1, About, Image2, FunFact, Image3, About, Image4, FunFact...
+    const slides: Array<{ type: 'image' | 'about' | 'funfact', imageIndex?: number }> = [];
+    
+    if (profileImages.length > 0) {
+      for (let i = 0; i < profileImages.length; i++) {
+        // Add image
+        slides.push({ type: 'image', imageIndex: i });
+        
+        // Add info card after each image
+        // Alternate: About after 1st/3rd/5th image, FunFact after 2nd/4th/6th image
+        if (i % 2 === 0) {
+          slides.push({ type: 'about' });
+        } else {
+          slides.push({ type: 'funfact' });
+        }
+      }
+    } else {
+      // No images, just show info cards
+      slides.push({ type: 'about' });
+      slides.push({ type: 'funfact' });
+    }
+    
+    const totalSlides = slides.length;
+    const currentSlideInfo = slides[currentSlide] || slides[0];
+    
+    // Debug logging
+    console.log('Total slides:', totalSlides);
+    console.log('Current slide index:', currentSlide);
+    console.log('Current slide type:', currentSlideInfo.type);
+    console.log('All slides:', slides.map((s, i) => `${i}: ${s.type}${s.imageIndex !== undefined ? ` (img${s.imageIndex})` : ''}`));
+    
+    const isImageSlide = currentSlideInfo.type === 'image';
+    const isAboutSlide = currentSlideInfo.type === 'about';
+    const isFunFactSlide = currentSlideInfo.type === 'funfact';
+    const currentImageIndex = currentSlideInfo.imageIndex || 0;
+
+    // Background colors for cards
+    const getCardColor = () => {
+      let hash = 0;
+      const str = selectedProfile.id.toString();
+      for (let i = 0; i < str.length; i++) {
+        hash = ((hash << 5) - hash) + str.charCodeAt(i);
+        hash = hash & hash;
+      }
+      const colors = [
+        'from-blue-400 to-blue-600',
+        'from-purple-400 to-purple-600',
+        'from-pink-400 to-pink-600',
+        'from-indigo-400 to-indigo-600',
+        'from-teal-400 to-teal-600',
+      ];
+      return colors[Math.abs(hash) % colors.length];
+    };
 
     return (
       <div className="h-full w-full relative flex flex-col bg-white">
-        {/* Main Image Area - takes full available height */}
+        {/* Main Slide Area */}
         <div 
           className="flex-1 relative" 
           onTouchEnd={handleTouch}
+          onClick={handleClick}
           style={{
-            height: 'calc(100vh - 120px)', // Fixed height minus nav space
+            height: 'calc(100vh - 120px)',
             minHeight: 'calc(100vh - 120px)',
             maxHeight: 'calc(100vh - 120px)',
             overflow: 'hidden'
           }}
         >
-          {profileImages.length > 0 ? (
+          {/* Image Slide */}
+          {isImageSlide && profileImages.length > 0 && currentImageIndex < profileImages.length && (
             <>
               <img
-                src={profileImages[imageIndex]}
+                src={profileImages[currentImageIndex]}
                 alt={`${selectedProfile.first_name}'s photo`}
                 className="w-full h-full object-cover"
                 style={{
@@ -651,35 +772,93 @@ const LikedMePage = ({ currentUser, isPremium = false }: LikedMePageProps) => {
                   width: '100%',
                   objectFit: 'cover',
                   objectPosition: 'center',
-                  display: 'block',
-                  WebkitTransform: 'translateZ(0)', // Force hardware acceleration
-                  transform: 'translateZ(0)'
+                  display: 'block'
                 }}
-                loading="lazy"
               />
-              {/* Image indicators */}
-              <div className="absolute top-4 left-1/2 transform -translate-x-1/2 flex gap-1 z-10">
-                {profileImages.map((_,idx) => (
-                  <div
-                    key={idx}
-                    className={`w-2 h-2 rounded-full ${idx === imageIndex ? 'bg-white' : 'bg-white/40'}`}
-                  />
-                ))}
-              </div>
+              {/* Gradient overlay */}
+              <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-transparent to-transparent pointer-events-none" />
             </>
-          ) : (
-            <div className="w-full h-full bg-gradient-to-br from-pink-200 to-purple-200 flex items-center justify-center">
-              <div className="w-32 h-32 bg-white rounded-full flex items-center justify-center">
-                <span className="text-4xl font-bold text-gray-700">
-                  {selectedProfile.first_name?.[0]}{selectedProfile.last_name?.[0]}
-                </span>
+          )}
+
+          {/* About Card */}
+          {isAboutSlide && (
+            <div className={`w-full h-full bg-gradient-to-br ${getCardColor()} flex flex-col items-center justify-center p-8 text-white`}>
+              <User className="w-16 h-16 mb-6 opacity-90" />
+              <h2 className="text-3xl font-bold mb-4 text-center">About</h2>
+              <div className="max-w-md w-full space-y-4 text-center">
+                {selectedProfile.bio ? (
+                  <p className="text-lg leading-relaxed">{selectedProfile.bio}</p>
+                ) : (
+                  <p className="text-lg opacity-75 italic">No bio yet</p>
+                )}
               </div>
             </div>
           )}
 
+          {/* Fun Fact Card */}
+          {isFunFactSlide && (
+            <div className={`w-full h-full bg-gradient-to-br ${getCardColor()} flex flex-col items-center justify-center p-8 text-white`}>
+              <Quote className="w-16 h-16 mb-6 opacity-90" />
+              <h2 className="text-3xl font-bold mb-8 text-center">Fun Questions</h2>
+              <div className="max-w-md w-full space-y-6">
+                {selectedProfile.fun_fact && (
+                  <div className="bg-white/10 backdrop-blur-sm rounded-lg p-4">
+                    <div className="flex items-start gap-3">
+                      <Heart className="w-5 h-5 flex-shrink-0 mt-1" />
+                      <div>
+                        <p className="text-sm opacity-75 mb-1">Fun Fact</p>
+                        <p className="text-base">{selectedProfile.fun_fact}</p>
+                      </div>
+                    </div>
+                  </div>
+                )}
+                {selectedProfile.perfect_first_date && (
+                  <div className="bg-white/10 backdrop-blur-sm rounded-lg p-4">
+                    <div className="flex items-start gap-3">
+                      <Coffee className="w-5 h-5 flex-shrink-0 mt-1" />
+                      <div>
+                        <p className="text-sm opacity-75 mb-1">Perfect First Date</p>
+                        <p className="text-base">{selectedProfile.perfect_first_date}</p>
+                      </div>
+                    </div>
+                  </div>
+                )}
+                {selectedProfile.last_googled && (
+                  <div className="bg-white/10 backdrop-blur-sm rounded-lg p-4">
+                    <div className="flex items-start gap-3">
+                      <Search className="w-5 h-5 flex-shrink-0 mt-1" />
+                      <div>
+                        <p className="text-sm opacity-75 mb-1">Last Googled</p>
+                        <p className="text-base">{selectedProfile.last_googled}</p>
+                      </div>
+                    </div>
+                  </div>
+                )}
+                {!selectedProfile.fun_fact && !selectedProfile.perfect_first_date && !selectedProfile.last_googled && (
+                  <p className="text-lg opacity-75 italic text-center">No fun questions answered yet</p>
+                )}
+              </div>
+            </div>
+          )}
+
+          {/* Slide indicators */}
+          <div className="absolute top-4 left-1/2 transform -translate-x-1/2 flex gap-1.5 z-10">
+            {Array.from({ length: totalSlides }).map((_, idx) => (
+              <div
+                key={idx}
+                className={`h-2 rounded-full transition-all duration-200 ${
+                  idx === currentSlide ? 'bg-white w-8' : 'bg-white/50 w-2'
+                }`}
+              />
+            ))}
+          </div>
+
           {/* Header buttons */}
           <Button
-            onClick={() => setSelectedProfile(null)}
+            onClick={() => {
+              setSelectedProfile(null);
+              setCurrentSlide(0);
+            }}
             variant="outline"
             className="absolute left-4 bg-white/80 hover:bg-white z-10 h-10 px-3"
             style={{
@@ -705,87 +884,129 @@ const LikedMePage = ({ currentUser, isPremium = false }: LikedMePageProps) => {
             <Shield className="w-4 h-4" />
           </Button>
 
-          {/* Gradient overlay for text readability */}
-          <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-transparent to-transparent pointer-events-none" />
-
-          {/* Profile Info Overlay - Fixed at bottom with proper spacing for mobile nav */}
-          <div 
-            className="absolute bottom-0 left-0 right-0 text-white"
-            style={{
-              paddingBottom: Capacitor.getPlatform() === 'ios' 
-                ? 'clamp(90px, calc(env(safe-area-inset-bottom, 10px) + 80px), 110px)'
-                : '96px'
-            }}
-          >
-            {/* Main info section */}
-            <div className="px-6 pb-4">
-              <div className="mb-3">
-                <h2 className="text-2xl font-bold mb-1">
-                  {selectedProfile.first_name} {selectedProfile.last_name}
-                </h2>
-                <div className="flex items-center space-x-4 text-sm">
-                  <div className="flex items-center">
-                    <Calendar className="w-4 h-4 mr-1" />
-                    <span>{calculateAge(selectedProfile.date_of_birth)} {t('matches.yearsOld')}</span>
-                  </div>
-                  <div className="flex items-center">
-                    <MapPin className="w-4 h-4 mr-1" />
-                    <span>{selectedProfile.city}, {selectedProfile.country}</span>
+          {/* Profile Info Overlay - Only show on image slides */}
+          {isImageSlide && (
+            <div 
+              className="absolute bottom-0 left-0 right-0 text-white"
+              style={{
+                paddingBottom: Capacitor.getPlatform() === 'ios' 
+                  ? 'clamp(90px, calc(env(safe-area-inset-bottom, 10px) + 80px), 110px)'
+                  : '96px'
+              }}
+            >
+              <div className="px-6 pb-4">
+                <div className="mb-3">
+                  <h2 className="text-2xl font-bold mb-1">
+                    {selectedProfile.first_name} {selectedProfile.last_name}
+                  </h2>
+                  <div className="flex items-center space-x-4 text-sm">
+                    <div className="flex items-center">
+                      <Calendar className="w-4 h-4 mr-1" />
+                      <span>{calculateAge(selectedProfile.date_of_birth)} {t('matches.yearsOld')}</span>
+                    </div>
+                    <div className="flex items-center">
+                      <MapPin className="w-4 h-4 mr-1" />
+                      <span>{selectedProfile.city}, {selectedProfile.country}</span>
+                    </div>
                   </div>
                 </div>
-              </div>
 
-              {/* Expandable Info Section */}
-              <div className="mb-4">
-                <Button
-                  onClick={() => setShowMoreInfo(!showMoreInfo)}
-                  variant="ghost"
-                  className="text-white p-0 h-auto font-normal text-left mb-2 hover:bg-transparent"
-                >
-                  <span className="flex items-center text-sm">
-                    {showMoreInfo ? t('matches.showLess') : t('matches.showMore')}
-                    {showMoreInfo ? <ChevronUp className="w-4 h-4 ml-1" /> : <ChevronDown className="w-4 h-4 ml-1" />}
-                  </span>
-                </Button>
+                {selectedProfile.occupation && (
+                  <div className="flex items-center text-sm mb-2">
+                    <Briefcase className="w-3 h-3 mr-2" />
+                    <span>{selectedProfile.occupation}</span>
+                  </div>
+                )}
 
+                {selectedProfile.interests && selectedProfile.interests.length > 0 && (
+                  <div className="flex flex-wrap gap-1 mt-2">
+                    {selectedProfile.interests.slice(0, 5).map((interest: string, index: number) => (
+                      <span
+                        key={index}
+                        className="px-2 py-1 bg-white/20 rounded-full text-xs backdrop-blur-sm"
+                      >
+                        {interest}
+                      </span>
+                    ))}
+                  </div>
+                )}
+
+                {/* Show More Button */}
+                <div className="flex justify-center mt-3">
+                  <Button
+                    onClick={() => setShowMoreInfo(!showMoreInfo)}
+                    variant="ghost"
+                    size="sm"
+                    className="text-white hover:bg-white/10 flex items-center gap-1"
+                  >
+                    {showMoreInfo ? (
+                      <>
+                        <ChevronUp className="w-4 h-4" />
+                        <span className="text-xs">Show Less</span>
+                      </>
+                    ) : (
+                      <>
+                        <ChevronDown className="w-4 h-4" />
+                        <span className="text-xs">Show More</span>
+                      </>
+                    )}
+                  </Button>
+                </div>
+
+                {/* Expanded Info */}
                 {showMoreInfo && (
-                  <div className="space-y-3 bg-black/50 p-3 rounded-lg max-h-32 overflow-y-auto">
-                    {selectedProfile.bio && (
-                      <div>
-                        <h3 className="font-semibold mb-1 text-sm">{t('matches.about')}</h3>
-                        <p className="text-xs leading-relaxed">{selectedProfile.bio}</p>
+                  <div className="mt-4 space-y-3 bg-black/30 backdrop-blur-sm rounded-lg p-4 max-h-64 overflow-y-auto">
+                    {selectedProfile.education && (
+                      <div className="flex items-start gap-2">
+                        <GraduationCap className="w-4 h-4 flex-shrink-0 mt-0.5" />
+                        <div>
+                          <p className="text-xs opacity-75">Education</p>
+                          <p className="text-sm">{selectedProfile.education}</p>
+                        </div>
                       </div>
                     )}
-
-                    {(selectedProfile.occupation || selectedProfile.education_level) && (
-                      <div className="space-y-2">
-                        {selectedProfile.occupation && (
-                          <div className="flex items-center text-xs">
-                            <Briefcase className="w-3 h-3 mr-2 flex-shrink-0" />
-                            <span>{selectedProfile.occupation}</span>
-                          </div>
-                        )}
-                        {selectedProfile.education_level && (
-                          <div className="flex items-center text-xs">
-                            <GraduationCap className="w-3 h-3 mr-2 flex-shrink-0" />
-                            <span>{selectedProfile.education_level}</span>
-                          </div>
-                        )}
+                    {selectedProfile.height && (
+                      <div className="flex items-start gap-2">
+                        <div className="w-4 h-4 flex-shrink-0 mt-0.5 text-center">📏</div>
+                        <div>
+                          <p className="text-xs opacity-75">Height</p>
+                          <p className="text-sm">{selectedProfile.height} cm</p>
+                        </div>
                       </div>
                     )}
-
-                    {selectedProfile.interests && selectedProfile.interests.length > 0 && (
-                      <div>
-                        <h3 className="font-semibold mb-2 text-sm">{t('matches.interests')}</h3>
-                        <div className="flex flex-wrap gap-1">
-                          {selectedProfile.interests.map((interest: string, index: number) => (
-                            <span
-                              key={index}
-                              className="px-2 py-1 bg-white/20 rounded-full text-xs"
-                            >
-                              {interest}
-                            </span>
-                          ))}
+                    {selectedProfile.languages && selectedProfile.languages.length > 0 && (
+                      <div className="flex items-start gap-2">
+                        <div className="w-4 h-4 flex-shrink-0 mt-0.5 text-center">🗣️</div>
+                        <div>
+                          <p className="text-xs opacity-75">Languages</p>
+                          <p className="text-sm">{selectedProfile.languages.join(', ')}</p>
+                        </div>
+                      </div>
+                    )}
+                    {selectedProfile.drinking && (
+                      <div className="flex items-start gap-2">
+                        <div className="w-4 h-4 flex-shrink-0 mt-0.5 text-center">🍷</div>
+                        <div>
+                          <p className="text-xs opacity-75">Drinking</p>
+                          <p className="text-sm">{selectedProfile.drinking}</p>
+                        </div>
+                      </div>
+                    )}
+                    {selectedProfile.smoking && (
+                      <div className="flex items-start gap-2">
+                        <div className="w-4 h-4 flex-shrink-0 mt-0.5 text-center">🚭</div>
+                        <div>
+                          <p className="text-xs opacity-75">Smoking</p>
+                          <p className="text-sm">{selectedProfile.smoking}</p>
+                        </div>
+                      </div>
+                    )}
+                    {selectedProfile.relationship_goals && (
+                      <div className="flex items-start gap-2">
+                        <Heart className="w-4 h-4 flex-shrink-0 mt-0.5" />
+                        <div>
+                          <p className="text-xs opacity-75">Looking For</p>
+                          <p className="text-sm">{selectedProfile.relationship_goals}</p>
                         </div>
                       </div>
                     )}
@@ -793,25 +1014,32 @@ const LikedMePage = ({ currentUser, isPremium = false }: LikedMePageProps) => {
                 )}
               </div>
             </div>
+          )}
 
-            {/* Action Buttons - positioned above mobile nav */}
-            <div className="flex justify-center space-x-6 px-6">
-              <Button
-                onClick={() => handlePass(selectedProfile.id)}
-                variant="outline"
-                className="w-14 h-14 rounded-full border-2 border-red-400/80 bg-red-500/20 hover:bg-red-500/30 backdrop-blur-sm"
-              >
-                <X className="w-6 h-6 text-red-400" />
-              </Button>
+          {/* Action Buttons - positioned above mobile nav */}
+          <div 
+            className="absolute bottom-0 left-0 right-0 flex justify-center space-x-6 px-6"
+            style={{
+              paddingBottom: Capacitor.getPlatform() === 'ios' 
+                ? 'clamp(24px, calc(env(safe-area-inset-bottom, 10px) + 16px), 40px)'
+                : '16px'
+            }}
+          >
+            <Button
+              onClick={() => handlePass(selectedProfile.id)}
+              variant="outline"
+              className="w-14 h-14 rounded-full border-2 border-red-400/80 bg-red-500/20 hover:bg-red-500/30 backdrop-blur-sm"
+            >
+              <X className="w-6 h-6 text-red-400" />
+            </Button>
 
-              <Button
-                onClick={() => handleLikeBack(selectedProfile.id)}
-                variant="outline"
-                className="w-14 h-14 rounded-full border-2 border-green-400/80 bg-green-500/20 hover:bg-green-500/30 backdrop-blur-sm"
-              >
-                <Heart className="w-6 h-6 text-green-400" />
-              </Button>
-            </div>
+            <Button
+              onClick={() => handleLikeBack(selectedProfile.id)}
+              variant="outline"
+              className="w-14 h-14 rounded-full border-2 border-green-400/80 bg-green-500/20 hover:bg-green-500/30 backdrop-blur-sm"
+            >
+              <Heart className="w-6 h-6 text-green-400" />
+            </Button>
           </div>
         </div>
 

@@ -137,7 +137,7 @@ const MatchExpirationAvatar = ({
     <div className="relative inline-flex items-center justify-center" style={{ width: circleSize[size], height: circleSize[size] }}>
       {/* SVG Circle - positioned behind the avatar */}
       <svg 
-        className="absolute -rotate-90"
+        className="absolute rotate-90"
         width={circleSize[size]}
         height={circleSize[size]}
         style={{ 
@@ -168,7 +168,8 @@ const MatchExpirationAvatar = ({
             strokeDashoffset={strokeDashoffset}
             strokeLinecap="round"
             style={{
-              transition: 'stroke-dashoffset 1s ease'
+              transition: 'stroke-dashoffset 0.5s ease',
+              willChange: 'stroke-dashoffset'
             }}
           />
         )}
@@ -188,7 +189,7 @@ const MatchExpirationAvatar = ({
       
       {/* Avatar - positioned on top of the circle */}
       <Avatar 
-        className={`${sizeClasses[size]} ${className || ''} ${onClick ? 'cursor-pointer hover:scale-105 transition-transform' : ''}`}
+        className={`${sizeClasses[size]} ${className || ''} ${onClick ? 'cursor-pointer' : ''}`}
         style={{ zIndex: 1, position: 'relative' }}
         onClick={onClick}
       >
