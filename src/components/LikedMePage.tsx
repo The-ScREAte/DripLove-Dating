@@ -393,7 +393,7 @@ const LikedMePage = ({ currentUser, isPremium = false }: LikedMePageProps) => {
     }
   };
 
-    const handleTouch = (e: React.TouchEvent) => {
+  const handleTouch = (e: React.TouchEvent) => {
     // Don't navigate if clicking on buttons or interactive elements
     const target = e.target as HTMLElement;
     if (target.closest('button') || target.closest('[role="button"]')) {
@@ -408,26 +408,37 @@ const LikedMePage = ({ currentUser, isPremium = false }: LikedMePageProps) => {
     
     if (!selectedProfile) return;
     
-    // Build the same slide sequence to get total count
+    // Helper to check content
+    const hasContent = (type: string) => {
+      if (type === 'image') return true;
+      if (type === 'about') return !!selectedProfile.bio;
+      if (type === 'funfact') return !!(selectedProfile.fun_fact || selectedProfile.perfect_first_date || selectedProfile.last_googled);
+      return false;
+    };
+
+    // Build slides array - same logic as render
     const profileImages = userImages[selectedProfile.id] || [];
     const slides: Array<{ type: string, imageIndex?: number }> = [];
     
     if (profileImages.length > 0) {
       for (let i = 0; i < profileImages.length; i++) {
         slides.push({ type: 'image', imageIndex: i });
-        slides.push({ type: i % 2 === 0 ? 'about' : 'funfact' });
+        const infoType = i % 2 === 0 ? 'about' : 'funfact';
+        if (hasContent(infoType)) {
+          slides.push({ type: infoType });
+        }
       }
     } else {
-      slides.push({ type: 'about' });
-      slides.push({ type: 'funfact' });
+      if (hasContent('about')) slides.push({ type: 'about' });
+      if (hasContent('funfact')) slides.push({ type: 'funfact' });
     }
     
     const totalSlides = slides.length;
     
-    // Larger tap zones - left 40% and right 40%
-    if (x < screenWidth * 0.4 && currentSlide > 0) {
+    // Tap zones - left 35% and right 35%
+    if (x < screenWidth * 0.35 && currentSlide > 0) {
       setCurrentSlide(prev => prev - 1);
-    } else if (x > screenWidth * 0.6 && currentSlide < totalSlides - 1) {
+    } else if (x > screenWidth * 0.65 && currentSlide < totalSlides - 1) {
       setCurrentSlide(prev => prev + 1);
     }
   };
@@ -444,23 +455,34 @@ const LikedMePage = ({ currentUser, isPremium = false }: LikedMePageProps) => {
     
     if (!selectedProfile) return;
     
-    // Build the same slide sequence to get total count
+    // Helper to check content
+    const hasContent = (type: string) => {
+      if (type === 'image') return true;
+      if (type === 'about') return !!selectedProfile.bio;
+      if (type === 'funfact') return !!(selectedProfile.fun_fact || selectedProfile.perfect_first_date || selectedProfile.last_googled);
+      return false;
+    };
+
+    // Build slides array - same logic as render
     const profileImages = userImages[selectedProfile.id] || [];
     const slides: Array<{ type: string, imageIndex?: number }> = [];
     
     if (profileImages.length > 0) {
       for (let i = 0; i < profileImages.length; i++) {
         slides.push({ type: 'image', imageIndex: i });
-        slides.push({ type: i % 2 === 0 ? 'about' : 'funfact' });
+        const infoType = i % 2 === 0 ? 'about' : 'funfact';
+        if (hasContent(infoType)) {
+          slides.push({ type: infoType });
+        }
       }
     } else {
-      slides.push({ type: 'about' });
-      slides.push({ type: 'funfact' });
+      if (hasContent('about')) slides.push({ type: 'about' });
+      if (hasContent('funfact')) slides.push({ type: 'funfact' });
     }
     
     const totalSlides = slides.length;
     
-    // Larger tap zones - left 35% and right 35%, prevent accidental swipes in middle
+    // Tap zones - left 35% and right 35%
     if (x < screenWidth * 0.35 && currentSlide > 0) {
       setCurrentSlide(prev => prev - 1);
     } else if (x > screenWidth * 0.65 && currentSlide < totalSlides - 1) {
@@ -691,8 +713,15 @@ const LikedMePage = ({ currentUser, isPremium = false }: LikedMePageProps) => {
   if (selectedProfile) {
     const profileImages = userImages[selectedProfile.id] || [];
     
-    // Build slide sequence: alternate between images and info cards
-    // Pattern: Image1, About, Image2, FunFact, Image3, About, Image4, FunFact...
+    // Helper to check content
+    const hasContent = (type: string) => {
+      if (type === 'image') return true;
+      if (type === 'about') return !!selectedProfile.bio;
+      if (type === 'funfact') return !!(selectedProfile.fun_fact || selectedProfile.perfect_first_date || selectedProfile.last_googled);
+      return false;
+    };
+    
+    // Build slide sequence: alternate between images and info cards, skip empty slides
     const slides: Array<{ type: 'image' | 'about' | 'funfact', imageIndex?: number }> = [];
     
     if (profileImages.length > 0) {
@@ -700,18 +729,16 @@ const LikedMePage = ({ currentUser, isPremium = false }: LikedMePageProps) => {
         // Add image
         slides.push({ type: 'image', imageIndex: i });
         
-        // Add info card after each image
-        // Alternate: About after 1st/3rd/5th image, FunFact after 2nd/4th/6th image
-        if (i % 2 === 0) {
-          slides.push({ type: 'about' });
-        } else {
-          slides.push({ type: 'funfact' });
+        // Add info card after each image only if it has content
+        const infoType: 'about' | 'funfact' = i % 2 === 0 ? 'about' : 'funfact';
+        if (hasContent(infoType)) {
+          slides.push({ type: infoType });
         }
       }
     } else {
-      // No images, just show info cards
-      slides.push({ type: 'about' });
-      slides.push({ type: 'funfact' });
+      // No images, just show info cards that have content
+      if (hasContent('about')) slides.push({ type: 'about' });
+      if (hasContent('funfact')) slides.push({ type: 'funfact' });
     }
     
     const totalSlides = slides.length;
