@@ -190,7 +190,7 @@ serve(async (req) => {
         console.log('✅ FCM access token obtained')
         
         // Determine notification channel and sound based on type
-        let androidChannelId = 'driplove_general'
+        let androidChannelId = 'driplove_notifications'
         let androidSound = 'botificationsound'
         let iosSound = 'botificationsound.caf'
         
@@ -205,7 +205,7 @@ serve(async (req) => {
             androidChannelId = 'driplove_likes'
             break
           default:
-            androidChannelId = 'driplove_general'
+            androidChannelId = 'driplove_notifications'
         }
 
         // Send to each device token using FCM v1 API
@@ -226,6 +226,10 @@ serve(async (req) => {
                 notification: {
                   channel_id: androidChannelId,
                   sound: androidSound,
+                  notification_priority: 'PRIORITY_HIGH',
+                  visibility: 'PUBLIC',
+                  color: '#9333EA',
+                  icon: 'ic_launcher',
                 },
               },
               apns: {

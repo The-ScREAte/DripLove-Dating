@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- DripLove brand color - Purple -->
+    <color name="colorPrimary">#9333EA</color>
+    <color name="colorPrimaryDark">#7E22CE</color>
+    <color name="colorAccent">#A855F7</color>
+    
+    <!-- Notification icon tint color -->
+    <color name="notification_icon_color">#9333EA</color>
+</resources>

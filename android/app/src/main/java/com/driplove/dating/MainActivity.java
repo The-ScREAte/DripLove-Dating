@@ -23,6 +23,9 @@ public class MainActivity extends BridgeActivity {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
             NotificationManager notificationManager = getSystemService(NotificationManager.class);
             
+            // Create default DripLove Notifications Channel (for FCM)
+            createDefaultChannel(notificationManager);
+            
             // Create DripLove Messages Channel with custom sound
             createMessageChannel(notificationManager);
             
@@ -34,6 +37,33 @@ public class MainActivity extends BridgeActivity {
             
             // Create DripLove General Channel
             createGeneralChannel(notificationManager);
+        }
+    }
+    
+    private void createDefaultChannel(NotificationManager manager) {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            String channelId = "driplove_notifications";
+            CharSequence channelName = "DripLove Notifications";
+            String channelDescription = "All notifications from DripLove";
+            int importance = NotificationManager.IMPORTANCE_HIGH;
+            
+            NotificationChannel channel = new NotificationChannel(channelId, channelName, importance);
+            channel.setDescription(channelDescription);
+            channel.enableVibration(true);
+            channel.setVibrationPattern(new long[]{0, 250, 250, 250});
+            channel.enableLights(true);
+            channel.setShowBadge(true);
+            
+            // Set custom sound
+            AudioAttributes audioAttributes = new AudioAttributes.Builder()
+                    .setContentType(AudioAttributes.CONTENT_TYPE_SONIFICATION)
+                    .setUsage(AudioAttributes.USAGE_NOTIFICATION)
+                    .build();
+            
+            Uri soundUri = Uri.parse("android.resource://" + getPackageName() + "/raw/botificationsound");
+            channel.setSound(soundUri, audioAttributes);
+            
+            manager.createNotificationChannel(channel);
         }
     }
     
