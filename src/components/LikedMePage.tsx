@@ -460,10 +460,10 @@ const LikedMePage = ({ currentUser, isPremium = false }: LikedMePageProps) => {
     
     const totalSlides = slides.length;
     
-    // Larger tap zones - left 40% and right 40%
-    if (x < screenWidth * 0.4 && currentSlide > 0) {
+    // Larger tap zones - left 35% and right 35%, prevent accidental swipes in middle
+    if (x < screenWidth * 0.35 && currentSlide > 0) {
       setCurrentSlide(prev => prev - 1);
-    } else if (x > screenWidth * 0.6 && currentSlide < totalSlides - 1) {
+    } else if (x > screenWidth * 0.65 && currentSlide < totalSlides - 1) {
       setCurrentSlide(prev => prev + 1);
     }
   };
@@ -955,31 +955,46 @@ const LikedMePage = ({ currentUser, isPremium = false }: LikedMePageProps) => {
 
                 {/* Expanded Info */}
                 {showMoreInfo && (
-                  <div className="mt-4 space-y-3 bg-black/30 backdrop-blur-sm rounded-lg p-4 max-h-64 overflow-y-auto">
-                    {selectedProfile.education && (
+                  <div className="mt-4 space-y-3 bg-white/90 backdrop-blur-sm rounded-lg p-4 max-h-64 overflow-y-auto text-gray-800">
+                    {selectedProfile.adinkra_symbols && selectedProfile.adinkra_symbols.length > 0 && (
                       <div className="flex items-start gap-2">
-                        <GraduationCap className="w-4 h-4 flex-shrink-0 mt-0.5" />
-                        <div>
-                          <p className="text-xs opacity-75">Education</p>
-                          <p className="text-sm">{selectedProfile.education}</p>
+                        <div className="w-4 h-4 flex-shrink-0 mt-0.5 text-center">✨</div>
+                        <div className="w-full">
+                          <p className="text-xs text-gray-600 mb-1">Adinkra Symbols</p>
+                          <div className="flex flex-wrap gap-1">
+                            {selectedProfile.adinkra_symbols.map((symbol: string, index: number) => (
+                              <span key={index} className="px-2 py-1 bg-primary/10 rounded-full text-xs text-primary font-medium">
+                                {symbol}
+                              </span>
+                            ))}
+                          </div>
                         </div>
                       </div>
                     )}
-                    {selectedProfile.height && (
-                      <div className="flex items-start gap-2">
-                        <div className="w-4 h-4 flex-shrink-0 mt-0.5 text-center">📏</div>
-                        <div>
-                          <p className="text-xs opacity-75">Height</p>
-                          <p className="text-sm">{selectedProfile.height} cm</p>
-                        </div>
-                      </div>
-                    )}
-                    {selectedProfile.languages && selectedProfile.languages.length > 0 && (
+                    {selectedProfile.preferred_language && (
                       <div className="flex items-start gap-2">
                         <div className="w-4 h-4 flex-shrink-0 mt-0.5 text-center">🗣️</div>
                         <div>
-                          <p className="text-xs opacity-75">Languages</p>
-                          <p className="text-sm">{selectedProfile.languages.join(', ')}</p>
+                          <p className="text-xs text-gray-600">Preferred Language</p>
+                          <p className="text-sm font-medium">{selectedProfile.preferred_language}</p>
+                        </div>
+                      </div>
+                    )}
+                    {selectedProfile.education_level && (
+                      <div className="flex items-start gap-2">
+                        <GraduationCap className="w-4 h-4 flex-shrink-0 mt-0.5" />
+                        <div>
+                          <p className="text-xs text-gray-600">Education</p>
+                          <p className="text-sm font-medium">{selectedProfile.education_level}</p>
+                        </div>
+                      </div>
+                    )}
+                    {selectedProfile.industry && (
+                      <div className="flex items-start gap-2">
+                        <Briefcase className="w-4 h-4 flex-shrink-0 mt-0.5" />
+                        <div>
+                          <p className="text-xs text-gray-600">Industry</p>
+                          <p className="text-sm font-medium">{selectedProfile.industry}</p>
                         </div>
                       </div>
                     )}
@@ -987,8 +1002,8 @@ const LikedMePage = ({ currentUser, isPremium = false }: LikedMePageProps) => {
                       <div className="flex items-start gap-2">
                         <div className="w-4 h-4 flex-shrink-0 mt-0.5 text-center">🍷</div>
                         <div>
-                          <p className="text-xs opacity-75">Drinking</p>
-                          <p className="text-sm">{selectedProfile.drinking}</p>
+                          <p className="text-xs text-gray-600">Drinking</p>
+                          <p className="text-sm font-medium">{selectedProfile.drinking}</p>
                         </div>
                       </div>
                     )}
@@ -996,17 +1011,35 @@ const LikedMePage = ({ currentUser, isPremium = false }: LikedMePageProps) => {
                       <div className="flex items-start gap-2">
                         <div className="w-4 h-4 flex-shrink-0 mt-0.5 text-center">🚭</div>
                         <div>
-                          <p className="text-xs opacity-75">Smoking</p>
-                          <p className="text-sm">{selectedProfile.smoking}</p>
+                          <p className="text-xs text-gray-600">Smoking</p>
+                          <p className="text-sm font-medium">{selectedProfile.smoking}</p>
                         </div>
                       </div>
                     )}
-                    {selectedProfile.relationship_goals && (
+                    {selectedProfile.exercise_level && (
+                      <div className="flex items-start gap-2">
+                        <div className="w-4 h-4 flex-shrink-0 mt-0.5 text-center">💪</div>
+                        <div>
+                          <p className="text-xs text-gray-600">Exercise</p>
+                          <p className="text-sm font-medium">{selectedProfile.exercise_level}</p>
+                        </div>
+                      </div>
+                    )}
+                    {selectedProfile.sleeping_schedule && (
+                      <div className="flex items-start gap-2">
+                        <div className="w-4 h-4 flex-shrink-0 mt-0.5 text-center">😴</div>
+                        <div>
+                          <p className="text-xs text-gray-600">Sleep Schedule</p>
+                          <p className="text-sm font-medium">{selectedProfile.sleeping_schedule}</p>
+                        </div>
+                      </div>
+                    )}
+                    {selectedProfile.relationship_intent && (
                       <div className="flex items-start gap-2">
                         <Heart className="w-4 h-4 flex-shrink-0 mt-0.5" />
                         <div>
-                          <p className="text-xs opacity-75">Looking For</p>
-                          <p className="text-sm">{selectedProfile.relationship_goals}</p>
+                          <p className="text-xs text-gray-600">Looking For</p>
+                          <p className="text-sm font-medium">{selectedProfile.relationship_intent}</p>
                         </div>
                       </div>
                     )}
