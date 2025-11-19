@@ -26,6 +26,9 @@ const MessageBubble: React.FC<MessageBubbleProps> = ({
   const [deleteType, setDeleteType] = useState<'me' | 'everyone'>('me');
   const [hasResponded, setHasResponded] = useState(false);
   
+  // Check if message is deleted for current user
+  const isDeletedForMe = message.deleted_for && message.deleted_for.includes(currentUser.id);
+  
   const handleDeleteForMe = () => {
     setDeleteType('me');
     setShowConfirm(true);
@@ -102,7 +105,9 @@ const MessageBubble: React.FC<MessageBubbleProps> = ({
             </div>
           )}
 
-          <p className="text-sm break-words pr-6">{message.message}</p>
+          <p className={`text-sm break-words pr-6 ${isDeletedForMe ? 'italic opacity-70' : ''}`}>
+            {isDeletedForMe ? 'deleted' : message.message}
+          </p>
           <div className={`flex items-center gap-1 text-xs mt-1 ${isOwnMessage ? 'text-primary-foreground/70' : 'text-gray-500'}`}>
             <span>
               {new Date(message.sent_at || message.created_at || '').toLocaleTimeString([], {

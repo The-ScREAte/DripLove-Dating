@@ -27,7 +27,7 @@ const ChatUserList: React.FC<ChatUserListProps> = ({
     ? 'clamp(32px, calc(env(safe-area-inset-top, 0px) + 32px), 80px)' 
     : platform === 'android' 
     ? '80px' 
-    : '16px';
+    : '64px'; // Increased from 16px to 64px for web to show DripChat header
 
   return (
     <div className="w-full h-full flex flex-col">
