@@ -322,10 +322,7 @@ const ChatPage = ({ currentUser, onUnreadChange, onDetailViewChange }: ChatPageP
               newMsg.sent_at = newMsg.created_at;
             }
             
-            // Check if message is deleted for current user
-            if (newMsg.deleted_for && newMsg.deleted_for.includes(currentUser.id)) {
-              return;
-            }
+            // Don't skip deleted messages - they will be displayed as "deleted"
             
             // INSTANT: Populate sender info from partner data for immediate display
             if (!newMsg.sender && selectedMatch.partner) {
@@ -394,14 +391,10 @@ const ChatPage = ({ currentUser, onUnreadChange, onDetailViewChange }: ChatPageP
               });
             }
             
-            // Check if message was deleted for current user
-            if (updatedMsg.deleted_for && updatedMsg.deleted_for.includes(currentUser.id)) {
-              setMessages((prev) => {
-                const updated = prev.filter(m => m.id !== updatedMsg.id);
-                return updated;
-              });
-              return;
-            }
+            // Update message even if deleted - it will show as "deleted"
+            setMessages((prev) => 
+              prev.map(m => m.id === updatedMsg.id ? { ...m, ...updatedMsg } : m)
+            );
             
             // Update the specific message in state
             setMessages((prev) => {
@@ -707,13 +700,8 @@ const ChatPage = ({ currentUser, onUnreadChange, onDetailViewChange }: ChatPageP
 
       const processedMessages = mappedMessages as unknown as ChatMessage[];
       
-      // Filter out messages deleted for current user
-      const visibleMessages = processedMessages.filter(msg => {
-        const isDeletedForMe = msg.deleted_for && msg.deleted_for.includes(currentUser.id);
-        if (msg.deleted_for && msg.deleted_for.length > 0) {
-        }
-        return !isDeletedForMe;
-      });
+      // Don't filter out deleted messages - mark them instead
+      const visibleMessages = processedMessages;
       
       
       // Update cache with all messages
@@ -750,10 +738,8 @@ const ChatPage = ({ currentUser, onUnreadChange, onDetailViewChange }: ChatPageP
 
       const processedMessages = mappedMessages as unknown as ChatMessage[];
       
-      // Filter out messages deleted for current user
-      const visibleMessages = processedMessages.filter(msg => 
-        !msg.deleted_for || !msg.deleted_for.includes(currentUser.id)
-      );
+      // Don't filter out deleted messages - mark them instead
+      const visibleMessages = processedMessages;
       
       // Update cache with all messages
       chatMessagesCache.set(matchId, {
@@ -1101,6 +1087,9 @@ const ChatPage = ({ currentUser, onUnreadChange, onDetailViewChange }: ChatPageP
         if (deleteError) {
           throw deleteError;
         }
+        // Remove from UI completely
+        setMessages(prev => prev.filter(msg => msg.id !== messageId));
+        chatMessagesCache.delete(selectedMatch.id);
       } else {
         // Otherwise just update the deleted_for field
         const { error: updateError } = await supabase
@@ -1110,12 +1099,24 @@ const ChatPage = ({ currentUser, onUnreadChange, onDetailViewChange }: ChatPageP
         if (updateError) {
           throw updateError;
         }
+        
+        // Update message in UI to show as deleted
+        setMessages(prev => prev.map(msg => 
+          msg.id === messageId ? { ...msg, deleted_for: deletedFor } : msg
+        ));
+        
+        // Update cache
+        const cachedData = chatMessagesCache.get(selectedMatch.id);
+        if (cachedData) {
+          const updatedMessages = cachedData.messages.map(m =>
+            m.id === messageId ? { ...m, deleted_for: deletedFor } : m
+          );
+          chatMessagesCache.set(selectedMatch.id, {
+            messages: updatedMessages,
+            timestamp: Date.now()
+          });
+        }
       }
-
-      // Clear cache to force fresh fetch next time
-      chatMessagesCache.delete(selectedMatch.id);
-      // Remove from UI immediately
-      setMessages(prev => prev.filter(msg => msg.id !== messageId));
     } catch (error) {}
   };
 
@@ -1129,19 +1130,21 @@ const ChatPage = ({ currentUser, onUnreadChange, onDetailViewChange }: ChatPageP
         return;
       }
       // Delete from database completely
-      const { error: deleteError, data } = await supabase
+      const { error: deleteError } = await supabase
         .from('chats')
         .delete()
         .eq('id', messageId)
-        .eq('sender_id', currentUser.id) // Double-check it's their message
-        .select(); // Return deleted rows to confirm deletion
+        .eq('sender_id', currentUser.id); // Double-check it's their message
+      
       if (deleteError) {
         throw deleteError;
       }
-      // Clear cache to force fresh fetch next time
-      chatMessagesCache.delete(selectedMatch.id);
-      // Remove from UI immediately
+      
+      // Remove from UI completely for everyone
       setMessages(prev => prev.filter(msg => msg.id !== messageId));
+      
+      // Clear cache
+      chatMessagesCache.delete(selectedMatch.id);
     } catch (error) {}
   };
 

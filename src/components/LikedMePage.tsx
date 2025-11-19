@@ -435,11 +435,11 @@ const LikedMePage = ({ currentUser, isPremium = false }: LikedMePageProps) => {
     
     const totalSlides = slides.length;
     
-    // Tap zones - left 35% and right 35%
-    if (x < screenWidth * 0.35 && currentSlide > 0) {
-      setCurrentSlide(prev => prev - 1);
-    } else if (x > screenWidth * 0.65 && currentSlide < totalSlides - 1) {
-      setCurrentSlide(prev => prev + 1);
+    // Tap zones - left 30% and right 30% to prevent accidental taps
+    if (x < screenWidth * 0.30 && currentSlide > 0) {
+      setCurrentSlide(prev => Math.max(0, prev - 1));
+    } else if (x > screenWidth * 0.70 && currentSlide < totalSlides - 1) {
+      setCurrentSlide(prev => Math.min(totalSlides - 1, prev + 1));
     }
   };
 
@@ -482,11 +482,11 @@ const LikedMePage = ({ currentUser, isPremium = false }: LikedMePageProps) => {
     
     const totalSlides = slides.length;
     
-    // Tap zones - left 35% and right 35%
-    if (x < screenWidth * 0.35 && currentSlide > 0) {
-      setCurrentSlide(prev => prev - 1);
-    } else if (x > screenWidth * 0.65 && currentSlide < totalSlides - 1) {
-      setCurrentSlide(prev => prev + 1);
+    // Tap zones - left 30% and right 30% to prevent accidental taps
+    if (x < screenWidth * 0.30 && currentSlide > 0) {
+      setCurrentSlide(prev => Math.max(0, prev - 1));
+    } else if (x > screenWidth * 0.70 && currentSlide < totalSlides - 1) {
+      setCurrentSlide(prev => Math.min(totalSlides - 1, prev + 1));
     }
   };
 
@@ -768,16 +768,22 @@ const LikedMePage = ({ currentUser, isPremium = false }: LikedMePageProps) => {
     };
 
     return (
-      <div className="h-full w-full relative flex flex-col bg-white">
+      <div 
+        className="h-full w-full relative flex flex-col bg-white"
+        style={{
+          paddingTop: 'env(safe-area-inset-top, 0px)',
+          paddingBottom: 'env(safe-area-inset-bottom, 0px)'
+        }}
+      >
         {/* Main Slide Area */}
         <div 
           className="flex-1 relative" 
           onTouchEnd={handleTouch}
           onClick={handleClick}
           style={{
-            height: 'calc(100vh - 120px)',
-            minHeight: 'calc(100vh - 120px)',
-            maxHeight: 'calc(100vh - 120px)',
+            height: 'calc(100vh - env(safe-area-inset-top, 0px) - env(safe-area-inset-bottom, 0px) - 64px)',
+            minHeight: 'calc(100vh - env(safe-area-inset-top, 0px) - env(safe-area-inset-bottom, 0px) - 64px)',
+            maxHeight: 'calc(100vh - env(safe-area-inset-top, 0px) - env(safe-area-inset-bottom, 0px) - 64px)',
             overflow: 'hidden'
           }}
         >
