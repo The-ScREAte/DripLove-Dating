@@ -371,7 +371,45 @@ const LikedMePage = ({ currentUser, isPremium = false }: LikedMePageProps) => {
   useEffect(() => {
     setImageIndex(0);
     setShowMoreInfo(false);
+    setCurrentSlide(0);
   }, [selectedProfile]);
+
+  // Memoize slides calculation to prevent rebuilding on every click
+  const slides = useMemo(() => {
+    if (!selectedProfile) return [];
+    
+    const profileImages = userImages[selectedProfile.id] || [];
+    const result: Array<{ type: 'image' | 'about' | 'funfact', imageIndex?: number }> = [];
+    
+    const hasContent = (type: string) => {
+      if (type === 'image') return true;
+      if (type === 'about') return !!selectedProfile.bio;
+      if (type === 'funfact') return !!(selectedProfile.fun_fact || selectedProfile.perfect_first_date || selectedProfile.last_googled);
+      return false;
+    };
+    
+    if (profileImages.length > 0) {
+      for (let i = 0; i < profileImages.length; i++) {
+        result.push({ type: 'image', imageIndex: i });
+        const infoType: 'about' | 'funfact' = i % 2 === 0 ? 'about' : 'funfact';
+        if (hasContent(infoType)) {
+          result.push({ type: infoType });
+        }
+      }
+    } else {
+      if (hasContent('about')) result.push({ type: 'about' });
+      if (hasContent('funfact')) result.push({ type: 'funfact' });
+    }
+    
+    return result;
+  }, [selectedProfile, userImages]);
+
+  // Clamp currentSlide if slides array shrinks
+  useEffect(() => {
+    if (currentSlide > Math.max(0, slides.length - 1)) {
+      setCurrentSlide(Math.max(0, slides.length - 1));
+    }
+  }, [slides.length, currentSlide]);
 
   const setLockoutPeriod = async () => {
     if (isPremium) return;
@@ -393,102 +431,21 @@ const LikedMePage = ({ currentUser, isPremium = false }: LikedMePageProps) => {
     }
   };
 
-  const handleTouch = (e: React.TouchEvent) => {
-    // Don't navigate if clicking on buttons or interactive elements
-    const target = e.target as HTMLElement;
-    if (target.closest('button') || target.closest('[role="button"]')) {
-      return;
-    }
-
-    const touch = e.changedTouches[0] || e.touches[0];
-    if (!touch) return;
-    
-    const x = touch.clientX;
-    const screenWidth = window.innerWidth;
-    
+    const handleNavigationClick = useCallback((e: React.MouseEvent) => {
     if (!selectedProfile) return;
     
-    // Helper to check content
-    const hasContent = (type: string) => {
-      if (type === 'image') return true;
-      if (type === 'about') return !!selectedProfile.bio;
-      if (type === 'funfact') return !!(selectedProfile.fun_fact || selectedProfile.perfect_first_date || selectedProfile.last_googled);
-      return false;
-    };
-
-    // Build slides array - same logic as render
-    const profileImages = userImages[selectedProfile.id] || [];
-    const slides: Array<{ type: string, imageIndex?: number }> = [];
-    
-    if (profileImages.length > 0) {
-      for (let i = 0; i < profileImages.length; i++) {
-        slides.push({ type: 'image', imageIndex: i });
-        const infoType = i % 2 === 0 ? 'about' : 'funfact';
-        if (hasContent(infoType)) {
-          slides.push({ type: infoType });
-        }
-      }
-    } else {
-      if (hasContent('about')) slides.push({ type: 'about' });
-      if (hasContent('funfact')) slides.push({ type: 'funfact' });
-    }
-    
-    const totalSlides = slides.length;
-    
-    // Tap zones - left 30% and right 30% to prevent accidental taps
-    if (x < screenWidth * 0.30 && currentSlide > 0) {
-      setCurrentSlide(prev => Math.max(0, prev - 1));
-    } else if (x > screenWidth * 0.70 && currentSlide < totalSlides - 1) {
-      setCurrentSlide(prev => Math.min(totalSlides - 1, prev + 1));
-    }
-  };
-
-  const handleClick = (e: React.MouseEvent) => {
-    // Don't navigate if clicking on buttons or interactive elements
-    const target = e.target as HTMLElement;
-    if (target.closest('button') || target.closest('[role="button"]')) {
-      return;
-    }
-
     const x = e.clientX;
-    const screenWidth = window.innerWidth;
-    
-    if (!selectedProfile) return;
-    
-    // Helper to check content
-    const hasContent = (type: string) => {
-      if (type === 'image') return true;
-      if (type === 'about') return !!selectedProfile.bio;
-      if (type === 'funfact') return !!(selectedProfile.fun_fact || selectedProfile.perfect_first_date || selectedProfile.last_googled);
-      return false;
-    };
+    const width = window.innerWidth;
+    const clickX = (x / width) * 100;
 
-    // Build slides array - same logic as render
-    const profileImages = userImages[selectedProfile.id] || [];
-    const slides: Array<{ type: string, imageIndex?: number }> = [];
-    
-    if (profileImages.length > 0) {
-      for (let i = 0; i < profileImages.length; i++) {
-        slides.push({ type: 'image', imageIndex: i });
-        const infoType = i % 2 === 0 ? 'about' : 'funfact';
-        if (hasContent(infoType)) {
-          slides.push({ type: infoType });
-        }
-      }
-    } else {
-      if (hasContent('about')) slides.push({ type: 'about' });
-      if (hasContent('funfact')) slides.push({ type: 'funfact' });
-    }
-    
-    const totalSlides = slides.length;
-    
-    // Tap zones - left 30% and right 30% to prevent accidental taps
-    if (x < screenWidth * 0.30 && currentSlide > 0) {
+    if (clickX < 50) {
+      // Left half - go to previous slide
       setCurrentSlide(prev => Math.max(0, prev - 1));
-    } else if (x > screenWidth * 0.70 && currentSlide < totalSlides - 1) {
-      setCurrentSlide(prev => Math.min(totalSlides - 1, prev + 1));
+    } else {
+      // Right half - go to next slide
+      setCurrentSlide(prev => Math.min(slides.length - 1, prev + 1));
     }
-  };
+  }, [selectedProfile, slides.length]);
 
   const handleLikeBack = async (profileId: string) => {
     // Optimistic update - remove profile immediately
@@ -712,35 +669,6 @@ const LikedMePage = ({ currentUser, isPremium = false }: LikedMePageProps) => {
 
   if (selectedProfile) {
     const profileImages = userImages[selectedProfile.id] || [];
-    
-    // Helper to check content
-    const hasContent = (type: string) => {
-      if (type === 'image') return true;
-      if (type === 'about') return !!selectedProfile.bio;
-      if (type === 'funfact') return !!(selectedProfile.fun_fact || selectedProfile.perfect_first_date || selectedProfile.last_googled);
-      return false;
-    };
-    
-    // Build slide sequence: alternate between images and info cards, skip empty slides
-    const slides: Array<{ type: 'image' | 'about' | 'funfact', imageIndex?: number }> = [];
-    
-    if (profileImages.length > 0) {
-      for (let i = 0; i < profileImages.length; i++) {
-        // Add image
-        slides.push({ type: 'image', imageIndex: i });
-        
-        // Add info card after each image only if it has content
-        const infoType: 'about' | 'funfact' = i % 2 === 0 ? 'about' : 'funfact';
-        if (hasContent(infoType)) {
-          slides.push({ type: infoType });
-        }
-      }
-    } else {
-      // No images, just show info cards that have content
-      if (hasContent('about')) slides.push({ type: 'about' });
-      if (hasContent('funfact')) slides.push({ type: 'funfact' });
-    }
-    
     const totalSlides = slides.length;
     const currentSlideInfo = slides[currentSlide] || slides[0];
     
@@ -778,13 +706,11 @@ const LikedMePage = ({ currentUser, isPremium = false }: LikedMePageProps) => {
         {/* Main Slide Area */}
         <div 
           className="flex-1 relative" 
-          onTouchEnd={handleTouch}
-          onClick={handleClick}
           style={{
             height: 'calc(100vh - env(safe-area-inset-top, 0px) - 80px)',
             minHeight: 'calc(100vh - env(safe-area-inset-top, 0px) - 80px)',
             maxHeight: 'calc(100vh - env(safe-area-inset-top, 0px) - 80px)',
-            marginBottom: 'calc(env(safe-area-inset-bottom, 0px) + 16px)',
+            marginBottom: 'calc(env(safe-area-inset-bottom, 0px) + 100px)',
             overflow: 'hidden'
           }}
         >
@@ -800,17 +726,28 @@ const LikedMePage = ({ currentUser, isPremium = false }: LikedMePageProps) => {
                   width: '100%',
                   objectFit: 'cover',
                   objectPosition: 'center',
-                  display: 'block'
+                  display: 'block',
+                  pointerEvents: 'none'
                 }}
               />
               {/* Gradient overlay */}
               <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-transparent to-transparent pointer-events-none" />
+              {/* Click/Touch handler overlay */}
+              <div 
+                className="absolute inset-0 z-0" 
+                onClick={handleNavigationClick}
+                style={{ cursor: 'pointer' }}
+              />
             </>
           )}
 
           {/* About Card */}
           {isAboutSlide && (
-            <div className={`w-full h-full bg-gradient-to-br ${getCardColor()} flex flex-col items-center justify-center p-8 text-white`}>
+            <div 
+              className={`w-full h-full bg-gradient-to-br ${getCardColor()} flex flex-col items-center justify-center p-8 text-white relative`}
+              onClick={handleNavigationClick}
+              style={{ cursor: 'pointer' }}
+            >
               <User className="w-16 h-16 mb-6 opacity-90" />
               <h2 className="text-3xl font-bold mb-4 text-center">About</h2>
               <div className="max-w-md w-full space-y-4 text-center">
@@ -825,7 +762,11 @@ const LikedMePage = ({ currentUser, isPremium = false }: LikedMePageProps) => {
 
           {/* Fun Fact Card */}
           {isFunFactSlide && (
-            <div className={`w-full h-full bg-gradient-to-br ${getCardColor()} flex flex-col items-center justify-center p-8 text-white`}>
+            <div 
+              className={`w-full h-full bg-gradient-to-br ${getCardColor()} flex flex-col items-center justify-center p-8 text-white relative`}
+              onClick={handleNavigationClick}
+              style={{ cursor: 'pointer' }}
+            >
               <Quote className="w-16 h-16 mb-6 opacity-90" />
               <h2 className="text-3xl font-bold mb-8 text-center">Fun Questions</h2>
               <div className="max-w-md w-full space-y-6">
@@ -918,8 +859,10 @@ const LikedMePage = ({ currentUser, isPremium = false }: LikedMePageProps) => {
               className="absolute bottom-0 left-0 right-0 text-white"
               style={{
                 paddingBottom: Capacitor.getPlatform() === 'ios' 
-                  ? 'clamp(90px, calc(env(safe-area-inset-bottom, 10px) + 80px), 110px)'
-                  : '96px'
+                  ? 'clamp(180px, calc(env(safe-area-inset-bottom, 10px) + 170px), 200px)'
+                  : Capacitor.getPlatform() === 'android'
+                    ? '180px'
+                    : 'max(180px, calc(env(safe-area-inset-bottom, 0px) + 180px))'
               }}
             >
               <div className="px-6 pb-4">
@@ -961,24 +904,34 @@ const LikedMePage = ({ currentUser, isPremium = false }: LikedMePageProps) => {
 
                 {/* Show More Button */}
                 <div className="flex justify-center mt-3">
-                  <Button
+                  <button
                     onClick={() => setShowMoreInfo(!showMoreInfo)}
-                    variant="ghost"
-                    size="sm"
-                    className="text-white hover:bg-white/10 flex items-center gap-1"
+                    className="bg-white/20 hover:bg-white/30 backdrop-blur-sm rounded-full px-4 py-2 flex items-center gap-1 transition-colors"
+                    style={{ 
+                      color: 'white !important',
+                      backgroundColor: 'rgba(255, 255, 255, 0.2)',
+                    }}
+                    onMouseEnter={(e) => {
+                      e.currentTarget.style.backgroundColor = 'rgba(255, 255, 255, 0.3)';
+                      e.currentTarget.style.color = 'white';
+                    }}
+                    onMouseLeave={(e) => {
+                      e.currentTarget.style.backgroundColor = 'rgba(255, 255, 255, 0.2)';
+                      e.currentTarget.style.color = 'white';
+                    }}
                   >
                     {showMoreInfo ? (
                       <>
-                        <ChevronUp className="w-4 h-4" />
-                        <span className="text-xs">Show Less</span>
+                        <ChevronUp className="w-4 h-4" style={{ color: 'white', stroke: 'white' }} />
+                        <span className="text-xs" style={{ color: 'white' }}>Show Less</span>
                       </>
                     ) : (
                       <>
-                        <ChevronDown className="w-4 h-4" />
-                        <span className="text-xs">Show More</span>
+                        <ChevronDown className="w-4 h-4" style={{ color: 'white', stroke: 'white' }} />
+                        <span className="text-xs" style={{ color: 'white' }}>Show More</span>
                       </>
                     )}
-                  </Button>
+                  </button>
                 </div>
 
                 {/* Expanded Info */}
@@ -1082,8 +1035,10 @@ const LikedMePage = ({ currentUser, isPremium = false }: LikedMePageProps) => {
             className="absolute bottom-0 left-0 right-0 flex justify-center space-x-6 px-6"
             style={{
               paddingBottom: Capacitor.getPlatform() === 'ios' 
-                ? 'clamp(24px, calc(env(safe-area-inset-bottom, 10px) + 16px), 40px)'
-                : '16px'
+                ? 'clamp(120px, calc(env(safe-area-inset-bottom, 10px) + 110px), 140px)'
+                : Capacitor.getPlatform() === 'android'
+                  ? '120px'
+                  : 'max(120px, calc(env(safe-area-inset-bottom, 0px) + 120px))'
             }}
           >
             <Button
