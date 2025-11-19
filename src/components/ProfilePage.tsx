@@ -475,7 +475,7 @@ const ProfilePage = ({ currentUser, profile, onProfileUpdate, onLogout, onShowTe
   // Safety check for required data
   if (!currentUser) {
     return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+      <div className="h-full w-full bg-gray-50 flex items-center justify-center" style={{ minHeight: '100%' }}>
         <div className="text-center">
           <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-500 mx-auto mb-4"></div>
           <p className="text-gray-600">{t('common.loading')}</p>
@@ -485,12 +485,14 @@ const ProfilePage = ({ currentUser, profile, onProfileUpdate, onLogout, onShowTe
   }
 
   return (
-      <div className="min-h-screen bg-gray-50 overflow-x-hidden w-full max-w-full"
+      <div className="h-full w-full bg-gray-50 overflow-x-hidden"
          style={{ 
            touchAction: 'pan-y', // allow horizontal gestures (e.g. slider drags) to be handled by child controls
            userSelect: 'none',
            WebkitUserSelect: 'none',
-           WebkitTouchCallout: 'none'
+           WebkitTouchCallout: 'none',
+           minHeight: '100%',
+           position: 'relative'
          }}> 
       {/* Fixed Header with Progress Bar - completely fixed below main header */}
       <div
@@ -612,7 +614,7 @@ const ProfilePage = ({ currentUser, profile, onProfileUpdate, onLogout, onShowTe
         className="max-w-4xl mx-auto p-4 space-y-8 overflow-x-hidden w-full" 
         style={{ 
           paddingTop: '160px', 
-          paddingBottom: 'clamp(100px, calc(env(safe-area-inset-bottom, 0px) + 100px), 150px)'
+          paddingBottom: '120px'
         }}
       >
         <div className="w-full max-w-full overflow-hidden">
