@@ -614,7 +614,9 @@ const ProfilePage = ({ currentUser, profile, onProfileUpdate, onLogout, onShowTe
         className="max-w-4xl mx-auto p-4 space-y-8 overflow-x-hidden w-full" 
         style={{ 
           paddingTop: '160px', 
-          paddingBottom: '120px'
+          paddingBottom: Capacitor.getPlatform() === 'web'
+            ? '120px'
+            : 'clamp(120px, calc(env(safe-area-inset-bottom, 0px) + 120px), 150px)'
         }}
       >
         <div className="w-full max-w-full overflow-hidden">
