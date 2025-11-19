@@ -882,7 +882,7 @@ const LikedMePage = ({ currentUser, isPremium = false }: LikedMePageProps) => {
               <div className="px-6" style={{
                 paddingBottom: Capacitor.getPlatform() === 'web'
                   ? '96px'
-                  : 'clamp(140px, calc(env(safe-area-inset-bottom, 10px) + 140px), 160px)'
+                  : 'clamp(96px, calc(env(safe-area-inset-bottom, 10px) + 96px), 96px)'
               }}>
                 <div className="mb-2">
                   <h2 className="text-xl font-bold mb-1">
