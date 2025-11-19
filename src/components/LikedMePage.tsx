@@ -781,9 +781,10 @@ const LikedMePage = ({ currentUser, isPremium = false }: LikedMePageProps) => {
           onTouchEnd={handleTouch}
           onClick={handleClick}
           style={{
-            height: 'calc(100vh - env(safe-area-inset-top, 0px) - env(safe-area-inset-bottom, 0px) - 64px)',
-            minHeight: 'calc(100vh - env(safe-area-inset-top, 0px) - env(safe-area-inset-bottom, 0px) - 64px)',
-            maxHeight: 'calc(100vh - env(safe-area-inset-top, 0px) - env(safe-area-inset-bottom, 0px) - 64px)',
+            height: 'calc(100vh - env(safe-area-inset-top, 0px) - 80px)',
+            minHeight: 'calc(100vh - env(safe-area-inset-top, 0px) - 80px)',
+            maxHeight: 'calc(100vh - env(safe-area-inset-top, 0px) - 80px)',
+            marginBottom: 'calc(env(safe-area-inset-bottom, 0px) + 16px)',
             overflow: 'hidden'
           }}
         >
