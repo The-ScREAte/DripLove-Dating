@@ -26,6 +26,11 @@ const config: CapacitorConfig = {
     webContentsDebuggingEnabled: true
   },
   plugins: {
+    GoogleAuth: {
+      scopes: ['profile', 'email'],
+      serverClientId: '361835962012-i85negkabf06fei55t34jh2gav0t56g6.apps.googleusercontent.com',
+      forceCodeForRefreshToken: true
+    },
     PushNotifications: {
       presentationOptions: ["badge", "sound", "banner"]
     },

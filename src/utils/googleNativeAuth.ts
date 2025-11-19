@@ -10,13 +10,17 @@ import { Capacitor } from '@capacitor/core';
 
 // Initialize Google Auth plugin
 export const initializeGoogleAuth = () => {
-  if (Capacitor.isNativePlatform()) {
-    // This MUST be called in main.tsx on app startup
-    GoogleAuth.initialize({
-      clientId: '1032929166034-h92c0d2jk2lv8u7hhqugk1bepnj4tfgv.apps.googleusercontent.com', // Web Client ID (server auth code)
-      scopes: ['profile', 'email'],
-      grantOfflineAccess: true,
-    });
+  // Use native config on Android (reads client ID from strings.xml)
+  if (Capacitor.isNativePlatform() && Capacitor.getPlatform() === 'android') {
+    try {
+      GoogleAuth.initialize({
+        // Do not pass clientId on Android; plugin reads @string/server_client_id
+        scopes: ['profile', 'email'],
+        grantOfflineAccess: true,
+      });
+    } catch {
+      // Safe no-op; initialization will be attempted on first use
+    }
   }
 };
 
@@ -26,14 +30,10 @@ export const initializeGoogleAuth = () => {
  */
 export const signInWithGoogleNative = async () => {
   try {
-    console.log('🔵 Starting native Google Sign-In...');
-    
     // This opens Google's native picker - stays entirely in your app!
     const googleUser = await GoogleAuth.signIn({
       scopes: ['profile', 'email']
     });
-    
-    console.log('✅ Google Sign-In successful:', googleUser);
     
     if (!googleUser.authentication?.idToken) {
       throw new Error('No ID token received from Google');
@@ -49,8 +49,6 @@ export const signInWithGoogleNative = async () => {
       console.error('❌ Supabase sign-in error:', error);
       throw error;
     }
-
-    console.log('✅ Supabase session established:', data);
     
     // Check if user has a profile
     const { data: profile } = await supabase

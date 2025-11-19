@@ -346,126 +346,54 @@ const AuthForm = ({ isLogin, onToggle, onOAuthSuccess, onBack }: AuthFormProps) 
           return;
         }
         
-        // For Google OAuth on Android: use Chrome Custom Tabs (in-app browser)
-        // The deep link redirect will automatically close the browser and return to app
+        // For Google OAuth on Android: use native Google Sign-In ONLY (no browser fallback)
         if (provider === 'google' && isNative && platform === 'android') {
           
           try {
-            // Use native Google Sign-In (entirely in-app, no browser!)
+            // Always use native Google Sign-In (entirely in-app)
             const { signInWithGoogleNative, isNativeGoogleAuthAvailable } = await import('@/utils/googleNativeAuth');
+            const canUseNative = isNativeGoogleAuthAvailable();
             
-            // TEMPORARILY DISABLED: Native Google Auth needs SHA-1 certificate registered
-            // Uncomment after adding SHA-1 to Google Cloud Console
-            const useNativeAuth = false; // Change to true after SHA-1 is registered
-            
-            if (useNativeAuth && isNativeGoogleAuthAvailable()) {
-              console.log('🔵 Using native Google Sign-In for Android');
-              
-              const result = await signInWithGoogleNative();
-              
-              console.log('✅ Native Google Sign-In completed:', result);
-              
-              // Save current language to user's profile
-              if (result?.user?.id) {
-                await saveLanguageToProfile(result.user.id);
-              }
-              
-              // Navigate based on profile completion
-              if (result.needsProfileCompletion) {
-                console.log('→ Navigating to profile completion');
-                setOauthLoading(null);
-                navigate('/complete-profile');
-              } else {
-                console.log('→ Navigating to main app');
-                setOauthLoading(null);
-                navigate('/');
-              }
-              
-              return;
-            }
-            
-            // Fallback to browser-based OAuth if native isn't available
-            console.log('⚠️ Using browser-based Google OAuth (SHA-1 certificate not yet registered)');
-            
-            // Generate the OAuth URL
-            const { data: oauthData, error: oauthError } = await supabase.auth.signInWithOAuth({
-              provider: 'google',
-              options: {
-                redirectTo,
-                queryParams: {
-                  prompt: 'select_account',
-                  access_type: 'offline',
-                },
-                skipBrowserRedirect: true, // Get URL without auto-redirect
-              }
-            });
-
-            if (oauthError || !oauthData?.url) {
-              throw new Error(oauthError?.message || 'Failed to generate OAuth URL');
+            if (!canUseNative) {
+              throw new Error('Native Google Sign-In is not available on this device');
             }
 
-            // Open OAuth URL in Chrome Custom Tabs (Android's in-app browser)
-            // The OAuth callback will deep link back to app (driplove://auth/callback)
-            // which automatically closes this browser and triggers appUrlOpen listener
-            const { Browser } = await import('@capacitor/browser');
-            await Browser.open({ 
-              url: oauthData.url,
-              presentationStyle: 'fullscreen',
-              toolbarColor: '#000000'
-            });
+            const result = await signInWithGoogleNative();
 
-            // Listen for browser close (user cancelled or completed)
-            const handleBrowserFinish = async () => {
-              console.log('🔍 Android browser closed');
-              
-              // Give deep link time to process
-              await new Promise(resolve => setTimeout(resolve, 500));
-              
-              // Check if session was established via deep link
-              const { data: { session } } = await supabase.auth.getSession();
-              
-              if (!session) {
-                // No session = user cancelled
-                console.log('❌ No session found, user cancelled');
-                toast({
-                  title: t('auth.authenticationCancelled'),
-                  description: t('auth.googleSignInCancelled'),
-                  variant: 'default',
-                });
-              } else {
-                // Session exists but deep link handler in main.tsx will handle navigation
-                console.log('✅ Session found, deep link handler will navigate');
-              }
-              
-              setOauthLoading(null);
-              Browser.removeAllListeners();
-            };
-            
-            Browser.addListener('browserFinished', handleBrowserFinish);
+            // Save current language to user's profile
+            if (result?.user?.id) {
+              await saveLanguageToProfile(result.user.id);
+            }
 
-            // Don't poll - let deep link redirect handle everything
+            // Navigate based on profile completion
+            setOauthLoading(null);
+            if (result.needsProfileCompletion) {
+              navigate('/complete-profile');
+            } else {
+              navigate('/');
+            }
             return;
-
-          } catch (err: any) {
-            console.error('❌ Android OAuth error:', err);
             
-            // Handle user cancellation
-            if (err.message?.includes('cancel')) {
+          } catch (androidErr: any) {
+            console.error('❌ Android native Google Sign-In error:', androidErr);
+            
+            // Handle user cancellation gracefully
+            if (androidErr.message?.includes('cancel')) {
               toast({
-                title: 'Sign-in Cancelled',
-                description: 'Google sign-in was cancelled.',
+                title: t('auth.authenticationCancelled'),
+                description: t('auth.googleSignInCancelled'),
                 variant: 'default',
               });
             } else {
               toast({
                 title: 'Authentication Error',
-                description: err?.message || 'Failed to sign in with Google',
+                description: androidErr?.message || 'Failed to sign in with Google. Please ensure you have Google Play Services installed.',
                 variant: 'destructive',
               });
             }
             setOauthLoading(null);
+            return;
           }
-          return;
         }
         
         // For Web: use small modal-style popup window (feels like in-page modal)

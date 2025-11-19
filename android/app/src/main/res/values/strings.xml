@@ -5,6 +5,6 @@
     <string name="package_name">com.driplove.dating</string>
     <string name="custom_url_scheme">driplove</string>
     
-    <!-- Google OAuth Client ID for native Google Sign-In -->
-    <string name="server_client_id">361835962012-rm8pn3rc5iog12c8dlkkavdtj10v83nt.apps.googleusercontent.com</string>
+    <!-- Google OAuth Client ID for native Google Sign-In (MUST be WEB client ID, not Android) -->
+    <string name="server_client_id">361835962012-i85negkabf06fei55t34jh2gav0t56g6.apps.googleusercontent.com</string>
 </resources>

@@ -744,12 +744,6 @@ const LikedMePage = ({ currentUser, isPremium = false }: LikedMePageProps) => {
     const totalSlides = slides.length;
     const currentSlideInfo = slides[currentSlide] || slides[0];
     
-    // Debug logging
-    console.log('Total slides:', totalSlides);
-    console.log('Current slide index:', currentSlide);
-    console.log('Current slide type:', currentSlideInfo.type);
-    console.log('All slides:', slides.map((s, i) => `${i}: ${s.type}${s.imageIndex !== undefined ? ` (img${s.imageIndex})` : ''}`));
-    
     const isImageSlide = currentSlideInfo.type === 'image';
     const isAboutSlide = currentSlideInfo.type === 'about';
     const isFunFactSlide = currentSlideInfo.type === 'funfact';
