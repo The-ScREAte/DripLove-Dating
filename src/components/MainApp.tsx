@@ -1037,7 +1037,7 @@ const MainApp = ({ user, onLogout }: MainAppProps) => {
 
         {/* Main Content */}
         <div 
-          className={`flex-1 overflow-auto ${!showTerms && !showPrivacy ? 'pt-[70px] pb-[80px]' : ''}`}
+          className={`flex-1 overflow-auto ${!showTerms && !showPrivacy ? 'pt-[56px] pb-[80px]' : ''}`}
           style={{ height: '100%', position: 'relative' }}
         >
           {/* Keep pages mounted to avoid reloading when switching tabs. Show/hide via classes. */}
