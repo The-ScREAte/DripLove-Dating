@@ -1046,13 +1046,13 @@ const LikedMePage = ({ currentUser, isPremium = false }: LikedMePageProps) => {
 
           {/* Action Buttons - positioned above mobile nav */}
           <div 
-            className="absolute bottom-0 left-0 right-0 flex justify-center space-x-6 px-6"
+            className="absolute bottom-0 left-0 right-0 flex justify-center space-x-6 px-6 z-10"
             style={{
               paddingBottom: Capacitor.getPlatform() === 'ios' 
                 ? 'clamp(120px, calc(env(safe-area-inset-bottom, 10px) + 110px), 140px)'
                 : Capacitor.getPlatform() === 'android'
                   ? '120px'
-                  : '100px'
+                  : '140px'
             }}
           >
             <Button
