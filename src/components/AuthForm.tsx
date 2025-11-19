@@ -279,17 +279,24 @@ const AuthForm = ({ isLogin, onToggle, onOAuthSuccess, onBack }: AuthFormProps) 
                   // Save current language to user's profile
                   await saveLanguageToProfile(session.user.id);
                   
-                  // Navigation without toast message
-                  await new Promise(resolve => setTimeout(resolve, 500));
+                  // Clear loading state
                   setOauthLoading(null);
-                  Browser.removeAllListeners();
-                  // Unified navigation logic
+                  
+                  // Clean up browser listeners
+                  try {
+                    Browser.removeAllListeners();
+                  } catch (e) {
+                    // Ignore errors
+                  }
+                  
+                  // Wait for browser to fully close before navigation
+                  await new Promise(resolve => setTimeout(resolve, 800));
+                  
+                  // Navigate to appropriate page
                   if (needsProfileCompletion) {
-          setOauthLoading(null);
-          navigate('/complete-profile');
+                    navigate('/complete-profile');
                   } else {
-          setOauthLoading(null);
-          navigate('/');
+                    navigate('/');
                   }
                 } catch (error) {
                   console.error('Error during post-login processing:', error);
