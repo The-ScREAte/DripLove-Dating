@@ -699,7 +699,7 @@ const LikedMePage = ({ currentUser, isPremium = false }: LikedMePageProps) => {
       <div 
         className="h-full w-full relative flex flex-col bg-white"
         style={{
-          paddingTop: 'env(safe-area-inset-top, 0px)',
+          paddingTop: Capacitor.getPlatform() === 'web' ? '0px' : '0px',
           paddingBottom: 'env(safe-area-inset-bottom, 0px)'
         }}
       >
@@ -707,10 +707,24 @@ const LikedMePage = ({ currentUser, isPremium = false }: LikedMePageProps) => {
         <div 
           className="flex-1 relative" 
           style={{
-            height: 'calc(100vh - env(safe-area-inset-top, 0px) - 80px)',
-            minHeight: 'calc(100vh - env(safe-area-inset-top, 0px) - 80px)',
-            maxHeight: 'calc(100vh - env(safe-area-inset-top, 0px) - 80px)',
-            marginBottom: 'calc(env(safe-area-inset-bottom, 0px) + 100px)',
+            height: Capacitor.getPlatform() === 'ios' 
+              ? 'calc(100vh - env(safe-area-inset-top, 0px) - 56px)'
+              : Capacitor.getPlatform() === 'web'
+                ? 'calc(100vh - 56px)'
+                : 'calc(100vh - 56px)',
+            minHeight: Capacitor.getPlatform() === 'ios'
+              ? 'calc(100vh - env(safe-area-inset-top, 0px) - 56px)'
+              : Capacitor.getPlatform() === 'web'
+                ? 'calc(100vh - 56px)'
+                : 'calc(100vh - 56px)',
+            maxHeight: Capacitor.getPlatform() === 'ios'
+              ? 'calc(100vh - env(safe-area-inset-top, 0px) - 56px)'
+              : Capacitor.getPlatform() === 'web'
+                ? 'calc(100vh - 56px)'
+                : 'calc(100vh - 56px)',
+            marginBottom: Capacitor.getPlatform() === 'web'
+              ? '80px'
+              : 'calc(env(safe-area-inset-bottom, 0px) + 100px)',
             overflow: 'hidden'
           }}
         >
@@ -862,10 +876,10 @@ const LikedMePage = ({ currentUser, isPremium = false }: LikedMePageProps) => {
                   ? 'clamp(180px, calc(env(safe-area-inset-bottom, 10px) + 170px), 200px)'
                   : Capacitor.getPlatform() === 'android'
                     ? '180px'
-                    : 'max(180px, calc(env(safe-area-inset-bottom, 0px) + 180px))'
+                    : '120px'
               }}
             >
-              <div className="px-6 pb-4">
+              <div className="px-6 pb-12">
                 <div className="mb-2">
                   <h2 className="text-xl font-bold mb-1">
                     {selectedProfile.first_name} {selectedProfile.last_name}
@@ -1038,7 +1052,7 @@ const LikedMePage = ({ currentUser, isPremium = false }: LikedMePageProps) => {
                 ? 'clamp(120px, calc(env(safe-area-inset-bottom, 10px) + 110px), 140px)'
                 : Capacitor.getPlatform() === 'android'
                   ? '120px'
-                  : 'max(120px, calc(env(safe-area-inset-bottom, 0px) + 120px))'
+                  : '100px'
             }}
           >
             <Button
