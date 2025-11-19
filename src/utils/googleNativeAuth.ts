@@ -27,6 +27,7 @@ export const initializeGoogleAuth = () => {
 /**
  * Sign in with native Google Auth (Android only)
  * This opens Google's native sign-in UI - no browser/webview
+ * Uses ONLY ID token (same as iOS Apple Sign-In)
  */
 export const signInWithGoogleNative = async () => {
   try {
@@ -35,14 +36,19 @@ export const signInWithGoogleNative = async () => {
       scopes: ['profile', 'email']
     });
     
-    if (!googleUser.authentication?.idToken) {
+    const idToken = googleUser.authentication?.idToken;
+    
+    if (!idToken) {
       throw new Error('No ID token received from Google');
     }
 
-    // Sign in to Supabase with the Google ID token
+    console.log('✅ Google Sign-In successful');
+
+    // Sign in to Supabase using ONLY ID token (same as iOS Apple Sign-In)
+    // DO NOT pass access_token - it causes audience validation issues
     const { data, error } = await supabase.auth.signInWithIdToken({
       provider: 'google',
-      token: googleUser.authentication.idToken,
+      token: idToken,
     });
 
     if (error) {
@@ -50,12 +56,25 @@ export const signInWithGoogleNative = async () => {
       throw error;
     }
     
-    // Check if user has a profile
+    console.log('✅ Supabase authentication successful');
+    
+    // Check if user has a profile (same flow as Apple Sign-In)
     const { data: profile } = await supabase
       .from('profiles')
-      .select('id, first_name, last_name, bio, date_of_birth, city, country')
+      .select('id, first_name, last_name, bio, date_of_birth, city, country, account_status')
       .eq('id', data.user.id)
       .maybeSingle();
+
+    // Check account status
+    if (profile?.account_status === 'blocked') {
+      await supabase.auth.signOut();
+      throw new Error('Account is blocked');
+    }
+
+    if (profile?.account_status === 'on_hold') {
+      await supabase.auth.signOut();
+      throw new Error('Account is on hold');
+    }
 
     // Determine if profile needs completion
     const needsProfileCompletion = !profile || 

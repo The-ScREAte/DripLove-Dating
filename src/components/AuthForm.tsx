@@ -346,11 +346,12 @@ const AuthForm = ({ isLogin, onToggle, onOAuthSuccess, onBack }: AuthFormProps) 
           return;
         }
         
-        // For Google OAuth on Android: use native Google Sign-In ONLY (no browser fallback)
+        // For Google OAuth on Android: use native Google Sign-In (entirely in-app)
+        // Uses signInWithIdToken like iOS Apple Sign-In does
         if (provider === 'google' && isNative && platform === 'android') {
           
           try {
-            // Always use native Google Sign-In (entirely in-app)
+            // Always use native Google Sign-In (entirely in-app, no browser)
             const { signInWithGoogleNative, isNativeGoogleAuthAvailable } = await import('@/utils/googleNativeAuth');
             const canUseNative = isNativeGoogleAuthAvailable();
             

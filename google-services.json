@@ -1,0 +1,55 @@
+{
+  "project_info": {
+    "project_number": "361835962012",
+    "project_id": "time-tracking-b70af",
+    "storage_bucket": "time-tracking-b70af.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:361835962012:android:2f32d6caa1717166f9d759",
+        "android_client_info": {
+          "package_name": "com.driplove.dating"
+        }
+      },
+      "oauth_client": [
+        {
+          "client_id": "361835962012-4hd40p50juhlu9ikm14cbmssj4egouma.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.driplove.dating",
+            "certificate_hash": "002ca98f2df1a535486c8841db89b44098ae7ee0"
+          }
+        },
+        {
+          "client_id": "361835962012-nnp3ar2ieg0rmtvji7t25vm48ho3a93n.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.driplove.dating",
+            "certificate_hash": "9e806c369dfd2fb34fa52be0edb567c012da2d7d"
+          }
+        },
+        {
+          "client_id": "361835962012-i85negkabf06fei55t34jh2gav0t56g6.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
+      "api_key": [
+        {
+          "current_key": "AIzaSyAD-W1piPbJOFE5bEFa53kQTLycG_sRbaQ"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": [
+            {
+              "client_id": "361835962012-i85negkabf06fei55t34jh2gav0t56g6.apps.googleusercontent.com",
+              "client_type": 3
+            }
+          ]
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

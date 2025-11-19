@@ -173,6 +173,7 @@ public class CustomFirebaseMessagingService extends FirebaseMessagingService {
     @Override
     public void onNewToken(String token) {
         super.onNewToken(token);
+        android.util.Log.d(TAG, "🔥 FCM Token received: " + token.substring(0, 20) + "...");
         // Token refresh is handled by Capacitor plugin
     }
 }
