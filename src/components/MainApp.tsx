@@ -1006,14 +1006,14 @@ const MainApp = ({ user, onLogout }: MainAppProps) => {
   };
 
   return (
-    <div className="w-full h-fill bg-gray-100" style={{ margin: 0, padding: 0, position: 'absolute', top: 0, left: 0, right: 0, bottom: 0 }}>
+    <div className="w-full h-screen bg-gray-100" style={{ margin: 0, padding: 0, position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, overflow: 'hidden' }}>
       {/* Make this parent the scrolling container so sticky children (header/nav) stick relative to it */}
-      <div className="w-full h-fill flex flex-col bg-white relative shadow-md overflow-y-auto" style={{ margin: 0, padding: 0 }}>
+      <div className="w-full h-full flex flex-col bg-white relative shadow-md" style={{ margin: 0, padding: 0 }}>
         
         {/* Fixed Header - always visible */}
           {/* Fixed Header */}
           {!showTerms && !showPrivacy && (
-            <div className="fixed top-0 left-0 right-0 w-full bg-white shadow-sm z-50" style={{ margin: 0, padding: 0 }}>
+            <div className="fixed top-0 left-0 right-0 w-full bg-white shadow-sm z-50" style={{ margin: 0, padding: 0, top: 0 }}>
               <div 
                 className="px-2 py-2 flex justify-between items-center"
                 style={{
@@ -1037,7 +1037,8 @@ const MainApp = ({ user, onLogout }: MainAppProps) => {
 
         {/* Main Content */}
         <div 
-          className={`flex-1 overflow-auto ${!showTerms && !showPrivacy ? 'pt-[50px]' : ''}`}
+          className={`flex-1 overflow-auto ${!showTerms && !showPrivacy ? 'pt-[70px] pb-[80px]' : ''}`}
+          style={{ height: '100%', position: 'relative' }}
         >
           {/* Keep pages mounted to avoid reloading when switching tabs. Show/hide via classes. */}
           <div className={`${activeTab === 'dripcheck' ? 'block' : 'hidden'} w-full h-full`}> 
