@@ -744,17 +744,17 @@ const LikedMePage = ({ currentUser, isPremium = false }: LikedMePageProps) => {
           {/* About Card */}
           {isAboutSlide && (
             <div 
-              className={`w-full h-full bg-gradient-to-br ${getCardColor()} flex flex-col items-center justify-center p-8 text-white relative`}
+              className={`w-full h-full bg-gradient-to-br ${getCardColor()} flex flex-col items-center justify-start pt-20 pb-6 px-6 text-white relative overflow-hidden`}
               onClick={handleNavigationClick}
               style={{ cursor: 'pointer' }}
             >
-              <User className="w-16 h-16 mb-6 opacity-90" />
-              <h2 className="text-3xl font-bold mb-4 text-center">About</h2>
-              <div className="max-w-md w-full space-y-4 text-center">
+              <User className="w-10 h-10 mb-3 opacity-90" />
+              <h2 className="text-xl font-bold mb-3 text-center">About</h2>
+              <div className="max-w-md w-full space-y-2 text-center overflow-y-auto px-2" style={{ maxHeight: '70%' }}>
                 {selectedProfile.bio ? (
-                  <p className="text-lg leading-relaxed">{selectedProfile.bio}</p>
+                  <p className="text-sm leading-relaxed">{selectedProfile.bio}</p>
                 ) : (
-                  <p className="text-lg opacity-75 italic">No bio yet</p>
+                  <p className="text-sm opacity-75 italic">No bio yet</p>
                 )}
               </div>
             </div>
@@ -763,48 +763,48 @@ const LikedMePage = ({ currentUser, isPremium = false }: LikedMePageProps) => {
           {/* Fun Fact Card */}
           {isFunFactSlide && (
             <div 
-              className={`w-full h-full bg-gradient-to-br ${getCardColor()} flex flex-col items-center justify-center p-8 text-white relative`}
+              className={`w-full h-full bg-gradient-to-br ${getCardColor()} flex flex-col items-center justify-start pt-20 pb-6 px-6 text-white relative overflow-hidden`}
               onClick={handleNavigationClick}
               style={{ cursor: 'pointer' }}
             >
-              <Quote className="w-16 h-16 mb-6 opacity-90" />
-              <h2 className="text-3xl font-bold mb-8 text-center">Fun Questions</h2>
-              <div className="max-w-md w-full space-y-6">
+              <Quote className="w-10 h-10 mb-3 opacity-90" />
+              <h2 className="text-xl font-bold mb-3 text-center">Fun Questions</h2>
+              <div className="max-w-md w-full space-y-3 overflow-y-auto px-2" style={{ maxHeight: '70%' }}>
                 {selectedProfile.fun_fact && (
-                  <div className="bg-white/10 backdrop-blur-sm rounded-lg p-4">
-                    <div className="flex items-start gap-3">
-                      <Heart className="w-5 h-5 flex-shrink-0 mt-1" />
+                  <div className="bg-white/10 backdrop-blur-sm rounded-lg p-3">
+                    <div className="flex items-start gap-2">
+                      <Heart className="w-4 h-4 flex-shrink-0 mt-1" />
                       <div>
-                        <p className="text-sm opacity-75 mb-1">Fun Fact</p>
-                        <p className="text-base">{selectedProfile.fun_fact}</p>
+                        <p className="text-xs opacity-75 mb-1">Fun Fact</p>
+                        <p className="text-sm">{selectedProfile.fun_fact}</p>
                       </div>
                     </div>
                   </div>
                 )}
                 {selectedProfile.perfect_first_date && (
-                  <div className="bg-white/10 backdrop-blur-sm rounded-lg p-4">
-                    <div className="flex items-start gap-3">
-                      <Coffee className="w-5 h-5 flex-shrink-0 mt-1" />
+                  <div className="bg-white/10 backdrop-blur-sm rounded-lg p-3">
+                    <div className="flex items-start gap-2">
+                      <Coffee className="w-4 h-4 flex-shrink-0 mt-1" />
                       <div>
-                        <p className="text-sm opacity-75 mb-1">Perfect First Date</p>
-                        <p className="text-base">{selectedProfile.perfect_first_date}</p>
+                        <p className="text-xs opacity-75 mb-1">Perfect First Date</p>
+                        <p className="text-sm">{selectedProfile.perfect_first_date}</p>
                       </div>
                     </div>
                   </div>
                 )}
                 {selectedProfile.last_googled && (
-                  <div className="bg-white/10 backdrop-blur-sm rounded-lg p-4">
-                    <div className="flex items-start gap-3">
-                      <Search className="w-5 h-5 flex-shrink-0 mt-1" />
+                  <div className="bg-white/10 backdrop-blur-sm rounded-lg p-3">
+                    <div className="flex items-start gap-2">
+                      <Search className="w-4 h-4 flex-shrink-0 mt-1" />
                       <div>
-                        <p className="text-sm opacity-75 mb-1">Last Googled</p>
-                        <p className="text-base">{selectedProfile.last_googled}</p>
+                        <p className="text-xs opacity-75 mb-1">Last Googled</p>
+                        <p className="text-sm">{selectedProfile.last_googled}</p>
                       </div>
                     </div>
                   </div>
                 )}
                 {!selectedProfile.fun_fact && !selectedProfile.perfect_first_date && !selectedProfile.last_googled && (
-                  <p className="text-lg opacity-75 italic text-center">No fun questions answered yet</p>
+                  <p className="text-sm opacity-75 italic text-center">No fun questions answered yet</p>
                 )}
               </div>
             </div>
@@ -866,24 +866,24 @@ const LikedMePage = ({ currentUser, isPremium = false }: LikedMePageProps) => {
               }}
             >
               <div className="px-6 pb-4">
-                <div className="mb-3">
-                  <h2 className="text-2xl font-bold mb-1">
+                <div className="mb-2">
+                  <h2 className="text-xl font-bold mb-1">
                     {selectedProfile.first_name} {selectedProfile.last_name}
                   </h2>
-                  <div className="flex items-center space-x-4 text-sm">
+                  <div className="flex items-center space-x-3 text-xs">
                     <div className="flex items-center">
-                      <Calendar className="w-4 h-4 mr-1" />
+                      <Calendar className="w-3 h-3 mr-1" />
                       <span>{calculateAge(selectedProfile.date_of_birth)} {t('matches.yearsOld')}</span>
                     </div>
                     <div className="flex items-center">
-                      <MapPin className="w-4 h-4 mr-1" />
+                      <MapPin className="w-3 h-3 mr-1" />
                       <span>{selectedProfile.city}, {selectedProfile.country}</span>
                     </div>
                   </div>
                 </div>
 
                 {selectedProfile.occupation && (
-                  <div className="flex items-center text-sm mb-2">
+                  <div className="flex items-center text-xs mb-2">
                     <Briefcase className="w-3 h-3 mr-2" />
                     <span>{selectedProfile.occupation}</span>
                   </div>
@@ -906,7 +906,7 @@ const LikedMePage = ({ currentUser, isPremium = false }: LikedMePageProps) => {
                 <div className="flex justify-center mt-3">
                   <button
                     onClick={() => setShowMoreInfo(!showMoreInfo)}
-                    className="bg-white/20 hover:bg-white/30 backdrop-blur-sm rounded-full px-4 py-2 flex items-center gap-1 transition-colors"
+                    className="bg-white/20 hover:bg-white/30 backdrop-blur-sm rounded-full px-3 py-1.5 flex items-center gap-1 transition-colors"
                     style={{ 
                       color: 'white !important',
                       backgroundColor: 'rgba(255, 255, 255, 0.2)',
@@ -922,13 +922,13 @@ const LikedMePage = ({ currentUser, isPremium = false }: LikedMePageProps) => {
                   >
                     {showMoreInfo ? (
                       <>
-                        <ChevronUp className="w-4 h-4" style={{ color: 'white', stroke: 'white' }} />
-                        <span className="text-xs" style={{ color: 'white' }}>Show Less</span>
+                        <ChevronUp className="w-3 h-3" style={{ color: 'white', stroke: 'white' }} />
+                        <span className="text-[10px]" style={{ color: 'white' }}>Show Less</span>
                       </>
                     ) : (
                       <>
-                        <ChevronDown className="w-4 h-4" style={{ color: 'white', stroke: 'white' }} />
-                        <span className="text-xs" style={{ color: 'white' }}>Show More</span>
+                        <ChevronDown className="w-3 h-3" style={{ color: 'white', stroke: 'white' }} />
+                        <span className="text-[10px]" style={{ color: 'white' }}>Show More</span>
                       </>
                     )}
                   </button>
