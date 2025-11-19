@@ -710,20 +710,20 @@ const LikedMePage = ({ currentUser, isPremium = false }: LikedMePageProps) => {
             height: Capacitor.getPlatform() === 'ios' 
               ? 'calc(100vh - env(safe-area-inset-top, 0px) - 56px)'
               : Capacitor.getPlatform() === 'web'
-                ? 'calc(100vh - 56px)'
+                ? 'calc(100vh - 56px - 80px)'
                 : 'calc(100vh - 56px)',
             minHeight: Capacitor.getPlatform() === 'ios'
               ? 'calc(100vh - env(safe-area-inset-top, 0px) - 56px)'
               : Capacitor.getPlatform() === 'web'
-                ? 'calc(100vh - 56px)'
+                ? 'calc(100vh - 56px - 80px)'
                 : 'calc(100vh - 56px)',
             maxHeight: Capacitor.getPlatform() === 'ios'
               ? 'calc(100vh - env(safe-area-inset-top, 0px) - 56px)'
               : Capacitor.getPlatform() === 'web'
-                ? 'calc(100vh - 56px)'
+                ? 'calc(100vh - 56px - 80px)'
                 : 'calc(100vh - 56px)',
             marginBottom: Capacitor.getPlatform() === 'web'
-              ? '80px'
+              ? '0px'
               : 'calc(env(safe-area-inset-bottom, 0px) + 100px)',
             overflow: 'hidden'
           }}
@@ -876,7 +876,7 @@ const LikedMePage = ({ currentUser, isPremium = false }: LikedMePageProps) => {
                   ? 'clamp(180px, calc(env(safe-area-inset-bottom, 10px) + 170px), 200px)'
                   : Capacitor.getPlatform() === 'android'
                     ? '180px'
-                    : '120px'
+                    : '80px'
               }}
             >
               <div className="px-6 pb-12">
@@ -1052,7 +1052,7 @@ const LikedMePage = ({ currentUser, isPremium = false }: LikedMePageProps) => {
                 ? 'clamp(120px, calc(env(safe-area-inset-bottom, 10px) + 110px), 140px)'
                 : Capacitor.getPlatform() === 'android'
                   ? '120px'
-                  : '140px'
+                  : '100px'
             }}
           >
             <Button
