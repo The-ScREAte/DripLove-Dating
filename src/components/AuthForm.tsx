@@ -289,14 +289,16 @@ const AuthForm = ({ isLogin, onToggle, onOAuthSuccess, onBack }: AuthFormProps) 
                     // Ignore errors
                   }
                   
-                  // Wait for browser to fully close before navigation
-                  await new Promise(resolve => setTimeout(resolve, 800));
+                  // Wait for browser to fully close
+                  await new Promise(resolve => setTimeout(resolve, 500));
                   
-                  // Navigate to appropriate page
+                  // Force a full page reload on iOS after OAuth to ensure clean state
+                  // This prevents the blank white screen issue
+                  // Use full page reload instead of navigate on iOS to prevent blank screen
                   if (needsProfileCompletion) {
-                    navigate('/complete-profile');
+                    window.location.href = '/complete-profile';
                   } else {
-                    navigate('/');
+                    window.location.href = '/';
                   }
                 } catch (error) {
                   console.error('Error during post-login processing:', error);

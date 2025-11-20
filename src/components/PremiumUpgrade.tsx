@@ -335,9 +335,7 @@ const PremiumUpgrade = ({ currentUser, onClose, preselectedPlan }: PremiumUpgrad
         className="max-w-3xl md:max-w-4xl lg:max-w-5xl mx-auto px-0 sm:px-2 md:px-4 lg:px-6"
         style={{
           // Ensure there is enough bottom padding on devices with a home indicator
-          paddingBottom: Capacitor.getPlatform() === 'web'
-            ? '120px'
-            : 'clamp(120px, calc(env(safe-area-inset-bottom, 10px) + 120px), 150px)'
+          paddingBottom: '150px'
         }}
       >
         {onClose && (
