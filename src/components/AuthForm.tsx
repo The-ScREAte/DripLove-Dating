@@ -230,115 +230,27 @@ const AuthForm = ({ isLogin, onToggle, onOAuthSuccess, onBack }: AuthFormProps) 
               toolbarColor: '#000000',
             });
 
-            // Poll for session in the background while browser is open
-            let sessionCheckInterval: NodeJS.Timeout | null = null;
-            let hasProcessedSession = false;
-
-            const checkForSession = async () => {
-              if (hasProcessedSession) return;
-              
-              const { data: { session } } = await supabase.auth.getSession();
-              
-              if (session) {
-                hasProcessedSession = true;
-                
-                // Clear the polling interval
-                if (sessionCheckInterval) {
-                  clearInterval(sessionCheckInterval);
-                  sessionCheckInterval = null;
-                }
-                
-                // Close the browser immediately
-                try {
-                  await Browser.close();
-                } catch (e) {
-                  // Browser already closed
-                }
-                
-                try {
-                  // Check if profile exists (don't create it)
-                  const profile = await checkProfileExists(session.user.id);
-                  await new Promise(resolve => setTimeout(resolve, 300));
-                  
-                  // Determine if profile needs completion
-                  let needsProfileCompletion = false;
-                  if (!profile) {
-                    // No profile exists - user needs to complete profile
-                    needsProfileCompletion = true;
-                  } else {
-                    // Profile exists - check if it's complete
-                    needsProfileCompletion = !profile.first_name || 
-                      profile.first_name === 'User' ||
-                      !profile.bio || 
-                      profile.date_of_birth === '1990-01-01' ||
-                      !profile.city || 
-                      profile.city === 'Unknown' ||
-                      !profile.country;
-                  }
-                  
-                  // Save current language to user's profile
-                  await saveLanguageToProfile(session.user.id);
-                  
-                  // Clear loading state
-                  setOauthLoading(null);
-                  
-                  // Clean up browser listeners
-                  try {
-                    Browser.removeAllListeners();
-                  } catch (e) {
-                    // Ignore errors
-                  }
-                  
-                  // Wait for browser to fully close before navigation
-                  await new Promise(resolve => setTimeout(resolve, 800));
-                  
-                  // Navigate to appropriate page
-                  if (needsProfileCompletion) {
-                    navigate('/complete-profile');
-                  } else {
-                    navigate('/');
-                  }
-                } catch (error) {
-                  console.error('Error during post-login processing:', error);
-                  setOauthLoading(null);
-                  Browser.removeAllListeners();
-                  navigate('/complete-profile');
-                }
-              }
-            };
-
-            // Start polling for session every 500ms
-            sessionCheckInterval = setInterval(checkForSession, 500);
-
+            // The deep link handler in main.tsx will:
+            // 1. Close the browser when the callback is received
+            // 2. Process the OAuth tokens
+            // 3. Navigate to the appropriate page
+            
+            // Listen for browser close (user cancelled)
             const handleBrowserFinish = async () => {
-              // Clear polling interval
-              if (sessionCheckInterval) {
-                clearInterval(sessionCheckInterval);
-                sessionCheckInterval = null;
-              }
-
-              // Do one final check for session
-              if (!hasProcessedSession) {
-                await checkForSession();
-              }
-              
-              // If still no session, show error
-              if (!hasProcessedSession) {
-                toast({
-                  title: t('auth.authenticationCancelled'),
-                  description: t('auth.googleSignInCancelled'),
-                  variant: 'default',
-                });
-              }
-              
+              // User closed the browser manually
               setOauthLoading(null);
               Browser.removeAllListeners();
+              
+              toast({
+                title: t('auth.authenticationCancelled'),
+                description: t('auth.googleSignInCancelled'),
+                variant: 'default',
+              });
             };
             
-            // Listen for browser close
             Browser.addListener('browserFinished', handleBrowserFinish);
 
-            // Don't set loading to null here - wait for callback
+            // Don't set loading to null here - wait for callback or browser close
             return;
 
           } catch (err: any) {

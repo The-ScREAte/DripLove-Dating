@@ -152,16 +152,18 @@ const AppWrapper = () => {
               App.addListener('appUrlOpen', async (event) => {
                 console.log('Deep link received:', event.url);
                 
-                // Skip if this is iOS Google OAuth (handled by AuthForm listener)
-                // This prevents double-handling which causes white screen
-                const platform = (window as any).Capacitor?.getPlatform?.();
-                if (platform === 'ios' && event.url.includes('driplove://auth/callback') && event.url.includes('#access_token=')) {
-                  console.log('Deep link: Skipping iOS Google OAuth (handled by AuthForm)');
-                  return;
-                }
-                
                 // Check if this is an OAuth callback
                 if (event.url.includes('#access_token=') || event.url.includes('?code=')) {
+                  // Close the browser immediately when we receive the deep link
+                  try {
+                    const { Browser } = await import('@capacitor/browser');
+                    await Browser.close();
+                    console.log('Deep link: Browser closed');
+                  } catch (e) {
+                    // Browser may already be closed, ignore error
+                    console.log('Deep link: Browser close (may already be closed)');
+                  }
+                  
                   try {
                     // Use the shared OAuth handler for consistency
                     const { handleOAuthRedirect } = await import('./utils/oauthCallbackHandler');

@@ -37,6 +37,16 @@ export const useMobileOAuth = () => {
       // Handle OAuth callback
       if (event.url.startsWith('driplove://auth/callback')) {
         
+        // Close the browser immediately when we receive the deep link callback
+        try {
+          if (Browser) {
+            await Browser.close();
+          }
+        } catch (e) {
+          // Browser may already be closed, ignore error
+          console.log('[Mobile OAuth] Browser close (may already be closed):', e);
+        }
+        
         try {
           // Extract the fragment from the URL
           const url = new URL(event.url);
