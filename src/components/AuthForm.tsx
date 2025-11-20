@@ -200,11 +200,13 @@ const AuthForm = ({ isLogin, onToggle, onOAuthSuccess, onBack }: AuthFormProps) 
         // Get current platform for Google OAuth
         const platform = Capacitor.getPlatform();
         
-        // For Google OAuth on iOS native: rely on Supabase deep link + mobile OAuth hook
-        // This matches Android/web behaviour and avoids the persistent blank screen
+        // For Google OAuth on iOS native: use Safari View Controller (in-app browser)
+        // This keeps the user in-app and satisfies Apple's review guidelines
         if (provider === 'google' && isNative && platform === 'ios') {
+          
           try {
-            await supabase.auth.signInWithOAuth({
+            // Generate the OAuth URL
+            const { data: oauthData, error: oauthError } = await supabase.auth.signInWithOAuth({
               provider: 'google',
               options: {
                 redirectTo,
@@ -212,14 +214,138 @@ const AuthForm = ({ isLogin, onToggle, onOAuthSuccess, onBack }: AuthFormProps) 
                   prompt: 'select_account',
                   access_type: 'offline',
                 },
-              },
+                skipBrowserRedirect: true, // Get URL without auto-redirect
+              }
             });
-            // Further navigation is handled by the mobile OAuth deep-link handler
+
+            if (oauthError || !oauthData?.url) {
+              throw new Error(oauthError?.message || 'Failed to generate OAuth URL');
+            }
+
+            // Open OAuth URL in Safari View Controller (in-app browser)
+            const { Browser } = await import('@capacitor/browser');
+            await Browser.open({ 
+              url: oauthData.url,
+              presentationStyle: 'popover', // iOS native presentation
+              toolbarColor: '#000000',
+            });
+
+            // Poll for session in the background while browser is open
+            let sessionCheckInterval: NodeJS.Timeout | null = null;
+            let hasProcessedSession = false;
+
+            const checkForSession = async () => {
+              if (hasProcessedSession) return;
+              
+              const { data: { session } } = await supabase.auth.getSession();
+              
+              if (session) {
+                hasProcessedSession = true;
+                
+                // Clear the polling interval
+                if (sessionCheckInterval) {
+                  clearInterval(sessionCheckInterval);
+                  sessionCheckInterval = null;
+                }
+                
+                // Close the browser immediately
+                try {
+                  await Browser.close();
+                } catch (e) {
+                  // Browser already closed
+                }
+                
+                try {
+                  // Check if profile exists (don't create it)
+                  const profile = await checkProfileExists(session.user.id);
+                  await new Promise(resolve => setTimeout(resolve, 300));
+                  
+                  // Determine if profile needs completion
+                  let needsProfileCompletion = false;
+                  if (!profile) {
+                    // No profile exists - user needs to complete profile
+                    needsProfileCompletion = true;
+                  } else {
+                    // Profile exists - check if it's complete
+                    needsProfileCompletion = !profile.first_name || 
+                      profile.first_name === 'User' ||
+                      !profile.bio || 
+                      profile.date_of_birth === '1990-01-01' ||
+                      !profile.city || 
+                      profile.city === 'Unknown' ||
+                      !profile.country;
+                  }
+                  
+                  // Save current language to user's profile
+                  await saveLanguageToProfile(session.user.id);
+                  
+                  // Clear loading state
+                  setOauthLoading(null);
+                  
+                  // Clean up browser listeners
+                  try {
+                    Browser.removeAllListeners();
+                  } catch (e) {
+                    // Ignore errors
+                  }
+                  
+                  // Wait for browser to fully close before navigation
+                  await new Promise(resolve => setTimeout(resolve, 800));
+                  
+                  // Navigate to appropriate page
+                  if (needsProfileCompletion) {
+                    navigate('/complete-profile');
+                  } else {
+                    navigate('/');
+                  }
+                } catch (error) {
+                  console.error('Error during post-login processing:', error);
+                  setOauthLoading(null);
+                  Browser.removeAllListeners();
+                  navigate('/complete-profile');
+                }
+              }
+            };
+
+            // Start polling for session every 500ms
+            sessionCheckInterval = setInterval(checkForSession, 500);
+
+            const handleBrowserFinish = async () => {
+              // Clear polling interval
+              if (sessionCheckInterval) {
+                clearInterval(sessionCheckInterval);
+                sessionCheckInterval = null;
+              }
+
+              // Do one final check for session
+              if (!hasProcessedSession) {
+                await checkForSession();
+              }
+              
+              // If still no session, show error
+              if (!hasProcessedSession) {
+                toast({
+                  title: t('auth.authenticationCancelled'),
+                  description: t('auth.googleSignInCancelled'),
+                  variant: 'default',
+                });
+              }
+              
+              setOauthLoading(null);
+              Browser.removeAllListeners();
+            };
+            
+            // Listen for browser close
+            Browser.addListener('browserFinished', handleBrowserFinish);
+
+            // Don't set loading to null here - wait for callback
+            return;
+
           } catch (err: any) {
-            console.error('❌ iOS Google OAuth error:', err);
+            console.error('❌ Safari View Controller error:', err);
             toast({
               title: 'Authentication Error',
-              description: err?.message || 'Failed to sign in with Google',
+              description: err?.message || 'Failed to open Google Sign-In',
               variant: 'destructive',
             });
             setOauthLoading(null);

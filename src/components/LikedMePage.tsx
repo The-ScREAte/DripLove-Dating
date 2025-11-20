@@ -828,11 +828,9 @@ const LikedMePage = ({ currentUser, isPremium = false }: LikedMePageProps) => {
           <div 
             className="absolute left-1/2 transform -translate-x-1/2 flex gap-1.5 z-10"
             style={{
-              top: Capacitor.getPlatform() === 'ios'
-                ? '48px'
-                : Capacitor.getPlatform() === 'android'
-                  ? '32px'
-                  : '16px'
+              top: Capacitor.getPlatform() === 'ios' || Capacitor.getPlatform() === 'android'
+                ? '32px'
+                : '16px'
             }}
           >
             {Array.from({ length: totalSlides }).map((_, idx) => (
@@ -855,9 +853,7 @@ const LikedMePage = ({ currentUser, isPremium = false }: LikedMePageProps) => {
             className="absolute left-4 bg-white/80 hover:bg-white z-10 h-10 px-3"
             style={{
               top: Capacitor.getPlatform() === 'ios' 
-                ? 'clamp(35px, calc(env(safe-area-inset-top, 10px) + 20px), 50px)'
-                : Capacitor.getPlatform() === 'android'
-                ? '32px'
+                ? 'clamp(50px, calc(env(safe-area-inset-top, 10px) + 35px), 70px)'
                 : '16px'
             }}
           >
@@ -871,9 +867,7 @@ const LikedMePage = ({ currentUser, isPremium = false }: LikedMePageProps) => {
             className="absolute right-4 bg-white/80 hover:bg-white z-10 h-10 w-10 p-0"
             style={{
               top: Capacitor.getPlatform() === 'ios' 
-                ? 'clamp(35px, calc(env(safe-area-inset-top, 10px) + 20px), 50px)'
-                : Capacitor.getPlatform() === 'android'
-                ? '32px'
+                ? 'clamp(50px, calc(env(safe-area-inset-top, 10px) + 35px), 70px)'
                 : '16px'
             }}
           >
@@ -1062,9 +1056,9 @@ const LikedMePage = ({ currentUser, isPremium = false }: LikedMePageProps) => {
             className="absolute bottom-0 left-0 right-0 flex justify-center space-x-6 px-6 z-10"
             style={{
               paddingBottom: Capacitor.getPlatform() === 'ios' 
-                ? 'clamp(100px, calc(env(safe-area-inset-bottom, 10px) + 90px), 120px)'
+                ? 'clamp(120px, calc(env(safe-area-inset-bottom, 10px) + 110px), 140px)'
                 : Capacitor.getPlatform() === 'android'
-                  ? '100px'
+                  ? '120px'
                   : '100px'
             }}
           >
