@@ -23,7 +23,7 @@ const config: CapacitorConfig = {
   android: {
     allowMixedContent: true,
     captureInput: true,
-    webContentsDebuggingEnabled: true
+    webContentsDebuggingEnabled: false
   },
   plugins: {
     GoogleAuth: {
@@ -68,7 +68,7 @@ const config: CapacitorConfig = {
       FadeSplashScreenDuration: '300',
       SplashShowOnlyFirstTime: 'false',
       SplashScreen: 'screen',
-      SplashScreenDelay: '3000'
+      SplashScreenDelay: '0'
     }
   }
 };
