@@ -854,9 +854,7 @@ const LikedMePage = ({ currentUser, isPremium = false }: LikedMePageProps) => {
             style={{
               top: Capacitor.getPlatform() === 'ios' 
                 ? 'clamp(50px, calc(env(safe-area-inset-top, 10px) + 35px), 70px)'
-                : Capacitor.getPlatform() === 'android'
-                  ? '24px'
-                  : '16px'
+                : '16px'
             }}
           >
             ← {t('matches.back')}
@@ -870,11 +868,6 @@ const LikedMePage = ({ currentUser, isPremium = false }: LikedMePageProps) => {
             style={{
               top: Capacitor.getPlatform() === 'ios' 
                 ? 'clamp(50px, calc(env(safe-area-inset-top, 10px) + 35px), 70px)'
-                : Capacitor.getPlatform() === 'android'
-                  ? '24px'
-                  : '16px'
-            }}
-          >
                 : '16px'
             }}
           >
