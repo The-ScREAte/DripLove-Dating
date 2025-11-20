@@ -880,19 +880,13 @@ const LikedMePage = ({ currentUser, isPremium = false }: LikedMePageProps) => {
               className="absolute bottom-0 left-0 right-0 text-white"
               style={{
                 paddingBottom: Capacitor.getPlatform() === 'ios' 
-                  ? 'clamp(180px, calc(env(safe-area-inset-bottom, 10px) + 170px), 200px)'
+                  ? 'clamp(180px, calc(env(safe-area-inset-bottom, 10px) + 190px), 190px)'
                   : Capacitor.getPlatform() === 'android'
                     ? '180px'
-                    : '80px'
+                    : '180px'
               }}
             >
-              <div className="px-6" style={{
-                paddingBottom: Capacitor.getPlatform() === 'ios'
-                  ? 'clamp(82px, calc(env(safe-area-inset-bottom, 10px) + 82px), 96px)'
-                  : Capacitor.getPlatform() === 'android'
-                    ? '82px'
-                    : '96px'
-              }}>
+              <div className="px-6">
                 <div className="mb-2">
                   <h2 className="text-xl font-bold mb-1">
                     {selectedProfile.first_name} {selectedProfile.last_name}
