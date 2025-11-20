@@ -825,7 +825,14 @@ const LikedMePage = ({ currentUser, isPremium = false }: LikedMePageProps) => {
           )}
 
           {/* Slide indicators */}
-          <div className="absolute top-4 left-1/2 transform -translate-x-1/2 flex gap-1.5 z-10">
+          <div 
+            className="absolute left-1/2 transform -translate-x-1/2 flex gap-1.5 z-10"
+            style={{
+              top: Capacitor.getPlatform() === 'ios' || Capacitor.getPlatform() === 'android'
+                ? '32px'
+                : '16px'
+            }}
+          >
             {Array.from({ length: totalSlides }).map((_, idx) => (
               <div
                 key={idx}
@@ -847,7 +854,9 @@ const LikedMePage = ({ currentUser, isPremium = false }: LikedMePageProps) => {
             style={{
               top: Capacitor.getPlatform() === 'ios' 
                 ? 'clamp(50px, calc(env(safe-area-inset-top, 10px) + 35px), 70px)'
-                : '16px'
+                : Capacitor.getPlatform() === 'android'
+                  ? '24px'
+                  : '16px'
             }}
           >
             ← {t('matches.back')}
@@ -861,6 +870,11 @@ const LikedMePage = ({ currentUser, isPremium = false }: LikedMePageProps) => {
             style={{
               top: Capacitor.getPlatform() === 'ios' 
                 ? 'clamp(50px, calc(env(safe-area-inset-top, 10px) + 35px), 70px)'
+                : Capacitor.getPlatform() === 'android'
+                  ? '24px'
+                  : '16px'
+            }}
+          >
                 : '16px'
             }}
           >
