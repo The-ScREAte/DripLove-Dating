@@ -19,6 +19,7 @@ import { loadUserLanguage } from '@/utils/languageSync';
 // Import rating debug utilities for development
 if (import.meta.env.DEV) {
   import('@/utils/ratingDebug');
+  import('@/utils/firstMatchRatingDebug');
 }
 
 // No SafeArea helpers here; header/nav will be fixed to viewport
