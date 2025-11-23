@@ -1206,13 +1206,7 @@ const AdminPageComponent = ({ currentUser, onLogout }: AdminPageProps) => {
   }
   
   return (
-    <div className="admin-page-container w-full min-h-screen bg-gray-100"
-         style={{ 
-           touchAction: 'pan-x pan-y',
-           userSelect: 'none',
-           WebkitUserSelect: 'none',
-           WebkitTouchCallout: 'none'
-         }}>
+    <div className="admin-page-container w-full min-h-screen bg-gray-100 overflow-y-auto">
       <div className="w-full max-w-[390px] mx-auto bg-white min-h-screen">
         {/* Fixed Header with Safe Area */}
         <div className="sticky top-0 z-50 bg-white border-b border-gray-200">
@@ -1239,7 +1233,7 @@ const AdminPageComponent = ({ currentUser, onLogout }: AdminPageProps) => {
         </div>
         
         {/* Scrollable Content */}
-        <div className="p-4">
+        <div className="p-4 pb-20">
 
           {/* Tabbed Interface with Error Boundaries for 1000+ users */}
           <AdminErrorBoundary>
