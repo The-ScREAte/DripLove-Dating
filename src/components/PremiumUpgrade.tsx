@@ -11,6 +11,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import { useEnhancedSubscription } from '@/hooks/useEnhancedSubscription';
 import { useTranslation } from 'react-i18next';
+import { Capacitor } from '@capacitor/core';
 
 interface PremiumUpgradeProps {
   currentUser: any;
