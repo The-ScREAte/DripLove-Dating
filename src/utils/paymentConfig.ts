@@ -20,7 +20,7 @@ export async function getPremiumPaymentConfig() {
   try {
     const response = await supabase
       .from('payment_config')
-      .select('premium_price, premium_price_monthly, currency, payment_methods, country_prices, paystack_plan_code')
+      .select('premium_price, premium_price_monthly, currency, payment_methods, country_prices, paystack_plan_code, default_international_price, default_international_currency')
       .order('created_at', { ascending: false })
       .limit(1)
       .single();
@@ -67,7 +67,9 @@ export async function getPremiumPaymentConfig() {
       monthlyPrice,
       paymentMethods: validMethods,
       currency: data.currency || 'GHS',
-      countryPrices: data.country_prices || {}
+      countryPrices: data.country_prices || {},
+      defaultInternationalPrice: data.default_international_price?.toString() || '5',
+      defaultInternationalCurrency: data.default_international_currency || 'USD'
     };
   } catch (error) {
     return { 
@@ -75,7 +77,9 @@ export async function getPremiumPaymentConfig() {
       monthlyPrice: null,
       paymentMethods: [],
       currency: 'GHS',
-      countryPrices: {}
+      countryPrices: {},
+      defaultInternationalPrice: '5',
+      defaultInternationalCurrency: 'USD'
     };
   }
 }
