@@ -26,9 +26,14 @@ const SwipeButtons: React.FC<SwipeButtonsProps> = ({
   const platform = Capacitor.getPlatform();
   const isWeb = platform === 'web';
   const isIOS = platform === 'ios';
+  const isAndroid = platform === 'android';
   
   // Adjust bottom position based on platform
-  const bottomClass = isIOS ? 'bottom-24 sm:bottom-24' : isWeb ? 'bottom-16 sm:bottom-16' : 'bottom-16 sm:bottom-16';
+  const bottomClass = isAndroid 
+    ? 'bottom-24 sm:bottom-24' 
+    : isIOS 
+    ? 'bottom-24 sm:bottom-24' 
+    : 'bottom-16 sm:bottom-16';
 
   return (
   <div className={`fixed right-6 z-30 sm:absolute sm:right-6 ${bottomClass}`}>
