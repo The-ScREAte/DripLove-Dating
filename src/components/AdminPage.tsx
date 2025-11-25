@@ -89,6 +89,8 @@ const AdminPageComponent = ({ currentUser, onLogout }: AdminPageProps) => {
   const [paymentMethods, setPaymentMethods] = useState<PaymentMethod[]>(defaultPaymentMethods);
   const [premiumPriceOneTime, setPremiumPriceOneTime] = useState('50');
   const [premiumPriceMonthly, setPremiumPriceMonthly] = useState('25');
+  const [defaultInternationalPrice, setDefaultInternationalPrice] = useState('5');
+  const [defaultInternationalCurrency, setDefaultInternationalCurrency] = useState('USD');
   // Now an array of { country, currency, price }
   const [countryPrices, setCountryPrices] = useState<{ country: string; currency: string; price: string }[]>([]);
   const [loadingConfig, setLoadingConfig] = useState(true);
@@ -135,7 +137,7 @@ const AdminPageComponent = ({ currentUser, onLogout }: AdminPageProps) => {
       try {
         const response = await supabase
           .from('payment_config')
-          .select('premium_price, premium_price_monthly, payment_methods, country_prices')
+          .select('premium_price, premium_price_monthly, payment_methods, country_prices, default_international_price, default_international_currency')
           .order('created_at', { ascending: false })
           .limit(1)
           .single();
@@ -146,12 +148,16 @@ const AdminPageComponent = ({ currentUser, onLogout }: AdminPageProps) => {
         setPaymentMethods(data.payment_methods as unknown as PaymentMethod[]);
         setPremiumPriceOneTime(data.premium_price?.toString() || '');
         setPremiumPriceMonthly(data.premium_price_monthly?.toString() || '');
+        setDefaultInternationalPrice(data.default_international_price?.toString() || '5');
+        setDefaultInternationalCurrency(data.default_international_currency || 'USD');
         setCountryPrices(Array.isArray(data.country_prices) ? (data.country_prices as { country: string; currency: string; price: string }[]) : []);
       } catch (error) {
         console.error('Error fetching payment config:', error);
         setPaymentMethods(defaultPaymentMethods);
         setPremiumPriceOneTime('');
         setPremiumPriceMonthly('');
+        setDefaultInternationalPrice('5');
+        setDefaultInternationalCurrency('USD');
         setCountryPrices([]);
       }
       setLoadingConfig(false);
@@ -186,6 +192,8 @@ const AdminPageComponent = ({ currentUser, onLogout }: AdminPageProps) => {
             payment_methods: paymentMethods as unknown as any,
             premium_price: Number(premiumPriceOneTime) || 0,
             premium_price_monthly: Number(premiumPriceMonthly) || 0,
+            default_international_price: Number(defaultInternationalPrice) || 5,
+            default_international_currency: defaultInternationalCurrency || 'USD',
             country_prices: countryPrices,
             updated_at: new Date().toISOString(),
           })
@@ -200,6 +208,8 @@ const AdminPageComponent = ({ currentUser, onLogout }: AdminPageProps) => {
             payment_methods: paymentMethods as unknown as any,
             premium_price: Number(premiumPriceOneTime) || 0,
             premium_price_monthly: Number(premiumPriceMonthly) || 0,
+            default_international_price: Number(defaultInternationalPrice) || 5,
+            default_international_currency: defaultInternationalCurrency || 'USD',
             country_prices: countryPrices,
           });
 
@@ -241,12 +251,35 @@ const AdminPageComponent = ({ currentUser, onLogout }: AdminPageProps) => {
             </h2>
             <div className="mb-6 space-y-4">
               <div>
-                <label className="block font-semibold mb-2 text-gray-700">One-Time Premium Price (GHS)</label>
-                <Input value={premiumPriceOneTime} onChange={e => setPremiumPriceOneTime(e.target.value)} type="number" min="1" className="w-full border-2 border-yellow-200 focus:border-yellow-400 rounded-lg" />
+                <label className="block font-semibold mb-2 text-gray-700">Ghana One-Time Price (GHS)</label>
+                <Input value={premiumPriceOneTime} onChange={e => setPremiumPriceOneTime(e.target.value)} type="number" min="1" step="0.01" className="w-full border-2 border-yellow-200 focus:border-yellow-400 rounded-lg" />
               </div>
               <div>
-                <label className="block font-semibold mb-2 text-gray-700">Monthly Premium Price (GHS)</label>
-                <Input value={premiumPriceMonthly} onChange={e => setPremiumPriceMonthly(e.target.value)} type="number" min="1" className="w-full border-2 border-yellow-200 focus:border-yellow-400 rounded-lg" />
+                <label className="block font-semibold mb-2 text-gray-700">Ghana Monthly Price (GHS)</label>
+                <Input value={premiumPriceMonthly} onChange={e => setPremiumPriceMonthly(e.target.value)} type="number" min="1" step="0.01" className="w-full border-2 border-yellow-200 focus:border-yellow-400 rounded-lg" />
+              </div>
+              <div className="p-3 bg-blue-50 border-2 border-blue-200 rounded-lg">
+                <label className="block font-semibold mb-2 text-blue-800">Default International Price (for countries not listed below)</label>
+                <div className="flex gap-2">
+                  <select 
+                    value={defaultInternationalCurrency} 
+                    onChange={e => setDefaultInternationalCurrency(e.target.value)}
+                    className="w-24 border-2 border-blue-300 rounded-lg px-2 py-1 focus:border-blue-400 bg-white font-semibold"
+                  >
+                    <option value="USD">USD</option>
+                    <option value="EUR">EUR</option>
+                    <option value="GBP">GBP</option>
+                  </select>
+                  <Input 
+                    value={defaultInternationalPrice} 
+                    onChange={e => setDefaultInternationalPrice(e.target.value)} 
+                    type="number" 
+                    min="1" 
+                    step="0.01"
+                    className="flex-1 border-2 border-blue-300 focus:border-blue-400 rounded-lg" 
+                  />
+                </div>
+                <p className="text-xs text-blue-600 mt-1">This price will be shown to users from countries not in your country-specific list</p>
               </div>
             </div>
             <div className="mb-6">

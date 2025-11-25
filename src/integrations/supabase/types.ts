@@ -367,6 +367,8 @@ export type Database = {
           country_prices: Json | null
           created_at: string
           currency: string
+          default_international_currency: string | null
+          default_international_price: number | null
           enabled_countries: Json | null
           id: string
           payment_methods: Json
@@ -379,6 +381,8 @@ export type Database = {
           country_prices?: Json | null
           created_at?: string
           currency?: string
+          default_international_currency?: string | null
+          default_international_price?: number | null
           enabled_countries?: Json | null
           id?: string
           payment_methods?: Json
@@ -391,6 +395,8 @@ export type Database = {
           country_prices?: Json | null
           created_at?: string
           currency?: string
+          default_international_currency?: string | null
+          default_international_price?: number | null
           enabled_countries?: Json | null
           id?: string
           payment_methods?: Json

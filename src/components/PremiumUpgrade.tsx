@@ -163,33 +163,24 @@ const PremiumUpgrade = ({ currentUser, onClose, preselectedPlan }: PremiumUpgrad
     const loadPaymentConfig = async () => {
       const config = await getPremiumPaymentConfig();
       
-      // Get user's country and currency
+      // Get user's country
       let userCountry = currentUser?.country?.toLowerCase() || '';
-      let userCurrency = currentUser?.currency?.toUpperCase?.() || '';
-      let selectedCurrency = 'GHS';
-      let selectedPrice = config.price || '0'; // Fallback to 0 if no price configured in database
+      let selectedCurrency = config.defaultInternationalCurrency || 'USD';
+      let selectedPrice = config.defaultInternationalPrice || '5';
 
-      // Try to find a match in countryPrices by country or currency
-      if (Array.isArray(config.countryPrices)) {
-        // Try match by country (case-insensitive)
+      // Check if user is from Ghana (use GHS pricing)
+      if (userCountry === 'ghana' || userCountry === 'gh') {
+        selectedCurrency = 'GHS';
+        selectedPrice = config.price || '50';
+      } 
+      // Try to find a match in countryPrices by country
+      else if (Array.isArray(config.countryPrices)) {
         const countryEntry = config.countryPrices.find((entry: any) => entry.country?.toLowerCase() === userCountry);
         if (countryEntry) {
-          selectedCurrency = countryEntry.currency || 'GHS';
+          selectedCurrency = countryEntry.currency || selectedCurrency;
           selectedPrice = countryEntry.price || selectedPrice;
-        } else if (userCurrency) {
-          // Try match by currency
-          const currencyEntry = config.countryPrices.find((entry: any) => entry.currency?.toUpperCase() === userCurrency);
-          if (currencyEntry) {
-            selectedCurrency = currencyEntry.currency;
-            selectedPrice = currencyEntry.price || selectedPrice;
-          } else {
-            selectedCurrency = config.currency || 'GHS';
-          }
-        } else {
-          selectedCurrency = config.currency || 'GHS';
         }
-      } else {
-        selectedCurrency = config.currency || 'GHS';
+        // If no country match, use default international pricing (USD)
       }
 
       setPrice(selectedPrice);
