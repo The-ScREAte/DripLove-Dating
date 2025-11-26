@@ -10,10 +10,24 @@ class VideoPreloader {
   private videoBlob: string | null = null;
   private isLoading = false;
   private loadPromise: Promise<string> | null = null;
+  private preloadedVideoElement: HTMLVideoElement | null = null;
 
   private constructor() {
     // Start loading immediately in background
     this.preloadVideo();
+    this.createPreloadedVideo();
+  }
+
+  // Create a preloaded video element for instant cloning
+  private createPreloadedVideo(): void {
+    if (typeof window === 'undefined') return;
+    
+    this.preloadedVideoElement = document.createElement('video');
+    this.preloadedVideoElement.src = this.videoUrl;
+    this.preloadedVideoElement.preload = 'auto';
+    this.preloadedVideoElement.muted = true;
+    this.preloadedVideoElement.playsInline = true;
+    this.preloadedVideoElement.load();
   }
 
   static getInstance(): VideoPreloader {
@@ -63,10 +77,19 @@ class VideoPreloader {
     return this.videoBlob || this.videoUrl;
   }
 
+  // Get the preloaded video element for instant use
+  getPreloadedVideo(): HTMLVideoElement | null {
+    return this.preloadedVideoElement;
+  }
+
   cleanup(): void {
     if (this.videoBlob) {
       URL.revokeObjectURL(this.videoBlob);
       this.videoBlob = null;
+    }
+    if (this.preloadedVideoElement) {
+      this.preloadedVideoElement.src = '';
+      this.preloadedVideoElement = null;
     }
   }
 }

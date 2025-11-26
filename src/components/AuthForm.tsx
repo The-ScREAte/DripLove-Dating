@@ -16,6 +16,7 @@ import AppleAuthDebug from '@/components/AppleAuthDebug';
 import { Capacitor } from '@capacitor/core';
 import { useTranslation } from 'react-i18next';
 import { saveLanguageToProfile } from '@/utils/languageSync';
+import { videoPreloader } from '@/utils/videoPreloader';
 
 interface AuthFormProps {
   isLogin: boolean;
@@ -934,7 +935,39 @@ const AuthForm = ({ isLogin, onToggle, onOAuthSuccess, onBack }: AuthFormProps) 
   };
 
   return (
-    <Card className="w-full max-w-md mx-auto backdrop-blur-sm bg-white/50 shadow-2xl border-0 relative no-bottom-space" style={{ marginBottom: 0, paddingBottom: 0 }}>
+    <div className="min-h-screen relative overflow-hidden">
+      {/* Video Background */}
+      <div className="absolute inset-0">
+        <video
+          autoPlay
+          loop
+          muted
+          playsInline
+          webkit-playsinline="true"
+          x5-playsinline="true"
+          preload="auto"
+          src={videoPreloader.getVideoUrl()}
+          className="absolute top-0 left-0 w-full h-full object-cover opacity-30"
+          onLoadedData={(e) => {
+            e.currentTarget.playbackRate = 1.2;
+            e.currentTarget.play().catch(() => {});
+          }}
+          onTimeUpdate={(e) => {
+            const video = e.currentTarget;
+            if (video.duration && video.currentTime >= video.duration - 0.1) {
+              video.currentTime = 0;
+            }
+          }}
+          onEnded={(e) => {
+            e.currentTarget.currentTime = 0;
+            e.currentTarget.play().catch(() => {});
+          }}
+        />
+        <div className="absolute inset-0 bg-gradient-to-br from-purple-500/20 to-pink-500/20"></div>
+      </div>
+
+      <div className="relative z-10 flex items-center justify-center min-h-screen p-4">
+        <Card className="w-full max-w-md mx-auto backdrop-blur-sm bg-white/50 shadow-2xl border-0 relative no-bottom-space" style={{ marginBottom: 0, paddingBottom: 0 }}>
       <CardHeader className="text-center pb-4 pt-8 relative">
         {/* Back Button - Inside the white card */}
         {onBack && (
@@ -1216,6 +1249,8 @@ const AuthForm = ({ isLogin, onToggle, onOAuthSuccess, onBack }: AuthFormProps) 
         )}
       </CardContent>
     </Card>
+      </div>
+    </div>
   );
 };
 

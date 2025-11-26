@@ -613,15 +613,19 @@ const ProfileCompletionPage = () => {
           preload="auto"
           src={videoPreloader.getVideoUrl()}
           className="absolute top-0 left-0 w-full h-full object-cover opacity-25"
-          onLoadedData={(e) => {
-            e.currentTarget.play().catch(() => {});
-          }}
           onTimeUpdate={(e) => {
             const video = e.currentTarget;
-            if (video.duration && video.currentTime >= video.duration - 0.5) {
+            if (video.duration && video.currentTime >= video.duration - 0.1) {
               video.currentTime = 0;
-              video.play().catch(() => {});
             }
+          }}
+          onEnded={(e) => {
+            e.currentTarget.currentTime = 0;
+            e.currentTarget.play().catch(() => {});
+          }}
+          onLoadedData={(e) => {
+            e.currentTarget.playbackRate = 1.2;
+            e.currentTarget.play().catch(() => {});
           }}
         />
         <div className="absolute inset-0 bg-gradient-to-b from-transparent via-pink-500/10 via-pink-500/20 to-pink-500/30"></div>
