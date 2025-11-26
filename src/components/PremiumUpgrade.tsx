@@ -157,36 +157,34 @@ const PremiumUpgrade = ({ currentUser, onClose, preselectedPlan }: PremiumUpgrad
   const [price, setPrice] = useState<string | null>(null);
   const [monthlyPrice, setMonthlyPrice] = useState<string | null>(null);
   const [paymentMethods, setPaymentMethods] = useState<any[]>([]);
-  const [currency, setCurrency] = useState('GHS');
+  const [currency, setCurrency] = useState('USD');
+  const [ghsPrice, setGhsPrice] = useState<string | null>(null);
+  
+  // USD to GHS exchange rate (update this periodically)
+  const USD_TO_GHS_RATE = 16.5;
 
   React.useEffect(() => {
     const loadPaymentConfig = async () => {
       const config = await getPremiumPaymentConfig();
       
-      // Get user's country
-      let userCountry = currentUser?.country?.toLowerCase() || '';
-      let selectedCurrency = config.defaultInternationalCurrency || 'USD';
-      let selectedPrice = config.defaultInternationalPrice || '5';
+      // Always use international pricing (USD) for display
+      const selectedCurrency = config.defaultInternationalCurrency || 'USD';
+      const usdPrice = config.defaultInternationalPrice || '1.99';
+      
+      // Convert USD to GHS for Paystack
+      const ghsAmount = (parseFloat(usdPrice) * USD_TO_GHS_RATE).toFixed(2);
 
-      // Check if user is from Ghana (use GHS pricing)
-      if (userCountry === 'ghana' || userCountry === 'gh') {
-        selectedCurrency = 'GHS';
-        selectedPrice = config.price || '50';
-      } 
-      // Try to find a match in countryPrices by country
-      else if (Array.isArray(config.countryPrices)) {
-        const countryEntry = config.countryPrices.find((entry: any) => entry.country?.toLowerCase() === userCountry);
-        if (countryEntry) {
-          selectedCurrency = countryEntry.currency || selectedCurrency;
-          selectedPrice = countryEntry.price || selectedPrice;
-        }
-        // If no country match, use default international pricing (USD)
-      }
-
-      setPrice(selectedPrice);
-      setMonthlyPrice(config.monthlyPrice);
+      setPrice(usdPrice);
+      setMonthlyPrice(usdPrice);
+      setGhsPrice(ghsAmount);
       setPaymentMethods(config.paymentMethods);
       setCurrency(selectedCurrency);
+      
+      console.log('[PremiumUpgrade] Loaded pricing:', {
+        usdPrice,
+        ghsPrice: ghsAmount,
+        exchangeRate: USD_TO_GHS_RATE
+      });
     };
     loadPaymentConfig();
   }, [currentUser]);
@@ -372,21 +370,11 @@ const PremiumUpgrade = ({ currentUser, onClose, preselectedPlan }: PremiumUpgrad
                 </CardTitle>
                 <div className="mt-2 md:mt-3">
                   <div className="space-y-2 md:space-y-3">
-                    {/* One-time payment option */}
-                    <div className="p-2 md:p-3 bg-gradient-to-r from-green-50 to-emerald-50 border border-green-200 rounded-lg">
-                      <div className="text-xl sm:text-2xl md:text-3xl font-bold text-gray-800 responsive-text">
-                        {price !== null ? `${currency} ${price}` : 'Loading...'}
-                      </div>
-                      {!isIOS() && (
-                        <div className="text-xs md:text-sm text-green-600 font-medium mt-1">✨ {t('premium.oneTimePayment')}</div>
-                      )}
-                    </div>
-                    
                     {/* Monthly payment option */}
                     {monthlyPrice && (
                       <div className="p-2 md:p-3 bg-gradient-to-r from-blue-50 to-sky-50 border border-blue-200 rounded-lg">
                         <div className="text-lg sm:text-xl md:text-2xl font-bold text-gray-800 responsive-text">
-                          {currency} {monthlyPrice}/month
+                          ${monthlyPrice}/month
                         </div>
                         <div className="text-xs md:text-sm text-blue-600 font-medium mt-1">📱 {t('premium.monthlySubscription')}</div>
                       </div>
@@ -543,23 +531,13 @@ const PremiumUpgrade = ({ currentUser, onClose, preselectedPlan }: PremiumUpgrad
               
               {/* Paystack/Card Payment Options - show on web and Android only, NOT on iOS */}
               {!(isIOS() && isNativeApp()) && (
-                <>
-                  <button
-                    onClick={() => handlePaymentTypeSelection('subscription')}
-                    className="w-full p-4 bg-gradient-to-r from-green-500 to-emerald-600 text-white rounded-lg hover:from-green-600 hover:to-emerald-700 transition-all duration-200 font-semibold"
-                  >
-                    <div className="text-lg">{t('premium.paymentOptions.monthly.button')}</div>
-                    <div className="text-sm opacity-90">{currency} {monthlyPrice}/month • {t('premium.paymentOptions.monthly.subtitle')}</div>
-                  </button>
-                  
-                  <button
-                    onClick={() => handlePaymentTypeSelection('one-time')}
-                    className="w-full p-4 bg-gradient-to-r from-blue-500 to-blue-600 text-white rounded-lg hover:from-blue-600 hover:to-blue-700 transition-all duration-200 font-semibold"
-                  >
-                    <div className="text-lg">{t('premium.paymentOptions.oneTime.button')}</div>
-                    <div className="text-sm opacity-90">{currency} {price}/month • {t('premium.paymentOptions.oneTime.subtitle')}</div>
-                  </button>
-                </>
+                <button
+                  onClick={() => handlePaymentTypeSelection('subscription')}
+                  className="w-full p-4 bg-gradient-to-r from-green-500 to-emerald-600 text-white rounded-lg hover:from-green-600 hover:to-emerald-700 transition-all duration-200 font-semibold"
+                >
+                  <div className="text-lg">{t('premium.paymentOptions.monthly.button')}</div>
+                  <div className="text-sm opacity-90">${monthlyPrice}/month • {t('premium.paymentOptions.monthly.subtitle')}</div>
+                </button>
               )}
             </div>
           </div>
@@ -571,8 +549,10 @@ const PremiumUpgrade = ({ currentUser, onClose, preselectedPlan }: PremiumUpgrad
         <PaystackPaymentModal
           isOpen={showPaymentModal}
           onClose={() => setShowPaymentModal(false)}
-          amount={parseFloat(paymentType === 'one-time' ? (price || '0') : (monthlyPrice || price || '0'))}
-          currency={currency}
+          amount={parseFloat(ghsPrice || '0')}
+          currency="GHS"
+          displayAmount={parseFloat(monthlyPrice || '0')}
+          displayCurrency="USD"
           email={currentUser?.email || ''}
           onSuccess={handlePaymentSuccess}
           paymentMethod={paymentMethods[0]?.type || 'card'}

@@ -5,8 +5,10 @@ import { isIOS, buyIAPProduct } from '@/utils/iap';
 interface PaystackPaymentModalProps {
   isOpen: boolean;
   onClose: () => void;
-  amount: number;
-  currency?: string;
+  amount: number; // GHS amount for Paystack
+  currency?: string; // GHS for Paystack
+  displayAmount?: number; // USD amount to show user
+  displayCurrency?: string; // USD to show user
   email: string;
   onSuccess: () => void;
   paymentMethod?: 'card' | 'momo' | 'iap';
@@ -50,7 +52,18 @@ const loadPaystackScript = () => {
   });
 };
 
-const PaystackPaymentModal: React.FC<PaystackPaymentModalProps> = ({ isOpen, onClose, amount, currency = 'GHS', email, onSuccess, paymentMethod = 'card', isOneTime = false }) => {
+const PaystackPaymentModal: React.FC<PaystackPaymentModalProps> = ({ 
+  isOpen, 
+  onClose, 
+  amount, 
+  currency = 'GHS', 
+  displayAmount,
+  displayCurrency = 'USD',
+  email, 
+  onSuccess, 
+  paymentMethod = 'card', 
+  isOneTime = false 
+}) => {
   const [isLoading, setIsLoading] = React.useState(false);
   const [selectedPaymentMethod, setSelectedPaymentMethod] = React.useState<'card' | 'momo' | 'iap'>(paymentMethod);
 
@@ -255,11 +268,16 @@ const PaystackPaymentModal: React.FC<PaystackPaymentModalProps> = ({ isOpen, onC
         <div className="mb-4">
           <label className="block font-medium mb-1">Amount</label>
           <input 
-            value={`${currency} ${amount}`} 
+            value={`${displayCurrency || 'USD'} ${displayAmount || amount}`} 
             readOnly 
-            className="w-full border rounded px-2 py-1" 
+            className="w-full border rounded px-2 py-1 font-bold text-lg" 
             style={{ fontSize: '16px' }}
           />
+          {displayCurrency && displayCurrency !== currency && (
+            <p className="text-xs text-gray-500 mt-1">
+              💱 Charged as GHS {amount.toFixed(2)} (equivalent amount in local currency)
+            </p>
+          )}
         </div>
         
         <div className="mb-4 text-sm text-gray-600">
@@ -291,8 +309,8 @@ const PaystackPaymentModal: React.FC<PaystackPaymentModalProps> = ({ isOpen, onC
           {isLoading
             ? 'Processing...'
             : selectedPaymentMethod === 'iap'
-              ? `Subscribe Now (${currency} ${amount})`
-              : `Pay with Card (${currency} ${amount})`}
+              ? `Subscribe Now (${displayCurrency || currency} ${displayAmount || amount})`
+              : `Pay ${displayCurrency || currency} ${(displayAmount || amount).toFixed(2)}`}
         </button>
       </div>
     </div>
