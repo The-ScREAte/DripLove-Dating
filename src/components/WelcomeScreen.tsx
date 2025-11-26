@@ -14,7 +14,22 @@ const WelcomeScreen: React.FC<WelcomeScreenProps> = ({ onLogin, onAbout, onTerms
   const { t } = useTranslation();
   
   return (
-  <div className="min-h-fill bg-gradient-to-br from-purple-500 to-pink-500 flex flex-col items-center justify-start text-center relative">
+  <div className="min-h-fill bg-gradient-to-br from-purple-500 to-pink-500 flex flex-col items-center justify-start text-center relative overflow-hidden">
+      {/* Video Background */}
+      <div className="absolute inset-0">
+        <video
+          autoPlay
+          loop
+          muted
+          playsInline
+          className="absolute top-0 left-0 w-full h-[70vh] object-cover opacity-40"
+        >
+          <source src="/welcome-video.mov" type="video/mp4" />
+        </video>
+        {/* Gradient overlay to blend video with pink background */}
+        <div className="absolute top-[60vh] left-0 right-0 h-[20vh] bg-gradient-to-b from-transparent to-pink-500"></div>
+      </div>
+
       {/* Background Bubbles */}
       <div className="absolute inset-0">
         <div className="bg-purple-400 opacity-30 rounded-full w-20 h-20 absolute top-10 left-20"></div>
