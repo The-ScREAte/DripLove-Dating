@@ -677,7 +677,7 @@ const RegistrationForm = ({ onSubmit, onBackToLogin }: RegistrationFormProps) =>
 
   return (
     <div className="keyboard-safe-form input-scroll-container">
-      <Card className="w-full max-w-md mx-auto backdrop-blur-sm bg-white/90 shadow-2xl border-0 animate-fade-in no-bottom-space" style={{ marginBottom: 0, paddingBottom: 0 }}>
+      <Card className="w-full max-w-md mx-auto backdrop-blur-sm bg-white/50 shadow-2xl border-0 animate-fade-in no-bottom-space" style={{ marginBottom: 0, paddingBottom: 0 }}>
       <CardHeader className="text-center pb-6">
         <div className="flex justify-center mb-4">
           <div className="p-3 bg-gradient-to-r from-pink-500 to-purple-600 rounded-full hover-scale">

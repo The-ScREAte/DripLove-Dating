@@ -594,32 +594,50 @@ const ProfileCompletionPage = () => {
   return (
     <div className="keyboard-safe-form input-scroll-container">
       <div 
-        className="min-h-screen bg-gradient-to-br from-pink-400 via-purple-500 to-indigo-600"
+        className="min-h-screen bg-gradient-to-br from-purple-500 to-pink-500 relative"
         style={{
           paddingTop: "calc(env(safe-area-inset-top, 0px) + 8px)",
           paddingBottom: "calc(env(safe-area-inset-bottom, 0px) + 8px)"
         }}
       >
+      {/* Video Background */}
+      <div className="absolute inset-0 overflow-hidden">
+        <video
+          autoPlay
+          loop
+          muted
+          playsInline
+          preload="auto"
+          src="/welcome-video.mov"
+          className="absolute top-0 left-0 w-full h-full object-cover opacity-25"
+          onTimeUpdate={(e) => {
+            const video = e.currentTarget;
+            if (video.duration && video.currentTime >= video.duration - 1.0) {
+              video.currentTime = 0;
+              video.play().catch(() => {});
+            }
+          }}
+        />
+        <div className="absolute inset-0 bg-gradient-to-b from-transparent via-pink-500/10 via-pink-500/20 to-pink-500/30"></div>
+      </div>
+      
       {/* Header - stays visible */}
-      <div className="text-center py-4 px-4">
+      <div className="text-center py-4 px-4 relative z-10">
         <h1 className="text-3xl font-bold text-white mb-2">
           {t('profileCompletion.title')}
         </h1>
-        <p className="text-white/90 text-lg">
-          {t('profileCompletion.justAFewMoreDetails')}
-        </p>
       </div>
 
       {/* Scrollable form container */}
       <div 
-        className="px-4 pb-4 overflow-y-auto"
+        className="px-4 pb-4 overflow-y-auto relative z-10"
         style={{
           maxHeight: "calc(100vh - env(safe-area-inset-top) - env(safe-area-inset-bottom) - 120px)"
         }}
       >
         <div className="max-w-2xl mx-auto">
-          <div className="bg-white/95 rounded-2xl shadow-2xl backdrop-blur-lg border border-white/30 overflow-hidden">
-            <Card className="w-full backdrop-blur-sm bg-white/95 shadow-2xl border-0 relative">
+          <div className="bg-white/25 rounded-2xl shadow-2xl backdrop-blur-lg border border-white/30 overflow-hidden">
+            <Card className="w-full backdrop-blur-sm bg-white/25 shadow-2xl border-0 relative">
               <CardContent className="p-6">
                 <div className="flex items-center justify-between mb-6">
                   <Button

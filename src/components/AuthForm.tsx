@@ -934,7 +934,7 @@ const AuthForm = ({ isLogin, onToggle, onOAuthSuccess, onBack }: AuthFormProps) 
   };
 
   return (
-    <Card className="w-full max-w-md mx-auto backdrop-blur-sm bg-white/90 shadow-2xl border-0 relative no-bottom-space" style={{ marginBottom: 0, paddingBottom: 0 }}>
+    <Card className="w-full max-w-md mx-auto backdrop-blur-sm bg-white/50 shadow-2xl border-0 relative no-bottom-space" style={{ marginBottom: 0, paddingBottom: 0 }}>
       <CardHeader className="text-center pb-4 pt-8 relative">
         {/* Back Button - Inside the white card */}
         {onBack && (

@@ -316,8 +316,28 @@ const Index = () => {
         )}
 
         {currentView === 'login' && (
-          <div className="h-fill bg-gradient-to-br from-pink-400 via-purple-500 to-indigo-600 flex justify-center px-4 py-8 overflow-y-auto" style={{ minHeight: '100vh', paddingTop: '10vh' }}>
-            <div className="w-full max-w-md">
+          <div className="h-fill bg-gradient-to-br from-purple-500 to-pink-500 flex justify-center px-4 py-8 overflow-y-auto relative" style={{ minHeight: '100vh', paddingTop: '10vh' }}>
+            {/* Video Background */}
+            <div className="absolute inset-0 overflow-hidden">
+              <video
+                autoPlay
+                loop
+                muted
+                playsInline
+                preload="auto"
+                src="/welcome-video.mov"
+                className="absolute top-0 left-0 w-full h-full object-cover opacity-30"
+                onTimeUpdate={(e) => {
+                  const video = e.currentTarget;
+                  if (video.duration && video.currentTime >= video.duration - 1.0) {
+                    video.currentTime = 0;
+                    video.play().catch(() => {});
+                  }
+                }}
+              />
+              <div className="absolute inset-0 bg-gradient-to-b from-transparent via-pink-500/10 via-pink-500/20 to-pink-500/30"></div>
+            </div>
+            <div className="w-full max-w-md relative z-10">
               <AuthForm 
                 isLogin={true}
                 onToggle={handleShowRegister}
@@ -328,8 +348,28 @@ const Index = () => {
         )}
 
         {currentView === 'register' && (
-          <div className="h-fill bg-gradient-to-br from-pink-400 via-purple-500 to-indigo-600 flex justify-center px-4 py-8 overflow-y-auto" style={{ minHeight: '100vh', paddingTop: '5vh' }}>
-            <div className="w-full max-w-md">
+          <div className="h-fill bg-gradient-to-br from-purple-500 to-pink-500 flex justify-center px-4 py-8 overflow-y-auto relative" style={{ minHeight: '100vh', paddingTop: '5vh' }}>
+            {/* Video Background */}
+            <div className="absolute inset-0 overflow-hidden">
+              <video
+                autoPlay
+                loop
+                muted
+                playsInline
+                preload="auto"
+                src="/welcome-video.mov"
+                className="absolute top-0 left-0 w-full h-full object-cover opacity-30"
+                onTimeUpdate={(e) => {
+                  const video = e.currentTarget;
+                  if (video.duration && video.currentTime >= video.duration - 1.0) {
+                    video.currentTime = 0;
+                    video.play().catch(() => {});
+                  }
+                }}
+              />
+              <div className="absolute inset-0 bg-gradient-to-b from-transparent via-pink-500/10 via-pink-500/20 to-pink-500/30"></div>
+            </div>
+            <div className="w-full max-w-md relative z-10">
               <RegistrationForm 
                 onSubmit={handleRegister}
                 onBackToLogin={handleBackToLogin}
