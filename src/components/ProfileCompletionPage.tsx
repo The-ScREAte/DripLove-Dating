@@ -608,6 +608,8 @@ const ProfileCompletionPage = () => {
           loop
           muted
           playsInline
+          webkit-playsinline="true"
+          x5-playsinline="true"
           preload="auto"
           src={videoPreloader.getVideoUrl()}
           className="absolute top-0 left-0 w-full h-full object-cover opacity-25"

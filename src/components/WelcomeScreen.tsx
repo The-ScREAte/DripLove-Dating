@@ -14,7 +14,7 @@ interface WelcomeScreenProps {
 const WelcomeScreen: React.FC<WelcomeScreenProps> = ({ onLogin, onAbout, onTerms, onPrivacy }) => {
   const { t } = useTranslation();
   const videoRef = React.useRef<HTMLVideoElement>(null);
-  const [videoSrc, setVideoSrc] = React.useState('/welcome-video.mov');
+  const [videoSrc, setVideoSrc] = React.useState('/welcome-video.mp4');
 
   React.useEffect(() => {
     // Update to blob URL when ready (non-blocking)
@@ -32,6 +32,13 @@ const WelcomeScreen: React.FC<WelcomeScreenProps> = ({ onLogin, onAbout, onTerms
     // Force immediate playback and seamless looping
     video.playbackRate = 1.0;
     
+    // iOS requires user interaction, but since we have buttons on page, try to play
+    const attemptPlay = () => {
+      video.play().catch((error) => {
+        console.log('Autoplay prevented, will play on user interaction:', error);
+      });
+    };
+
     // Monitor playback and loop instantly before end
     const handleTimeUpdate = () => {
       // Loop much earlier to prevent any visible gap - 1 second before end
@@ -42,26 +49,40 @@ const WelcomeScreen: React.FC<WelcomeScreenProps> = ({ onLogin, onAbout, onTerms
     };
 
     const handleLoadedData = () => {
-      video.play().catch(() => {});
+      attemptPlay();
     };
 
     const handleCanPlay = () => {
-      video.play().catch(() => {});
+      attemptPlay();
+    };
+
+    // Add click handler to entire document to start video on iOS
+    const handleUserInteraction = () => {
+      if (video.paused) {
+        attemptPlay();
+      }
+      // Remove listener after first interaction
+      document.removeEventListener('touchstart', handleUserInteraction);
+      document.removeEventListener('click', handleUserInteraction);
     };
 
     video.addEventListener('loadeddata', handleLoadedData);
     video.addEventListener('canplay', handleCanPlay);
     video.addEventListener('timeupdate', handleTimeUpdate);
+    document.addEventListener('touchstart', handleUserInteraction, { once: true });
+    document.addEventListener('click', handleUserInteraction, { once: true });
 
     // Ensure video starts playing immediately
     if (video.readyState >= 2) {
-      video.play().catch(() => {});
+      attemptPlay();
     }
 
     return () => {
       video.removeEventListener('loadeddata', handleLoadedData);
       video.removeEventListener('canplay', handleCanPlay);
       video.removeEventListener('timeupdate', handleTimeUpdate);
+      document.removeEventListener('touchstart', handleUserInteraction);
+      document.removeEventListener('click', handleUserInteraction);
     };
   }, [videoSrc]);
   
@@ -75,6 +96,8 @@ const WelcomeScreen: React.FC<WelcomeScreenProps> = ({ onLogin, onAbout, onTerms
           loop
           muted
           playsInline
+          webkit-playsinline="true"
+          x5-playsinline="true"
           preload="auto"
           src={videoSrc}
           className="absolute top-0 left-0 w-full h-full object-cover opacity-40"

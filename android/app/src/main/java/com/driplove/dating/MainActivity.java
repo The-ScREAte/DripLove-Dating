@@ -6,6 +6,8 @@ import android.media.AudioAttributes;
 import android.net.Uri;
 import android.os.Build;
 import android.os.Bundle;
+import android.webkit.WebSettings;
+import android.webkit.WebView;
 import com.getcapacitor.BridgeActivity;
 
 public class MainActivity extends BridgeActivity {
@@ -14,8 +16,41 @@ public class MainActivity extends BridgeActivity {
     public void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         
+        // Enable WebView debugging for development
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.KITKAT) {
+            WebView.setWebContentsDebuggingEnabled(true);
+        }
+        
+        // Configure WebView settings for video playback
+        configureWebViewForVideo();
+        
         // Create notification channels with custom sound
         createNotificationChannels();
+    }
+    
+    private void configureWebViewForVideo() {
+        // Get the WebView from BridgeActivity
+        WebView webView = getBridge().getWebView();
+        if (webView != null) {
+            WebSettings settings = webView.getSettings();
+            
+            // Enable media playback
+            settings.setMediaPlaybackRequiresUserGesture(false);
+            
+            // Enable DOM storage for video
+            settings.setDomStorageEnabled(true);
+            
+            // Enable database storage
+            settings.setDatabaseEnabled(true);
+            
+            // Set cache mode for better video loading
+            settings.setCacheMode(WebSettings.LOAD_DEFAULT);
+            
+            // Enable hardware acceleration for smooth video
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP) {
+                settings.setMixedContentMode(WebSettings.MIXED_CONTENT_ALWAYS_ALLOW);
+            }
+        }
     }
     
     private void createNotificationChannels() {

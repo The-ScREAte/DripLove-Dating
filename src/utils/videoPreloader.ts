@@ -6,7 +6,7 @@
 
 class VideoPreloader {
   private static instance: VideoPreloader;
-  private videoUrl = '/welcome-video.mov';
+  private videoUrl = '/welcome-video.mp4';
   private videoBlob: string | null = null;
   private isLoading = false;
   private loadPromise: Promise<string> | null = null;
