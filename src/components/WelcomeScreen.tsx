@@ -12,22 +12,65 @@ interface WelcomeScreenProps {
 
 const WelcomeScreen: React.FC<WelcomeScreenProps> = ({ onLogin, onAbout, onTerms, onPrivacy }) => {
   const { t } = useTranslation();
+  const videoRef = React.useRef<HTMLVideoElement>(null);
+
+  React.useEffect(() => {
+    const video = videoRef.current;
+    if (!video) return;
+
+    // Force immediate playback and seamless looping
+    video.playbackRate = 1.0;
+    
+    // Monitor playback and loop instantly before end
+    const handleTimeUpdate = () => {
+      // Loop much earlier to prevent any visible gap - 1 second before end
+      if (video.duration && video.currentTime >= video.duration - 1.0) {
+        video.currentTime = 0;
+        video.play().catch(() => {});
+      }
+    };
+
+    const handleLoadedData = () => {
+      video.play().catch(() => {});
+    };
+
+    const handleCanPlay = () => {
+      video.play().catch(() => {});
+    };
+
+    video.addEventListener('loadeddata', handleLoadedData);
+    video.addEventListener('canplay', handleCanPlay);
+    video.addEventListener('timeupdate', handleTimeUpdate);
+
+    // Ensure video starts playing immediately
+    if (video.readyState >= 2) {
+      video.play().catch(() => {});
+    }
+
+    return () => {
+      video.removeEventListener('loadeddata', handleLoadedData);
+      video.removeEventListener('canplay', handleCanPlay);
+      video.removeEventListener('timeupdate', handleTimeUpdate);
+    };
+  }, []);
   
   return (
   <div className="min-h-fill bg-gradient-to-br from-purple-500 to-pink-500 flex flex-col items-center justify-start text-center relative overflow-hidden">
       {/* Video Background */}
       <div className="absolute inset-0">
         <video
+          ref={videoRef}
           autoPlay
           loop
           muted
           playsInline
           preload="auto"
           src="/welcome-video.mov"
-          className="absolute top-0 left-0 w-full h-[65vh] object-cover opacity-30"
+          className="absolute top-0 left-0 w-full h-full object-cover opacity-40"
+          style={{ willChange: 'auto' }}
         />
-        {/* Gradient overlay to blend video with pink background */}
-        <div className="absolute top-[50vh] left-0 right-0 h-[30vh] bg-gradient-to-b from-transparent via-pink-500/50 to-pink-500"></div>
+        {/* Gradient overlay to blend video with pink background - smoother transition */}
+        <div className="absolute inset-0 bg-gradient-to-b from-transparent from-40% via-pink-500/10 via-55% via-pink-500/30 via-70% to-pink-500"></div>
       </div>
 
       {/* Background Bubbles */}
@@ -47,6 +90,9 @@ const WelcomeScreen: React.FC<WelcomeScreenProps> = ({ onLogin, onAbout, onTerms
           className="w-50 h-40 mb-4" 
           loading="eager"
           fetchPriority="high"
+          decoding="async"
+          width="200"
+          height="160"
         />
         <p className="text-lg text-white font-semibold text-center break-words">{t('welcome.tagline')}</p>
         <p className="text-sm text-white/80 text-center break-words mt-2">{t('welcome.subtitle')}</p>
