@@ -17,6 +17,7 @@ import { moderateImage, ModerationResult } from '@/utils/photoModeration';
 import { compressImage } from '@/utils/imageCompression';
 import TermsAcceptance from './TermsAcceptance';
 import { getLanguageForCountry } from '@/i18n/config';
+import { videoPreloader } from '@/utils/videoPreloader';
 
 interface ImageUpload {
   file: File;
@@ -600,7 +601,7 @@ const ProfileCompletionPage = () => {
           paddingBottom: "calc(env(safe-area-inset-bottom, 0px) + 8px)"
         }}
       >
-      {/* Video Background */}
+      {/* Video Background - always rendered, loads async */}
       <div className="absolute inset-0 overflow-hidden">
         <video
           autoPlay
@@ -608,11 +609,14 @@ const ProfileCompletionPage = () => {
           muted
           playsInline
           preload="auto"
-          src="/welcome-video.mov"
+          src={videoPreloader.getVideoUrl()}
           className="absolute top-0 left-0 w-full h-full object-cover opacity-25"
+          onLoadedData={(e) => {
+            e.currentTarget.play().catch(() => {});
+          }}
           onTimeUpdate={(e) => {
             const video = e.currentTarget;
-            if (video.duration && video.currentTime >= video.duration - 1.0) {
+            if (video.duration && video.currentTime >= video.duration - 0.5) {
               video.currentTime = 0;
               video.play().catch(() => {});
             }
@@ -638,7 +642,7 @@ const ProfileCompletionPage = () => {
         <div className="max-w-2xl mx-auto">
           <div className="bg-white/25 rounded-2xl shadow-2xl backdrop-blur-lg border border-white/30 overflow-hidden">
             <Card className="w-full backdrop-blur-sm bg-white/25 shadow-2xl border-0 relative">
-              <CardContent className="p-6">
+              <CardContent className="p-6 pb-8">
                 <div className="flex items-center justify-between mb-6">
                   <Button
                     type="button"

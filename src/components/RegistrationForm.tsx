@@ -688,7 +688,7 @@ const RegistrationForm = ({ onSubmit, onBackToLogin }: RegistrationFormProps) =>
           {currentStep === 1 ? t('registration.createAccount') : currentStep === 2 ? t('registration.tellUsMore') : t('registration.addPhotos')}
         </CardTitle>
       </CardHeader>
-      <CardContent className="animate-fade-in" style={{ paddingBottom: 0, marginBottom: 0 }}>
+      <CardContent className="animate-fade-in pb-8">
         <form onSubmit={handleSubmit} className="space-y-8">
           {currentStep === 1 && (
             <div className="space-y-6 animate-fade-in">

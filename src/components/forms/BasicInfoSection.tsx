@@ -33,7 +33,7 @@ const BasicInfoSection = ({
   
   return (
     <div className="space-y-4">
-      <p className="text-xs text-center text-gray-400 font-normal">{t('registration.step1Description')}</p>
+      {/* <p className="text-xs text-center text-gray-400 font-normal">{t('registration.step1Description')}</p> */}
       
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
         <div className="space-y-2">

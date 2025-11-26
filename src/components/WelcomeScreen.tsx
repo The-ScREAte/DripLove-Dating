@@ -2,6 +2,7 @@ import React from 'react';
 import { Button } from '@/components/ui/button';
 import { useTranslation } from 'react-i18next';
 import GlobalLanguageSelector from './GlobalLanguageSelector';
+import { videoPreloader } from '@/utils/videoPreloader';
 
 interface WelcomeScreenProps {
   onLogin: () => void;
@@ -13,6 +14,16 @@ interface WelcomeScreenProps {
 const WelcomeScreen: React.FC<WelcomeScreenProps> = ({ onLogin, onAbout, onTerms, onPrivacy }) => {
   const { t } = useTranslation();
   const videoRef = React.useRef<HTMLVideoElement>(null);
+  const [videoSrc, setVideoSrc] = React.useState('/welcome-video.mov');
+
+  React.useEffect(() => {
+    // Update to blob URL when ready (non-blocking)
+    videoPreloader.preloadVideo().then((url) => {
+      setVideoSrc(url);
+    }).catch((error) => {
+      console.error('Video preload failed, using direct URL:', error);
+    });
+  }, []);
 
   React.useEffect(() => {
     const video = videoRef.current;
@@ -52,11 +63,11 @@ const WelcomeScreen: React.FC<WelcomeScreenProps> = ({ onLogin, onAbout, onTerms
       video.removeEventListener('canplay', handleCanPlay);
       video.removeEventListener('timeupdate', handleTimeUpdate);
     };
-  }, []);
+  }, [videoSrc]);
   
   return (
   <div className="min-h-fill bg-gradient-to-br from-purple-500 to-pink-500 flex flex-col items-center justify-start text-center relative overflow-hidden">
-      {/* Video Background */}
+      {/* Video Background - always rendered, loads async */}
       <div className="absolute inset-0">
         <video
           ref={videoRef}
@@ -65,7 +76,7 @@ const WelcomeScreen: React.FC<WelcomeScreenProps> = ({ onLogin, onAbout, onTerms
           muted
           playsInline
           preload="auto"
-          src="/welcome-video.mov"
+          src={videoSrc}
           className="absolute top-0 left-0 w-full h-full object-cover opacity-40"
           style={{ willChange: 'auto' }}
         />

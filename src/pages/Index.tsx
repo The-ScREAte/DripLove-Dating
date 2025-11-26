@@ -12,6 +12,7 @@ import ErrorBoundary from '@/components/ErrorBoundary';
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
 import { transformFormDataForSubmission } from '@/utils/formValidation';
+import { videoPreloader } from '@/utils/videoPreloader';
 
 // Lazy load AdminPage (54KB) - only loads when admin features are accessed
 const LazyAdminPage = lazy(() => import('@/components/AdminPage'));
@@ -325,11 +326,14 @@ const Index = () => {
                 muted
                 playsInline
                 preload="auto"
-                src="/welcome-video.mov"
+                src={videoPreloader.getVideoUrl()}
                 className="absolute top-0 left-0 w-full h-full object-cover opacity-30"
+                onLoadedData={(e) => {
+                  e.currentTarget.play().catch(() => {});
+                }}
                 onTimeUpdate={(e) => {
                   const video = e.currentTarget;
-                  if (video.duration && video.currentTime >= video.duration - 1.0) {
+                  if (video.duration && video.currentTime >= video.duration - 0.5) {
                     video.currentTime = 0;
                     video.play().catch(() => {});
                   }
@@ -349,7 +353,7 @@ const Index = () => {
 
         {currentView === 'register' && (
           <div className="h-fill bg-gradient-to-br from-purple-500 to-pink-500 flex justify-center px-4 py-8 overflow-y-auto relative" style={{ minHeight: '100vh', paddingTop: '5vh' }}>
-            {/* Video Background */}
+            {/* Video Background - always rendered, loads async */}
             <div className="absolute inset-0 overflow-hidden">
               <video
                 autoPlay
@@ -357,11 +361,14 @@ const Index = () => {
                 muted
                 playsInline
                 preload="auto"
-                src="/welcome-video.mov"
+                src={videoPreloader.getVideoUrl()}
                 className="absolute top-0 left-0 w-full h-full object-cover opacity-30"
+                onLoadedData={(e) => {
+                  e.currentTarget.play().catch(() => {});
+                }}
                 onTimeUpdate={(e) => {
                   const video = e.currentTarget;
-                  if (video.duration && video.currentTime >= video.duration - 1.0) {
+                  if (video.duration && video.currentTime >= video.duration - 0.5) {
                     video.currentTime = 0;
                     video.play().catch(() => {});
                   }
