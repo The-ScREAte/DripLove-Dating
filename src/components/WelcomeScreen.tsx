@@ -22,11 +22,9 @@ const WelcomeScreen: React.FC<WelcomeScreenProps> = ({ onLogin, onAbout, onTerms
           loop
           muted
           playsInline
+          src="/welcome-video.mov"
           className="absolute top-0 left-0 w-full h-[70vh] object-cover opacity-40"
-        >
-          <source src="/welcome-video.mov" type="video/quicktime" />
-          <source src="/welcome-video.mp4" type="video/mp4" />
-        </video>
+        />
         {/* Gradient overlay to blend video with pink background */}
         <div className="absolute top-[60vh] left-0 right-0 h-[20vh] bg-gradient-to-b from-transparent to-pink-500"></div>
       </div>
