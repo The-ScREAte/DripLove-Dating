@@ -19,6 +19,7 @@ import { moderateImage, ModerationResult } from '@/utils/photoModeration';
 import { compressImage } from '@/utils/imageCompression';
 import { useToast } from '@/hooks/use-toast';
 import { useTranslation } from 'react-i18next';
+import { videoPreloader } from '@/utils/videoPreloader';
 
 interface RegistrationFormProps {
   onSubmit: (data: any) => void;
@@ -676,8 +677,39 @@ const RegistrationForm = ({ onSubmit, onBackToLogin }: RegistrationFormProps) =>
   };
 
   return (
-    <div className="keyboard-safe-form input-scroll-container">
-      <Card className="w-full max-w-md mx-auto backdrop-blur-sm bg-white/50 shadow-2xl border-0 animate-fade-in no-bottom-space" style={{ marginBottom: 0, paddingBottom: 0 }}>
+    <div className="keyboard-safe-form input-scroll-container relative min-h-screen">
+      {/* Video Background */}
+      <div className="fixed inset-0">
+        <video
+          autoPlay
+          loop
+          muted
+          playsInline
+          webkit-playsinline="true"
+          x5-playsinline="true"
+          preload="auto"
+          src={videoPreloader.getVideoUrl()}
+          className="absolute top-0 left-0 w-full h-full object-cover opacity-30"
+          onLoadedData={(e) => {
+            e.currentTarget.playbackRate = 1.2;
+            e.currentTarget.play().catch(() => {});
+          }}
+          onTimeUpdate={(e) => {
+            const video = e.currentTarget;
+            if (video.duration && video.currentTime >= video.duration - 0.1) {
+              video.currentTime = 0;
+            }
+          }}
+          onEnded={(e) => {
+            e.currentTarget.currentTime = 0;
+            e.currentTarget.play().catch(() => {});
+          }}
+        />
+        <div className="absolute inset-0 bg-gradient-to-br from-purple-500/20 to-pink-500/20"></div>
+      </div>
+
+      <div className="relative z-10 py-8">
+        <Card className="w-full max-w-md mx-auto backdrop-blur-sm bg-white/50 shadow-2xl border-0 animate-fade-in no-bottom-space" style={{ marginBottom: 0, paddingBottom: 0 }}>
       <CardHeader className="text-center pb-6">
         <div className="flex justify-center mb-4">
           <div className="p-3 bg-gradient-to-r from-pink-500 to-purple-600 rounded-full hover-scale">
@@ -934,6 +966,7 @@ const RegistrationForm = ({ onSubmit, onBackToLogin }: RegistrationFormProps) =>
         </form>
       </CardContent>
     </Card>
+      </div>
     </div>
   );
 };
