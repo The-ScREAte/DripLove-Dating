@@ -22,11 +22,12 @@ const WelcomeScreen: React.FC<WelcomeScreenProps> = ({ onLogin, onAbout, onTerms
           loop
           muted
           playsInline
+          preload="auto"
           src="/welcome-video.mov"
-          className="absolute top-0 left-0 w-full h-[70vh] object-cover opacity-40"
+          className="absolute top-0 left-0 w-full h-[65vh] object-cover opacity-30"
         />
         {/* Gradient overlay to blend video with pink background */}
-        <div className="absolute top-[60vh] left-0 right-0 h-[20vh] bg-gradient-to-b from-transparent to-pink-500"></div>
+        <div className="absolute top-[50vh] left-0 right-0 h-[30vh] bg-gradient-to-b from-transparent via-pink-500/50 to-pink-500"></div>
       </div>
 
       {/* Background Bubbles */}
@@ -40,7 +41,13 @@ const WelcomeScreen: React.FC<WelcomeScreenProps> = ({ onLogin, onAbout, onTerms
 
       {/* Logo and Tagline */}
       <div className="mb-12 flex flex-col items-center relative z-10 mt-32 px-6 w-full max-w-md">
-        <img src="/driplove-logo.png" alt="DripLove Logo" className="w-50 h-40 mb-4" />
+        <img 
+          src="/driplove-logo.png" 
+          alt="DripLove Logo" 
+          className="w-50 h-40 mb-4" 
+          loading="eager"
+          fetchPriority="high"
+        />
         <p className="text-lg text-white font-semibold text-center break-words">{t('welcome.tagline')}</p>
         <p className="text-sm text-white/80 text-center break-words mt-2">{t('welcome.subtitle')}</p>
       </div>
