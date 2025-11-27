@@ -341,13 +341,11 @@ const Index = () => {
               />
               <div className="absolute inset-0 bg-gradient-to-b from-transparent via-pink-500/10 via-pink-500/20 to-pink-500/30"></div>
             </div>
-            <div className="w-full max-w-md relative z-10">
-              <AuthForm 
-                isLogin={true}
-                onToggle={handleShowRegister}
-                onBack={handleBackToWelcome}
-              />
-            </div>
+            <AuthForm 
+              isLogin={true}
+              onToggle={handleShowRegister}
+              onBack={handleBackToWelcome}
+            />
           </div>
         )}
 
@@ -378,12 +376,10 @@ const Index = () => {
               />
               <div className="absolute inset-0 bg-gradient-to-b from-transparent via-pink-500/10 via-pink-500/20 to-pink-500/30"></div>
             </div>
-            <div className="w-full max-w-md relative z-10">
-              <RegistrationForm 
-                onSubmit={handleRegister}
-                onBackToLogin={handleBackToLogin}
-              />
-            </div>
+            <RegistrationForm 
+              onSubmit={handleRegister}
+              onBackToLogin={handleBackToLogin}
+            />
           </div>
         )}
 
