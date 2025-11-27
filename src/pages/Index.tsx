@@ -13,6 +13,7 @@ import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
 import { transformFormDataForSubmission } from '@/utils/formValidation';
 import { videoPreloader } from '@/utils/videoPreloader';
+import VideoBackground from '@/components/VideoBackground';
 
 // Lazy load AdminPage (54KB) - only loads when admin features are accessed
 const LazyAdminPage = lazy(() => import('@/components/AdminPage'));
@@ -317,30 +318,9 @@ const Index = () => {
         )}
 
         {currentView === 'login' && (
-          <div className="h-fill bg-gradient-to-br from-purple-500 to-pink-500 flex justify-center px-4 py-8 overflow-y-auto relative" style={{ minHeight: '100vh', paddingTop: '10vh' }}>
+          <div className="h-fill bg-gradient-to-br from-purple-500 to-pink-500 flex items-start px-4 pt-8 overflow-y-auto relative" style={{ minHeight: '100vh' }}>
             {/* Video Background */}
-            <div className="absolute inset-0 overflow-hidden">
-              <video
-                autoPlay
-                loop
-                muted
-                playsInline
-                preload="auto"
-                src={videoPreloader.getVideoUrl()}
-                className="absolute top-0 left-0 w-full h-full object-cover opacity-30"
-                onLoadedData={(e) => {
-                  e.currentTarget.play().catch(() => {});
-                }}
-                onTimeUpdate={(e) => {
-                  const video = e.currentTarget;
-                  if (video.duration && video.currentTime >= video.duration - 0.5) {
-                    video.currentTime = 0;
-                    video.play().catch(() => {});
-                  }
-                }}
-              />
-              <div className="absolute inset-0 bg-gradient-to-b from-transparent via-pink-500/10 via-pink-500/20 to-pink-500/30"></div>
-            </div>
+            <VideoBackground />
             <AuthForm 
               isLogin={true}
               onToggle={handleShowRegister}
@@ -350,32 +330,9 @@ const Index = () => {
         )}
 
         {currentView === 'register' && (
-          <div className="h-fill bg-gradient-to-br from-purple-500 to-pink-500 flex justify-center px-4 py-8 overflow-y-auto relative" style={{ minHeight: '100vh', paddingTop: '5vh' }}>
+          <div className="h-fill bg-gradient-to-br from-purple-500 to-pink-500 flex items-start justify-center px-4 pt-8 overflow-y-auto relative" style={{ minHeight: '100vh' }}>
             {/* Video Background - always rendered, loads async */}
-            <div className="absolute inset-0 overflow-hidden">
-              <video
-                autoPlay
-                loop
-                muted
-                playsInline
-                webkit-playsinline="true"
-                x5-playsinline="true"
-                preload="auto"
-                src={videoPreloader.getVideoUrl()}
-                className="absolute top-0 left-0 w-full h-full object-cover opacity-30"
-                onLoadedData={(e) => {
-                  e.currentTarget.play().catch(() => {});
-                }}
-                onTimeUpdate={(e) => {
-                  const video = e.currentTarget;
-                  if (video.duration && video.currentTime >= video.duration - 0.5) {
-                    video.currentTime = 0;
-                    video.play().catch(() => {});
-                  }
-                }}
-              />
-              <div className="absolute inset-0 bg-gradient-to-b from-transparent via-pink-500/10 via-pink-500/20 to-pink-500/30"></div>
-            </div>
+            <VideoBackground />
             <RegistrationForm 
               onSubmit={handleRegister}
               onBackToLogin={handleBackToLogin}
@@ -384,7 +341,10 @@ const Index = () => {
         )}
 
         {currentView === 'profile-completion' && user && (
-          <ProfileCompletionPage />
+          <div className="h-fill bg-gradient-to-br from-purple-500 to-pink-500 flex items-start justify-center px-4 pt-8 overflow-y-auto relative" style={{ minHeight: '100vh' }}>
+            <VideoBackground />
+            <ProfileCompletionPage />
+          </div>
         )}
 
         {currentView === 'terms-acceptance' && user && (

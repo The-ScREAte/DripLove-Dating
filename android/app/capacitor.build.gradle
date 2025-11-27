@@ -19,6 +19,7 @@ dependencies {
     implementation project(':capacitor-status-bar')
     implementation project(':southdevs-capacitor-google-auth')
     implementation project(':capacitor-rate-app')
+    implementation project(':capacitor-video-player')
     implementation "com.android.billingclient:billing:7.1.1"
 }
 

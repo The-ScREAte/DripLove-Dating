@@ -31,3 +31,6 @@ project(':southdevs-capacitor-google-auth').projectDir = new File('../node_modul
 
 include ':capacitor-rate-app'
 project(':capacitor-rate-app').projectDir = new File('../node_modules/capacitor-rate-app/android')
+
+include ':capacitor-video-player'
+project(':capacitor-video-player').projectDir = new File('../node_modules/capacitor-video-player/android')
