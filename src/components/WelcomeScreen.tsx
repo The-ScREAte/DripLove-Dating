@@ -626,26 +626,28 @@ const WelcomeScreen: React.FC<WelcomeScreenProps> = ({ onLogin, onAbout, onTerms
           )}
         </Button>
 
-        {/* Apple Sign-In Button */}
-        <Button
-          onClick={() => handleOAuthSignIn('apple')}
-          disabled={oauthLoading !== null}
-          className="w-full bg-black hover:bg-gray-900 text-white font-medium py-1.5 sm:py-2 md:py-2.5 px-3 sm:px-4 md:px-5 rounded-full transition-all duration-200 shadow-sm hover:shadow-md text-[11px] sm:text-[13px] md:text-[14px]"
-        >
-          {oauthLoading === 'apple' ? (
-            <div className="flex items-center justify-center">
-              <div className="w-3 h-3 md:w-4 md:h-4 border-2 border-white border-t-transparent rounded-full animate-spin mr-1.5"></div>
-              <span className="text-[11px] sm:text-[13px] md:text-[14px]">{t('auth.connecting')}</span>
-            </div>
-          ) : (
-            <div className="flex items-center justify-center">
-              <svg className="w-3 h-3 md:w-4 md:h-4 mr-1.5" viewBox="0 0 24 24" fill="currentColor">
-                <path d="M17.05 20.28c-.98.95-2.05.8-3.08.35-1.09-.46-2.09-.48-3.24 0-1.44.62-2.2.44-3.06-.35C2.79 15.25 3.51 7.59 9.05 7.31c1.35.07 2.29.74 3.08.8 1.18-.24 2.31-.93 3.57-.84 1.51.12 2.65.72 3.4 1.8-3.12 1.87-2.38 5.98.48 7.13-.57 1.5-1.31 2.99-2.54 4.09l.01-.01zM12.03 7.25c-.15-2.23 1.66-4.07 3.74-4.25.29 2.58-2.34 4.5-3.74 4.25z"/>
-              </svg>
-              <span className="text-[11px] sm:text-[13px] md:text-[14px]">{t('auth.continueWithApple')}</span>
-            </div>
-          )}
-        </Button>
+        {/* Apple Sign-In Button - Only show on iOS devices */}
+        {isIOS && (
+          <Button
+            onClick={() => handleOAuthSignIn('apple')}
+            disabled={oauthLoading !== null}
+            className="w-full bg-black hover:bg-gray-900 text-white font-medium py-1.5 sm:py-2 md:py-2.5 px-3 sm:px-4 md:px-5 rounded-full transition-all duration-200 shadow-sm hover:shadow-md text-[11px] sm:text-[13px] md:text-[14px]"
+          >
+            {oauthLoading === 'apple' ? (
+              <div className="flex items-center justify-center">
+                <div className="w-3 h-3 md:w-4 md:h-4 border-2 border-white border-t-transparent rounded-full animate-spin mr-1.5"></div>
+                <span className="text-[11px] sm:text-[13px] md:text-[14px]">{t('auth.connecting')}</span>
+              </div>
+            ) : (
+              <div className="flex items-center justify-center">
+                <svg className="w-3 h-3 md:w-4 md:h-4 mr-1.5" viewBox="0 0 24 24" fill="currentColor">
+                  <path d="M17.05 20.28c-.98.95-2.05.8-3.08.35-1.09-.46-2.09-.48-3.24 0-1.44.62-2.2.44-3.06-.35C2.79 15.25 3.51 7.59 9.05 7.31c1.35.07 2.29.74 3.08.8 1.18-.24 2.31-.93 3.57-.84 1.51.12 2.65.72 3.4 1.8-3.12 1.87-2.38 5.98.48 7.13-.57 1.5-1.31 2.99-2.54 4.09l.01-.01zM12.03 7.25c-.15-2.23 1.66-4.07 3.74-4.25.29 2.58-2.34 4.5-3.74 4.25z"/>
+                </svg>
+                <span className="text-[11px] sm:text-[13px] md:text-[14px]">{t('auth.continueWithApple')}</span>
+              </div>
+            )}
+          </Button>
+        )}
 
         {/* Manual Login Button */}
         <Button
@@ -659,22 +661,26 @@ const WelcomeScreen: React.FC<WelcomeScreenProps> = ({ onLogin, onAbout, onTerms
       {/* Footer Section */}
       <div className="flex flex-col items-center space-y-2 z-10 pb-6 sm:pb-8 px-4 sm:px-6">
         {/* Terms acceptance text */}
-        <p className="text-xs sm:text-sm text-white/90 text-center max-w-[90%] sm:max-w-3xl leading-tight m-0 p-0">
-          By signing in or creating an account, you agree to our{' '}
-          <button
-            onClick={onTerms}
-            className="text-white font-bold hover:text-white/80 transition-colors duration-200 bg-transparent border-none cursor-pointer underline decoration-white/40 hover:decoration-white/80 underline-offset-2 inline p-0 m-0"
-          >
-            Terms of Service
-          </button>
-          . Learn how we process your data in our{' '}
-          <button
-            onClick={onPrivacy}
-            className="text-white font-bold hover:text-white/80 transition-colors duration-200 bg-transparent border-none cursor-pointer underline decoration-white/40 hover:decoration-white/80 underline-offset-2 inline p-0 m-0"
-          >
-            Privacy Policy
-          </button>
-          .
+          <p className="text-xs sm:text-sm text-white/90 text-center max-w-[92%] sm:max-w-3xl [line-height:1.05] sm:[line-height:1.15] m-0 p-0">
+            By signing in or creating an account, you agree to our <a
+              href="#terms"
+              onClick={(e) => {
+                e.preventDefault();
+                onTerms();
+              }}
+              className="text-white font-bold hover:text-white/80 active:text-white/60 transition-colors duration-200 bg-transparent border-none cursor-pointer underline decoration-white/40 hover:decoration-white/80 underline-offset-2 inline py-1 px-0 m-0 leading-[inherit] touch-manipulation"
+            >
+              Terms of Service
+            </a>. Learn how we process your data in our <a
+              href="#privacy"
+              onClick={(e) => {
+                e.preventDefault();
+                onPrivacy();
+              }}
+              className="text-white font-bold hover:text-white/80 active:text-white/60 transition-colors duration-200 bg-transparent border-none cursor-pointer underline decoration-white/40 hover:decoration-white/80 underline-offset-2 inline py-1 px-0 m-0 leading-[inherit] touch-manipulation"
+            >
+              Privacy Policy
+            </a>.
         </p>
         
         {/* About and Language selector */}
