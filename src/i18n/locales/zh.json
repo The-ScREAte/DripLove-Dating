@@ -55,6 +55,8 @@
     "processing": "处理中...",
     "connecting": "连接中...",
     "continueWithGoogle": "使用 Google 继续",
+    "continueWithApple": "使用 Apple 继续",
+    "signInWithEmail": "使用电子邮件登录",
     "joinDripLoveToday": "立即加入 DripLove",
     "accountAlreadyExists": "此电子邮件的帐户已存在。请登录。",
     "registrationFailed": "注册失败",

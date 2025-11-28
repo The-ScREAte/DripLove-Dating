@@ -71,6 +71,8 @@
     "processing": "Traitement...",
     "connecting": "Connexion...",
     "continueWithGoogle": "Continuer avec Google",
+    "continueWithApple": "Continuer avec Apple",
+    "signInWithEmail": "Se connecter avec Email",
     "joinDripLoveToday": "Rejoignez DripLove aujourd'hui",
     "accountAlreadyExists": "Un compte avec cet e-mail existe déjà. Veuillez vous connecter.",
     "registrationFailed": "Échec de l'inscription",

@@ -934,24 +934,8 @@ const AuthForm = ({ isLogin, onToggle, onOAuthSuccess, onBack }: AuthFormProps) 
   };
 
   return (
-    <Card className="w-full max-w-md mx-auto backdrop-blur-sm bg-white/50 shadow-2xl border-0 relative no-bottom-space pb-0" style={{ marginBottom: 0, paddingBottom: 0 }}>
+    <Card className="w-full max-w-md mx-auto backdrop-blur-none bg-transparent shadow-none border-0 relative no-bottom-space pb-0" style={{ marginBottom: 0, paddingBottom: 0 }}>
       <CardHeader className="text-center pb-4 pt-8 relative">
-        {/* Back Button - Inside the white card */}
-        {onBack && (
-          <button
-            onClick={onBack}
-            className="absolute top-4 left-4 z-10 p-2 rounded-full bg-gray-100 hover:bg-gray-200 transition-all duration-200 shadow-sm hover:shadow-md"
-            aria-label="Go back"
-          >
-            <svg className="w-4 h-4 text-gray-700" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M15 19l-7-7 7-7" />
-            </svg>
-          </button>
-        )}
-        {/* App Logo */}
-        <div className="flex justify-center mb-6">
-          <img src="/driplove-logo.png" alt="DripLove Logo" className="h-16 w-auto" />
-        </div>
         
         {/* Only show title for forgot password or account creation */}
         {(showForgotPassword || !isLogin) && (
@@ -967,73 +951,6 @@ const AuthForm = ({ isLogin, onToggle, onOAuthSuccess, onBack }: AuthFormProps) 
       </CardHeader>
 
       <CardContent className="pb-0" style={{ marginBottom: 0 }}>
-  {/* Show OAuth buttons only when not in forgot password mode */}
-        {!showForgotPassword && (
-          <>
-            {/* OAuth Buttons - Cute and Simple */}
-            <div className="space-y-3 mb-6 flex flex-col items-center">
-              {/* Apple Sign-In - Only show on iOS native platform */}
-              {isIOS && (
-                <Button
-                  type="button"
-                  variant="outline"
-                  className="w-64 bg-black hover:bg-gray-800 text-white font-medium border-0 py-3 rounded-full transition-all duration-200 flex items-center justify-center shadow-md hover:shadow-lg"
-                  onClick={() => handleOAuthSignIn('apple')}
-                  disabled={oauthLoading !== null || loading}
-                  aria-label="Sign in with Apple"
-                >
-                  {oauthLoading === 'apple' ? (
-                    <div className="flex items-center">
-                      <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin mr-2"></div>
-                      {t('auth.connecting')}
-                    </div>
-                  ) : (
-                    <>
-                      <svg className="w-5 h-5 mr-2.5 fill-white" viewBox="0 0 814 1000" aria-hidden="true">
-                        <path d="M788.1 340.9c-5.8 4.5-108.2 62.2-108.2 190.5 0 148.4 130.3 200.9 134.2 202.2-.6 3.2-20.7 71.9-68.7 141.9-42.8 61.6-87.5 123.1-155.5 123.1s-85.5-39.5-164-39.5c-76.5 0-103.7 40.8-165.9 40.8s-105.6-57-155.5-127c-52.5-73.8-94.5-189.9-94.5-297.5 0-174.2 113.8-266.6 225.3-266.6 59.3 0 108.9 41.1 146.5 41.1s94.5-44.1 160.8-44.1c26.4 0 121.2 2.6 183.5 93.1zm-234.4-553.1c35.4-42.4 58-101.7 58-160.1 0-8.3-1.2-16.6-2.6-24.2-55.6 2.2-121.2 37.5-159.5 83.8-33.2 38.3-55.6 101.1-55.6 160.1 0 9.6 1.9 19.1 2.6 22.2 1.3.6 3.9.6 6.4.6 50.7 0 113.2-33.8 150.7-82.4z" />
-                      </svg>
-                      {t('auth.signInWithApple')}
-                    </>
-                  )}
-                </Button>
-              )}
-
-              <Button
-                type="button"
-                variant="outline"
-                className="w-64 bg-white hover:bg-gray-50 text-gray-700 font-medium border border-gray-300 hover:border-gray-400 py-3 rounded-full transition-all duration-200 shadow-md hover:shadow-lg"
-                onClick={() => handleOAuthSignIn('google')}
-                disabled={oauthLoading !== null || loading}
-              >
-                {oauthLoading === 'google' ? (
-                  <div className="flex items-center">
-                    <div className="w-4 h-4 border-2 border-gray-400 border-t-transparent rounded-full animate-spin mr-2"></div>
-                    {t('auth.connecting')}
-                  </div>
-                ) : (
-                  <>
-                    <svg className="w-5 h-5 mr-2.5" viewBox="0 0 24 24">
-                      <path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"/>
-                      <path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"/>
-                      <path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z"/>
-                      <path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"/>
-                    </svg>
-                    {t('auth.continueWithGoogle')}
-                  </>
-                )}
-              </Button>
-            </div>
-
-            <div className="relative my-8">
-              <div className="absolute inset-0 flex items-center">
-                <span className="w-full border-t border-gray-300" />
-              </div>
-              <div className="relative flex justify-center text-sm">
-              </div>
-            </div>
-          </>
-        )}
-
         {/* Forgot Password Form */}
         {showForgotPassword ? (
           <div className="space-y-4">

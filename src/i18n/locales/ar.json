@@ -55,6 +55,8 @@
     "processing": "جارٍ المعالجة...",
     "connecting": "جارٍ الاتصال...",
     "continueWithGoogle": "المتابعة مع Google",
+    "continueWithApple": "المتابعة مع Apple",
+    "signInWithEmail": "تسجيل الدخول بالبريد الإلكتروني",
     "joinDripLoveToday": "انضم إلى DripLove اليوم",
     "accountAlreadyExists": "يوجد حساب بهذا البريد الإلكتروني بالفعل. يرجى تسجيل الدخول بدلاً من ذلك.",
     "registrationFailed": "فشل التسجيل",

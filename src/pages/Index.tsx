@@ -1,5 +1,6 @@
 import React, { useState, useEffect, Suspense, lazy } from 'react';
 import WelcomeScreen from '@/components/WelcomeScreen';
+import AuthDialog from '@/components/AuthDialog';
 import AuthForm from '@/components/AuthForm';
 import RegistrationForm from '@/components/RegistrationForm';
 import ProfileCompletionPage from '@/components/ProfileCompletionPage';
@@ -32,6 +33,8 @@ const Index = () => {
   const [currentView, setCurrentView] = useState<'welcome' | 'login' | 'register' | 'profile-completion' | 'terms-acceptance' | 'app' | 'admin' | 'about' | 'terms' | 'privacy'>('welcome');
   const [user, setUser] = useState<any>(null);
   const [loading, setLoading] = useState(true);
+  const [showAuthDialog, setShowAuthDialog] = useState(false);
+  const [isLoginMode, setIsLoginMode] = useState(true);
   const { toast } = useToast();
 
   useEffect(() => {
@@ -206,7 +209,7 @@ const Index = () => {
   };
 
   const handleBackToLogin = () => {
-    setCurrentView('login');
+    setCurrentView('welcome');
   };
 
   const handleAdminAccess = () => {
@@ -233,6 +236,21 @@ const Index = () => {
     setCurrentView('privacy');
   };
 
+  const handleManualLogin = () => {
+    setShowAuthDialog(true);
+    setIsLoginMode(true);
+  };
+
+  const handleAuthDialogToggle = () => {
+    // Close the dialog and navigate to registration page
+    setShowAuthDialog(false);
+    setCurrentView('register');
+  };
+
+  const handleAuthDialogClose = () => {
+    setShowAuthDialog(false);
+  };
+
   // Shortest possible registration: essentials only
   const handleRegister = async (formData: any) => {
     // Registration is now fully handled in RegistrationForm, just update user and view if needed
@@ -257,7 +275,6 @@ const Index = () => {
     await supabase.auth.signOut();
     setUser(null);
     setCurrentView('welcome');
-    // Removed: Profile completion cancelled toast
   };
 
   const handleLogout = async () => {
@@ -297,12 +314,21 @@ const Index = () => {
       <div className="w-full h-fill" style={{ margin: 0, padding: 0 }}>
 
         {currentView === 'welcome' && (
-          <WelcomeScreen
-            onLogin={handleShowLogin}
-            onAbout={handleShowAbout}
-            onTerms={handleShowTerms}
-            onPrivacy={handleShowPrivacy}
-          />
+          <>
+            <WelcomeScreen
+              onLogin={handleShowLogin}
+              onAbout={handleShowAbout}
+              onTerms={handleShowTerms}
+              onPrivacy={handleShowPrivacy}
+              onManualLogin={handleManualLogin}
+            />
+            <AuthDialog
+              open={showAuthDialog}
+              onOpenChange={setShowAuthDialog}
+              isLogin={isLoginMode}
+              onToggle={handleAuthDialogToggle}
+            />
+          </>
         )}
 
         {currentView === 'about' && (

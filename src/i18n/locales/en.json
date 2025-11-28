@@ -71,6 +71,8 @@
     "processing": "Processing...",
     "connecting": "Connecting...",
     "continueWithGoogle": "Continue with Google",
+    "continueWithApple": "Continue with Apple",
+    "signInWithEmail": "Sign in with Email",
     "joinDripLoveToday": "Join DripLove today",
     "accountAlreadyExists": "An account with this email already exists. Please sign in instead.",
     "registrationFailed": "Registration Failed",
@@ -704,8 +706,7 @@
     "unavailable": "This user's profile is not available or has been removed."
   },
   "welcome": {
-    "tagline": "Feel the Spark. Drip in Love",
-    "subtitle": "Real Vibes. Real People. Real Love.",
+    "tagline": "Real People, Real Love, Drip In Love",
     "getStarted": "Get Started",
     "joinThousands": "Join thousands finding love across continents",
     "aboutLink": "About DripLove",
