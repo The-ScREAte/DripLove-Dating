@@ -659,7 +659,7 @@ const WelcomeScreen: React.FC<WelcomeScreenProps> = ({ onLogin, onAbout, onTerms
       {/* Footer Section */}
       <div className="flex flex-col items-center space-y-2 z-10 pb-6 sm:pb-8 px-4 sm:px-6">
         {/* Terms acceptance text */}
-        <p className="text-xs sm:text-sm text-white/90 text-center max-w-[90%] sm:max-w-3xl leading-relaxed">
+        <p className="text-xs sm:text-sm text-white/90 text-center max-w-[90%] sm:max-w-3xl leading-snug">
           By signing in or creating an account, you agree to our{' '}
           <button
             onClick={onTerms}
