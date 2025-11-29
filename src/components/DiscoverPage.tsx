@@ -883,14 +883,49 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, isPremium }: DiscoverPage
     );
 
     // Deterministic shuffle function to ensure consistent profile order
-
     // Create seed using user ID and today's date to maintain consistent order per day
-    // Use ISO date string for consistency across timezones
     const today = new Date().toISOString().split('T')[0]; // e.g., "2025-10-08"
-    // Include profile count in seed for extra stability
     const profileHash = uniqueProfiles.map(p => p.id).sort().join('');
     const shuffleSeed = `${userId}_${today}_${profileHash.slice(0, 10)}`;
-    const shuffled = createDeterministicShuffle(uniqueProfiles, shuffleSeed);
+    
+    // ⭐ Check if we have a saved profile order for today
+    const savedOrderKey = `driplove_profile_order_${userId}_${today}`;
+    const savedOrder = localStorage.getItem(savedOrderKey);
+    
+    let shuffled: typeof uniqueProfiles;
+    
+    if (savedOrder) {
+      // Restore saved order
+      try {
+        const orderIds: string[] = JSON.parse(savedOrder);
+        const orderMap = new Map(uniqueProfiles.map(p => [p.id, p]));
+        
+        // Reorder profiles according to saved order, append any new profiles at end
+        const orderedProfiles = orderIds
+          .map(id => orderMap.get(id))
+          .filter((p): p is typeof uniqueProfiles[0] => p !== undefined);
+        
+        // Add any new profiles that weren't in saved order
+        const orderedIds = new Set(orderIds);
+        const newProfiles = uniqueProfiles.filter(p => !orderedIds.has(p.id));
+        
+        shuffled = [...orderedProfiles, ...newProfiles];
+      } catch (error) {
+        // If parse fails, shuffle normally
+        shuffled = createDeterministicShuffle(uniqueProfiles, shuffleSeed);
+      }
+    } else {
+      // First time today - shuffle and save order
+      shuffled = createDeterministicShuffle(uniqueProfiles, shuffleSeed);
+      
+      // Save profile order to localStorage
+      try {
+        const profileIds = shuffled.map(p => p.id);
+        localStorage.setItem(savedOrderKey, JSON.stringify(profileIds));
+      } catch (error) {
+        // Ignore localStorage errors
+      }
+    }
 
     // Load last profile ID and time from localStorage
     const savedId = localStorage.getItem('driplove_last_profile_id');
@@ -898,11 +933,12 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, isPremium }: DiscoverPage
     const twentyFourHours = 24 * 60 * 60 * 1000;
     const isSavedValid = savedId && Date.now() - savedTime < twentyFourHours;
 
-    let indexToShow = 0;
-    if (isSavedValid) {
-      const savedIndex = shuffled.findIndex(p => p.id === savedId);
-      if (savedIndex !== -1) {
-        indexToShow = savedIndex;
+    // Find starting index based on saved profile
+    let startIndex = 0;
+    if (isSavedValid && savedId) {
+      const foundIndex = shuffled.findIndex(p => p.id === savedId);
+      if (foundIndex !== -1) {
+        startIndex = foundIndex;
       }
     }
 
@@ -943,7 +979,7 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, isPremium }: DiscoverPage
       matches: shuffled,
       images: imageMap,
       distances: distanceMap,
-      index: indexToShow
+      index: startIndex
     };
   }, []);
 
@@ -989,8 +1025,15 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, isPremium }: DiscoverPage
         
         // ⭐ Cache REMOVED - was causing already-swiped profiles to reappear
 
-        // Set profiles FIRST before marking fetch complete
-        setPotentialMatches(matchesWithAds);
+        // ⭐ CRITICAL: Only set profiles if we don't already have them loaded
+        // This prevents replacing profiles when the effect runs multiple times
+        setPotentialMatches(prev => {
+          // If we already have profiles, don't replace them (prevents duplicates)
+          if (prev.length > 0) {
+            return prev;
+          }
+          return matchesWithAds;
+        });
         setUserImages(images);
         setUserDistances(distances);
         setCurrentIndex(index);
@@ -1210,7 +1253,8 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, isPremium }: DiscoverPage
     const today = new Date().toISOString().split('T')[0]; // "2025-10-08"
     const cacheKey = `${currentUser.id}_${today}`;
 
-    // Prevent re-initialization for the same user+date
+    // ⭐ CRITICAL FIX: Check if we've already initialized to prevent double-loading
+    // This prevents the effect from running multiple times and creating duplicates
     if (initializedUserRef.current === cacheKey) {
       return; // Already initialized for this user today
     }
@@ -1236,20 +1280,37 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, isPremium }: DiscoverPage
     if (needsUpdate) {
       persistSwipedIds();
     }
+    
+    // ⭐ Clean up old profile order from previous days
+    try {
+      const today = new Date().toISOString().split('T')[0];
+      const prefix = `driplove_profile_order_${currentUser.id}_`;
+      
+      // Remove old profile orders (not today's)
+      for (let i = 0; i < localStorage.length; i++) {
+        const key = localStorage.key(i);
+        if (key?.startsWith(prefix) && !key.endsWith(today)) {
+          localStorage.removeItem(key);
+        }
+      }
+    } catch (error) {
+      // Ignore localStorage errors
+    }
 
     // Start loading immediately - always fetch fresh to exclude swiped profiles
     const initializeProfiles = async () => {
-      // ⭐ ALWAYS fetch fresh - no cache loading
-      // Cache was causing already-swiped profiles to reappear
-      await fetchPotentialMatches();
-      // Mark this user+date as initialized
+      // ⭐ Mark as initialized BEFORE fetching to prevent race conditions
+      // This ensures the effect won't run again even if state updates trigger re-renders
       initializedUserRef.current = cacheKey;
+      
+      // Fetch fresh profiles excluding already swiped ones
+      await fetchPotentialMatches();
     };
 
     // Start immediately without setTimeout
     initializeProfiles();
     fetchReverseUsage();
-  }, [currentUser?.id, adsLoaded]); // Keep adsLoaded for ad injection timing
+  }, [currentUser?.id]); // Removed adsLoaded to prevent double-fetching
 
   // Cleanup continuous loading interval on unmount
   useEffect(() => {
@@ -1660,8 +1721,8 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, isPremium }: DiscoverPage
     const prevIndex = currentIndex;
     const prevMatch = currentMatch;
 
-    // CRITICAL: Add to local exclusion list immediately with 'pass' action
-    locallySwipedProfileIds.current.set(prevMatch.id, { action: 'pass', timestamp: Date.now() });
+    // CRITICAL: Add to local exclusion list immediately with 'like' action (permanent)
+    locallySwipedProfileIds.current.set(prevMatch.id, { action: 'like', timestamp: Date.now() });
     persistSwipedIds(); // ⭐ Persist to sessionStorage
 
     // Remove from cache to prevent re-showing
@@ -1891,8 +1952,8 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, isPremium }: DiscoverPage
     const prevIndex = currentIndex;
     const prevMatch = currentMatch;
 
-    // CRITICAL: Add to local exclusion list immediately with 'like' action (permanent)
-    locallySwipedProfileIds.current.set(prevMatch.id, { action: 'like', timestamp: Date.now() });
+    // CRITICAL: Add to local exclusion list immediately with 'pass' action (expires after 6 days)
+    locallySwipedProfileIds.current.set(prevMatch.id, { action: 'pass', timestamp: Date.now() });
     persistSwipedIds(); // ⭐ Persist to sessionStorage
 
     // Remove from cache to prevent re-showing
@@ -2075,6 +2136,24 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, isPremium }: DiscoverPage
     setPotentialMatches(prev => {
       const newMatches = prev.filter((_, i) => i !== currentIndex);
       const remainingProfiles = newMatches.length;
+      
+      // ⭐ Update saved profile order in localStorage (remove swiped profile)
+      try {
+        const today = new Date().toISOString().split('T')[0];
+        const savedOrderKey = `driplove_profile_order_${currentUser?.id}_${today}`;
+        const currentProfile = prev[currentIndex];
+        
+        if (currentProfile && 'id' in currentProfile) {
+          const savedOrder = localStorage.getItem(savedOrderKey);
+          if (savedOrder) {
+            const orderIds: string[] = JSON.parse(savedOrder);
+            const updatedOrder = orderIds.filter(id => id !== currentProfile.id);
+            localStorage.setItem(savedOrderKey, JSON.stringify(updatedOrder));
+          }
+        }
+      } catch (error) {
+        // Ignore localStorage errors
+      }
       
       // Check if we need to load more (do this in next tick to avoid setState during setState)
       setTimeout(() => {
