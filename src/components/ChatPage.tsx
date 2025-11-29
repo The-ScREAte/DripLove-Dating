@@ -1381,17 +1381,17 @@ const ChatPage = ({ currentUser, onUnreadChange, onDetailViewChange }: ChatPageP
   <div className="fixed inset-0 flex flex-col bg-gray-50">
         {/* Header (safe area respected via env padding) */}
         <div 
-          className="sticky top-0 z-30 bg-white text-gray-900 shadow-sm" 
+          className="sticky top-0 z-30 bg-white text-gray-900 shadow-sm border-b border-gray-100" 
           style={{ 
             paddingTop: Capacitor.getPlatform() === 'web' 
-              ? '60px' 
+              ? '64px' 
               : Capacitor.getPlatform() === 'ios' 
                 ? 'clamp(30px, calc(env(safe-area-inset-top, 30px) + 15px), 90px)' 
-                : '60px' 
+                : '64px' 
           }}
         >
-          <div className="px-2 pb-1 pt-2">
-            <h2 className="text-xl font-bold m-1 bg-gradient-to-r from-pink-500 to-purple-600 bg-clip-text text-transparent">
+          <div className="px-4 py-3">
+            <h2 className="text-xl font-bold bg-gradient-to-r from-pink-500 to-purple-600 bg-clip-text text-transparent">
               💧 DripChat
             </h2>
           </div>
@@ -1402,11 +1402,7 @@ const ChatPage = ({ currentUser, onUnreadChange, onDetailViewChange }: ChatPageP
           <div 
             className="px-4 py-3 border-b bg-white"
             style={{
-              marginTop: Capacitor.getPlatform() === 'web'
-                ? '8px'
-                : Capacitor.getPlatform() === 'ios'
-                  ? 'clamp(30px, calc(env(safe-area-inset-top, 30px) + 15px), 45px)'
-                  : '0px'
+              marginTop: '0px'
             }}
           >
             <h3 className="text-sm font-semibold text-gray-900 mb-3">{t('chat.newMatches')}</h3>
@@ -1449,11 +1445,7 @@ const ChatPage = ({ currentUser, onUnreadChange, onDetailViewChange }: ChatPageP
     className="flex-1 overflow-y-auto pb-35"
     style={{ 
       WebkitOverflowScrolling: 'touch',
-      paddingTop: newMatchList.length > 0 
-        ? '0px'
-        : Capacitor.getPlatform() === 'ios'
-          ? 'calc(0px + env(safe-area-inset-top))'
-          : '50px'
+      paddingTop: '0px'
     }}
     onTouchStart={handleTouchStart}
     onTouchMove={handleTouchMove}
