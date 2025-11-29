@@ -343,6 +343,7 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, isPremium }: DiscoverPage
   const [isLoading, setIsLoading] = useState(true);
   const [isLoadingMore, setIsLoadingMore] = useState(false);
   const [hasCompletedInitialFetch, setHasCompletedInitialFetch] = useState(false);
+  const [noMoreProfiles, setNoMoreProfiles] = useState(false); // Track when truly no more profiles available
   const [passedUsers, setPassedUsers] = useState<PassedUser[]>([]);
   const [showMoreInfo, setShowMoreInfo] = useState(false);
   const [showPremiumUpgrade, setShowPremiumUpgrade] = useState(false);
@@ -1016,6 +1017,7 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, isPremium }: DiscoverPage
     try {
       // Background loading - don't block UI
       setIsLoading(true);
+      setNoMoreProfiles(false); // Reset when fetching new profiles
 
       const result = await fetchPotentialMatchesData(currentUser.id);
       if (result) {
@@ -1592,6 +1594,7 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, isPremium }: DiscoverPage
       
       // If no new profiles found, we've exhausted the pool
       if (!newProfiles || newProfiles.length === 0) {
+        setNoMoreProfiles(true); // Mark that we've exhausted all available profiles
         return;
       }
 
@@ -1666,10 +1669,11 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, isPremium }: DiscoverPage
   useEffect(() => {
     const remaining = potentialMatches.length - currentIndex;
 
-    if (!isLoadingMore && remaining <= 5 && hasCompletedInitialFetch && remaining > 0) {
+    // Only load more if we haven't exhausted all profiles
+    if (!noMoreProfiles && !isLoadingMore && remaining <= 5 && hasCompletedInitialFetch && remaining > 0) {
       loadMoreMatches();
     }
-  }, [potentialMatches.length, currentIndex, isLoadingMore, hasCompletedInitialFetch, loadMoreMatches]);
+  }, [potentialMatches.length, currentIndex, isLoadingMore, hasCompletedInitialFetch, noMoreProfiles, loadMoreMatches]);
 
   // ⭐ CONTINUOUS IMAGE PRELOADER - Preload next 10 profiles as user swipes
   useEffect(() => {
@@ -2157,10 +2161,13 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, isPremium }: DiscoverPage
       
       // Check if we need to load more (do this in next tick to avoid setState during setState)
       setTimeout(() => {
-        if (remainingProfiles <= 5 && !isLoadingMore) {
-          loadMoreMatches();
-        } else if (remainingProfiles === 0 && !isLoadingMore) {
-          loadMoreMatches();
+        // Only load more if we haven't exhausted all profiles
+        if (!noMoreProfiles) {
+          if (remainingProfiles <= 5 && !isLoadingMore) {
+            loadMoreMatches();
+          } else if (remainingProfiles === 0 && !isLoadingMore) {
+            loadMoreMatches();
+          }
         }
       }, 0);
       
@@ -2358,8 +2365,8 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, isPremium }: DiscoverPage
     );
   }
 
-  // Show no profiles only if truly no profiles after initial fetch completes and not loading
-  if (potentialMatches.length === 0 && hasCompletedInitialFetch && !isLoading) {
+  // Show no profiles if we've exhausted all available profiles OR if initial fetch found none
+  if ((noMoreProfiles && potentialMatches.length === 0) || (potentialMatches.length === 0 && hasCompletedInitialFetch && !isLoading)) {
     return (
       <div className="min-h-screen w-full flex items-center justify-center" style={{ minHeight: 'calc(100vh - 152px)' }}>
         <Card className="max-w-md w-full mx-4">
@@ -2369,7 +2376,10 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, isPremium }: DiscoverPage
             <p className="text-gray-600 mb-4">
               {t('discover.noProfilesDescription')}
             </p>
-            <Button onClick={fetchPotentialMatches} className="w-full">
+            <Button onClick={() => {
+              setNoMoreProfiles(false); // Reset the state
+              fetchPotentialMatches();
+            }} className="w-full">
               {t('discover.refresh')}
             </Button>
           </CardContent>
