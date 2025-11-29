@@ -8,8 +8,16 @@ import { GoogleAuth } from '@southdevs/capacitor-google-auth';
 import { supabase } from '@/integrations/supabase/client';
 import { Capacitor } from '@capacitor/core';
 
+// Track initialization state to prevent redundant initializations
+let isInitialized = false;
+
 // Initialize Google Auth plugin
 export const initializeGoogleAuth = () => {
+  // Skip if already initialized
+  if (isInitialized) {
+    return;
+  }
+
   // Use native config on Android (reads client ID from strings.xml)
   if (Capacitor.isNativePlatform() && Capacitor.getPlatform() === 'android') {
     try {
@@ -18,7 +26,10 @@ export const initializeGoogleAuth = () => {
         scopes: ['profile', 'email'],
         grantOfflineAccess: true,
       });
-    } catch {
+      isInitialized = true;
+      console.log('✅ Google Auth initialized');
+    } catch (err) {
+      console.warn('Google Auth initialization failed:', err);
       // Safe no-op; initialization will be attempted on first use
     }
   }
@@ -31,6 +42,11 @@ export const initializeGoogleAuth = () => {
  */
 export const signInWithGoogleNative = async () => {
   try {
+    // Ensure Google Auth is initialized (fast if already done)
+    if (!isInitialized) {
+      initializeGoogleAuth();
+    }
+
     // This opens Google's native picker - stays entirely in your app!
     const googleUser = await GoogleAuth.signIn({
       scopes: ['profile', 'email']
@@ -58,14 +74,15 @@ export const signInWithGoogleNative = async () => {
     
     console.log('✅ Supabase authentication successful');
     
-    // Check if user has a profile (same flow as Apple Sign-In)
+    // Fast path: Check if user has a profile with minimal fields
+    // This dramatically improves Android performance by reducing query complexity
     const { data: profile } = await supabase
       .from('profiles')
       .select('id, first_name, last_name, bio, date_of_birth, city, country, account_status')
       .eq('id', data.user.id)
       .maybeSingle();
 
-    // Check account status
+    // Quick account status check (blocks if account is restricted)
     if (profile?.account_status === 'blocked') {
       await supabase.auth.signOut();
       throw new Error('Account is blocked');

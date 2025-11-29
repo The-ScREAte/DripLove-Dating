@@ -774,16 +774,33 @@ const MainApp = ({ user, onLogout }: MainAppProps) => {
     }
   }, [pushSupported, pushError]);
 
-  // Preload data as soon as app loads
+  // Preload data as soon as app loads - OPTIMIZED FOR ANDROID PERFORMANCE
   useEffect(() => {
     if (user?.id) {
-      // Load user's saved language preference
-      loadUserLanguage(user.id);
+      // Load user's saved language preference (non-blocking)
+      loadUserLanguage(user.id).catch(() => {});
       
-      // Start preloading all main page data immediately in background
-      preloadDiscoverData(user.id);
-      preloadChatMatches(user.id);
-      preloadLikedMeData(user.id);
+      // IMMEDIATE: Load only the currently active tab's data
+      if (activeTab === 'dripcheck') {
+        preloadDiscoverData(user.id);
+      } else if (activeTab === 'chat') {
+        preloadChatMatches(user.id);
+      } else if (activeTab === 'liked') {
+        preloadLikedMeData(user.id);
+      }
+      
+      // DEFERRED: Load other tabs in background after 1 second (prevents UI blocking)
+      setTimeout(() => {
+        if (activeTab !== 'dripcheck') {
+          preloadDiscoverData(user.id);
+        }
+        if (activeTab !== 'chat') {
+          preloadChatMatches(user.id);
+        }
+        if (activeTab !== 'liked') {
+          preloadLikedMeData(user.id);
+        }
+      }, 1000);
       
       // Set up periodic refresh every 60 seconds when not on respective tabs
       const interval = setInterval(() => {
@@ -800,7 +817,7 @@ const MainApp = ({ user, onLogout }: MainAppProps) => {
 
       return () => clearInterval(interval);
     }
-  }, [user?.id, activeTab]);
+  }, [user?.id]);
 
   // Refresh discover data when switching to dripcheck tab if cache is missing
   useEffect(() => {
@@ -808,7 +825,10 @@ const MainApp = ({ user, onLogout }: MainAppProps) => {
       // Check if discover cache exists
       const cache = typeof window !== 'undefined' && (window as any).discoverCache?.get(user.id);
       if (!cache) {
-        preloadDiscoverData(user.id);
+        // Defer to prevent blocking tab switch animation
+        requestAnimationFrame(() => {
+          preloadDiscoverData(user.id);
+        });
       }
     }
   }, [activeTab, user?.id]);

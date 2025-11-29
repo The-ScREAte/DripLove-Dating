@@ -36,3 +36,23 @@
 # Keep line numbers for debugging crashes
 -keepattributes SourceFile,LineNumberTable
 -renamesourcefileattribute SourceFile
+
+# Fix for R8 missing classes (Conscrypt - security provider)
+-dontwarn org.conscrypt.Conscrypt
+-dontwarn org.conscrypt.OpenSSLProvider
+
+# Keep OkHttp and related networking classes
+-keep class okhttp3.** { *; }
+-dontwarn okhttp3.**
+-dontwarn okio.**
+
+# Keep Retrofit and networking
+-keep class retrofit2.** { *; }
+-dontwarn retrofit2.**
+
+# Keep Gson for JSON parsing
+-keep class com.google.gson.** { *; }
+-dontwarn com.google.gson.**
+
+# Keep annotation classes
+-keep class * extends java.lang.annotation.Annotation { *; }

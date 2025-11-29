@@ -54,6 +54,23 @@ const AuthForm = ({ isLogin, onToggle, onOAuthSuccess, onBack }: AuthFormProps) 
     };
   }, []);
 
+  // Preload Google Auth on Android for instant sign-in
+  useEffect(() => {
+    if (isNative && platform === 'android') {
+      import('@/utils/googleNativeAuth').then(({ initializeGoogleAuth }) => {
+        // Initialize Google Auth silently in background
+        setTimeout(() => {
+          try {
+            initializeGoogleAuth();
+            console.log('✅ Google Auth preloaded in AuthForm');
+          } catch (err) {
+            console.warn('Google Auth preload failed (non-critical):', err);
+          }
+        }, 300); // Delay 300ms to avoid blocking initial render
+      }).catch(() => {});
+    }
+  }, [isNative, platform]);
+
   const validateForm = () => {
     const newErrors: {[key: string]: string} = {};
     
@@ -280,17 +297,19 @@ const AuthForm = ({ isLogin, onToggle, onOAuthSuccess, onBack }: AuthFormProps) 
 
             const result = await signInWithGoogleNative();
 
-            // Save current language to user's profile
-            if (result?.user?.id) {
-              await saveLanguageToProfile(result.user.id);
-            }
-
-            // Navigate based on profile completion
+            // Navigate FIRST for instant feedback (much faster on Android)
             setOauthLoading(null);
             if (result.needsProfileCompletion) {
               navigate('/complete-profile');
             } else {
               navigate('/');
+            }
+
+            // Save language in background (non-blocking)
+            if (result?.user?.id) {
+              saveLanguageToProfile(result.user.id).catch(err => 
+                console.warn('Language save failed (non-critical):', err)
+              );
             }
             return;
             

@@ -40,7 +40,22 @@ const WelcomeScreen: React.FC<WelcomeScreenProps> = ({ onLogin, onAbout, onTerms
     }).catch((error) => {
       console.error('Video preload failed, using direct URL:', error);
     });
-  }, []);
+
+    // Preload Google Auth on Android in background for instant sign-in
+    if (isNative && platform === 'android') {
+      import('@/utils/googleNativeAuth').then(({ initializeGoogleAuth }) => {
+        // Initialize Google Auth silently in background
+        setTimeout(() => {
+          try {
+            initializeGoogleAuth();
+            console.log('✅ Google Auth preloaded');
+          } catch (err) {
+            console.warn('Google Auth preload failed (non-critical):', err);
+          }
+        }, 500); // Delay 500ms to avoid blocking initial render
+      }).catch(() => {});
+    }
+  }, [isNative, platform]);
 
   // Cleanup Safari View Controller listeners on unmount
   React.useEffect(() => {
