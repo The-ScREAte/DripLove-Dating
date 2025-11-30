@@ -89,7 +89,8 @@ const MessageBubble: React.FC<MessageBubbleProps> = ({
   };
   
   const handleTouchEnd = () => {
-    if (swipeOffset > 80 && onReply) {
+    const threshold = window.innerWidth * 0.3; // 30% of screen width
+    if (swipeOffset > threshold && onReply) {
       onReply(message);
     }
     setSwipeOffset(0);
@@ -123,7 +124,8 @@ const MessageBubble: React.FC<MessageBubbleProps> = ({
   };
   
   const handleMouseUp = () => {
-    if (swipeOffset > 80 && onReply) {
+    const threshold = window.innerWidth * 0.3; // 30% of screen width
+    if (swipeOffset > threshold && onReply) {
       onReply(message);
     }
     setSwipeOffset(0);
@@ -242,9 +244,9 @@ const MessageBubble: React.FC<MessageBubbleProps> = ({
         </div>
         
         {/* Swipe hint icon */}
-        {swipeOffset > 20 && (
+        {swipeOffset > window.innerWidth * 0.15 && (
           <div className={`flex items-center justify-center w-8 ${isOwnMessage ? 'order-first mr-2' : 'order-last ml-2'}`}>
-            <span className="text-2xl animate-pulse">↩️</span>
+            <span className={`text-2xl ${swipeOffset > window.innerWidth * 0.3 ? 'animate-pulse scale-125' : ''} transition-transform`}>↩️</span>
           </div>
         )}
       </div>
