@@ -28,7 +28,7 @@ const MessageInput: React.FC<MessageInputProps> = ({
   const { t } = useTranslation();
   const inputRef = useRef<HTMLInputElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
-  const [keyboardOffset, setKeyboardOffset] = useState(0);
+  const platform = Capacitor.getPlatform();
 
   const handleKeyPress = (e: React.KeyboardEvent) => {
     if (e.key === 'Enter' && !e.shiftKey) {
@@ -41,66 +41,14 @@ const MessageInput: React.FC<MessageInputProps> = ({
     }
   };
 
-  React.useEffect(() => {
-    const viewport = (window as any).visualViewport;
-    const isMobile = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
-    
-    // Only apply keyboard adjustments on mobile devices
-    if (!isMobile) {
-      return;
-    }
-
-    if (viewport) {
-      const handleResize = () => {
-        // Calculate exact keyboard height from viewport change
-        const viewportHeight = viewport.height;
-        const windowHeight = window.innerHeight;
-        const keyboardHeight = Math.max(0, windowHeight - viewportHeight);
-        setKeyboardOffset(keyboardHeight);
-      };
-
-      const handleScroll = () => {
-        // Account for viewport scroll offset (iOS Safari)
-        const viewportHeight = viewport.height + (viewport.offsetTop || 0);
-        const windowHeight = window.innerHeight;
-        const keyboardHeight = Math.max(0, windowHeight - viewportHeight);
-        setKeyboardOffset(keyboardHeight);
-      };
-
-      viewport.addEventListener('resize', handleResize);
-      viewport.addEventListener('scroll', handleScroll);
-      
-      // Initial measurement
-      handleResize();
-
-      return () => {
-        viewport.removeEventListener('resize', handleResize);
-        viewport.removeEventListener('scroll', handleScroll);
-      };
-    }
-  }, []);
-
-  const platform = Capacitor.getPlatform();
-  const isMobile = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
-  
-  // Use safe area padding only when keyboard is NOT visible
-  const paddingBottomValue = keyboardOffset === 0 
-    ? (platform === 'android' ? '24px' : `calc(env(safe-area-inset-bottom, 0px) + 8px)`)
-    : '0px';
-
   return (
     <div 
       ref={containerRef}
       className="border-t bg-white z-30"
       style={{
-        position: isMobile ? 'fixed' : 'relative',
-        bottom: isMobile ? '0' : 'auto',
-        left: isMobile ? '0' : 'auto',
-        right: isMobile ? '0' : 'auto',
-        width: isMobile ? '100%' : 'auto',
-        paddingBottom: paddingBottomValue,
-        transform: keyboardOffset > 0 ? `translateY(-${keyboardOffset}px)` : 'translateY(0px)',
-        transition: 'transform 0.2s ease-out, padding-bottom 0.2s ease-out'
+        paddingBottom: platform === 'android'
+          ? '24px'
+          : `calc(env(safe-area-inset-bottom, 0px) + 8px)`
       }}
     >
       {/* Reply preview */}
