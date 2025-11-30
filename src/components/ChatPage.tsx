@@ -311,8 +311,16 @@ const ChatPage = ({ currentUser, onUnreadChange, onDetailViewChange }: ChatPageP
     scrollToBottom();
   }, [messages]);
 
-  // Keyboard handling for all platforms
+  // Keyboard handling - only on mobile devices
   useEffect(() => {
+    const isMobile = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
+    
+    // Desktop: no keyboard adjustments needed
+    if (!isMobile) {
+      setKeyboardHeight(0);
+      return;
+    }
+
     const viewport = (window as any).visualViewport;
     
     const handleKeyboardChange = () => {
@@ -327,36 +335,53 @@ const ChatPage = ({ currentUser, onUnreadChange, onDetailViewChange }: ChatPageP
       }
     };
 
-    const handleResize = () => {
-      // Fallback for devices without visualViewport
-      const currentHeight = window.innerHeight;
-      const heightDiff = window.screen.height - currentHeight;
-      
-      // Estimate keyboard height
-      if (heightDiff > 200) {
-        setKeyboardHeight(heightDiff - 100);
-        setTimeout(() => scrollToBottom(), 100);
-      } else {
-        setKeyboardHeight(0);
-      }
-    };
-
     if (viewport) {
       viewport.addEventListener('resize', handleKeyboardChange);
       viewport.addEventListener('scroll', handleKeyboardChange);
       handleKeyboardChange(); // Initial check
-    } else {
-      window.addEventListener('resize', handleResize);
     }
 
     return () => {
       if (viewport) {
         viewport.removeEventListener('resize', handleKeyboardChange);
         viewport.removeEventListener('scroll', handleKeyboardChange);
-      } else {
-        window.removeEventListener('resize', handleResize);
       }
       setKeyboardHeight(0);
+    };
+  }, [selectedMatch]);
+
+  // Dismiss keyboard on scroll (like iMessages) - mobile only
+  useEffect(() => {
+    const isMobile = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
+    if (!isMobile || !messagesContainerRef.current) return;
+
+    let lastScrollTop = 0;
+    let scrollTimeout: NodeJS.Timeout;
+
+    const handleScroll = (e: Event) => {
+      const target = e.target as HTMLElement;
+      const currentScrollTop = target.scrollTop;
+
+      // Only dismiss keyboard when scrolling up (like iMessages)
+      if (currentScrollTop < lastScrollTop) {
+        clearTimeout(scrollTimeout);
+        scrollTimeout = setTimeout(() => {
+          const activeElement = document.activeElement as HTMLElement;
+          if (activeElement && (activeElement.tagName === 'INPUT' || activeElement.tagName === 'TEXTAREA')) {
+            activeElement.blur();
+          }
+        }, 50);
+      }
+
+      lastScrollTop = currentScrollTop;
+    };
+
+    const container = messagesContainerRef.current;
+    container.addEventListener('scroll', handleScroll);
+
+    return () => {
+      container.removeEventListener('scroll', handleScroll);
+      clearTimeout(scrollTimeout);
     };
   }, [selectedMatch]);
 
