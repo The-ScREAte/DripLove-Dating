@@ -74,7 +74,6 @@ const ChatPage = ({ currentUser, onUnreadChange, onDetailViewChange }: ChatPageP
   const [pullDistance, setPullDistance] = useState(0);
   const [startY, setStartY] = useState(0);
   const matchesNeedsRefreshRef = useRef(false);
-  const [keyboardHeight, setKeyboardHeight] = useState(0);
   
   // Swipe gesture state for back navigation
   const [swipeStartX, setSwipeStartX] = useState(0);
@@ -310,45 +309,6 @@ const ChatPage = ({ currentUser, onUnreadChange, onDetailViewChange }: ChatPageP
   useEffect(() => {
     scrollToBottom();
   }, [messages]);
-
-  // Keyboard handling - only on mobile devices
-  useEffect(() => {
-    const isMobile = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
-    
-    // Desktop: no keyboard adjustments needed
-    if (!isMobile) {
-      setKeyboardHeight(0);
-      return;
-    }
-
-    const viewport = (window as any).visualViewport;
-    
-    const handleKeyboardChange = () => {
-      if (viewport) {
-        const currentKeyboardHeight = window.innerHeight - viewport.height;
-        setKeyboardHeight(currentKeyboardHeight > 100 ? currentKeyboardHeight : 0);
-        
-        // Scroll to bottom when keyboard appears
-        if (currentKeyboardHeight > 100) {
-          setTimeout(() => scrollToBottom(), 100);
-        }
-      }
-    };
-
-    if (viewport) {
-      viewport.addEventListener('resize', handleKeyboardChange);
-      viewport.addEventListener('scroll', handleKeyboardChange);
-      handleKeyboardChange(); // Initial check
-    }
-
-    return () => {
-      if (viewport) {
-        viewport.removeEventListener('resize', handleKeyboardChange);
-        viewport.removeEventListener('scroll', handleKeyboardChange);
-      }
-      setKeyboardHeight(0);
-    };
-  }, [selectedMatch]);
 
   // Dismiss keyboard on scroll (like iMessages) - mobile only
   useEffect(() => {
@@ -1331,16 +1291,6 @@ const ChatPage = ({ currentUser, onUnreadChange, onDetailViewChange }: ChatPageP
   const scrollToBottom = () => {
     if (messagesEndRef.current) {
       messagesEndRef.current.scrollIntoView({ behavior: 'smooth', block: 'end' });
-      
-      // Extra scroll on mobile to ensure visibility above keyboard
-      if (keyboardHeight > 0 && messagesContainerRef.current) {
-        setTimeout(() => {
-          messagesContainerRef.current?.scrollTo({
-            top: messagesContainerRef.current.scrollHeight,
-            behavior: 'smooth'
-          });
-        }, 100);
-      }
     }
   };
 
@@ -1733,8 +1683,10 @@ const ChatPage = ({ currentUser, onUnreadChange, onDetailViewChange }: ChatPageP
             : Capacitor.getPlatform() === 'web'
               ? '120px'
               : '120px',
-          paddingBottom: keyboardHeight > 0 ? `${keyboardHeight + 20}px` : '20px',
-          marginBottom: keyboardHeight > 0 ? `-${keyboardHeight}px` : '0px'
+          // Always account for input area (100px) + keyboard height when visible
+          paddingBottom: Capacitor.getPlatform() === 'web' 
+            ? '20px'
+            : '120px'
         }}
         onTouchStart={handleSwipeStart}
         onTouchMove={handleSwipeMove}
