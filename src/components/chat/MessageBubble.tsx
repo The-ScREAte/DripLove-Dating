@@ -34,6 +34,7 @@ const MessageBubble: React.FC<MessageBubbleProps> = ({
   const [touchStart, setTouchStart] = useState({ x: 0, y: 0 });
   const [swipeOffset, setSwipeOffset] = useState(0);
   const [isSwiping, setIsSwiping] = useState(false);
+  const [isMouseDown, setIsMouseDown] = useState(false);
   
   // Check if message is deleted for current user
   const isDeletedForMe = message.deleted_for && message.deleted_for.includes(currentUser.id);
@@ -63,7 +64,7 @@ const MessageBubble: React.FC<MessageBubbleProps> = ({
     }
   };
   
-  // Swipe gesture handlers
+  // Swipe gesture handlers for touch
   const handleTouchStart = (e: React.TouchEvent) => {
     setTouchStart({ x: e.touches[0].clientX, y: e.touches[0].clientY });
     setIsSwiping(true);
@@ -93,6 +94,50 @@ const MessageBubble: React.FC<MessageBubbleProps> = ({
     }
     setSwipeOffset(0);
     setIsSwiping(false);
+  };
+  
+  // Mouse gesture handlers for desktop
+  const handleMouseDown = (e: React.MouseEvent) => {
+    e.preventDefault();
+    setTouchStart({ x: e.clientX, y: e.clientY });
+    setIsMouseDown(true);
+    setIsSwiping(true);
+  };
+  
+  const handleMouseMove = (e: React.MouseEvent) => {
+    if (!isSwiping || !isMouseDown) return;
+    
+    const mouseX = e.clientX;
+    const mouseY = e.clientY;
+    const deltaX = mouseX - touchStart.x;
+    const deltaY = mouseY - touchStart.y;
+    
+    // Only trigger swipe if horizontal movement is dominant
+    if (Math.abs(deltaX) > Math.abs(deltaY)) {
+      // Own messages: swipe left to reply
+      // Other's messages: swipe right to reply
+      if ((isOwnMessage && deltaX < 0) || (!isOwnMessage && deltaX > 0)) {
+        setSwipeOffset(Math.abs(deltaX));
+      }
+    }
+  };
+  
+  const handleMouseUp = () => {
+    if (swipeOffset > 80 && onReply) {
+      onReply(message);
+    }
+    setSwipeOffset(0);
+    setIsSwiping(false);
+    setIsMouseDown(false);
+  };
+  
+  const handleMouseLeave = () => {
+    // Reset if mouse leaves the bubble while dragging
+    if (isMouseDown) {
+      setSwipeOffset(0);
+      setIsSwiping(false);
+      setIsMouseDown(false);
+    }
   };
   
   // Render system message (dormancy check)
@@ -132,9 +177,14 @@ const MessageBubble: React.FC<MessageBubbleProps> = ({
         onTouchStart={handleTouchStart}
         onTouchMove={handleTouchMove}
         onTouchEnd={handleTouchEnd}
+        onMouseDown={handleMouseDown}
+        onMouseMove={handleMouseMove}
+        onMouseUp={handleMouseUp}
+        onMouseLeave={handleMouseLeave}
         style={{
           transform: swipeOffset > 0 ? `translateX(${isOwnMessage ? -swipeOffset * 0.3 : swipeOffset * 0.3}px)` : 'none',
-          transition: isSwiping ? 'none' : 'transform 0.2s ease-out'
+          transition: isSwiping ? 'none' : 'transform 0.2s ease-out',
+          cursor: isMouseDown ? 'grabbing' : 'grab'
         }}
       >
         <div
