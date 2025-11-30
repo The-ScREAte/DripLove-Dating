@@ -1403,11 +1403,17 @@ const ChatPage = ({ currentUser, onUnreadChange, onDetailViewChange }: ChatPageP
             paddingTop: Capacitor.getPlatform() === 'web' 
               ? '64px' 
               : Capacitor.getPlatform() === 'ios' 
-                ? 'env(safe-area-inset-top, 0px)' 
+                ? '44px' 
                 : '64px' 
           }}
         >
-          <div className="px-4 py-3">
+          <div 
+            className="px-4"
+            style={{
+              paddingTop: Capacitor.getPlatform() === 'ios' ? '4px' : '12px',
+              paddingBottom: Capacitor.getPlatform() === 'ios' ? '6px' : '12px'
+            }}
+          >
             <h2 className="text-xl font-bold bg-gradient-to-r from-pink-500 to-purple-600 bg-clip-text text-transparent">
               💧 DripChat
             </h2>
@@ -1419,7 +1425,7 @@ const ChatPage = ({ currentUser, onUnreadChange, onDetailViewChange }: ChatPageP
           <div 
             className="px-4 py-3 border-b bg-white"
             style={{
-              marginTop: '0px'
+              marginTop: Capacitor.getPlatform() === 'android' ? '0px' : '54px'
             }}
           >
             <h3 className="text-sm font-semibold text-gray-900 mb-3">{t('chat.newMatches')}</h3>
@@ -1462,7 +1468,7 @@ const ChatPage = ({ currentUser, onUnreadChange, onDetailViewChange }: ChatPageP
     className="flex-1 overflow-y-auto pb-35"
     style={{ 
       WebkitOverflowScrolling: 'touch',
-      paddingTop: '0px'
+      paddingTop: Capacitor.getPlatform() === 'android' ? '0px' : (newMatchList.length > 0 ? '0px' : '54px')
     }}
     onTouchStart={handleTouchStart}
     onTouchMove={handleTouchMove}
