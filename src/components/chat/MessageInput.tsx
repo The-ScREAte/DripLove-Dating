@@ -52,15 +52,19 @@ const MessageInput: React.FC<MessageInputProps> = ({
 
     if (viewport) {
       const handleResize = () => {
-        // Calculate keyboard height from viewport change
-        const keyboardHeight = window.innerHeight - viewport.height;
-        setKeyboardOffset(keyboardHeight > 0 ? keyboardHeight : 0);
+        // Calculate exact keyboard height from viewport change
+        const viewportHeight = viewport.height;
+        const windowHeight = window.innerHeight;
+        const keyboardHeight = Math.max(0, windowHeight - viewportHeight);
+        setKeyboardOffset(keyboardHeight);
       };
 
       const handleScroll = () => {
         // Account for viewport scroll offset (iOS Safari)
-        const keyboardHeight = window.innerHeight - viewport.height - (viewport.offsetTop || 0);
-        setKeyboardOffset(keyboardHeight > 0 ? keyboardHeight : 0);
+        const viewportHeight = viewport.height + (viewport.offsetTop || 0);
+        const windowHeight = window.innerHeight;
+        const keyboardHeight = Math.max(0, windowHeight - viewportHeight);
+        setKeyboardOffset(keyboardHeight);
       };
 
       viewport.addEventListener('resize', handleResize);
@@ -77,18 +81,26 @@ const MessageInput: React.FC<MessageInputProps> = ({
   }, []);
 
   const platform = Capacitor.getPlatform();
-  const paddingBottomValue = platform === 'android' 
-    ? '24px' 
-    : `calc(env(safe-area-inset-bottom, 0px) + 0px)`;
+  const isMobile = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
+  
+  // Use safe area padding only when keyboard is NOT visible
+  const paddingBottomValue = keyboardOffset === 0 
+    ? (platform === 'android' ? '24px' : `calc(env(safe-area-inset-bottom, 0px) + 8px)`)
+    : '0px';
 
   return (
     <div 
       ref={containerRef}
-      className="border-t bg-white relative z-30"
+      className="border-t bg-white z-30"
       style={{
+        position: isMobile ? 'fixed' : 'relative',
+        bottom: isMobile ? '0' : 'auto',
+        left: isMobile ? '0' : 'auto',
+        right: isMobile ? '0' : 'auto',
+        width: isMobile ? '100%' : 'auto',
         paddingBottom: paddingBottomValue,
         transform: keyboardOffset > 0 ? `translateY(-${keyboardOffset}px)` : 'translateY(0px)',
-        transition: 'transform 0.3s ease-out'
+        transition: 'transform 0.2s ease-out, padding-bottom 0.2s ease-out'
       }}
     >
       {/* Reply preview */}
