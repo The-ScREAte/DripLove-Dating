@@ -75,6 +75,7 @@ export interface ChatMessage {
   is_read: boolean;
   match_id?: string;
   deleted_for?: string[]; // Array of user IDs who deleted this message
+  reply_to?: string | null; // ID of the message this is replying to
   sender?: {
     first_name: string;
     last_name: string;

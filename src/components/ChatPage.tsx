@@ -83,6 +83,9 @@ const ChatPage = ({ currentUser, onUnreadChange, onDetailViewChange }: ChatPageP
   // Rating dialog state
   const [messagesSentCount, setMessagesSentCount] = useState(0);
   const [showRatingDialog, setShowRatingDialog] = useState(false);
+  
+  // Reply state
+  const [replyingTo, setReplyingTo] = useState<ChatMessage | null>(null);
 
   useEffect(() => {
     if (!currentUser || !currentUser.id) return;
@@ -909,13 +912,17 @@ const ChatPage = ({ currentUser, onUnreadChange, onDetailViewChange }: ChatPageP
         .insert({
           match_id: selectedMatch.id,
           sender_id: currentUser.id,
-          message: messageText
+          message: messageText,
+          reply_to: replyingTo?.id || null
         })
         .select(`
           *,
           sender:profiles!chats_sender_id_fkey(first_name, last_name)
         `)
         .single();
+      
+      // Clear reply state after sending
+      setReplyingTo(null);
 
       if (error) {
         throw error;
@@ -1670,6 +1677,11 @@ const ChatPage = ({ currentUser, onUnreadChange, onDetailViewChange }: ChatPageP
                 new Date(message.created_at || message.sent_at || '').getTime() -
                 new Date(prevMessage.created_at || prevMessage.sent_at || '').getTime() < 300000;
 
+              // Find the replied-to message if this message is a reply
+              const repliedMessage = message.reply_to 
+                ? messages.find(m => m.id === message.reply_to)
+                : null;
+
               return (
                 <MessageBubble
                   key={message.id}
@@ -1679,6 +1691,8 @@ const ChatPage = ({ currentUser, onUnreadChange, onDetailViewChange }: ChatPageP
                   onDeleteForMe={deleteMessageForMe}
                   onDeleteForEveryone={deleteMessageForEveryone}
                   onDormancyResponse={handleDormancyResponse}
+                  onReply={setReplyingTo}
+                  repliedMessage={repliedMessage}
                 />
               );
             })}
@@ -1694,6 +1708,8 @@ const ChatPage = ({ currentUser, onUnreadChange, onDetailViewChange }: ChatPageP
           onMessageChange={setNewMessage}
           onSendMessage={sendMessage}
           disabled={isSending}
+          replyingTo={replyingTo}
+          onCancelReply={() => setReplyingTo(null)}
         />
       </div>
 

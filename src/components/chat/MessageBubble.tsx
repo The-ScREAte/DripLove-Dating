@@ -10,6 +10,8 @@ interface MessageBubbleProps {
   onDeleteForMe?: (messageId: string) => void;
   onDeleteForEveryone?: (messageId: string) => void;
   onDormancyResponse?: (response: boolean) => void;
+  onReply?: (message: ChatMessage) => void;
+  repliedMessage?: ChatMessage | null;
 }
 
 const MessageBubble: React.FC<MessageBubbleProps> = ({
@@ -18,13 +20,20 @@ const MessageBubble: React.FC<MessageBubbleProps> = ({
   isConsecutive,
   onDeleteForMe,
   onDeleteForEveryone,
-  onDormancyResponse
+  onDormancyResponse,
+  onReply,
+  repliedMessage
 }) => {
   const isOwnMessage = message.sender_id === currentUser.id;
   const isSystemMessage = message.sender_id === '00000000-0000-0000-0000-000000000000';
   const [showConfirm, setShowConfirm] = useState(false);
   const [deleteType, setDeleteType] = useState<'me' | 'everyone'>('me');
   const [hasResponded, setHasResponded] = useState(false);
+  
+  // Swipe gesture state
+  const [touchStart, setTouchStart] = useState({ x: 0, y: 0 });
+  const [swipeOffset, setSwipeOffset] = useState(0);
+  const [isSwiping, setIsSwiping] = useState(false);
   
   // Check if message is deleted for current user
   const isDeletedForMe = message.deleted_for && message.deleted_for.includes(currentUser.id);
@@ -52,6 +61,38 @@ const MessageBubble: React.FC<MessageBubbleProps> = ({
       onDormancyResponse(response);
       setHasResponded(true);
     }
+  };
+  
+  // Swipe gesture handlers
+  const handleTouchStart = (e: React.TouchEvent) => {
+    setTouchStart({ x: e.touches[0].clientX, y: e.touches[0].clientY });
+    setIsSwiping(true);
+  };
+  
+  const handleTouchMove = (e: React.TouchEvent) => {
+    if (!isSwiping) return;
+    
+    const touchX = e.touches[0].clientX;
+    const touchY = e.touches[0].clientY;
+    const deltaX = touchX - touchStart.x;
+    const deltaY = touchY - touchStart.y;
+    
+    // Only trigger swipe if horizontal movement is dominant
+    if (Math.abs(deltaX) > Math.abs(deltaY)) {
+      // Own messages: swipe left to reply
+      // Other's messages: swipe right to reply
+      if ((isOwnMessage && deltaX < 0) || (!isOwnMessage && deltaX > 0)) {
+        setSwipeOffset(Math.abs(deltaX));
+      }
+    }
+  };
+  
+  const handleTouchEnd = () => {
+    if (swipeOffset > 80 && onReply) {
+      onReply(message);
+    }
+    setSwipeOffset(0);
+    setIsSwiping(false);
   };
   
   // Render system message (dormancy check)
@@ -86,7 +127,16 @@ const MessageBubble: React.FC<MessageBubbleProps> = ({
   
   return (
     <>
-      <div className={`flex ${isOwnMessage ? 'justify-end' : 'justify-start'} ${isConsecutive ? 'mt-1' : 'mt-4'}`}>
+      <div 
+        className={`flex ${isOwnMessage ? 'justify-end' : 'justify-start'} ${isConsecutive ? 'mt-1' : 'mt-4'}`}
+        onTouchStart={handleTouchStart}
+        onTouchMove={handleTouchMove}
+        onTouchEnd={handleTouchEnd}
+        style={{
+          transform: swipeOffset > 0 ? `translateX(${isOwnMessage ? -swipeOffset * 0.3 : swipeOffset * 0.3}px)` : 'none',
+          transition: isSwiping ? 'none' : 'transform 0.2s ease-out'
+        }}
+      >
         <div
           className={`relative max-w-xs lg:max-w-md px-4 py-2 rounded-lg ${
             isOwnMessage
@@ -94,6 +144,23 @@ const MessageBubble: React.FC<MessageBubbleProps> = ({
               : 'bg-gray-200 text-gray-900'
           } ${isConsecutive ? '' : 'shadow-sm'}`}
         >
+          {/* Reply thread indicator */}
+          {repliedMessage && (
+            <div className={`mb-2 pb-2 border-b ${isOwnMessage ? 'border-primary-foreground/20' : 'border-gray-400/20'}`}>
+              <div className="flex items-start space-x-1">
+                <div className={`w-1 h-full rounded-full ${isOwnMessage ? 'bg-primary-foreground/40' : 'bg-primary/40'}`}></div>
+                <div className="flex-1 min-w-0">
+                  <p className={`text-xs font-semibold ${isOwnMessage ? 'text-primary-foreground/80' : 'text-gray-600'}`}>
+                    {repliedMessage.sender_id === currentUser.id ? 'You' : repliedMessage.sender?.first_name}
+                  </p>
+                  <p className={`text-xs truncate ${isOwnMessage ? 'text-primary-foreground/70' : 'text-gray-500'}`}>
+                    {repliedMessage.message}
+                  </p>
+                </div>
+              </div>
+            </div>
+          )}
+          
           {/* Three-dot menu in top corner inside bubble */}
           {!isSystemMessage && (
             <div className={`absolute -top-1 ${isOwnMessage ? 'right-1' : 'left-1'}`}>
@@ -122,6 +189,13 @@ const MessageBubble: React.FC<MessageBubbleProps> = ({
             )}
           </div>
         </div>
+        
+        {/* Swipe hint icon */}
+        {swipeOffset > 20 && (
+          <div className={`flex items-center justify-center w-8 ${isOwnMessage ? 'order-first mr-2' : 'order-last ml-2'}`}>
+            <span className="text-2xl animate-pulse">↩️</span>
+          </div>
+        )}
       </div>
 
       <DeleteConfirmDialog
