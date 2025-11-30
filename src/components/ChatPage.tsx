@@ -1403,7 +1403,7 @@ const ChatPage = ({ currentUser, onUnreadChange, onDetailViewChange }: ChatPageP
             paddingTop: Capacitor.getPlatform() === 'web' 
               ? '64px' 
               : Capacitor.getPlatform() === 'ios' 
-                ? 'clamp(30px, calc(env(safe-area-inset-top, 30px) + 15px), 90px)' 
+                ? 'env(safe-area-inset-top, 0px)' 
                 : '64px' 
           }}
         >
