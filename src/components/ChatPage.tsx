@@ -16,8 +16,10 @@ import MessageInput from './chat/MessageInput';
 import ChatHeader from './chat/ChatHeader';
 import ChatUserAvatar from './ChatUserAvatar';
 import MatchExpirationAvatar from './chat/MatchExpirationAvatar';
+import RatingDialog from './RatingDialog';
 import { CurrentUser, ChatMatch, ChatMessage } from '@/types';
 import { useTranslation } from 'react-i18next';
+import { getRatingData } from '@/utils/ratingStorage';
 
 interface ChatPageProps {
   currentUser: CurrentUser;
@@ -77,6 +79,10 @@ const ChatPage = ({ currentUser, onUnreadChange, onDetailViewChange }: ChatPageP
   const [swipeStartX, setSwipeStartX] = useState(0);
   const [swipeStartY, setSwipeStartY] = useState(0);
   const [isSwiping, setIsSwiping] = useState(false);
+  
+  // Rating dialog state
+  const [messagesSentCount, setMessagesSentCount] = useState(0);
+  const [showRatingDialog, setShowRatingDialog] = useState(false);
 
   useEffect(() => {
     if (!currentUser || !currentUser.id) return;
@@ -884,6 +890,17 @@ const ChatPage = ({ currentUser, onUnreadChange, onDetailViewChange }: ChatPageP
 
     // Clear input immediately
     setNewMessage('');
+
+    // Track messages sent and show rating dialog after 7 messages
+    const newCount = messagesSentCount + 1;
+    setMessagesSentCount(newCount);
+    
+    if (newCount === 7) {
+      const ratingData = getRatingData();
+      if (!ratingData.hasRated) {
+        setShowRatingDialog(true);
+      }
+    }
 
     try {
       // Send the message to server
@@ -1709,6 +1726,11 @@ const ChatPage = ({ currentUser, onUnreadChange, onDetailViewChange }: ChatPageP
         onClose={() => setIsDeleteDialogOpen(false)}
         onConfirm={handleDeleteChatConfirm}
         matchName={selectedMatch ? `${selectedMatch.first_name} ${selectedMatch.last_name}` : ''}
+      />
+
+      <RatingDialog 
+        forceShow={showRatingDialog}
+        onRatingComplete={() => setShowRatingDialog(false)}
       />
     </div>
   );
