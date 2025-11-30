@@ -1,17 +1,19 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { MoreVertical, Trash2 } from 'lucide-react';
+import { MoreVertical, Trash2, Reply } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 
 interface MessageOptionsMenuProps {
   isOwnMessage: boolean;
   onDeleteForMe: () => void;
   onDeleteForEveryone: () => void;
+  onReply?: () => void;
 }
 
 const MessageOptionsMenu: React.FC<MessageOptionsMenuProps> = ({
   isOwnMessage,
   onDeleteForMe,
   onDeleteForEveryone,
+  onReply,
 }) => {
   const { t } = useTranslation();
   const [isOpen, setIsOpen] = useState(false);
@@ -64,6 +66,13 @@ const MessageOptionsMenu: React.FC<MessageOptionsMenuProps> = ({
     onDeleteForEveryone();
     setIsOpen(false);
   };
+  
+  const handleReply = () => {
+    if (onReply) {
+      onReply();
+    }
+    setIsOpen(false);
+  };
 
   return (
     <div className="relative inline-block" ref={menuRef}>
@@ -82,6 +91,16 @@ const MessageOptionsMenu: React.FC<MessageOptionsMenuProps> = ({
             isOwnMessage ? 'right-0' : 'left-0'
           } bg-white rounded-lg shadow-lg border border-gray-200 py-0.5 z-50 w-32 text-sm`}
         >
+          {onReply && (
+            <button
+              onClick={handleReply}
+              className="w-full px-2.5 py-1.5 text-left text-gray-700 hover:bg-gray-50 flex items-center gap-1.5 transition-colors text-xs"
+            >
+              <Reply className="w-3 h-3" />
+              {t('chat.reply')}
+            </button>
+          )}
+          
           <button
             onClick={handleDeleteForMe}
             className="w-full px-2.5 py-1.5 text-left text-gray-700 hover:bg-gray-50 flex items-center gap-1.5 transition-colors text-xs"

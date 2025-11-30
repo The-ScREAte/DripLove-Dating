@@ -405,6 +405,7 @@
     "failedToDeleteChat": "Failed to delete chat. Please try again.",
     "deleteForMe": "Delete for me",
     "deleteForEveryone": "Delete for everyone",
+    "reply": "Reply",
     "activeOnDripLove": "Active on DripLove",
     "inappropriateLanguage": "Your message contains inappropriate language. Please remove it.",
     "addEmoji": "Add emoji",

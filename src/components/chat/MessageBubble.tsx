@@ -168,6 +168,7 @@ const MessageBubble: React.FC<MessageBubbleProps> = ({
                 isOwnMessage={isOwnMessage}
                 onDeleteForMe={handleDeleteForMe}
                 onDeleteForEveryone={handleDeleteForEveryone}
+                onReply={onReply ? () => onReply(message) : undefined}
               />
             </div>
           )}
