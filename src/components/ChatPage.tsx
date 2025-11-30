@@ -1683,10 +1683,7 @@ const ChatPage = ({ currentUser, onUnreadChange, onDetailViewChange }: ChatPageP
             : Capacitor.getPlatform() === 'web'
               ? '120px'
               : '120px',
-          // Always account for input area (100px) + keyboard height when visible
-          paddingBottom: Capacitor.getPlatform() === 'web' 
-            ? '20px'
-            : '120px'
+          paddingBottom: '16px'
         }}
         onTouchStart={handleSwipeStart}
         onTouchMove={handleSwipeMove}
