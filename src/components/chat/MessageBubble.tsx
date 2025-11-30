@@ -242,13 +242,6 @@ const MessageBubble: React.FC<MessageBubbleProps> = ({
             )}
           </div>
         </div>
-        
-        {/* Swipe hint icon */}
-        {swipeOffset > window.innerWidth * 0.15 && (
-          <div className={`flex items-center justify-center w-8 ${isOwnMessage ? 'order-first mr-2' : 'order-last ml-2'}`}>
-            <span className={`text-2xl ${swipeOffset > window.innerWidth * 0.3 ? 'animate-pulse scale-125' : ''} transition-transform`}>↩️</span>
-          </div>
-        )}
       </div>
 
       <DeleteConfirmDialog
