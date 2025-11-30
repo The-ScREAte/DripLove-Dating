@@ -121,6 +121,7 @@ export type Database = {
           is_read: boolean | null
           match_id: string
           message: string
+          reply_to: string | null
           sender_id: string
         }
         Insert: {
@@ -130,6 +131,7 @@ export type Database = {
           is_read?: boolean | null
           match_id: string
           message: string
+          reply_to?: string | null
           sender_id: string
         }
         Update: {
@@ -139,6 +141,7 @@ export type Database = {
           is_read?: boolean | null
           match_id?: string
           message?: string
+          reply_to?: string | null
           sender_id?: string
         }
         Relationships: [
@@ -147,6 +150,13 @@ export type Database = {
             columns: ["match_id"]
             isOneToOne: false
             referencedRelation: "matches"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "chats_reply_to_fkey"
+            columns: ["reply_to"]
+            isOneToOne: false
+            referencedRelation: "chats"
             referencedColumns: ["id"]
           },
           {
