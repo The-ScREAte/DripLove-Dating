@@ -793,7 +793,9 @@
     "alreadyHaveAccount": "Haben Sie bereits ein Konto? Anmelden",
     "uploadAtLeastTwoPhotos": "Bitte laden Sie mindestens 2 Fotos hoch, um die Registrierung abzuschließen.",
     "removeRejectedImages": "Bitte entfernen Sie abgelehnte Bilder, bevor Sie fortfahren.",
-    "reuploadTwoPhotos": "Bitte laden Sie Ihre 2 Fotos erneut hoch, um die Registrierung abzuschließen."
+    "reuploadTwoPhotos": "Bitte laden Sie Ihre 2 Fotos erneut hoch, um die Registrierung abzuschließen.",
+    "adinkraSymbols": "Afrikanische Adinkra-Symbole",
+    "selectSymbolsDescription": "Wählen Sie Symbole, die Ihre Werte und Persönlichkeit repräsentieren (1-10 Symbole)"
   },
   "profileCompletion": {
     "justAFewMoreDetails": "Nur noch ein paar Details, um loszulegen!",

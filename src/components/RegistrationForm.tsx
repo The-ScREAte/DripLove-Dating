@@ -858,7 +858,9 @@ const RegistrationForm = ({ onSubmit, onBackToLogin }: RegistrationFormProps) =>
             </div>
 
             {/* Adinkra Symbols Selector */}
-            <div className="animate-scale-in">
+            <div className="space-y-4 mt-6 animate-scale-in">
+              <h4 className="text-lg font-semibold text-gray-800">{t('registration.adinkraSymbols')}</h4>
+              <p className="text-sm text-gray-600">{t('registration.selectSymbolsDescription')}</p>
               <AdinkraSymbolSelector
                 selectedSymbols={formData.adinkraSymbols}
                 onChange={(symbols) => setFormData({ ...formData, adinkraSymbols: symbols })}

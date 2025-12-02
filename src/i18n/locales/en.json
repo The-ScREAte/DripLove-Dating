@@ -798,7 +798,9 @@
     "alreadyHaveAccount": "Already have an account? Sign In",
     "uploadAtLeastTwoPhotos": "Please upload at least 2 photos to complete registration.",
     "removeRejectedImages": "Please remove rejected images before continuing.",
-    "reuploadTwoPhotos": "Please re-upload your 2 photos to complete registration."
+    "reuploadTwoPhotos": "Please re-upload your 2 photos to complete registration.",
+    "adinkraSymbols": "African Adinkra Symbols",
+    "selectSymbolsDescription": "Choose symbols that represent your values and personality (1-10 symbols)"
   },
   "profileCompletion": {
     "title": "Complete Your Profile",
