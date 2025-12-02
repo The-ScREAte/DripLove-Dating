@@ -1,4 +1,5 @@
 import React, { useState, useMemo } from 'react';
+ 
 import { AFRICAN_SYMBOL_GROUPS } from '@/constants/africanSymbols';
 import { Label } from '@/components/ui/label';
 import { Card } from '@/components/ui/card';
@@ -144,7 +145,7 @@ const AdinkraSymbolSelector: React.FC<AdinkraSymbolSelectorProps> = ({ selectedS
         {/* Default Groups (Western/Chinese Zodiac) - Show when user's country is not in our list */}
         {!userCountryGroup && defaultGroups.length > 0 && defaultGroups.map((group) => (
           <div key={group.id} className="space-y-2">
-            <Card className="overflow-hidden border-2 border-primary/30 bg-gradient-to-br from-primary/5 to-purple-500/5">
+            <Card className="overflow-visible border-2 border-primary/30 bg-gradient-to-br from-primary/5 to-purple-500/5">
               <div className="p-2 bg-gradient-to-r from-primary/10 to-purple-500/10 border-b border-primary/20">
                 <div className="flex items-center gap-2">
                   <span className="text-xl">{group.flag}</span>
@@ -207,7 +208,7 @@ const AdinkraSymbolSelector: React.FC<AdinkraSymbolSelectorProps> = ({ selectedS
                           {isSelected && <div className="absolute bottom-0 left-0 right-0 h-1 bg-primary" />}
                         </Card>
                         {showTooltip && (
-                          <div className={`absolute bottom-full ${tooltipPositionClass} mb-2 z-20 w-48`}>
+                          <div className={`absolute bottom-full ${tooltipPositionClass} mb-2 z-[9999] w-44 max-w-[calc(100vw-3rem)]`}>
                             <div className="bg-popover text-popover-foreground p-2 rounded-lg shadow-lg border text-xs">
                               <p className="font-medium mb-1">{symbol.name}</p>
                               <p className="text-muted-foreground">{symbol.meaning}</p>
@@ -228,8 +229,9 @@ const AdinkraSymbolSelector: React.FC<AdinkraSymbolSelectorProps> = ({ selectedS
 
         {/* User's Country Group - Always Visible if exists */}
         {userCountryGroup && (
+                          
           <div className="space-y-2">
-            <Card className="overflow-hidden border-2 border-primary/30 bg-gradient-to-br from-primary/5 to-purple-500/5">
+            <Card className="overflow-visible border-2 border-primary/30 bg-gradient-to-br from-primary/5 to-purple-500/5">
               {/* User's Country Header - Always Expanded */}
               <div className="p-2 bg-gradient-to-r from-primary/10 to-purple-500/10 border-b border-primary/20">
                 <div className="flex items-center gap-2">
@@ -320,7 +322,7 @@ const AdinkraSymbolSelector: React.FC<AdinkraSymbolSelectorProps> = ({ selectedS
                         </Card>
 
                         {showTooltip && (
-                          <div className={`absolute bottom-full ${tooltipPositionClass} mb-2 z-20 w-48`}>
+                          <div className={`absolute bottom-full ${tooltipPositionClass} mb-2 z-[9999] w-44 max-w-[calc(100vw-3rem)]`}>
                             <div className="bg-popover text-popover-foreground p-2 rounded-lg shadow-lg border text-xs">
                               <p className="font-medium mb-1">{symbol.name}</p>
                               <p className="text-muted-foreground">{symbol.meaning}</p>
@@ -364,7 +366,7 @@ const AdinkraSymbolSelector: React.FC<AdinkraSymbolSelectorProps> = ({ selectedS
                 const selectedInGroup = selectedCounts[group.id] || 0;
                 
                 return (
-                  <Card key={group.id} className="overflow-hidden">
+                  <Card key={group.id} className="overflow-visible">
                     <button
                       type="button"
                       onClick={() => toggleGroup(group.id)}
@@ -444,6 +446,7 @@ const AdinkraSymbolSelector: React.FC<AdinkraSymbolSelectorProps> = ({ selectedS
                                   `}
                                   onClick={() => canSelect && toggleSymbol(symbol.name)}
                                 >
+                                  
                                   <button
                                     type="button"
                                     className="absolute top-0.5 right-0.5 w-4 h-4 min-w-4 min-h-4 p-0 rounded-full bg-pink-100 hover:bg-pink-200 flex items-center justify-center z-10 transition-colors shadow-sm flex-shrink-0 border border-pink-200"
@@ -466,7 +469,7 @@ const AdinkraSymbolSelector: React.FC<AdinkraSymbolSelectorProps> = ({ selectedS
                                 </Card>
 
                                 {showTooltip && (
-                                  <div className={`absolute bottom-full ${tooltipPositionClass} mb-2 z-20 w-48`}>
+                                  <div className={`absolute bottom-full ${tooltipPositionClass} mb-2 z-[9999] w-44 max-w-[calc(100vw-3rem)]`}>
                                     <div className="bg-popover text-popover-foreground p-2 rounded-lg shadow-lg border text-xs">
                                       <p className="font-medium mb-1">{symbol.name}</p>
                                       <p className="text-muted-foreground">{symbol.meaning}</p>

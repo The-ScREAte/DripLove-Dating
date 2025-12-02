@@ -133,7 +133,7 @@ const AdinkraSection = ({ editedProfile, profile, isEditing, onAdinkraChange }: 
                       {tooltipSymbol === symbolName && (
                         <div ref={tooltipRef}>
                           <Card 
-                            className={`absolute bottom-full mb-2 z-50 p-3 bg-background border-2 border-primary shadow-lg w-64 ${
+                            className={`absolute bottom-full mb-2 z-[9999] p-3 bg-background border-2 border-primary shadow-lg w-64 ${
                               isLeftEdge ? 'left-0' : isRightEdge ? 'right-0' : 'left-1/2 transform -translate-x-1/2'
                             }`}
                             onClick={(e) => e.stopPropagation()}
@@ -234,7 +234,7 @@ const AdinkraSection = ({ editedProfile, profile, isEditing, onAdinkraChange }: 
                                   {tooltipSymbol === symbol.name && (
                                     <div ref={tooltipRef}>
                                       <Card 
-                                        className={`absolute bottom-full mb-2 z-50 p-3 bg-background border-2 border-primary shadow-lg w-64 ${
+                                        className={`absolute bottom-full mb-2 z-[9999] p-3 bg-background border-2 border-primary shadow-lg w-64 ${
                                           isLeftEdge ? 'left-0' : isRightEdge ? 'right-0' : 'left-1/2 transform -translate-x-1/2'
                                         }`}
                                         onClick={(e) => e.stopPropagation()}
