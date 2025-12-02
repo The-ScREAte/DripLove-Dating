@@ -49,10 +49,10 @@ const AdinkraSymbolSelector: React.FC<AdinkraSymbolSelectorProps> = ({ selectedS
           <div className="relative info-tooltip-container">
             <button
               type="button"
-              className="w-6 h-6 p-0 m-0 aspect-square rounded-full bg-purple-500 hover:bg-purple-600 flex items-center justify-center transition-colors shadow-sm flex-shrink-0"
+              className="w-6 h-6 min-w-6 min-h-6 p-0 rounded-full bg-primary hover:bg-primary/90 flex items-center justify-center transition-colors shadow-sm flex-shrink-0"
               onClick={() => setShowInfoTooltip(!showInfoTooltip)}
             >
-              <span className="text-white text-sm font-bold leading-none">!</span>
+              <span className="text-primary-foreground text-sm font-bold leading-none">!</span>
             </button>
             {showInfoTooltip && (
               <div className="absolute top-full left-1/2 transform -translate-x-1/2 mt-2 z-30 w-64">
@@ -139,13 +139,13 @@ const AdinkraSymbolSelector: React.FC<AdinkraSymbolSelectorProps> = ({ selectedS
                             {/* Info Icon */}
                             <button
                               type="button"
-                              className="absolute top-1 right-1 w-5 h-5 p-0 m-0 aspect-square rounded-full bg-purple-500 hover:bg-purple-600 flex items-center justify-center z-10 transition-colors shadow-sm flex-shrink-0"
+                              className="absolute top-1 right-1 w-5 h-5 min-w-5 min-h-5 p-0 rounded-full bg-primary hover:bg-primary/90 flex items-center justify-center z-10 transition-colors shadow-sm flex-shrink-0"
                               onClick={(e) => {
                                 e.stopPropagation();
                                 setTooltipSymbol(showTooltip ? null : symbol.name);
                               }}
                             >
-                              <span className="text-white text-[10px] font-bold leading-none">!</span>
+                              <span className="text-primary-foreground text-[10px] font-bold leading-none">!</span>
                             </button>
 
                             <div 
