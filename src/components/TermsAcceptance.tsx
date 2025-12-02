@@ -65,8 +65,12 @@ const TermsAcceptance = ({ user, onAccept }: TermsAcceptanceProps) => {
     <div className="terms-container min-h-screen bg-gradient-to-br from-pink-50 via-purple-50 to-blue-50 p-4 flex items-center justify-center">
       <Card className="w-full max-w-2xl mx-auto bg-white shadow-xl border-0 rounded-2xl">
         <CardHeader className="text-center pb-3 pt-6">
-          <div className="mx-auto w-14 h-14 bg-gradient-to-br from-pink-400 to-purple-500 rounded-full flex items-center justify-center mb-3">
-            <Heart className="w-7 h-7 text-white" />
+          <div className="mx-auto w-16 h-16 mb-3">
+            <img 
+              src="/driplove-logo.png" 
+              alt="DripLove" 
+              className="w-full h-full object-contain"
+            />
           </div>
           <CardTitle className="text-xl sm:text-2xl font-bold text-gray-900 mb-1">
             Welcome to DripLove! 💕
