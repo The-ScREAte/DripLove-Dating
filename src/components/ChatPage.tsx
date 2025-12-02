@@ -310,6 +310,41 @@ const ChatPage = ({ currentUser, onUnreadChange, onDetailViewChange }: ChatPageP
     scrollToBottom();
   }, [messages]);
 
+  // Dismiss keyboard on scroll (like iMessages) - mobile only
+  useEffect(() => {
+    const isMobile = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
+    if (!isMobile || !messagesContainerRef.current) return;
+
+    let lastScrollTop = 0;
+    let scrollTimeout: NodeJS.Timeout;
+
+    const handleScroll = (e: Event) => {
+      const target = e.target as HTMLElement;
+      const currentScrollTop = target.scrollTop;
+
+      // Only dismiss keyboard when scrolling up (like iMessages)
+      if (currentScrollTop < lastScrollTop) {
+        clearTimeout(scrollTimeout);
+        scrollTimeout = setTimeout(() => {
+          const activeElement = document.activeElement as HTMLElement;
+          if (activeElement && (activeElement.tagName === 'INPUT' || activeElement.tagName === 'TEXTAREA')) {
+            activeElement.blur();
+          }
+        }, 50);
+      }
+
+      lastScrollTop = currentScrollTop;
+    };
+
+    const container = messagesContainerRef.current;
+    container.addEventListener('scroll', handleScroll);
+
+    return () => {
+      container.removeEventListener('scroll', handleScroll);
+      clearTimeout(scrollTimeout);
+    };
+  }, [selectedMatch]);
+
   useEffect(() => {
     if (!currentUser || !currentUser.id) return;
     if (selectedMatch) {
@@ -1254,7 +1289,9 @@ const ChatPage = ({ currentUser, onUnreadChange, onDetailViewChange }: ChatPageP
   };
 
   const scrollToBottom = () => {
-    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+    if (messagesEndRef.current) {
+      messagesEndRef.current.scrollIntoView({ behavior: 'smooth', block: 'end' });
+    }
   };
 
   // Pull to refresh handlers for the matches list
@@ -1638,14 +1675,15 @@ const ChatPage = ({ currentUser, onUnreadChange, onDetailViewChange }: ChatPageP
       {/* Scrollable Messages Area (only this area scrolls) */}
       <div
         ref={messagesContainerRef}
-        className="flex-1 overflow-y-auto px-4 space-y-2 bg-gray-50 pb-1"
+        className="flex-1 overflow-y-auto px-4 space-y-2 bg-gray-50"
         style={{ 
           WebkitOverflowScrolling: 'touch', 
           paddingTop: Capacitor.getPlatform() === 'ios' 
             ? 'clamp(160px, calc(env(safe-area-inset-top, 10px) + 140px), 180px)'
             : Capacitor.getPlatform() === 'web'
               ? '120px'
-              : '120px'
+              : '120px',
+          paddingBottom: '16px'
         }}
         onTouchStart={handleSwipeStart}
         onTouchMove={handleSwipeMove}

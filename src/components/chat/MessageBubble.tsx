@@ -66,6 +66,7 @@ const MessageBubble: React.FC<MessageBubbleProps> = ({
   
   // Swipe gesture handlers for touch
   const handleTouchStart = (e: React.TouchEvent) => {
+    e.stopPropagation();
     setTouchStart({ x: e.touches[0].clientX, y: e.touches[0].clientY });
     setIsSwiping(true);
   };
@@ -80,6 +81,10 @@ const MessageBubble: React.FC<MessageBubbleProps> = ({
     
     // Only trigger swipe if horizontal movement is dominant
     if (Math.abs(deltaX) > Math.abs(deltaY)) {
+      // Prevent browser's native swipe-back gesture
+      e.preventDefault();
+      e.stopPropagation();
+      
       // Own messages: swipe left to reply
       // Other's messages: swipe right to reply
       if ((isOwnMessage && deltaX < 0) || (!isOwnMessage && deltaX > 0)) {
@@ -186,7 +191,8 @@ const MessageBubble: React.FC<MessageBubbleProps> = ({
         style={{
           transform: swipeOffset > 0 ? `translateX(${isOwnMessage ? -swipeOffset * 0.3 : swipeOffset * 0.3}px)` : 'none',
           transition: isSwiping ? 'none' : 'transform 0.2s ease-out',
-          cursor: isMouseDown ? 'grabbing' : 'grab'
+          cursor: isMouseDown ? 'grabbing' : 'grab',
+          touchAction: 'pan-y' // Allow vertical scroll, prevent horizontal swipe-back
         }}
       >
         <div
@@ -242,13 +248,6 @@ const MessageBubble: React.FC<MessageBubbleProps> = ({
             )}
           </div>
         </div>
-        
-        {/* Swipe hint icon */}
-        {swipeOffset > window.innerWidth * 0.15 && (
-          <div className={`flex items-center justify-center w-8 ${isOwnMessage ? 'order-first mr-2' : 'order-last ml-2'}`}>
-            <span className={`text-2xl ${swipeOffset > window.innerWidth * 0.3 ? 'animate-pulse scale-125' : ''} transition-transform`}>↩️</span>
-          </div>
-        )}
       </div>
 
       <DeleteConfirmDialog
