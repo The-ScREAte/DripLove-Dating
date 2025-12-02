@@ -2,8 +2,11 @@ import React from 'react';
 import { useTranslation } from 'react-i18next';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Label } from '@/components/ui/label';
-import { SELECTABLE_ADINKRA_SYMBOLS } from '@/constants/adinkraSymbols';
+import { AFRICAN_SYMBOL_GROUPS } from '@/constants/africanSymbols';
 import { X } from 'lucide-react';
+
+// Flatten all symbols for easy lookup
+const ALL_SYMBOLS = AFRICAN_SYMBOL_GROUPS.flatMap(group => group.symbols);
 
 interface AdinkraSectionProps {
   editedProfile: any;
@@ -58,7 +61,7 @@ const AdinkraSection = ({ editedProfile, profile, isEditing, onAdinkraChange }: 
               <p className="text-sm text-muted-foreground">{t('profile.selected')} ({selectedSymbols.length}/10)</p>
               <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-3">
                 {selectedSymbols.map((symbolName: string) => {
-                  const symbol = SELECTABLE_ADINKRA_SYMBOLS.find(s => s.name === symbolName);
+                  const symbol = ALL_SYMBOLS.find(s => s.name === symbolName);
                   if (!symbol) return null;
                   
                   return (
@@ -96,7 +99,7 @@ const AdinkraSection = ({ editedProfile, profile, isEditing, onAdinkraChange }: 
             <div className="space-y-2">
               <p className="text-sm text-muted-foreground">{t('profile.availableSymbols')}</p>
               <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-3">
-                {SELECTABLE_ADINKRA_SYMBOLS.filter(symbol => !selectedSymbols.includes(symbol.name)).map((symbol) => (
+                {ALL_SYMBOLS.filter(symbol => !selectedSymbols.includes(symbol.name)).map((symbol) => (
                   <Card
                     key={symbol.name}
                     className="cursor-pointer border-border hover:border-primary/50 p-3 flex flex-col items-center gap-2 hover:scale-105 transition-all"

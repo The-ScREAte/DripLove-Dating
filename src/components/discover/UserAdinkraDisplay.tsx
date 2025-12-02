@@ -1,6 +1,9 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { SELECTABLE_ADINKRA_SYMBOLS } from '@/constants/adinkraSymbols';
+import { AFRICAN_SYMBOL_GROUPS } from '@/constants/africanSymbols';
 import { AdinkraSvgComponents, type AdinkraSymbolName } from '@/components/adinkra/AdinkraSvgs';
+
+// Flatten all symbols for easy lookup
+const ALL_SYMBOLS = AFRICAN_SYMBOL_GROUPS.flatMap(group => group.symbols);
 
 interface UserAdinkraDisplayProps {
   adinkraSymbols: string[];
@@ -70,11 +73,11 @@ const UserAdinkraDisplay: React.FC<UserAdinkraDisplayProps> = React.memo(({ adin
   }
 
   const currentSymbolName = adinkraSymbols[currentIndex];
-  const currentSymbol = SELECTABLE_ADINKRA_SYMBOLS.find(s => s.name === currentSymbolName);
+  const currentSymbol = ALL_SYMBOLS.find(s => s.name === currentSymbolName);
   const CurrentSvgComponent = AdinkraSvgComponents[currentSymbolName as AdinkraSymbolName];
 
   const nextSymbolName = adinkraSymbols[nextIndex];
-  const nextSymbol = SELECTABLE_ADINKRA_SYMBOLS.find(s => s.name === nextSymbolName);
+  const nextSymbol = ALL_SYMBOLS.find(s => s.name === nextSymbolName);
   const NextSvgComponent = AdinkraSvgComponents[nextSymbolName as AdinkraSymbolName];
 
   if (!currentSymbol || !CurrentSvgComponent) {
