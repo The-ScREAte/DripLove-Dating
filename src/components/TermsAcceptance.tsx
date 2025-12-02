@@ -64,48 +64,48 @@ const TermsAcceptance = ({ user, onAccept }: TermsAcceptanceProps) => {
   return (
     <div className="terms-container min-h-screen bg-gradient-to-br from-pink-50 via-purple-50 to-blue-50 p-4 flex items-center justify-center">
       <Card className="w-full max-w-2xl mx-auto bg-white shadow-xl border-0 rounded-2xl">
-        <CardHeader className="text-center pb-4 pt-8">
-          <div className="mx-auto w-16 h-16 bg-gradient-to-br from-pink-400 to-purple-500 rounded-full flex items-center justify-center mb-4">
-            <Heart className="w-8 h-8 text-white" />
+        <CardHeader className="text-center pb-3 pt-6">
+          <div className="mx-auto w-14 h-14 bg-gradient-to-br from-pink-400 to-purple-500 rounded-full flex items-center justify-center mb-3">
+            <Heart className="w-7 h-7 text-white" />
           </div>
-          <CardTitle className="text-2xl font-bold text-gray-800 mb-2">
+          <CardTitle className="text-xl sm:text-2xl font-bold text-gray-900 mb-1">
             Welcome to DripLove! 💕
           </CardTitle>
-          <CardDescription className="text-gray-600">
+          <CardDescription className="text-sm text-gray-700">
             Before we start, let's keep things safe and fun for everyone
           </CardDescription>
         </CardHeader>
 
-        <CardContent className="space-y-6 px-6 pb-8">
+        <CardContent className="space-y-4 px-4 sm:px-6 pb-6">
           {/* Key Points */}
-          <div className="space-y-3">
-            <div className="flex items-start gap-3 p-3 bg-pink-50 rounded-xl">
-              <div className="w-8 h-8 bg-pink-200 rounded-full flex items-center justify-center flex-shrink-0">
-                <Heart className="w-4 h-4 text-pink-600" />
+          <div className="space-y-2">
+            <div className="flex items-start gap-2 p-2 bg-pink-50 rounded-xl">
+              <div className="w-7 h-7 bg-pink-200 rounded-full flex items-center justify-center flex-shrink-0">
+                <Heart className="w-3.5 h-3.5 text-pink-600" />
               </div>
               <div>
-                <h4 className="font-semibold text-gray-800 text-sm">Be Respectful</h4>
-                <p className="text-xs text-gray-600 mt-1">Treat everyone with kindness and respect</p>
+                <h4 className="font-semibold text-gray-900 text-sm">Be Respectful</h4>
+                <p className="text-xs text-gray-700 mt-0.5">Treat everyone with kindness and respect</p>
               </div>
             </div>
 
-            <div className="flex items-start gap-3 p-3 bg-purple-50 rounded-xl">
-              <div className="w-8 h-8 bg-purple-200 rounded-full flex items-center justify-center flex-shrink-0">
-                <Shield className="w-4 h-4 text-purple-600" />
+            <div className="flex items-start gap-2 p-2 bg-purple-50 rounded-xl">
+              <div className="w-7 h-7 bg-purple-200 rounded-full flex items-center justify-center flex-shrink-0">
+                <Shield className="w-3.5 h-3.5 text-purple-600" />
               </div>
               <div>
-                <h4 className="font-semibold text-gray-800 text-sm">Stay Safe</h4>
-                <p className="text-xs text-gray-600 mt-1">Meet in public places and protect your privacy</p>
+                <h4 className="font-semibold text-gray-900 text-sm">Stay Safe</h4>
+                <p className="text-xs text-gray-700 mt-0.5">Meet in public places and protect your privacy</p>
               </div>
             </div>
 
-            <div className="flex items-start gap-3 p-3 bg-blue-50 rounded-xl">
-              <div className="w-8 h-8 bg-blue-200 rounded-full flex items-center justify-center flex-shrink-0">
-                <Users className="w-4 h-4 text-blue-600" />
+            <div className="flex items-start gap-2 p-2 bg-blue-50 rounded-xl">
+              <div className="w-7 h-7 bg-blue-200 rounded-full flex items-center justify-center flex-shrink-0">
+                <Users className="w-3.5 h-3.5 text-blue-600" />
               </div>
               <div>
-                <h4 className="font-semibold text-gray-800 text-sm">Be Authentic</h4>
-                <p className="text-xs text-gray-600 mt-1">Use real photos and honest information</p>
+                <h4 className="font-semibold text-gray-900 text-sm">Be Authentic</h4>
+                <p className="text-xs text-gray-700 mt-0.5">Use real photos and honest information</p>
               </div>
             </div>
           </div>
@@ -135,17 +135,17 @@ const TermsAcceptance = ({ user, onAccept }: TermsAcceptanceProps) => {
           </div>
 
           {/* Acceptance Checkbox */}
-          <div className="bg-gradient-to-r from-pink-50 to-purple-50 rounded-xl p-4 border border-pink-200">
-            <div className="flex items-start space-x-3">
+          <div className="bg-gradient-to-r from-pink-50 to-purple-50 rounded-xl p-3 border border-pink-200">
+            <div className="flex items-start space-x-2.5">
               <Checkbox
                 id="terms-acceptance"
                 checked={termsAccepted}
                 onCheckedChange={(checked) => setTermsAccepted(checked === true)}
-                className="mt-1"
+                className="mt-0.5 rounded-full"
               />
               <label
                 htmlFor="terms-acceptance"
-                className="text-sm text-gray-700 cursor-pointer leading-relaxed"
+                className="text-sm text-gray-900 cursor-pointer leading-relaxed"
               >
                 I agree to the Terms of Service and Privacy Policy, and I'm 18 years or older
               </label>
@@ -156,7 +156,7 @@ const TermsAcceptance = ({ user, onAccept }: TermsAcceptanceProps) => {
           <Button
             onClick={handleAccept}
             disabled={loading || !termsAccepted}
-            className="w-full bg-gradient-to-r from-pink-500 to-purple-500 hover:from-pink-600 hover:to-purple-600 text-white font-semibold py-3 rounded-xl transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed shadow-lg"
+            className="w-full bg-gradient-to-r from-pink-500 to-purple-500 hover:from-pink-600 hover:to-purple-600 text-white font-semibold py-2.5 rounded-xl transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed shadow-lg"
           >
             {loading ? "Processing..." : "Let's Go! 🚀"}
           </Button>

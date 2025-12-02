@@ -12,11 +12,15 @@ import ResetPasswordPage from '@/components/ResetPasswordPage';
 import AppleOAuthCallback from '@/components/AppleOAuthCallback';
 import AppleOAuthTest from '@/components/AppleOAuthTest';
 import RedirectHandler from '@/components/RedirectHandler';
+import TermsOfService from '@/components/TermsOfService';
+import PrivacyPolicy from '@/components/PrivacyPolicy';
 import { useMobileOAuth } from '@/hooks/useMobileOAuth';
+import { useNavigate } from 'react-router-dom';
 
 const AppRoutes = () => {
   // Initialize mobile OAuth handler inside router context
   useMobileOAuth();
+  const navigate = useNavigate();
 
   return (
     <Routes>
@@ -30,6 +34,8 @@ const AppRoutes = () => {
       <Route path="/auth/apple-test" element={<AppleOAuthTest />} />
       <Route path="/complete-profile" element={<ProfileCompletionPage />} />
       <Route path="/reset-password" element={<ResetPasswordPage />} />
+      <Route path="/terms-of-service" element={<TermsOfService onBack={() => navigate(-1)} />} />
+      <Route path="/privacy-policy" element={<PrivacyPolicy onBack={() => navigate(-1)} />} />
       <Route path="/r/:id" element={<RedirectHandler />} />
       {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
       <Route path="*" element={<NotFound />} />
