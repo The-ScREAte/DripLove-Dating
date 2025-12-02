@@ -3,7 +3,7 @@ import { useTranslation } from 'react-i18next';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Checkbox } from '@/components/ui/checkbox';
-import { Heart, Shield, Users, MessageCircle, Star } from 'lucide-react';
+import { Heart, Shield, Users, FileText, ExternalLink } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 
@@ -62,125 +62,80 @@ const TermsAcceptance = ({ user, onAccept }: TermsAcceptanceProps) => {
   };
 
   return (
-  <div className="terms-container min-h-fill bg-gradient-to-br from-pink-400 via-purple-500 to-indigo-600 p-4 flex items-center justify-center">
-      <Card className="w-full max-w-4xl mx-auto backdrop-blur-sm bg-white/95 shadow-2xl border-0">
-        <CardHeader className="text-center pb-6">
-          <CardTitle className="text-3xl font-bold text-center text-gray-800 mb-2">
-            {t('termsAcceptance.cardTitle')}
+    <div className="terms-container min-h-screen bg-gradient-to-br from-pink-50 via-purple-50 to-blue-50 p-4 flex items-center justify-center">
+      <Card className="w-full max-w-2xl mx-auto bg-white shadow-xl border-0 rounded-2xl">
+        <CardHeader className="text-center pb-4 pt-8">
+          <div className="mx-auto w-16 h-16 bg-gradient-to-br from-pink-400 to-purple-500 rounded-full flex items-center justify-center mb-4">
+            <Heart className="w-8 h-8 text-white" />
+          </div>
+          <CardTitle className="text-2xl font-bold text-gray-800 mb-2">
+            Welcome to DripLove! 💕
           </CardTitle>
-          <CardDescription className="text-gray-600 text-lg">
-            {t('termsAcceptance.cardDescription')}
+          <CardDescription className="text-gray-600">
+            Before we start, let's keep things safe and fun for everyone
           </CardDescription>
         </CardHeader>
 
-        <CardContent className="space-y-6">
-          {/* Terms and Conditions Content */}
-          <div className="bg-white rounded-lg border border-gray-200 p-6 max-h-96 overflow-y-auto">
-            <h3 className="text-xl font-semibold text-gray-800 mb-3">
-              {t('termsAcceptance.termsOfService')}
-            </h3>
-            
-            <div className="space-y-4 text-sm text-gray-600">
-              <section>
-                <h4 className="font-semibold text-gray-800 mb-2">1. Acceptance of Terms</h4>
-                <p>
-                  By creating an account and using DripLove, you agree to comply with and be bound by these Terms and Conditions. 
-                  If you do not agree with any part of these terms, you may not use our service.
-                </p>
-              </section>
+        <CardContent className="space-y-6 px-6 pb-8">
+          {/* Key Points */}
+          <div className="space-y-3">
+            <div className="flex items-start gap-3 p-3 bg-pink-50 rounded-xl">
+              <div className="w-8 h-8 bg-pink-200 rounded-full flex items-center justify-center flex-shrink-0">
+                <Heart className="w-4 h-4 text-pink-600" />
+              </div>
+              <div>
+                <h4 className="font-semibold text-gray-800 text-sm">Be Respectful</h4>
+                <p className="text-xs text-gray-600 mt-1">Treat everyone with kindness and respect</p>
+              </div>
+            </div>
 
-              <section>
-                <h4 className="font-semibold text-gray-800 mb-2">2. User Conduct and Responsibilities</h4>
-                <p>You agree to:</p>
-                <ul className="list-disc list-inside ml-4 mt-2 space-y-1">
-                  <li>Provide accurate and truthful information in your profile</li>
-                  <li>Treat other users with respect and kindness</li>
-                  <li>Not engage in harassment, bullying, or discriminatory behavior</li>
-                  <li>Not share inappropriate, offensive, or explicit content</li>
-                  <li>Not create fake accounts or impersonate others</li>
-                  <li>Report any suspicious or inappropriate behavior</li>
-                </ul>
-              </section>
+            <div className="flex items-start gap-3 p-3 bg-purple-50 rounded-xl">
+              <div className="w-8 h-8 bg-purple-200 rounded-full flex items-center justify-center flex-shrink-0">
+                <Shield className="w-4 h-4 text-purple-600" />
+              </div>
+              <div>
+                <h4 className="font-semibold text-gray-800 text-sm">Stay Safe</h4>
+                <p className="text-xs text-gray-600 mt-1">Meet in public places and protect your privacy</p>
+              </div>
+            </div>
 
-              <section>
-                <h4 className="font-semibold text-gray-800 mb-2">3. Privacy and Data Protection</h4>
-                <p>
-                  Your privacy is important to us. We collect and use your personal information in accordance with our Privacy Policy. 
-                  By using DripLove, you consent to the collection and use of your information as described in our Privacy Policy.
-                </p>
-              </section>
-
-              <section>
-                <h4 className="font-semibold text-gray-800 mb-2">4. Safety and Security</h4>
-                <p>
-                  DripLove implements various safety measures to protect our users. However, you are responsible for your own safety when 
-                  interacting with other users. We recommend:
-                </p>
-                <ul className="list-disc list-inside ml-4 mt-2 space-y-1">
-                  <li>Meeting in public places for first dates</li>
-                  <li>Informing friends or family about your plans</li>
-                  <li>Trusting your instincts and reporting concerning behavior</li>
-                  <li>Never sharing personal financial information</li>
-                </ul>
-              </section>
-
-              <section>
-                <h4 className="font-semibold text-gray-800 mb-2">5. Prohibited Activities</h4>
-                <p>The following activities are strictly prohibited:</p>
-                <ul className="list-disc list-inside ml-4 mt-2 space-y-1">
-                  <li>Soliciting money or engaging in commercial activities</li>
-                  <li>Sharing or requesting explicit content</li>
-                  <li>Spamming or sending unsolicited messages</li>
-                  <li>Using automated tools or bots</li>
-                  <li>Attempting to hack or manipulate the platform</li>
-                </ul>
-              </section>
-
-              <section>
-                <h4 className="font-semibold text-gray-800 mb-2">6. Account Termination</h4>
-                <p>
-                  DripLove reserves the right to suspend or terminate accounts that violate these terms or engage in inappropriate behavior. 
-                  Users may also delete their accounts at any time through their profile settings.
-                </p>
-              </section>
-
-              <section>
-                <h4 className="font-semibold text-gray-800 mb-2">7. Intellectual Property</h4>
-                <p>
-                  All content and materials on DripLove, including logos, designs, and software, are owned by DripLove and protected by 
-                  intellectual property laws. Users retain ownership of their uploaded content but grant DripLove a license to use it 
-                  within the platform.
-                </p>
-              </section>
-
-              <section>
-                <h4 className="font-semibold text-gray-800 mb-2">8. Limitation of Liability</h4>
-                <p>
-                  DripLove provides the service "as is" and cannot guarantee specific outcomes from using the platform. We are not liable 
-                  for any direct, indirect, or consequential damages arising from your use of the service.
-                </p>
-              </section>
-
-              <section>
-                <h4 className="font-semibold text-gray-800 mb-2">9. Changes to Terms</h4>
-                <p>
-                  DripLove may update these terms from time to time. Users will be notified of significant changes, and continued use of 
-                  the service constitutes acceptance of the updated terms.
-                </p>
-              </section>
-
-              <section>
-                <h4 className="font-semibold text-gray-800 mb-2">10. Contact Information</h4>
-                <p>
-                  For questions about these terms or to report issues, please contact us at support@driplove.com or through our 
-                  in-app support feature.
-                </p>
-              </section>
+            <div className="flex items-start gap-3 p-3 bg-blue-50 rounded-xl">
+              <div className="w-8 h-8 bg-blue-200 rounded-full flex items-center justify-center flex-shrink-0">
+                <Users className="w-4 h-4 text-blue-600" />
+              </div>
+              <div>
+                <h4 className="font-semibold text-gray-800 text-sm">Be Authentic</h4>
+                <p className="text-xs text-gray-600 mt-1">Use real photos and honest information</p>
+              </div>
             </div>
           </div>
 
+          {/* Document Links */}
+          <div className="flex gap-2 justify-center flex-wrap">
+            <a
+              href="/terms-of-service"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="inline-flex items-center gap-2 px-4 py-2 bg-pink-100 hover:bg-pink-200 text-pink-700 rounded-full text-sm font-medium transition-colors border border-pink-200"
+            >
+              <FileText className="w-4 h-4" />
+              Terms of Service
+              <ExternalLink className="w-3 h-3" />
+            </a>
+            <a
+              href="/privacy-policy"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="inline-flex items-center gap-2 px-4 py-2 bg-purple-100 hover:bg-purple-200 text-purple-700 rounded-full text-sm font-medium transition-colors border border-purple-200"
+            >
+              <Shield className="w-4 h-4" />
+              Privacy Policy
+              <ExternalLink className="w-3 h-3" />
+            </a>
+          </div>
+
           {/* Acceptance Checkbox */}
-          <div className="bg-gray-50 rounded-lg p-4 border-2 border-dashed border-gray-300">
+          <div className="bg-gradient-to-r from-pink-50 to-purple-50 rounded-xl p-4 border border-pink-200">
             <div className="flex items-start space-x-3">
               <Checkbox
                 id="terms-acceptance"
@@ -192,25 +147,19 @@ const TermsAcceptance = ({ user, onAccept }: TermsAcceptanceProps) => {
                 htmlFor="terms-acceptance"
                 className="text-sm text-gray-700 cursor-pointer leading-relaxed"
               >
-                {t('termsAcceptance.agreementText')}
+                I agree to the Terms of Service and Privacy Policy, and I'm 18 years or older
               </label>
             </div>
           </div>
 
-          {/* Action Buttons */}
-          <div className="flex flex-col gap-3">
-            <Button
-              onClick={handleAccept}
-              disabled={loading || !termsAccepted}
-              className="w-full bg-gray-900 hover:bg-gray-800 text-white font-semibold py-3 rounded-lg transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed"
-            >
-              {loading ? t('termsAcceptance.processing') : t('termsAcceptance.accept')}
-            </Button>
-            
-            <p className="text-xs text-gray-500 text-center">
-              {t('termsAcceptance.acknowledgment')}
-            </p>
-          </div>
+          {/* Action Button */}
+          <Button
+            onClick={handleAccept}
+            disabled={loading || !termsAccepted}
+            className="w-full bg-gradient-to-r from-pink-500 to-purple-500 hover:from-pink-600 hover:to-purple-600 text-white font-semibold py-3 rounded-xl transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed shadow-lg"
+          >
+            {loading ? "Processing..." : "Let's Go! 🚀"}
+          </Button>
         </CardContent>
       </Card>
     </div>
