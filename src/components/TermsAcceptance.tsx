@@ -171,18 +171,22 @@ const TermsAcceptance = ({ user, onAccept }: TermsAcceptanceProps) => {
 
       {/* Terms of Service Dialog */}
       <Dialog open={showTerms} onOpenChange={setShowTerms}>
-        <DialogContent className="max-w-4xl max-h-[90vh] p-0">
-          <ScrollArea className="h-full">
-            <TermsOfService onBack={() => setShowTerms(false)} />
+        <DialogContent className="max-w-4xl max-h-[90vh]">
+          <ScrollArea className="h-[80vh] pr-4">
+            <div className="pb-6">
+              <TermsOfService onBack={() => setShowTerms(false)} />
+            </div>
           </ScrollArea>
         </DialogContent>
       </Dialog>
 
       {/* Privacy Policy Dialog */}
       <Dialog open={showPrivacy} onOpenChange={setShowPrivacy}>
-        <DialogContent className="max-w-4xl max-h-[90vh] p-0">
-          <ScrollArea className="h-full">
-            <PrivacyPolicy onBack={() => setShowPrivacy(false)} />
+        <DialogContent className="max-w-4xl max-h-[90vh]">
+          <ScrollArea className="h-[80vh] pr-4">
+            <div className="pb-6">
+              <PrivacyPolicy onBack={() => setShowPrivacy(false)} />
+            </div>
           </ScrollArea>
         </DialogContent>
       </Dialog>
