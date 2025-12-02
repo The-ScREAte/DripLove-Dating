@@ -3,7 +3,6 @@ import { AFRICAN_SYMBOL_GROUPS } from '@/constants/africanSymbols';
 import { Label } from '@/components/ui/label';
 import { Card } from '@/components/ui/card';
 import { ChevronDown, ChevronUp, Info } from 'lucide-react';
-import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 
 interface AdinkraSymbolSelectorProps {
   selectedSymbols: string[];
@@ -12,6 +11,22 @@ interface AdinkraSymbolSelectorProps {
 
 const AdinkraSymbolSelector: React.FC<AdinkraSymbolSelectorProps> = ({ selectedSymbols, onChange }) => {
   const [expandedGroup, setExpandedGroup] = useState<string | null>('ghana-adinkra');
+  const [tooltipSymbol, setTooltipSymbol] = useState<string | null>(null);
+  const [showInfoTooltip, setShowInfoTooltip] = useState(false);
+
+  // Close tooltips when clicking outside
+  React.useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      const target = event.target as HTMLElement;
+      if (!target.closest('.info-tooltip-container')) {
+        setShowInfoTooltip(false);
+        setTooltipSymbol(null);
+      }
+    };
+
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
 
   const toggleSymbol = (symbolName: string) => {
     if (selectedSymbols.includes(symbolName)) {
@@ -27,33 +42,38 @@ const AdinkraSymbolSelector: React.FC<AdinkraSymbolSelectorProps> = ({ selectedS
   };
 
   return (
-    <TooltipProvider>
-      <div className="space-y-4">
-        <div>
-          <div className="flex items-center gap-2">
-            <Label className="text-base font-medium">Adinkra Symbols *</Label>
-            <Tooltip>
-              <TooltipTrigger asChild>
-                <button
-                  type="button"
-                  className="w-6 h-6 min-w-6 min-h-6 p-0 rounded-full bg-pink-100 hover:bg-pink-200 flex items-center justify-center transition-colors shadow-md flex-shrink-0 border border-pink-200"
-                >
-                  <span className="text-pink-700 text-sm font-bold leading-none">!</span>
-                </button>
-              </TooltipTrigger>
-              <TooltipContent side="bottom" className="max-w-xs z-50">
-                <p className="text-xs">
-                  <span className="font-semibold text-purple-700">ℹ️ Adinkra Symbols</span>
-                  <br />
-                  <span className="text-muted-foreground">
-                    Select symbols that resonate with you and reflect your personality and values.
-                  </span>
-                </p>
-              </TooltipContent>
-            </Tooltip>
+    <div className="space-y-4">
+      <div>
+        <div className="flex items-center gap-2">
+          <Label className="text-base font-medium">African Symbols *</Label>
+          <div className="relative info-tooltip-container">
+            <button
+              type="button"
+              className="w-6 h-6 min-w-6 min-h-6 p-0 rounded-full bg-pink-100 hover:bg-pink-200 flex items-center justify-center transition-colors shadow-md flex-shrink-0 border border-pink-200"
+              onClick={() => setShowInfoTooltip(!showInfoTooltip)}
+            >
+              <span className="text-pink-700 text-sm font-bold leading-none">!</span>
+            </button>
+            {showInfoTooltip && (
+              <div className="absolute top-full left-1/2 transform -translate-x-1/2 mt-2 z-30 w-64">
+                <div className="bg-popover text-popover-foreground p-2.5 rounded-lg shadow-lg border">
+                  <p className="text-xs">
+                    <span className="font-semibold text-purple-700">ℹ️ African Symbols</span>
+                    <br />
+                    <span className="text-muted-foreground">
+                      Select symbols that resonate with you and reflect your personality and values.
+                    </span>
+                  </p>
+                  <div className="absolute bottom-full left-1/2 transform -translate-x-1/2 -mb-1">
+                    <div className="border-6 border-transparent border-b-popover"></div>
+                  </div>
+                </div>
+              </div>
+            )}
           </div>
-          <p className="text-sm text-muted-foreground mt-1">Choose at least 1 symbol that resonates with you (up to 10)</p>
         </div>
+        <p className="text-sm text-muted-foreground mt-1">Choose at least 1 symbol that resonates with you (up to 10)</p>
+      </div>
 
       {/* Symbol Groups */}
       <div className="space-y-2">
@@ -100,9 +120,10 @@ const AdinkraSymbolSelector: React.FC<AdinkraSymbolSelectorProps> = ({ selectedS
                     {group.symbols.map((symbol) => {
                       const isSelected = selectedSymbols.includes(symbol.name);
                       const canSelect = selectedSymbols.length < 10 || isSelected;
+                      const showTooltip = tooltipSymbol === symbol.name;
                       
                       return (
-                        <div key={symbol.name} className="relative">
+                        <div key={symbol.name} className="relative info-tooltip-container">
                           <Card
                             className={`
                               cursor-pointer transition-all p-3 flex flex-col items-center gap-2 relative
@@ -115,30 +136,17 @@ const AdinkraSymbolSelector: React.FC<AdinkraSymbolSelectorProps> = ({ selectedS
                             `}
                             onClick={() => canSelect && toggleSymbol(symbol.name)}
                           >
-                            {/* Info Icon with Tooltip */}
-                            <Tooltip>
-                              <TooltipTrigger asChild>
-                                <button
-                                  type="button"
-                                  className="absolute top-1 right-1 w-5 h-5 min-w-5 min-h-5 p-0 rounded-full bg-pink-100 hover:bg-pink-200 flex items-center justify-center z-10 transition-colors shadow-md flex-shrink-0 border border-pink-200"
-                                  onClick={(e) => {
-                                    e.stopPropagation();
-                                  }}
-                                >
-                                  <span className="text-pink-700 text-[10px] font-bold leading-none">!</span>
-                                </button>
-                              </TooltipTrigger>
-                              <TooltipContent 
-                                side="top" 
-                                align="center"
-                                className="max-w-[200px] z-50"
-                                sideOffset={5}
-                                collisionPadding={10}
-                              >
-                                <p className="font-medium mb-1 text-xs">{symbol.name}</p>
-                                <p className="text-muted-foreground text-xs">{symbol.meaning}</p>
-                              </TooltipContent>
-                            </Tooltip>
+                            {/* Info Icon */}
+                            <button
+                              type="button"
+                              className="absolute top-1 right-1 w-5 h-5 min-w-5 min-h-5 p-0 rounded-full bg-pink-100 hover:bg-pink-200 flex items-center justify-center z-10 transition-colors shadow-md flex-shrink-0 border border-pink-200"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                setTooltipSymbol(showTooltip ? null : symbol.name);
+                              }}
+                            >
+                              <span className="text-pink-700 text-[10px] font-bold leading-none">!</span>
+                            </button>
 
                             <div 
                               className="w-12 h-12 flex-shrink-0"
@@ -151,6 +159,19 @@ const AdinkraSymbolSelector: React.FC<AdinkraSymbolSelectorProps> = ({ selectedS
                               <div className="w-full h-1 bg-primary rounded-full" />
                             )}
                           </Card>
+
+                          {/* Tooltip */}
+                          {showTooltip && (
+                            <div className="absolute bottom-full left-1/2 transform -translate-x-1/2 mb-2 z-20 w-48">
+                              <div className="bg-popover text-popover-foreground p-2 rounded-lg shadow-lg border text-xs">
+                                <p className="font-medium mb-1">{symbol.name}</p>
+                                <p className="text-muted-foreground">{symbol.meaning}</p>
+                                <div className="absolute top-full left-1/2 transform -translate-x-1/2 -mt-1">
+                                  <div className="border-8 border-transparent border-t-popover"></div>
+                                </div>
+                              </div>
+                            </div>
+                          )}
                         </div>
                       );
                     })}
@@ -178,7 +199,6 @@ const AdinkraSymbolSelector: React.FC<AdinkraSymbolSelectorProps> = ({ selectedS
         )}
       </div>
     </div>
-    </TooltipProvider>
   );
 };
 
