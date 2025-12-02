@@ -13,6 +13,7 @@ export interface SymbolGroup {
   ethnicGroup: string;
   use: string;
   notes: string;
+  description: string; // Brief explanation of the symbol system's origin and significance
   symbols: AfricanSymbol[];
 }
 
@@ -24,6 +25,7 @@ export const AFRICAN_SYMBOL_GROUPS: SymbolGroup[] = [
     ethnicGroup: 'Akan',
     use: 'Proverbs, values, wisdom',
     notes: 'Over 400 years old, widely used across Ghana and diaspora',
+    description: 'Adinkra symbols originated from the Akan people of Ghana over 400 years ago. These visual symbols represent concepts, proverbs, and aphorisms, traditionally printed on cloth for special occasions. Each symbol carries deep philosophical meaning passed down through generations.',
     symbols: [
       {
         name: 'Gye Nyame',
@@ -84,6 +86,7 @@ export const AFRICAN_SYMBOL_GROUPS: SymbolGroup[] = [
     ethnicGroup: 'Ejagham, Igbo, Efik',
     use: 'Communication, rituals, love letters, justice symbols',
     notes: 'One of Africa\'s oldest symbol systems (over 1,000 years old)',
+    description: 'Nsibidi is an ancient ideographic writing system from southeastern Nigeria, created by the Ejagham people. Dating back thousands of years, it was used by secret societies for communication and record-keeping, making it one of Africa\'s oldest indigenous writing systems.',
     symbols: [
       {
         name: 'Love',
@@ -134,6 +137,7 @@ export const AFRICAN_SYMBOL_GROUPS: SymbolGroup[] = [
     ethnicGroup: 'Amhara, Tigray',
     use: 'Protection, religious texts, healing scrolls',
     notes: 'Ancient Christian mystical symbols drawn on parchment scrolls',
+    description: 'Ethiopian Ge\'ez symbols are mystical protective signs rooted in ancient Ethiopian Christianity, one of the world\'s oldest Christian traditions. These sacred symbols appear on healing scrolls, religious manuscripts, and talismans, combining indigenous spiritual practices with Orthodox Christian iconography. They serve as powerful protective emblems believed to ward off evil and bring divine blessings.',
     symbols: [
       {
         name: 'Cross of Lalibela',
@@ -169,6 +173,7 @@ export const AFRICAN_SYMBOL_GROUPS: SymbolGroup[] = [
     ethnicGroup: 'Yoruba',
     use: 'Spiritual wisdom, proverbs, divination',
     notes: '256 Ifá symbols representing deep meaning',
+    description: 'Ifá is an ancient Yoruba divination system containing 256 sacred symbols (Odù Ifá) that encode profound spiritual wisdom and philosophical teachings. Originating from the Yoruba people of West Africa, this complex system has been practiced for thousands of years by Babalawos (priests) to provide guidance, preserve oral history, and maintain cosmic balance. Each symbol represents intricate combinations of spiritual forces and ancestral knowledge.',
     symbols: [
       {
         name: 'Eji Ogbe',
@@ -204,6 +209,7 @@ export const AFRICAN_SYMBOL_GROUPS: SymbolGroup[] = [
     ethnicGroup: 'Great Zimbabwe Culture',
     use: 'Spiritual kingship, identity',
     notes: 'Derived from the ancient stone city of Great Zimbabwe',
+    description: 'Symbols from Great Zimbabwe represent one of medieval Africa\'s most remarkable civilizations, flourishing between the 11th and 15th centuries. The iconic Zimbabwe Bird and architectural patterns derive from this ancient stone city, which served as a powerful trading empire. These symbols embody royal authority, architectural achievement, and the enduring cultural heritage of the Shona people.',
     symbols: [
       {
         name: 'Zimbabwe Bird',
@@ -234,6 +240,7 @@ export const AFRICAN_SYMBOL_GROUPS: SymbolGroup[] = [
     ethnicGroup: 'San/Bushman (Khoisan)',
     use: 'Hunting, rituals, healing dances, storytelling',
     notes: 'Some symbols are 20,000+ years old',
+    description: 'San (Bushman) rock art represents humanity\'s oldest continuous artistic tradition, with some symbols dating back over 20,000 years. Created by the indigenous Khoisan peoples of southern Africa, these sacred images record spiritual experiences, hunting knowledge, healing rituals, and trance dances. The symbols preserve ancient wisdom about the relationship between the physical and spiritual worlds.',
     symbols: [
       {
         name: 'Hunter',
@@ -269,6 +276,7 @@ export const AFRICAN_SYMBOL_GROUPS: SymbolGroup[] = [
     ethnicGroup: 'Bakongo',
     use: 'Life cycle, spirituality, ancestral world',
     notes: 'A cross inside a circle showing sunrise, noon, sunset, night',
+    description: 'The Bakongo cosmogram (Dikenga dia Kongo) is a profound spiritual diagram representing the cycle of life, death, and rebirth. Created by the Bakongo people of Central Africa, this cross-within-circle symbol maps the journey of the soul through four cosmic moments mirroring the sun\'s daily path. It illustrates the connection between the living world and the ancestral realm, serving as a fundamental framework for Kongo spiritual philosophy.',
     symbols: [
       {
         name: 'Dikenga',
@@ -299,6 +307,7 @@ export const AFRICAN_SYMBOL_GROUPS: SymbolGroup[] = [
     ethnicGroup: 'Dogon',
     use: 'Cosmology, astronomy, spiritual truths',
     notes: 'Strong symbolic system linked to the stars (Sirius)',
+    description: 'Dogon symbols encode sophisticated astronomical and cosmological knowledge from the Dogon people of Mali\'s Bandiagara Escarpment. Their intricate symbolic system, particularly focused on the Sirius star system, represents creation myths, spiritual concepts, and celestial observations passed down through millennia. These symbols reflect the Dogon\'s deep understanding of the cosmos and their role within the universal order.',
     symbols: [
       {
         name: 'Sirius Star',
@@ -329,6 +338,7 @@ export const AFRICAN_SYMBOL_GROUPS: SymbolGroup[] = [
     ethnicGroup: 'Amazigh (Berber)',
     use: 'Writing system, tribal identity, jewelry',
     notes: 'Tifinagh is one of Africa\'s oldest alphabets',
+    description: 'Amazigh (Berber) symbols, particularly the Tifinagh script, represent one of Africa\'s oldest writing systems, dating back over 2,500 years. These distinctive geometric symbols serve as both alphabet and cultural identity markers for the indigenous peoples of North Africa. Featured in jewelry, textiles, and tattoos, they embody the enduring spirit of Amazigh freedom, resilience, and cultural pride across the Maghreb region.',
     symbols: [
       {
         name: 'Yaz (ⵣ)',
@@ -359,6 +369,7 @@ export const AFRICAN_SYMBOL_GROUPS: SymbolGroup[] = [
     ethnicGroup: 'Ancient Egyptians',
     use: 'Writing, rituals, kingship',
     notes: 'The entire writing system was based on symbols',
+    description: 'Egyptian hieroglyphs form one of the world\'s oldest and most iconic writing systems, used for over 3,000 years in ancient Egypt. These sacred symbols combined phonetic, logographic, and symbolic meanings to record everything from royal decrees to religious texts and everyday life. Beyond mere writing, hieroglyphs embodied profound spiritual concepts and were believed to possess magical power, making them central to Egyptian religion, kingship, and the pursuit of eternal life.',
     symbols: [
       {
         name: 'Ankh',
@@ -394,6 +405,7 @@ export const AFRICAN_SYMBOL_GROUPS: SymbolGroup[] = [
     ethnicGroup: 'Global (Western Culture)',
     use: 'Personality traits, destiny, compatibility',
     notes: 'Ancient Babylonian system based on constellations and birth dates',
+    description: 'The Western zodiac originated from ancient Babylonian astronomy over 2,000 years ago and was later refined by Greek and Roman civilizations. This system divides the ecliptic into twelve signs corresponding to constellations, each associated with specific personality traits, elements, and mythological archetypes. Used globally for understanding character, predicting compatibility, and exploring life patterns based on birth dates.',
     symbols: [
       {
         name: 'Aries',
@@ -464,6 +476,7 @@ export const AFRICAN_SYMBOL_GROUPS: SymbolGroup[] = [
     ethnicGroup: 'East Asian Culture',
     use: 'Personality, fortune, compatibility, lunar calendar',
     notes: '12-year cycle based on lunar calendar, over 3,000 years old',
+    description: 'The Chinese zodiac is an ancient astrological system with roots stretching back over 3,000 years, based on a twelve-year cycle with each year represented by an animal. Deeply integrated with Chinese philosophy, lunar calendar, and cultural traditions, each animal embodies specific personality traits and fortunes. This system influences major life decisions, compatibility assessments, and cultural celebrations across East Asian societies.',
     symbols: [
       {
         name: 'Rat',

@@ -12,7 +12,7 @@ export const validateRegistrationForm = (formData: any) => {
   // Country is now optional per Apple's App Store guidelines
   if (!formData.gender) newErrors.gender = 'Gender is required';
   if (!formData.preference) newErrors.preference = 'Preference is required';
-  if (!formData.adinkraSymbols || formData.adinkraSymbols.length === 0) newErrors.adinkraSymbols = 'Please select at least 1 Adinkra symbol';
+  if (!formData.adinkraSymbols || formData.adinkraSymbols.length === 0) newErrors.adinkraSymbols = 'Please select at least 1 cultural sign';
 
   // Email validation
   const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;

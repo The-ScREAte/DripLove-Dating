@@ -734,6 +734,59 @@ const RegistrationForm = ({ onSubmit, onBackToLogin }: RegistrationFormProps) =>
             onTogglePassword={() => setShowPassword(!showPassword)}
             onToggleConfirmPassword={() => setShowConfirmPassword(!showConfirmPassword)}
           />
+
+          {/* Work & Education */}
+          <div className="space-y-4 animate-scale-in">
+            <h4 className="text-lg font-semibold text-gray-800">{t('registration.workEducation')}</h4>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label className="text-sm font-medium">{t('profile.occupation')}</Label>
+                <Select value={formData.occupation} onValueChange={(value) => handleSelectChange('occupation', value)}>
+                  <SelectTrigger className={`border-gray-200 focus:border-pink-400 focus:ring-pink-400 ${errors.occupation ? 'border-red-500' : ''}`}>
+                    <SelectValue placeholder={t('registration.selectOccupation')} />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {occupationOptions.map(option => (
+                      <SelectItem key={option} value={option}>{option}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                {errors.occupation && <p className="text-red-500 text-xs mt-1">{errors.occupation}</p>}
+              </div>
+              <div className="space-y-2">
+                <Label className="text-sm font-medium">{t('profile.industry')}</Label>
+                <Select value={formData.industry} onValueChange={(value) => handleSelectChange('industry', value)}>
+                  <SelectTrigger className={`border-gray-200 focus:border-pink-400 focus:ring-pink-400 ${errors.industry ? 'border-red-500' : ''}`}>
+                    <SelectValue placeholder={t('registration.selectIndustry')} />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {industryOptions.map(option => (
+                      <SelectItem key={option} value={option}>{option}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                {errors.industry && <p className="text-red-500 text-xs mt-1">{errors.industry}</p>}
+              </div>
+            </div>
+            <div className="space-y-2">
+              <Label className="text-sm font-medium">{t('registration.educationLevel')}</Label>
+              <Select value={formData.educationLevel} onValueChange={(value) => handleSelectChange('educationLevel', value)}>
+                <SelectTrigger className={`border-gray-200 focus:border-pink-400 focus:ring-pink-400 ${errors.educationLevel ? 'border-red-500' : ''}`}>
+                  <SelectValue placeholder={t('registration.selectEducation')} />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="High School">{t('registration.highSchool')}</SelectItem>
+                  <SelectItem value="Some College">{t('registration.someCollege')}</SelectItem>
+                  <SelectItem value="Associate Degree">{t('registration.associateDegree')}</SelectItem>
+                  <SelectItem value="Bachelor's Degree">{t('registration.bachelorsDegree')}</SelectItem>
+                  <SelectItem value="Master's Degree">{t('registration.mastersDegree')}</SelectItem>
+                  <SelectItem value="Doctorate">{t('registration.doctorate')}</SelectItem>
+                  <SelectItem value="Other">{t('registration.other')}</SelectItem>
+                </SelectContent>
+              </Select>
+              {errors.educationLevel && <p className="text-red-500 text-xs mt-1">{errors.educationLevel}</p>}
+            </div>
+          </div>
           
           {/* Location Section */}
           <div className="animate-scale-in">
@@ -805,69 +858,15 @@ const RegistrationForm = ({ onSubmit, onBackToLogin }: RegistrationFormProps) =>
             {errors.relationshipIntent && <p className="text-red-500 text-xs mt-1">{errors.relationshipIntent}</p>}
           </div>
 
-          {/* Work & Education */}
-          <div className="space-y-4 animate-scale-in">
-            <h4 className="text-lg font-semibold text-gray-800">{t('registration.workEducation')}</h4>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div className="space-y-2">
-                <Label className="text-sm font-medium">{t('profile.occupation')}</Label>
-                <Select value={formData.occupation} onValueChange={(value) => handleSelectChange('occupation', value)}>
-                  <SelectTrigger className={`border-gray-200 focus:border-pink-400 focus:ring-pink-400 ${errors.occupation ? 'border-red-500' : ''}`}>
-                    <SelectValue placeholder={t('registration.selectOccupation')} />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {occupationOptions.map(option => (
-                      <SelectItem key={option} value={option}>{option}</SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-                {errors.occupation && <p className="text-red-500 text-xs mt-1">{errors.occupation}</p>}
-              </div>
-              <div className="space-y-2">
-                <Label className="text-sm font-medium">{t('profile.industry')}</Label>
-                <Select value={formData.industry} onValueChange={(value) => handleSelectChange('industry', value)}>
-                  <SelectTrigger className={`border-gray-200 focus:border-pink-400 focus:ring-pink-400 ${errors.industry ? 'border-red-500' : ''}`}>
-                    <SelectValue placeholder={t('registration.selectIndustry')} />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {industryOptions.map(option => (
-                      <SelectItem key={option} value={option}>{option}</SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-                {errors.industry && <p className="text-red-500 text-xs mt-1">{errors.industry}</p>}
-              </div>
-            </div>
-            <div className="space-y-2">
-              <Label className="text-sm font-medium">{t('registration.educationLevel')}</Label>
-              <Select value={formData.educationLevel} onValueChange={(value) => handleSelectChange('educationLevel', value)}>
-                <SelectTrigger className={`border-gray-200 focus:border-pink-400 focus:ring-pink-400 ${errors.educationLevel ? 'border-red-500' : ''}`}>
-                  <SelectValue placeholder={t('registration.selectEducation')} />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="High School">{t('registration.highSchool')}</SelectItem>
-                  <SelectItem value="Some College">{t('registration.someCollege')}</SelectItem>
-                  <SelectItem value="Associate Degree">{t('registration.associateDegree')}</SelectItem>
-                  <SelectItem value="Bachelor's Degree">{t('registration.bachelorsDegree')}</SelectItem>
-                  <SelectItem value="Master's Degree">{t('registration.mastersDegree')}</SelectItem>
-                  <SelectItem value="Doctorate">{t('registration.doctorate')}</SelectItem>
-                  <SelectItem value="Other">{t('registration.other')}</SelectItem>
-                </SelectContent>
-              </Select>
-              {errors.educationLevel && <p className="text-red-500 text-xs mt-1">{errors.educationLevel}</p>}
-            </div>
-
             {/* Adinkra Symbols Selector */}
             <div className="space-y-4 mt-6 animate-scale-in">
-              <h4 className="text-lg font-semibold text-gray-800">{t('registration.adinkraSymbols')}</h4>
-              <p className="text-sm text-gray-600">{t('registration.selectSymbolsDescription')}</p>
               <AdinkraSymbolSelector
                 selectedSymbols={formData.adinkraSymbols}
                 onChange={(symbols) => setFormData({ ...formData, adinkraSymbols: symbols })}
+                userCountry={formData.country}
               />
               {errors.adinkraSymbols && <p className="text-red-500 text-xs mt-1">{errors.adinkraSymbols}</p>}
             </div>
-          </div>
           </div>
           )}
 

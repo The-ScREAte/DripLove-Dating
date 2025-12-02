@@ -964,7 +964,7 @@ const LikedMePage = ({ currentUser, isPremium = false }: LikedMePageProps) => {
                       <div className="flex items-start gap-2">
                         <div className="w-4 h-4 flex-shrink-0 mt-0.5 text-center">✨</div>
                         <div className="w-full">
-                          <p className="text-xs text-gray-600 mb-1">Adinkra Symbols</p>
+                          <p className="text-xs text-gray-600 mb-1">Cultural Signs</p>
                           <div className="flex flex-wrap gap-1">
                             {selectedProfile.adinkra_symbols.map((symbol: string, index: number) => (
                               <span key={index} className="px-2 py-1 bg-primary/10 rounded-full text-xs text-primary font-medium">

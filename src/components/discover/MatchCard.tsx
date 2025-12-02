@@ -566,7 +566,7 @@ const MatchCard: React.FC<MatchCardProps> = ({
             </div>
           )}
 
-          {/* Optimized Adinkra glow effect */}
+          {/* Optimized cultural sign glow effect */}
           {match.adinkra_symbols && match.adinkra_symbols.length > 0 && (
             <div 
               className="absolute left-1/2 transform -translate-x-1/2 z-10"
@@ -584,7 +584,7 @@ const MatchCard: React.FC<MatchCardProps> = ({
                     }}
                   ></div>
 
-                  {/* Adinkra Symbol */}
+                  {/* Cultural Sign Symbol */}
                   <div className="relative z-10">
                     <UserAdinkraDisplay adinkraSymbols={match.adinkra_symbols} />
                   </div>

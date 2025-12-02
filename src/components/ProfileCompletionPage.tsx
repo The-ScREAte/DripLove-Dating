@@ -416,7 +416,7 @@ const ProfileCompletionPage = () => {
     if (!formData.occupation) validationErrors.occupation = t('profileCompletion.errors.occupationRequired');
     if (!formData.industry) validationErrors.industry = t('profileCompletion.errors.industryRequired');
     if (!formData.educationLevel) validationErrors.educationLevel = t('profileCompletion.errors.educationRequired');
-    if (!formData.adinkraSymbols || formData.adinkraSymbols.length === 0) validationErrors.adinkraSymbols = 'Please select at least 1 Adinkra symbol';
+    if (!formData.adinkraSymbols || formData.adinkraSymbols.length === 0) validationErrors.adinkraSymbols = 'Please select at least 1 cultural sign';
 
     // Validate images
     const approvedImages = images.filter(img => img.status === 'approved' || img.status === 'pending');
@@ -766,20 +766,6 @@ const ProfileCompletionPage = () => {
                     </div>
                   </div>
 
-                  <div className="space-y-4">
-                    <h3 className="text-lg font-semibold text-gray-800">Location</h3>
-                    <p className="text-sm text-gray-600">City is required. Country is optional but helps improve matches.</p>
-                    <LocationInput
-                      country={formData.country}
-                      city={formData.city}
-                      zipCode={formData.zipCode}
-                      onLocationChange={handleLocationChange}
-                      errors={errors}
-                      required={false}
-                      autoDetect={true}
-                    />
-                  </div>
-
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <div className="space-y-2">
                       <label className="text-sm font-medium text-gray-700">{t('profileCompletion.occupation')} *</label>
@@ -844,13 +830,26 @@ const ProfileCompletionPage = () => {
                     {errors.educationLevel && <p className="text-sm text-red-500">{errors.educationLevel}</p>}
                   </div>
 
+                  <div className="space-y-4">
+                    <h3 className="text-lg font-semibold text-gray-800">Location</h3>
+                    <p className="text-sm text-gray-600">City is required. Country is optional but helps improve matches.</p>
+                    <LocationInput
+                      country={formData.country}
+                      city={formData.city}
+                      zipCode={formData.zipCode}
+                      onLocationChange={handleLocationChange}
+                      errors={errors}
+                      required={false}
+                      autoDetect={true}
+                    />
+                  </div>
+
                   {/* Adinkra Symbols Selector */}
                   <div className="space-y-4 mt-6">
-                    <h3 className="text-lg font-semibold text-gray-800">{t('registration.adinkraSymbols')}</h3>
-                    <p className="text-sm text-gray-600">{t('registration.selectSymbolsDescription')}</p>
                     <AdinkraSymbolSelector
                       selectedSymbols={formData.adinkraSymbols}
                       onChange={(symbols) => setFormData({ ...formData, adinkraSymbols: symbols })}
+                      userCountry={formData.country}
                     />
                     {errors.adinkraSymbols && <p className="text-sm text-red-500">{errors.adinkraSymbols}</p>}
                   </div>

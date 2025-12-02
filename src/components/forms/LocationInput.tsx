@@ -521,21 +521,6 @@ const LocationInput = ({
           )}
         </div>
       )}
-
-      {/* Location Summary */}
-      {selectedCountryCode && cityInput && (
-        <div className="p-3 bg-blue-50 rounded-lg">
-          <div className="text-sm font-medium text-blue-800 mb-1">Your Location</div>
-          <div className="text-sm text-blue-600">
-            📍 {cityInput}, {selectedCountryData?.name}
-            {coordinates.lat && coordinates.lng && (
-              <div className="text-xs text-blue-500 mt-1">
-                Coordinates: {coordinates.lat.toFixed(4)}, {coordinates.lng.toFixed(4)}
-              </div>
-            )}
-          </div>
-        </div>
-      )}
     </div>
   );
 };
