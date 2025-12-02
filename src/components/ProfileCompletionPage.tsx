@@ -845,7 +845,9 @@ const ProfileCompletionPage = () => {
                   </div>
 
                   {/* Adinkra Symbols Selector */}
-                  <div className="space-y-4">
+                  <div className="space-y-4 mt-6">
+                    <h3 className="text-lg font-semibold text-gray-800">{t('registration.adinkraSymbols')}</h3>
+                    <p className="text-sm text-gray-600">{t('registration.selectSymbolsDescription')}</p>
                     <AdinkraSymbolSelector
                       selectedSymbols={formData.adinkraSymbols}
                       onChange={(symbols) => setFormData({ ...formData, adinkraSymbols: symbols })}
