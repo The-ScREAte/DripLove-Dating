@@ -638,7 +638,6 @@ const ProfilePage = ({ currentUser, profile, onProfileUpdate, onLogout, onShowTe
             isEditing={isEditing} 
             onInputChange={handleInputChange} 
           />
-          <div className="mb-2" />
           <CollapsibleSection
             title={t('profile.photos')}
             isOpen={showPhotoSection}
@@ -646,7 +645,6 @@ const ProfilePage = ({ currentUser, profile, onProfileUpdate, onLogout, onShowTe
           >
             <ImageManagement currentUser={currentUser} />
           </CollapsibleSection>
-          <div className="mb-2" />
           <CollapsibleSection
             title={t('profile.location')}
             isOpen={showLocationSection}
@@ -661,7 +659,6 @@ const ProfilePage = ({ currentUser, profile, onProfileUpdate, onLogout, onShowTe
               onDistanceChange={handleDistanceChange}
             />
           </CollapsibleSection>
-          <div className="mb-2" />
           <CollapsibleSection
             title={t('profile.preferences')}
             isOpen={showPreferencesSection}
@@ -675,7 +672,6 @@ const ProfilePage = ({ currentUser, profile, onProfileUpdate, onLogout, onShowTe
               onAgeRangeChange={handleAgeRangeChange} 
             />
           </CollapsibleSection>
-          <div className="mb-2" />
           <CollapsibleSection
             title={t('profile.lifestyle')}
             isOpen={showLifestyleSection}
@@ -687,7 +683,6 @@ const ProfilePage = ({ currentUser, profile, onProfileUpdate, onLogout, onShowTe
               onSelectChange={handleSelectChange} 
             />
           </CollapsibleSection>
-          <div className="mb-2" />
           <CollapsibleSection
             title={t('profile.workEducation')}
             isOpen={showWorkEducationSection}
@@ -699,7 +694,6 @@ const ProfilePage = ({ currentUser, profile, onProfileUpdate, onLogout, onShowTe
               onInputChange={handleInputChange} 
             />
           </CollapsibleSection>
-          <div className="mb-2" />
           <CollapsibleSection
             title={t('profile.personality')}
             isOpen={showPersonalitySection}
@@ -711,7 +705,6 @@ const ProfilePage = ({ currentUser, profile, onProfileUpdate, onLogout, onShowTe
               onSliderChange={handleSliderChange} 
             />
           </CollapsibleSection>
-          <div className="mb-2" />
           <CollapsibleSection
             title={t('profile.funQuestions')}
             isOpen={showFunQuestionsSection}
@@ -723,7 +716,6 @@ const ProfilePage = ({ currentUser, profile, onProfileUpdate, onLogout, onShowTe
               onInputChange={handleInputChange} 
             />
           </CollapsibleSection>
-          <div className="mb-2" />
           <CollapsibleSection
             title={t('profile.interests')}
             isOpen={showInterestsSection}
@@ -736,7 +728,6 @@ const ProfilePage = ({ currentUser, profile, onProfileUpdate, onLogout, onShowTe
               onInterestsChange={handleInterestsChange} 
             />
           </CollapsibleSection>
-          <div className="mb-2" />
           <CollapsibleSection
             title={t('profile.adinkra')}
             isOpen={showAdinkraSection}
@@ -764,7 +755,6 @@ const ProfilePage = ({ currentUser, profile, onProfileUpdate, onLogout, onShowTe
               onLanguageChange={handleLanguageChange}
             />
           </CollapsibleSection>
-          <div className="mb-2" />
         </div>
         {/* Move Logout to the bottom of the page */}
         <div className="mt-2 flex flex-col items-center gap-4 w-full">
