@@ -642,6 +642,7 @@ const ProfilePage = ({ currentUser, profile, onProfileUpdate, onLogout, onShowTe
             title={t('profile.photos')}
             isOpen={showPhotoSection}
             onToggle={() => setShowPhotoSection(!showPhotoSection)}
+            className="mt-3"
           >
             <ImageManagement currentUser={currentUser} />
           </CollapsibleSection>
@@ -649,7 +650,7 @@ const ProfilePage = ({ currentUser, profile, onProfileUpdate, onLogout, onShowTe
             title={t('profile.location')}
             isOpen={showLocationSection}
             onToggle={() => setShowLocationSection(!showLocationSection)}
-            className="mt-2"
+            className="mt-3"
           >
             <LocationSection 
               editedProfile={editedProfile} 
@@ -663,6 +664,7 @@ const ProfilePage = ({ currentUser, profile, onProfileUpdate, onLogout, onShowTe
             title={t('profile.preferences')}
             isOpen={showPreferencesSection}
             onToggle={() => setShowPreferencesSection(!showPreferencesSection)}
+            className="mt-3"
           >
             <PreferencesSection 
               editedProfile={editedProfile} 
@@ -676,6 +678,7 @@ const ProfilePage = ({ currentUser, profile, onProfileUpdate, onLogout, onShowTe
             title={t('profile.lifestyle')}
             isOpen={showLifestyleSection}
             onToggle={() => setShowLifestyleSection(!showLifestyleSection)}
+            className="mt-3"
           >
             <LifestyleSection 
               editedProfile={editedProfile} 
@@ -687,6 +690,7 @@ const ProfilePage = ({ currentUser, profile, onProfileUpdate, onLogout, onShowTe
             title={t('profile.workEducation')}
             isOpen={showWorkEducationSection}
             onToggle={() => setShowWorkEducationSection(!showWorkEducationSection)}
+            className="mt-3"
           >
             <WorkEducationSection 
               editedProfile={editedProfile} 
@@ -698,6 +702,7 @@ const ProfilePage = ({ currentUser, profile, onProfileUpdate, onLogout, onShowTe
             title={t('profile.personality')}
             isOpen={showPersonalitySection}
             onToggle={() => setShowPersonalitySection(!showPersonalitySection)}
+            className="mt-3"
           >
             <PersonalitySection 
               editedProfile={editedProfile} 
@@ -709,6 +714,7 @@ const ProfilePage = ({ currentUser, profile, onProfileUpdate, onLogout, onShowTe
             title={t('profile.funQuestions')}
             isOpen={showFunQuestionsSection}
             onToggle={() => setShowFunQuestionsSection(!showFunQuestionsSection)}
+            className="mt-3"
           >
             <FunQuestionsSection 
               editedProfile={editedProfile} 
@@ -720,6 +726,7 @@ const ProfilePage = ({ currentUser, profile, onProfileUpdate, onLogout, onShowTe
             title={t('profile.interests')}
             isOpen={showInterestsSection}
             onToggle={() => setShowInterestsSection(!showInterestsSection)}
+            className="mt-3"
           >
             <InterestsSection 
               editedProfile={editedProfile} 
@@ -732,6 +739,7 @@ const ProfilePage = ({ currentUser, profile, onProfileUpdate, onLogout, onShowTe
             title={t('profile.adinkra')}
             isOpen={showAdinkraSection}
             onToggle={() => setShowAdinkraSection(!showAdinkraSection)}
+            className="mt-3"
           >
             <AdinkraSection 
               editedProfile={editedProfile} 
@@ -740,11 +748,11 @@ const ProfilePage = ({ currentUser, profile, onProfileUpdate, onLogout, onShowTe
               onAdinkraChange={handleAdinkraChange} 
             />
           </CollapsibleSection>
-          <div className="mb-2" />
           <CollapsibleSection
             title={t('profile.accountActions')}
             isOpen={showAccountActionsSection}
             onToggle={() => setShowAccountActionsSection(!showAccountActionsSection)}
+            className="mt-3"
           >
             {/* Only show the rest of the account actions here, not logout/terms/privacy */}
             <AccountActions 
