@@ -3,9 +3,13 @@ import { useTranslation } from 'react-i18next';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Checkbox } from '@/components/ui/checkbox';
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Heart, Shield, Users, FileText, ExternalLink } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
+import { ScrollArea } from '@/components/ui/scroll-area';
+import TermsOfService from './TermsOfService';
+import PrivacyPolicy from './PrivacyPolicy';
 
 interface TermsAcceptanceProps {
   user: any;
@@ -16,6 +20,8 @@ const TermsAcceptance = ({ user, onAccept }: TermsAcceptanceProps) => {
   const { t } = useTranslation();
   const [termsAccepted, setTermsAccepted] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [showTerms, setShowTerms] = useState(false);
+  const [showPrivacy, setShowPrivacy] = useState(false);
   const { toast } = useToast();
 
   const handleAccept = async () => {
@@ -116,26 +122,22 @@ const TermsAcceptance = ({ user, onAccept }: TermsAcceptanceProps) => {
 
           {/* Document Links */}
           <div className="flex gap-2 justify-center flex-wrap">
-            <a
-              href="/terms-of-service"
-              target="_blank"
-              rel="noopener noreferrer"
+            <button
+              onClick={() => setShowTerms(true)}
               className="inline-flex items-center gap-2 px-4 py-2 bg-pink-100 hover:bg-pink-200 text-pink-700 rounded-full text-sm font-medium transition-colors border border-pink-200"
             >
               <FileText className="w-4 h-4" />
               Terms of Service
               <ExternalLink className="w-3 h-3" />
-            </a>
-            <a
-              href="/privacy-policy"
-              target="_blank"
-              rel="noopener noreferrer"
+            </button>
+            <button
+              onClick={() => setShowPrivacy(true)}
               className="inline-flex items-center gap-2 px-4 py-2 bg-purple-100 hover:bg-purple-200 text-purple-700 rounded-full text-sm font-medium transition-colors border border-purple-200"
             >
               <Shield className="w-4 h-4" />
               Privacy Policy
               <ExternalLink className="w-3 h-3" />
-            </a>
+            </button>
           </div>
 
           {/* Acceptance Checkbox */}
@@ -166,6 +168,24 @@ const TermsAcceptance = ({ user, onAccept }: TermsAcceptanceProps) => {
           </Button>
         </CardContent>
       </Card>
+
+      {/* Terms of Service Dialog */}
+      <Dialog open={showTerms} onOpenChange={setShowTerms}>
+        <DialogContent className="max-w-4xl max-h-[90vh] p-0">
+          <ScrollArea className="h-full">
+            <TermsOfService onBack={() => setShowTerms(false)} />
+          </ScrollArea>
+        </DialogContent>
+      </Dialog>
+
+      {/* Privacy Policy Dialog */}
+      <Dialog open={showPrivacy} onOpenChange={setShowPrivacy}>
+        <DialogContent className="max-w-4xl max-h-[90vh] p-0">
+          <ScrollArea className="h-full">
+            <PrivacyPolicy onBack={() => setShowPrivacy(false)} />
+          </ScrollArea>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 };
