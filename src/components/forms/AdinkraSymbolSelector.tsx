@@ -55,7 +55,7 @@ const AdinkraSymbolSelector: React.FC<AdinkraSymbolSelectorProps> = ({ selectedS
               <span className="text-pink-700 text-sm font-bold leading-none">!</span>
             </button>
             {showInfoTooltip && (
-              <div className="absolute top-full left-1/2 transform -translate-x-1/2 mt-2 z-30 w-64">
+              <div className="absolute top-full left-1/2 transform -translate-x-1/2 mt-2 z-[9999] w-64">
                 <div className="bg-popover text-popover-foreground p-2.5 rounded-lg shadow-lg border">
                   <p className="text-xs">
                     <span className="font-semibold text-purple-700">ℹ️ African Symbols</span>
@@ -82,7 +82,7 @@ const AdinkraSymbolSelector: React.FC<AdinkraSymbolSelectorProps> = ({ selectedS
           const selectedInGroup = group.symbols.filter(s => selectedSymbols.includes(s.name)).length;
           
           return (
-            <Card key={group.id} className="overflow-hidden">
+            <Card key={group.id} className="overflow-visible">
               {/* Group Header */}
               <button
                 type="button"
@@ -112,7 +112,7 @@ const AdinkraSymbolSelector: React.FC<AdinkraSymbolSelectorProps> = ({ selectedS
 
               {/* Group Content */}
               {isExpanded && (
-                <div className="px-3 pb-3 pt-1 border-t bg-muted/20">
+                <div className="px-3 pb-3 pt-1 border-t bg-muted/20 overflow-visible">
                   <p className="text-[10px] text-muted-foreground mb-2 italic">
                     ℹ️ {group.notes}
                   </p>
@@ -162,7 +162,7 @@ const AdinkraSymbolSelector: React.FC<AdinkraSymbolSelectorProps> = ({ selectedS
 
                           {/* Tooltip */}
                           {showTooltip && (
-                            <div className="absolute bottom-full left-1/2 transform -translate-x-1/2 mb-2 z-20 w-48">
+                            <div className="absolute bottom-full left-1/2 transform -translate-x-1/2 mb-2 z-[9999] w-48">
                               <div className="bg-popover text-popover-foreground p-2 rounded-lg shadow-lg border text-xs">
                                 <p className="font-medium mb-1">{symbol.name}</p>
                                 <p className="text-muted-foreground">{symbol.meaning}</p>
