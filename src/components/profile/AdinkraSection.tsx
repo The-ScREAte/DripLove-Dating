@@ -166,7 +166,7 @@ const AdinkraSection = ({ editedProfile, profile, isEditing, onAdinkraChange }: 
                 >
                   <div className="flex items-center gap-2">
                     <span className="text-xl">🌍</span>
-                    <span className="font-semibold">Browse Countries & Symbols</span>
+                    <span className="font-semibold">Browse Other Signs</span>
                     <span className="text-xs text-muted-foreground">({AFRICAN_SYMBOL_GROUPS.length} groups)</span>
                   </div>
                   {showOtherCountries ? (

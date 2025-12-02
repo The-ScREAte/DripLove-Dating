@@ -124,19 +124,19 @@ const TermsAcceptance = ({ user, onAccept }: TermsAcceptanceProps) => {
           <div className="flex gap-2 justify-center flex-wrap">
             <button
               onClick={() => setShowTerms(true)}
-              className="inline-flex items-center gap-2 px-4 py-2 bg-pink-100 hover:bg-pink-200 text-pink-700 rounded-full text-sm font-medium transition-colors border border-pink-200"
+              className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-pink-100 hover:bg-pink-200 text-pink-700 rounded-full text-xs font-medium transition-colors border border-pink-200"
             >
-              <FileText className="w-4 h-4" />
+              <FileText className="w-3 h-3" />
               Terms of Service
-              <ExternalLink className="w-3 h-3" />
+              <ExternalLink className="w-2.5 h-2.5" />
             </button>
             <button
               onClick={() => setShowPrivacy(true)}
-              className="inline-flex items-center gap-2 px-4 py-2 bg-purple-100 hover:bg-purple-200 text-purple-700 rounded-full text-sm font-medium transition-colors border border-purple-200"
+              className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-purple-100 hover:bg-purple-200 text-purple-700 rounded-full text-xs font-medium transition-colors border border-purple-200"
             >
-              <Shield className="w-4 h-4" />
+              <Shield className="w-3 h-3" />
               Privacy Policy
-              <ExternalLink className="w-3 h-3" />
+              <ExternalLink className="w-2.5 h-2.5" />
             </button>
           </div>
 

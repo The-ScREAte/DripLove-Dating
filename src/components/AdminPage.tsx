@@ -65,6 +65,9 @@ interface UserProfile {
   country: string;
   age: number;
   is_admin: boolean;
+  gender?: string | null;
+  preference?: string | null;
+  relationship_intent?: string | null;
 }
 
 interface PendingImage {
@@ -100,6 +103,10 @@ const AdminPageComponent = ({ currentUser, onLogout }: AdminPageProps) => {
   const [adminUsers, setAdminUsers] = useState<UserProfile[]>([]);
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState('all');
+  const [genderFilter, setGenderFilter] = useState('all');
+  const [interestedInFilter, setInterestedInFilter] = useState('all');
+  const [countryFilter, setCountryFilter] = useState('all');
+  const [relationshipIntentFilter, setRelationshipIntentFilter] = useState('all');
   const [loading, setLoading] = useState(true);
   const [currentPage, setCurrentPage] = useState(1);
   const [matchUser1, setMatchUser1] = useState('');
@@ -879,7 +886,7 @@ const AdminPageComponent = ({ currentUser, onLogout }: AdminPageProps) => {
       setLoading(true);
       
       // Check cache first for performance
-      const cacheKey = `users_all_${statusFilter}`;
+      const cacheKey = `users_all_${statusFilter}_${genderFilter}_${interestedInFilter}_${countryFilter}_${relationshipIntentFilter}`;
       const cachedUsers = userDataCache.get(cacheKey);
       if (cachedUsers) {
         const { regularUsers, admins } = cachedUsers;
@@ -892,12 +899,28 @@ const AdminPageComponent = ({ currentUser, onLogout }: AdminPageProps) => {
       // Fetch ALL users (not paginated in query - pagination happens in UI)
       let query = supabase
         .from('profiles')
-        .select('id, first_name, last_name, email, account_status, created_at, city, country, date_of_birth, is_admin')
+        .select('id, first_name, last_name, email, account_status, created_at, city, country, date_of_birth, is_admin, gender, preference, relationship_intent')
         .eq('is_admin', false)
         .order('created_at', { ascending: false });
 
       if (statusFilter !== 'all') {
         query = query.eq('account_status', statusFilter);
+      }
+      
+      if (genderFilter !== 'all') {
+        query = query.eq('gender', genderFilter);
+      }
+      
+      if (interestedInFilter !== 'all') {
+        query = query.eq('preference', interestedInFilter);
+      }
+      
+      if (countryFilter !== 'all') {
+        query = query.eq('country', countryFilter);
+      }
+      
+      if (relationshipIntentFilter !== 'all') {
+        query = query.eq('relationship_intent', relationshipIntentFilter);
       }
 
       const { data, error } = await query;
@@ -912,7 +935,7 @@ const AdminPageComponent = ({ currentUser, onLogout }: AdminPageProps) => {
       // Fetch admin users separately
       const { data: adminData } = await supabase
         .from('profiles')
-        .select('id, first_name, last_name, email, account_status, created_at, city, country, date_of_birth, is_admin')
+        .select('id, first_name, last_name, email, account_status, created_at, city, country, date_of_birth, is_admin, gender, preference, relationship_intent')
         .eq('is_admin', true)
         .order('created_at', { ascending: false });
 
@@ -936,7 +959,7 @@ const AdminPageComponent = ({ currentUser, onLogout }: AdminPageProps) => {
     } finally {
       setLoading(false);
     }
-  }, 300), [toast, statusFilter]);
+  }, 300), [toast, statusFilter, genderFilter, interestedInFilter, countryFilter, relationshipIntentFilter]);
 
   const calculateAge = (dateOfBirth: string) => {
     const today = new Date();
@@ -1182,11 +1205,17 @@ const AdminPageComponent = ({ currentUser, onLogout }: AdminPageProps) => {
   const filteredUsers = users.filter(user => {
     const matchesSearch = user.first_name.toLowerCase().includes(searchTerm.toLowerCase()) ||
                          user.last_name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                         user.email.toLowerCase().includes(searchTerm.toLowerCase());
+                         user.email.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                         (user.city && user.city.toLowerCase().includes(searchTerm.toLowerCase())) ||
+                         (user.country && user.country.toLowerCase().includes(searchTerm.toLowerCase()));
     
     const matchesStatus = statusFilter === 'all' || user.account_status === statusFilter;
+    const matchesGender = genderFilter === 'all' || user.gender === genderFilter;
+    const matchesInterestedIn = interestedInFilter === 'all' || user.preference === interestedInFilter;
+    const matchesCountry = countryFilter === 'all' || user.country === countryFilter;
+    const matchesRelationshipIntent = relationshipIntentFilter === 'all' || user.relationship_intent === relationshipIntentFilter;
     
-    return matchesSearch && matchesStatus;
+    return matchesSearch && matchesStatus && matchesGender && matchesInterestedIn && matchesCountry && matchesRelationshipIntent;
   });
 
   // Pagination
@@ -1510,27 +1539,105 @@ const AdminPageComponent = ({ currentUser, onLogout }: AdminPageProps) => {
                 </CardHeader>
                 <CardContent>
                   {/* Search and Filter */}
-                  <div className="flex gap-2 mb-3">
+                  <div className="space-y-2 mb-3">
+                    {/* Search Bar */}
                     <div className="flex-1 relative">
                       <Search className="absolute left-2 top-2 h-3 w-3 text-gray-400" />
                       <Input
-                        placeholder="Search users..."
+                        placeholder="Search by name, email, city, or country..."
                         value={searchTerm}
                         onChange={(e) => setSearchTerm(e.target.value)}
                         className="pl-7 text-xs h-8"
                       />
                     </div>
-                    <Select value={statusFilter} onValueChange={setStatusFilter}>
-                      <SelectTrigger className="w-28 text-xs h-8">
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="all" className="text-xs">All</SelectItem>
-                        <SelectItem value="active" className="text-xs">Active</SelectItem>
-                        <SelectItem value="on_hold" className="text-xs">On Hold</SelectItem>
-                        <SelectItem value="blocked" className="text-xs">Blocked</SelectItem>
-                      </SelectContent>
-                    </Select>
+                    
+                    {/* First Row: Status, Gender */}
+                    <div className="flex gap-2 flex-wrap">
+                      <Select value={statusFilter} onValueChange={setStatusFilter}>
+                        <SelectTrigger className="w-28 text-xs h-8">
+                          <SelectValue placeholder="Status" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="all" className="text-xs">All Status</SelectItem>
+                          <SelectItem value="active" className="text-xs">Active</SelectItem>
+                          <SelectItem value="on_hold" className="text-xs">On Hold</SelectItem>
+                          <SelectItem value="blocked" className="text-xs">Blocked</SelectItem>
+                        </SelectContent>
+                      </Select>
+                      
+                      <Select value={genderFilter} onValueChange={setGenderFilter}>
+                        <SelectTrigger className="w-28 text-xs h-8">
+                          <SelectValue placeholder="Gender" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="all" className="text-xs">All Genders</SelectItem>
+                          <SelectItem value="male" className="text-xs">Male</SelectItem>
+                          <SelectItem value="female" className="text-xs">Female</SelectItem>
+                          <SelectItem value="other" className="text-xs">Other</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    
+                    {/* Second Row: Interested In, Relationship Intent, Country */}
+                    <div className="flex gap-2 flex-wrap">
+                      <Select value={interestedInFilter} onValueChange={setInterestedInFilter}>
+                        <SelectTrigger className="w-32 text-xs h-8">
+                          <SelectValue placeholder="Interested In" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="all" className="text-xs">All Preferences</SelectItem>
+                          <SelectItem value="male" className="text-xs">Interested in Male</SelectItem>
+                          <SelectItem value="female" className="text-xs">Interested in Female</SelectItem>
+                          <SelectItem value="both" className="text-xs">Interested in Both</SelectItem>
+                        </SelectContent>
+                      </Select>
+                      
+                      <Select value={relationshipIntentFilter} onValueChange={setRelationshipIntentFilter}>
+                        <SelectTrigger className="w-36 text-xs h-8">
+                          <SelectValue placeholder="Intent" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="all" className="text-xs">All Intents</SelectItem>
+                          <SelectItem value="serious_relationship" className="text-xs">Serious Relationship</SelectItem>
+                          <SelectItem value="casual_dating" className="text-xs">Casual Dating</SelectItem>
+                          <SelectItem value="friendship" className="text-xs">Friendship</SelectItem>
+                          <SelectItem value="open_to_anything" className="text-xs">Open to Anything</SelectItem>
+                        </SelectContent>
+                      </Select>
+                      
+                      <Select value={countryFilter} onValueChange={setCountryFilter}>
+                        <SelectTrigger className="w-32 text-xs h-8">
+                          <SelectValue placeholder="Country" />
+                        </SelectTrigger>
+                        <SelectContent className="max-h-60">
+                          <SelectItem value="all" className="text-xs">All Countries</SelectItem>
+                          {getCountriesList().map(country => (
+                            <SelectItem key={country.code} value={country.name} className="text-xs">
+                              {country.name}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    
+                    {/* Clear Filters Button */}
+                    {(statusFilter !== 'all' || genderFilter !== 'all' || interestedInFilter !== 'all' || 
+                      countryFilter !== 'all' || relationshipIntentFilter !== 'all') && (
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => {
+                          setStatusFilter('all');
+                          setGenderFilter('all');
+                          setInterestedInFilter('all');
+                          setCountryFilter('all');
+                          setRelationshipIntentFilter('all');
+                        }}
+                        className="text-xs h-7"
+                      >
+                        Clear All Filters
+                      </Button>
+                    )}
                   </div>
 
                   {/* Users List Container */}
@@ -1551,8 +1658,21 @@ const AdminPageComponent = ({ currentUser, onLogout }: AdminPageProps) => {
                                 <p className="text-[11px] text-gray-600 truncate">{user.email}</p>
                                 <p className="text-[11px] text-gray-500">
                                   {user.city}, {user.country} • Age {user.age}
+                                  {user.gender && ` • ${user.gender.charAt(0).toUpperCase() + user.gender.slice(1)}`}
                                 </p>
-                                <p className="text-xs text-gray-500">
+                                <div className="flex gap-1 mt-0.5 flex-wrap">
+                                  {user.preference && (
+                                    <Badge variant="outline" className="text-[10px] px-1.5 py-0 h-4">
+                                      Interested: {user.preference === 'both' ? 'Both' : user.preference.charAt(0).toUpperCase() + user.preference.slice(1)}
+                                    </Badge>
+                                  )}
+                                  {user.relationship_intent && (
+                                    <Badge variant="outline" className="text-[10px] px-1.5 py-0 h-4">
+                                      {user.relationship_intent.split('_').map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(' ')}
+                                    </Badge>
+                                  )}
+                                </div>
+                                <p className="text-[11px] text-gray-500 mt-0.5">
                                   Joined: {new Date(user.created_at).toLocaleDateString()}
                                 </p>
                               </div>
