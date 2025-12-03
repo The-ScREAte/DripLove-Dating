@@ -530,7 +530,11 @@
     "youAreAllCaughtUp": "You're all caught up!",
     "pushNotifications": "Push Notifications",
     "enableNotifications": "Enable Notifications",
-    "disableNotifications": "Disable Notifications"
+    "disableNotifications": "Disable Notifications",
+    "photoApprovedTitle": "✅ Photo Approved!",
+    "photoApprovedMessage": "Your photo has been approved and is now visible on your profile.",
+    "photoRejectedTitle": "❌ Photo Rejected",
+    "photoRejectedMessage": "One of your photos was removed as it did not meet our community guidelines. Please upload appropriate/real photos of yourself to help others identify you better. This may limit you being prioritized for showing in others Dripcheck"
   },
   "settings": {
     "settings": "Settings",

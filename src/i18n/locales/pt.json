@@ -517,7 +517,11 @@
     "youAreAllCaughtUp": "Você está em dia!",
     "pushNotifications": "Notificações Push",
     "enableNotifications": "Ativar Notificações",
-    "disableNotifications": "Desativar Notificações"
+    "disableNotifications": "Desativar Notificações",
+    "photoApprovedTitle": "✅ Foto Aprovada!",
+    "photoApprovedMessage": "Sua foto foi aprovada e agora está visível no seu perfil.",
+    "photoRejectedTitle": "❌ Foto Rejeitada",
+    "photoRejectedMessage": "Uma de suas fotos foi removida por não atender às nossas diretrizes da comunidade. Por favor, carregue fotos apropriadas/reais de você mesmo para ajudar outras pessoas a identificá-lo melhor. Isso pode limitar sua prioridade de exibição no Dripcheck"
   },
   "settings": {
     "settings": "Configurações",

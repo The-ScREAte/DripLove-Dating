@@ -68,6 +68,7 @@ interface UserProfile {
   gender?: string | null;
   preference?: string | null;
   relationship_intent?: string | null;
+  is_premium?: boolean;
 }
 
 interface PendingImage {
@@ -107,6 +108,7 @@ const AdminPageComponent = ({ currentUser, onLogout }: AdminPageProps) => {
   const [interestedInFilter, setInterestedInFilter] = useState('all');
   const [countryFilter, setCountryFilter] = useState('all');
   const [relationshipIntentFilter, setRelationshipIntentFilter] = useState('all');
+  const [premiumFilter, setPremiumFilter] = useState('all');
   const [loading, setLoading] = useState(true);
   const [currentPage, setCurrentPage] = useState(1);
   const [matchUser1, setMatchUser1] = useState('');
@@ -886,7 +888,7 @@ const AdminPageComponent = ({ currentUser, onLogout }: AdminPageProps) => {
       setLoading(true);
       
       // Check cache first for performance
-      const cacheKey = `users_all_${statusFilter}_${genderFilter}_${interestedInFilter}_${countryFilter}_${relationshipIntentFilter}`;
+      const cacheKey = `users_all_${statusFilter}_${genderFilter}_${interestedInFilter}_${countryFilter}_${relationshipIntentFilter}_${premiumFilter}`;
       const cachedUsers = userDataCache.get(cacheKey);
       if (cachedUsers) {
         const { regularUsers, admins } = cachedUsers;
@@ -899,7 +901,25 @@ const AdminPageComponent = ({ currentUser, onLogout }: AdminPageProps) => {
       // Fetch ALL users (not paginated in query - pagination happens in UI)
       let query = supabase
         .from('profiles')
-        .select('id, first_name, last_name, email, account_status, created_at, city, country, date_of_birth, is_admin, gender, preference, relationship_intent')
+        .select(`
+          id, 
+          first_name, 
+          last_name, 
+          email, 
+          account_status, 
+          created_at, 
+          city, 
+          country, 
+          date_of_birth, 
+          is_admin, 
+          gender, 
+          preference, 
+          relationship_intent,
+          user_subscriptions!left(
+            status,
+            expires_at
+          )
+        `)
         .eq('is_admin', false)
         .order('created_at', { ascending: false });
 
@@ -927,10 +947,20 @@ const AdminPageComponent = ({ currentUser, onLogout }: AdminPageProps) => {
 
       if (error) throw error;
 
-      const usersWithAge = data?.map(user => ({
-        ...user,
-        age: calculateAge(user.date_of_birth)
-      })) || [];
+      const usersWithAge = data?.map(user => {
+        // Check if user has active premium subscription
+        const hasPremium = Array.isArray(user.user_subscriptions) && 
+          user.user_subscriptions.some((sub: any) => 
+            sub.status === 'active' && 
+            new Date(sub.expires_at) > new Date()
+          );
+        
+        return {
+          ...user,
+          age: calculateAge(user.date_of_birth),
+          is_premium: hasPremium
+        };
+      }) || [];
 
       // Fetch admin users separately
       const { data: adminData } = await supabase
@@ -959,7 +989,7 @@ const AdminPageComponent = ({ currentUser, onLogout }: AdminPageProps) => {
     } finally {
       setLoading(false);
     }
-  }, 300), [toast, statusFilter, genderFilter, interestedInFilter, countryFilter, relationshipIntentFilter]);
+  }, 300), [toast, statusFilter, genderFilter, interestedInFilter, countryFilter, relationshipIntentFilter, premiumFilter]);
 
   const calculateAge = (dateOfBirth: string) => {
     const today = new Date();
@@ -1214,8 +1244,11 @@ const AdminPageComponent = ({ currentUser, onLogout }: AdminPageProps) => {
     const matchesInterestedIn = interestedInFilter === 'all' || user.preference === interestedInFilter;
     const matchesCountry = countryFilter === 'all' || user.country === countryFilter;
     const matchesRelationshipIntent = relationshipIntentFilter === 'all' || user.relationship_intent === relationshipIntentFilter;
+    const matchesPremium = premiumFilter === 'all' || 
+      (premiumFilter === 'premium' && user.is_premium) || 
+      (premiumFilter === 'free' && !user.is_premium);
     
-    return matchesSearch && matchesStatus && matchesGender && matchesInterestedIn && matchesCountry && matchesRelationshipIntent;
+    return matchesSearch && matchesStatus && matchesGender && matchesInterestedIn && matchesCountry && matchesRelationshipIntent && matchesPremium;
   });
 
   // Pagination
@@ -1557,7 +1590,7 @@ const AdminPageComponent = ({ currentUser, onLogout }: AdminPageProps) => {
                       />
                     </div>
                     
-                    {/* First Row: Status, Gender */}
+                    {/* First Row: Status, Gender, Premium */}
                     <div className="flex gap-2 flex-wrap">
                       <Select value={statusFilter} onValueChange={setStatusFilter}>
                         <SelectTrigger className="w-28 text-xs h-8">
@@ -1580,6 +1613,17 @@ const AdminPageComponent = ({ currentUser, onLogout }: AdminPageProps) => {
                           <SelectItem value="male" className="text-xs">Male</SelectItem>
                           <SelectItem value="female" className="text-xs">Female</SelectItem>
                           <SelectItem value="other" className="text-xs">Other</SelectItem>
+                        </SelectContent>
+                      </Select>
+                      
+                      <Select value={premiumFilter} onValueChange={setPremiumFilter}>
+                        <SelectTrigger className="w-28 text-xs h-8">
+                          <SelectValue placeholder="Premium" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="all" className="text-xs">All Users</SelectItem>
+                          <SelectItem value="premium" className="text-xs">Premium</SelectItem>
+                          <SelectItem value="free" className="text-xs">Free</SelectItem>
                         </SelectContent>
                       </Select>
                     </div>
@@ -1628,7 +1672,7 @@ const AdminPageComponent = ({ currentUser, onLogout }: AdminPageProps) => {
                     
                     {/* Clear Filters Button */}
                     {(statusFilter !== 'all' || genderFilter !== 'all' || interestedInFilter !== 'all' || 
-                      countryFilter !== 'all' || relationshipIntentFilter !== 'all') && (
+                      countryFilter !== 'all' || relationshipIntentFilter !== 'all' || premiumFilter !== 'all') && (
                       <Button
                         variant="outline"
                         size="sm"
@@ -1638,6 +1682,7 @@ const AdminPageComponent = ({ currentUser, onLogout }: AdminPageProps) => {
                           setInterestedInFilter('all');
                           setCountryFilter('all');
                           setRelationshipIntentFilter('all');
+                          setPremiumFilter('all');
                         }}
                         className="text-xs h-7"
                       >

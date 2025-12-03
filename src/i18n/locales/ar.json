@@ -510,15 +510,19 @@
   "notifications": {
     "notifications": "الإشعارات",
     "newMatch": "لديك تطابق جديد!",
-    "newMessage": "{{name}} أرسل لك رسالة",
+    "newMessage": "أرسل {{name}} لك رسالة",
     "newLike": "شخص ما أعجب بك!",
-    "profileViewed": "{{name}} شاهد ملفك الشخصي",
+    "profileViewed": "شاهد {{name}} ملفك الشخصي",
     "markAllRead": "وضع علامة مقروء على الكل",
     "noNotifications": "لا توجد إشعارات",
-    "youAreAllCaughtUp": "أنت على اطلاع بكل شيء!",
+    "youAreAllCaughtUp": "أنت على اطلاع!",
     "pushNotifications": "الإشعارات الفورية",
     "enableNotifications": "تفعيل الإشعارات",
-    "disableNotifications": "تعطيل الإشعارات"
+    "disableNotifications": "تعطيل الإشعارات",
+    "photoApprovedTitle": "✅ تمت الموافقة على الصورة!",
+    "photoApprovedMessage": "تمت الموافقة على صورتك وهي الآن مرئية في ملفك الشخصي.",
+    "photoRejectedTitle": "❌ تم رفض الصورة",
+    "photoRejectedMessage": "تم إزالة إحدى صورك لأنها لم تلتزم بإرشادات مجتمعنا. يرجى تحميل صور مناسبة/حقيقية لنفسك لمساعدة الآخرين على التعرف عليك بشكل أفضل. قد يؤدي هذا إلى تقليل أولوية ظهورك في Dripcheck"
   },
   "settings": {
     "settings": "الإعدادات",

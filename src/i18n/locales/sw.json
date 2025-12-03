@@ -512,13 +512,17 @@
     "newMatch": "Una mechi mpya!",
     "newMessage": "{{name}} amekutumia ujumbe",
     "newLike": "Mtu amekupenda!",
-    "profileViewed": "{{name}} ameona wasifu wako",
+    "profileViewed": "{{name}} ameangalia wasifu wako",
     "markAllRead": "Weka zote kama zimesomwa",
     "noNotifications": "Hakuna arifa",
-    "youAreAllCaughtUp": "Umekamilika!",
+    "youAreAllCaughtUp": "Umekamilisha kila kitu!",
     "pushNotifications": "Arifa za Kusukuma",
     "enableNotifications": "Washa Arifa",
-    "disableNotifications": "Zima Arifa"
+    "disableNotifications": "Zima Arifa",
+    "photoApprovedTitle": "✅ Picha Imeidhinishwa!",
+    "photoApprovedMessage": "Picha yako imeidhinishwa na sasa inaonekana kwenye wasifu wako.",
+    "photoRejectedTitle": "❌ Picha Imekataliwa",
+    "photoRejectedMessage": "Moja ya picha zako imeondolewa kwa sababu haikuzingatia miongozo yetu ya jamii. Tafadhali pakia picha sahihi/halisi za wewe mwenyewe ili kuwasaidia wengine kukutambua vizuri zaidi. Hii inaweza kupunguza kipaumbele chako cha kuonyeshwa kwa wengine katika Dripcheck"
   },
   "settings": {
     "settings": "Mipangilio",

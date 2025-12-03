@@ -8,6 +8,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { Eye, Trash2, CheckCircle, XCircle, Clock, AlertTriangle, User } from 'lucide-react';
 import { usePushNotifications } from '@/hooks/usePushNotifications';
 import ImageViewer from '@/components/ImageViewer';
+import { useTranslation } from 'react-i18next';
 
 interface PendingImage {
   id: string;
@@ -48,6 +49,7 @@ interface ReportedImage {
 }
 
 const ImageModerationPanel = () => {
+  const { t, i18n } = useTranslation();
   const [pendingImages, setPendingImages] = useState<PendingImage[]>([]);
   const [reportedImages, setReportedImages] = useState<ReportedImage[]>([]);
   const [loadingPending, setLoadingPending] = useState(false);
@@ -63,6 +65,29 @@ const ImageModerationPanel = () => {
   // Get current admin user for push notifications
   const [currentAdminId, setCurrentAdminId] = useState<string | null>(null);
   const { sendAdminNotification } = usePushNotifications(currentAdminId || undefined);
+
+  // Helper function to get user's language
+  const getUserLanguage = async (userId: string): Promise<string> => {
+    try {
+      const { data } = await supabase
+        .from('profiles')
+        .select('language')
+        .eq('id', userId)
+        .single();
+      return data?.language || 'en';
+    } catch {
+      return 'en';
+    }
+  };
+
+  // Helper function to get translated message
+  const getTranslatedMessage = (key: string, language: string): string => {
+    const currentLang = i18n.language;
+    i18n.changeLanguage(language);
+    const translated = t(key);
+    i18n.changeLanguage(currentLang);
+    return translated;
+  };
 
   useEffect(() => {
     const getCurrentAdmin = async () => {
@@ -194,9 +219,13 @@ const ImageModerationPanel = () => {
       // Send push notification to user
       if (imageToApprove?.user_id) {
         try {
+          const userLanguage = await getUserLanguage(imageToApprove.user_id);
+          const title = getTranslatedMessage('notifications.photoApprovedTitle', userLanguage);
+          const message = getTranslatedMessage('notifications.photoApprovedMessage', userLanguage);
+          
           await sendAdminNotification(
-            '✅ Photo Approved!',
-            'Your photo has been approved and is now visible on your profile.',
+            title,
+            message,
             imageToApprove.user_id
           );
           console.log('📤 Image approval notification sent to:', imageToApprove.user_id);
@@ -211,7 +240,8 @@ const ImageModerationPanel = () => {
         description: 'Image approved successfully'
       });
 
-      fetchPendingImages();
+      // Remove the approved image from state immediately
+      setPendingImages(prev => prev.filter(img => img.id !== imageId));
     } catch (error) {
       console.error('Error approving image:', error);
       toast({
@@ -249,9 +279,13 @@ const ImageModerationPanel = () => {
       // Send push notification to user
       if (imageToReject?.user_id) {
         try {
+          const userLanguage = await getUserLanguage(imageToReject.user_id);
+          const title = getTranslatedMessage('notifications.photoRejectedTitle', userLanguage);
+          const message = getTranslatedMessage('notifications.photoRejectedMessage', userLanguage);
+          
           await sendAdminNotification(
-            '❌ Photo Rejected',
-            'One of your photos was removed as it did not meet our community guidelines. Please upload appropriate photos.',
+            title,
+            message,
             imageToReject.user_id
           );
           console.log('📤 Image rejection notification sent to:', imageToReject.user_id);
@@ -286,7 +320,8 @@ const ImageModerationPanel = () => {
         description: 'Image rejected and permanently removed from database and storage'
       });
 
-      fetchPendingImages();
+      // Remove the rejected image from state immediately
+      setPendingImages(prev => prev.filter(img => img.id !== imageId));
     } catch (error) {
       console.error('Error rejecting image:', error);
       toast({
@@ -363,7 +398,7 @@ const ImageModerationPanel = () => {
       try {
         await sendAdminNotification(
           '⚠️ Photo Removed',
-          'One of your photos was removed after review. It violated our community guidelines. Please ensure all photos are appropriate.',
+          'One of your photos was removed as it did not meet our community guidelines. Please upload appropriate/ real photosof yourself to help others identify you better. this may limit you being prioritized for showing in others Dripcheck',
           reportedUserId
         );
         console.log('📤 Image deletion notification sent to:', reportedUserId);
@@ -485,55 +520,55 @@ const ImageModerationPanel = () => {
               ) : pendingImages.length === 0 ? (
                 <div className="text-center py-6 text-gray-500 text-sm">No images pending approval</div>
               ) : (
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
+                <div className="grid grid-cols-2 gap-2">
                   {pendingImages.map((image) => (
                     <Card key={image.id} className="border-yellow-200">
-                      <CardContent className="p-3">
+                      <CardContent className="p-2">
                         <div className="relative mb-2">
                           <img
                             src={image.image_url}
                             alt="Pending approval"
-                            className="w-full h-40 object-cover rounded-lg cursor-pointer hover:opacity-90 transition-opacity"
+                            className="w-full h-32 object-cover rounded-md cursor-pointer hover:opacity-90 transition-opacity"
                             onClick={() => handleImageClick(image.image_url)}
                           />
-                          <Badge className="absolute top-2 right-2 bg-yellow-500 text-xs">
+                          <Badge className="absolute top-1 right-1 bg-yellow-500 text-[10px] h-4">
                             Pending
                           </Badge>
                         </div>
                         
                         <div className="space-y-1 mb-2">
-                          <div className="flex items-center gap-2 text-xs">
-                            <User className="w-3 h-3" />
-                            <span className="font-medium">
+                          <div className="flex items-center gap-1 text-[10px]">
+                            <User className="w-2.5 h-2.5" />
+                            <span className="font-medium truncate">
                               {image.profile ? 
                                 `${image.profile.first_name} ${image.profile.last_name}` : 
                                 'Unknown User'
                               }
                             </span>
                           </div>
-                          <div className="text-[11px] text-gray-500">
-                            Uploaded: {new Date(image.created_at).toLocaleDateString()}
+                          <div className="text-[9px] text-gray-500">
+                            {new Date(image.created_at).toLocaleDateString()}
                           </div>
                         </div>
 
-                        <div className="flex gap-2">
+                        <div className="flex flex-col gap-1">
                           <Button
                             size="sm"
-                            className="flex-1 bg-green-600 hover:bg-green-700 text-xs h-8"
+                            className="w-full bg-green-600 hover:bg-green-700 text-[10px] h-6"
                             onClick={() => handleApproveImage(image.id)}
                             disabled={approvingImages[image.id]}
                           >
-                            <CheckCircle className="w-3 h-3 mr-1" />
+                            <CheckCircle className="w-2.5 h-2.5 mr-1" />
                             {approvingImages[image.id] ? 'Approving...' : 'Approve'}
                           </Button>
                           <Button
                             size="sm"
                             variant="destructive"
-                            className="flex-1 text-xs h-8"
+                            className="w-full text-[10px] h-6"
                             onClick={() => handleRejectImage(image.id)}
                             disabled={rejectingImages[image.id]}
                           >
-                            <Trash2 className="w-3 h-3 mr-1" />
+                            <Trash2 className="w-2.5 h-2.5 mr-1" />
                             {rejectingImages[image.id] ? 'Rejecting...' : 'Reject'}
                           </Button>
                         </div>

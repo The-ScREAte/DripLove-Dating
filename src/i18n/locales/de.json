@@ -515,14 +515,18 @@
     "notifications": "Benachrichtigungen",
     "newMatch": "Sie haben ein neues Match!",
     "newMessage": "{{name}} hat Ihnen eine Nachricht gesendet",
-    "newLike": "Jemand mag Sie!",
+    "newLike": "Jemand mag dich!",
     "profileViewed": "{{name}} hat Ihr Profil angesehen",
     "markAllRead": "Alle als gelesen markieren",
     "noNotifications": "Keine Benachrichtigungen",
     "youAreAllCaughtUp": "Sie sind auf dem neuesten Stand!",
     "pushNotifications": "Push-Benachrichtigungen",
     "enableNotifications": "Benachrichtigungen aktivieren",
-    "disableNotifications": "Benachrichtigungen deaktivieren"
+    "disableNotifications": "Benachrichtigungen deaktivieren",
+    "photoApprovedTitle": "✅ Foto Genehmigt!",
+    "photoApprovedMessage": "Ihr Foto wurde genehmigt und ist jetzt auf Ihrem Profil sichtbar.",
+    "photoRejectedTitle": "❌ Foto Abgelehnt",
+    "photoRejectedMessage": "Eines Ihrer Fotos wurde entfernt, da es nicht unseren Community-Richtlinien entsprach. Bitte laden Sie angemessene/echte Fotos von sich hoch, um anderen zu helfen, Sie besser zu identifizieren. Dies kann Ihre Priorität bei der Anzeige im Dripcheck einschränken"
   },
   "settings": {
     "title": "Einstellungen",

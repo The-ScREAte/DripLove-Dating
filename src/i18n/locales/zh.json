@@ -509,16 +509,20 @@
   },
   "notifications": {
     "notifications": "通知",
-    "newMatch": "您有新匹配！",
-    "newMessage": "{{name}}给您发送了消息",
+    "newMatch": "你有新配对！",
+    "newMessage": "{{name}} 发送了一条消息",
     "newLike": "有人喜欢你！",
-    "profileViewed": "{{name}}查看了您的资料",
-    "markAllRead": "标记全部为已读",
+    "profileViewed": "{{name}} 查看了你的个人资料",
+    "markAllRead": "全部标记为已读",
     "noNotifications": "没有通知",
-    "youAreAllCaughtUp": "您已查看所有通知！",
+    "youAreAllCaughtUp": "你已经看完所有内容了！",
     "pushNotifications": "推送通知",
     "enableNotifications": "启用通知",
-    "disableNotifications": "禁用通知"
+    "disableNotifications": "禁用通知",
+    "photoApprovedTitle": "✅ 照片已批准！",
+    "photoApprovedMessage": "您的照片已获批准，现在已在您的个人资料中可见。",
+    "photoRejectedTitle": "❌ 照片被拒绝",
+    "photoRejectedMessage": "您的一张照片因不符合我们的社区准则而被删除。请上传适当/真实的自己照片，以帮助他人更好地识别您。这可能会限制您在Dripcheck中的优先显示"
   },
   "settings": {
     "settings": "设置",
