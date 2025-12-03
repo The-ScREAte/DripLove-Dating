@@ -39,11 +39,6 @@ const RateAppButton: React.FC<RateAppButtonProps> = ({ className, onRatingComple
     try {
       await openRatingInterface();
       markUserHasRated(platform);
-      
-      toast({
-        title: "Thank you! ❤️",
-        description: "Thank you for rating DripLove!",
-      });
 
       if (onRatingComplete) {
         onRatingComplete(5, platform); // Assume 5 stars for native
