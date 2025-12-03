@@ -29,18 +29,22 @@ export function useChatKeyboardFix() {
     }
 
     const wasVisible = isKeyboardVisibleRef.current;
+    const previousHeight = keyboardHeightRef.current;
     keyboardHeightRef.current = height;
     const isVisible = height > 50;
     isKeyboardVisibleRef.current = isVisible;
 
+    // Add extra padding for emoji keyboard (typically taller)
+    const adjustedHeight = height > 0 ? height + 10 : 0;
+
     // Apply CSS variable for keyboard offset
-    document.documentElement.style.setProperty("--keyboard-height", `${height}px`);
+    document.documentElement.style.setProperty("--keyboard-height", `${adjustedHeight}px`);
     
     // Toggle body class for additional styling hooks
     if (isVisible) {
       document.body.classList.add("keyboard-open");
-      // Auto-scroll to bottom when keyboard first appears or changes height
-      if (shouldScroll && (!wasVisible || height !== keyboardHeightRef.current)) {
+      // Auto-scroll to bottom when keyboard first appears or changes height significantly
+      if (shouldScroll && (!wasVisible || Math.abs(height - previousHeight) > 20)) {
         setTimeout(scrollChatToBottom, 100);
       }
     } else {

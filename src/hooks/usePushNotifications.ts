@@ -123,9 +123,7 @@ export const usePushNotifications = (userId?: string) => {
   };
 
   const sendMultipleLikesNotification = async (targetUserId: string, likeCount: number) => {
-    const message = likeCount === 1 
-      ? "Someone is showing interest in you. Check them out!"
-      : `${likeCount} people are showing interest in you. Check them out!`;
+    const message = "People are showing interest in you. Check them out!";
     
     return sendNotification({
       title: "💕 Others are showing interest!",
