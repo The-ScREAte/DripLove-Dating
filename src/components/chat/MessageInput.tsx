@@ -40,7 +40,7 @@ const MessageInput: React.FC<MessageInputProps> = ({
   return (
     <div 
       ref={containerRef}
-      className="chat-input-container border-t bg-white z-30"
+      className="chat-input-container border-t border-gray-200"
     >
       {/* Reply preview */}
       {replyingTo && (
