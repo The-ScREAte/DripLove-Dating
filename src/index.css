@@ -3,6 +3,26 @@
 @tailwind components;
 @tailwind utilities;
 
+/* Chat input keyboard handling */
+:root {
+  --keyboard-offset: 0px;
+}
+
+.chat-input-container {
+  position: fixed;
+  bottom: 0;
+  left: 0;
+  width: 100%;
+  padding-bottom: calc(env(safe-area-inset-bottom, 0px) + 8px);
+  transform: translateY(calc(-1 * var(--keyboard-offset, 0px)));
+  transition: transform 0.2s ease-out;
+  z-index: 30;
+}
+
+body.keyboard-open .chat-messages-area {
+  padding-bottom: calc(var(--keyboard-offset, 0px) + 80px);
+}
+
 /* Mobile optimizations and safe areas */
 @layer base {
   html, body, #root {

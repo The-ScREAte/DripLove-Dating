@@ -1,10 +1,7 @@
-import React, { useState, useRef, useEffect } from 'react';
-import { Button } from '@/components/ui/button';
+import React, { useRef } from 'react';
 import { Input } from '@/components/ui/input';
-import { Send, X } from 'lucide-react';
-import { sanitizeMessage } from '@/utils/inputSanitization';
+import { X } from 'lucide-react';
 import { containsBadWords } from '@/utils/textModeration';
-import { Capacitor } from '@capacitor/core';
 import { useTranslation } from 'react-i18next';
 import { ChatMessage } from '@/types';
 
@@ -28,7 +25,6 @@ const MessageInput: React.FC<MessageInputProps> = ({
   const { t } = useTranslation();
   const inputRef = useRef<HTMLInputElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
-  const platform = Capacitor.getPlatform();
 
   const handleKeyPress = (e: React.KeyboardEvent) => {
     if (e.key === 'Enter' && !e.shiftKey) {
@@ -44,12 +40,7 @@ const MessageInput: React.FC<MessageInputProps> = ({
   return (
     <div 
       ref={containerRef}
-      className="border-t bg-white z-30"
-      style={{
-        paddingBottom: platform === 'android'
-          ? '24px'
-          : `calc(env(safe-area-inset-bottom, 0px) + 8px)`
-      }}
+      className="chat-input-container border-t bg-white z-30"
     >
       {/* Reply preview */}
       {replyingTo && (

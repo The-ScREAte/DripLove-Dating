@@ -20,6 +20,7 @@ import RatingDialog from './RatingDialog';
 import { CurrentUser, ChatMatch, ChatMessage } from '@/types';
 import { useTranslation } from 'react-i18next';
 import { getRatingData } from '@/utils/ratingStorage';
+import { useChatKeyboardFix } from '@/hooks/useChatKeyboardFix';
 
 interface ChatPageProps {
   currentUser: CurrentUser;
@@ -86,6 +87,9 @@ const ChatPage = ({ currentUser, onUnreadChange, onDetailViewChange }: ChatPageP
   
   // Reply state
   const [replyingTo, setReplyingTo] = useState<ChatMessage | null>(null);
+
+  // Keyboard handling for chat input
+  useChatKeyboardFix();
 
   useEffect(() => {
     if (!currentUser || !currentUser.id) return;
