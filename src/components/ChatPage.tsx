@@ -1679,15 +1679,14 @@ const ChatPage = ({ currentUser, onUnreadChange, onDetailViewChange }: ChatPageP
       {/* Scrollable Messages Area (only this area scrolls) */}
       <div
         ref={messagesContainerRef}
-        className="flex-1 overflow-y-auto px-4 space-y-2 bg-gray-50"
+        className="flex-1 overflow-y-auto px-4 space-y-2 bg-gray-50 chat-messages-container"
         style={{ 
           WebkitOverflowScrolling: 'touch', 
           paddingTop: Capacitor.getPlatform() === 'ios' 
             ? 'clamp(160px, calc(env(safe-area-inset-top, 10px) + 140px), 180px)'
             : Capacitor.getPlatform() === 'web'
               ? '120px'
-              : '120px',
-          paddingBottom: '16px'
+              : '120px'
         }}
         onTouchStart={handleSwipeStart}
         onTouchMove={handleSwipeMove}

@@ -3,24 +3,42 @@
 @tailwind components;
 @tailwind utilities;
 
-/* Chat input keyboard handling */
+/* Chat input keyboard handling - robust solution */
 :root {
-  --keyboard-offset: 0px;
+  --keyboard-height: 0px;
+  --input-bar-height: 70px;
 }
 
+/* Fixed input container that moves with keyboard */
 .chat-input-container {
   position: fixed;
-  bottom: 0;
   left: 0;
+  right: 0;
+  /* Use bottom positioning instead of transform for reliability */
+  bottom: var(--keyboard-height, 0px);
   width: 100%;
-  padding-bottom: calc(env(safe-area-inset-bottom, 0px) + 8px);
-  transform: translateY(calc(-1 * var(--keyboard-offset, 0px)));
-  transition: transform 0.2s ease-out;
-  z-index: 30;
+  padding-bottom: env(safe-area-inset-bottom, 0px);
+  background: white;
+  transition: bottom 0.15s ease-out;
+  z-index: 100;
+  /* Ensure it doesn't get covered */
+  transform: translateZ(0);
+  -webkit-transform: translateZ(0);
 }
 
-body.keyboard-open .chat-messages-area {
-  padding-bottom: calc(var(--keyboard-offset, 0px) + 80px);
+/* When keyboard is open, hide safe area padding (keyboard provides its own space) */
+body.keyboard-open .chat-input-container {
+  padding-bottom: 0;
+}
+
+/* Messages area adjusts based on keyboard */
+.chat-messages-container {
+  padding-bottom: calc(var(--input-bar-height) + env(safe-area-inset-bottom, 0px));
+  transition: padding-bottom 0.15s ease-out;
+}
+
+body.keyboard-open .chat-messages-container {
+  padding-bottom: calc(var(--keyboard-height, 0px) + var(--input-bar-height));
 }
 
 /* Mobile optimizations and safe areas */
