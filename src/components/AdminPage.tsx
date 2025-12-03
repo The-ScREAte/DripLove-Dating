@@ -1300,41 +1300,47 @@ const AdminPageComponent = ({ currentUser, onLogout }: AdminPageProps) => {
           {/* Tabbed Interface with Error Boundaries for 1000+ users */}
           <AdminErrorBoundary>
             <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-              <TabsList className="grid w-full grid-cols-8 mb-3 h-9">
-                <TabsTrigger value="dashboard" className="text-[11px] flex flex-col gap-0.5 py-1">
-                  <BarChart3 className="w-4 h-4" />
-                  <span>Dash</span>
-                </TabsTrigger>
-                <TabsTrigger value="users" className="text-[11px] flex flex-col gap-0.5 py-1">
-                  <Users className="w-4 h-4" />
-                  <span>Users</span>
-                </TabsTrigger>
-                <TabsTrigger value="content" className="text-[11px] flex flex-col gap-0.5 py-1">
-                  <Image className="w-4 h-4" />
-                  <span>Cont..</span>
-                </TabsTrigger>
-                <TabsTrigger value="broadcast" className="text-[11px] flex flex-col gap-0.5 py-1">
-                  <Megaphone className="w-4 h-4" />
-                  <span>Cast</span>
-                </TabsTrigger>
+              <div className="space-y-2 mb-3">
+                {/* First Row - Main Tabs */}
+                <TabsList className="grid w-full grid-cols-4 h-auto">
+                  <TabsTrigger value="dashboard" className="text-xs flex flex-col gap-1 py-2">
+                    <BarChart3 className="w-4 h-4" />
+                    <span>Dashboard</span>
+                  </TabsTrigger>
+                  <TabsTrigger value="users" className="text-xs flex flex-col gap-1 py-2">
+                    <Users className="w-4 h-4" />
+                    <span>Users</span>
+                  </TabsTrigger>
+                  <TabsTrigger value="content" className="text-xs flex flex-col gap-1 py-2">
+                    <Image className="w-4 h-4" />
+                    <span>Content</span>
+                  </TabsTrigger>
+                  <TabsTrigger value="broadcast" className="text-xs flex flex-col gap-1 py-2">
+                    <Megaphone className="w-4 h-4" />
+                    <span>Broadcast</span>
+                  </TabsTrigger>
+                </TabsList>
 
-                <TabsTrigger value="ads" className="text-[11px] flex flex-col gap-0.5 py-1">
-                  <Megaphone className="w-4 h-4" />
-                  <span>Ads</span>
-                </TabsTrigger>
-                <TabsTrigger value="redirects" className="text-[11px] flex flex-col gap-0.5 py-1">
-                  <Link2 className="w-4 h-4" />
-                  <span>Links</span>
-                </TabsTrigger>
-                <TabsTrigger value="debugger" className="text-[11px] flex flex-col gap-0.5 py-1">
-                  <Search className="w-4 h-4" />
-                  <span>Debug</span>
-                </TabsTrigger>
-                <TabsTrigger value="settings" className="text-[11px] flex flex-col gap-0.5 py-1">
-                  <Settings className="w-4 h-4" />
-                  <span>Sett..</span>
-                </TabsTrigger>
-              </TabsList>
+                {/* Second Row - Additional Tabs */}
+                <TabsList className="grid w-full grid-cols-4 h-auto">
+                  <TabsTrigger value="ads" className="text-xs flex flex-col gap-1 py-2">
+                    <Megaphone className="w-4 h-4" />
+                    <span>Ads</span>
+                  </TabsTrigger>
+                  <TabsTrigger value="redirects" className="text-xs flex flex-col gap-1 py-2">
+                    <Link2 className="w-4 h-4" />
+                    <span>Links</span>
+                  </TabsTrigger>
+                  <TabsTrigger value="debugger" className="text-xs flex flex-col gap-1 py-2">
+                    <Search className="w-4 h-4" />
+                    <span>Debugger</span>
+                  </TabsTrigger>
+                  <TabsTrigger value="settings" className="text-xs flex flex-col gap-1 py-2">
+                    <Settings className="w-4 h-4" />
+                    <span>Settings</span>
+                  </TabsTrigger>
+                </TabsList>
+              </div>
 
             {/* Dashboard Tab */}
             <TabsContent value="dashboard" className="space-y-4">
