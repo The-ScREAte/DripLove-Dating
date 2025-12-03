@@ -227,7 +227,16 @@ export default function BroadcastNotifications() {
 
       if (error) throw error;
 
-      setCampaignRecipients(data || []);
+      const recipients: Recipient[] = (data || []).map((item: any) => ({
+        id: item.id,
+        user_id: item.user_id,
+        status: item.status as 'pending' | 'sent' | 'failed',
+        error_message: item.error_message,
+        sent_at: item.sent_at,
+        user: item.user,
+      }));
+
+      setCampaignRecipients(recipients);
     } catch (error) {
       console.error('Error loading recipients:', error);
       toast({
