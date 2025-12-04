@@ -9,36 +9,37 @@
   --input-bar-height: 70px;
 }
 
-/* Fixed input container that moves with keyboard */
+/* Fixed input container that stays above keyboard */
 .chat-input-container {
-  position: fixed;
-  left: 0;
-  right: 0;
-  /* Use bottom positioning instead of transform for reliability */
-  bottom: var(--keyboard-height, 0px);
-  width: 100%;
-  padding-bottom: env(safe-area-inset-bottom, 0px);
+  position: fixed !important;
+  left: 0 !important;
+  right: 0 !important;
+  bottom: 0 !important;
+  width: 100% !important;
   background: white;
-  transition: bottom 0.15s ease-out;
-  z-index: 100;
-  /* Ensure it doesn't get covered */
-  transform: translateZ(0);
-  -webkit-transform: translateZ(0);
+  z-index: 9999 !important;
+  /* GPU acceleration for smooth movement */
+  transform: translate3d(0, calc(-1 * var(--keyboard-height, 0px)), 0);
+  -webkit-transform: translate3d(0, calc(-1 * var(--keyboard-height, 0px)), 0);
+  transition: transform 0.2s ease-out;
+  -webkit-transition: -webkit-transform 0.2s ease-out;
+  /* Safe area padding when keyboard is closed */
+  padding-bottom: env(safe-area-inset-bottom, 0px);
 }
 
-/* When keyboard is open, hide safe area padding (keyboard provides its own space) */
+/* When keyboard is open, remove safe area padding (keyboard provides its own space) */
 body.keyboard-open .chat-input-container {
-  padding-bottom: 0;
+  padding-bottom: 0 !important;
 }
 
-/* Messages area adjusts based on keyboard */
+/* Messages area adjusts for input bar */
 .chat-messages-container {
-  padding-bottom: calc(var(--input-bar-height) + env(safe-area-inset-bottom, 0px));
-  transition: padding-bottom 0.15s ease-out;
+  padding-bottom: calc(var(--input-bar-height) + env(safe-area-inset-bottom, 0px)) !important;
 }
 
+/* When keyboard is open, add extra space for keyboard + input bar */
 body.keyboard-open .chat-messages-container {
-  padding-bottom: calc(var(--keyboard-height, 0px) + var(--input-bar-height));
+  padding-bottom: calc(var(--keyboard-height, 0px) + var(--input-bar-height)) !important;
 }
 
 /* Mobile optimizations and safe areas */
