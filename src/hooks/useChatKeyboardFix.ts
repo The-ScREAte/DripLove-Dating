@@ -6,11 +6,13 @@ import { Keyboard } from "@capacitor/keyboard";
  * Robust keyboard handling hook for chat input
  * Handles both native (Capacitor) and web keyboard events
  * Auto-scrolls chat to bottom when keyboard opens
+ * DOES NOT close keyboard on scroll - only on intentional dismiss
  */
 export function useChatKeyboardFix() {
   const keyboardHeightRef = useRef(0);
   const isKeyboardVisibleRef = useRef(false);
   const debounceTimerRef = useRef<NodeJS.Timeout | null>(null);
+  const lastViewportHeightRef = useRef(window.innerHeight);
 
   const scrollChatToBottom = useCallback(() => {
     // Find the messages container and scroll to bottom
@@ -35,7 +37,7 @@ export function useChatKeyboardFix() {
     isKeyboardVisibleRef.current = isVisible;
 
     // Add extra padding for emoji keyboard (typically taller)
-    const adjustedHeight = height > 0 ? height + 10 : 0;
+    const adjustedHeight = height > 0 ? height + 15 : 0;
 
     // Apply CSS variable for keyboard offset
     document.documentElement.style.setProperty("--keyboard-height", `${adjustedHeight}px`);
@@ -54,15 +56,23 @@ export function useChatKeyboardFix() {
 
   useEffect(() => {
     const isNative = Capacitor.isNativePlatform();
-    const platform = Capacitor.getPlatform();
     
     let showListener: any;
     let hideListener: any;
+    let didShowListener: any;
 
     const setupNativeKeyboardListeners = async () => {
       if (!isNative) return;
 
       try {
+        // Configure keyboard to NOT resize/scroll on scroll
+        // This prevents keyboard from closing when user scrolls
+        try {
+          await Keyboard.setScroll({ isDisabled: true });
+        } catch (e) {
+          // Older versions may not support this
+        }
+
         // Use keyboardWillShow for smooth animation
         showListener = await Keyboard.addListener("keyboardWillShow", (info) => {
           console.log("[Keyboard] Will show, height:", info.keyboardHeight);
@@ -75,7 +85,7 @@ export function useChatKeyboardFix() {
         });
 
         // Also listen to didShow for cases where height changes (emoji → text keyboard)
-        await Keyboard.addListener("keyboardDidShow", (info) => {
+        didShowListener = await Keyboard.addListener("keyboardDidShow", (info) => {
           // Only update if height changed (keyboard type switch)
           if (Math.abs(keyboardHeightRef.current - info.keyboardHeight) > 20) {
             console.log("[Keyboard] Did show with different height:", info.keyboardHeight);
@@ -89,11 +99,23 @@ export function useChatKeyboardFix() {
     };
 
     // Web fallback using visualViewport API
+    // Only tracks viewport resize, NOT scroll events (to prevent keyboard closing on scroll)
     const handleVisualViewportResize = () => {
       if (!window.visualViewport || isNative) return;
 
+      const currentHeight = window.visualViewport.height;
+      const windowHeight = window.innerHeight;
+      
       // Calculate keyboard height from viewport difference
-      const keyboardHeight = window.innerHeight - window.visualViewport.height;
+      const keyboardHeight = windowHeight - currentHeight;
+      
+      // Only update if the viewport size actually changed (not just scrolled)
+      const heightDelta = Math.abs(currentHeight - lastViewportHeightRef.current);
+      
+      // Ignore small changes that might be from scroll/bounce
+      if (heightDelta < 50) return;
+      
+      lastViewportHeightRef.current = currentHeight;
       
       // Debounce to avoid rapid updates during keyboard animation
       if (debounceTimerRef.current) {
@@ -107,18 +129,18 @@ export function useChatKeyboardFix() {
         } else if (keyboardHeight < 50) {
           applyKeyboardOffset(0);
         }
-      }, 50);
+      }, 100);
     };
 
     // Initialize
     applyKeyboardOffset(0);
+    lastViewportHeightRef.current = window.visualViewport?.height || window.innerHeight;
     
     if (isNative) {
       setupNativeKeyboardListeners();
     } else if (window.visualViewport) {
-      // Web browser - use visualViewport
+      // Web browser - use visualViewport resize only (NOT scroll)
       window.visualViewport.addEventListener("resize", handleVisualViewportResize);
-      window.visualViewport.addEventListener("scroll", handleVisualViewportResize);
     }
 
     // Cleanup
@@ -129,10 +151,10 @@ export function useChatKeyboardFix() {
       
       if (showListener) showListener.remove();
       if (hideListener) hideListener.remove();
+      if (didShowListener) didShowListener.remove();
       
       if (!isNative && window.visualViewport) {
         window.visualViewport.removeEventListener("resize", handleVisualViewportResize);
-        window.visualViewport.removeEventListener("scroll", handleVisualViewportResize);
       }
       
       // Reset styles

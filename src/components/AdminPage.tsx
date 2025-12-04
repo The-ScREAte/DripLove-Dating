@@ -949,10 +949,11 @@ const AdminPageComponent = ({ currentUser, onLogout }: AdminPageProps) => {
 
       const usersWithAge = data?.map(user => {
         // Check if user has active premium subscription
+        // Premium if status is 'active' AND (expires_at is null OR expires_at is in the future)
         const hasPremium = Array.isArray(user.user_subscriptions) && 
           user.user_subscriptions.some((sub: any) => 
             sub.status === 'active' && 
-            new Date(sub.expires_at) > new Date()
+            (sub.expires_at === null || new Date(sub.expires_at) > new Date())
           );
         
         return {
