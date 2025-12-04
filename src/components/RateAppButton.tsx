@@ -43,11 +43,28 @@ const RateAppButton: React.FC<RateAppButtonProps> = ({ className, onRatingComple
       if (onRatingComplete) {
         onRatingComplete(5, platform); // Assume 5 stars for native
       }
+      
+      // Android-specific message explaining quota behavior
+      if (platform === 'android') {
+        toast({
+          title: "Thanks for your support! ❤️",
+          description: "The rating dialog should appear now. If it doesn't, you may have already rated us recently (Google limits how often we can ask). You can always rate us directly in the Play Store!",
+          duration: 6000,
+        });
+      } else {
+        // iOS shows dialog immediately
+        toast({
+          title: "Thank you! ❤️",
+          description: "Your feedback helps us improve DripLove",
+        });
+      }
     } catch (error) {
       console.error('[RateAppButton] Error opening rating:', error);
       toast({
         title: "Unable to open rating",
-        description: "Please try again later",
+        description: platform === 'android' 
+          ? "Please rate us in the Google Play Store" 
+          : "Please try again later",
         variant: "destructive",
       });
     } finally {

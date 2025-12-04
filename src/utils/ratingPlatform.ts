@@ -32,13 +32,16 @@ export const openRatingInterface = async (rating?: number): Promise<void> => {
   
   try {
     if (platform === 'ios') {
-      // iOS - Use Apple's SKStoreReviewController
+      // iOS - Use Apple's SKStoreReviewController (in-app modal)
+      // Limited to 3 prompts per user per 365 days
       await RateApp.requestReview();
-      console.log('[Rating] iOS rating dialog requested');
+      console.log('[Rating] iOS in-app rating dialog requested');
     } else if (platform === 'android') {
-      // Android - Open Play Store listing
+      // Android - Use Google Play In-App Review API (in-app modal)
+      // Note: Google enforces time-bound quotas - may not show if user was recently prompted
+      // If quota exceeded, dialog won't appear (this is expected behavior)
       await RateApp.requestReview();
-      console.log('[Rating] Android Play Store opened');
+      console.log('[Rating] Android in-app review requested (subject to Google Play quota)');
     } else {
       // Web - Handle internally (rating is required for web)
       if (rating !== undefined) {
