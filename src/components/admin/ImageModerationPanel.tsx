@@ -8,7 +8,6 @@ import { supabase } from '@/integrations/supabase/client';
 import { Eye, Trash2, CheckCircle, XCircle, Clock, AlertTriangle, User } from 'lucide-react';
 import { usePushNotifications } from '@/hooks/usePushNotifications';
 import ImageViewer from '@/components/ImageViewer';
-import { useTranslation } from 'react-i18next';
 
 interface PendingImage {
   id: string;
@@ -49,7 +48,6 @@ interface ReportedImage {
 }
 
 const ImageModerationPanel = () => {
-  const { t, i18n } = useTranslation();
   const [pendingImages, setPendingImages] = useState<PendingImage[]>([]);
   const [reportedImages, setReportedImages] = useState<ReportedImage[]>([]);
   const [loadingPending, setLoadingPending] = useState(false);
@@ -65,29 +63,6 @@ const ImageModerationPanel = () => {
   // Get current admin user for push notifications
   const [currentAdminId, setCurrentAdminId] = useState<string | null>(null);
   const { sendAdminNotification } = usePushNotifications(currentAdminId || undefined);
-
-  // Helper function to get user's language
-  const getUserLanguage = async (userId: string): Promise<string> => {
-    try {
-      const { data } = await supabase
-        .from('profiles')
-        .select('language')
-        .eq('id', userId)
-        .single();
-      return data?.language || 'en';
-    } catch {
-      return 'en';
-    }
-  };
-
-  // Helper function to get translated message
-  const getTranslatedMessage = (key: string, language: string): string => {
-    const currentLang = i18n.language;
-    i18n.changeLanguage(language);
-    const translated = t(key);
-    i18n.changeLanguage(currentLang);
-    return translated;
-  };
 
   useEffect(() => {
     const getCurrentAdmin = async () => {
@@ -219,13 +194,9 @@ const ImageModerationPanel = () => {
       // Send push notification to user
       if (imageToApprove?.user_id) {
         try {
-          const userLanguage = await getUserLanguage(imageToApprove.user_id);
-          const title = getTranslatedMessage('notifications.photoApprovedTitle', userLanguage);
-          const message = getTranslatedMessage('notifications.photoApprovedMessage', userLanguage);
-          
           await sendAdminNotification(
-            title,
-            message,
+            '✅ Photos Approved',
+            'Your images have been approved! Keep swiping and have fun finding someone made just for you.',
             imageToApprove.user_id
           );
           console.log('📤 Image approval notification sent to:', imageToApprove.user_id);
@@ -279,13 +250,9 @@ const ImageModerationPanel = () => {
       // Send push notification to user
       if (imageToReject?.user_id) {
         try {
-          const userLanguage = await getUserLanguage(imageToReject.user_id);
-          const title = getTranslatedMessage('notifications.photoRejectedTitle', userLanguage);
-          const message = getTranslatedMessage('notifications.photoRejectedMessage', userLanguage);
-          
           await sendAdminNotification(
-            title,
-            message,
+            '⚠️ Photo Rejected',
+            'Your image has been rejected because it\'s either inappropriate or not a real representation of yourself. This violates our terms and conditions and if it continues will result in deletion of your account.',
             imageToReject.user_id
           );
           console.log('📤 Image rejection notification sent to:', imageToReject.user_id);
@@ -397,8 +364,8 @@ const ImageModerationPanel = () => {
       // Send push notification to user about image deletion
       try {
         await sendAdminNotification(
-          '⚠️ Photo Removed',
-          'One of your photos was removed as it did not meet our community guidelines. Please upload appropriate/ real photosof yourself to help others identify you better. this may limit you being prioritized for showing in others Dripcheck',
+          '⚠️ Photo Rejected',
+          'Your image has been rejected because it\'s either inappropriate or not a real representation of yourself. This violates our terms and conditions and if it continues will result in deletion of your account.',
           reportedUserId
         );
         console.log('📤 Image deletion notification sent to:', reportedUserId);
