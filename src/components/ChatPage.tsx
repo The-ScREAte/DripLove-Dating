@@ -30,11 +30,11 @@ interface ChatPageProps {
 
 // Global cache for chat matches - persists across component mounts
 const chatMatchesCache = new Map<string, { matches: ChatMatch[], timestamp: number }>();
-const CACHE_DURATION = 10000; // 10 seconds - faster updates for live feel
+const CACHE_DURATION = 30000; // 30 seconds - keep matches fresh
 
-// Global cache for individual chat messages
+// Global cache for individual chat messages - NEVER expire, only update
 const chatMessagesCache = new Map<string, { messages: ChatMessage[], timestamp: number }>();
-const MESSAGE_CACHE_DURATION = 15000; // 15 seconds - faster message updates
+const MESSAGE_CACHE_DURATION = Infinity; // Never expire - always show cached messages instantly
 
 // Make caches globally accessible for preloading
 if (typeof window !== 'undefined') {
@@ -191,10 +191,14 @@ const ChatPage = ({ currentUser, onUnreadChange, onDetailViewChange }: ChatPageP
             setMatches(prev => {
               const updated = prev.map(match => {
                 if (match.id === newMsg.match_id) {
+                  // Increment unread count if we're NOT the sender and NOT viewing this chat
+                  const shouldIncrementUnread = newMsg.sender_id !== currentUser.id && selectedMatch?.id !== newMsg.match_id;
+                  
                   return {
                     ...match,
                     last_message: newMsg.message,
                     last_message_time: newMsg.created_at,
+                    unread_messages: shouldIncrementUnread ? (match.unread_messages || 0) + 1 : (match.unread_messages || 0),
                   };
                 }
                 return match;
@@ -271,6 +275,29 @@ const ChatPage = ({ currentUser, onUnreadChange, onDetailViewChange }: ChatPageP
     };
   }, [currentUser?.id, selectedMatch]);
 
+  // Preload messages for visible chats in background for instant access
+  useEffect(() => {
+    if (!currentUser?.id || selectedMatch || matches.length === 0) return;
+    
+    // Preload first 5 chat conversations in background
+    const preloadChats = async () => {
+      const topChats = matches.slice(0, 5);
+      for (const match of topChats) {
+        const cached = chatMessagesCache.get(match.id);
+        // Only preload if not cached or cache is very old
+        if (!cached || cached.messages.length === 0) {
+          await fetchMessagesInBackground(match.id);
+          // Small delay between preloads to avoid overwhelming
+          await new Promise(resolve => setTimeout(resolve, 200));
+        }
+      }
+    };
+    
+    // Start preloading after a short delay (don't block initial render)
+    const timer = setTimeout(preloadChats, 1000);
+    return () => clearTimeout(timer);
+  }, [currentUser?.id, selectedMatch, matches]);
+
   // Listen for new match events from DiscoverPage
   useEffect(() => {
     if (!currentUser || !currentUser.id) return;
@@ -296,9 +323,22 @@ const ChatPage = ({ currentUser, onUnreadChange, onDetailViewChange }: ChatPageP
   useEffect(() => {
     if (!currentUser || !currentUser.id) return;
     if (selectedMatch) {
-      // Clear messages immediately to prevent showing previous chat's messages
-      setMessages([]);
-      fetchMessages();
+      // ALWAYS load from cache first for instant display
+      const cached = chatMessagesCache.get(selectedMatch.id);
+      if (cached && cached.messages.length > 0) {
+        // Show cached messages instantly - don't filter, let them appear immediately
+        const visibleMessages = cached.messages.filter(msg => {
+          const isDeletedForMe = msg.deleted_for && msg.deleted_for.includes(currentUser.id);
+          return !isDeletedForMe;
+        });
+        setMessages(visibleMessages);
+      } else {
+        // No cache yet, show empty state
+        setMessages([]);
+      }
+      
+      // ALWAYS fetch new messages in background (even if cache exists)
+      fetchMessagesInBackground(selectedMatch.id);
       markMessagesAsRead();
       onDetailViewChange?.(true);
       
@@ -354,6 +394,18 @@ const ChatPage = ({ currentUser, onUnreadChange, onDetailViewChange }: ChatPageP
       return () => clearInterval(interval);
     }
   }, [messages, selectedMatch, currentUser?.id]);
+
+  // Poll for new messages every 1 second when chat is open (for ultra-live updates)
+  useEffect(() => {
+    if (!selectedMatch || !currentUser?.id) return;
+    
+    const interval = setInterval(() => {
+      // Fetch new messages in background
+      fetchMessagesInBackground(selectedMatch.id);
+    }, 1000); // Check every 1 second for instant live feel
+    
+    return () => clearInterval(interval);
+  }, [selectedMatch, currentUser?.id]);
 
   // Ensure on open we always start at the last message unless user scrolls up
   useEffect(() => {
@@ -860,7 +912,9 @@ const ChatPage = ({ currentUser, onUnreadChange, onDetailViewChange }: ChatPageP
 
   const fetchMessagesInBackground = async (matchId: string) => {
     try {
-      const { data, error } = await supabase
+      // Get the latest message ID from cache to only fetch newer messages
+      const cached = chatMessagesCache.get(matchId);
+      let query = supabase
         .from('chats')
         .select(`
           *,
@@ -868,6 +922,14 @@ const ChatPage = ({ currentUser, onUnreadChange, onDetailViewChange }: ChatPageP
         `)
         .eq('match_id', matchId)
         .order('created_at', { ascending: true });
+
+      // If we have cached messages, only fetch messages newer than the latest one
+      if (cached && cached.messages.length > 0) {
+        const latestMessage = cached.messages[cached.messages.length - 1];
+        query = query.gt('created_at', latestMessage.created_at);
+      }
+
+      const { data, error } = await query;
 
       if (error) throw error;
 
@@ -879,20 +941,32 @@ const ChatPage = ({ currentUser, onUnreadChange, onDetailViewChange }: ChatPageP
           : currentUser.id
       })) || [];
 
-      const processedMessages = mappedMessages as unknown as ChatMessage[];
+      const newMessages = mappedMessages as unknown as ChatMessage[];
       
-      // Don't filter out deleted messages - mark them instead
-      const visibleMessages = processedMessages;
+      // Merge new messages with cached messages
+      const allMessages = cached 
+        ? [...cached.messages, ...newMessages]
+        : newMessages;
       
-      // Update cache with all messages
+      // Update cache with merged messages
       chatMessagesCache.set(matchId, {
-        messages: processedMessages,
+        messages: allMessages,
         timestamp: Date.now()
       });
 
-      // Update state if this is still the selected match
-      if (selectedMatch?.id === matchId) {
-        setMessages(visibleMessages);
+      // Update state if this is still the selected match and we have new messages
+      if (selectedMatch?.id === matchId && newMessages.length > 0) {
+        setMessages(allMessages);
+        
+        // Auto-scroll to bottom if user was already at bottom
+        setTimeout(() => {
+          if (isAtBottomRef.current) {
+            const container = messagesContainerRef.current;
+            if (container) {
+              container.scrollTop = container.scrollHeight;
+            }
+          }
+        }, 50);
       }
     } catch (error) {
       // Silently handle background fetch errors

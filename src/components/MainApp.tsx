@@ -1,12 +1,8 @@
-import React, { useState, useEffect, useCallback, useMemo } from 'react';
+import React, { useState, useEffect, useCallback, useMemo, lazy, Suspense } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Button } from '@/components/ui/button';
 import { Heart, MessageCircle, Users, User } from 'lucide-react';
 import { Capacitor } from '@capacitor/core';
-import DiscoverPage from '@/components/DiscoverPage';
-import ChatPage from '@/components/ChatPage';
-import LikedMePage from '@/components/LikedMePage';
-import ProfilePage from '@/components/ProfilePage';
 import TermsOfService from '@/components/TermsOfService';
 import PrivacyPolicy from '@/components/PrivacyPolicy';
 import DripCoupleIcon from '@/components/DripCoupleIcon';
@@ -15,6 +11,23 @@ import { supabase, SUPABASE_URL } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import { usePushNotifications } from '@/hooks/usePushNotifications';
 import { loadUserLanguage } from '@/utils/languageSync';
+
+// Lazy load tab components - reduces initial bundle by ~700KB
+// Each component only loads when user navigates to that tab
+const DiscoverPage = lazy(() => import('@/components/DiscoverPage'));
+const ChatPage = lazy(() => import('@/components/ChatPage'));
+const LikedMePage = lazy(() => import('@/components/LikedMePage'));
+const ProfilePage = lazy(() => import('@/components/ProfilePage'));
+
+// Tab loading fallback
+const TabLoader = () => (
+  <div className="flex items-center justify-center h-full">
+    <div className="text-center">
+      <div className="w-8 h-8 border-4 border-pink-500 border-t-transparent rounded-full animate-spin mx-auto mb-2"></div>
+      <p className="text-sm text-gray-500">Loading...</p>
+    </div>
+  </div>
+);
 
 // Import rating debug utilities for development
 if (import.meta.env.DEV) {
@@ -1079,30 +1092,51 @@ const MainApp = ({ user, onLogout }: MainAppProps) => {
           className={`flex-1 overflow-auto ${!showTerms && !showPrivacy ? 'pt-[56px] pb-[80px]' : ''}`}
           style={{ height: '100%', position: 'relative' }}
         >
-          {/* Keep pages mounted to avoid reloading when switching tabs. Show/hide via classes. */}
-          <div className={`${activeTab === 'dripcheck' ? 'block' : 'hidden'} w-full h-full`}> 
-            <DiscoverPage currentUser={profile} onNavigateToChat={handleNavigateToChat} isPremium={isPremium} />
-          </div>
+          {/* Lazy load tabs on first access, then keep mounted in background */}
+          {/* Use visibility instead of conditional rendering to preserve state */}
+          <Suspense fallback={<TabLoader />}>
+            <div 
+              className="w-full h-full" 
+              style={{ display: activeTab === 'dripcheck' ? 'block' : 'none' }}
+            > 
+              <DiscoverPage currentUser={profile} onNavigateToChat={handleNavigateToChat} isPremium={isPremium} />
+            </div>
+          </Suspense>
 
-          <div className={`${activeTab === 'chat' ? 'block' : 'hidden'} w-full h-full`}> 
-            <ChatPage currentUser={profile} onUnreadChange={fetchUnreadCount} onDetailViewChange={setIsChatDetailOpen} />
-          </div>
+          <Suspense fallback={<TabLoader />}>
+            <div 
+              className="w-full h-full" 
+              style={{ display: activeTab === 'chat' ? 'block' : 'none' }}
+            > 
+              <ChatPage currentUser={profile} onUnreadChange={fetchUnreadCount} onDetailViewChange={setIsChatDetailOpen} />
+            </div>
+          </Suspense>
 
-          <div className={`${activeTab === 'liked' ? 'block' : 'hidden'} w-full h-full`}> 
-            <LikedMePage currentUser={profile} isPremium={isPremium} />
-          </div>
+          <Suspense fallback={<TabLoader />}>
+            <div 
+              className="w-full h-full" 
+              style={{ display: activeTab === 'liked' ? 'block' : 'none' }}
+            > 
+              <LikedMePage currentUser={profile} isPremium={isPremium} />
+            </div>
+          </Suspense>
 
-          <div className={`${activeTab === 'profile' ? 'block' : 'hidden'} w-full h-full`}> 
-            <ProfilePage 
-              currentUser={profile} 
-              profile={profile} 
-              onProfileUpdate={fetchUserProfile} 
-              onLogout={onLogout}
-              onShowTerms={handleShowTerms}
-              onShowPrivacy={handleShowPrivacy}
-              isPremium={isPremium}
-            />
-          </div>
+          <Suspense fallback={<TabLoader />}>
+            <div 
+              className="w-full h-full" 
+              style={{ display: activeTab === 'profile' ? 'block' : 'none' }}
+            > 
+              <ProfilePage 
+                currentUser={profile} 
+                profile={profile} 
+                onProfileUpdate={fetchUserProfile} 
+                onLogout={onLogout}
+                onShowTerms={handleShowTerms}
+                onShowPrivacy={handleShowPrivacy}
+                isPremium={isPremium}
+              />
+            </div>
+          </Suspense>
         </div>
 
         {/* Fixed Bottom Nav - always visible */}
