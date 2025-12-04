@@ -4,15 +4,16 @@ import { Keyboard } from "@capacitor/keyboard";
 
 /**
  * Robust keyboard handling hook for chat input
- * Uses bottom positioning for reliable input placement
+ * Handles both native (Capacitor) and web keyboard events
  * Auto-scrolls chat to bottom when keyboard opens
  */
 export function useChatKeyboardFix() {
   const keyboardHeightRef = useRef(0);
   const isKeyboardVisibleRef = useRef(false);
-  const lastViewportHeightRef = useRef(window.innerHeight);
+  const debounceTimerRef = useRef<NodeJS.Timeout | null>(null);
 
   const scrollChatToBottom = useCallback(() => {
+    // Find the messages container and scroll to bottom
     requestAnimationFrame(() => {
       const messagesContainer = document.querySelector('.chat-messages-container');
       if (messagesContainer) {
@@ -21,21 +22,30 @@ export function useChatKeyboardFix() {
     });
   }, []);
 
-  const applyKeyboardOffset = useCallback((height: number) => {
+  const applyKeyboardOffset = useCallback((height: number, shouldScroll = true) => {
+    // Clear any pending debounce
+    if (debounceTimerRef.current) {
+      clearTimeout(debounceTimerRef.current);
+    }
+
     const wasVisible = isKeyboardVisibleRef.current;
-    const isVisible = height > 50;
-    
+    const previousHeight = keyboardHeightRef.current;
     keyboardHeightRef.current = height;
+    const isVisible = height > 50;
     isKeyboardVisibleRef.current = isVisible;
 
-    // Set the CSS variable - no extra padding needed, just use the actual height
-    document.documentElement.style.setProperty("--keyboard-height", `${height}px`);
+    // Add extra padding for emoji keyboard (typically taller)
+    const adjustedHeight = height > 0 ? height + 10 : 0;
+
+    // Apply CSS variable for keyboard offset
+    document.documentElement.style.setProperty("--keyboard-height", `${adjustedHeight}px`);
     
+    // Toggle body class for additional styling hooks
     if (isVisible) {
       document.body.classList.add("keyboard-open");
-      // Auto-scroll to bottom when keyboard appears
-      if (!wasVisible) {
-        setTimeout(scrollChatToBottom, 150);
+      // Auto-scroll to bottom when keyboard first appears or changes height significantly
+      if (shouldScroll && (!wasVisible || Math.abs(height - previousHeight) > 20)) {
+        setTimeout(scrollChatToBottom, 100);
       }
     } else {
       document.body.classList.remove("keyboard-open");
@@ -44,18 +54,18 @@ export function useChatKeyboardFix() {
 
   useEffect(() => {
     const isNative = Capacitor.isNativePlatform();
+    const platform = Capacitor.getPlatform();
     
     let showListener: any;
     let hideListener: any;
-    let didShowListener: any;
 
     const setupNativeKeyboardListeners = async () => {
       if (!isNative) return;
 
       try {
-        // Use keyboardWillShow for immediate response
+        // Use keyboardWillShow for smooth animation
         showListener = await Keyboard.addListener("keyboardWillShow", (info) => {
-          console.log("[Keyboard] Will show:", info.keyboardHeight);
+          console.log("[Keyboard] Will show, height:", info.keyboardHeight);
           applyKeyboardOffset(info.keyboardHeight);
         });
 
@@ -64,18 +74,17 @@ export function useChatKeyboardFix() {
           applyKeyboardOffset(0);
         });
 
-        // Handle keyboard type changes (text ↔ emoji)
-        didShowListener = await Keyboard.addListener("keyboardDidShow", (info) => {
-          const heightDiff = Math.abs(keyboardHeightRef.current - info.keyboardHeight);
-          // Only update if height changed significantly (keyboard type switch)
-          if (heightDiff > 30) {
-            console.log("[Keyboard] Height changed to:", info.keyboardHeight);
+        // Also listen to didShow for cases where height changes (emoji → text keyboard)
+        await Keyboard.addListener("keyboardDidShow", (info) => {
+          // Only update if height changed (keyboard type switch)
+          if (Math.abs(keyboardHeightRef.current - info.keyboardHeight) > 20) {
+            console.log("[Keyboard] Did show with different height:", info.keyboardHeight);
             applyKeyboardOffset(info.keyboardHeight);
           }
         });
 
       } catch (error) {
-        console.log("[Keyboard] Plugin not available:", error);
+        console.log("[Keyboard] Plugin not available, using web fallback:", error);
       }
     };
 
@@ -83,42 +92,50 @@ export function useChatKeyboardFix() {
     const handleVisualViewportResize = () => {
       if (!window.visualViewport || isNative) return;
 
-      const currentHeight = window.visualViewport.height;
-      const windowHeight = window.innerHeight;
-      const keyboardHeight = Math.max(0, windowHeight - currentHeight);
+      // Calculate keyboard height from viewport difference
+      const keyboardHeight = window.innerHeight - window.visualViewport.height;
       
-      // Ignore small fluctuations
-      const heightDelta = Math.abs(currentHeight - lastViewportHeightRef.current);
-      if (heightDelta < 50) return;
-      
-      lastViewportHeightRef.current = currentHeight;
-      
-      if (keyboardHeight > 100) {
-        applyKeyboardOffset(keyboardHeight);
-      } else {
-        applyKeyboardOffset(0);
+      // Debounce to avoid rapid updates during keyboard animation
+      if (debounceTimerRef.current) {
+        clearTimeout(debounceTimerRef.current);
       }
+
+      debounceTimerRef.current = setTimeout(() => {
+        // Only consider it a keyboard if the height difference is significant
+        if (keyboardHeight > 100) {
+          applyKeyboardOffset(keyboardHeight);
+        } else if (keyboardHeight < 50) {
+          applyKeyboardOffset(0);
+        }
+      }, 50);
     };
 
     // Initialize
     applyKeyboardOffset(0);
-    lastViewportHeightRef.current = window.visualViewport?.height || window.innerHeight;
     
     if (isNative) {
       setupNativeKeyboardListeners();
     } else if (window.visualViewport) {
+      // Web browser - use visualViewport
       window.visualViewport.addEventListener("resize", handleVisualViewportResize);
+      window.visualViewport.addEventListener("scroll", handleVisualViewportResize);
     }
 
+    // Cleanup
     return () => {
+      if (debounceTimerRef.current) {
+        clearTimeout(debounceTimerRef.current);
+      }
+      
       if (showListener) showListener.remove();
       if (hideListener) hideListener.remove();
-      if (didShowListener) didShowListener.remove();
       
       if (!isNative && window.visualViewport) {
         window.visualViewport.removeEventListener("resize", handleVisualViewportResize);
+        window.visualViewport.removeEventListener("scroll", handleVisualViewportResize);
       }
       
+      // Reset styles
       document.documentElement.style.removeProperty("--keyboard-height");
       document.body.classList.remove("keyboard-open");
     };
