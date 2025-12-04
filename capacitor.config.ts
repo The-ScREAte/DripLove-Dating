@@ -23,7 +23,17 @@ const config: CapacitorConfig = {
   android: {
     allowMixedContent: true,
     captureInput: true,
-    webContentsDebuggingEnabled: false
+    webContentsDebuggingEnabled: false,
+    // Performance optimizations for Android WebView
+    backgroundColor: '#ffffff',
+    // Enable hardware acceleration
+    hardwareAccelerated: true,
+    // Optimize WebView loading
+    useLegacyBridge: false,
+    // Improve scrolling performance
+    overscrollHistoryNavigation: false,
+    // Optimize for modern Android
+    mixedContentMode: 0
   },
   plugins: {
     GoogleAuth: {
@@ -39,7 +49,8 @@ const config: CapacitorConfig = {
       overlaysWebView: true
     },
     Keyboard: {
-      resize: 'body',
+      // Prevent native viewport resize; we handle layout manually in JS
+      resize: 'none',
       style: 'dark',
       resizeOnFullScreen: true
     },

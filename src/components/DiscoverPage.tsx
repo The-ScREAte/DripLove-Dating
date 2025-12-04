@@ -2779,4 +2779,4 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, isPremium }: DiscoverPage
   );
 }
 
-export default DiscoverPage;
+export default React.memo(DiscoverPage);

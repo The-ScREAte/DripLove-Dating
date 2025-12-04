@@ -70,6 +70,7 @@ const ChatPage = ({ currentUser, onUnreadChange, onDetailViewChange }: ChatPageP
   const { sendMessageNotification, isInitialized, isSupported } = usePushNotifications(currentUser?.id);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const messagesContainerRef = useRef<HTMLDivElement>(null);
+  const isAtBottomRef = useRef<boolean>(true);
   const backgroundFetchingRef = useRef(false);
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [pullDistance, setPullDistance] = useState(0);
@@ -295,9 +296,21 @@ const ChatPage = ({ currentUser, onUnreadChange, onDetailViewChange }: ChatPageP
   useEffect(() => {
     if (!currentUser || !currentUser.id) return;
     if (selectedMatch) {
+      // Clear messages immediately to prevent showing previous chat's messages
+      setMessages([]);
       fetchMessages();
       markMessagesAsRead();
       onDetailViewChange?.(true);
+      
+      // Scroll to bottom after messages load
+      setTimeout(() => {
+        const container = messagesContainerRef.current;
+        if (container) {
+          container.scrollTop = container.scrollHeight;
+          // Reset state: entering a chat should consider us at bottom
+          isAtBottomRef.current = true;
+        }
+      }, 100);
     }
     else {
       onDetailViewChange?.(false);
@@ -310,8 +323,65 @@ const ChatPage = ({ currentUser, onUnreadChange, onDetailViewChange }: ChatPageP
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selectedMatch]);
 
+  // Fallback: periodically refresh read flags for recent messages to ensure double-check appears
   useEffect(() => {
-    scrollToBottom();
+    if (!selectedMatch || !currentUser?.id) return;
+    
+    // Poll for read status updates every 2 seconds when we have unread sent messages
+    const hasUnreadSent = messages.some(m => m.sender_id === currentUser.id && !m.is_read);
+    
+    if (hasUnreadSent) {
+      const interval = setInterval(async () => {
+        try {
+          const { data, error } = await supabase
+            .from('chats')
+            .select('id, is_read')
+            .eq('match_id', selectedMatch.id)
+            .eq('sender_id', currentUser.id);
+          
+          if (!error && Array.isArray(data)) {
+            // Update only the is_read flag for matching messages
+            setMessages(prev => prev.map(msg => {
+              const updated = data.find(d => d.id === msg.id);
+              return updated ? { ...msg, is_read: updated.is_read } : msg;
+            }));
+          }
+        } catch (e) {
+          console.log('[ChatPage] Error polling read status:', e);
+        }
+      }, 2000);
+      
+      return () => clearInterval(interval);
+    }
+  }, [messages, selectedMatch, currentUser?.id]);
+
+  // Ensure on open we always start at the last message unless user scrolls up
+  useEffect(() => {
+    const container = messagesContainerRef.current;
+    if (!container) return;
+    // If user hasn't scrolled up yet (near bottom or initial open), snap to bottom
+    const distanceFromBottom = container.scrollHeight - container.scrollTop - container.clientHeight;
+    const isUserNearBottom = distanceFromBottom < 50; // threshold
+    if (isUserNearBottom) {
+      // Use a microtask + animation frame to wait for layout
+      setTimeout(() => {
+        requestAnimationFrame(() => {
+          container.scrollTop = container.scrollHeight;
+        });
+      }, 0);
+    }
+  }, [selectedMatch]);
+
+  // On new messages, only keep user at bottom if they are already near bottom
+  useEffect(() => {
+    const container = messagesContainerRef.current;
+    if (!container || messages.length === 0) return;
+
+    if (isAtBottomRef.current) {
+      requestAnimationFrame(() => {
+        container.scrollTop = container.scrollHeight;
+      });
+    }
   }, [messages]);
 
   // Dismiss keyboard on scroll (like iMessages) - mobile only
@@ -325,6 +395,11 @@ const ChatPage = ({ currentUser, onUnreadChange, onDetailViewChange }: ChatPageP
     const handleScroll = (e: Event) => {
       const target = e.target as HTMLElement;
       const currentScrollTop = target.scrollTop;
+
+      // Track whether user is near bottom to control auto-scroll behavior
+      const threshold = 24; // px from bottom considered "at bottom"
+      const distanceFromBottom = target.scrollHeight - (target.scrollTop + target.clientHeight);
+      isAtBottomRef.current = distanceFromBottom <= threshold;
 
       // Only dismiss keyboard when scrolling up (like iMessages)
       if (currentScrollTop < lastScrollTop) {
@@ -348,6 +423,26 @@ const ChatPage = ({ currentUser, onUnreadChange, onDetailViewChange }: ChatPageP
       clearTimeout(scrollTimeout);
     };
   }, [selectedMatch]);
+
+  // Track bottom position on all platforms (desktop/web too)
+  useEffect(() => {
+    const container = messagesContainerRef.current;
+    if (!container) return;
+
+    const handleScroll = () => {
+      const threshold = 24;
+      const distanceFromBottom = container.scrollHeight - (container.scrollTop + container.clientHeight);
+      isAtBottomRef.current = distanceFromBottom <= threshold;
+    };
+
+    container.addEventListener('scroll', handleScroll, { passive: true });
+    // Initialize once attached
+    handleScroll();
+
+    return () => {
+      container.removeEventListener('scroll', handleScroll);
+    };
+  }, [messagesContainerRef.current]);
 
   useEffect(() => {
     if (!currentUser || !currentUser.id) return;
@@ -836,7 +931,8 @@ const ChatPage = ({ currentUser, onUnreadChange, onDetailViewChange }: ChatPageP
           .from('chats')
           .update({ is_read: true })
           .eq('match_id', selectedMatch.id)
-          .neq('sender_id', currentUser.id);
+          .eq('receiver_id', currentUser.id)
+          .eq('is_read', false);
         
         if (!error) {
           // Update local state to show double checkmarks immediately
@@ -845,7 +941,7 @@ const ChatPage = ({ currentUser, onUnreadChange, onDetailViewChange }: ChatPageP
           ));
         }
       } catch (chatError) {
-        // Silently handle if is_read field doesn't exist
+        console.log('[ChatPage] Error marking messages as read:', chatError);
       }
 
       onUnreadChange?.();
@@ -1685,8 +1781,8 @@ const ChatPage = ({ currentUser, onUnreadChange, onDetailViewChange }: ChatPageP
           paddingTop: Capacitor.getPlatform() === 'ios' 
             ? 'clamp(160px, calc(env(safe-area-inset-top, 10px) + 140px), 180px)'
             : Capacitor.getPlatform() === 'web'
-              ? '120px'
-              : '120px'
+              ? '140px'
+              : '140px'
         }}
         onTouchStart={handleSwipeStart}
         onTouchMove={handleSwipeMove}
@@ -1799,4 +1895,4 @@ const ChatPage = ({ currentUser, onUnreadChange, onDetailViewChange }: ChatPageP
   );
 };
 
-export default ChatPage;
+export default React.memo(ChatPage);

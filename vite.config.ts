@@ -66,15 +66,34 @@ export default defineConfig(({ mode }) => ({
   // Build configuration
   build: {
     chunkSizeWarningLimit: 1000, // Increase from default 500kb to 1000kb
+    // Optimize for mobile devices (especially Android)
+    target: 'es2020',
+    minify: 'terser',
+    terserOptions: {
+      compress: {
+        drop_console: mode === 'production', // Remove console.* in production
+        drop_debugger: true,
+        pure_funcs: mode === 'production' ? ['console.log', 'console.info', 'console.debug', 'console.warn'] : []
+      },
+      format: {
+        comments: false
+      }
+    },
     rollupOptions: {
       output: {
         manualChunks: {
           // Separate vendor chunks to optimize loading
-          'react-vendor': ['react', 'react-dom'],
+          'react-vendor': ['react', 'react-dom', 'react-router-dom'],
           'supabase-vendor': ['@supabase/supabase-js'],
-          'ui-vendor': ['lucide-react', '@radix-ui/react-dialog', '@radix-ui/react-alert-dialog'],
+          // Split large Radix UI into separate chunks
+          'radix-dialog': ['@radix-ui/react-dialog', '@radix-ui/react-alert-dialog'],
+          'radix-forms': ['@radix-ui/react-select', '@radix-ui/react-checkbox', '@radix-ui/react-radio-group', '@radix-ui/react-switch'],
+          'radix-other': ['@radix-ui/react-tabs', '@radix-ui/react-tooltip', '@radix-ui/react-popover', '@radix-ui/react-dropdown-menu'],
+          'ui-vendor': ['lucide-react', 'class-variance-authority', 'clsx', 'tailwind-merge']
         },
       },
     },
   },
+  // Enable build cache for faster rebuilds
+  cacheDir: '.vite-cache',
 }));

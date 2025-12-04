@@ -92,13 +92,7 @@ const RatingDialog: React.FC<RatingDialogProps> = ({
       // Mark as rated
       markUserHasRated(platform);
 
-      // Show success message
-      toast({
-        title: "Thank you! ❤️",
-        description: platform === 'web' 
-          ? "Your feedback helps us improve DripLove"
-          : "Thank you for rating DripLove!",
-      });
+      // Success: optionally handle silently without toast
 
       // Call callback
       if (onRatingComplete) {

@@ -1,5 +1,60 @@
 // Performance optimization utilities for the dating app
 
+/**
+ * Detect if running on Android
+ */
+export const isAndroid = (): boolean => {
+  if (typeof window === 'undefined') return false;
+  return /Android/i.test(navigator.userAgent);
+};
+
+/**
+ * Detect if running on iOS
+ */
+export const isIOS = (): boolean => {
+  if (typeof window === 'undefined') return false;
+  return /iPhone|iPad|iPod/i.test(navigator.userAgent);
+};
+
+/**
+ * Get device performance tier (low, medium, high)
+ */
+export const getDevicePerformanceTier = (): 'low' | 'medium' | 'high' => {
+  if (typeof window === 'undefined') return 'medium';
+  
+  const cores = navigator.hardwareConcurrency || 4;
+  const memory = (navigator as any).deviceMemory || 4;
+  
+  if (memory <= 2 || cores <= 4) return 'low';
+  if (memory >= 6 && cores >= 8) return 'high';
+  return 'medium';
+};
+
+/**
+ * Get optimal image quality based on device performance
+ */
+export const getOptimalImageQuality = (): number => {
+  const tier = getDevicePerformanceTier();
+  
+  // Android gets lower quality by default for better performance
+  if (isAndroid()) {
+    switch (tier) {
+      case 'low': return 50;
+      case 'medium': return 60;
+      case 'high': return 70;
+      default: return 60;
+    }
+  }
+  
+  // iOS can handle higher quality
+  switch (tier) {
+    case 'low': return 60;
+    case 'medium': return 75;
+    case 'high': return 85;
+    default: return 75;
+  }
+};
+
 // 1. Debounce function for search and other frequent operations
 export const debounce = <T extends (...args: any[]) => any>(
   func: T,
@@ -29,9 +84,15 @@ export const throttle = <T extends (...args: any[]) => any>(
 
 // 3. Image lazy loading and optimization - ULTRA OPTIMIZED FOR SPEED
 export const optimizeImageUrl = (url: string, maxWidth: number = 300): string => {
+  // Get optimal quality based on device
+  const quality = getOptimalImageQuality();
+  
+  // Android devices get more aggressive optimization
+  const width = isAndroid() ? Math.min(maxWidth, 800) : maxWidth;
+  
   // Ultra-aggressive optimization for maximum speed and concurrent users
   if (url.includes('supabase')) {
-    return `${url}?width=${maxWidth}&quality=60&format=webp&resize=fill`;
+    return `${url}?width=${width}&quality=${quality}&format=webp&resize=fill`;
   }
   return url;
 };

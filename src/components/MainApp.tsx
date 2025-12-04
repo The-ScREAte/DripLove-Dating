@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Button } from '@/components/ui/button';
 import { Heart, MessageCircle, Users, User } from 'lucide-react';
@@ -857,8 +857,18 @@ const MainApp = ({ user, onLogout }: MainAppProps) => {
     if (user?.id) {
       fetchUserProfile();
       fetchUnreadCount();
+      
+      // Only preload data for the active tab to save resources
+      // Other tabs will load on demand when user switches to them
+      if (activeTab === 'dripcheck') {
+        preloadDiscoverData(user.id);
+      } else if (activeTab === 'chat') {
+        preloadChatMatches(user.id);
+      } else if (activeTab === 'liked') {
+        preloadLikedMeData(user.id);
+      }
     }
-  }, [user?.id]); // More specific dependency
+  }, [user?.id, activeTab]); // Preload based on active tab
 
   useEffect(() => {
     if (!user?.id) return;
@@ -991,16 +1001,13 @@ const MainApp = ({ user, onLogout }: MainAppProps) => {
     setShowPrivacy(false);
   };
 
-  const renderContent = () => {
-    if (showTerms) {
-      return <TermsOfService onBack={handleBackFromTerms} />;
-    }
-    
-    if (showPrivacy) {
-      return <PrivacyPolicy onBack={handleBackFromPrivacy} />;
-    }
+  // Memoize tab change handler to prevent re-creating function on every render
+  const handleTabChange = useCallback((tab: string) => {
+    setActiveTab(tab);
+  }, []);
 
-    // Use isPremium from subscription table, not profile
+  // Memoize the current page component to prevent unnecessary re-renders
+  const currentPageComponent = useMemo(() => {
     switch (activeTab) {
       case 'dripcheck':
         return <DiscoverPage currentUser={profile} onNavigateToChat={handleNavigateToChat} isPremium={isPremium} />;
@@ -1023,6 +1030,18 @@ const MainApp = ({ user, onLogout }: MainAppProps) => {
       default:
         return <DiscoverPage currentUser={profile} onNavigateToChat={handleNavigateToChat} isPremium={isPremium} />;
     }
+  }, [activeTab, profile, isPremium, handleNavigateToChat, fetchUnreadCount, setIsChatDetailOpen, fetchUserProfile, onLogout, handleShowTerms, handleShowPrivacy]);
+
+  const renderContent = () => {
+    if (showTerms) {
+      return <TermsOfService onBack={handleBackFromTerms} />;
+    }
+    
+    if (showPrivacy) {
+      return <PrivacyPolicy onBack={handleBackFromPrivacy} />;
+    }
+
+    return currentPageComponent;
   };
 
   return (
@@ -1105,7 +1124,7 @@ const MainApp = ({ user, onLogout }: MainAppProps) => {
               ].map(({ label, value, icon: Icon }) => (
                 <button
                   key={value}
-                  onClick={() => setActiveTab(value)}
+                  onClick={() => handleTabChange(value)}
                   className={`flex flex-col items-center space-y-1 py-1 px-2 rounded-lg transition-colors relative ${
                     activeTab === value ? 'text-pink-600' : 'text-gray-500'
                   }`}

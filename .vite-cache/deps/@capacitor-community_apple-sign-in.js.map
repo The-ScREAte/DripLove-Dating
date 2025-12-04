@@ -1,0 +1,7 @@
+{
+  "version": 3,
+  "sources": ["../../node_modules/@capacitor-community/apple-sign-in/src/index.ts"],
+  "sourcesContent": [null],
+  "mappings": ";;;;;;AAIA,IAAM,kBAAkB,eAAsC,mBAAmB;EAC/E,KAAK,MAAM,OAAO,mBAAO,EAAE,KAAK,CAAC,MAAM,IAAI,EAAE,mBAAkB,CAAE;CAClE;",
+  "names": []
+}

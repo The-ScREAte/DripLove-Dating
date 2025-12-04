@@ -34,8 +34,12 @@ export function useChatKeyboardFix() {
     const isVisible = height > 50;
     isKeyboardVisibleRef.current = isVisible;
 
-    // Add extra padding for emoji keyboard (typically taller)
-    const adjustedHeight = height > 0 ? height + 10 : 0;
+    // Add extra padding and safe-area inset for devices with home indicator
+    const safeArea = parseInt(
+      getComputedStyle(document.documentElement)
+        .getPropertyValue("--ion-safe-area-bottom") || "0"
+    );
+    const adjustedHeight = height > 0 ? height + safeArea + 10 : 0;
 
     // Apply CSS variable for keyboard offset
     document.documentElement.style.setProperty("--keyboard-height", `${adjustedHeight}px`);
@@ -60,10 +64,10 @@ export function useChatKeyboardFix() {
     let hideListener: any;
 
     const setupNativeKeyboardListeners = async () => {
-      if (!isNative) return;
+      if (!isNative || platform !== 'ios') return; // Only iOS uses Capacitor keyboard events
 
       try {
-        // Use keyboardWillShow for smooth animation
+        // iOS: keyboardWillShow/WillHide fire and are reliable
         showListener = await Keyboard.addListener("keyboardWillShow", (info) => {
           console.log("[Keyboard] Will show, height:", info.keyboardHeight);
           applyKeyboardOffset(info.keyboardHeight);
@@ -76,11 +80,16 @@ export function useChatKeyboardFix() {
 
         // Also listen to didShow for cases where height changes (emoji → text keyboard)
         await Keyboard.addListener("keyboardDidShow", (info) => {
-          // Only update if height changed (keyboard type switch)
+          // iOS: update if height changed (emoji/text, etc.)
           if (Math.abs(keyboardHeightRef.current - info.keyboardHeight) > 20) {
             console.log("[Keyboard] Did show with different height:", info.keyboardHeight);
             applyKeyboardOffset(info.keyboardHeight);
           }
+        });
+
+        await Keyboard.addListener("keyboardDidHide", () => {
+          console.log("[Keyboard] Did hide");
+          applyKeyboardOffset(0);
         });
 
       } catch (error) {
@@ -90,7 +99,7 @@ export function useChatKeyboardFix() {
 
     // Web fallback using visualViewport API
     const handleVisualViewportResize = () => {
-      if (!window.visualViewport || isNative) return;
+      if (!window.visualViewport) return;
 
       // Calculate keyboard height from viewport difference
       const keyboardHeight = window.innerHeight - window.visualViewport.height;
@@ -102,7 +111,7 @@ export function useChatKeyboardFix() {
 
       debounceTimerRef.current = setTimeout(() => {
         // Only consider it a keyboard if the height difference is significant
-        if (keyboardHeight > 100) {
+        if (keyboardHeight > 50) {
           applyKeyboardOffset(keyboardHeight);
         } else if (keyboardHeight < 50) {
           applyKeyboardOffset(0);
@@ -113,13 +122,34 @@ export function useChatKeyboardFix() {
     // Initialize
     applyKeyboardOffset(0);
     
+    // Attach both: on Android native, visualViewport exists and is more reliable for height
     if (isNative) {
-      setupNativeKeyboardListeners();
-    } else if (window.visualViewport) {
-      // Web browser - use visualViewport
-      window.visualViewport.addEventListener("resize", handleVisualViewportResize);
-      window.visualViewport.addEventListener("scroll", handleVisualViewportResize);
+      if (platform === 'ios') {
+        // iOS → use Capacitor keyboard events only
+        setupNativeKeyboardListeners();
+      } else if (platform === 'android') {
+        // Android → use visualViewport only
+        if (window.visualViewport) {
+          window.visualViewport.addEventListener("resize", handleVisualViewportResize);
+          window.visualViewport.addEventListener("scroll", handleVisualViewportResize);
+        }
+        // Tag body for Android-specific CSS overrides
+        document.body.classList.add('android');
+      }
+    } else {
+      // Web/PWA → use visualViewport when available
+      if (window.visualViewport) {
+        window.visualViewport.addEventListener("resize", handleVisualViewportResize);
+        window.visualViewport.addEventListener("scroll", handleVisualViewportResize);
+      }
     }
+
+    // Handle orientation changes to reset offsets and ensure proper layout
+    const handleOrientationChange = () => {
+      applyKeyboardOffset(0, false);
+      scrollChatToBottom();
+    };
+    window.addEventListener("orientationchange", handleOrientationChange);
 
     // Cleanup
     return () => {
@@ -130,10 +160,12 @@ export function useChatKeyboardFix() {
       if (showListener) showListener.remove();
       if (hideListener) hideListener.remove();
       
-      if (!isNative && window.visualViewport) {
+      if (window.visualViewport) {
         window.visualViewport.removeEventListener("resize", handleVisualViewportResize);
         window.visualViewport.removeEventListener("scroll", handleVisualViewportResize);
       }
+      document.body.classList.remove('android');
+      window.removeEventListener("orientationchange", handleOrientationChange);
       
       // Reset styles
       document.documentElement.style.removeProperty("--keyboard-height");

@@ -1,4 +1,4 @@
-import React, { useRef } from 'react';
+import React, { useEffect, useRef } from 'react';
 import { Input } from '@/components/ui/input';
 import { X } from 'lucide-react';
 import { containsBadWords } from '@/utils/textModeration';
@@ -25,6 +25,32 @@ const MessageInput: React.FC<MessageInputProps> = ({
   const { t } = useTranslation();
   const inputRef = useRef<HTMLInputElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
+
+  // Keep CSS var --input-bar-height in sync with actual input container height
+  useEffect(() => {
+    const el = containerRef.current;
+    if (!el) return;
+
+    const setHeightVar = () => {
+      const h = el.offsetHeight;
+      document.documentElement.style.setProperty('--input-bar-height', `${h}px`);
+    };
+
+    setHeightVar();
+
+    // Observe size changes (reply preview opens/closes, orientation changes, etc.)
+    const ro = new ResizeObserver(() => setHeightVar());
+    ro.observe(el);
+
+    // Also handle viewport/orientation changes that might affect layout
+    const onResize = () => setHeightVar();
+    window.addEventListener('resize', onResize);
+
+    return () => {
+      ro.disconnect();
+      window.removeEventListener('resize', onResize);
+    };
+  }, []);
 
   const handleKeyPress = (e: React.KeyboardEvent) => {
     if (e.key === 'Enter' && !e.shiftKey) {

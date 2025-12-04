@@ -6,6 +6,15 @@ import "./index.css";
 import { initializeGoogleAuth } from "./utils/googleNativeAuth";
 import "./i18n/config"; // Initialize i18n
 
+// Disable console.* in production for Android performance
+if (import.meta.env.PROD) {
+  console.log = () => {};
+  console.debug = () => {};
+  console.info = () => {};
+  console.warn = () => {};
+  // Keep console.error for critical issues
+}
+
 // Create a loading screen component
 const LoadingScreen = () => (
   <div className="w-full h-screen flex items-center justify-center bg-gradient-to-br from-pink-500 to-purple-600">
@@ -139,13 +148,13 @@ const AppWrapper = () => {
               // Configure status bar
               await StatusBar.setStyle({ style: Style.Dark });
               
-              // Configure keyboard
+              // Configure keyboard: do not modify body padding; handled by useChatKeyboardFix
               Keyboard.addListener('keyboardWillShow', () => {
-                document.body.style.paddingBottom = '0px';
+                // No-op: layout handled via CSS variables in useChatKeyboardFix
               });
               
               Keyboard.addListener('keyboardWillHide', () => {
-                document.body.style.paddingBottom = '0px';
+                // No-op: layout handled via CSS variables in useChatKeyboardFix
               });
 
               // Handle deep links for OAuth callbacks

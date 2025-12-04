@@ -23,8 +23,14 @@
   -webkit-transform: translate3d(0, calc(-1 * var(--keyboard-height, 0px)), 0);
   transition: transform 0.2s ease-out;
   -webkit-transition: -webkit-transform 0.2s ease-out;
-  /* Safe area padding when keyboard is closed */
-  padding-bottom: env(safe-area-inset-bottom, 0px);
+  /* Safe area padding when keyboard is closed (iOS only) */
+}
+
+/* Apply safe-area bottom padding only when env() is supported (iOS) */
+@supports (padding: env(safe-area-inset-bottom)) {
+  .chat-input-container {
+    padding-bottom: env(safe-area-inset-bottom, 0px);
+  }
 }
 
 /* When keyboard is open, remove safe area padding (keyboard provides its own space) */
@@ -34,12 +40,19 @@ body.keyboard-open .chat-input-container {
 
 /* Messages area adjusts for input bar */
 .chat-messages-container {
-  padding-bottom: calc(var(--input-bar-height) + env(safe-area-inset-bottom, 0px)) !important;
+  /* Add a little extra spacing so the last message isn't cramped */
+  padding-bottom: calc(var(--input-bar-height) + env(safe-area-inset-bottom, 0px) + 16px) !important;
 }
 
 /* When keyboard is open, add extra space for keyboard + input bar */
 body.keyboard-open .chat-messages-container {
-  padding-bottom: calc(var(--keyboard-height, 0px) + var(--input-bar-height)) !important;
+  padding-bottom: calc(var(--keyboard-height, 0px) + var(--input-bar-height) + 16px) !important;
+}
+
+/* Ensure chat area height accounts for keyboard and input bar */
+.chat-messages-container {
+  height: calc(100vh - var(--keyboard-height, 0px) - var(--input-bar-height, 60px));
+  overflow-y: auto;
 }
 
 /* Mobile optimizations and safe areas */
@@ -73,10 +86,15 @@ body.keyboard-open .chat-messages-container {
   }
   
   body {
-    position: fixed;
+    position: fixed; /* Good for iOS */
     width: 100%;
     height: 100vh;
     height: 100dvh; /* Dynamic viewport height */
+  }
+
+  /* On Android, do not fix body to avoid keyboard layout issues */
+  body.android {
+    position: relative !important;
   }
 
   /* Prevent zoom on double tap for mobile */

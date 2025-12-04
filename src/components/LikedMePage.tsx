@@ -1230,4 +1230,4 @@ const LikedMePage = ({ currentUser, isPremium = false }: LikedMePageProps) => {
   );
 };
 
-export default LikedMePage;
+export default React.memo(LikedMePage);

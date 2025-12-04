@@ -105,12 +105,13 @@ class KeyboardHandler {
     document.body.classList.add('keyboard-visible');
     
     // Store original body padding
+    // Do not modify body padding; chat layout handles keyboard spacing via CSS variables
     this.originalBodyPaddingBottom = document.body.style.paddingBottom;
     
     // Only adjust layout if there's an active input that needs it
     if (this.activeInput) {
       // Add padding to body to prevent content from being hidden
-      document.body.style.paddingBottom = `${Math.max(this.keyboardHeight - 50, 0)}px`;
+      // No-op: avoid fighting chat input positioning on Android/iOS
       
       // Scroll active input into view
       setTimeout(() => {
@@ -124,7 +125,7 @@ class KeyboardHandler {
     document.body.classList.remove('keyboard-visible');
     
     // Restore original body padding
-    document.body.style.paddingBottom = this.originalBodyPaddingBottom;
+    // No-op: padding is controlled elsewhere
     
     // Reset scroll if needed
     setTimeout(() => {
@@ -227,7 +228,7 @@ class KeyboardHandler {
     
     // Restore body state
     document.body.classList.remove('keyboard-visible');
-    document.body.style.paddingBottom = this.originalBodyPaddingBottom;
+    // No-op: padding is controlled elsewhere
   }
 }
 

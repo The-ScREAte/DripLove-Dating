@@ -22,10 +22,24 @@ android {
             minifyEnabled true
             shrinkResources true
             proguardFiles getDefaultProguardFile('proguard-android-optimize.txt'), 'proguard-rules.pro'
+            // Enable R8 full mode for better optimization
+            android.enableR8.fullMode=true
         }
         debug {
             minifyEnabled false
         }
+    }
+    
+    // Enable hardware acceleration for better WebView performance
+    buildFeatures {
+        renderScript true
+    }
+    
+    // Optimize dex compilation
+    dexOptions {
+        preDexLibraries = true
+        maxProcessCount 8
+        javaMaxHeapSize "4g"
     }
     compileOptions {
         sourceCompatibility JavaVersion.VERSION_21
