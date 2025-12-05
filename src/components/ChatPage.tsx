@@ -1005,7 +1005,7 @@ const ChatPage = ({ currentUser, onUnreadChange, onDetailViewChange }: ChatPageP
           .from('chats')
           .update({ is_read: true })
           .eq('match_id', selectedMatch.id)
-          .eq('receiver_id', currentUser.id)
+          .neq('sender_id', currentUser.id)
           .eq('is_read', false);
         
         if (!error) {

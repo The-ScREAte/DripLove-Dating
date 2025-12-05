@@ -537,9 +537,11 @@ export type Database = {
           is_admin: boolean | null
           is_custom_city: boolean | null
           last_googled: string | null
+          last_login_at: string | null
           last_name: string
           latitude: number | null
           like_me_cooldown_until: string | null
+          login_count: number | null
           longitude: number | null
           max_age: number | null
           max_distance: number | null
@@ -582,9 +584,11 @@ export type Database = {
           is_admin?: boolean | null
           is_custom_city?: boolean | null
           last_googled?: string | null
+          last_login_at?: string | null
           last_name: string
           latitude?: number | null
           like_me_cooldown_until?: string | null
+          login_count?: number | null
           longitude?: number | null
           max_age?: number | null
           max_distance?: number | null
@@ -627,9 +631,11 @@ export type Database = {
           is_admin?: boolean | null
           is_custom_city?: boolean | null
           last_googled?: string | null
+          last_login_at?: string | null
           last_name?: string
           latitude?: number | null
           like_me_cooldown_until?: string | null
+          login_count?: number | null
           longitude?: number | null
           max_age?: number | null
           max_distance?: number | null
