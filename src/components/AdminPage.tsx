@@ -69,6 +69,8 @@ interface UserProfile {
   preference?: string | null;
   relationship_intent?: string | null;
   is_premium?: boolean;
+  last_login_at?: string | null;
+  login_count?: number | null;
 }
 
 interface PendingImage {
@@ -109,6 +111,7 @@ const AdminPageComponent = ({ currentUser, onLogout }: AdminPageProps) => {
   const [countryFilter, setCountryFilter] = useState('all');
   const [relationshipIntentFilter, setRelationshipIntentFilter] = useState('all');
   const [premiumFilter, setPremiumFilter] = useState('all');
+  const [activityFilter, setActivityFilter] = useState('all');
   const [loading, setLoading] = useState(true);
   const [currentPage, setCurrentPage] = useState(1);
   const [matchUser1, setMatchUser1] = useState('');
@@ -888,7 +891,7 @@ const AdminPageComponent = ({ currentUser, onLogout }: AdminPageProps) => {
       setLoading(true);
       
       // Check cache first for performance
-      const cacheKey = `users_all_${statusFilter}_${genderFilter}_${interestedInFilter}_${countryFilter}_${relationshipIntentFilter}_${premiumFilter}`;
+      const cacheKey = `users_all_${statusFilter}_${genderFilter}_${interestedInFilter}_${countryFilter}_${relationshipIntentFilter}_${premiumFilter}_${activityFilter}`;
       const cachedUsers = userDataCache.get(cacheKey);
       if (cachedUsers) {
         const { regularUsers, admins } = cachedUsers;
@@ -915,6 +918,8 @@ const AdminPageComponent = ({ currentUser, onLogout }: AdminPageProps) => {
           gender, 
           preference, 
           relationship_intent,
+          last_login_at,
+          login_count,
           user_subscriptions!left(
             status,
             expires_at
@@ -959,7 +964,9 @@ const AdminPageComponent = ({ currentUser, onLogout }: AdminPageProps) => {
         return {
           ...user,
           age: calculateAge(user.date_of_birth),
-          is_premium: hasPremium
+          is_premium: hasPremium,
+          last_login_at: (user as any).last_login_at,
+          login_count: (user as any).login_count
         };
       }) || [];
 
@@ -990,7 +997,7 @@ const AdminPageComponent = ({ currentUser, onLogout }: AdminPageProps) => {
     } finally {
       setLoading(false);
     }
-  }, 300), [toast, statusFilter, genderFilter, interestedInFilter, countryFilter, relationshipIntentFilter, premiumFilter]);
+  }, 300), [toast, statusFilter, genderFilter, interestedInFilter, countryFilter, relationshipIntentFilter, premiumFilter, activityFilter]);
 
   const calculateAge = (dateOfBirth: string) => {
     const today = new Date();
@@ -1249,7 +1256,35 @@ const AdminPageComponent = ({ currentUser, onLogout }: AdminPageProps) => {
       (premiumFilter === 'premium' && user.is_premium) || 
       (premiumFilter === 'free' && !user.is_premium);
     
-    return matchesSearch && matchesStatus && matchesGender && matchesInterestedIn && matchesCountry && matchesRelationshipIntent && matchesPremium;
+    // Activity filter logic
+    let matchesActivity = true;
+    if (activityFilter !== 'all') {
+      const now = new Date();
+      const oneWeekAgo = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
+      const oneMonthAgo = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
+      const lastLogin = user.last_login_at ? new Date(user.last_login_at) : null;
+      const loginCount = user.login_count || 0;
+      
+      switch (activityFilter) {
+        case 'active_week':
+          matchesActivity = lastLogin !== null && lastLogin >= oneWeekAgo;
+          break;
+        case 'active_month':
+          matchesActivity = lastLogin !== null && lastLogin >= oneMonthAgo;
+          break;
+        case 'logged_once':
+          matchesActivity = loginCount === 1;
+          break;
+        case 'never_active':
+          matchesActivity = lastLogin === null || loginCount === 0;
+          break;
+        case 'inactive_month':
+          matchesActivity = lastLogin === null || lastLogin < oneMonthAgo;
+          break;
+      }
+    }
+    
+    return matchesSearch && matchesStatus && matchesGender && matchesInterestedIn && matchesCountry && matchesRelationshipIntent && matchesPremium && matchesActivity;
   });
 
   // Pagination
@@ -1671,9 +1706,26 @@ const AdminPageComponent = ({ currentUser, onLogout }: AdminPageProps) => {
                       </Select>
                     </div>
                     
+                    {/* Third Row: Activity Filter */}
+                    <div className="flex gap-2 flex-wrap">
+                      <Select value={activityFilter} onValueChange={setActivityFilter}>
+                        <SelectTrigger className="w-40 text-xs h-8">
+                          <SelectValue placeholder="Activity" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="all" className="text-xs">All Activity</SelectItem>
+                          <SelectItem value="active_week" className="text-xs">Active Last Week</SelectItem>
+                          <SelectItem value="active_month" className="text-xs">Active Last Month</SelectItem>
+                          <SelectItem value="logged_once" className="text-xs">Logged In Once</SelectItem>
+                          <SelectItem value="inactive_month" className="text-xs">Inactive 30+ Days</SelectItem>
+                          <SelectItem value="never_active" className="text-xs">Never Logged In</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    
                     {/* Clear Filters Button */}
                     {(statusFilter !== 'all' || genderFilter !== 'all' || interestedInFilter !== 'all' || 
-                      countryFilter !== 'all' || relationshipIntentFilter !== 'all' || premiumFilter !== 'all') && (
+                      countryFilter !== 'all' || relationshipIntentFilter !== 'all' || premiumFilter !== 'all' || activityFilter !== 'all') && (
                       <Button
                         variant="outline"
                         size="sm"
@@ -1684,6 +1736,7 @@ const AdminPageComponent = ({ currentUser, onLogout }: AdminPageProps) => {
                           setCountryFilter('all');
                           setRelationshipIntentFilter('all');
                           setPremiumFilter('all');
+                          setActivityFilter('all');
                         }}
                         className="text-xs h-7"
                       >
@@ -1723,9 +1776,23 @@ const AdminPageComponent = ({ currentUser, onLogout }: AdminPageProps) => {
                                       {user.relationship_intent.split('_').map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(' ')}
                                     </Badge>
                                   )}
+                                  {user.is_premium && (
+                                    <Badge className="bg-yellow-100 text-yellow-800 text-[10px] px-1.5 py-0 h-4">
+                                      Premium
+                                    </Badge>
+                                  )}
                                 </div>
                                 <p className="text-[11px] text-gray-500 mt-0.5">
                                   Joined: {new Date(user.created_at).toLocaleDateString()}
+                                  {user.last_login_at && (
+                                    <> • Last active: {new Date(user.last_login_at).toLocaleDateString()}</>
+                                  )}
+                                  {!user.last_login_at && (
+                                    <> • <span className="text-orange-600">Never logged in</span></>
+                                  )}
+                                  {user.login_count !== null && user.login_count !== undefined && (
+                                    <> • Logins: {user.login_count}</>
+                                  )}
                                 </p>
                               </div>
                               <div className="ml-2">
