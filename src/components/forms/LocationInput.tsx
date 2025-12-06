@@ -183,22 +183,23 @@ const LocationInput = ({
     }
   };
 
-  // Auto-detect country on mount if enabled (only for new users, not profile edit)
+  // Auto-detect country on mount if enabled (for new users/registration)
   useEffect(() => {
-    if (autoDetect && !country && countries.length > 0 && !isProfileEdit) {
-      handleAutoDetect();
+    if (autoDetect && !country && countries.length > 0 && !isProfileEdit && !isDetecting) {
+      handleAutoDetectSilent();
     }
-  }, [autoDetect, countries, isProfileEdit]);
+  }, [autoDetect, countries, isProfileEdit, country]);
 
-  // Auto-detect country function
-  const handleAutoDetect = async () => {
+  // Silent auto-detect country function (no button needed - runs automatically)
+  const handleAutoDetectSilent = async () => {
     setIsDetecting(true);
     
     try {
       const result = await autoDetectCountry();
       
       if (result.method === 'failed') {
-        // Silently fail and let user select manually
+        // Detection failed - allow manual selection
+        setIsCountryLocked(false);
         setIsDetecting(false);
         return;
       }
@@ -207,12 +208,13 @@ const LocationInput = ({
       const detectedCountry = countries.find(c => c.code === result.countryCode);
       
       if (!detectedCountry) {
-        // Silently fail and let user select manually
+        // Country not in enabled list - allow manual selection
+        setIsCountryLocked(false);
         setIsDetecting(false);
         return;
       }
 
-      // Set detected country and lock it
+      // Set detected country and lock it (no manual selection allowed)
       setSelectedCountryCode(result.countryCode);
       setIsCountryLocked(true);
       setDetectionMethod(result.method);
@@ -229,30 +231,33 @@ const LocationInput = ({
       });
     } catch (error) {
       console.error('Auto-detection error:', error);
-      // Silently fail and let user select manually
+      // Detection failed - allow manual selection
+      setIsCountryLocked(false);
     } finally {
       setIsDetecting(false);
     }
   };
 
-  // Unlock country to allow manual selection
+  // Unlock country for manual selection - only available when detection failed
   const handleUnlockCountry = () => {
-    setIsCountryLocked(false);
-    setDetectionMethod(null);
-    setSelectedCountryCode('');
-    setCityInput('');
-    setIsCustomCity(false);
-    setCoordinates({});
-    
-    onLocationChange({
-      country: '',
-      countryCode: '',
-      city: '',
-      zipCode,
-      latitude: undefined,
-      longitude: undefined,
-      isCustomCity: false
-    });
+    // Only allow unlock if detection failed initially (not after successful detection)
+    if (!isProfileEdit && detectionMethod === null) {
+      setIsCountryLocked(false);
+      setSelectedCountryCode('');
+      setCityInput('');
+      setIsCustomCity(false);
+      setCoordinates({});
+      
+      onLocationChange({
+        country: '',
+        countryCode: '',
+        city: '',
+        zipCode,
+        latitude: undefined,
+        longitude: undefined,
+        isCustomCity: false
+      });
+    }
   };
 
   // Initialize selected country
@@ -475,26 +480,12 @@ const LocationInput = ({
         </div>
       )}
 
-      {/* Auto-detect Button - only show for new users, not profile edit */}
-      {autoDetect && !isProfileEdit && !isCountryLocked && !selectedCountryCode && (
-        <Button
-          type="button"
-          onClick={handleAutoDetect}
-          disabled={isDetecting || loadingCountries}
-          className="w-full bg-gradient-to-r from-pink-500 to-purple-500 hover:from-pink-600 hover:to-purple-600"
-        >
-          {isDetecting ? (
-            <>
-              <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-              Detecting your location...
-            </>
-          ) : (
-            <>
-              <MapPin className="w-4 h-4 mr-2" />
-              Auto-detect your country
-            </>
-          )}
-        </Button>
+      {/* Detecting location indicator for new users */}
+      {autoDetect && !isProfileEdit && isDetecting && (
+        <div className="flex items-center gap-2 p-3 bg-blue-50 dark:bg-blue-950/30 rounded-lg text-sm text-blue-700 dark:text-blue-300">
+          <Loader2 className="w-4 h-4 animate-spin" />
+          Detecting your location...
+        </div>
       )}
 
       {/* Country Display/Selection */}
@@ -502,10 +493,15 @@ const LocationInput = ({
         <Label className="flex items-center gap-2">
           <MapPin className="w-4 h-4" />
           Country
-          {!isProfileEdit && isCountryLocked && (
+          {!isProfileEdit && isCountryLocked && detectionMethod && (
             <span className="flex items-center gap-1 text-xs text-green-600 font-medium">
               <CheckCircle2 className="w-3 h-3" />
               Auto-detected {detectionMethod === 'gps' ? '(GPS)' : '(IP)'}
+            </span>
+          )}
+          {!isProfileEdit && !isCountryLocked && !isDetecting && !selectedCountryCode && (
+            <span className="flex items-center gap-1 text-xs text-amber-600 font-medium">
+              Detection unavailable - select manually
             </span>
           )}
           {isProfileEdit && (
@@ -516,8 +512,8 @@ const LocationInput = ({
           )}
         </Label>
         
-        {/* Profile Edit Mode - Show read-only display */}
-        {isProfileEdit ? (
+        {/* Profile Edit Mode OR New User with locked country - Show read-only display */}
+        {isProfileEdit || (isCountryLocked && selectedCountryCode) ? (
           <div className="flex items-center justify-between p-3 bg-muted rounded-lg border border-border">
             <div className="flex items-center gap-2">
               <span className="font-medium">{country || 'No country set'}</span>
@@ -528,19 +524,17 @@ const LocationInput = ({
             <Lock className="w-4 h-4 text-muted-foreground" />
           </div>
         ) : (
-          /* New User Mode - Show Select dropdown */
+          /* New User Mode with detection failed - Show Select dropdown for manual selection */
           <div className="relative">
             <Select 
               value={selectedCountryCode} 
               onValueChange={handleCountryChange} 
-              disabled={loadingCountries || isCountryLocked || isCheckingOutsideCountry}
+              disabled={loadingCountries || isDetecting}
             >
               <SelectTrigger 
-                className={`${errors.country ? 'border-red-500' : ''} ${
-                  isCountryLocked ? 'bg-green-50 border-green-300 cursor-not-allowed opacity-70 pr-20' : ''
-                }`}
+                className={errors.country ? 'border-red-500' : ''}
               >
-                <SelectValue placeholder={loadingCountries ? "Loading countries..." : isCheckingOutsideCountry ? "Checking location..." : "Select your country"} />
+                <SelectValue placeholder={loadingCountries ? "Loading countries..." : isDetecting ? "Detecting location..." : "Select your country"} />
               </SelectTrigger>
               <SelectContent>
                 {countries.map((countryItem) => (
@@ -555,22 +549,6 @@ const LocationInput = ({
                 ))}
               </SelectContent>
             </Select>
-            {/* Lock icon and unlock button only for auto-detect mode */}
-            {isCountryLocked && (
-              <>
-                <div className="absolute right-10 top-1/2 -translate-y-1/2">
-                  <Lock className="w-4 h-4 text-green-600" />
-                </div>
-                <button
-                  type="button"
-                  onClick={handleUnlockCountry}
-                  className="absolute right-2 top-1/2 -translate-y-1/2 p-1 hover:bg-red-100 rounded-full transition-colors group"
-                  title="Wrong location? Click to select manually"
-                >
-                  <X className="w-4 h-4 text-gray-400 group-hover:text-red-500" />
-                </button>
-              </>
-            )}
           </div>
         )}
         
