@@ -38,6 +38,15 @@ const Index = () => {
   const { toast } = useToast();
 
   useEffect(() => {
+    // Safety timeout - if loading takes too long, reset to welcome
+    const loadingTimeout = setTimeout(() => {
+      if (loading) {
+        console.warn('Loading timeout - resetting to welcome screen');
+        setLoading(false);
+        setCurrentView('welcome');
+      }
+    }, 15000); // 15 second timeout
+
     // Check for existing session
     supabase.auth.getSession().then(({ data: { session } }) => {
       if (session?.user) {
@@ -52,6 +61,9 @@ const Index = () => {
       } else {
         setLoading(false);
       }
+    }).catch((err) => {
+      console.error('Error getting session:', err);
+      setLoading(false);
     });
 
     // Listen for auth changes
@@ -102,7 +114,10 @@ const Index = () => {
       }
     });
     
-    return () => subscription.unsubscribe();
+    return () => {
+      clearTimeout(loadingTimeout);
+      subscription.unsubscribe();
+    };
   }, []);
 
   const checkUserTypeAndRedirect = async (userId: string) => {
@@ -319,10 +334,15 @@ const Index = () => {
   };
 
   if (loading) {
-    // Option 1: Show nothing while loading
-    return null;
-    // Option 2: Show a minimal blank screen
-    // return <div style={{ minHeight: '100vh', background: '#fff' }} />;
+    // Show a minimal loading state instead of blank screen
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-pink-500 via-purple-600 to-indigo-700 flex items-center justify-center">
+        <div className="text-center">
+          <div className="w-10 h-10 border-4 border-white border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
+          <p className="text-white text-sm">Loading...</p>
+        </div>
+      </div>
+    );
   }
   
   if (currentView === 'admin') {
