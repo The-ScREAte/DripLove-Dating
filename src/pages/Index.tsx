@@ -39,7 +39,14 @@ const Index = () => {
 
   useEffect(() => {
     // Check for existing session
-    supabase.auth.getSession().then(({ data: { session } }) => {
+    supabase.auth.getSession().then(({ data: { session }, error }) => {
+      if (error) {
+        // Session error (e.g., invalid refresh token) - show welcome screen
+        setLoading(false);
+        setCurrentView('welcome');
+        return;
+      }
+      
       if (session?.user) {
         // Check if email is confirmed before proceeding
         if (!session.user.email_confirmed_at) {
@@ -52,6 +59,10 @@ const Index = () => {
       } else {
         setLoading(false);
       }
+    }).catch(() => {
+      // Handle any errors by showing welcome screen
+      setLoading(false);
+      setCurrentView('welcome');
     });
 
     // Listen for auth changes
