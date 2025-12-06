@@ -4,7 +4,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
-import { MapPin, Search, Check, Loader2, CheckCircle2, Lock, X } from 'lucide-react';
+import { MapPin, Search, Check, Loader2, CheckCircle2, Lock, X, Globe } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { 
   getCountriesList, 
@@ -14,7 +14,7 @@ import {
   type CityData 
 } from '@/constants/locationData';
 import { getEnabledCountries } from '@/utils/enabledCountries';
-import { autoDetectCountry, checkIfUserIsOutsideCountry } from '@/utils/countryDetection';
+import { autoDetectCountry, checkIfUserIsOutsideCountry, getCountryName as getCountryNameFromCode } from '@/utils/countryDetection';
 
 interface LocationInputProps {
   country: string;
@@ -38,6 +38,7 @@ interface LocationInputProps {
   required?: boolean;
   autoDetect?: boolean; // Enable auto-detection on mount
   isProfileEdit?: boolean; // If true, check if user is outside their country
+  isPremium?: boolean; // Show upgrade note for free users
 }
 
 const LocationInput = ({
@@ -49,7 +50,8 @@ const LocationInput = ({
   errors = {},
   required = false,
   autoDetect = false,
-  isProfileEdit = false
+  isProfileEdit = false,
+  isPremium = false
 }: LocationInputProps) => {
   const [selectedCountryCode, setSelectedCountryCode] = useState<string>('');
   const [cityInput, setCityInput] = useState<string>(city);
@@ -66,8 +68,10 @@ const LocationInput = ({
     checked: boolean;
     isOutside: boolean;
     currentLocation: string | null;
-  }>({ checked: false, isOutside: false, currentLocation: null });
+    currentCountryCode: string | null;
+  }>({ checked: false, isOutside: false, currentLocation: null, currentCountryCode: null });
   const [detectionMethod, setDetectionMethod] = useState<'gps' | 'ip' | null>(null);
+  const [isChangingCountry, setIsChangingCountry] = useState(false);
   const { toast } = useToast();
 
   // Load enabled countries on mount
@@ -103,7 +107,8 @@ const LocationInput = ({
       setOutsideCountryStatus({
         checked: true,
         isOutside: result.isOutside,
-        currentLocation: result.currentCountryName
+        currentLocation: result.currentCountryName,
+        currentCountryCode: result.currentCountryCode
       });
       
       // If user is NOT outside their country, lock the country field
@@ -114,10 +119,67 @@ const LocationInput = ({
     } catch (error) {
       console.error('Error checking user location:', error);
       // If check fails, lock country for safety
-      setOutsideCountryStatus({ checked: true, isOutside: false, currentLocation: null });
+      setOutsideCountryStatus({ checked: true, isOutside: false, currentLocation: null, currentCountryCode: null });
       setIsCountryLocked(true);
     } finally {
       setIsCheckingOutsideCountry(false);
+    }
+  };
+
+  // Handle auto-change country when user clicks the button (for profile edit)
+  const handleAutoChangeCountry = async () => {
+    if (!outsideCountryStatus.currentCountryCode || !outsideCountryStatus.currentLocation) return;
+    
+    setIsChangingCountry(true);
+    
+    try {
+      const newCountryCode = outsideCountryStatus.currentCountryCode;
+      const newCountryName = outsideCountryStatus.currentLocation;
+      
+      // Check if country is in enabled list
+      const countryInList = countries.find(c => c.code === newCountryCode);
+      if (!countryInList) {
+        toast({
+          title: "Country not available",
+          description: `${newCountryName} is not currently available. Please contact support.`,
+          variant: "destructive"
+        });
+        return;
+      }
+      
+      // Update the country and clear city
+      setSelectedCountryCode(newCountryCode);
+      setCityInput('');
+      setIsCustomCity(false);
+      setCoordinates({});
+      setShowCitySuggestions(true);
+      
+      // Update parent
+      onLocationChange({
+        country: newCountryName,
+        countryCode: newCountryCode,
+        city: '', // Clear city so user must select new one
+        zipCode: '',
+        latitude: undefined,
+        longitude: undefined,
+        isCustomCity: false
+      });
+      
+      // Reset outside status since we've now changed
+      setOutsideCountryStatus({
+        checked: true,
+        isOutside: false,
+        currentLocation: newCountryName,
+        currentCountryCode: newCountryCode
+      });
+      setIsCountryLocked(true);
+      
+      toast({
+        title: "Country updated",
+        description: `Your country has been changed to ${newCountryName}. Please select your city.`,
+      });
+    } finally {
+      setIsChangingCountry(false);
     }
   };
 
@@ -347,6 +409,19 @@ const LocationInput = ({
 
   return (
     <div className="space-y-4">
+      {/* Upgrade note for free users */}
+      {isProfileEdit && !isPremium && (
+        <div className="p-3 bg-gradient-to-r from-primary/10 to-purple-500/10 rounded-lg border border-primary/20">
+          <div className="flex items-center gap-2 text-sm text-primary font-medium">
+            <Globe className="w-4 h-4" />
+            Want to match with people in other countries?
+          </div>
+          <p className="text-xs text-muted-foreground mt-1">
+            Upgrade to Premium to unlock up to 3 additional countries and expand your dating pool globally.
+          </p>
+        </div>
+      )}
+
       {/* Checking location indicator for profile edit */}
       {isProfileEdit && isCheckingOutsideCountry && (
         <div className="flex items-center gap-2 p-3 bg-blue-50 dark:bg-blue-950/30 rounded-lg text-sm text-blue-700 dark:text-blue-300">
@@ -369,17 +444,34 @@ const LocationInput = ({
         </div>
       )}
 
-      {/* Message when country is unlocked (user is outside their profile country) */}
+      {/* Message when country is unlocked (user is outside their profile country) - with Change button */}
       {isProfileEdit && outsideCountryStatus.isOutside && outsideCountryStatus.checked && !isCheckingOutsideCountry && (
         <div className="p-3 bg-green-50 dark:bg-green-950/30 rounded-lg border border-green-200 dark:border-green-800">
-          <div className="flex items-center gap-2 text-sm text-green-800 dark:text-green-200 font-medium">
-            <CheckCircle2 className="w-4 h-4" />
-            Country change available
+          <div className="flex items-center justify-between">
+            <div>
+              <div className="flex items-center gap-2 text-sm text-green-800 dark:text-green-200 font-medium">
+                <CheckCircle2 className="w-4 h-4" />
+                Country change available
+              </div>
+              <p className="text-xs text-green-600 dark:text-green-300 mt-1">
+                You appear to be in {outsideCountryStatus.currentLocation || 'a different country'}. 
+                Click the button to update your location.
+              </p>
+            </div>
+            <Button
+              type="button"
+              size="sm"
+              onClick={handleAutoChangeCountry}
+              disabled={isChangingCountry}
+              className="ml-3 bg-green-600 hover:bg-green-700 text-white shrink-0"
+            >
+              {isChangingCountry ? (
+                <Loader2 className="w-4 h-4 animate-spin" />
+              ) : (
+                <>Change to {outsideCountryStatus.currentLocation}</>
+              )}
+            </Button>
           </div>
-          <p className="text-xs text-green-600 dark:text-green-300 mt-1">
-            You appear to be in {outsideCountryStatus.currentLocation || 'a different country'}. 
-            You can update your country if you've moved.
-          </p>
         </div>
       )}
 
