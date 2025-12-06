@@ -67,29 +67,34 @@ const Index = () => {
           return;
         }
         
-        // Track last login - update profile with login timestamp
+        // Track last login - update profile with login timestamp (fire-and-forget, don't await)
         if (_event === 'SIGNED_IN') {
-          try {
-            // Get current login count first
-            const { data: profileData } = await supabase
-              .from('profiles')
-              .select('login_count')
-              .eq('id', session.user.id)
-              .single();
-            
-            const currentCount = profileData?.login_count || 0;
-            
-            // Update last login and increment count
-            await supabase
-              .from('profiles')
-              .update({ 
-                last_login_at: new Date().toISOString(),
-                login_count: currentCount + 1
-              })
-              .eq('id', session.user.id);
-          } catch (err) {
-            console.log('Failed to track login:', err);
-          }
+          // Use setTimeout to ensure this doesn't block auth flow
+          setTimeout(async () => {
+            try {
+              // Get current login count first
+              const { data: profileData } = await supabase
+                .from('profiles')
+                .select('login_count')
+                .eq('id', session.user.id)
+                .single();
+              
+              if (profileData) {
+                const currentCount = profileData.login_count || 0;
+                
+                // Update last login and increment count
+                await supabase
+                  .from('profiles')
+                  .update({ 
+                    last_login_at: new Date().toISOString(),
+                    login_count: currentCount + 1
+                  })
+                  .eq('id', session.user.id);
+              }
+            } catch (err) {
+              // Silently fail - login tracking is non-critical
+            }
+          }, 100);
         }
         
         // Auth state changed for user ID: session.user.id
