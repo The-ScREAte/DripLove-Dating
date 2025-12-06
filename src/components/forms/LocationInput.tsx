@@ -508,10 +508,10 @@ const LocationInput = ({
               Auto-detected {detectionMethod === 'gps' ? '(GPS)' : '(IP)'}
             </span>
           )}
-          {isProfileEdit && shouldLockCountry && (
+          {isProfileEdit && (
             <span className="flex items-center gap-1 text-xs text-amber-600 font-medium">
               <Lock className="w-3 h-3" />
-              Locked (in-country)
+              {shouldLockCountry ? 'Locked (in-country)' : 'Change via button above'}
             </span>
           )}
         </Label>
@@ -519,11 +519,11 @@ const LocationInput = ({
           <Select 
             value={selectedCountryCode} 
             onValueChange={handleCountryChange} 
-            disabled={loadingCountries || shouldLockCountry || isCheckingOutsideCountry}
+            disabled={loadingCountries || isProfileEdit || isCheckingOutsideCountry}
           >
             <SelectTrigger 
               className={`${errors.country ? 'border-red-500' : ''} ${
-                shouldLockCountry ? 'bg-amber-50 border-amber-300 cursor-not-allowed opacity-70' : ''
+                isProfileEdit ? 'bg-muted border-muted-foreground/20 cursor-not-allowed opacity-70' : ''
               } ${
                 !isProfileEdit && isCountryLocked ? 'bg-green-50 border-green-300 cursor-not-allowed opacity-70 pr-20' : ''
               }`}
