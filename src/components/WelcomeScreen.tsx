@@ -34,7 +34,13 @@ const WelcomeScreen: React.FC<WelcomeScreenProps> = ({ onLogin, onAbout, onTerms
   const isIOS = platform === 'ios';
 
   React.useEffect(() => {
-    // Update to blob URL when ready (non-blocking)
+    // On iOS, use direct URL instead of blob URL for better compatibility
+    if (isIOS) {
+      setVideoSrc('/welcome-video.mp4');
+      return;
+    }
+
+    // Update to blob URL when ready (non-blocking) - non-iOS only
     videoPreloader.preloadVideo().then((url) => {
       setVideoSrc(url);
     }).catch((error) => {
@@ -55,7 +61,7 @@ const WelcomeScreen: React.FC<WelcomeScreenProps> = ({ onLogin, onAbout, onTerms
         }, 500); // Delay 500ms to avoid blocking initial render
       }).catch(() => {});
     }
-  }, [isNative, platform]);
+  }, [isNative, platform, isIOS]);
 
   // Cleanup Safari View Controller listeners on unmount
   React.useEffect(() => {
@@ -506,11 +512,25 @@ const WelcomeScreen: React.FC<WelcomeScreenProps> = ({ onLogin, onAbout, onTerms
     video.playbackRate = 1.2;
     
     const attemptPlay = () => {
+      // iOS specific: ensure muted attribute is set before playing
+      video.muted = true;
+      video.setAttribute('playsinline', '');
+      
       const playPromise = video.play();
       if (playPromise !== undefined) {
-        playPromise.catch((error) => {
-          console.log('Autoplay prevented:', error);
-        });
+        playPromise
+          .then(() => {
+            console.log('Video playing successfully');
+          })
+          .catch((error) => {
+            console.log('Autoplay prevented:', error);
+            // On iOS, sometimes we need to try again after a short delay
+            if (isIOS) {
+              setTimeout(() => {
+                video.play().catch(e => console.log('Retry play failed:', e));
+              }, 100);
+            }
+          });
       }
     };
 
@@ -535,7 +555,7 @@ const WelcomeScreen: React.FC<WelcomeScreenProps> = ({ onLogin, onAbout, onTerms
       attemptPlay();
     };
 
-    // iOS user interaction handler
+    // iOS user interaction handler (fallback)
     const handleUserInteraction = () => {
       if (video.paused) {
         attemptPlay();
@@ -546,9 +566,12 @@ const WelcomeScreen: React.FC<WelcomeScreenProps> = ({ onLogin, onAbout, onTerms
     video.addEventListener('canplay', handleCanPlay);
     video.addEventListener('timeupdate', handleTimeUpdate);
     video.addEventListener('ended', handleEnded);
+    
+    // Add interaction listeners as fallback (remove once after first use)
     document.addEventListener('touchstart', handleUserInteraction, { once: true });
     document.addEventListener('click', handleUserInteraction, { once: true });
 
+    // Initial play attempt if video is ready
     if (video.readyState >= 2) {
       attemptPlay();
     }
@@ -561,7 +584,7 @@ const WelcomeScreen: React.FC<WelcomeScreenProps> = ({ onLogin, onAbout, onTerms
       document.removeEventListener('touchstart', handleUserInteraction);
       document.removeEventListener('click', handleUserInteraction);
     };
-  }, [videoSrc]);
+  }, [videoSrc, isIOS]);
   
   return (
   <div className="min-h-fill bg-gradient-to-br from-purple-500 to-pink-500 flex flex-col items-center justify-start text-center relative overflow-hidden">
@@ -569,12 +592,10 @@ const WelcomeScreen: React.FC<WelcomeScreenProps> = ({ onLogin, onAbout, onTerms
       <div className="absolute inset-0">
         <video
           ref={videoRef}
-          autoPlay
-          loop
           muted
           playsInline
-          webkit-playsinline="true"
-          x5-playsinline="true"
+          autoPlay
+          loop
           preload="auto"
           src={videoSrc}
           className="absolute top-0 left-0 w-full h-full object-cover opacity-40"
