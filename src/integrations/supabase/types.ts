@@ -557,6 +557,7 @@ export type Database = {
           spontaneous_planner: number | null
           terms_accepted: boolean | null
           terms_accepted_at: string | null
+          unlocked_countries: string[] | null
           updated_at: string | null
           zip_code: string | null
         }
@@ -604,6 +605,7 @@ export type Database = {
           spontaneous_planner?: number | null
           terms_accepted?: boolean | null
           terms_accepted_at?: string | null
+          unlocked_countries?: string[] | null
           updated_at?: string | null
           zip_code?: string | null
         }
@@ -651,6 +653,7 @@ export type Database = {
           spontaneous_planner?: number | null
           terms_accepted?: boolean | null
           terms_accepted_at?: string | null
+          unlocked_countries?: string[] | null
           updated_at?: string | null
           zip_code?: string | null
         }
