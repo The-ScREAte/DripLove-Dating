@@ -497,7 +497,7 @@ const LocationInput = ({
         </Button>
       )}
 
-      {/* Country Selection */}
+      {/* Country Display/Selection */}
       <div className="space-y-2">
         <Label className="flex items-center gap-2">
           <MapPin className="w-4 h-4" />
@@ -509,57 +509,71 @@ const LocationInput = ({
             </span>
           )}
           {isProfileEdit && (
-            <span className="flex items-center gap-1 text-xs text-amber-600 font-medium">
+            <span className="flex items-center gap-1 text-xs text-muted-foreground font-medium">
               <Lock className="w-3 h-3" />
-              {shouldLockCountry ? 'Locked (in-country)' : 'Change via button above'}
+              {outsideCountryStatus.isOutside ? 'Use button above to change' : 'Location locked'}
             </span>
           )}
         </Label>
-        <div className="relative">
-          <Select 
-            value={selectedCountryCode} 
-            onValueChange={handleCountryChange} 
-            disabled={loadingCountries || isProfileEdit || isCheckingOutsideCountry}
-          >
-            <SelectTrigger 
-              className={`${errors.country ? 'border-red-500' : ''} ${
-                isProfileEdit ? 'bg-muted border-muted-foreground/20 cursor-not-allowed opacity-70' : ''
-              } ${
-                !isProfileEdit && isCountryLocked ? 'bg-green-50 border-green-300 cursor-not-allowed opacity-70 pr-20' : ''
-              }`}
+        
+        {/* Profile Edit Mode - Show read-only display */}
+        {isProfileEdit ? (
+          <div className="flex items-center justify-between p-3 bg-muted rounded-lg border border-border">
+            <div className="flex items-center gap-2">
+              <span className="font-medium">{country || 'No country set'}</span>
+              {selectedCountryData?.continent === 'Africa' && (
+                <span className="text-xs text-green-600">🌍 Africa</span>
+              )}
+            </div>
+            <Lock className="w-4 h-4 text-muted-foreground" />
+          </div>
+        ) : (
+          /* New User Mode - Show Select dropdown */
+          <div className="relative">
+            <Select 
+              value={selectedCountryCode} 
+              onValueChange={handleCountryChange} 
+              disabled={loadingCountries || isCountryLocked || isCheckingOutsideCountry}
             >
-              <SelectValue placeholder={loadingCountries ? "Loading countries..." : isCheckingOutsideCountry ? "Checking location..." : "Select your country"} />
-            </SelectTrigger>
-            <SelectContent>
-              {countries.map((country) => (
-                <SelectItem key={country.code} value={country.code}>
-                  <div className="flex items-center justify-between w-full">
-                    <span>{country.name}</span>
-                    {country.continent === 'Africa' && (
-                      <span className="text-xs text-green-600 ml-2">🌍 Africa</span>
-                    )}
-                  </div>
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-          {/* Lock icon and unlock button only for auto-detect mode, not profile edit */}
-          {!isProfileEdit && isCountryLocked && (
-            <>
-              <div className="absolute right-10 top-1/2 -translate-y-1/2">
-                <Lock className="w-4 h-4 text-green-600" />
-              </div>
-              <button
-                type="button"
-                onClick={handleUnlockCountry}
-                className="absolute right-2 top-1/2 -translate-y-1/2 p-1 hover:bg-red-100 rounded-full transition-colors group"
-                title="Wrong location? Click to select manually"
+              <SelectTrigger 
+                className={`${errors.country ? 'border-red-500' : ''} ${
+                  isCountryLocked ? 'bg-green-50 border-green-300 cursor-not-allowed opacity-70 pr-20' : ''
+                }`}
               >
-                <X className="w-4 h-4 text-gray-400 group-hover:text-red-500" />
-              </button>
-            </>
-          )}
-        </div>
+                <SelectValue placeholder={loadingCountries ? "Loading countries..." : isCheckingOutsideCountry ? "Checking location..." : "Select your country"} />
+              </SelectTrigger>
+              <SelectContent>
+                {countries.map((countryItem) => (
+                  <SelectItem key={countryItem.code} value={countryItem.code}>
+                    <div className="flex items-center justify-between w-full">
+                      <span>{countryItem.name}</span>
+                      {countryItem.continent === 'Africa' && (
+                        <span className="text-xs text-green-600 ml-2">🌍 Africa</span>
+                      )}
+                    </div>
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            {/* Lock icon and unlock button only for auto-detect mode */}
+            {isCountryLocked && (
+              <>
+                <div className="absolute right-10 top-1/2 -translate-y-1/2">
+                  <Lock className="w-4 h-4 text-green-600" />
+                </div>
+                <button
+                  type="button"
+                  onClick={handleUnlockCountry}
+                  className="absolute right-2 top-1/2 -translate-y-1/2 p-1 hover:bg-red-100 rounded-full transition-colors group"
+                  title="Wrong location? Click to select manually"
+                >
+                  <X className="w-4 h-4 text-gray-400 group-hover:text-red-500" />
+                </button>
+              </>
+            )}
+          </div>
+        )}
+        
         {errors.country && (
           <p className="text-sm text-red-500">{errors.country}</p>
         )}
