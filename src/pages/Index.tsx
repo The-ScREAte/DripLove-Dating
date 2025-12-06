@@ -67,12 +67,10 @@ const Index = () => {
           return;
         }
         
-        // Track last login - update profile with login timestamp (fire-and-forget, don't await)
+        // Track last login - update profile with login timestamp (non-blocking)
         if (_event === 'SIGNED_IN') {
-          // Use setTimeout to ensure this doesn't block auth flow
-          setTimeout(async () => {
+          (async () => {
             try {
-              // Get current login count first
               const { data: profileData } = await supabase
                 .from('profiles')
                 .select('login_count')
@@ -81,8 +79,6 @@ const Index = () => {
               
               if (profileData) {
                 const currentCount = profileData.login_count || 0;
-                
-                // Update last login and increment count
                 await supabase
                   .from('profiles')
                   .update({ 
@@ -91,10 +87,8 @@ const Index = () => {
                   })
                   .eq('id', session.user.id);
               }
-            } catch (err) {
-              // Silently fail - login tracking is non-critical
-            }
-          }, 100);
+            } catch {}
+          })();
         }
         
         // Auth state changed for user ID: session.user.id
