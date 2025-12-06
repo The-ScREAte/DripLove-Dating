@@ -10,7 +10,7 @@ import { useToast } from '@/hooks/use-toast';
 import { useSubscription } from '@/hooks/useSubscription';
 import BasicInfoSection from './profile/BasicInfoSection';
 import LocationSection from './profile/LocationSection';
-import PreferencesSection from './profile/PreferencesSection';
+
 import LifestyleSection from './profile/LifestyleSection';
 import WorkEducationSection from './profile/WorkEducationSection';
 import PersonalitySection from './profile/PersonalitySection';
@@ -47,7 +47,7 @@ const ProfilePage = ({ currentUser, profile, onProfileUpdate, onLogout, onShowTe
   
   // State for collapsible sections
   const [showLocationSection, setShowLocationSection] = useState(false);
-  const [showPreferencesSection, setShowPreferencesSection] = useState(false);
+  
   const [showLifestyleSection, setShowLifestyleSection] = useState(false);
   const [showWorkEducationSection, setShowWorkEducationSection] = useState(false);
   const [showPersonalitySection, setShowPersonalitySection] = useState(false);
@@ -662,26 +662,14 @@ const ProfilePage = ({ currentUser, profile, onProfileUpdate, onLogout, onShowTe
               onInputChange={handleInputChange}
               onLocationChange={handleLocationChange}
               onDistanceChange={handleDistanceChange}
+              onSelectChange={handleSelectChange}
+              onAgeRangeChange={handleAgeRangeChange}
               isPremium={isPremium}
               userId={currentUser?.id}
               onUnlockedCountriesChange={(countries) => {
                 setEditedProfile(prev => ({ ...prev, unlocked_countries: countries }));
                 onProfileUpdate();
               }}
-            />
-          </CollapsibleSection>
-          <CollapsibleSection
-            title={t('profile.preferences')}
-            isOpen={showPreferencesSection}
-            onToggle={() => setShowPreferencesSection(!showPreferencesSection)}
-            className="mt-3"
-          >
-            <PreferencesSection 
-              editedProfile={editedProfile} 
-              isEditing={isEditing} 
-              onSliderChange={handleSliderChange} 
-              onSelectChange={handleSelectChange} 
-              onAgeRangeChange={handleAgeRangeChange} 
             />
           </CollapsibleSection>
           <CollapsibleSection
