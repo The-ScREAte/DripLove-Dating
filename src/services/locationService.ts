@@ -58,13 +58,14 @@ class LocationService {
    */
   private async getFallbackLocationMatches(
     userId: string, 
-    maxDistance: number = 50
+    maxDistance: number = 50,
+    unlockedCountries: string[] = []
   ): Promise<LocationMatch[]> {
     try {
       // Get current user's location
       const { data: currentUser, error: userError } = await supabase
         .from('profiles')
-        .select('country, country_code, city, latitude, longitude, max_distance')
+        .select('country, country_code, city, latitude, longitude, max_distance, unlocked_countries')
         .eq('id', userId)
         .single();
 
@@ -74,6 +75,11 @@ class LocationService {
       }
 
       const searchDistance = maxDistance || currentUser.max_distance || 50;
+      // Merge passed unlocked countries with user's saved unlocked countries
+      const allUnlockedCountries = [...new Set([
+        ...unlockedCountries,
+        ...(Array.isArray(currentUser.unlocked_countries) ? currentUser.unlocked_countries : [])
+      ])];
 
       // Get all potential matches
       const { data: profiles, error: profilesError } = await supabase
@@ -99,8 +105,16 @@ class LocationService {
         // Calculate age from date_of_birth
         const age = profile.date_of_birth ? this.calculateAge(profile.date_of_birth) : undefined;
 
+        // PREMIUM FEATURE: Check if profile is from an unlocked country
+        const isFromUnlockedCountry = allUnlockedCountries.includes(profile.country_code);
+        
+        if (isFromUnlockedCountry) {
+          // Include profiles from unlocked countries regardless of distance
+          distance = 0; // Show as nearby for unlocked countries
+          includeProfile = true;
+        }
         // If both users have coordinates, calculate exact distance
-        if (
+        else if (
           currentUser.latitude && currentUser.longitude &&
           profile.latitude && profile.longitude
         ) {

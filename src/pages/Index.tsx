@@ -57,7 +57,7 @@ const Index = () => {
     // Listen for auth changes
     const {
       data: { subscription },
-    } = supabase.auth.onAuthStateChange((_event, session) => {
+    } = supabase.auth.onAuthStateChange(async (_event, session) => {
       if (session?.user) {
         // Check if email is confirmed before proceeding
         if (!session.user.email_confirmed_at) {
@@ -65,6 +65,31 @@ const Index = () => {
           setCurrentView('login');
           setLoading(false);
           return;
+        }
+        
+        // Track last login - update profile with login timestamp
+        if (_event === 'SIGNED_IN') {
+          try {
+            // Get current login count first
+            const { data: profileData } = await supabase
+              .from('profiles')
+              .select('login_count')
+              .eq('id', session.user.id)
+              .single();
+            
+            const currentCount = profileData?.login_count || 0;
+            
+            // Update last login and increment count
+            await supabase
+              .from('profiles')
+              .update({ 
+                last_login_at: new Date().toISOString(),
+                login_count: currentCount + 1
+              })
+              .eq('id', session.user.id);
+          } catch (err) {
+            console.log('Failed to track login:', err);
+          }
         }
         
         // Auth state changed for user ID: session.user.id
