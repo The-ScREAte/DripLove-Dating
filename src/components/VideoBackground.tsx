@@ -14,10 +14,14 @@ const VideoBackground: React.FC = () => {
     if (native) {
       const initVideo = async () => {
         try {
+          // Get the base URL for assets
+          const baseUrl = Capacitor.convertFileSrc('');
+          const videoUrl = `${window.location.origin}/welcome-video.mov`;
+          
           // Initialize and play video with native player
           const result = await CapacitorVideoPlayer.initPlayer({
             mode: 'embedded',
-            url: 'public/welcome-video.mov',
+            url: videoUrl,
             playerId: 'backgroundVideo',
             componentTag: 'div',
             width: window.innerWidth,
@@ -25,7 +29,7 @@ const VideoBackground: React.FC = () => {
             loopOnEnd: true,
             exitOnEnd: false,
             showControls: false,
-            rate: 1.2,
+            rate: 1.0,
           });
           
           if (result.result) {
