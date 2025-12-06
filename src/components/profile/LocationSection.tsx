@@ -6,7 +6,6 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Slider } from '@/components/ui/slider';
 import LocationInput from '@/components/forms/LocationInput';
-import UnlockedCountriesSelector from './UnlockedCountriesSelector';
 
 interface LocationSectionProps {
   editedProfile: any;
@@ -22,9 +21,6 @@ interface LocationSectionProps {
     isCustomCity?: boolean;
   }) => void;
   onDistanceChange?: (distance: number[]) => void;
-  currentUserId?: string;
-  isPremium?: boolean;
-  onUnlockedCountriesChange?: (countries: string[]) => void;
 }
 
 const LocationSection = ({ 
@@ -32,10 +28,7 @@ const LocationSection = ({
   isEditing, 
   onInputChange, 
   onLocationChange,
-  onDistanceChange,
-  currentUserId,
-  isPremium,
-  onUnlockedCountriesChange
+  onDistanceChange 
 }: LocationSectionProps) => {
   const { t } = useTranslation();
   return (
@@ -143,17 +136,6 @@ const LocationSection = ({
                 Please add your city to enable location-based matching.
               </div>
             </div>
-          )}
-
-          {/* Premium Country Unlock Feature */}
-          {currentUserId && (
-            <UnlockedCountriesSelector
-              currentUserId={currentUserId}
-              userCountryCode={editedProfile.country_code || ''}
-              isPremium={isPremium || false}
-              unlockedCountries={editedProfile.unlocked_countries || []}
-              onCountriesChange={onUnlockedCountriesChange || (() => {})}
-            />
           )}
         </div>
       </CardContent>
