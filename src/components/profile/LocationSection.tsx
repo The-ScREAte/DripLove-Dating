@@ -1,11 +1,14 @@
-
-import React from 'react';
+import React, { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Slider } from '@/components/ui/slider';
+import { Button } from '@/components/ui/button';
+import { Globe, Crown, ChevronRight } from 'lucide-react';
 import LocationInput from '@/components/forms/LocationInput';
+import UnlockCountriesDialog from './UnlockCountriesDialog';
+import { getCountriesList } from '@/constants/locationData';
 
 interface LocationSectionProps {
   editedProfile: any;
@@ -21,6 +24,9 @@ interface LocationSectionProps {
     isCustomCity?: boolean;
   }) => void;
   onDistanceChange?: (distance: number[]) => void;
+  isPremium?: boolean;
+  userId?: string;
+  onUnlockedCountriesChange?: (countries: string[]) => void;
 }
 
 const LocationSection = ({ 
@@ -28,9 +34,21 @@ const LocationSection = ({
   isEditing, 
   onInputChange, 
   onLocationChange,
-  onDistanceChange 
+  onDistanceChange,
+  isPremium,
+  userId,
+  onUnlockedCountriesChange
 }: LocationSectionProps) => {
   const { t } = useTranslation();
+  const [showCountryDialog, setShowCountryDialog] = useState(false);
+  const unlockedCountries = editedProfile.unlocked_countries || [];
+
+  const getCountryName = (code: string) => {
+    const countries = getCountriesList();
+    const country = countries.find(c => c.code === code);
+    return country?.name || code;
+  };
+
   return (
     <Card>
       <CardHeader>
@@ -103,42 +121,115 @@ const LocationSection = ({
                 className="w-full"
                 disabled={!isEditing}
               />
-              <div className="flex justify-between text-xs text-gray-500 mt-1">
+              <div className="flex justify-between text-xs text-muted-foreground mt-1">
                 <span>1 km</span>
                 <span className="font-medium">{editedProfile.max_distance || 250} km</span>
                 <span>500 km</span>
               </div>
             </div>
-            <div className="text-sm text-gray-600">
-              Set how far you're willing to match with other users. 
-              Smaller distances mean more local matches.
+            <div className="text-sm text-muted-foreground">
+              {t('profile.maxDistanceDescription')}
             </div>
           </div>
 
+          {/* Premium Country Unlock Feature */}
+          {isPremium && userId && (
+            <div className="space-y-3">
+              <div className="flex items-center gap-2">
+                <Globe className="w-4 h-4 text-primary" />
+                <Label className="font-medium">{t('profile.unlockCountries')}</Label>
+                <Crown className="w-4 h-4 text-yellow-500" />
+              </div>
+              
+              <div className="p-4 bg-gradient-to-r from-primary/5 to-primary/10 rounded-lg border border-primary/20">
+                <p className="text-sm text-muted-foreground mb-3">
+                  {t('profile.unlockCountriesInfo')}
+                </p>
+                
+                {/* Show currently unlocked countries */}
+                {unlockedCountries.length > 0 && (
+                  <div className="mb-3">
+                    <div className="text-xs text-muted-foreground mb-1">
+                      {t('profile.currentlyUnlocked')}:
+                    </div>
+                    <div className="flex flex-wrap gap-2">
+                      {unlockedCountries.map((code: string) => (
+                        <span 
+                          key={code}
+                          className="px-2 py-1 bg-primary/20 text-primary text-sm rounded-full"
+                        >
+                          {getCountryName(code)}
+                        </span>
+                      ))}
+                    </div>
+                  </div>
+                )}
+                
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setShowCountryDialog(true)}
+                  className="w-full flex items-center justify-between"
+                  disabled={!isEditing}
+                >
+                  <span className="flex items-center gap-2">
+                    <Globe className="w-4 h-4" />
+                    {unlockedCountries.length > 0 
+                      ? t('profile.manageCountries') 
+                      : t('profile.selectCountries')}
+                  </span>
+                  <div className="flex items-center gap-1">
+                    <span className="text-xs text-muted-foreground">
+                      {unlockedCountries.length}/3
+                    </span>
+                    <ChevronRight className="w-4 h-4" />
+                  </div>
+                </Button>
+              </div>
+            </div>
+          )}
+
           {/* Location Status - Only show warnings when location is not available */}
           {editedProfile.city && !editedProfile.latitude && (
-            <div className="p-3 bg-orange-50 rounded-lg">
-              <div className="text-sm text-orange-800 font-medium">
-                ⚠️ Approximate Location
+            <div className="p-3 bg-orange-50 dark:bg-orange-950/30 rounded-lg">
+              <div className="text-sm text-orange-800 dark:text-orange-200 font-medium">
+                ⚠️ {t('profile.approximateLocation')}
               </div>
-              <div className="text-xs text-orange-600">
-                Your city isn't in our database. You'll still get matches based on country/region.
+              <div className="text-xs text-orange-600 dark:text-orange-300">
+                {t('profile.approximateLocationDescription')}
               </div>
             </div>
           )}
 
           {!editedProfile.city && (
-            <div className="p-3 bg-red-50 rounded-lg">
-              <div className="text-sm text-red-800 font-medium">
-                ⚠️ Location Required
+            <div className="p-3 bg-red-50 dark:bg-red-950/30 rounded-lg">
+              <div className="text-sm text-red-800 dark:text-red-200 font-medium">
+                ⚠️ {t('profile.locationRequired')}
               </div>
-              <div className="text-xs text-red-600">
-                Please add your city to enable location-based matching.
+              <div className="text-xs text-red-600 dark:text-red-300">
+                {t('profile.locationRequiredDescription')}
               </div>
             </div>
           )}
         </div>
       </CardContent>
+
+      {/* Country Unlock Dialog */}
+      {isPremium && userId && (
+        <UnlockCountriesDialog
+          isOpen={showCountryDialog}
+          onClose={() => setShowCountryDialog(false)}
+          userId={userId}
+          currentCountry={editedProfile.country || ''}
+          currentCountryCode={editedProfile.country_code || ''}
+          unlockedCountries={unlockedCountries}
+          onSave={(countries) => {
+            if (onUnlockedCountriesChange) {
+              onUnlockedCountriesChange(countries);
+            }
+          }}
+        />
+      )}
     </Card>
   );
 };
