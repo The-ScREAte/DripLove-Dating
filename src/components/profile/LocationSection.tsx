@@ -65,6 +65,7 @@ const LocationSection = ({
               onLocationChange={onLocationChange}
               required={false}
               isProfileEdit={true}
+              isPremium={isPremium}
             />
           ) : (
             // Display mode
