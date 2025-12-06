@@ -6,7 +6,7 @@ import { Label } from '@/components/ui/label';
 import { Slider } from '@/components/ui/slider';
 import { Button } from '@/components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Globe, Crown, ChevronRight } from 'lucide-react';
+import { Globe, Crown, ChevronRight, CheckCircle } from 'lucide-react';
 import LocationInput from '@/components/forms/LocationInput';
 import UnlockCountriesDialog from './UnlockCountriesDialog';
 import { getCountriesList } from '@/constants/locationData';
@@ -218,7 +218,7 @@ const LocationSection = ({
             </div>
           </div>
 
-          {/* Premium Country Unlock Feature */}
+          {/* Premium Country Unlock Feature - Show for Premium users */}
           {isPremium && userId && (
             <div className="space-y-3">
               <div className="flex items-center gap-2">
@@ -271,6 +271,50 @@ const LocationSection = ({
                     <ChevronRight className="w-4 h-4" />
                   </div>
                 </Button>
+              </div>
+            </div>
+          )}
+
+          {/* Premium Upsell for Free Users */}
+          {!isPremium && (
+            <div className="space-y-3">
+              <div className="flex items-center gap-2">
+                <Globe className="w-4 h-4 text-muted-foreground" />
+                <Label className="font-medium">{t('profile.unlockCountries')}</Label>
+                <Crown className="w-4 h-4 text-yellow-500" />
+              </div>
+              
+              <div className="p-4 bg-gradient-to-r from-yellow-500/10 via-amber-500/10 to-orange-500/10 rounded-lg border border-yellow-500/30">
+                <div className="flex items-start gap-3">
+                  <div className="p-2 bg-yellow-500/20 rounded-full shrink-0">
+                    <Globe className="w-5 h-5 text-yellow-600" />
+                  </div>
+                  <div className="flex-1">
+                    <h4 className="font-semibold text-foreground flex items-center gap-2">
+                      {t('profile.matchGlobally', 'Match with people worldwide')}
+                      <Crown className="w-4 h-4 text-yellow-500" />
+                    </h4>
+                    <p className="text-sm text-muted-foreground mt-1">
+                      {t('profile.upgradeToUnlockCountries', 'Upgrade to Premium to unlock up to 3 additional countries and expand your dating pool beyond your current location.')}
+                    </p>
+                    <div className="mt-3 flex items-center gap-2 text-xs text-muted-foreground">
+                      <div className="flex items-center gap-1">
+                        <CheckCircle className="w-3 h-3 text-green-500" />
+                        <span>3 extra countries</span>
+                      </div>
+                      <span>•</span>
+                      <div className="flex items-center gap-1">
+                        <CheckCircle className="w-3 h-3 text-green-500" />
+                        <span>More matches</span>
+                      </div>
+                      <span>•</span>
+                      <div className="flex items-center gap-1">
+                        <CheckCircle className="w-3 h-3 text-green-500" />
+                        <span>Global reach</span>
+                      </div>
+                    </div>
+                  </div>
+                </div>
               </div>
             </div>
           )}
