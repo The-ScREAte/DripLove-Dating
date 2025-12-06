@@ -765,7 +765,7 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, isPremium }: DiscoverPage
     ] = await Promise.all([
       supabase
         .from('profiles')
-        .select('max_distance, distance_preference, country, min_age, max_age, preference')
+        .select('max_distance, distance_preference, country, country_code, min_age, max_age, preference, unlocked_countries')
         .eq('id', userId)
         .single(),
       supabase
@@ -805,6 +805,11 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, isPremium }: DiscoverPage
                           currentUserData?.preference === 'female' ? ['female'] : 
                           currentUserData?.preference === 'everyone' || currentUserData?.preference === 'both' ? ['male', 'female', 'other'] :
                           ['male', 'female', 'other']; // Default to all if preference is not set
+
+    // Get unlocked countries for premium users
+    const unlockedCountries: string[] = Array.isArray(currentUserData?.unlocked_countries) 
+      ? currentUserData.unlocked_countries 
+      : [];
 
     // Get location-based matches
     const locationMatches = await locationService.getLocationBasedMatches(userId, userMaxDistance);
@@ -857,6 +862,35 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, isPremium }: DiscoverPage
 
       if (error) throw error;
       filteredProfiles = profiles || [];
+    }
+
+    // ⭐ PREMIUM FEATURE: Fetch profiles from unlocked countries
+    if (unlockedCountries.length > 0 && isPremium) {
+      const existingIds = new Set(filteredProfiles.map(p => p.id));
+      const allExcludedIds = [...excludedIds, ...Array.from(existingIds)];
+      
+      let unlockedQuery = supabase
+        .from('profiles')
+        .select('id, first_name, last_name, bio, city, country, country_code, occupation, education_level, date_of_birth, interests, gender, latitude, longitude, fun_fact, perfect_first_date, last_googled, relationship_intent, smoking, drinking, exercise_level, sleeping_schedule, introvert_extrovert, spontaneous_planner, messy_organized, adinkra_symbols')
+        .in('country_code', unlockedCountries);
+      
+      if (allExcludedIds.length > 0) {
+        unlockedQuery = unlockedQuery.not('id', 'in', `(${allExcludedIds.join(',')})`);
+      }
+      
+      const { data: unlockedProfiles, error: unlockedError } = await unlockedQuery
+        .in('gender', allowedGenders)
+        .eq('account_status', 'active')
+        .eq('is_admin', false)
+        .limit(20);
+
+      if (!unlockedError && unlockedProfiles) {
+        // Add distance info for unlocked country profiles (mark as far away)
+        unlockedProfiles.forEach(profile => {
+          distanceMap[profile.id] = 999; // Mark as from unlocked country
+        });
+        filteredProfiles = [...filteredProfiles, ...unlockedProfiles];
+      }
     }
  
     // Apply age filtering

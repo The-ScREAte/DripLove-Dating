@@ -251,7 +251,23 @@
       "personality": "Complete personality sliders",
       "funQuestions": "Answer fun questions",
       "interests": "Select at least 3 interests"
-    }
+    },
+    "unlockCountries": "Unlock Countries",
+    "unlockCountriesDescription": "Select up to 3 additional countries to see people from. This is a premium feature that lets you connect with people beyond your local area.",
+    "unlockCountriesInfo": "As a premium member, you can see people from up to 3 additional countries beyond your current location.",
+    "selectedCountries": "Selected",
+    "yourCountry": "Your country",
+    "currentlyUnlocked": "Currently unlocked",
+    "manageCountries": "Manage Countries",
+    "selectCountries": "Select Countries",
+    "countriesUnlocked": "Countries Unlocked!",
+    "countriesUnlockedDescription": "Your discover feed will now include people from the selected countries.",
+    "errorSavingCountries": "Failed to save country preferences. Please try again.",
+    "maxDistanceDescription": "Set how far you're willing to match with other users. Smaller distances mean more local matches.",
+    "approximateLocation": "Approximate Location",
+    "approximateLocationDescription": "Your city isn't in our database. You'll still get matches based on country/region.",
+    "locationRequired": "Location Required",
+    "locationRequiredDescription": "Please add your city to enable location-based matching."
   },
   "discover": {
     "title": "DripCheck",
@@ -477,6 +493,11 @@
         "name": "Priority Support",
         "free": "Standard",
         "premium": "Priority"
+      },
+      "unlockCountries": {
+        "name": "Unlock Countries",
+        "free": "Your country only",
+        "premium": "Up to 3 extra countries"
       },
       "allFutureFeatures": {
         "name": "All Future Features",
