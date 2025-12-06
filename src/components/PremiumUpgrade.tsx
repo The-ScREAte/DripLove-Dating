@@ -6,7 +6,7 @@ import { isIOS, isNativeApp } from '@/utils/iap';
 import { buyMonthly, debugIAPState, restorePurchases } from '../iap';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Crown, Heart, RotateCcw, Users, Check, X, Globe } from 'lucide-react';
+import { Crown, Heart, RotateCcw, Users, Check, X } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import { useEnhancedSubscription } from '@/hooks/useEnhancedSubscription';
@@ -305,7 +305,6 @@ const PremiumUpgrade = ({ currentUser, onClose, preselectedPlan }: PremiumUpgrad
     { name: t('premium.features.reverseDislikes.name'), free: t('premium.features.reverseDislikes.free'), premium: t('premium.features.reverseDislikes.premium'), icon: RotateCcw },
     { name: t('premium.features.seeWhoLiked.name'), free: t('premium.features.seeWhoLiked.free'), premium: t('premium.features.seeWhoLiked.premium'), icon: Users },
     { name: t('premium.features.prioritySupport.name'), free: t('premium.features.prioritySupport.free'), premium: t('premium.features.prioritySupport.premium'), icon: Crown },
-    { name: t('premium.features.unlockCountries.name'), free: t('premium.features.unlockCountries.free'), premium: t('premium.features.unlockCountries.premium'), icon: Globe },
   ];
 
   return (

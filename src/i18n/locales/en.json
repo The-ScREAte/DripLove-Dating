@@ -26,9 +26,7 @@
     "findYourPerfectMatch": "Find Your Perfect Match",
     "findYour": "Find Your",
     "perfectMatch": "Perfect Match 💖",
-    "clickToClose": "Click to close",
-    "searchCountries": "Search countries...",
-    "saveFailed": "Failed to save. Please try again."
+    "clickToClose": "Click to close"
   },
   "auth": {
     "signIn": "Sign In",
@@ -253,19 +251,7 @@
       "personality": "Complete personality sliders",
       "funQuestions": "Answer fun questions",
       "interests": "Select at least 3 interests"
-    },
-    "premiumFeature": "Premium Feature",
-    "premium": "Premium",
-    "unlockCountriesDescription": "Upgrade to Premium to unlock up to 3 additional countries and see people from anywhere in the world!",
-    "unlockedCountries": "Unlocked Countries",
-    "unlockCountriesExplanation": "Select up to 3 countries to see people from beyond your distance limit.",
-    "selectCountries": "Select Countries",
-    "editUnlockedCountries": "Edit Countries",
-    "selectUnlockedCountries": "Select Countries to Unlock",
-    "selectUpToCountries": "Choose up to {{count}} countries to see people from",
-    "selectedCount": "{{current}} of {{max}} selected",
-    "countriesUnlocked": "Countries Unlocked! 🌍",
-    "countriesUnlockedDesc": "You can now see people from your selected countries."
+    }
   },
   "discover": {
     "title": "DripCheck",
@@ -495,11 +481,6 @@
       "allFutureFeatures": {
         "name": "All Future Features",
         "premium": "Included forever!"
-      },
-      "unlockCountries": {
-        "name": "Unlock Countries",
-        "free": "Local only",
-        "premium": "3 extra countries"
       }
     },
     "upgradeButton": "Upgrade to Premium Now",

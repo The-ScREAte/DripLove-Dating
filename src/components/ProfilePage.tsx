@@ -93,7 +93,6 @@ const ProfilePage = ({ currentUser, profile, onProfileUpdate, onLogout, onShowTe
     interests: [] as string[],
     adinkra_symbols: [] as string[],
     preferred_language: 'en',
-    unlocked_countries: [] as string[],
   });
 
   // Initialize userImages state
@@ -141,7 +140,6 @@ const ProfilePage = ({ currentUser, profile, onProfileUpdate, onLogout, onShowTe
           interests: Array.isArray(profile.interests) ? profile.interests : [],
           adinkra_symbols: Array.isArray(profile.adinkra_symbols) ? profile.adinkra_symbols : [],
           preferred_language: detectedLanguage,
-          unlocked_countries: Array.isArray(profile.unlocked_countries) ? profile.unlocked_countries : [],
         });
       } catch (error) {
         console.error('Error initializing profile data:', error);
@@ -179,7 +177,6 @@ const ProfilePage = ({ currentUser, profile, onProfileUpdate, onLogout, onShowTe
           interests: [],
           adinkra_symbols: [],
           preferred_language: 'en',
-          unlocked_countries: [],
         });
       }
     }
@@ -413,7 +410,6 @@ const ProfilePage = ({ currentUser, profile, onProfileUpdate, onLogout, onShowTe
         interests: profile.interests || [],
         adinkra_symbols: profile.adinkra_symbols || [],
         preferred_language: detectedLanguage,
-        unlocked_countries: Array.isArray(profile.unlocked_countries) ? profile.unlocked_countries : [],
       });
     }
     setIsEditing(false);
@@ -662,12 +658,6 @@ const ProfilePage = ({ currentUser, profile, onProfileUpdate, onLogout, onShowTe
               onInputChange={handleInputChange}
               onLocationChange={handleLocationChange}
               onDistanceChange={handleDistanceChange}
-              currentUserId={currentUser?.id}
-              isPremium={isPremium}
-              onUnlockedCountriesChange={(countries) => {
-                setEditedProfile(prev => ({ ...prev, unlocked_countries: countries }));
-                onProfileUpdate();
-              }}
             />
           </CollapsibleSection>
           <CollapsibleSection

@@ -1,10 +1,6 @@
 -- Add function to check and dissolve expired matches
 CREATE OR REPLACE FUNCTION check_and_dissolve_expired_matches()
-RETURNS TABLE(dissolved_count INTEGER, notified_count INTEGER)
-LANGUAGE plpgsql
-SECURITY DEFINER
-SET search_path = public, pg_temp
-AS $$
+RETURNS TABLE(dissolved_count INTEGER, notified_count INTEGER) AS $$
 DECLARE
   v_dissolved_count INTEGER := 0;
   v_notified_count INTEGER := 0;
@@ -69,7 +65,7 @@ BEGIN
 
   RETURN QUERY SELECT v_dissolved_count, v_notified_count;
 END;
-$$;
+$$ LANGUAGE plpgsql SECURITY DEFINER;
 
 -- Create a cron job to run this function daily (if pg_cron is available)
 -- This would typically be set up separately in Supabase dashboard
