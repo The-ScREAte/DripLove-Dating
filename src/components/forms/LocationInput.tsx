@@ -14,12 +14,13 @@ import {
   type CityData 
 } from '@/constants/locationData';
 import { getEnabledCountries } from '@/utils/enabledCountries';
-import { autoDetectCountry } from '@/utils/countryDetection';
+import { autoDetectCountry, checkIfUserIsOutsideCountry } from '@/utils/countryDetection';
 
 interface LocationInputProps {
   country: string;
   city: string;
   zipCode: string;
+  countryCode?: string; // Current profile country code for lock check
   onLocationChange: (location: {
     country: string;
     countryCode: string;
@@ -36,16 +37,19 @@ interface LocationInputProps {
   };
   required?: boolean;
   autoDetect?: boolean; // Enable auto-detection on mount
+  isProfileEdit?: boolean; // If true, check if user is outside their country
 }
 
 const LocationInput = ({
   country,
   city,
   zipCode,
+  countryCode: profileCountryCode,
   onLocationChange,
   errors = {},
   required = false,
-  autoDetect = false
+  autoDetect = false,
+  isProfileEdit = false
 }: LocationInputProps) => {
   const [selectedCountryCode, setSelectedCountryCode] = useState<string>('');
   const [cityInput, setCityInput] = useState<string>(city);
@@ -57,6 +61,12 @@ const LocationInput = ({
   const [loadingCountries, setLoadingCountries] = useState(true);
   const [isDetecting, setIsDetecting] = useState(false);
   const [isCountryLocked, setIsCountryLocked] = useState(false);
+  const [isCheckingOutsideCountry, setIsCheckingOutsideCountry] = useState(false);
+  const [outsideCountryStatus, setOutsideCountryStatus] = useState<{
+    checked: boolean;
+    isOutside: boolean;
+    currentLocation: string | null;
+  }>({ checked: false, isOutside: false, currentLocation: null });
   const [detectionMethod, setDetectionMethod] = useState<'gps' | 'ip' | null>(null);
   const { toast } = useToast();
 
@@ -79,12 +89,44 @@ const LocationInput = ({
     loadCountries();
   }, []);
 
-  // Auto-detect country on mount if enabled
+  // Check if user is outside their profile country when editing profile
   useEffect(() => {
-    if (autoDetect && !country && countries.length > 0) {
+    if (isProfileEdit && profileCountryCode && countries.length > 0 && !outsideCountryStatus.checked) {
+      checkUserLocation();
+    }
+  }, [isProfileEdit, profileCountryCode, countries]);
+
+  const checkUserLocation = async () => {
+    setIsCheckingOutsideCountry(true);
+    try {
+      const result = await checkIfUserIsOutsideCountry(profileCountryCode || '');
+      setOutsideCountryStatus({
+        checked: true,
+        isOutside: result.isOutside,
+        currentLocation: result.currentCountryName
+      });
+      
+      // If user is NOT outside their country, lock the country field
+      if (!result.isOutside && result.method !== 'failed') {
+        setIsCountryLocked(true);
+        setDetectionMethod(result.method);
+      }
+    } catch (error) {
+      console.error('Error checking user location:', error);
+      // If check fails, lock country for safety
+      setOutsideCountryStatus({ checked: true, isOutside: false, currentLocation: null });
+      setIsCountryLocked(true);
+    } finally {
+      setIsCheckingOutsideCountry(false);
+    }
+  };
+
+  // Auto-detect country on mount if enabled (only for new users, not profile edit)
+  useEffect(() => {
+    if (autoDetect && !country && countries.length > 0 && !isProfileEdit) {
       handleAutoDetect();
     }
-  }, [autoDetect, countries]);
+  }, [autoDetect, countries, isProfileEdit]);
 
   // Auto-detect country function
   const handleAutoDetect = async () => {
@@ -300,10 +342,49 @@ const LocationInput = ({
 
   const selectedCountryData = getCountryByCode(selectedCountryCode);
 
+  // Determine if country should be locked based on profile edit mode
+  const shouldLockCountry = isProfileEdit && isCountryLocked && !outsideCountryStatus.isOutside;
+
   return (
     <div className="space-y-4">
-      {/* Auto-detect Button */}
-      {autoDetect && !isCountryLocked && !selectedCountryCode && (
+      {/* Checking location indicator for profile edit */}
+      {isProfileEdit && isCheckingOutsideCountry && (
+        <div className="flex items-center gap-2 p-3 bg-blue-50 dark:bg-blue-950/30 rounded-lg text-sm text-blue-700 dark:text-blue-300">
+          <Loader2 className="w-4 h-4 animate-spin" />
+          Verifying your current location...
+        </div>
+      )}
+
+      {/* Message when country is locked (user is in their profile country) */}
+      {isProfileEdit && shouldLockCountry && outsideCountryStatus.checked && !isCheckingOutsideCountry && (
+        <div className="p-3 bg-amber-50 dark:bg-amber-950/30 rounded-lg border border-amber-200 dark:border-amber-800">
+          <div className="flex items-center gap-2 text-sm text-amber-800 dark:text-amber-200 font-medium">
+            <Lock className="w-4 h-4" />
+            Country is locked
+          </div>
+          <p className="text-xs text-amber-600 dark:text-amber-300 mt-1">
+            You can only change your country when you're physically outside of {country || 'your current country'}. 
+            Travel abroad and your country setting will unlock automatically.
+          </p>
+        </div>
+      )}
+
+      {/* Message when country is unlocked (user is outside their profile country) */}
+      {isProfileEdit && outsideCountryStatus.isOutside && outsideCountryStatus.checked && !isCheckingOutsideCountry && (
+        <div className="p-3 bg-green-50 dark:bg-green-950/30 rounded-lg border border-green-200 dark:border-green-800">
+          <div className="flex items-center gap-2 text-sm text-green-800 dark:text-green-200 font-medium">
+            <CheckCircle2 className="w-4 h-4" />
+            Country change available
+          </div>
+          <p className="text-xs text-green-600 dark:text-green-300 mt-1">
+            You appear to be in {outsideCountryStatus.currentLocation || 'a different country'}. 
+            You can update your country if you've moved.
+          </p>
+        </div>
+      )}
+
+      {/* Auto-detect Button - only show for new users, not profile edit */}
+      {autoDetect && !isProfileEdit && !isCountryLocked && !selectedCountryCode && (
         <Button
           type="button"
           onClick={handleAutoDetect}
@@ -329,10 +410,16 @@ const LocationInput = ({
         <Label className="flex items-center gap-2">
           <MapPin className="w-4 h-4" />
           Country
-          {isCountryLocked && (
+          {!isProfileEdit && isCountryLocked && (
             <span className="flex items-center gap-1 text-xs text-green-600 font-medium">
               <CheckCircle2 className="w-3 h-3" />
               Auto-detected {detectionMethod === 'gps' ? '(GPS)' : '(IP)'}
+            </span>
+          )}
+          {isProfileEdit && shouldLockCountry && (
+            <span className="flex items-center gap-1 text-xs text-amber-600 font-medium">
+              <Lock className="w-3 h-3" />
+              Locked (in-country)
             </span>
           )}
         </Label>
@@ -340,14 +427,16 @@ const LocationInput = ({
           <Select 
             value={selectedCountryCode} 
             onValueChange={handleCountryChange} 
-            disabled={loadingCountries || isCountryLocked}
+            disabled={loadingCountries || shouldLockCountry || isCheckingOutsideCountry}
           >
             <SelectTrigger 
               className={`${errors.country ? 'border-red-500' : ''} ${
-                isCountryLocked ? 'bg-green-50 border-green-300 cursor-not-allowed opacity-70 pr-20' : ''
+                shouldLockCountry ? 'bg-amber-50 border-amber-300 cursor-not-allowed opacity-70' : ''
+              } ${
+                !isProfileEdit && isCountryLocked ? 'bg-green-50 border-green-300 cursor-not-allowed opacity-70 pr-20' : ''
               }`}
             >
-              <SelectValue placeholder={loadingCountries ? "Loading countries..." : "Select your country"} />
+              <SelectValue placeholder={loadingCountries ? "Loading countries..." : isCheckingOutsideCountry ? "Checking location..." : "Select your country"} />
             </SelectTrigger>
             <SelectContent>
               {countries.map((country) => (
@@ -362,7 +451,8 @@ const LocationInput = ({
               ))}
             </SelectContent>
           </Select>
-          {isCountryLocked && (
+          {/* Lock icon and unlock button only for auto-detect mode, not profile edit */}
+          {!isProfileEdit && isCountryLocked && (
             <>
               <div className="absolute right-10 top-1/2 -translate-y-1/2">
                 <Lock className="w-4 h-4 text-green-600" />
