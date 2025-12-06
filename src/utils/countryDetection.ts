@@ -197,3 +197,35 @@ export function getCountryName(countryCode: string): string {
 export function isGeolocationSupported(): boolean {
   return 'geolocation' in navigator;
 }
+
+/**
+ * Check if user is currently outside their profile country
+ * Returns { isOutside: boolean, currentCountryCode: string | null }
+ */
+export async function checkIfUserIsOutsideCountry(profileCountryCode: string): Promise<{
+  isOutside: boolean;
+  currentCountryCode: string | null;
+  currentCountryName: string | null;
+  method: 'gps' | 'ip' | 'failed';
+}> {
+  // If no profile country set, allow editing
+  if (!profileCountryCode) {
+    return { isOutside: true, currentCountryCode: null, currentCountryName: null, method: 'failed' };
+  }
+
+  const result = await autoDetectCountry();
+  
+  if (result.method === 'failed') {
+    // Can't determine location, lock country for safety
+    return { isOutside: false, currentCountryCode: null, currentCountryName: null, method: 'failed' };
+  }
+
+  const isOutside = result.countryCode.toUpperCase() !== profileCountryCode.toUpperCase();
+  
+  return {
+    isOutside,
+    currentCountryCode: result.countryCode,
+    currentCountryName: result.countryName,
+    method: result.method
+  };
+}

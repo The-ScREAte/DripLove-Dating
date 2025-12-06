@@ -61,8 +61,10 @@ const LocationSection = ({
               country={editedProfile.country || ''}
               city={editedProfile.city || ''}
               zipCode={editedProfile.zip_code || ''}
+              countryCode={editedProfile.country_code || ''}
               onLocationChange={onLocationChange}
               required={false}
+              isProfileEdit={true}
             />
           ) : (
             // Display mode
