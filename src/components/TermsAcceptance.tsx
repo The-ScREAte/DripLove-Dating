@@ -171,7 +171,8 @@ const TermsAcceptance = ({ user, onAccept }: TermsAcceptanceProps) => {
 
       {/* Terms of Service Dialog */}
       <Dialog open={showTerms} onOpenChange={setShowTerms}>
-        <DialogContent className="max-w-4xl max-h-[90vh]">
+        <DialogContent className="max-w-4xl max-h-[90vh]" aria-describedby={undefined}>
+          <DialogTitle className="absolute w-px h-px p-0 -m-px overflow-hidden whitespace-nowrap border-0">Terms of Service</DialogTitle>
           <ScrollArea className="h-[80vh] pr-4">
             <div className="pb-6">
               <TermsOfService onBack={() => setShowTerms(false)} />
@@ -182,7 +183,8 @@ const TermsAcceptance = ({ user, onAccept }: TermsAcceptanceProps) => {
 
       {/* Privacy Policy Dialog */}
       <Dialog open={showPrivacy} onOpenChange={setShowPrivacy}>
-        <DialogContent className="max-w-4xl max-h-[90vh]">
+        <DialogContent className="max-w-4xl max-h-[90vh]" aria-describedby={undefined}>
+          <DialogTitle className="absolute w-px h-px p-0 -m-px overflow-hidden whitespace-nowrap border-0">Privacy Policy</DialogTitle>
           <ScrollArea className="h-[80vh] pr-4">
             <div className="pb-6">
               <PrivacyPolicy onBack={() => setShowPrivacy(false)} />
