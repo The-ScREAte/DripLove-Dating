@@ -20,6 +20,7 @@ const AuthDialog: React.FC<AuthDialogProps> = ({
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-[500px] max-h-[90vh] overflow-y-auto p-0 bg-transparent border-none">
+        <DialogTitle className="sr-only">{isLogin ? 'Sign In' : 'Sign Up'}</DialogTitle>
         <div className="bg-white/30 backdrop-blur-xl rounded-2xl">
           <AuthForm
             isLogin={isLogin}

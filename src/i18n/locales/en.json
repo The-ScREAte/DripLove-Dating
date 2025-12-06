@@ -123,10 +123,9 @@
       "other": "Other",
       "both": "Both"
     },
-    "ageRangeForMatches": "Age Range for Matches",
+    "ageRangeForMatches": "What age range are you looking for?",
     "ageYears": "{{age}} years",
     "ageRange": "{{min}} - {{max}} years",
-    "ageRangeDescription": "Set the age range for potential matches. You'll only see profiles within this age range.",
     "relationshipIntent": "Relationship Intent",
     "serious": "Serious",
     "casual": "Casual",
@@ -204,7 +203,9 @@
     "deletePhoto": "Delete Photo",
     "mainPhoto": "Main Photo",
     "yourPhotos": "Your Photos",
-    "locationAndPreferences": "Location and Matching Preferences",
+    "matchingPreferences": "Matching Preferences",
+    "locationPreferences": "Location",
+    "locationAndPreferences": "Preferences",
     "workAndEducation": "Work and Education",
     "myAdinkra": "My Cultural Signs",
     "accountActions": "Account Actions",
@@ -263,7 +264,6 @@
     "countriesUnlocked": "Countries Unlocked!",
     "countriesUnlockedDescription": "Your discover feed will now include people from the selected countries.",
     "errorSavingCountries": "Failed to save country preferences. Please try again.",
-    "maxDistanceDescription": "Set how far you're willing to match with other users. Smaller distances mean more local matches.",
     "approximateLocation": "Approximate Location",
     "approximateLocationDescription": "Your city isn't in our database. You'll still get matches based on country/region.",
     "locationRequired": "Location Required",
@@ -300,8 +300,8 @@
     "nopeOverlay": "NOPE",
     "outOfSwipes": {
       "title": "You're out of swipes for today!",
-      "freeUserMessage": "Free users get 20 swipes per day. Come back tomorrow or upgrade to Premium for unlimited swipes!",
-      "premiumUserMessage": "Refreshing your matches...",
+      "freeUserMessage": "Free users get 16 swipes per day. Come back tomorrow or upgrade to Premium for more swipes!",
+      "premiumUserMessage": "You've reached your max swipes for today! Check back later as DripLove puts together a new set of people based on your past swipes.",
       "upgradeButton": "Upgrade to Premium",
       "okButton": "OK"
     },
@@ -316,7 +316,8 @@
       "profileCompletionRequired": "Complete Your Profile",
       "profileCompletionMessage": "You need {{percentage}}% more to continue swiping. Complete your profile to unlock more swipes!",
       "dailyLimitReached": "Daily Limit Reached",
-      "dailyLimitMessage": "You have reached your swipe limit."
+      "dailyLimitMessage": "You have reached your swipe limit.",
+      "premiumDailyLimitMessage": "You've reached your max swipes for today! Check back later as DripLove puts together a new set of people based on your past swipes."
     },
     "actions": {
       "pass": "Pass",
@@ -475,18 +476,23 @@
     "basicFeaturesOnly": "Basic features only",
     "features": {
       "unlimitedSwipes": {
-        "name": "Unlimited Daily Swipes",
-        "free": "12 per day",
-        "premium": "Unlimited"
+        "name": "Daily Swipes",
+        "free": "16 per day",
+        "premium": "55 per day"
       },
       "reverseDislikes": {
         "name": "Reverse Dislikes",
         "free": "2 per day",
         "premium": "Unlimited"
       },
+      "adFrequency": {
+        "name": "Ad Frequency",
+        "free": "Every 5 swipes",
+        "premium": "Every 10 swipes"
+      },
       "seeWhoLiked": {
         "name": "See All Who Liked You",
-        "free": "1 visible",
+        "free": "0 visible",
         "premium": "All visible"
       },
       "prioritySupport": {

@@ -211,13 +211,14 @@ export const checkSwipeRestrictions = async (
       };
     }
 
-    // Daily limit check (only for free users)
-    if (!isPremium && swipesUsedToday >= 20) {
+    // Daily limit check (free users: 16, premium users: 55)
+    const swipeLimit = isPremium ? 55 : 16;
+    if (swipesUsedToday >= swipeLimit) {
       return {
         canSwipe: false,
         reason: 'Daily limit reached',
         swipesUsedToday,
-        swipeLimit: 20,
+        swipeLimit,
         requiresProfileCompletion: false
       };
     }
@@ -225,7 +226,7 @@ export const checkSwipeRestrictions = async (
     return {
       canSwipe: true,
       swipesUsedToday,
-      swipeLimit: isPremium ? 'unlimited' : 20,
+      swipeLimit,
       requiresProfileCompletion: false
     };
   } catch (error) {

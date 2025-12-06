@@ -45,17 +45,25 @@ const ProfilePage = ({ currentUser, profile, onProfileUpdate, onLogout, onShowTe
   const [showPremiumUpgrade, setShowPremiumUpgrade] = useState(false);
   const [hideProfileCompletion, setHideProfileCompletion] = useState(false);
   
-  // State for collapsible sections
-  const [showLocationSection, setShowLocationSection] = useState(false);
+  // State for collapsible sections - accordion style (only one open at a time)
+  const [openSection, setOpenSection] = useState<string | null>(null);
   
-  const [showLifestyleSection, setShowLifestyleSection] = useState(false);
-  const [showWorkEducationSection, setShowWorkEducationSection] = useState(false);
-  const [showPersonalitySection, setShowPersonalitySection] = useState(false);
-  const [showFunQuestionsSection, setShowFunQuestionsSection] = useState(false);
-  const [showInterestsSection, setShowInterestsSection] = useState(false);
-  const [showAdinkraSection, setShowAdinkraSection] = useState(false);
-  const [showAccountActionsSection, setShowAccountActionsSection] = useState(false);
-  const [showPhotoSection, setShowPhotoSection] = useState(false);
+  // Helper function to toggle sections (accordion behavior)
+  const toggleSection = (sectionName: string) => {
+    setOpenSection(prevSection => prevSection === sectionName ? null : sectionName);
+  };
+  
+  // Computed section states
+  const showBasicInfoSection = openSection === 'basicInfo';
+  const showPhotoSection = openSection === 'photos';
+  const showLocationSection = openSection === 'location';
+  const showLifestyleSection = openSection === 'lifestyle';
+  const showWorkEducationSection = openSection === 'workEducation';
+  const showPersonalitySection = openSection === 'personality';
+  const showFunQuestionsSection = openSection === 'funQuestions';
+  const showInterestsSection = openSection === 'interests';
+  const showAdinkraSection = openSection === 'adinkra';
+  const showAccountActionsSection = openSection === 'accountActions';
   
   const { toast } = useToast();
   const { subscription, loading: subscriptionLoading } = useSubscription(currentUser?.id);
@@ -637,23 +645,30 @@ const ProfilePage = ({ currentUser, profile, onProfileUpdate, onLogout, onShowTe
               />
             )}
           </div>
-          <BasicInfoSection 
-            editedProfile={editedProfile} 
-            isEditing={isEditing} 
-            onInputChange={handleInputChange} 
-          />
+          <CollapsibleSection
+            title={t('profile.basicInfo')}
+            isOpen={showBasicInfoSection}
+            onToggle={() => toggleSection('basicInfo')}
+            className="mt-3"
+          >
+            <BasicInfoSection 
+              editedProfile={editedProfile} 
+              isEditing={isEditing} 
+              onInputChange={handleInputChange} 
+            />
+          </CollapsibleSection>
           <CollapsibleSection
             title={t('profile.photos')}
             isOpen={showPhotoSection}
-            onToggle={() => setShowPhotoSection(!showPhotoSection)}
+            onToggle={() => toggleSection('photos')}
             className="mt-3"
           >
             <ImageManagement currentUser={currentUser} />
           </CollapsibleSection>
           <CollapsibleSection
-            title={t('profile.location')}
+            title={t('profile.preferences')}
             isOpen={showLocationSection}
-            onToggle={() => setShowLocationSection(!showLocationSection)}
+            onToggle={() => toggleSection('location')}
             className="mt-3"
           >
             <LocationSection 
@@ -675,7 +690,7 @@ const ProfilePage = ({ currentUser, profile, onProfileUpdate, onLogout, onShowTe
           <CollapsibleSection
             title={t('profile.lifestyle')}
             isOpen={showLifestyleSection}
-            onToggle={() => setShowLifestyleSection(!showLifestyleSection)}
+            onToggle={() => toggleSection('lifestyle')}
             className="mt-3"
           >
             <LifestyleSection 
@@ -687,7 +702,7 @@ const ProfilePage = ({ currentUser, profile, onProfileUpdate, onLogout, onShowTe
           <CollapsibleSection
             title={t('profile.workEducation')}
             isOpen={showWorkEducationSection}
-            onToggle={() => setShowWorkEducationSection(!showWorkEducationSection)}
+            onToggle={() => toggleSection('workEducation')}
             className="mt-3"
           >
             <WorkEducationSection 
@@ -699,7 +714,7 @@ const ProfilePage = ({ currentUser, profile, onProfileUpdate, onLogout, onShowTe
           <CollapsibleSection
             title={t('profile.personality')}
             isOpen={showPersonalitySection}
-            onToggle={() => setShowPersonalitySection(!showPersonalitySection)}
+            onToggle={() => toggleSection('personality')}
             className="mt-3"
           >
             <PersonalitySection 
@@ -711,7 +726,7 @@ const ProfilePage = ({ currentUser, profile, onProfileUpdate, onLogout, onShowTe
           <CollapsibleSection
             title={t('profile.funQuestions')}
             isOpen={showFunQuestionsSection}
-            onToggle={() => setShowFunQuestionsSection(!showFunQuestionsSection)}
+            onToggle={() => toggleSection('funQuestions')}
             className="mt-3"
           >
             <FunQuestionsSection 
@@ -723,7 +738,7 @@ const ProfilePage = ({ currentUser, profile, onProfileUpdate, onLogout, onShowTe
           <CollapsibleSection
             title={t('profile.interests')}
             isOpen={showInterestsSection}
-            onToggle={() => setShowInterestsSection(!showInterestsSection)}
+            onToggle={() => toggleSection('interests')}
             className="mt-3"
           >
             <InterestsSection 
@@ -736,7 +751,7 @@ const ProfilePage = ({ currentUser, profile, onProfileUpdate, onLogout, onShowTe
           <CollapsibleSection
             title={t('profile.adinkra')}
             isOpen={showAdinkraSection}
-            onToggle={() => setShowAdinkraSection(!showAdinkraSection)}
+            onToggle={() => toggleSection('adinkra')}
             className="mt-3"
           >
             <AdinkraSection 
@@ -749,7 +764,7 @@ const ProfilePage = ({ currentUser, profile, onProfileUpdate, onLogout, onShowTe
           <CollapsibleSection
             title={t('profile.accountActions')}
             isOpen={showAccountActionsSection}
-            onToggle={() => setShowAccountActionsSection(!showAccountActionsSection)}
+            onToggle={() => toggleSection('accountActions')}
             className="mt-3"
           >
             {/* Only show the rest of the account actions here, not logout/terms/privacy */}

@@ -154,10 +154,10 @@ const AccountActions = ({ currentUser, onLogout, onShowTerms, onShowPrivacy, hid
             {t('settings.contactSupport')}
           </p>
           <a 
-            href="mailto:support@driplove.com" 
+            href="mailto:info@screate.org" 
             className="text-blue-600 hover:text-blue-800 underline"
           >
-            support@driplove.com
+            info@screate.org
           </a>
         </div>
 

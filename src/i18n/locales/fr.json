@@ -461,7 +461,7 @@
       },
       "seeWhoLiked": {
         "name": "Voir tous ceux qui vous ont aimé",
-        "free": "1 visible",
+        "free": "0 visible",
         "premium": "Tous visibles"
       },
       "prioritySupport": {

@@ -198,9 +198,14 @@ const LocationInput = ({
       const result = await autoDetectCountry();
       
       if (result.method === 'failed') {
-        // Detection failed - allow manual selection
+        // Detection failed - allow manual selection as fallback, but once selected it will be locked
         setIsCountryLocked(false);
         setIsDetecting(false);
+        toast({
+          title: "Auto-detection unavailable",
+          description: "Please select your country manually. Once selected, it cannot be changed to prevent fake locations.",
+          variant: "default"
+        });
         return;
       }
 
@@ -208,13 +213,18 @@ const LocationInput = ({
       const detectedCountry = countries.find(c => c.code === result.countryCode);
       
       if (!detectedCountry) {
-        // Country not in enabled list - allow manual selection
+        // Country not in enabled list - allow manual selection from available countries
         setIsCountryLocked(false);
         setIsDetecting(false);
+        toast({
+          title: "Country not available",
+          description: `${result.countryName} is not currently available. Please select an available country manually.`,
+          variant: "default"
+        });
         return;
       }
 
-      // Set detected country and lock it (no manual selection allowed)
+      // Set detected country and lock it permanently (no manual selection allowed)
       setSelectedCountryCode(result.countryCode);
       setIsCountryLocked(true);
       setDetectionMethod(result.method);
@@ -231,32 +241,15 @@ const LocationInput = ({
       });
     } catch (error) {
       console.error('Auto-detection error:', error);
-      // Detection failed - allow manual selection
+      // Detection failed - allow manual selection as fallback
       setIsCountryLocked(false);
+      toast({
+        title: "Location detection failed",
+        description: "Please select your country manually. Once selected, it cannot be changed.",
+        variant: "default"
+      });
     } finally {
       setIsDetecting(false);
-    }
-  };
-
-  // Unlock country for manual selection - only available when detection failed
-  const handleUnlockCountry = () => {
-    // Only allow unlock if detection failed initially (not after successful detection)
-    if (!isProfileEdit && detectionMethod === null) {
-      setIsCountryLocked(false);
-      setSelectedCountryCode('');
-      setCityInput('');
-      setIsCustomCity(false);
-      setCoordinates({});
-      
-      onLocationChange({
-        country: '',
-        countryCode: '',
-        city: '',
-        zipCode,
-        latitude: undefined,
-        longitude: undefined,
-        isCustomCity: false
-      });
     }
   };
 
@@ -321,6 +314,15 @@ const LocationInput = ({
       setIsCustomCity(false);
       setCoordinates({});
       setShowCitySuggestions(true); // Show suggestions immediately when country is selected
+      
+      // Lock country immediately after manual selection (can't be changed)
+      if (!isProfileEdit) {
+        setIsCountryLocked(true);
+        toast({
+          title: "Country set",
+          description: `Your country has been set to ${selectedCountry.name}. This cannot be changed to prevent fake locations.`,
+        });
+      }
       
       onLocationChange({
         country: selectedCountry.name,
@@ -409,82 +411,43 @@ const LocationInput = ({
 
   const selectedCountryData = getCountryByCode(selectedCountryCode);
 
-  // Determine if country should be locked based on profile edit mode
-  const shouldLockCountry = isProfileEdit && isCountryLocked && !outsideCountryStatus.isOutside;
-
   return (
     <div className="space-y-4">
       {/* Upgrade note for free users */}
-      {isProfileEdit && !isPremium && (
-        <div className="p-3 bg-gradient-to-r from-primary/10 to-purple-500/10 rounded-lg border border-primary/20">
-          <div className="flex items-center gap-2 text-sm text-primary font-medium">
-            <Globe className="w-4 h-4" />
-            Want to match with people in other countries?
-          </div>
-          <p className="text-xs text-muted-foreground mt-1">
-            Upgrade to Premium to unlock up to 3 additional countries and expand your dating pool globally.
-          </p>
-        </div>
-      )}
-
       {/* Checking location indicator for profile edit */}
-      {isProfileEdit && isCheckingOutsideCountry && (
-        <div className="flex items-center gap-2 p-3 bg-blue-50 dark:bg-blue-950/30 rounded-lg text-sm text-blue-700 dark:text-blue-300">
-          <Loader2 className="w-4 h-4 animate-spin" />
-          Verifying your current location...
-        </div>
-      )}
-
-      {/* Message when country is locked (user is in their profile country) */}
-      {isProfileEdit && shouldLockCountry && outsideCountryStatus.checked && !isCheckingOutsideCountry && (
-        <div className="p-3 bg-amber-50 dark:bg-amber-950/30 rounded-lg border border-amber-200 dark:border-amber-800">
-          <div className="flex items-center gap-2 text-sm text-amber-800 dark:text-amber-200 font-medium">
-            <Lock className="w-4 h-4" />
-            Country is locked
-          </div>
-          <p className="text-xs text-amber-600 dark:text-amber-300 mt-1">
-            You can only change your country when you're physically outside of {country || 'your current country'}. 
-            Travel abroad and your country setting will unlock automatically.
-          </p>
-        </div>
-      )}
-
       {/* Message when country is unlocked (user is outside their profile country) - with Change button */}
       {isProfileEdit && outsideCountryStatus.isOutside && outsideCountryStatus.checked && !isCheckingOutsideCountry && (
-        <div className="p-3 bg-green-50 dark:bg-green-950/30 rounded-lg border border-green-200 dark:border-green-800">
-          <div className="flex items-center justify-between">
-            <div>
-              <div className="flex items-center gap-2 text-sm text-green-800 dark:text-green-200 font-medium">
-                <CheckCircle2 className="w-4 h-4" />
-                Country change available
-              </div>
-              <p className="text-xs text-green-600 dark:text-green-300 mt-1">
-                You appear to be in {outsideCountryStatus.currentLocation || 'a different country'}. 
-                Click the button to update your location.
-              </p>
-            </div>
-            <Button
-              type="button"
-              size="sm"
-              onClick={handleAutoChangeCountry}
-              disabled={isChangingCountry}
-              className="ml-3 bg-green-600 hover:bg-green-700 text-white shrink-0"
-            >
-              {isChangingCountry ? (
-                <Loader2 className="w-4 h-4 animate-spin" />
-              ) : (
-                <>Change to {outsideCountryStatus.currentLocation}</>
-              )}
-            </Button>
+        <div className="flex items-center justify-between gap-3 p-2 bg-green-50 dark:bg-green-950/30 rounded-lg border border-green-200 dark:border-green-800 text-xs">
+          <div className="flex flex-col gap-0.5">
+            <span className="flex items-center gap-1 text-sm font-medium text-green-800 dark:text-green-200">
+              <CheckCircle2 className="w-4 h-4" />
+              Country change available
+            </span>
+            <span className="text-green-600 dark:text-green-300 text-[11px]">
+              You appear to be in {outsideCountryStatus.currentLocation || 'a different country'}.
+            </span>
           </div>
+          <Button
+            type="button"
+            size="sm"
+            onClick={handleAutoChangeCountry}
+            disabled={isChangingCountry}
+            className="text-xs px-3 py-1 bg-green-600 hover:bg-green-700 text-white"
+          >
+            {isChangingCountry ? (
+              <Loader2 className="w-4 h-4 animate-spin" />
+            ) : (
+              <>Change to {outsideCountryStatus.currentLocation}</>
+            )}
+          </Button>
         </div>
       )}
 
       {/* Detecting location indicator for new users */}
-      {autoDetect && !isProfileEdit && isDetecting && (
-        <div className="flex items-center gap-2 p-3 bg-blue-50 dark:bg-blue-950/30 rounded-lg text-sm text-blue-700 dark:text-blue-300">
-          <Loader2 className="w-4 h-4 animate-spin" />
-          Detecting your location...
+      {!isProfileEdit && isDetecting && (
+        <div className="flex items-center gap-2 p-2 bg-blue-50 dark:bg-blue-950/30 rounded-lg border border-blue-200 dark:border-blue-800 text-xs">
+          <Loader2 className="w-4 h-4 animate-spin text-blue-600" />
+          <span className="text-blue-800 dark:text-blue-200">Detecting your location...</span>
         </div>
       )}
 
@@ -499,42 +462,42 @@ const LocationInput = ({
               Auto-detected {detectionMethod === 'gps' ? '(GPS)' : '(IP)'}
             </span>
           )}
-          {!isProfileEdit && !isCountryLocked && !isDetecting && !selectedCountryCode && (
+          {!isProfileEdit && isCountryLocked && !detectionMethod && selectedCountryCode && (
             <span className="flex items-center gap-1 text-xs text-amber-600 font-medium">
-              Detection unavailable - select manually
+              <Lock className="w-3 h-3" />
+              Manually set (locked)
             </span>
           )}
           {isProfileEdit && (
-            <span className="flex items-center gap-1 text-xs text-muted-foreground font-medium">
+            <span className="text-muted-foreground" aria-label="Location locked">
               <Lock className="w-3 h-3" />
-              {outsideCountryStatus.isOutside ? 'Use button above to change' : 'Location locked'}
             </span>
           )}
         </Label>
         
-        {/* Profile Edit Mode OR New User with locked country - Show read-only display */}
-        {isProfileEdit || (isCountryLocked && selectedCountryCode) ? (
+        {/* Show read-only display when country is locked */}
+        {isCountryLocked && selectedCountryCode ? (
           <div className="flex items-center justify-between p-3 bg-muted rounded-lg border border-border">
             <div className="flex items-center gap-2">
-              <span className="font-medium">{country || 'No country set'}</span>
+              <span className="font-medium">{country || 'Detecting...'}</span>
               {selectedCountryData?.continent === 'Africa' && (
                 <span className="text-xs text-green-600">🌍 Africa</span>
               )}
             </div>
             <Lock className="w-4 h-4 text-muted-foreground" />
           </div>
-        ) : (
-          /* New User Mode with detection failed - Show Select dropdown for manual selection */
+        ) : !isCountryLocked && !isDetecting ? (
+          /* Show manual selection dropdown when detection failed or not locked yet */
           <div className="relative">
             <Select 
               value={selectedCountryCode} 
               onValueChange={handleCountryChange} 
-              disabled={loadingCountries || isDetecting}
+              disabled={loadingCountries}
             >
               <SelectTrigger 
                 className={errors.country ? 'border-red-500' : ''}
               >
-                <SelectValue placeholder={loadingCountries ? "Loading countries..." : isDetecting ? "Detecting location..." : "Select your country"} />
+                <SelectValue placeholder={loadingCountries ? "Loading countries..." : "Select your country (cannot be changed later)"} />
               </SelectTrigger>
               <SelectContent>
                 {countries.map((countryItem) => (
@@ -549,6 +512,21 @@ const LocationInput = ({
                 ))}
               </SelectContent>
             </Select>
+            {!selectedCountryCode && (
+              <p className="text-xs text-amber-600 mt-1">
+                ⚠️ Once selected, your country cannot be changed to prevent fake locations
+              </p>
+            )}
+          </div>
+        ) : (
+          /* Show loading state when detecting */
+          <div className="flex items-center justify-between p-3 bg-muted rounded-lg border border-border">
+            <div className="flex items-center gap-2">
+              <span className="font-medium text-muted-foreground">
+                Detecting your location...
+              </span>
+            </div>
+            <Loader2 className="w-4 h-4 animate-spin text-muted-foreground" />
           </div>
         )}
         

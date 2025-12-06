@@ -180,7 +180,7 @@ const PrivacyPolicy = ({ onBack }: PrivacyPolicyProps) => {
             </p>
             <div className="bg-pink-50 border border-pink-200 rounded-lg p-4 space-y-2">
               <p className="text-pink-800 font-semibold">
-                📧 <a href="mailto:support@driplove.com" className="hover:underline">support@driplove.com</a>
+                📧 <a href="mailto:info@screate.org" className="hover:underline">info@screate.org</a>
               </p>
               <p className="text-pink-700">
                 📍 The ScREAte Ltd – Privacy Team

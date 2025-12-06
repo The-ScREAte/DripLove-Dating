@@ -477,11 +477,14 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, isPremium }: DiscoverPage
     const result: (PotentialMatch | AdData)[] = [];
     let adIndex = 0;
     
+    // Premium users see ads every 10 swipes, free users every 5 swipes
+    const adFrequency = isPremium ? 10 : 5;
+    
     for (let i = 0; i < matches.length; i++) {
       result.push(matches[i]);
       
-      // Insert ad every 10 profiles, ensuring we cycle through ALL ads
-      if ((i + 1) % 10 === 0) {
+      // Insert ad at the specified frequency, ensuring we cycle through ALL ads
+      if ((i + 1) % adFrequency === 0) {
         const selectedAd = stableShuffledAds[adIndex % stableShuffledAds.length];
         result.push(selectedAd);
         adIndex++;
@@ -489,7 +492,7 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, isPremium }: DiscoverPage
     }
     
     return result;
-  }, [stableShuffledAds]);
+  }, [stableShuffledAds, isPremium]);
 
   // --- BEGIN: Swipe Guide Popup State ---
   const [showSwipeGuide, setShowSwipeGuide] = useState(false);
@@ -864,7 +867,7 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, isPremium }: DiscoverPage
       filteredProfiles = profiles || [];
     }
 
-    // ⭐ PREMIUM FEATURE: Fetch profiles from unlocked countries
+    // ⭐ PREMIUM FEATURE: Fetch profiles from unlocked countries and mix with local profiles
     if (unlockedCountries.length > 0 && isPremium) {
       const existingIds = new Set(filteredProfiles.map(p => p.id));
       const allExcludedIds = [...excludedIds, ...Array.from(existingIds)];
@@ -882,13 +885,14 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, isPremium }: DiscoverPage
         .in('gender', allowedGenders)
         .eq('account_status', 'active')
         .eq('is_admin', false)
-        .limit(20);
+        .limit(100); // Increased limit to get more profiles from unlocked countries
 
-      if (!unlockedError && unlockedProfiles) {
+      if (!unlockedError && unlockedProfiles && unlockedProfiles.length > 0) {
         // Add distance info for unlocked country profiles (mark as far away)
         unlockedProfiles.forEach(profile => {
           distanceMap[profile.id] = 999; // Mark as from unlocked country
         });
+        // Mix unlocked country profiles with local profiles instead of appending
         filteredProfiles = [...filteredProfiles, ...unlockedProfiles];
       }
     }
@@ -1654,6 +1658,36 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, isPremium }: DiscoverPage
         });
       }
 
+      // ⭐ PREMIUM FEATURE: Also fetch profiles from unlocked countries for premium users
+      if (isPremium && currentUser.unlocked_countries && Array.isArray(currentUser.unlocked_countries) && currentUser.unlocked_countries.length > 0) {
+        const existingIds = new Set(filteredProfiles.map(p => p.id));
+        const allExcludedIds = [...excludedIds, ...Array.from(existingIds)];
+        
+        let unlockedQuery = supabase
+          .from('profiles')
+          .select('id, first_name, last_name, bio, city, country, country_code, occupation, education_level, date_of_birth, interests, gender, latitude, longitude, fun_fact, perfect_first_date, last_googled, relationship_intent, smoking, drinking, exercise_level, sleeping_schedule, introvert_extrovert, spontaneous_planner, messy_organized, adinkra_symbols')
+          .in('country_code', currentUser.unlocked_countries);
+        
+        if (allExcludedIds.length > 0) {
+          unlockedQuery = unlockedQuery.not('id', 'in', `(${allExcludedIds.join(',')})`);
+        }
+        
+        const { data: unlockedProfiles, error: unlockedError } = await unlockedQuery
+          .in('gender', allowedGenders)
+          .eq('account_status', 'active')
+          .eq('is_admin', false)
+          .limit(30); // Fetch additional profiles from unlocked countries
+
+        if (!unlockedError && unlockedProfiles && unlockedProfiles.length > 0) {
+          // Add distance info for unlocked country profiles
+          unlockedProfiles.forEach(profile => {
+            distanceMap[profile.id] = 999; // Mark as from unlocked country
+          });
+          // Mix unlocked country profiles with local profiles
+          filteredProfiles = [...filteredProfiles, ...unlockedProfiles];
+        }
+      }
+
       // Apply age filtering
       const userMinAge = currentUser.min_age || 18;
       const userMaxAge = currentUser.max_age || 99;
@@ -1744,12 +1778,16 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, isPremium }: DiscoverPage
       return;
     }
 
-    // Check daily limit for free users (20 swipes) - MUST be checked BEFORE swipe
-    if (!isPremium && todaySwipeCount >= 20) {
+    // Check daily limit - MUST be checked BEFORE swipe
+    // Free users: 16 swipes, Premium users: 55 swipes
+    const swipeLimit = isPremium ? 55 : 16;
+    if (todaySwipeCount >= swipeLimit) {
       setIsOutOfSwipes(true);
       toast({
         title: t('discover.errors.dailyLimitReached'),
-        description: t('discover.errors.dailyLimitMessage'),
+        description: isPremium 
+          ? t('discover.errors.premiumDailyLimitMessage')
+          : t('discover.errors.dailyLimitMessage'),
         variant: 'destructive'
       });
       return;
@@ -1975,12 +2013,16 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, isPremium }: DiscoverPage
       return;
     }
 
-    // Check daily limit for free users (20 swipes) - MUST be checked BEFORE swipe
-    if (!isPremium && todaySwipeCount >= 20) {
+    // Check daily limit - MUST be checked BEFORE swipe
+    // Free users: 16 swipes, Premium users: 55 swipes
+    const swipeLimit = isPremium ? 55 : 16;
+    if (todaySwipeCount >= swipeLimit) {
       setIsOutOfSwipes(true);
       toast({
         title: t('discover.errors.dailyLimitReached'),
-        description: t('discover.errors.dailyLimitMessage'),
+        description: isPremium 
+          ? t('discover.errors.premiumDailyLimitMessage')
+          : t('discover.errors.dailyLimitMessage'),
         variant: 'destructive'
       });
       return;
