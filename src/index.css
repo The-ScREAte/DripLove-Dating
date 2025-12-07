@@ -393,9 +393,12 @@ body.keyboard-open .chat-messages-container {
     -webkit-overflow-scrolling: touch;
   }
 
-  /* ✅ Ensure touch targets are appropriate size on mobile */
-  button, 
-  [role="button"],
+  /* ✅ Ensure touch targets are appropriate size on mobile - only for standalone buttons, not small UI buttons */
+  button:not([class*="h-"]):not([class*="py-"]):not([class*="px-"]), 
+  [role="button"]:not([class*="h-"]):not([class*="py-"]):not([class*="px-"]) {
+    min-height: 44px;
+  }
+  
   input,
   select,
   textarea {
