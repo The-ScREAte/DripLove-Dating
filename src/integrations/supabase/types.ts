@@ -551,6 +551,7 @@ export type Database = {
           perfect_first_date: string | null
           preference: string
           preferred_language: string | null
+          promo_code_used: string | null
           relationship_intent: string | null
           sleeping_schedule: string | null
           smoking: string | null
@@ -599,6 +600,7 @@ export type Database = {
           perfect_first_date?: string | null
           preference: string
           preferred_language?: string | null
+          promo_code_used?: string | null
           relationship_intent?: string | null
           sleeping_schedule?: string | null
           smoking?: string | null
@@ -647,6 +649,7 @@ export type Database = {
           perfect_first_date?: string | null
           preference?: string
           preferred_language?: string | null
+          promo_code_used?: string | null
           relationship_intent?: string | null
           sleeping_schedule?: string | null
           smoking?: string | null
@@ -656,6 +659,36 @@ export type Database = {
           unlocked_countries?: string[] | null
           updated_at?: string | null
           zip_code?: string | null
+        }
+        Relationships: []
+      }
+      promo_codes: {
+        Row: {
+          code: string
+          created_at: string
+          id: string
+          is_active: boolean
+          owner_name: string
+          percentage_cut: number
+          updated_at: string
+        }
+        Insert: {
+          code: string
+          created_at?: string
+          id?: string
+          is_active?: boolean
+          owner_name: string
+          percentage_cut?: number
+          updated_at?: string
+        }
+        Update: {
+          code?: string
+          created_at?: string
+          id?: string
+          is_active?: boolean
+          owner_name?: string
+          percentage_cut?: number
+          updated_at?: string
         }
         Relationships: []
       }
