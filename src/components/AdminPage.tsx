@@ -1661,26 +1661,25 @@ const AdminPageComponent = ({ currentUser, onLogout }: AdminPageProps) => {
                       <Users className="w-4 h-4" />
                       User Management ({filteredUsers.length})
                     </CardTitle>
-                    {(searchTerm || statusFilter !== 'all' || genderFilter !== 'all' || interestedInFilter !== 'all' || countryFilter !== 'all' || relationshipIntentFilter !== 'all' || premiumFilter !== 'all' || activityFilter !== 'all' || imagesFilter !== 'all') && (
-                      <Button 
-                        variant="ghost" 
-                        size="sm" 
-                        className="text-xs h-6 px-2"
-                        onClick={() => {
-                          setSearchTerm('');
-                          setStatusFilter('all');
-                          setGenderFilter('all');
-                          setInterestedInFilter('all');
-                          setCountryFilter('all');
-                          setRelationshipIntentFilter('all');
-                          setPremiumFilter('all');
-                          setActivityFilter('all');
-                          setImagesFilter('all');
-                        }}
-                      >
-                        Clear Filters
-                      </Button>
-                    )}
+                    <Button 
+                      variant="outline" 
+                      size="sm" 
+                      className="text-xs h-7 px-3"
+                      disabled={!searchTerm && statusFilter === 'all' && genderFilter === 'all' && interestedInFilter === 'all' && countryFilter === 'all' && relationshipIntentFilter === 'all' && premiumFilter === 'all' && activityFilter === 'all' && imagesFilter === 'all'}
+                      onClick={() => {
+                        setSearchTerm('');
+                        setStatusFilter('all');
+                        setGenderFilter('all');
+                        setInterestedInFilter('all');
+                        setCountryFilter('all');
+                        setRelationshipIntentFilter('all');
+                        setPremiumFilter('all');
+                        setActivityFilter('all');
+                        setImagesFilter('all');
+                      }}
+                    >
+                      Clear Filters
+                    </Button>
                   </div>
                 </CardHeader>
                 <CardContent>
