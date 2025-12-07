@@ -46,5 +46,6 @@ export const initialFormData = {
   funFact: '',
   perfectFirstDate: '',
   lastGoogled: '',
-  adinkraSymbols: [] as string[]
+  adinkraSymbols: [] as string[],
+  promoCode: ''
 };
