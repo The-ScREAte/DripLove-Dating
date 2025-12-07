@@ -73,6 +73,7 @@ interface UserProfile {
   is_premium?: boolean;
   last_login_at?: string | null;
   login_count?: number | null;
+  image_count?: number;
 }
 
 interface PendingImage {
@@ -114,6 +115,7 @@ const AdminPageComponent = ({ currentUser, onLogout }: AdminPageProps) => {
   const [relationshipIntentFilter, setRelationshipIntentFilter] = useState('all');
   const [premiumFilter, setPremiumFilter] = useState('all');
   const [activityFilter, setActivityFilter] = useState('all');
+  const [imageCountFilter, setImageCountFilter] = useState('all');
   const [loading, setLoading] = useState(true);
   const [currentPage, setCurrentPage] = useState(1);
   const [matchUser1, setMatchUser1] = useState('');
@@ -925,6 +927,9 @@ const AdminPageComponent = ({ currentUser, onLogout }: AdminPageProps) => {
           user_subscriptions!left(
             status,
             expires_at
+          ),
+          user_images!left(
+            id
           )
         `)
         .eq('is_admin', false)
@@ -963,12 +968,16 @@ const AdminPageComponent = ({ currentUser, onLogout }: AdminPageProps) => {
             (sub.expires_at === null || new Date(sub.expires_at) > new Date())
           );
         
+        // Count images
+        const imageCount = Array.isArray((user as any).user_images) ? (user as any).user_images.length : 0;
+        
         return {
           ...user,
           age: calculateAge(user.date_of_birth),
           is_premium: hasPremium,
           last_login_at: (user as any).last_login_at,
-          login_count: (user as any).login_count
+          login_count: (user as any).login_count,
+          image_count: imageCount
         };
       }) || [];
 
@@ -1286,7 +1295,19 @@ const AdminPageComponent = ({ currentUser, onLogout }: AdminPageProps) => {
       }
     }
     
-    return matchesSearch && matchesStatus && matchesGender && matchesInterestedIn && matchesCountry && matchesRelationshipIntent && matchesPremium && matchesActivity;
+    // Image count filter logic
+    let matchesImageCount = true;
+    if (imageCountFilter !== 'all') {
+      const imageCount = user.image_count || 0;
+      const filterValue = parseInt(imageCountFilter, 10);
+      if (filterValue === 7) {
+        matchesImageCount = imageCount >= 7;
+      } else {
+        matchesImageCount = imageCount === filterValue;
+      }
+    }
+    
+    return matchesSearch && matchesStatus && matchesGender && matchesInterestedIn && matchesCountry && matchesRelationshipIntent && matchesPremium && matchesActivity && matchesImageCount;
   });
 
   // Pagination
@@ -1705,9 +1726,10 @@ const AdminPageComponent = ({ currentUser, onLogout }: AdminPageProps) => {
                         </SelectTrigger>
                         <SelectContent>
                           <SelectItem value="all" className="text-xs">All Intents</SelectItem>
-                          <SelectItem value="serious_relationship" className="text-xs">Serious Relationship</SelectItem>
-                          <SelectItem value="casual_dating" className="text-xs">Casual Dating</SelectItem>
-                          <SelectItem value="friendship" className="text-xs">Friendship</SelectItem>
+                          <SelectItem value="serious" className="text-xs">Serious</SelectItem>
+                          <SelectItem value="long-term" className="text-xs">Long-term</SelectItem>
+                          <SelectItem value="casual" className="text-xs">Casual</SelectItem>
+                          <SelectItem value="not-sure" className="text-xs">Not Sure</SelectItem>
                           <SelectItem value="open_to_anything" className="text-xs">Open to Anything</SelectItem>
                         </SelectContent>
                       </Select>
@@ -1727,7 +1749,7 @@ const AdminPageComponent = ({ currentUser, onLogout }: AdminPageProps) => {
                       </Select>
                     </div>
                     
-                    {/* Third Row: Activity Filter */}
+                    {/* Third Row: Activity & Images Filter */}
                     <div className="flex gap-2 flex-wrap">
                       <Select value={activityFilter} onValueChange={setActivityFilter}>
                         <SelectTrigger className="w-40 text-xs h-8">
@@ -1742,11 +1764,28 @@ const AdminPageComponent = ({ currentUser, onLogout }: AdminPageProps) => {
                           <SelectItem value="never_active" className="text-xs">Never Logged In</SelectItem>
                         </SelectContent>
                       </Select>
+                      
+                      <Select value={imageCountFilter} onValueChange={setImageCountFilter}>
+                        <SelectTrigger className="w-32 text-xs h-8">
+                          <SelectValue placeholder="Images" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="all" className="text-xs">All Images</SelectItem>
+                          <SelectItem value="0" className="text-xs">0 Images</SelectItem>
+                          <SelectItem value="1" className="text-xs">1 Image</SelectItem>
+                          <SelectItem value="2" className="text-xs">2 Images</SelectItem>
+                          <SelectItem value="3" className="text-xs">3 Images</SelectItem>
+                          <SelectItem value="4" className="text-xs">4 Images</SelectItem>
+                          <SelectItem value="5" className="text-xs">5 Images</SelectItem>
+                          <SelectItem value="6" className="text-xs">6 Images</SelectItem>
+                          <SelectItem value="7" className="text-xs">7+ Images</SelectItem>
+                        </SelectContent>
+                      </Select>
                     </div>
                     
                     {/* Clear Filters Button */}
                     {(statusFilter !== 'all' || genderFilter !== 'all' || interestedInFilter !== 'all' || 
-                      countryFilter !== 'all' || relationshipIntentFilter !== 'all' || premiumFilter !== 'all' || activityFilter !== 'all') && (
+                      countryFilter !== 'all' || relationshipIntentFilter !== 'all' || premiumFilter !== 'all' || activityFilter !== 'all' || imageCountFilter !== 'all') && (
                       <Button
                         variant="outline"
                         size="sm"
@@ -1758,6 +1797,7 @@ const AdminPageComponent = ({ currentUser, onLogout }: AdminPageProps) => {
                           setRelationshipIntentFilter('all');
                           setPremiumFilter('all');
                           setActivityFilter('all');
+                          setImageCountFilter('all');
                         }}
                         className="text-xs h-7"
                       >
@@ -1802,6 +1842,9 @@ const AdminPageComponent = ({ currentUser, onLogout }: AdminPageProps) => {
                                       Premium
                                     </Badge>
                                   )}
+                                  <Badge variant="outline" className="text-[10px] px-1.5 py-0 h-4">
+                                    📷 {user.image_count ?? 0}
+                                  </Badge>
                                 </div>
                                 <p className="text-[11px] text-gray-500 mt-0.5">
                                   Joined: {new Date(user.created_at).toLocaleDateString()}
