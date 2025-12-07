@@ -22,7 +22,6 @@ import ManualPremiumManager from './admin/ManualPremiumManager';
 import AdsManagement from './admin/AdsManagement';
 import RedirectLinkCreator from './admin/RedirectLinkCreator';
 import BroadcastNotifications from './admin/BroadcastNotifications';
-import PromotionsPanel from './admin/PromotionsPanel';
 import { debounce, userDataCache, createPagination } from '@/utils/performanceOptimizer';
 import { useSupabaseSubscription, useMemoryMonitor } from '@/hooks/usePerformance';
 import { CurrentUser, AdminStats } from '@/types';
@@ -47,8 +46,7 @@ import {
   BarChart3,
   Crown,
   Megaphone,
-  Link2,
-  Tag
+  Link2
 } from 'lucide-react';
 
 interface AdminPageProps {
@@ -1393,11 +1391,7 @@ const AdminPageComponent = ({ currentUser, onLogout }: AdminPageProps) => {
                 </TabsList>
 
                 {/* Second Row - Additional Tabs */}
-                <TabsList className="grid w-full grid-cols-5 h-auto">
-                  <TabsTrigger value="promotions" className="text-xs flex flex-col gap-1 py-2">
-                    <Tag className="w-4 h-4" />
-                    <span>Promos</span>
-                  </TabsTrigger>
+                <TabsList className="grid w-full grid-cols-4 h-auto">
                   <TabsTrigger value="ads" className="text-xs flex flex-col gap-1 py-2">
                     <Megaphone className="w-4 h-4" />
                     <span>Ads</span>
@@ -1988,11 +1982,6 @@ const AdminPageComponent = ({ currentUser, onLogout }: AdminPageProps) => {
             {/* Redirects Tab */}
             <TabsContent value="redirects" className="space-y-4">
               <RedirectLinkCreator />
-            </TabsContent>
-
-            {/* Promotions Tab */}
-            <TabsContent value="promotions" className="space-y-4">
-              <PromotionsPanel premiumPrice={parseFloat(premiumPriceOneTime) || 50} />
             </TabsContent>
 
             {/* Settings Tab */}

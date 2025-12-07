@@ -12,7 +12,6 @@ import { Heart, MapPin, Briefcase, GraduationCap, Upload, Shield, CheckCircle, A
 import BasicInfoSection from '@/components/forms/BasicInfoSection';
 import LocationInput from '@/components/forms/LocationInput';
 import AdinkraSymbolSelector from '@/components/forms/AdinkraSymbolSelector';
-import PromoCodeInput from '@/components/forms/PromoCodeInput';
 import { validateRegistrationForm, transformFormDataForSubmission } from '@/utils/formValidation';
 import { initialFormData } from '@/constants/formData';
 import { occupationOptions, industryOptions } from '@/constants/professionOptions';
@@ -549,8 +548,7 @@ const RegistrationForm = ({ onSubmit, onBackToLogin }: RegistrationFormProps) =>
         is_custom_city: formData.isCustomCity || false,
         max_distance: formData.maxDistance || 250,
         country_code: formData.countryCode || '',
-        adinkra_symbols: formData.adinkraSymbols || [],
-        promo_code_used: formData.promoCode || null
+        adinkra_symbols: formData.adinkraSymbols || []
       };
 
       if (existingProfile) {
@@ -807,14 +805,6 @@ const RegistrationForm = ({ onSubmit, onBackToLogin }: RegistrationFormProps) =>
               }}
               required={false}
               autoDetect={true}
-            />
-          </div>
-
-          {/* Promo Code Input */}
-          <div className="animate-scale-in">
-            <PromoCodeInput
-              value={formData.promoCode}
-              onChange={(value) => setFormData({ ...formData, promoCode: value })}
             />
           </div>
           </div>

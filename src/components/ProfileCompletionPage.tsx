@@ -13,7 +13,6 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { occupationOptions, industryOptions } from '@/constants/professionOptions';
 import LocationInput from '@/components/forms/LocationInput';
 import AdinkraSymbolSelector from '@/components/forms/AdinkraSymbolSelector';
-import PromoCodeInput from '@/components/forms/PromoCodeInput';
 import { moderateImage, ModerationResult } from '@/utils/photoModeration';
 import { compressImage } from '@/utils/imageCompression';
 import TermsAcceptance from './TermsAcceptance';
@@ -497,8 +496,7 @@ const ProfileCompletionPage = () => {
         max_distance: formData.maxDistance || 250,
         country_code: formData.countryCode || '',
         adinkra_symbols: formData.adinkraSymbols || [],
-        preferred_language: getLanguageForCountry(formData.country) || i18n.language || 'en',
-        promo_code_used: formData.promoCode || null
+        preferred_language: getLanguageForCountry(formData.country) || i18n.language || 'en'
       };
 
       const { error } = await supabase
@@ -854,14 +852,6 @@ const ProfileCompletionPage = () => {
                       userCountry={formData.country}
                     />
                     {errors.adinkraSymbols && <p className="text-sm text-red-500">{errors.adinkraSymbols}</p>}
-                  </div>
-
-                  {/* Promo Code Input */}
-                  <div className="mt-6">
-                    <PromoCodeInput
-                      value={formData.promoCode}
-                      onChange={(value) => setFormData({ ...formData, promoCode: value })}
-                    />
                   </div>
 
                   <div className="space-y-4">
