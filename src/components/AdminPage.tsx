@@ -73,7 +73,6 @@ interface UserProfile {
   is_premium?: boolean;
   last_login_at?: string | null;
   login_count?: number | null;
-  image_count?: number;
 }
 
 interface PendingImage {
@@ -115,7 +114,6 @@ const AdminPageComponent = ({ currentUser, onLogout }: AdminPageProps) => {
   const [relationshipIntentFilter, setRelationshipIntentFilter] = useState('all');
   const [premiumFilter, setPremiumFilter] = useState('all');
   const [activityFilter, setActivityFilter] = useState('all');
-  const [imageCountFilter, setImageCountFilter] = useState('all');
   const [loading, setLoading] = useState(true);
   const [currentPage, setCurrentPage] = useState(1);
   const [matchUser1, setMatchUser1] = useState('');
@@ -927,9 +925,6 @@ const AdminPageComponent = ({ currentUser, onLogout }: AdminPageProps) => {
           user_subscriptions!left(
             status,
             expires_at
-          ),
-          user_images!left(
-            id
           )
         `)
         .eq('is_admin', false)
@@ -968,16 +963,12 @@ const AdminPageComponent = ({ currentUser, onLogout }: AdminPageProps) => {
             (sub.expires_at === null || new Date(sub.expires_at) > new Date())
           );
         
-        // Count images
-        const imageCount = Array.isArray((user as any).user_images) ? (user as any).user_images.length : 0;
-        
         return {
           ...user,
           age: calculateAge(user.date_of_birth),
           is_premium: hasPremium,
           last_login_at: (user as any).last_login_at,
-          login_count: (user as any).login_count,
-          image_count: imageCount
+          login_count: (user as any).login_count
         };
       }) || [];
 
@@ -1295,19 +1286,7 @@ const AdminPageComponent = ({ currentUser, onLogout }: AdminPageProps) => {
       }
     }
     
-    // Image count filter logic
-    let matchesImageCount = true;
-    if (imageCountFilter !== 'all') {
-      const imageCount = user.image_count || 0;
-      const filterValue = parseInt(imageCountFilter, 10);
-      if (filterValue === 4) {
-        matchesImageCount = imageCount >= 4;
-      } else {
-        matchesImageCount = imageCount === filterValue;
-      }
-    }
-    
-    return matchesSearch && matchesStatus && matchesGender && matchesInterestedIn && matchesCountry && matchesRelationshipIntent && matchesPremium && matchesActivity && matchesImageCount;
+    return matchesSearch && matchesStatus && matchesGender && matchesInterestedIn && matchesCountry && matchesRelationshipIntent && matchesPremium && matchesActivity;
   });
 
   // Pagination
@@ -1387,7 +1366,7 @@ const AdminPageComponent = ({ currentUser, onLogout }: AdminPageProps) => {
         </div>
         
         {/* Scrollable Content */}
-        <div className="p-4 pb-64">
+        <div className="p-4 pb-20">
 
           {/* Tabbed Interface with Error Boundaries for 1000+ users */}
           <AdminErrorBoundary>
@@ -1658,7 +1637,7 @@ const AdminPageComponent = ({ currentUser, onLogout }: AdminPageProps) => {
                   {/* Search and Filter */}
                   <div className="space-y-2 mb-3">
                     {/* Search Bar */}
-                    <div className="relative">
+                    <div className="flex-1 relative">
                       <Search className="absolute left-2 top-2 h-3 w-3 text-gray-400" />
                       <Input
                         placeholder="Search by name, email, city, or country..."
@@ -1668,10 +1647,10 @@ const AdminPageComponent = ({ currentUser, onLogout }: AdminPageProps) => {
                       />
                     </div>
                     
-                    {/* Filters Grid */}
-                    <div className="grid grid-cols-3 gap-2">
+                    {/* First Row: Status, Gender, Premium */}
+                    <div className="flex gap-2 flex-wrap">
                       <Select value={statusFilter} onValueChange={setStatusFilter}>
-                        <SelectTrigger className="text-xs h-8">
+                        <SelectTrigger className="w-28 text-xs h-8">
                           <SelectValue placeholder="Status" />
                         </SelectTrigger>
                         <SelectContent>
@@ -1683,7 +1662,7 @@ const AdminPageComponent = ({ currentUser, onLogout }: AdminPageProps) => {
                       </Select>
                       
                       <Select value={genderFilter} onValueChange={setGenderFilter}>
-                        <SelectTrigger className="text-xs h-8">
+                        <SelectTrigger className="w-28 text-xs h-8">
                           <SelectValue placeholder="Gender" />
                         </SelectTrigger>
                         <SelectContent>
@@ -1695,44 +1674,46 @@ const AdminPageComponent = ({ currentUser, onLogout }: AdminPageProps) => {
                       </Select>
                       
                       <Select value={premiumFilter} onValueChange={setPremiumFilter}>
-                        <SelectTrigger className="text-xs h-8">
+                        <SelectTrigger className="w-28 text-xs h-8">
                           <SelectValue placeholder="Premium" />
                         </SelectTrigger>
                         <SelectContent>
-                          <SelectItem value="all" className="text-xs">All Plans</SelectItem>
+                          <SelectItem value="all" className="text-xs">All Users</SelectItem>
                           <SelectItem value="premium" className="text-xs">Premium</SelectItem>
                           <SelectItem value="free" className="text-xs">Free</SelectItem>
                         </SelectContent>
                       </Select>
-                      
+                    </div>
+                    
+                    {/* Second Row: Interested In, Relationship Intent, Country */}
+                    <div className="flex gap-2 flex-wrap">
                       <Select value={interestedInFilter} onValueChange={setInterestedInFilter}>
-                        <SelectTrigger className="text-xs h-8">
-                          <SelectValue placeholder="Preference" />
+                        <SelectTrigger className="w-32 text-xs h-8">
+                          <SelectValue placeholder="Interested In" />
                         </SelectTrigger>
                         <SelectContent>
-                          <SelectItem value="all" className="text-xs">All Prefs</SelectItem>
-                          <SelectItem value="male" className="text-xs">Into Male</SelectItem>
-                          <SelectItem value="female" className="text-xs">Into Female</SelectItem>
-                          <SelectItem value="both" className="text-xs">Into Both</SelectItem>
+                          <SelectItem value="all" className="text-xs">All Preferences</SelectItem>
+                          <SelectItem value="male" className="text-xs">Interested in Male</SelectItem>
+                          <SelectItem value="female" className="text-xs">Interested in Female</SelectItem>
+                          <SelectItem value="both" className="text-xs">Interested in Both</SelectItem>
                         </SelectContent>
                       </Select>
                       
                       <Select value={relationshipIntentFilter} onValueChange={setRelationshipIntentFilter}>
-                        <SelectTrigger className="text-xs h-8">
+                        <SelectTrigger className="w-36 text-xs h-8">
                           <SelectValue placeholder="Intent" />
                         </SelectTrigger>
                         <SelectContent>
                           <SelectItem value="all" className="text-xs">All Intents</SelectItem>
-                          <SelectItem value="serious" className="text-xs">Serious</SelectItem>
-                          <SelectItem value="long-term" className="text-xs">Long-term</SelectItem>
-                          <SelectItem value="casual" className="text-xs">Casual</SelectItem>
-                          <SelectItem value="not-sure" className="text-xs">Not Sure</SelectItem>
-                          <SelectItem value="open_to_anything" className="text-xs">Open</SelectItem>
+                          <SelectItem value="serious_relationship" className="text-xs">Serious Relationship</SelectItem>
+                          <SelectItem value="casual_dating" className="text-xs">Casual Dating</SelectItem>
+                          <SelectItem value="friendship" className="text-xs">Friendship</SelectItem>
+                          <SelectItem value="open_to_anything" className="text-xs">Open to Anything</SelectItem>
                         </SelectContent>
                       </Select>
                       
                       <Select value={countryFilter} onValueChange={setCountryFilter}>
-                        <SelectTrigger className="text-xs h-8">
+                        <SelectTrigger className="w-32 text-xs h-8">
                           <SelectValue placeholder="Country" />
                         </SelectTrigger>
                         <SelectContent className="max-h-60">
@@ -1744,57 +1725,45 @@ const AdminPageComponent = ({ currentUser, onLogout }: AdminPageProps) => {
                           ))}
                         </SelectContent>
                       </Select>
-                      
+                    </div>
+                    
+                    {/* Third Row: Activity Filter */}
+                    <div className="flex gap-2 flex-wrap">
                       <Select value={activityFilter} onValueChange={setActivityFilter}>
-                        <SelectTrigger className="text-xs h-8">
+                        <SelectTrigger className="w-40 text-xs h-8">
                           <SelectValue placeholder="Activity" />
                         </SelectTrigger>
                         <SelectContent>
                           <SelectItem value="all" className="text-xs">All Activity</SelectItem>
-                          <SelectItem value="active_week" className="text-xs">Last Week</SelectItem>
-                          <SelectItem value="active_month" className="text-xs">Last Month</SelectItem>
-                          <SelectItem value="logged_once" className="text-xs">Once Only</SelectItem>
-                          <SelectItem value="inactive_month" className="text-xs">30+ Days</SelectItem>
-                          <SelectItem value="never_active" className="text-xs">Never</SelectItem>
+                          <SelectItem value="active_week" className="text-xs">Active Last Week</SelectItem>
+                          <SelectItem value="active_month" className="text-xs">Active Last Month</SelectItem>
+                          <SelectItem value="logged_once" className="text-xs">Logged In Once</SelectItem>
+                          <SelectItem value="inactive_month" className="text-xs">Inactive 30+ Days</SelectItem>
+                          <SelectItem value="never_active" className="text-xs">Never Logged In</SelectItem>
                         </SelectContent>
                       </Select>
-                      
-                      <Select value={imageCountFilter} onValueChange={setImageCountFilter}>
-                        <SelectTrigger className="text-xs h-8">
-                          <SelectValue placeholder="Images" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="all" className="text-xs">All Images</SelectItem>
-                          <SelectItem value="0" className="text-xs">0 Images</SelectItem>
-                          <SelectItem value="1" className="text-xs">1 Image</SelectItem>
-                          <SelectItem value="2" className="text-xs">2 Images</SelectItem>
-                          <SelectItem value="3" className="text-xs">3 Images</SelectItem>
-                          <SelectItem value="4" className="text-xs">4+</SelectItem>
-                        </SelectContent>
-                      </Select>
-                      
-                      {/* Clear Filters Button */}
-                      {(statusFilter !== 'all' || genderFilter !== 'all' || interestedInFilter !== 'all' || 
-                        countryFilter !== 'all' || relationshipIntentFilter !== 'all' || premiumFilter !== 'all' || activityFilter !== 'all' || imageCountFilter !== 'all') && (
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          onClick={() => {
-                            setStatusFilter('all');
-                            setGenderFilter('all');
-                            setInterestedInFilter('all');
-                            setCountryFilter('all');
-                            setRelationshipIntentFilter('all');
-                            setPremiumFilter('all');
-                            setActivityFilter('all');
-                            setImageCountFilter('all');
-                          }}
-                          className="text-xs h-8 text-red-600 border-red-200 hover:bg-red-50"
-                        >
-                          Clear Filters
-                        </Button>
-                      )}
                     </div>
+                    
+                    {/* Clear Filters Button */}
+                    {(statusFilter !== 'all' || genderFilter !== 'all' || interestedInFilter !== 'all' || 
+                      countryFilter !== 'all' || relationshipIntentFilter !== 'all' || premiumFilter !== 'all' || activityFilter !== 'all') && (
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => {
+                          setStatusFilter('all');
+                          setGenderFilter('all');
+                          setInterestedInFilter('all');
+                          setCountryFilter('all');
+                          setRelationshipIntentFilter('all');
+                          setPremiumFilter('all');
+                          setActivityFilter('all');
+                        }}
+                        className="text-xs h-7"
+                      >
+                        Clear All Filters
+                      </Button>
+                    )}
                   </div>
 
                   {/* Users List Container */}
@@ -1833,9 +1802,6 @@ const AdminPageComponent = ({ currentUser, onLogout }: AdminPageProps) => {
                                       Premium
                                     </Badge>
                                   )}
-                                  <Badge variant="outline" className="text-[10px] px-1.5 py-0 h-4">
-                                    📷 {user.image_count ?? 0}
-                                  </Badge>
                                 </div>
                                 <p className="text-[11px] text-gray-500 mt-0.5">
                                   Joined: {new Date(user.created_at).toLocaleDateString()}
