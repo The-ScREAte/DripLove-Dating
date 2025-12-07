@@ -22,6 +22,7 @@ import ManualPremiumManager from './admin/ManualPremiumManager';
 import AdsManagement from './admin/AdsManagement';
 import RedirectLinkCreator from './admin/RedirectLinkCreator';
 import BroadcastNotifications from './admin/BroadcastNotifications';
+import PromotionsManagement from './admin/PromotionsManagement';
 import { debounce, userDataCache, createPagination } from '@/utils/performanceOptimizer';
 import { useSupabaseSubscription, useMemoryMonitor } from '@/hooks/usePerformance';
 import { CurrentUser, AdminStats } from '@/types';
@@ -46,7 +47,8 @@ import {
   BarChart3,
   Crown,
   Megaphone,
-  Link2
+  Link2,
+  Gift
 } from 'lucide-react';
 
 interface AdminPageProps {
@@ -1391,7 +1393,11 @@ const AdminPageComponent = ({ currentUser, onLogout }: AdminPageProps) => {
                 </TabsList>
 
                 {/* Second Row - Additional Tabs */}
-                <TabsList className="grid w-full grid-cols-4 h-auto">
+                <TabsList className="grid w-full grid-cols-5 h-auto">
+                  <TabsTrigger value="promos" className="text-xs flex flex-col gap-1 py-2">
+                    <Gift className="w-4 h-4" />
+                    <span>Promos</span>
+                  </TabsTrigger>
                   <TabsTrigger value="ads" className="text-xs flex flex-col gap-1 py-2">
                     <Megaphone className="w-4 h-4" />
                     <span>Ads</span>
@@ -1562,6 +1568,21 @@ const AdminPageComponent = ({ currentUser, onLogout }: AdminPageProps) => {
             {/* Broadcast Notifications Tab */}
             <TabsContent value="broadcast" className="space-y-4">
               <BroadcastNotifications />
+            </TabsContent>
+
+            {/* Promotions Tab */}
+            <TabsContent value="promos" className="space-y-4">
+              <Card>
+                <CardHeader className="pb-3">
+                  <CardTitle className="flex items-center gap-2 text-sm">
+                    <Gift className="w-4 h-4" />
+                    Promo Code Management
+                  </CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <PromotionsManagement />
+                </CardContent>
+              </Card>
             </TabsContent>
 
             {/* Users Tab */}
