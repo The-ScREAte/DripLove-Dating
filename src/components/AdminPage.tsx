@@ -924,11 +924,11 @@ const AdminPageComponent = ({ currentUser, onLogout }: AdminPageProps) => {
           relationship_intent,
           last_login_at,
           login_count,
-          user_subscriptions!left(
+          user_subscriptions(
             status,
             expires_at
           ),
-          user_images!left(
+          user_images(
             id
           )
         `)
@@ -1387,7 +1387,7 @@ const AdminPageComponent = ({ currentUser, onLogout }: AdminPageProps) => {
         </div>
         
         {/* Scrollable Content */}
-        <div className="p-4 pb-20">
+        <div className="p-4 pb-40">
 
           {/* Tabbed Interface with Error Boundaries for 1000+ users */}
           <AdminErrorBoundary>
