@@ -1656,10 +1656,32 @@ const AdminPageComponent = ({ currentUser, onLogout }: AdminPageProps) => {
               {/* User Management */}
               <Card>
                 <CardHeader className="pb-3">
-                  <CardTitle className="flex items-center gap-2 text-sm">
-                    <Users className="w-4 h-4" />
-                    User Management ({filteredUsers.length})
-                  </CardTitle>
+                  <div className="flex items-center justify-between">
+                    <CardTitle className="flex items-center gap-2 text-sm">
+                      <Users className="w-4 h-4" />
+                      User Management ({filteredUsers.length})
+                    </CardTitle>
+                    {(searchTerm || statusFilter !== 'all' || genderFilter !== 'all' || interestedInFilter !== 'all' || countryFilter !== 'all' || relationshipIntentFilter !== 'all' || premiumFilter !== 'all' || activityFilter !== 'all' || imagesFilter !== 'all') && (
+                      <Button 
+                        variant="ghost" 
+                        size="sm" 
+                        className="text-xs h-6 px-2"
+                        onClick={() => {
+                          setSearchTerm('');
+                          setStatusFilter('all');
+                          setGenderFilter('all');
+                          setInterestedInFilter('all');
+                          setCountryFilter('all');
+                          setRelationshipIntentFilter('all');
+                          setPremiumFilter('all');
+                          setActivityFilter('all');
+                          setImagesFilter('all');
+                        }}
+                      >
+                        Clear Filters
+                      </Button>
+                    )}
+                  </div>
                 </CardHeader>
                 <CardContent>
                   {/* Search and Filter */}
