@@ -1675,10 +1675,10 @@ const AdminPageComponent = ({ currentUser, onLogout }: AdminPageProps) => {
                       />
                     </div>
                     
-                    {/* First Row: Status, Gender, Premium */}
-                    <div className="flex gap-2 flex-wrap">
+                    {/* Row 1: Status, Gender */}
+                    <div className="grid grid-cols-2 gap-2">
                       <Select value={statusFilter} onValueChange={setStatusFilter}>
-                        <SelectTrigger className="w-28 text-xs h-8">
+                        <SelectTrigger className="text-xs h-8">
                           <SelectValue placeholder="Status" />
                         </SelectTrigger>
                         <SelectContent>
@@ -1690,7 +1690,7 @@ const AdminPageComponent = ({ currentUser, onLogout }: AdminPageProps) => {
                       </Select>
                       
                       <Select value={genderFilter} onValueChange={setGenderFilter}>
-                        <SelectTrigger className="w-28 text-xs h-8">
+                        <SelectTrigger className="text-xs h-8">
                           <SelectValue placeholder="Gender" />
                         </SelectTrigger>
                         <SelectContent>
@@ -1700,10 +1700,25 @@ const AdminPageComponent = ({ currentUser, onLogout }: AdminPageProps) => {
                           <SelectItem value="other" className="text-xs">Other</SelectItem>
                         </SelectContent>
                       </Select>
+                    </div>
+                    
+                    {/* Row 2: Preference, Premium */}
+                    <div className="grid grid-cols-2 gap-2">
+                      <Select value={interestedInFilter} onValueChange={setInterestedInFilter}>
+                        <SelectTrigger className="text-xs h-8">
+                          <SelectValue placeholder="Preference" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="all" className="text-xs">All Preferences</SelectItem>
+                          <SelectItem value="male" className="text-xs">Into Male</SelectItem>
+                          <SelectItem value="female" className="text-xs">Into Female</SelectItem>
+                          <SelectItem value="everyone" className="text-xs">Into Everyone</SelectItem>
+                        </SelectContent>
+                      </Select>
                       
                       <Select value={premiumFilter} onValueChange={setPremiumFilter}>
-                        <SelectTrigger className="w-28 text-xs h-8">
-                          <SelectValue placeholder="Premium" />
+                        <SelectTrigger className="text-xs h-8">
+                          <SelectValue placeholder="Subscription" />
                         </SelectTrigger>
                         <SelectContent>
                           <SelectItem value="all" className="text-xs">All Users</SelectItem>
@@ -1713,35 +1728,24 @@ const AdminPageComponent = ({ currentUser, onLogout }: AdminPageProps) => {
                       </Select>
                     </div>
                     
-                    {/* Second Row: Interested In, Relationship Intent, Country */}
-                    <div className="flex gap-2 flex-wrap">
-                      <Select value={interestedInFilter} onValueChange={setInterestedInFilter}>
-                        <SelectTrigger className="w-32 text-xs h-8">
-                          <SelectValue placeholder="Interested In" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="all" className="text-xs">All Preferences</SelectItem>
-                          <SelectItem value="male" className="text-xs">Interested in Male</SelectItem>
-                          <SelectItem value="female" className="text-xs">Interested in Female</SelectItem>
-                          <SelectItem value="both" className="text-xs">Interested in Both</SelectItem>
-                        </SelectContent>
-                      </Select>
-                      
+                    {/* Row 3: Intent, Country */}
+                    <div className="grid grid-cols-2 gap-2">
                       <Select value={relationshipIntentFilter} onValueChange={setRelationshipIntentFilter}>
-                        <SelectTrigger className="w-36 text-xs h-8">
+                        <SelectTrigger className="text-xs h-8">
                           <SelectValue placeholder="Intent" />
                         </SelectTrigger>
                         <SelectContent>
                           <SelectItem value="all" className="text-xs">All Intents</SelectItem>
-                          <SelectItem value="serious_relationship" className="text-xs">Serious Relationship</SelectItem>
-                          <SelectItem value="casual_dating" className="text-xs">Casual Dating</SelectItem>
-                          <SelectItem value="friendship" className="text-xs">Friendship</SelectItem>
+                          <SelectItem value="serious" className="text-xs">Serious</SelectItem>
+                          <SelectItem value="long-term" className="text-xs">Long-term</SelectItem>
+                          <SelectItem value="casual" className="text-xs">Casual</SelectItem>
                           <SelectItem value="open_to_anything" className="text-xs">Open to Anything</SelectItem>
+                          <SelectItem value="not-sure" className="text-xs">Not Sure</SelectItem>
                         </SelectContent>
                       </Select>
                       
                       <Select value={countryFilter} onValueChange={setCountryFilter}>
-                        <SelectTrigger className="w-32 text-xs h-8">
+                        <SelectTrigger className="text-xs h-8">
                           <SelectValue placeholder="Country" />
                         </SelectTrigger>
                         <SelectContent className="max-h-60">
@@ -1755,10 +1759,10 @@ const AdminPageComponent = ({ currentUser, onLogout }: AdminPageProps) => {
                       </Select>
                     </div>
                     
-                    {/* Third Row: Activity Filter and Images Filter */}
-                    <div className="flex gap-2 flex-wrap">
+                    {/* Row 4: Activity, Images */}
+                    <div className="grid grid-cols-2 gap-2">
                       <Select value={activityFilter} onValueChange={setActivityFilter}>
-                        <SelectTrigger className="w-40 text-xs h-8">
+                        <SelectTrigger className="text-xs h-8">
                           <SelectValue placeholder="Activity" />
                         </SelectTrigger>
                         <SelectContent>
@@ -1772,7 +1776,7 @@ const AdminPageComponent = ({ currentUser, onLogout }: AdminPageProps) => {
                       </Select>
                       
                       <Select value={imagesFilter} onValueChange={setImagesFilter}>
-                        <SelectTrigger className="w-32 text-xs h-8">
+                        <SelectTrigger className="text-xs h-8">
                           <SelectValue placeholder="Images" />
                         </SelectTrigger>
                         <SelectContent>
@@ -1805,7 +1809,7 @@ const AdminPageComponent = ({ currentUser, onLogout }: AdminPageProps) => {
                           setActivityFilter('all');
                           setImagesFilter('all');
                         }}
-                        className="text-xs h-7"
+                        className="text-xs h-7 w-full"
                       >
                         Clear All Filters
                       </Button>
@@ -1835,7 +1839,7 @@ const AdminPageComponent = ({ currentUser, onLogout }: AdminPageProps) => {
                                 <div className="flex gap-1 mt-0.5 flex-wrap">
                                   {user.preference && (
                                     <Badge variant="outline" className="text-[10px] px-1.5 py-0 h-4">
-                                      Interested: {user.preference === 'both' ? 'Both' : user.preference.charAt(0).toUpperCase() + user.preference.slice(1)}
+                                      Into: {user.preference === 'everyone' ? 'Everyone' : user.preference.charAt(0).toUpperCase() + user.preference.slice(1)}
                                     </Badge>
                                   )}
                                   {user.relationship_intent && (
