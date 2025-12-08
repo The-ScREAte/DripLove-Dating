@@ -135,53 +135,74 @@ export async function buyGooglePremium(): Promise<Transaction> {
     throw new Error('Google IAP only works on Android');
   }
 
+  console.log('[Google IAP] buyGooglePremium called');
+
   // Ensure initialized
   if (!googleIapInitialized) {
+    console.log('[Google IAP] Not initialized, initializing now...');
     await initGoogleIAP();
   }
 
   // Check if billing is supported before attempting purchase
   try {
+    console.log('[Google IAP] Checking if billing is supported...');
     const { isBillingSupported } = await NativePurchases.isBillingSupported();
+    console.log('[Google IAP] Billing supported:', isBillingSupported);
+    
     if (!isBillingSupported) {
       console.error('[Google IAP] Billing not supported');
-      throw new Error('Google Play Billing is not supported on this device');
+      throw new Error('Google Play Billing is not supported on this device. Please ensure Google Play Services is installed and up to date.');
     }
   } catch (billingCheckError) {
     console.error('[Google IAP] Billing check failed:', billingCheckError);
-    throw new Error('Unable to connect to Google Play. Please check your connection.');
+    throw new Error(`Unable to connect to Google Play: ${billingCheckError}`);
   }
 
   window.googleIapPurchaseInitiated = true;
 
   try {
-    console.log('[Google IAP] Starting purchase for:', GOOGLE_PRODUCT_ID);
+    console.log('[Google IAP] Starting purchase for product:', GOOGLE_PRODUCT_ID);
     
     // First ensure the product is available
+    console.log('[Google IAP] Loading products to verify availability...');
     const products = await loadGoogleProducts();
+    console.log('[Google IAP] Product details:', products);
+    
     if (!products) {
-      throw new Error('Product not available. Please try again later.');
+      console.error('[Google IAP] Product not found or not available');
+      throw new Error('Subscription not available. Please ensure the product is set up correctly in Google Play Console.');
     }
     
+    console.log('[Google IAP] Initiating purchase flow...');
     const transaction = await NativePurchases.purchaseProduct({
       productIdentifier: GOOGLE_PRODUCT_ID,
       productType: PURCHASE_TYPE.SUBS,
     });
-
-    console.log('[Google IAP] Purchase result:', transaction);
     
+    console.log('[Google IAP] Purchase flow completed, transaction:', JSON.stringify(transaction));
+
     // Check if purchase was successful (purchaseState === "1" means purchased)
     if (transaction.purchaseState === '1') {
+      console.log('[Google IAP] Purchase successful! Processing...');
       await handleGooglePurchaseSuccess(transaction);
     } else if (transaction.purchaseState === '0') {
       // Pending purchase
-      console.log('[Google IAP] Purchase pending');
+      console.log('[Google IAP] Purchase pending - waiting for payment confirmation');
+    } else {
+      console.log('[Google IAP] Purchase state:', transaction.purchaseState, 'Transaction:', transaction);
     }
 
     window.googleIapPurchaseInitiated = false;
     return transaction;
   } catch (error: any) {
     window.googleIapPurchaseInitiated = false;
+    
+    // Log full error details
+    console.error('[Google IAP] Purchase error details:', {
+      message: error?.message,
+      code: error?.code,
+      error: JSON.stringify(error)
+    });
     
     // Check if user cancelled
     const errorMessage = error?.message?.toLowerCase() || '';
@@ -195,8 +216,17 @@ export async function buyGooglePremium(): Promise<Transaction> {
       throw new Error('User cancelled');
     }
     
-    console.error('[Google IAP] Purchase failed:', error);
-    throw error;
+    // Provide more helpful error messages
+    if (errorMessage.includes('item_already_owned') || errorCode === '7') {
+      throw new Error('You already own this subscription. Try restoring your purchase instead.');
+    }
+    
+    if (errorMessage.includes('network') || errorMessage.includes('connection')) {
+      throw new Error('Network error. Please check your internet connection and try again.');
+    }
+    
+    console.error('[Google IAP] Purchase failed with error:', error);
+    throw new Error(error?.message || 'Unable to complete purchase. Please try again.');
   }
 }
 
