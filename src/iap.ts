@@ -436,6 +436,98 @@ export function restorePurchases(): Promise<void> {
   });
 }
 
+// Load Apple product price (localized from App Store)
+export function loadAppleProductPrice(): Promise<{
+  id: string;
+  price: string;
+  currency: string;
+  title: string;
+  description: string;
+} | null> {
+  return new Promise((resolve) => {
+    // @ts-ignore
+    const store = window.CdvPurchase?.store;
+    
+    if (!store) {
+      console.warn('[IAP] Cannot load Apple product price - store not available');
+      resolve(null);
+      return;
+    }
+    
+    // Product IDs to check
+    const PRODUCT_IDS = [
+      'com.driplove.dating.premium.monthlysub3', // Prefer newer one
+      'com.driplove.dating.premium.monthlysub2'
+    ];
+    
+    // Try to find a valid product with pricing info
+    for (const id of PRODUCT_IDS) {
+      try {
+        const product = store.get ? store.get(id) : null;
+        if (product && product.pricing) {
+          console.log('[IAP] Found Apple product with pricing:', {
+            id: product.id,
+            price: product.pricing.price,
+            currency: product.pricing.currency,
+            title: product.title
+          });
+          
+          resolve({
+            id: product.id,
+            price: product.pricing.price || product.price || '',
+            currency: product.pricing.currency || '',
+            title: product.title || '',
+            description: product.description || ''
+          });
+          return;
+        }
+        
+        // Fallback: check if product has a price string directly
+        if (product && product.price) {
+          console.log('[IAP] Found Apple product with price:', {
+            id: product.id,
+            price: product.price
+          });
+          
+          resolve({
+            id: product.id,
+            price: product.price,
+            currency: product.currency || '',
+            title: product.title || '',
+            description: product.description || ''
+          });
+          return;
+        }
+        
+        // Check offer pricing
+        const offer = product?.getOffer?.();
+        if (offer && offer.pricingPhases && offer.pricingPhases.length > 0) {
+          const phase = offer.pricingPhases[0];
+          console.log('[IAP] Found Apple product offer with pricing:', {
+            id: product.id,
+            price: phase.price,
+            currency: phase.currency
+          });
+          
+          resolve({
+            id: product.id,
+            price: phase.price || '',
+            currency: phase.currency || '',
+            title: product.title || '',
+            description: product.description || ''
+          });
+          return;
+        }
+      } catch (err) {
+        console.warn(`[IAP] Could not check product ${id}:`, err);
+      }
+    }
+    
+    console.warn('[IAP] No Apple product with pricing found');
+    resolve(null);
+  });
+}
+
 // Debug helper function
 export function debugIAPState() {
   // @ts-ignore
