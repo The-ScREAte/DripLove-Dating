@@ -135,14 +135,33 @@ export async function buyGooglePremium(): Promise<Transaction> {
     throw new Error('Google IAP only works on Android');
   }
 
+  // Ensure initialized
   if (!googleIapInitialized) {
     await initGoogleIAP();
+  }
+
+  // Check if billing is supported before attempting purchase
+  try {
+    const { isBillingSupported } = await NativePurchases.isBillingSupported();
+    if (!isBillingSupported) {
+      console.error('[Google IAP] Billing not supported');
+      throw new Error('Google Play Billing is not supported on this device');
+    }
+  } catch (billingCheckError) {
+    console.error('[Google IAP] Billing check failed:', billingCheckError);
+    throw new Error('Unable to connect to Google Play. Please check your connection.');
   }
 
   window.googleIapPurchaseInitiated = true;
 
   try {
     console.log('[Google IAP] Starting purchase for:', GOOGLE_PRODUCT_ID);
+    
+    // First ensure the product is available
+    const products = await loadGoogleProducts();
+    if (!products) {
+      throw new Error('Product not available. Please try again later.');
+    }
     
     const transaction = await NativePurchases.purchaseProduct({
       productIdentifier: GOOGLE_PRODUCT_ID,
@@ -154,6 +173,9 @@ export async function buyGooglePremium(): Promise<Transaction> {
     // Check if purchase was successful (purchaseState === "1" means purchased)
     if (transaction.purchaseState === '1') {
       await handleGooglePurchaseSuccess(transaction);
+    } else if (transaction.purchaseState === '0') {
+      // Pending purchase
+      console.log('[Google IAP] Purchase pending');
     }
 
     window.googleIapPurchaseInitiated = false;
@@ -163,7 +185,12 @@ export async function buyGooglePremium(): Promise<Transaction> {
     
     // Check if user cancelled
     const errorMessage = error?.message?.toLowerCase() || '';
-    if (errorMessage.includes('cancel') || error?.code === 'USER_CANCELLED' || error?.code === 1) {
+    const errorCode = error?.code?.toString() || '';
+    
+    if (errorMessage.includes('cancel') || 
+        errorCode === 'USER_CANCELLED' || 
+        errorCode === '1' ||
+        errorMessage.includes('user cancelled')) {
       console.log('[Google IAP] User cancelled purchase');
       throw new Error('User cancelled');
     }

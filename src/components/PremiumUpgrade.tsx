@@ -652,7 +652,7 @@ const PremiumUpgrade = ({ currentUser, onClose, preselectedPlan }: PremiumUpgrad
                 </div>
               )}
               
-              {/* Fallback when Google IAP times out - show Paystack option */}
+              {/* Fallback message when Google IAP times out */}
               {isAndroid() && isNativeApp() && !googleCanBuy && googleIapLoadingTimeout && (
                 <div className="text-center p-4 bg-amber-50 rounded-lg border border-amber-200 mb-2">
                   <div className="text-amber-800 mb-2 font-semibold">{t('premium.paymentOptions.unavailable.title')}</div>
@@ -662,8 +662,8 @@ const PremiumUpgrade = ({ currentUser, onClose, preselectedPlan }: PremiumUpgrad
                 </div>
               )}
               
-              {/* Paystack/Card Payment Options - show on web, or on Android when Google IAP failed */}
-              {(!isNativeApp() || (isAndroid() && isNativeApp() && googleIapLoadingTimeout)) && (
+              {/* Paystack/Card Payment Options - show on web AND on Android (always available on Android) */}
+              {(!isNativeApp() || (isAndroid() && isNativeApp())) && (
                 <button
                   onClick={() => handlePaymentTypeSelection('subscription')}
                   className="w-full p-4 bg-gradient-to-r from-green-500 to-emerald-600 text-white rounded-lg hover:from-green-600 hover:to-emerald-700 transition-all duration-200 font-semibold"
