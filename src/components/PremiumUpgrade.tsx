@@ -3,7 +3,7 @@ import React, { useState } from 'react';
 import PaystackPaymentModal from './PaystackPaymentModal';
 import { getPremiumPaymentConfig } from '@/utils/paymentConfig';
 import { isIOS, isNativeApp } from '@/utils/iap';
-import { buyMonthly, debugIAPState, restorePurchases } from '../iap';
+import { buyMonthly, debugIAPState, restorePurchases, loadAppleProductPrice } from '../iap';
 import { isAndroid, initGoogleIAP, buyGooglePremium, restoreGooglePurchases, loadGoogleProducts, isGoogleIapReady } from '@/utils/googleIap';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -31,6 +31,7 @@ const PremiumUpgrade = ({ currentUser, onClose, preselectedPlan }: PremiumUpgrad
   const [canBuy, setCanBuy] = useState(false);
   const [iapLoadingTimeout, setIapLoadingTimeout] = useState(false);
   const [restoreLoading, setRestoreLoading] = useState(false);
+  const [applePrice, setApplePrice] = useState<string | null>(null);
   
   // Google IAP state
   const [googleIapLoading, setGoogleIapLoading] = useState(false);
@@ -43,7 +44,7 @@ const PremiumUpgrade = ({ currentUser, onClose, preselectedPlan }: PremiumUpgrad
 
   React.useEffect(() => {
     // Listen for productUpdated to enable the in-app purchase button
-    function onProductUpdated(p?: any) {
+    async function onProductUpdated(p?: any) {
       // @ts-ignore
       const store = window.CdvPurchase?.store;
       
@@ -61,9 +62,20 @@ const PremiumUpgrade = ({ currentUser, onClose, preselectedPlan }: PremiumUpgrad
       const hasOffer = !!product?.getOffer?.();
       setCanBuy(hasOffer);
       
-      // If product becomes available, clear the timeout flag
+      // If product becomes available, clear the timeout flag and load price
       if (hasOffer) {
         setIapLoadingTimeout(false);
+        
+        // Load Apple product price
+        try {
+          const priceData = await loadAppleProductPrice();
+          if (priceData && priceData.price) {
+            console.log('[PremiumUpgrade] Apple price loaded:', priceData.price);
+            setApplePrice(priceData.price);
+          }
+        } catch (err) {
+          console.warn('[PremiumUpgrade] Failed to load Apple price:', err);
+        }
       }
       
       // Check if initialization failed
@@ -597,7 +609,9 @@ const PremiumUpgrade = ({ currentUser, onClose, preselectedPlan }: PremiumUpgrad
                     className="w-full p-4 bg-gradient-to-r from-gray-800 to-black text-white rounded-lg hover:from-gray-700 hover:to-gray-900 transition-all duration-200 font-semibold disabled:opacity-50"
                   >
                     <div className="text-lg">{iapLoading ? t('premium.paymentOptions.iap.processing') : t('premium.paymentOptions.iap.button')}</div>
-                    <div className="text-sm opacity-90">{t('premium.paymentOptions.iap.subtitle')}</div>
+                    <div className="text-sm opacity-90">
+                      {applePrice || `$${monthlyPrice}`}/month • Secure & Easy
+                    </div>
                   </button>
                   
                   {/* Auto-renewal disclosure */}
