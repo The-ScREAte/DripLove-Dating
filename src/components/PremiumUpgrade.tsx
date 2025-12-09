@@ -4,7 +4,6 @@ import PaystackPaymentModal from './PaystackPaymentModal';
 import { getPremiumPaymentConfig } from '@/utils/paymentConfig';
 import { isIOS, isNativeApp } from '@/utils/iap';
 import { buyMonthly, debugIAPState, restorePurchases } from '../iap';
-import { isAndroid, initGoogleIAP, buyGooglePremium, restoreGooglePurchases, loadGoogleProducts, isGoogleIapReady } from '@/utils/googleIap';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Crown, Heart, RotateCcw, Users, Check, X, Globe } from 'lucide-react';
@@ -26,24 +25,18 @@ const PremiumUpgrade = ({ currentUser, onClose, preselectedPlan }: PremiumUpgrad
   const { toast } = useToast();
   const [showPaymentModal, setShowPaymentModal] = useState(false);
   const [showPaymentOptions, setShowPaymentOptions] = useState(false);
-  const [paymentType, setPaymentType] = useState<'subscription' | 'one-time' | 'iap' | 'google_iap' | null>(null);
+  const [paymentType, setPaymentType] = useState<'subscription' | 'one-time' | 'iap' | null>(null);
   const [iapLoading, setIapLoading] = useState(false);
   const [canBuy, setCanBuy] = useState(false);
   const [iapLoadingTimeout, setIapLoadingTimeout] = useState(false);
   const [restoreLoading, setRestoreLoading] = useState(false);
-  
-  // Google IAP state
-  const [googleIapLoading, setGoogleIapLoading] = useState(false);
-  const [googleCanBuy, setGoogleCanBuy] = useState(false);
-  const [googleIapLoadingTimeout, setGoogleIapLoadingTimeout] = useState(false);
-  const [googlePrice, setGooglePrice] = useState<string | null>(null);
   
   // Enhanced subscription status monitoring
   const { subscriptionStatus, isPremium, loading: subscriptionLoading, refetch: refetchSubscription } = useEnhancedSubscription();
 
   React.useEffect(() => {
     // Listen for productUpdated to enable the in-app purchase button
-    async function onProductUpdated(p?: any) {
+    function onProductUpdated(p?: any) {
       // @ts-ignore
       const store = window.CdvPurchase?.store;
       
@@ -160,54 +153,7 @@ const PremiumUpgrade = ({ currentUser, onClose, preselectedPlan }: PremiumUpgrad
       }
     };
     // No off/unsubscribe in plugin
-  }, [toast, canBuy]);
-  
-  // Google IAP initialization effect
-  React.useEffect(() => {
-    if (!isAndroid() || !isNativeApp()) {
-      return;
-    }
-
-    let loadingTimeout: NodeJS.Timeout | undefined;
-
-    const initializeGoogleIAP = async () => {
-      try {
-        console.log('[PremiumUpgrade] Initializing Google IAP...');
-        await initGoogleIAP();
-        
-        // Load products to get the localized price
-        const product = await loadGoogleProducts();
-        if (product) {
-          setGooglePrice(product.price);
-          setGoogleCanBuy(true);
-          setGoogleIapLoadingTimeout(false);
-          console.log('[PremiumUpgrade] Google IAP product loaded:', product);
-        } else {
-          console.warn('[PremiumUpgrade] No Google IAP products found');
-          setGoogleIapLoadingTimeout(true);
-        }
-      } catch (error) {
-        console.error('[PremiumUpgrade] Google IAP init error:', error);
-        setGoogleIapLoadingTimeout(true);
-      }
-    };
-
-    initializeGoogleIAP();
-
-    // Set timeout for Google IAP loading
-    loadingTimeout = setTimeout(() => {
-      if (!googleCanBuy) {
-        console.warn('[PremiumUpgrade] Google IAP loading timeout');
-        setGoogleIapLoadingTimeout(true);
-      }
-    }, 8000);
-
-    return () => {
-      if (loadingTimeout) {
-        clearTimeout(loadingTimeout);
-      }
-    };
-  }, [googleCanBuy]);
+  }, [toast]);
   
   const [price, setPrice] = useState<string | null>(null);
   const [monthlyPrice, setMonthlyPrice] = useState<string | null>(null);
@@ -268,7 +214,7 @@ const PremiumUpgrade = ({ currentUser, onClose, preselectedPlan }: PremiumUpgrad
     setShowPaymentOptions(true);
   };
 
-  const handlePaymentTypeSelection = async (type: 'subscription' | 'one-time' | 'iap' | 'google_iap') => {
+  const handlePaymentTypeSelection = async (type: 'subscription' | 'one-time' | 'iap') => {
     if (type === 'iap') {
       if (!canBuy) {
         // Silently prevent action if not ready
@@ -302,39 +248,6 @@ const PremiumUpgrade = ({ currentUser, onClose, preselectedPlan }: PremiumUpgrad
           });
         }
       }
-    } else if (type === 'google_iap') {
-      // Google Play IAP
-      if (!googleCanBuy) {
-        return;
-      }
-      setGoogleIapLoading(true);
-      const timeoutId = setTimeout(() => {
-        setGoogleIapLoading(false);
-        toast({
-          title: 'Request timeout',
-          description: 'The payment request is taking longer than expected. Please try again.',
-        });
-      }, 30000);
-      try {
-        await buyGooglePremium();
-        clearTimeout(timeoutId);
-        // Success: handled in the function
-      } catch (err: any) {
-        clearTimeout(timeoutId);
-        setGoogleIapLoading(false);
-        
-        // Check if it's a user cancellation
-        const isCancellation = err?.message?.toLowerCase().includes('cancel') || 
-                              err?.code === 'USER_CANCELLED' || 
-                              err?.code === 1;
-        
-        if (!isCancellation) {
-          toast({
-            title: 'Unable to complete purchase',
-            description: 'Please check your connection and try again.',
-          });
-        }
-      }
     } else {
       setPaymentType(type);
       setShowPaymentOptions(false);
@@ -359,12 +272,8 @@ const PremiumUpgrade = ({ currentUser, onClose, preselectedPlan }: PremiumUpgrad
     try {
       console.log('[PremiumUpgrade] Starting restore purchases...');
       
-      // Call the appropriate restore function based on platform
-      if (isIOS() && isNativeApp()) {
-        await restorePurchases();
-      } else if (isAndroid() && isNativeApp()) {
-        await restoreGooglePurchases();
-      }
+      // Call the restore function and wait for it to complete
+      await restorePurchases();
       
       // Give it an additional moment to process any receipt validations
       await new Promise(resolve => setTimeout(resolve, 2000));
@@ -513,8 +422,8 @@ const PremiumUpgrade = ({ currentUser, onClose, preselectedPlan }: PremiumUpgrad
                     {t('premium.upgradeButton')}
                   </Button>
                   
-                  {/* Restore Purchases Link for iOS and Android */}
-                  {(isIOS() || isAndroid()) && isNativeApp() && (
+                  {/* Restore Purchases Link for iOS */}
+                  {isIOS() && isNativeApp() && (
                     <button
                       onClick={handleRestorePurchases}
                       disabled={restoreLoading}
@@ -597,9 +506,7 @@ const PremiumUpgrade = ({ currentUser, onClose, preselectedPlan }: PremiumUpgrad
                     className="w-full p-4 bg-gradient-to-r from-gray-800 to-black text-white rounded-lg hover:from-gray-700 hover:to-gray-900 transition-all duration-200 font-semibold disabled:opacity-50"
                   >
                     <div className="text-lg">{iapLoading ? t('premium.paymentOptions.iap.processing') : t('premium.paymentOptions.iap.button')}</div>
-                    <div className="text-sm opacity-90">
-                      ${monthlyPrice}/month • Secure & Easy
-                    </div>
+                    <div className="text-sm opacity-90">{t('premium.paymentOptions.iap.subtitle')}</div>
                   </button>
                   
                   {/* Auto-renewal disclosure */}
@@ -625,47 +532,8 @@ const PremiumUpgrade = ({ currentUser, onClose, preselectedPlan }: PremiumUpgrad
                 </div>
               )}
               
-              {/* Google Play IAP - show on Android native when available */}
-              {isAndroid() && isNativeApp() && googleCanBuy && (
-                <>
-                  <button
-                    onClick={() => handlePaymentTypeSelection('google_iap')}
-                    disabled={googleIapLoading}
-                    className="w-full p-4 bg-gradient-to-r from-green-600 to-green-700 text-white rounded-lg hover:from-green-700 hover:to-green-800 transition-all duration-200 font-semibold disabled:opacity-50"
-                  >
-                    <div className="text-lg">{googleIapLoading ? t('premium.paymentOptions.iap.processing') : 'Pay with Google Play'}</div>
-                    <div className="text-sm opacity-90">
-                      {googlePrice || `$${monthlyPrice}`}/month • Secure & Easy
-                    </div>
-                  </button>
-                  
-                  {/* Auto-renewal disclosure for Google */}
-                  <div className="text-xs text-gray-600 text-center px-2 -mt-2">
-                    {t('premium.paymentOptions.iap.disclosure')}
-                  </div>
-                </>
-              )}
-              
-              {/* Loading message when Google IAP is not ready on Android */}
-              {isAndroid() && isNativeApp() && !googleCanBuy && !googleIapLoadingTimeout && (
-                <div className="text-center p-4 bg-blue-50 rounded-lg border border-blue-200">
-                  <div className="text-blue-600 mb-2 font-semibold">{t('premium.paymentOptions.loading.title')}</div>
-                  <div className="text-sm text-blue-500">{t('premium.paymentOptions.loading.message')}</div>
-                </div>
-              )}
-              
-              {/* Fallback message when Google IAP times out */}
-              {isAndroid() && isNativeApp() && !googleCanBuy && googleIapLoadingTimeout && (
-                <div className="text-center p-4 bg-amber-50 rounded-lg border border-amber-200 mb-2">
-                  <div className="text-amber-800 mb-2 font-semibold">{t('premium.paymentOptions.unavailable.title')}</div>
-                  <div className="text-sm text-amber-700">
-                    Google Play unavailable. Use card payment below.
-                  </div>
-                </div>
-              )}
-              
-              {/* Paystack/Card Payment Options - show on web AND on Android (always available on Android) */}
-              {(!isNativeApp() || (isAndroid() && isNativeApp())) && (
+              {/* Paystack/Card Payment Options - show on web and Android only, NOT on iOS */}
+              {!(isIOS() && isNativeApp()) && (
                 <button
                   onClick={() => handlePaymentTypeSelection('subscription')}
                   className="w-full p-4 bg-gradient-to-r from-green-500 to-emerald-600 text-white rounded-lg hover:from-green-600 hover:to-emerald-700 transition-all duration-200 font-semibold"
