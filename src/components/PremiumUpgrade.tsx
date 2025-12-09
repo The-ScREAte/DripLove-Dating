@@ -1,7 +1,6 @@
 
 import React, { useState } from 'react';
 import PaystackPaymentModal from './PaystackPaymentModal';
-import { getPremiumPaymentConfig } from '@/utils/paymentConfig';
 import { isIOS, isNativeApp } from '@/utils/iap';
 import { buyMonthly, debugIAPState, restorePurchases } from '../iap';
 import { buyGoogleMonthly, canUseGoogleIAP, restoreGooglePurchases, isAndroid, getGoogleProducts } from '../iap-google';
@@ -11,6 +10,7 @@ import { Crown, Heart, RotateCcw, Users, Check, X, Globe } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import { useEnhancedSubscription } from '@/hooks/useEnhancedSubscription';
+import { usePricingConfig } from '@/hooks/usePricingConfig';
 import { useTranslation } from 'react-i18next';
 import { Capacitor } from '@capacitor/core';
 
@@ -209,44 +209,19 @@ const PremiumUpgrade = ({ currentUser, onClose, preselectedPlan }: PremiumUpgrad
     
     return () => clearTimeout(loadingTimeout);
   }, [canBuyGoogle]);
-  const [price, setPrice] = useState<string | null>(null);
-  const [monthlyPrice, setMonthlyPrice] = useState<string | null>(null);
-  const [paymentMethods, setPaymentMethods] = useState<any[]>([]);
-  const [currency, setCurrency] = useState('USD');
-  const [ghsPrice, setGhsPrice] = useState<string | null>(null);
+  // Use pricing config hook with background loading
+  const pricingConfig = usePricingConfig();
   
-  // USD to GHS exchange rate (update this periodically)
-  const USD_TO_GHS_RATE = 16.5;
-
-  React.useEffect(() => {
-    const loadPaymentConfig = async () => {
-      const config = await getPremiumPaymentConfig();
-      
-      // Always use international pricing (USD) for display
-      const selectedCurrency = config.defaultInternationalCurrency || 'USD';
-      const usdPrice = config.defaultInternationalPrice || '1.99';
-      
-      // Convert USD to GHS for Paystack
-      const ghsAmount = (parseFloat(usdPrice) * USD_TO_GHS_RATE).toFixed(2);
-
-      setPrice(usdPrice);
-      setMonthlyPrice(usdPrice);
-      setGhsPrice(ghsAmount);
-      setPaymentMethods(config.paymentMethods);
-      setCurrency(selectedCurrency);
-      
-      console.log('[PremiumUpgrade] Loaded pricing:', {
-        usdPrice,
-        ghsPrice: ghsAmount,
-        exchangeRate: USD_TO_GHS_RATE
-      });
-    };
-    loadPaymentConfig();
-  }, [currentUser]);
+  const price = pricingConfig.monthlyPrice;
+  const monthlyPrice = pricingConfig.monthlyPrice;
+  const currency = pricingConfig.currency;
+  const currencySymbol = pricingConfig.currencySymbol;
+  const ghsPrice = pricingConfig.ghsPrice;
+  const [paymentMethods, setPaymentMethods] = useState<any[]>([{ type: 'card' }]);
 
   const handleUpgrade = () => {
-    // Don't allow upgrade if price hasn't loaded yet
-    if (price === null) {
+    // Don't allow upgrade if price is still loading
+    if (pricingConfig.loading) {
       toast({
         title: 'Loading...',
         description: 'Please wait while we load pricing information.',
@@ -464,11 +439,11 @@ const PremiumUpgrade = ({ currentUser, onClose, preselectedPlan }: PremiumUpgrad
                   <div className="space-y-2 md:space-y-3">
                     {/* Monthly payment option */}
                     {monthlyPrice && (
-                      <div className="p-2 md:p-3 bg-gradient-to-r from-blue-50 to-sky-50 border border-blue-200 rounded-lg">
-                        <div className="text-base sm:text-lg md:text-2xl font-bold text-gray-800 responsive-text">
-                          {isAndroid() && isNativeApp() && googlePrice ? googlePrice : `$${monthlyPrice}`}/month
+                      <div className="p-1.5 md:p-2 bg-gradient-to-r from-blue-50 to-sky-50 border border-blue-200 rounded-lg">
+                        <div className="text-sm sm:text-base md:text-xl font-bold text-gray-800">
+                          {isAndroid() && isNativeApp() && googlePrice ? googlePrice : `${currencySymbol}${monthlyPrice}`}/month
                         </div>
-                        <div className="text-[10px] md:text-sm text-blue-600 font-medium mt-1">📱 {t('premium.monthlySubscription')}</div>
+                        <div className="text-[9px] md:text-xs text-blue-600 font-medium mt-0.5">📱 {t('premium.monthlySubscription')}</div>
                       </div>
                     )}
                   </div>
@@ -502,12 +477,12 @@ const PremiumUpgrade = ({ currentUser, onClose, preselectedPlan }: PremiumUpgrad
                 </div>
 
                 {/* CTA Button */}
-                <div className="pt-3 md:pt-5 text-center">
+                <div className="pt-2 md:pt-4 text-center">
                   <Button
                     onClick={handleUpgrade}
-                    className="w-full bg-gradient-to-r from-yellow-400 via-yellow-500 to-orange-400 hover:from-yellow-500 hover:via-yellow-600 hover:to-orange-500 text-black font-bold py-2.5 md:py-4 px-4 md:px-8 rounded-xl text-base md:text-lg shadow-xl transition-all duration-200 responsive-text"
+                    className="w-full bg-gradient-to-r from-yellow-400 via-yellow-500 to-orange-400 hover:from-yellow-500 hover:via-yellow-600 hover:to-orange-500 text-black font-bold py-2 md:py-3 px-3 md:px-6 rounded-lg text-sm md:text-base shadow-lg transition-all duration-200"
                   >
-                    <Crown className="w-5 h-5 md:w-6 md:h-6 mr-2 md:mr-3" />
+                    <Crown className="w-4 h-4 md:w-5 md:h-5 mr-1.5 md:mr-2" />
                     {t('premium.upgradeButton')}
                   </Button>
                   
@@ -532,8 +507,8 @@ const PremiumUpgrade = ({ currentUser, onClose, preselectedPlan }: PremiumUpgrad
               <CardHeader className="text-center pb-3 md:pb-5 px-2 md:px-4">
                 <CardTitle className="text-lg sm:text-xl md:text-2xl font-bold text-gray-700 responsive-text">{t('premium.freePlan')}</CardTitle>
                 <div className="mt-2 md:mt-3">
-                  <div className="text-2xl sm:text-3xl md:text-4xl font-bold text-gray-700 responsive-text">{currency} 0</div>
-                  <div className="text-xs md:text-sm text-gray-500 mt-1">{t('premium.basicFeaturesOnly')}</div>
+                  <div className="text-xl sm:text-2xl md:text-3xl font-bold text-gray-700">{currencySymbol} 0</div>
+                  <div className="text-[10px] md:text-xs text-gray-500 mt-1">{t('premium.basicFeaturesOnly')}</div>
                 </div>
               </CardHeader>
               <CardContent className="space-y-1.5 md:space-y-3 px-2 md:px-5 pb-4 md:pb-7">
@@ -575,31 +550,31 @@ const PremiumUpgrade = ({ currentUser, onClose, preselectedPlan }: PremiumUpgrad
       {/* Payment Type Selection Modal */}
       {showPaymentOptions && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 px-2 sm:px-4">
-          <div className="bg-white rounded-lg shadow-lg p-4 sm:p-6 w-full max-w-md relative">
+          <div className="bg-white rounded-lg shadow-lg p-3 sm:p-5 w-full max-w-md relative">
             <button 
               onClick={() => setShowPaymentOptions(false)} 
               className="absolute top-2 right-2 text-gray-400 hover:text-gray-600"
             >
               ✕
             </button>
-            <h2 className="text-xl font-bold mb-4 text-center">
+            <h2 className="text-base sm:text-lg font-bold mb-3 text-center">
               {t('premium.paymentOptions.title')}
             </h2>
-            <div className="space-y-4">
+            <div className="space-y-3">
               {/* Apple IAP - show on iOS native when available */}
               {isIOS() && isNativeApp() && canBuy && (
                 <>
                   <button
                     onClick={() => handlePaymentTypeSelection('iap')}
                     disabled={iapLoading}
-                    className="w-full p-4 bg-gradient-to-r from-gray-800 to-black text-white rounded-lg hover:from-gray-700 hover:to-gray-900 transition-all duration-200 font-semibold disabled:opacity-50"
+                    className="w-full p-3 bg-gradient-to-r from-gray-800 to-black text-white rounded-lg hover:from-gray-700 hover:to-gray-900 transition-all duration-200 font-semibold disabled:opacity-50"
                   >
-                    <div className="text-lg">{iapLoading ? t('premium.paymentOptions.iap.processing') : t('premium.paymentOptions.iap.button')}</div>
-                    <div className="text-sm opacity-90">{t('premium.paymentOptions.iap.subtitle')}</div>
+                    <div className="text-sm sm:text-base">{iapLoading ? t('premium.paymentOptions.iap.processing') : t('premium.paymentOptions.iap.button')}</div>
+                    <div className="text-xs opacity-90">{t('premium.paymentOptions.iap.subtitle')}</div>
                   </button>
                   
                   {/* Auto-renewal disclosure */}
-                  <div className="text-xs text-gray-600 text-center px-2 -mt-2">
+                  <div className="text-[10px] text-gray-600 text-center px-2 -mt-2">
                     {t('premium.paymentOptions.iap.disclosure')}
                   </div>
                 </>
@@ -607,15 +582,15 @@ const PremiumUpgrade = ({ currentUser, onClose, preselectedPlan }: PremiumUpgrad
               
               {/* Loading message when IAP is not ready on iOS */}
               {isIOS() && isNativeApp() && !canBuy && !iapLoadingTimeout && (
-                <div className="text-center p-4 bg-blue-50 rounded-lg border border-blue-200">
-                  <div className="text-blue-600 mb-2 font-semibold">{t('premium.paymentOptions.loading.title')}</div>
-                  <div className="text-sm text-blue-500">{t('premium.paymentOptions.loading.message')}</div>
+                <div className="text-center p-3 bg-blue-50 rounded-lg border border-blue-200">
+                  <div className="text-blue-600 mb-1 text-sm font-semibold">{t('premium.paymentOptions.loading.title')}</div>
+                  <div className="text-xs text-blue-500">{t('premium.paymentOptions.loading.message')}</div>
                 </div>
               )}
               {isIOS() && isNativeApp() && !canBuy && iapLoadingTimeout && (
-                <div className="text-center p-4 bg-amber-50 rounded-lg border border-amber-200">
-                  <div className="text-amber-800 mb-2 font-semibold">{t('premium.paymentOptions.unavailable.title')}</div>
-                  <div className="text-sm text-amber-700">
+                <div className="text-center p-3 bg-amber-50 rounded-lg border border-amber-200">
+                  <div className="text-amber-800 mb-1 text-sm font-semibold">{t('premium.paymentOptions.unavailable.title')}</div>
+                  <div className="text-xs text-amber-700">
                     {t('premium.paymentOptions.unavailable.message')}
                   </div>
                 </div>
@@ -625,10 +600,10 @@ const PremiumUpgrade = ({ currentUser, onClose, preselectedPlan }: PremiumUpgrad
               {(!isNativeApp() || (isAndroid() && isNativeApp())) && !isIOS() && (
                 <button
                   onClick={() => handlePaymentTypeSelection('subscription')}
-                  className="w-full p-4 bg-gradient-to-r from-green-500 to-emerald-600 text-white rounded-lg hover:from-green-600 hover:to-emerald-700 transition-all duration-200 font-semibold"
+                  className="w-full p-3 bg-gradient-to-r from-green-500 to-emerald-600 text-white rounded-lg hover:from-green-600 hover:to-emerald-700 transition-all duration-200 font-semibold"
                 >
-                  <div className="text-lg">💳 Pay with Paystack</div>
-                  <div className="text-sm opacity-90">${monthlyPrice}/month • {t('premium.paymentOptions.monthly.subtitle')}</div>
+                  <div className="text-sm sm:text-base">💳 Pay with Paystack</div>
+                  <div className="text-xs opacity-90">{currencySymbol}{monthlyPrice}/month • {t('premium.paymentOptions.monthly.subtitle')}</div>
                 </button>
               )}
               
@@ -638,12 +613,12 @@ const PremiumUpgrade = ({ currentUser, onClose, preselectedPlan }: PremiumUpgrad
                   <button
                     onClick={() => handlePaymentTypeSelection('google_iap')}
                     disabled={googleIapLoading || !canBuyGoogle}
-                    className="w-full p-4 bg-gradient-to-r from-gray-800 to-black text-white rounded-lg hover:from-gray-700 hover:to-gray-900 transition-all duration-200 font-semibold disabled:opacity-50"
+                    className="w-full p-3 bg-gradient-to-r from-gray-800 to-black text-white rounded-lg hover:from-gray-700 hover:to-gray-900 transition-all duration-200 font-semibold disabled:opacity-50"
                   >
-                    <div className="text-lg flex items-center justify-center gap-2">
+                    <div className="text-sm sm:text-base flex items-center justify-center gap-2">
                       {googleIapLoading ? (
                         <>
-                          <svg className="animate-spin h-5 w-5" viewBox="0 0 24 24">
+                          <svg className="animate-spin h-4 w-4" viewBox="0 0 24 24">
                             <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" fill="none"/>
                             <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"/>
                           </svg>
@@ -651,7 +626,7 @@ const PremiumUpgrade = ({ currentUser, onClose, preselectedPlan }: PremiumUpgrad
                         </>
                       ) : (
                         <>
-                          <svg className="h-5 w-5" viewBox="0 0 24 24">
+                          <svg className="h-4 w-4" viewBox="0 0 24 24">
                             <path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"/>
                             <path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"/>
                             <path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z"/>
@@ -661,11 +636,11 @@ const PremiumUpgrade = ({ currentUser, onClose, preselectedPlan }: PremiumUpgrad
                         </>
                       )}
                     </div>
-                    <div className="text-sm opacity-90">{googlePrice || `$${monthlyPrice}`}/month • Google Play</div>
+                    <div className="text-xs opacity-90">{googlePrice || `${currencySymbol}${monthlyPrice}`}/month • Google Play</div>
                   </button>
                   
                   {/* Auto-renewal disclosure */}
-                  <div className="text-xs text-gray-600 text-center px-2 -mt-2">
+                  <div className="text-[10px] text-gray-600 text-center px-2 -mt-2">
                     Subscription automatically renews unless auto-renew is turned off at least 24 hours before the end of the current period.
                   </div>
                   
@@ -686,10 +661,10 @@ const PremiumUpgrade = ({ currentUser, onClose, preselectedPlan }: PremiumUpgrad
       <PaystackPaymentModal
         isOpen={showPaymentModal && (!isNativeApp() || !isIOS())}
         onClose={() => setShowPaymentModal(false)}
-        amount={parseFloat(ghsPrice || '0')}
+        amount={parseFloat(ghsPrice)}
         currency="GHS"
-        displayAmount={parseFloat(monthlyPrice || '0')}
-        displayCurrency="USD"
+        displayAmount={parseFloat(monthlyPrice)}
+        displayCurrency={currency}
         email={currentUser?.email || ''}
         onSuccess={handlePaymentSuccess}
         paymentMethod={paymentMethods[0]?.type || 'card'}
