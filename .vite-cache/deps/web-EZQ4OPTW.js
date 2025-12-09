@@ -1,7 +1,7 @@
-import {
-  WebPlugin
-} from "./chunk-SW4DC6T6.js";
 import "./chunk-HXA6O6EE.js";
+
+// node_modules/capacitor-video-player/dist/esm/web.js
+import { WebPlugin } from "@capacitor/core";
 
 // node_modules/hls.js/dist/hls.mjs
 var isFiniteNumber = Number.isFinite || function(value) {
@@ -33914,4 +33914,4 @@ var CapacitorVideoPlayerWeb = class extends WebPlugin {
 export {
   CapacitorVideoPlayerWeb
 };
-//# sourceMappingURL=web-LHELE4P6.js.map
+//# sourceMappingURL=web-EZQ4OPTW.js.map

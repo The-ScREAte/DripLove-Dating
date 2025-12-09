@@ -1076,7 +1076,7 @@ const MainApp = ({ user, onLogout }: MainAppProps) => {
                     : '8px'
                 }}
               >
-                <img src="/driplove-logo.png" alt="DripLove Logo" className="h-10" />
+                <img src="/driplove-logo.webp" alt="DripLove Logo" className="h-10" loading="lazy" decoding="async" />
                 <div className="text-right">
                   <div className="text-sm font-bold text-black leading-tight">
                     <div>{t('common.findYour')}</div>

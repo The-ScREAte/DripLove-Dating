@@ -1,11 +1,9 @@
-import {
-  registerPlugin
-} from "./chunk-SW4DC6T6.js";
 import "./chunk-HXA6O6EE.js";
 
 // node_modules/@southdevs/capacitor-google-auth/dist/esm/index.js
+import { registerPlugin } from "@capacitor/core";
 var GoogleAuth = registerPlugin("GoogleAuth", {
-  web: () => import("./web-GVLOHTWS.js").then((m) => new m.GoogleAuthWeb())
+  web: () => import("./web-OJMVRIAG.js").then((m) => new m.GoogleAuthWeb())
 });
 export {
   GoogleAuth

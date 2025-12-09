@@ -1,9 +1,7 @@
-import {
-  WebPlugin
-} from "./chunk-SW4DC6T6.js";
 import "./chunk-HXA6O6EE.js";
 
 // node_modules/@capacitor/browser/dist/esm/web.js
+import { WebPlugin } from "@capacitor/core";
 var BrowserWeb = class extends WebPlugin {
   constructor() {
     super();
@@ -29,4 +27,4 @@ export {
   Browser,
   BrowserWeb
 };
-//# sourceMappingURL=web-GE5E53ZF.js.map
+//# sourceMappingURL=web-BCVUFJQR.js.map

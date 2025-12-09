@@ -3,14 +3,14 @@ import {
   clamp
 } from "./chunk-TCQMTAGU.js";
 import {
-  useDirection
-} from "./chunk-UNSMH54V.js";
+  usePrevious
+} from "./chunk-ZC6QMYOX.js";
 import {
   createCollection
 } from "./chunk-EIAWBNG2.js";
 import {
-  usePrevious
-} from "./chunk-ZC6QMYOX.js";
+  useDirection
+} from "./chunk-UNSMH54V.js";
 import {
   useSize
 } from "./chunk-VCB7SA53.js";

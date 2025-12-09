@@ -9,6 +9,7 @@ import { useSubscription } from '@/hooks/useSubscription';
 import BlockDialog from './BlockDialog';
 import PremiumUpgrade from './PremiumUpgrade';
 import { useTranslation } from 'react-i18next';
+import { useVirtualizer } from '@tanstack/react-virtual';
 
 // Global cache for liked me data - persists across component mounts
 const likedMeCache = new Map<string, { 
@@ -16,6 +17,19 @@ const likedMeCache = new Map<string, {
   userImages: { [key: string]: string[] }, 
   timestamp: number 
 }>();
+const likedMePollIntervals = new Map<string, ReturnType<typeof setInterval>>();
+
+const hasListChanged = (previous: any[], next: any[]) => {
+  if (previous.length !== next.length) return true;
+  for (let i = 0; i < previous.length; i++) {
+    const prev = previous[i];
+    const curr = next[i];
+    if (!curr || prev.id !== curr.id || prev.updated_at !== curr.updated_at) {
+      return true;
+    }
+  }
+  return false;
+};
 const LIKED_ME_CACHE_DURATION = 30000; // 30 seconds
 
 // Make cache globally accessible for preloading
@@ -63,9 +77,16 @@ const LikedMePage = ({ currentUser, isPremium = false }: LikedMePageProps) => {
   const [pullDistance, setPullDistance] = useState(0);
   const [startY, setStartY] = useState(0);
   const backgroundFetchingRef = useRef(false);
+  const scrollContainerRef = useRef<HTMLDivElement>(null);
   const { toast } = useToast();
 
   const { subscription, getLikedMeVisibleCount } = useSubscription(currentUser?.id);
+  const rowVirtualizer = useVirtualizer({
+    count: likers.length > 0 ? Math.ceil(likers.length / 2) : 0,
+    getScrollElement: () => scrollContainerRef.current,
+    estimateSize: () => 310,
+    overscan: 3
+  });
 
   const calculateAge = useCallback((dateOfBirth: string) => {
     const today = new Date();
@@ -116,17 +137,21 @@ const LikedMePage = ({ currentUser, isPremium = false }: LikedMePageProps) => {
       const result = await fetchLikersData(currentUser.id);
       if (result) {
         const { likers: newLikers, userImages: newUserImages } = result;
-        
-        // Update cache
-        likedMeCache.set(currentUser.id, {
-          likers: newLikers,
-          userImages: newUserImages,
-          timestamp: Date.now()
-        });
+        const cached = likedMeCache.get(currentUser.id);
+        const shouldUpdate = hasListChanged(cached?.likers || [], newLikers);
 
-        // Update state with fresh data
-        setLikers(newLikers);
-        setUserImages(newUserImages);
+        if (shouldUpdate) {
+          likedMeCache.set(currentUser.id, {
+            likers: newLikers,
+            userImages: newUserImages,
+            timestamp: Date.now()
+          });
+
+          setLikers(newLikers);
+          setUserImages(newUserImages);
+        } else if (cached) {
+          cached.timestamp = Date.now();
+        }
       }
     } catch (error) {
       // Silently handle background fetch errors
@@ -367,6 +392,25 @@ const LikedMePage = ({ currentUser, isPremium = false }: LikedMePageProps) => {
     checkLockoutStatus();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [currentUser?.id]);
+
+  useEffect(() => {
+    if (!currentUser?.id) return;
+    const existingInterval = likedMePollIntervals.get(currentUser.id);
+    if (existingInterval) {
+      return () => clearInterval(existingInterval);
+    }
+
+    const interval = setInterval(() => {
+      void fetchLikersInBackground();
+    }, 30000);
+
+    likedMePollIntervals.set(currentUser.id, interval);
+
+    return () => {
+      clearInterval(interval);
+      likedMePollIntervals.delete(currentUser.id);
+    };
+  }, [currentUser?.id, fetchLikersInBackground]);
 
   useEffect(() => {
     setImageIndex(0);
@@ -1155,7 +1199,7 @@ const LikedMePage = ({ currentUser, isPremium = false }: LikedMePageProps) => {
         )} 
       </div>
       
-      <div className="flex-1 overflow-y-auto p-4 pb-24 bg-white">
+      <div className="flex-1 overflow-y-auto p-4 pb-24 bg-white" ref={scrollContainerRef}>
         {likers.length === 0 ? (
           <div className="flex items-center justify-center h-full">
             <div className="text-center">
@@ -1165,62 +1209,145 @@ const LikedMePage = ({ currentUser, isPremium = false }: LikedMePageProps) => {
             </div>
           </div>
         ) : (
-          <div className="grid grid-cols-2 gap-3">
-            {likers.map((liker, index) => {
-              const profileImages = userImages[liker.id] || [];
+          <div
+            style={{
+              position: 'relative',
+              height: `${rowVirtualizer.getTotalSize()}px`
+            }}
+          >
+            {rowVirtualizer.getVirtualItems().map(row => {
+              const firstIndex = row.index * 2;
+              const secondIndex = firstIndex + 1;
+              const firstLiker = likers[firstIndex];
+              const secondLiker = secondIndex < likers.length ? likers[secondIndex] : null;
               const isLocked = !isPremium;
               
               return (
-                <Card
-                  key={liker.id}
-                  className={`cursor-pointer hover:shadow-lg transition-shadow flex flex-col relative ${isLocked ? 'opacity-75' : ''}`}
-                  onClick={() => handleProfileClick(liker, index)}
+                <div
+                  key={row.index}
+                  style={{
+                    position: 'absolute',
+                    top: `${row.start}px`,
+                    left: 0,
+                    width: '100%',
+                    padding: '0 4px'
+                  }}
+                  className="grid grid-cols-2 gap-3"
                 >
-                  <div className="relative aspect-[3/4] w-full overflow-hidden rounded-t-lg">
-                    {profileImages.length > 0 ? (
-                      <img
-                        src={profileImages[0]}
-                        alt={`${liker.first_name}'s photo`}
-                        className={`w-full h-full object-cover ${isLocked ? 'blur-md' : ''}`}
-                        style={{
-                          height: '100%',
-                          width: '100%',
-                          objectFit: 'cover',
-                          objectPosition: 'center',
-                          display: 'block',
-                          // iOS-specific fixes for proper image scaling
-                          minHeight: '100%',
-                          minWidth: '100%',
-                          WebkitTransform: 'translateZ(0)', // Force hardware acceleration
-                          transform: 'translateZ(0)'
-                        }}
-                        loading="lazy"
-                      />
-                    ) : (
-                      <div className={`w-full h-full bg-gradient-to-br from-pink-200 to-purple-200 flex items-center justify-center ${isLocked ? 'blur-md' : ''}`}>
-                        <span className="text-2xl font-bold text-gray-700">
-                          {liker.first_name?.[0]}{liker.last_name?.[0]}
-                        </span>
+                  {/* first column */}
+                  {firstLiker ? (
+                    <Card
+                      key={firstLiker.id}
+                      className={`cursor-pointer hover:shadow-lg transition-shadow flex flex-col relative ${isLocked ? 'opacity-75' : ''}`}
+                      onClick={() => handleProfileClick(firstLiker, firstIndex)}
+                    >
+                      <div className="relative aspect-[3/4] w-full overflow-hidden rounded-t-lg">
+                        {(() => {
+                          const profileImages = userImages[firstLiker.id] || [];
+                          return profileImages.length > 0 ? (
+                            <img
+                              src={profileImages[0]}
+                              alt={`${firstLiker.first_name}'s photo`}
+                              className={`w-full h-full object-cover ${isLocked ? 'blur-md' : ''}`}
+                              style={{
+                                height: '100%',
+                                width: '100%',
+                                objectFit: 'cover',
+                                objectPosition: 'center',
+                                display: 'block',
+                                minHeight: '100%',
+                                minWidth: '100%',
+                                WebkitTransform: 'translateZ(0)',
+                                transform: 'translateZ(0)'
+                              }}
+                              loading="lazy"
+                            />
+                          ) : (
+                            <div className={`w-full h-full bg-gradient-to-br from-pink-200 to-purple-200 flex items-center justify-center ${isLocked ? 'blur-md' : ''}`}>
+                              <span className="text-2xl font-bold text-gray-700">
+                                {firstLiker.first_name?.[0]}{firstLiker.last_name?.[0]}
+                              </span>
+                            </div>
+                          );
+                        })()}
+                        {isLocked && (
+                          <div className="absolute inset-0 flex items-center justify-center bg-black/20">
+                            <div className="bg-white/90 backdrop-blur-sm rounded-full p-3">
+                              <Lock className="w-6 h-6 text-gray-700" />
+                            </div>
+                          </div>
+                        )}
                       </div>
-                    )}
-                    {isLocked && (
-                      <div className="absolute inset-0 flex items-center justify-center bg-black/20">
-                        <div className="bg-white/90 backdrop-blur-sm rounded-full p-3">
-                          <Lock className="w-6 h-6 text-gray-700" />
-                        </div>
-                      </div>
-                    )}
-                  </div>
+                      <CardContent className="p-3 flex-1">
+                        <h3 className={`font-semibold text-gray-800 truncate text-sm ${isLocked ? 'blur-sm' : ''}`}>
+                          {firstLiker.first_name}, {calculateAge(firstLiker.date_of_birth)}
+                        </h3>
+                        <p className={`text-xs text-gray-600 truncate ${isLocked ? 'blur-sm' : ''}`}>
+                          {firstLiker.city}
+                        </p>
+                      </CardContent>
+                    </Card>
+                  ) : (
+                    <div />
+                  )}
 
-                  <CardContent className="p-3 flex-1">
-                    <h3 className={`font-semibold text-gray-800 truncate text-sm ${isLocked ? 'blur-sm' : ''}`}>
-                      {liker.first_name}, {calculateAge(liker.date_of_birth)}
-                    </h3>
-                    <p className={`text-xs text-gray-600 truncate ${isLocked ? 'blur-sm' : ''}`}>
-                      {liker.city}
-                    </p>
-                  </CardContent>
-                </Card>
+                  {/* second column */}
+                  {secondLiker ? (
+                    <Card
+                      key={secondLiker.id}
+                      className={`cursor-pointer hover:shadow-lg transition-shadow flex flex-col relative ${isLocked ? 'opacity-75' : ''}`}
+                      onClick={() => handleProfileClick(secondLiker, secondIndex)}
+                    >
+                      <div className="relative aspect-[3/4] w-full overflow-hidden rounded-t-lg">
+                        {(() => {
+                          const profileImages = userImages[secondLiker.id] || [];
+                          return profileImages.length > 0 ? (
+                            <img
+                              src={profileImages[0]}
+                              alt={`${secondLiker.first_name}'s photo`}
+                              className={`w-full h-full object-cover ${isLocked ? 'blur-md' : ''}`}
+                              style={{
+                                height: '100%',
+                                width: '100%',
+                                objectFit: 'cover',
+                                objectPosition: 'center',
+                                display: 'block',
+                                minHeight: '100%',
+                                minWidth: '100%',
+                                WebkitTransform: 'translateZ(0)',
+                                transform: 'translateZ(0)'
+                              }}
+                              loading="lazy"
+                            />
+                          ) : (
+                            <div className={`w-full h-full bg-gradient-to-br from-pink-200 to-purple-200 flex items-center justify-center ${isLocked ? 'blur-md' : ''}`}>
+                              <span className="text-2xl font-bold text-gray-700">
+                                {secondLiker.first_name?.[0]}{secondLiker.last_name?.[0]}
+                              </span>
+                            </div>
+                          );
+                        })()}
+                        {isLocked && (
+                          <div className="absolute inset-0 flex items-center justify-center bg-black/20">
+                            <div className="bg-white/90 backdrop-blur-sm rounded-full p-3">
+                              <Lock className="w-6 h-6 text-gray-700" />
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                      <CardContent className="p-3 flex-1">
+                        <h3 className={`font-semibold text-gray-800 truncate text-sm ${isLocked ? 'blur-sm' : ''}`}>
+                          {secondLiker.first_name}, {calculateAge(secondLiker.date_of_birth)}
+                        </h3>
+                        <p className={`text-xs text-gray-600 truncate ${isLocked ? 'blur-sm' : ''}`}>
+                          {secondLiker.city}
+                        </p>
+                      </CardContent>
+                    </Card>
+                  ) : (
+                    <div />
+                  )}
+                </div>
               );
             })}
           </div>

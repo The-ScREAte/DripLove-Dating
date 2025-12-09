@@ -103,7 +103,9 @@ const RedirectHandler = () => {
           <div className="text-center space-y-4 p-8">
             <div className="flex justify-center">
               <img 
-                src="/driplove-logo.png" 
+                src="/driplove-logo.webp"
+                loading="lazy"
+                decoding="async" 
                 alt="DripLove" 
                 className="w-20 h-20 animate-bounce"
               />

@@ -1,9 +1,7 @@
-import {
-  WebPlugin
-} from "./chunk-SW4DC6T6.js";
 import "./chunk-HXA6O6EE.js";
 
 // node_modules/@southdevs/capacitor-google-auth/dist/esm/web.js
+import { WebPlugin } from "@capacitor/core";
 var GoogleAuthWeb = class extends WebPlugin {
   constructor() {
     super();
@@ -148,4 +146,4 @@ var GoogleAuthWeb = class extends WebPlugin {
 export {
   GoogleAuthWeb
 };
-//# sourceMappingURL=web-GVLOHTWS.js.map
+//# sourceMappingURL=web-OJMVRIAG.js.map

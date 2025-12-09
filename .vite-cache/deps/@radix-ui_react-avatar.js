@@ -1,8 +1,5 @@
 "use client";
 import {
-  require_shim
-} from "./chunk-QKVPWGRF.js";
-import {
   useCallbackRef
 } from "./chunk-2WKFAOYP.js";
 import {
@@ -13,6 +10,9 @@ import {
   Primitive
 } from "./chunk-P56Q3YE5.js";
 import "./chunk-WEGMSTPT.js";
+import {
+  require_shim
+} from "./chunk-QKVPWGRF.js";
 import "./chunk-DQTDWSXG.js";
 import {
   require_jsx_runtime

@@ -1,7 +1,7 @@
-import {
-  WebPlugin
-} from "./chunk-SW4DC6T6.js";
 import "./chunk-HXA6O6EE.js";
+
+// node_modules/@capacitor-firebase/messaging/dist/esm/web.js
+import { WebPlugin } from "@capacitor/core";
 
 // node_modules/@firebase/util/dist/postinstall.mjs
 var getDefaultsFromPostinstall = () => void 0;
@@ -3439,4 +3439,4 @@ export {
    * limitations under the License.
    *)
 */
-//# sourceMappingURL=web-FTNOCAFM.js.map
+//# sourceMappingURL=web-4AG7YORW.js.map

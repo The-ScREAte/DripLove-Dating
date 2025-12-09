@@ -2,6 +2,6 @@
   "version": 3,
   "sources": ["../../node_modules/capacitor-rate-app/src/web.ts"],
   "sourcesContent": [null],
-  "mappings": ";;;;;;AAIM,IAAO,aAAP,cAA0B,UAAS;EACvC,MAAM,gBAAa;AACjB;EACF;;",
+  "mappings": ";;;AAAA,SAAS,iBAAiB;AAIpB,IAAO,aAAP,cAA0B,UAAS;EACvC,MAAM,gBAAa;AACjB;EACF;;",
   "names": []
 }

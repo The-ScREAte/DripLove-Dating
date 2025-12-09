@@ -713,10 +713,11 @@ const RegistrationForm = ({ onSubmit, onBackToLogin }: RegistrationFormProps) =>
       <CardHeader className="text-center pb-6">
         <div className="flex justify-center mb-4">
           <img 
-            src="/driplove-logo.png" 
+            src="/driplove-logo.webp"
             alt="DripLove Logo" 
             className="w-16 h-14" 
             loading="eager"
+            decoding="async"
           />
         </div>
         <CardTitle className="text-2xl font-bold bg-gradient-to-r from-pink-600 to-purple-600 bg-clip-text text-transparent animate-fade-in">

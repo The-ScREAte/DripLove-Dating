@@ -1,7 +1,4 @@
 import {
-  WebPlugin
-} from "./chunk-SW4DC6T6.js";
-import {
   __commonJS,
   __toESM
 } from "./chunk-HXA6O6EE.js";
@@ -109,6 +106,7 @@ var require_script = __commonJS({
 
 // node_modules/@capacitor-community/apple-sign-in/dist/esm/web.js
 var $script = __toESM(require_script());
+import { WebPlugin } from "@capacitor/core";
 var SignInWithAppleWeb = class extends WebPlugin {
   constructor() {
     super(...arguments);
@@ -181,4 +179,4 @@ scriptjs/dist/script.js:
     * (c) Dustin Diaz 2014 | License MIT
     *)
 */
-//# sourceMappingURL=web-ABAHJHBZ.js.map
+//# sourceMappingURL=web-2BS6GBFI.js.map

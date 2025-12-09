@@ -43,13 +43,38 @@ public class MainActivity extends BridgeActivity {
             // Enable database storage
             settings.setDatabaseEnabled(true);
             
-            // Set cache mode for better video loading
+            // Set cache mode for better video loading and overall performance
             settings.setCacheMode(WebSettings.LOAD_DEFAULT);
             
-            // Enable hardware acceleration for smooth video
+            // Enable and optimize JavaScript performance
+            settings.setJavaScriptEnabled(true);
+            settings.setJavaScriptCanOpenWindowsAutomatically(true);
+            
+            // Enable hardware acceleration for smooth video and animations
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP) {
                 settings.setMixedContentMode(WebSettings.MIXED_CONTENT_ALWAYS_ALLOW);
             }
+            
+            // Performance optimizations for Android WebView
+            settings.setRenderPriority(WebSettings.RenderPriority.HIGH);
+            settings.setLayoutAlgorithm(WebSettings.LayoutAlgorithm.NORMAL);
+            
+            // Enable zoom controls (optional, improves UX)
+            settings.setSupportZoom(false);
+            settings.setBuiltInZoomControls(false);
+            settings.setDisplayZoomControls(false);
+            
+            // Enable safe browsing and security features
+            settings.setAllowFileAccess(true);
+            settings.setAllowContentAccess(true);
+            
+            // Improve image loading performance
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                settings.setSafeBrowsingEnabled(true);
+            }
+            
+            // Enable geolocation
+            settings.setGeolocationEnabled(true);
         }
     }
     

@@ -327,8 +327,8 @@ async function loadPricingConfig(userId?: string): Promise<PricingConfig> {
         return config;
       }
       
-      // Fallback for Android if IAP fails - use database pricing
-      console.log('[Pricing] Android IAP failed, using database fallback');
+      // Fallback for Android if IAP fails - use database pricing in USD
+      console.log('[Pricing] Android IAP failed, using database fallback (USD)');
       return { ...webPricing };
     }
     

@@ -1,5 +1,5 @@
 
-import React, { useState } from 'react';
+import React, { useCallback, useMemo, useRef, useState } from 'react';
 import PaystackPaymentModal from './PaystackPaymentModal';
 import { isIOS, isNativeApp } from '@/utils/iap';
 import { buyMonthly, debugIAPState, restorePurchases } from '../iap';
@@ -37,59 +37,65 @@ const PremiumUpgrade = ({ currentUser, onClose, preselectedPlan }: PremiumUpgrad
   const [googleIapLoading, setGoogleIapLoading] = useState(false);
   const [googleIapLoadingTimeout, setGoogleIapLoadingTimeout] = useState(false);
   const [googlePrice, setGooglePrice] = useState<string | null>(null);
+  const canBuyRef = useRef(canBuy);
+  const googleCanBuyRef = useRef(canBuyGoogle);
+  React.useEffect(() => {
+    canBuyRef.current = canBuy;
+  }, [canBuy]);
+
+  React.useEffect(() => {
+    googleCanBuyRef.current = canBuyGoogle;
+  }, [canBuyGoogle]);
   
   // Enhanced subscription status monitoring
   const { subscriptionStatus, isPremium, loading: subscriptionLoading, refetch: refetchSubscription } = useEnhancedSubscription();
 
+  const deviceIsNative = isNativeApp();
+  const deviceIsAndroid = isAndroid();
+  const deviceIsIos = isIOS();
+  const isAndroidNative = deviceIsAndroid && deviceIsNative;
+  const isIosNative = deviceIsIos && deviceIsNative;
+  const showRestoreButton = (deviceIsIos || deviceIsAndroid) && deviceIsNative;
+  const showPaystackOption = (!deviceIsNative || isAndroidNative) && !deviceIsIos;
+
   React.useEffect(() => {
-    // Listen for productUpdated to enable the in-app purchase button
+    const productUpdateTimeouts: NodeJS.Timeout[] = [];
+    let loadingTimeout: NodeJS.Timeout | undefined;
+
     function onProductUpdated(p?: any) {
       // @ts-ignore
       const store = window.CdvPurchase?.store;
-      
-      // Check for both possible product IDs
+
       const product2 = store?.get?.('com.driplove.dating.premium.monthlysub2');
       const product3 = store?.get?.('com.driplove.dating.premium.monthlysub3');
-      const product = product3 || product2; // Prefer monthlysub3, fallback to monthlysub2
-      
-      console.log('[PremiumUpgrade] Products from store:', {
-        monthlysub2: product2,
-        monthlysub3: product3,
-        selected: product?.id
-      });
-      
+      const product = product3 || product2;
+
       const hasOffer = !!product?.getOffer?.();
       setCanBuy(hasOffer);
-      
-      // If product becomes available, clear the timeout flag
+
       if (hasOffer) {
         setIapLoadingTimeout(false);
       }
-      
-      // Check if initialization failed
+
       // @ts-ignore
       if (window.iapInitializationFailed && !hasOffer) {
         setIapLoadingTimeout(true);
         setCanBuy(false);
       }
     }
-    
-    // Listen for verified purchases to reset loading state
+
     function onVerified(r?: any) {
-      // Check for both product IDs
-      const isOurProduct = r?.productId === 'com.driplove.dating.premium.monthlysub2' || 
-                           r?.productId === 'com.driplove.dating.premium.monthlysub3';
+      const isOurProduct = r?.productId === 'com.driplove.dating.premium.monthlysub2' ||
+        r?.productId === 'com.driplove.dating.premium.monthlysub3';
       if (isOurProduct) {
         setIapLoading(false);
         setShowPaymentOptions(false);
       }
     }
-    
-    // Listen for unverified purchases (includes cancellations)
-    function onUnverified(r?: any, err?: any) {
-      // Check for both product IDs
-      const isOurProduct = r?.productId === 'com.driplove.dating.premium.monthlysub2' || 
-                           r?.productId === 'com.driplove.dating.premium.monthlysub3';
+
+    function onUnverified(r?: any) {
+      const isOurProduct = r?.productId === 'com.driplove.dating.premium.monthlysub2' ||
+        r?.productId === 'com.driplove.dating.premium.monthlysub3';
       if (isOurProduct) {
         setIapLoading(false);
         toast({
@@ -98,10 +104,8 @@ const PremiumUpgrade = ({ currentUser, onClose, preselectedPlan }: PremiumUpgrad
         });
       }
     }
-    
-    // Listen for errors (includes user cancellations)
+
     function onError(e?: any) {
-      // User cancellation typically has specific error codes
       if (e?.code === 'UserCancel' || e?.code === 2 || e?.message?.toLowerCase()?.includes('cancel')) {
         setIapLoading(false);
         toast({
@@ -110,12 +114,11 @@ const PremiumUpgrade = ({ currentUser, onClose, preselectedPlan }: PremiumUpgrad
         });
       }
     }
-    
+
     // @ts-ignore
     const store = window.CdvPurchase?.store;
     if (store && store.when && typeof store.when === 'function') {
       try {
-        // Listen to purchase events using the correct API
         store.when()
           .productUpdated(onProductUpdated)
           .verified(onVerified)
@@ -124,8 +127,7 @@ const PremiumUpgrade = ({ currentUser, onClose, preselectedPlan }: PremiumUpgrad
         console.warn('[UI] Error setting up IAP listeners:', error);
       }
     }
-    
-    // Also listen for global errors
+
     if (store && store.error && typeof store.error === 'function') {
       try {
         store.error(onError);
@@ -133,82 +135,73 @@ const PremiumUpgrade = ({ currentUser, onClose, preselectedPlan }: PremiumUpgrad
         console.warn('[UI] Error setting up global error listener:', error);
       }
     }
-    
-    // Also check current state
+
     onProductUpdated();
-    
-    // Initial check with delay
-    setTimeout(() => {
-      onProductUpdated();
-    }, 1000);
-    
-    // Set timeout for IAP loading - applies to ALL platforms including iOS
-    let loadingTimeout: NodeJS.Timeout | undefined;
-    
+    productUpdateTimeouts.push(setTimeout(onProductUpdated, 1000));
+
     loadingTimeout = setTimeout(() => {
-      if (!canBuy) {
+      if (!canBuyRef.current) {
         console.warn('[UI] IAP loading timeout - products not available after 8 seconds');
         setIapLoadingTimeout(true);
-        // Silently handle timeout without showing toast
       }
-    }, 8000); // 8 seconds timeout for better UX
-    
-    // Cleanup
+    }, 8000);
+
     return () => {
+      productUpdateTimeouts.forEach(clearTimeout);
       if (loadingTimeout) {
         clearTimeout(loadingTimeout);
       }
     };
     // No off/unsubscribe in plugin
-  }, [toast, canBuy]);
+  }, [toast]);
   
   // Google IAP initialization effect
   React.useEffect(() => {
-    if (!isAndroid() || !isNativeApp()) return;
-    
+    if (!isAndroidNative) return;
+
+    const timeouts: NodeJS.Timeout[] = [];
+    let loadingTimeout: NodeJS.Timeout | undefined;
+
     const checkGoogleIAP = async () => {
       // @ts-ignore
       const store = window.CdvPurchase?.store;
-      
-      // Check for Google product
+
       const googleProduct = store?.get?.('premium_monthly');
-      
-      console.log('[PremiumUpgrade] Google product:', googleProduct);
-      
       const hasOffer = !!googleProduct?.getOffer?.();
       setCanBuyGoogle(hasOffer);
-      
+
       if (hasOffer) {
         setGoogleIapLoadingTimeout(false);
-        // Get localized price
         const products = await getGoogleProducts();
         if (products) {
           setGooglePrice(products.price);
         }
       }
-      
+
       // @ts-ignore
       if (window.googleIapInitializationFailed && !hasOffer) {
         setGoogleIapLoadingTimeout(true);
         setCanBuyGoogle(false);
       }
     };
-    
-    // Check immediately and after delay
+
     checkGoogleIAP();
-    setTimeout(checkGoogleIAP, 1000);
-    setTimeout(checkGoogleIAP, 3000);
-    
-    // Set timeout for Google IAP loading
-    const loadingTimeout = setTimeout(() => {
-      if (!canBuyGoogle) {
-        console.warn('[UI] Google IAP loading timeout');
+    timeouts.push(setTimeout(checkGoogleIAP, 1000));
+    timeouts.push(setTimeout(checkGoogleIAP, 3000));
+
+    loadingTimeout = setTimeout(() => {
+      if (!googleCanBuyRef.current) {
         setGoogleIapLoadingTimeout(true);
       }
     }, 8000);
-    
-    return () => clearTimeout(loadingTimeout);
-  }, [canBuyGoogle]);
+
+    return () => {
+      timeouts.forEach(clearTimeout);
+      if (loadingTimeout) {
+        clearTimeout(loadingTimeout);
+      }
+    };
+  }, [isAndroidNative]);
   
   // Use pricing config hook - now fetches localized IAP prices directly
   const pricingConfig = usePricingConfig();
@@ -219,6 +212,34 @@ const PremiumUpgrade = ({ currentUser, onClose, preselectedPlan }: PremiumUpgrad
   const currency = pricingConfig.currency;
   const currencySymbol = pricingConfig.currencySymbol;
   const ghsPrice = pricingConfig.ghsPrice;
+  
+  // For Paystack on Android, always fetch USD pricing from admin dashboard
+  const [paystackPrice, setPaystackPrice] = useState('1.99');
+  
+  React.useEffect(() => {
+    if (isAndroidNative) {
+      const loadPaystackPrice = async () => {
+        try {
+          const { data } = await supabase
+            .from('payment_config')
+            .select('default_international_price')
+            .order('created_at', { ascending: false })
+            .limit(1)
+            .single();
+
+          if (data?.default_international_price) {
+            setPaystackPrice(data.default_international_price.toString());
+          }
+        } catch (error) {
+          console.error('[Paystack] Error loading price:', error);
+        }
+      };
+      loadPaystackPrice();
+    } else {
+      setPaystackPrice(monthlyPrice);
+    }
+  }, [isAndroidNative, monthlyPrice]);
+  
   const [paymentMethods, setPaymentMethods] = useState<any[]>([{ type: 'card' }]);
 
   const handleUpgrade = () => {
@@ -232,7 +253,7 @@ const PremiumUpgrade = ({ currentUser, onClose, preselectedPlan }: PremiumUpgrad
     }
     
     // Check if we're on iOS and IAP initialization has failed
-    if (isIOS() && isNativeApp() && window.iapInitializationFailed) {
+    if (isIosNative && window.iapInitializationFailed) {
       toast({
         title: 'Connection Failed',
         description: 'Please try again later.',
@@ -245,7 +266,7 @@ const PremiumUpgrade = ({ currentUser, onClose, preselectedPlan }: PremiumUpgrad
     setShowPaymentOptions(true);
   };
 
-  const handlePaymentTypeSelection = async (type: 'subscription' | 'one-time' | 'iap' | 'google_iap') => {
+  const handlePaymentTypeSelection = useCallback(async (type: 'subscription' | 'one-time' | 'iap' | 'google_iap') => {
     if (type === 'iap') {
       if (!canBuy) {
         // Silently prevent action if not ready
@@ -315,7 +336,7 @@ const PremiumUpgrade = ({ currentUser, onClose, preselectedPlan }: PremiumUpgrad
       setShowPaymentOptions(false);
       setShowPaymentModal(true);
     }
-  };
+  }, [canBuy, canBuyGoogle, toast]);
 
   const handlePaymentSuccess = () => {
     // Removed: Premium activated toast
@@ -335,7 +356,7 @@ const PremiumUpgrade = ({ currentUser, onClose, preselectedPlan }: PremiumUpgrad
       console.log('[PremiumUpgrade] Starting restore purchases...');
       
       // Call the appropriate restore function based on platform
-      if (isAndroid() && isNativeApp()) {
+      if (isAndroidNative) {
         await restoreGooglePurchases();
       } else {
         await restorePurchases();
@@ -367,14 +388,14 @@ const PremiumUpgrade = ({ currentUser, onClose, preselectedPlan }: PremiumUpgrad
     }
   };
 
-  const features = [
+  const features = useMemo(() => [
     { name: t('premium.features.unlimitedSwipes.name'), free: t('premium.features.unlimitedSwipes.free'), premium: t('premium.features.unlimitedSwipes.premium'), icon: Heart },
     { name: t('premium.features.reverseDislikes.name'), free: t('premium.features.reverseDislikes.free'), premium: t('premium.features.reverseDislikes.premium'), icon: RotateCcw },
     { name: t('premium.features.adFrequency.name'), free: t('premium.features.adFrequency.free'), premium: t('premium.features.adFrequency.premium'), icon: X },
     { name: t('premium.features.seeWhoLiked.name'), free: t('premium.features.seeWhoLiked.free'), premium: t('premium.features.seeWhoLiked.premium'), icon: Users },
     { name: t('premium.features.unlockCountries.name'), free: t('premium.features.unlockCountries.free'), premium: t('premium.features.unlockCountries.premium'), icon: Globe },
     { name: t('premium.features.prioritySupport.name'), free: t('premium.features.prioritySupport.free'), premium: t('premium.features.prioritySupport.premium'), icon: Crown },
-  ];
+  ], [t]);
 
   return (
   <div
@@ -487,7 +508,7 @@ const PremiumUpgrade = ({ currentUser, onClose, preselectedPlan }: PremiumUpgrad
                   </Button>
                   
                   {/* Restore Purchases Link for iOS and Android */}
-                  {(isIOS() || isAndroid()) && isNativeApp() && (
+                  {showRestoreButton && (
                     <button
                       onClick={handleRestorePurchases}
                       disabled={restoreLoading}
@@ -562,7 +583,7 @@ const PremiumUpgrade = ({ currentUser, onClose, preselectedPlan }: PremiumUpgrad
             </h2>
             <div className="space-y-3">
               {/* Apple IAP - show on iOS native when available */}
-              {isIOS() && isNativeApp() && canBuy && (
+              {isIosNative && canBuy && (
                 <>
                   <button
                     onClick={() => handlePaymentTypeSelection('iap')}
@@ -581,13 +602,13 @@ const PremiumUpgrade = ({ currentUser, onClose, preselectedPlan }: PremiumUpgrad
               )}
               
               {/* Loading message when IAP is not ready on iOS */}
-              {isIOS() && isNativeApp() && !canBuy && !iapLoadingTimeout && (
+              {isIosNative && !canBuy && !iapLoadingTimeout && (
                 <div className="text-center p-3 bg-blue-50 rounded-lg border border-blue-200">
                   <div className="text-blue-600 mb-1 text-sm font-semibold">{t('premium.paymentOptions.loading.title')}</div>
                   <div className="text-xs text-blue-500">{t('premium.paymentOptions.loading.message')}</div>
                 </div>
               )}
-              {isIOS() && isNativeApp() && !canBuy && iapLoadingTimeout && (
+              {isIosNative && !canBuy && iapLoadingTimeout && (
                 <div className="text-center p-3 bg-amber-50 rounded-lg border border-amber-200">
                   <div className="text-amber-800 mb-1 text-sm font-semibold">{t('premium.paymentOptions.unavailable.title')}</div>
                   <div className="text-xs text-amber-700">
@@ -597,18 +618,18 @@ const PremiumUpgrade = ({ currentUser, onClose, preselectedPlan }: PremiumUpgrad
               )}
               
               {/* Paystack/Card Payment Options - show on web AND Android native, NOT on iOS */}
-              {(!isNativeApp() || (isAndroid() && isNativeApp())) && !isIOS() && (
+              {showPaystackOption && (
                 <button
                   onClick={() => handlePaymentTypeSelection('subscription')}
                   className="w-full p-3 bg-gradient-to-r from-green-500 to-emerald-600 text-white rounded-lg hover:from-green-600 hover:to-emerald-700 transition-all duration-200 font-semibold"
                 >
                   <div className="text-sm sm:text-base">💳 Pay with Paystack</div>
-                  <div className="text-xs opacity-90">{currencySymbol}{monthlyPrice}/month • {t('premium.paymentOptions.monthly.subtitle')}</div>
+                  <div className="text-xs opacity-90">${paystackPrice}/month • {t('premium.paymentOptions.monthly.subtitle')}</div>
                 </button>
               )}
               
               {/* Google IAP - show on Android native */}
-              {isAndroid() && isNativeApp() && (
+              {isAndroidNative && (
                 <>
                   <button
                     onClick={() => handlePaymentTypeSelection('google_iap')}
@@ -659,7 +680,7 @@ const PremiumUpgrade = ({ currentUser, onClose, preselectedPlan }: PremiumUpgrad
 
       {/* Payment Modals - Show on Web and Android (NOT on iOS native) */}
       <PaystackPaymentModal
-        isOpen={showPaymentModal && (!isNativeApp() || !isIOS())}
+        isOpen={showPaymentModal && (!deviceIsNative || !deviceIsIos)}
         onClose={() => setShowPaymentModal(false)}
         amount={parseFloat(ghsPrice)}
         currency="GHS"
@@ -674,4 +695,4 @@ const PremiumUpgrade = ({ currentUser, onClose, preselectedPlan }: PremiumUpgrad
   );
 };
 
-export default PremiumUpgrade;
+export default React.memo(PremiumUpgrade);

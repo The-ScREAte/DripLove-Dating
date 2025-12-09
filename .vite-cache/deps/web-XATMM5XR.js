@@ -1,9 +1,7 @@
-import {
-  WebPlugin
-} from "./chunk-SW4DC6T6.js";
 import "./chunk-HXA6O6EE.js";
 
 // node_modules/@capacitor/app/dist/esm/web.js
+import { WebPlugin } from "@capacitor/core";
 var AppWeb = class extends WebPlugin {
   constructor() {
     super();
@@ -39,4 +37,4 @@ var AppWeb = class extends WebPlugin {
 export {
   AppWeb
 };
-//# sourceMappingURL=web-UKOWJXZ5.js.map
+//# sourceMappingURL=web-XATMM5XR.js.map

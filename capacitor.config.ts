@@ -33,7 +33,11 @@ const config: CapacitorConfig = {
     // Improve scrolling performance
     overscrollHistoryNavigation: false,
     // Optimize for modern Android
-    mixedContentMode: 0
+    mixedContentMode: 0,
+    // Enhanced Android WebView performance settings
+    loggingBehavior: 'none',
+    // Enable WebView cache and storage for better performance
+    appendUserAgent: 'DripLove-Android'
   },
   plugins: {
     GoogleAuth: {

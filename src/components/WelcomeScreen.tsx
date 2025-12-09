@@ -617,7 +617,7 @@ const WelcomeScreen: React.FC<WelcomeScreenProps> = ({ onLogin, onAbout, onTerms
       {/* Logo and Tagline */}
       <div className="flex flex-col items-center relative z-10 mt-24 sm:mt-24 px-4 sm:px-6 w-full max-w-md">
         <img 
-          src="/driplove-logo.png" 
+          src="/driplove-logo.webp"
           alt="DripLove Logo" 
           className="w-28 h-24 sm:w-40 sm:h-32 mb-3 sm:mb-4" 
           loading="eager"

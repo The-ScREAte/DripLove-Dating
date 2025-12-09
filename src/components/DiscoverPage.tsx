@@ -2,6 +2,7 @@
 import { buyMonthly, restorePurchases } from '../iap';
 import { Capacitor } from '@capacitor/core';
 import { useTranslation } from 'react-i18next';
+import { memo } from 'react';
 
 // ⭐ GLOBAL IMAGE CACHE - Shared across all components for instant loading
 const globalImageCache = new Map<string, string>(); // url => blobURL
@@ -2342,9 +2343,10 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, isPremium }: DiscoverPage
   }
 
   const currentMatch = potentialMatches[currentIndex];
+  const nextMatch = potentialMatches[currentIndex + 1];
+  
   // Use preloaded images for current and next card
   const currentMatchImages = currentMatch && !isAd(currentMatch) ? (userImages[currentMatch.id] || []) : [];
-  const nextMatch = potentialMatches[currentIndex + 1];
   const nextMatchImages = nextMatch && !isAd(nextMatch) ? (userImages[nextMatch.id] || []) : [];
 
   // Handle ads separately
@@ -2429,7 +2431,9 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, isPremium }: DiscoverPage
           <div className="flex flex-col items-center">
             <div className="mb-4 float-animation">
               <img 
-                src="/driplove-logo.png" 
+                src="/driplove-logo.webp"
+                loading="lazy"
+                decoding="async" 
                 alt="DripLove" 
                 className="w-20 h-20"
               />
@@ -2467,13 +2471,12 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, isPremium }: DiscoverPage
   // Calculate swipe overlay opacity and transform
   const swipeOpacity = Math.min(swipeUI.swipeDistance / 100, 0.8);
 
-  // Simple card transform for smooth dragging only - use dragOffset (signed) to avoid stale state
-  // Use translate3d to ensure GPU compositing and avoid expensive layout
-  const getCardTransform = () => {
+  // Simple card transform for smooth dragging - use translate3d for GPU acceleration
+  const cardTransform = (() => {
     if (exitingCard && exitDirection) {
       const screenWidth = window.innerWidth;
       const exitX = exitDirection === 'right' ? screenWidth * 1.5 : -screenWidth * 1.5;
-      const exitY = window.innerHeight * 0.3; // Fall down effect
+      const exitY = window.innerHeight * 0.3;
       const rotation = exitDirection === 'right' ? 30 : -30;
       return `translate3d(${exitX}px, ${exitY}px, 0) rotate(${rotation}deg)`;
     }
@@ -2481,9 +2484,7 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, isPremium }: DiscoverPage
       return `translate3d(${swipeUI.dragOffset}px, 0, 0) rotate(${swipeUI.dragOffset * 0.08}deg)`;
     }
     return '';
-  };
-  
-  const cardTransform = getCardTransform();
+  })();
 
 
 
