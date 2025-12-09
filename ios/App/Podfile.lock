@@ -29,8 +29,6 @@ PODS:
     - Capacitor
   - CapacitorVideoPlayer (6.0.2):
     - Capacitor
-  - CapgoNativePurchases (7.16.2):
-    - Capacitor
   - CordovaPlugins (7.4.2):
     - CapacitorCordova
   - FirebaseCore (11.7.0):
@@ -115,7 +113,6 @@ DEPENDENCIES:
   - CapacitorRateApp (from `../../node_modules/capacitor-rate-app`)
   - "CapacitorStatusBar (from `../../node_modules/@capacitor/status-bar`)"
   - CapacitorVideoPlayer (from `../../node_modules/capacitor-video-player`)
-  - "CapgoNativePurchases (from `../../node_modules/@capgo/native-purchases`)"
   - CordovaPlugins (from `../capacitor-cordova-ios-plugins`)
   - GoogleSignIn (~> 7.1)
   - GTMAppAuth (~> 4.1)
@@ -162,8 +159,6 @@ EXTERNAL SOURCES:
     :path: "../../node_modules/@capacitor/status-bar"
   CapacitorVideoPlayer:
     :path: "../../node_modules/capacitor-video-player"
-  CapgoNativePurchases:
-    :path: "../../node_modules/@capgo/native-purchases"
   CordovaPlugins:
     :path: "../capacitor-cordova-ios-plugins"
   SouthdevsCapacitorGoogleAuth:
@@ -183,7 +178,6 @@ SPEC CHECKSUMS:
   CapacitorRateApp: 20928fa996851647e912bbf119af59a48a171712
   CapacitorStatusBar: 6e7af040d8fc4dd655999819625cae9c2d74c36f
   CapacitorVideoPlayer: b10c7102c50bb5d5eba2653b5bd99109f5a1bf10
-  CapgoNativePurchases: 8c676076beb71f7361f10e9cfb2cf043122fd5e4
   CordovaPlugins: b2618e17f8dd580d2354710b7b52b0af9d6f03f2
   FirebaseCore: 3227e35f4197a924206fbcdc0349325baf4f5de4
   FirebaseCoreInternal: d6c17dafc8dc33614733a8b52df78fcb4394c881
@@ -198,6 +192,6 @@ SPEC CHECKSUMS:
   PromisesObjC: f5707f49cb48b9636751c5b2e7d227e43fba9f47
   SouthdevsCapacitorGoogleAuth: 453cab6e5f58fec290e30b2d918ded3434ad22c9
 
-PODFILE CHECKSUM: 26cddd6cd1a72e66392d0410a8d13b4ad20c068f
+PODFILE CHECKSUM: aa42be7420f47bc5143ec4e7744e58eedfb81ea8
 
 COCOAPODS: 1.16.2

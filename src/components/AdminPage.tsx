@@ -22,7 +22,6 @@ import ManualPremiumManager from './admin/ManualPremiumManager';
 import AdsManagement from './admin/AdsManagement';
 import RedirectLinkCreator from './admin/RedirectLinkCreator';
 import BroadcastNotifications from './admin/BroadcastNotifications';
-import PromotionsManagement from './admin/PromotionsManagement';
 import { debounce, userDataCache, createPagination } from '@/utils/performanceOptimizer';
 import { useSupabaseSubscription, useMemoryMonitor } from '@/hooks/usePerformance';
 import { CurrentUser, AdminStats } from '@/types';
@@ -47,8 +46,7 @@ import {
   BarChart3,
   Crown,
   Megaphone,
-  Link2,
-  Gift
+  Link2
 } from 'lucide-react';
 
 interface AdminPageProps {
@@ -73,7 +71,6 @@ interface UserProfile {
   is_premium?: boolean;
   last_login_at?: string | null;
   login_count?: number | null;
-  image_count?: number;
 }
 
 interface PendingImage {
@@ -115,7 +112,6 @@ const AdminPageComponent = ({ currentUser, onLogout }: AdminPageProps) => {
   const [relationshipIntentFilter, setRelationshipIntentFilter] = useState('all');
   const [premiumFilter, setPremiumFilter] = useState('all');
   const [activityFilter, setActivityFilter] = useState('all');
-  const [imagesFilter, setImagesFilter] = useState('all');
   const [loading, setLoading] = useState(true);
   const [currentPage, setCurrentPage] = useState(1);
   const [matchUser1, setMatchUser1] = useState('');
@@ -895,7 +891,7 @@ const AdminPageComponent = ({ currentUser, onLogout }: AdminPageProps) => {
       setLoading(true);
       
       // Check cache first for performance
-      const cacheKey = `users_all_${statusFilter}_${genderFilter}_${interestedInFilter}_${countryFilter}_${relationshipIntentFilter}_${premiumFilter}_${activityFilter}_${imagesFilter}`;
+      const cacheKey = `users_all_${statusFilter}_${genderFilter}_${interestedInFilter}_${countryFilter}_${relationshipIntentFilter}_${premiumFilter}_${activityFilter}`;
       const cachedUsers = userDataCache.get(cacheKey);
       if (cachedUsers) {
         const { regularUsers, admins } = cachedUsers;
@@ -956,23 +952,6 @@ const AdminPageComponent = ({ currentUser, onLogout }: AdminPageProps) => {
 
       if (error) throw error;
 
-      // Fetch image counts for all users
-      const userIds = data?.map(u => u.id) || [];
-      let imageCounts: Record<string, number> = {};
-      
-      if (userIds.length > 0) {
-        const { data: imageData } = await supabase
-          .from('user_images')
-          .select('user_id')
-          .in('user_id', userIds);
-        
-        if (imageData) {
-          imageData.forEach((img: any) => {
-            imageCounts[img.user_id] = (imageCounts[img.user_id] || 0) + 1;
-          });
-        }
-      }
-
       const usersWithAge = data?.map(user => {
         // Check if user has active premium subscription
         // Premium if status is 'active' AND (expires_at is null OR expires_at is in the future)
@@ -987,8 +966,7 @@ const AdminPageComponent = ({ currentUser, onLogout }: AdminPageProps) => {
           age: calculateAge(user.date_of_birth),
           is_premium: hasPremium,
           last_login_at: (user as any).last_login_at,
-          login_count: (user as any).login_count,
-          image_count: imageCounts[user.id] || 0
+          login_count: (user as any).login_count
         };
       }) || [];
 
@@ -1019,7 +997,7 @@ const AdminPageComponent = ({ currentUser, onLogout }: AdminPageProps) => {
     } finally {
       setLoading(false);
     }
-  }, 300), [toast, statusFilter, genderFilter, interestedInFilter, countryFilter, relationshipIntentFilter, premiumFilter, activityFilter, imagesFilter]);
+  }, 300), [toast, statusFilter, genderFilter, interestedInFilter, countryFilter, relationshipIntentFilter, premiumFilter, activityFilter]);
 
   const calculateAge = (dateOfBirth: string) => {
     const today = new Date();
@@ -1306,15 +1284,7 @@ const AdminPageComponent = ({ currentUser, onLogout }: AdminPageProps) => {
       }
     }
     
-    // Images filter logic
-    let matchesImages = true;
-    if (imagesFilter !== 'all') {
-      const imageCount = user.image_count || 0;
-      const filterNum = parseInt(imagesFilter, 10);
-      matchesImages = imageCount === filterNum;
-    }
-    
-    return matchesSearch && matchesStatus && matchesGender && matchesInterestedIn && matchesCountry && matchesRelationshipIntent && matchesPremium && matchesActivity && matchesImages;
+    return matchesSearch && matchesStatus && matchesGender && matchesInterestedIn && matchesCountry && matchesRelationshipIntent && matchesPremium && matchesActivity;
   });
 
   // Pagination
@@ -1394,7 +1364,7 @@ const AdminPageComponent = ({ currentUser, onLogout }: AdminPageProps) => {
         </div>
         
         {/* Scrollable Content */}
-        <div className="p-4 pb-40">
+        <div className="p-4 pb-20">
 
           {/* Tabbed Interface with Error Boundaries for 1000+ users */}
           <AdminErrorBoundary>
@@ -1421,11 +1391,7 @@ const AdminPageComponent = ({ currentUser, onLogout }: AdminPageProps) => {
                 </TabsList>
 
                 {/* Second Row - Additional Tabs */}
-                <TabsList className="grid w-full grid-cols-5 h-auto">
-                  <TabsTrigger value="promos" className="text-xs flex flex-col gap-1 py-2">
-                    <Gift className="w-4 h-4" />
-                    <span>Promos</span>
-                  </TabsTrigger>
+                <TabsList className="grid w-full grid-cols-4 h-auto">
                   <TabsTrigger value="ads" className="text-xs flex flex-col gap-1 py-2">
                     <Megaphone className="w-4 h-4" />
                     <span>Ads</span>
@@ -1598,21 +1564,6 @@ const AdminPageComponent = ({ currentUser, onLogout }: AdminPageProps) => {
               <BroadcastNotifications />
             </TabsContent>
 
-            {/* Promotions Tab */}
-            <TabsContent value="promos" className="space-y-4">
-              <Card>
-                <CardHeader className="pb-3">
-                  <CardTitle className="flex items-center gap-2 text-sm">
-                    <Gift className="w-4 h-4" />
-                    Promo Code Management
-                  </CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <PromotionsManagement />
-                </CardContent>
-              </Card>
-            </TabsContent>
-
             {/* Users Tab */}
             <TabsContent value="users" className="space-y-4">
               {/* Admin Users */}
@@ -1656,31 +1607,10 @@ const AdminPageComponent = ({ currentUser, onLogout }: AdminPageProps) => {
               {/* User Management */}
               <Card>
                 <CardHeader className="pb-3">
-                  <div className="flex items-center justify-between">
-                    <CardTitle className="flex items-center gap-2 text-sm">
-                      <Users className="w-4 h-4" />
-                      User Management ({filteredUsers.length})
-                    </CardTitle>
-                    <Button 
-                      variant="outline" 
-                      size="sm" 
-                      className="text-xs h-7 px-3"
-                      disabled={!searchTerm && statusFilter === 'all' && genderFilter === 'all' && interestedInFilter === 'all' && countryFilter === 'all' && relationshipIntentFilter === 'all' && premiumFilter === 'all' && activityFilter === 'all' && imagesFilter === 'all'}
-                      onClick={() => {
-                        setSearchTerm('');
-                        setStatusFilter('all');
-                        setGenderFilter('all');
-                        setInterestedInFilter('all');
-                        setCountryFilter('all');
-                        setRelationshipIntentFilter('all');
-                        setPremiumFilter('all');
-                        setActivityFilter('all');
-                        setImagesFilter('all');
-                      }}
-                    >
-                      Clear Filters
-                    </Button>
-                  </div>
+                  <CardTitle className="flex items-center gap-2 text-sm">
+                    <Users className="w-4 h-4" />
+                    User Management ({filteredUsers.length})
+                  </CardTitle>
                 </CardHeader>
                 <CardContent>
                   {/* Search and Filter */}
@@ -1696,10 +1626,10 @@ const AdminPageComponent = ({ currentUser, onLogout }: AdminPageProps) => {
                       />
                     </div>
                     
-                    {/* Row 1: Status, Gender */}
-                    <div className="grid grid-cols-2 gap-2">
+                    {/* First Row: Status, Gender, Premium */}
+                    <div className="flex gap-2 flex-wrap">
                       <Select value={statusFilter} onValueChange={setStatusFilter}>
-                        <SelectTrigger className="text-xs h-8">
+                        <SelectTrigger className="w-28 text-xs h-8">
                           <SelectValue placeholder="Status" />
                         </SelectTrigger>
                         <SelectContent>
@@ -1711,7 +1641,7 @@ const AdminPageComponent = ({ currentUser, onLogout }: AdminPageProps) => {
                       </Select>
                       
                       <Select value={genderFilter} onValueChange={setGenderFilter}>
-                        <SelectTrigger className="text-xs h-8">
+                        <SelectTrigger className="w-28 text-xs h-8">
                           <SelectValue placeholder="Gender" />
                         </SelectTrigger>
                         <SelectContent>
@@ -1721,25 +1651,10 @@ const AdminPageComponent = ({ currentUser, onLogout }: AdminPageProps) => {
                           <SelectItem value="other" className="text-xs">Other</SelectItem>
                         </SelectContent>
                       </Select>
-                    </div>
-                    
-                    {/* Row 2: Preference, Premium */}
-                    <div className="grid grid-cols-2 gap-2">
-                      <Select value={interestedInFilter} onValueChange={setInterestedInFilter}>
-                        <SelectTrigger className="text-xs h-8">
-                          <SelectValue placeholder="Preference" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="all" className="text-xs">All Preferences</SelectItem>
-                          <SelectItem value="male" className="text-xs">Into Male</SelectItem>
-                          <SelectItem value="female" className="text-xs">Into Female</SelectItem>
-                          <SelectItem value="everyone" className="text-xs">Into Everyone</SelectItem>
-                        </SelectContent>
-                      </Select>
                       
                       <Select value={premiumFilter} onValueChange={setPremiumFilter}>
-                        <SelectTrigger className="text-xs h-8">
-                          <SelectValue placeholder="Subscription" />
+                        <SelectTrigger className="w-28 text-xs h-8">
+                          <SelectValue placeholder="Premium" />
                         </SelectTrigger>
                         <SelectContent>
                           <SelectItem value="all" className="text-xs">All Users</SelectItem>
@@ -1749,24 +1664,35 @@ const AdminPageComponent = ({ currentUser, onLogout }: AdminPageProps) => {
                       </Select>
                     </div>
                     
-                    {/* Row 3: Intent, Country */}
-                    <div className="grid grid-cols-2 gap-2">
+                    {/* Second Row: Interested In, Relationship Intent, Country */}
+                    <div className="flex gap-2 flex-wrap">
+                      <Select value={interestedInFilter} onValueChange={setInterestedInFilter}>
+                        <SelectTrigger className="w-32 text-xs h-8">
+                          <SelectValue placeholder="Interested In" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="all" className="text-xs">All Preferences</SelectItem>
+                          <SelectItem value="male" className="text-xs">Interested in Male</SelectItem>
+                          <SelectItem value="female" className="text-xs">Interested in Female</SelectItem>
+                          <SelectItem value="both" className="text-xs">Interested in Both</SelectItem>
+                        </SelectContent>
+                      </Select>
+                      
                       <Select value={relationshipIntentFilter} onValueChange={setRelationshipIntentFilter}>
-                        <SelectTrigger className="text-xs h-8">
+                        <SelectTrigger className="w-36 text-xs h-8">
                           <SelectValue placeholder="Intent" />
                         </SelectTrigger>
                         <SelectContent>
                           <SelectItem value="all" className="text-xs">All Intents</SelectItem>
-                          <SelectItem value="serious" className="text-xs">Serious</SelectItem>
-                          <SelectItem value="long-term" className="text-xs">Long-term</SelectItem>
-                          <SelectItem value="casual" className="text-xs">Casual</SelectItem>
+                          <SelectItem value="serious_relationship" className="text-xs">Serious Relationship</SelectItem>
+                          <SelectItem value="casual_dating" className="text-xs">Casual Dating</SelectItem>
+                          <SelectItem value="friendship" className="text-xs">Friendship</SelectItem>
                           <SelectItem value="open_to_anything" className="text-xs">Open to Anything</SelectItem>
-                          <SelectItem value="not-sure" className="text-xs">Not Sure</SelectItem>
                         </SelectContent>
                       </Select>
                       
                       <Select value={countryFilter} onValueChange={setCountryFilter}>
-                        <SelectTrigger className="text-xs h-8">
+                        <SelectTrigger className="w-32 text-xs h-8">
                           <SelectValue placeholder="Country" />
                         </SelectTrigger>
                         <SelectContent className="max-h-60">
@@ -1780,10 +1706,10 @@ const AdminPageComponent = ({ currentUser, onLogout }: AdminPageProps) => {
                       </Select>
                     </div>
                     
-                    {/* Row 4: Activity, Images */}
-                    <div className="grid grid-cols-2 gap-2">
+                    {/* Third Row: Activity Filter */}
+                    <div className="flex gap-2 flex-wrap">
                       <Select value={activityFilter} onValueChange={setActivityFilter}>
-                        <SelectTrigger className="text-xs h-8">
+                        <SelectTrigger className="w-40 text-xs h-8">
                           <SelectValue placeholder="Activity" />
                         </SelectTrigger>
                         <SelectContent>
@@ -1795,28 +1721,11 @@ const AdminPageComponent = ({ currentUser, onLogout }: AdminPageProps) => {
                           <SelectItem value="never_active" className="text-xs">Never Logged In</SelectItem>
                         </SelectContent>
                       </Select>
-                      
-                      <Select value={imagesFilter} onValueChange={setImagesFilter}>
-                        <SelectTrigger className="text-xs h-8">
-                          <SelectValue placeholder="Images" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="all" className="text-xs">All Images</SelectItem>
-                          <SelectItem value="0" className="text-xs">0 Images</SelectItem>
-                          <SelectItem value="1" className="text-xs">1 Image</SelectItem>
-                          <SelectItem value="2" className="text-xs">2 Images</SelectItem>
-                          <SelectItem value="3" className="text-xs">3 Images</SelectItem>
-                          <SelectItem value="4" className="text-xs">4 Images</SelectItem>
-                          <SelectItem value="5" className="text-xs">5 Images</SelectItem>
-                          <SelectItem value="6" className="text-xs">6 Images</SelectItem>
-                          <SelectItem value="7" className="text-xs">7 Images</SelectItem>
-                        </SelectContent>
-                      </Select>
                     </div>
                     
                     {/* Clear Filters Button */}
                     {(statusFilter !== 'all' || genderFilter !== 'all' || interestedInFilter !== 'all' || 
-                      countryFilter !== 'all' || relationshipIntentFilter !== 'all' || premiumFilter !== 'all' || activityFilter !== 'all' || imagesFilter !== 'all') && (
+                      countryFilter !== 'all' || relationshipIntentFilter !== 'all' || premiumFilter !== 'all' || activityFilter !== 'all') && (
                       <Button
                         variant="outline"
                         size="sm"
@@ -1828,9 +1737,8 @@ const AdminPageComponent = ({ currentUser, onLogout }: AdminPageProps) => {
                           setRelationshipIntentFilter('all');
                           setPremiumFilter('all');
                           setActivityFilter('all');
-                          setImagesFilter('all');
                         }}
-                        className="text-xs h-7 w-full"
+                        className="text-xs h-7"
                       >
                         Clear All Filters
                       </Button>
@@ -1860,7 +1768,7 @@ const AdminPageComponent = ({ currentUser, onLogout }: AdminPageProps) => {
                                 <div className="flex gap-1 mt-0.5 flex-wrap">
                                   {user.preference && (
                                     <Badge variant="outline" className="text-[10px] px-1.5 py-0 h-4">
-                                      Into: {user.preference === 'everyone' ? 'Everyone' : user.preference.charAt(0).toUpperCase() + user.preference.slice(1)}
+                                      Interested: {user.preference === 'both' ? 'Both' : user.preference.charAt(0).toUpperCase() + user.preference.slice(1)}
                                     </Badge>
                                   )}
                                   {user.relationship_intent && (
@@ -1871,11 +1779,6 @@ const AdminPageComponent = ({ currentUser, onLogout }: AdminPageProps) => {
                                   {user.is_premium && (
                                     <Badge className="bg-yellow-100 text-yellow-800 text-[10px] px-1.5 py-0 h-4">
                                       Premium
-                                    </Badge>
-                                  )}
-                                  {user.image_count !== undefined && (
-                                    <Badge variant="outline" className="text-[10px] px-1.5 py-0 h-4">
-                                      {user.image_count} {user.image_count === 1 ? 'Photo' : 'Photos'}
                                     </Badge>
                                   )}
                                 </div>

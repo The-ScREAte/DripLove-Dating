@@ -61,10 +61,6 @@ dependencies {
     // Google Play Services for native Google Sign-In
     implementation 'com.google.android.gms:play-services-auth:21.0.0'
     
-    // Google Play Billing for in-app purchases
-    implementation 'com.android.billingclient:billing:7.1.1'
-    implementation 'com.android.billingclient:billing-ktx:7.1.1'
-    
     // Firebase Cloud Messaging
     implementation platform('com.google.firebase:firebase-bom:33.7.0')
     implementation 'com.google.firebase:firebase-messaging'

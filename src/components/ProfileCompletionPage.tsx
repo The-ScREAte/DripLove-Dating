@@ -16,7 +16,6 @@ import AdinkraSymbolSelector from '@/components/forms/AdinkraSymbolSelector';
 import { moderateImage, ModerationResult } from '@/utils/photoModeration';
 import { compressImage } from '@/utils/imageCompression';
 import TermsAcceptance from './TermsAcceptance';
-import PromoCodeInput from './forms/PromoCodeInput';
 import { getLanguageForCountry } from '@/i18n/config';
 import { videoPreloader } from '@/utils/videoPreloader';
 
@@ -41,7 +40,6 @@ const ProfileCompletionPage = () => {
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [images, setImages] = useState<ImageUpload[]>([]);
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [promoCode, setPromoCode] = useState('');
 
   // iOS detection for other potential optimizations
   const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent);
@@ -498,8 +496,7 @@ const ProfileCompletionPage = () => {
         max_distance: formData.maxDistance || 250,
         country_code: formData.countryCode || '',
         adinkra_symbols: formData.adinkraSymbols || [],
-        preferred_language: getLanguageForCountry(formData.country) || i18n.language || 'en',
-        promo_code_used: promoCode || null
+        preferred_language: getLanguageForCountry(formData.country) || i18n.language || 'en'
       };
 
       const { error } = await supabase
@@ -855,14 +852,6 @@ const ProfileCompletionPage = () => {
                       userCountry={formData.country}
                     />
                     {errors.adinkraSymbols && <p className="text-sm text-red-500">{errors.adinkraSymbols}</p>}
-                  </div>
-
-                  {/* Promo Code Input */}
-                  <div className="space-y-2 pt-2">
-                    <PromoCodeInput
-                      value={promoCode}
-                      onChange={setPromoCode}
-                    />
                   </div>
 
                   <div className="space-y-4">

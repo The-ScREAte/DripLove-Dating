@@ -153,8 +153,7 @@ const PremiumUpgrade = ({ currentUser, onClose, preselectedPlan }: PremiumUpgrad
       }
     };
     // No off/unsubscribe in plugin
-  }, [toast]);
-  
+  }, [toast, canBuy]);
   const [price, setPrice] = useState<string | null>(null);
   const [monthlyPrice, setMonthlyPrice] = useState<string | null>(null);
   const [paymentMethods, setPaymentMethods] = useState<any[]>([]);
