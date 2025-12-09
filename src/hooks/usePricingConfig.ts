@@ -38,13 +38,13 @@ const currencySymbols: Record<string, string> = {
   AUD: 'A$',
 };
 
-// Default pricing (fallback for web when IAP not available)
-const defaultPricing: PricingConfig = {
+// Default USD pricing for web
+const webPricing: PricingConfig = {
   price: '1.99',
   monthlyPrice: '1.99',
   currency: 'USD',
   currencySymbol: '$',
-  displayPrice: '$1.99',
+  displayPrice: '$1.99/month',
   ghsPrice: '32',
   loading: false,
   source: 'fallback',
@@ -255,83 +255,80 @@ function calculateGHSPrice(price: string, currency: string): string {
   return Math.round(ghsAmount).toString();
 }
 
-// Load pricing config - fetches from IAP first, falls back to defaults
+// Load pricing config - platform specific
 async function loadPricingConfig(userId?: string): Promise<PricingConfig> {
   try {
-    console.log('[Pricing] Loading pricing config...');
+    console.log('[Pricing] Loading pricing config for platform:', Capacitor.getPlatform());
     
-    // On native platforms, try to get IAP price first
-    if (isNativeApp()) {
-      const iapPrice = await getIAPPriceWithRetry(5);
+    // WEB: Always use USD $1.99
+    if (!isNativeApp()) {
+      console.log('[Pricing] Web platform - using USD pricing');
+      return { ...webPricing };
+    }
+    
+    // ANDROID: Use Google Play Console pricing
+    if (isAndroid()) {
+      console.log('[Pricing] Android - fetching Google Play price');
+      const googlePrice = await getIAPPriceWithRetry(5);
       
-      if (iapPrice && iapPrice.formattedPrice) {
-        const symbol = extractCurrencySymbol(iapPrice.formattedPrice) || currencySymbols[iapPrice.currency] || iapPrice.currency;
-        const ghsPrice = calculateGHSPrice(iapPrice.price, iapPrice.currency);
+      if (googlePrice && googlePrice.formattedPrice) {
+        const symbol = extractCurrencySymbol(googlePrice.formattedPrice) || currencySymbols[googlePrice.currency] || googlePrice.currency;
+        const ghsPrice = calculateGHSPrice(googlePrice.price, googlePrice.currency);
         
         const config: PricingConfig = {
-          price: iapPrice.price,
-          monthlyPrice: iapPrice.price,
-          currency: iapPrice.currency,
+          price: googlePrice.price,
+          monthlyPrice: googlePrice.price,
+          currency: googlePrice.currency,
           currencySymbol: symbol,
-          displayPrice: iapPrice.formattedPrice,
+          displayPrice: googlePrice.formattedPrice + '/month',
           ghsPrice,
           loading: false,
           source: 'iap',
         };
         
-        console.log('[Pricing] Loaded IAP config:', config);
+        console.log('[Pricing] Android Google Play config:', config);
         return config;
       }
+      
+      // Fallback for Android if IAP fails
+      console.log('[Pricing] Android IAP failed, using USD fallback');
+      return { ...webPricing };
     }
     
-    // Fallback: Use Android price if available (for web/Paystack)
-    // This ensures consistency across platforms
-    // Default fallback pricing for web
-    console.log('[Pricing] Using fallback pricing for web');
-    
-    // Try to detect country for better defaults
-    let fallbackConfig = { ...defaultPricing };
-    
-    // Check user profile for country
-    if (userId) {
-      try {
-        const { data } = await supabase
-          .from('profiles')
-          .select('country_code')
-          .eq('id', userId)
-          .single();
+    // iOS: Use App Store pricing
+    if (isIOS()) {
+      console.log('[Pricing] iOS - fetching App Store price');
+      const applePrice = await getIAPPriceWithRetry(5);
+      
+      if (applePrice && applePrice.formattedPrice) {
+        const symbol = extractCurrencySymbol(applePrice.formattedPrice) || currencySymbols[applePrice.currency] || applePrice.currency;
+        const ghsPrice = calculateGHSPrice(applePrice.price, applePrice.currency);
         
-        if (data?.country_code === 'GH') {
-          fallbackConfig = {
-            ...fallbackConfig,
-            price: '32',
-            monthlyPrice: '32',
-            currency: 'GHS',
-            currencySymbol: '₵',
-            displayPrice: '₵32',
-            ghsPrice: '32',
-          };
-        } else if (data?.country_code === 'NG') {
-          fallbackConfig = {
-            ...fallbackConfig,
-            price: '3200',
-            monthlyPrice: '3200',
-            currency: 'NGN',
-            currencySymbol: '₦',
-            displayPrice: '₦3,200',
-            ghsPrice: '32',
-          };
-        }
-      } catch (e) {
-        console.log('[Pricing] Could not fetch user country from profile');
+        const config: PricingConfig = {
+          price: applePrice.price,
+          monthlyPrice: applePrice.price,
+          currency: applePrice.currency,
+          currencySymbol: symbol,
+          displayPrice: applePrice.formattedPrice + '/month',
+          ghsPrice,
+          loading: false,
+          source: 'iap',
+        };
+        
+        console.log('[Pricing] iOS App Store config:', config);
+        return config;
       }
+      
+      // Fallback for iOS if IAP fails
+      console.log('[Pricing] iOS IAP failed, using USD fallback');
+      return { ...webPricing };
     }
     
-    console.log('[Pricing] Using fallback config:', fallbackConfig);
-    return fallbackConfig;
+    // Default fallback
+    return { ...webPricing };
   } catch (error) {
     console.error('[Pricing] Error loading config:', error);
-    return defaultPricing;
+    return { ...webPricing };
   }
 }
 
@@ -350,7 +347,7 @@ export function preloadPricingConfig(userId?: string): void {
 // Hook to use pricing config
 export function usePricingConfig(): PricingConfig {
   const [config, setConfig] = useState<PricingConfig>(
-    cachedConfig || { ...defaultPricing, loading: true }
+    cachedConfig || { ...webPricing, loading: true }
   );
 
   useEffect(() => {
@@ -368,8 +365,7 @@ export function usePricingConfig(): PricingConfig {
 
     // Otherwise, load fresh
     const loadConfig = async () => {
-      const { data: { user } } = await supabase.auth.getUser();
-      const freshConfig = await loadPricingConfig(user?.id);
+      const freshConfig = await loadPricingConfig();
       cachedConfig = freshConfig;
       setConfig(freshConfig);
     };
