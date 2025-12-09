@@ -436,66 +436,6 @@ export function restorePurchases(): Promise<void> {
   });
 }
 
-// Load Apple product price (localized from App Store)
-// This uses the simple price string from the product which is already formatted
-export function loadAppleProductPrice(): Promise<string | null> {
-  return new Promise((resolve) => {
-    // @ts-ignore
-    const store = window.CdvPurchase?.store;
-    
-    if (!store) {
-      console.warn('[IAP] Cannot load Apple product price - store not available');
-      resolve(null);
-      return;
-    }
-    
-    // Product IDs to check
-    const PRODUCT_IDS = [
-      'com.driplove.dating.premium.monthlysub3', // Prefer newer one
-      'com.driplove.dating.premium.monthlysub2'
-    ];
-    
-    // Try to find a valid product with pricing info
-    for (const id of PRODUCT_IDS) {
-      try {
-        const product = store.get ? store.get(id) : null;
-        
-        if (!product) continue;
-        
-        // Try pricing object first
-        if (product.pricing && product.pricing.price) {
-          console.log('[IAP] Found Apple product pricing.price:', product.pricing.price);
-          resolve(product.pricing.price);
-          return;
-        }
-        
-        // Try direct price property
-        if (product.price) {
-          console.log('[IAP] Found Apple product price:', product.price);
-          resolve(product.price);
-          return;
-        }
-        
-        // Try offer pricing
-        const offer = product.getOffer?.();
-        if (offer && offer.pricingPhases && offer.pricingPhases.length > 0) {
-          const phase = offer.pricingPhases[0];
-          if (phase.price) {
-            console.log('[IAP] Found Apple offer price:', phase.price);
-            resolve(phase.price);
-            return;
-          }
-        }
-      } catch (err) {
-        console.warn(`[IAP] Error getting product ${id}:`, err);
-      }
-    }
-    
-    console.warn('[IAP] No Apple product with pricing found');
-    resolve(null);
-  });
-}
-
 // Debug helper function
 export function debugIAPState() {
   // @ts-ignore
