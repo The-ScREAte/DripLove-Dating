@@ -1,5 +1,4 @@
 import { useEffect, useState } from 'react';
-import { Capacitor } from '@capacitor/core';
 import { supabase } from '@/integrations/supabase/client';
 
 interface PricingConfig {
@@ -96,17 +95,29 @@ const APPLE_PRODUCT_IDS = [
   'com.driplove.dating.premium.monthlysub2',
 ];
 
-// Check if running as native app
-const isNativeApp = () => {
-  return Capacitor.isNativePlatform();
+// Helper functions using dynamic Capacitor import
+const getCapacitor = async () => {
+  try {
+    const { Capacitor } = await import('@capacitor/core');
+    return Capacitor;
+  } catch {
+    return null;
+  }
 };
 
-const isAndroid = () => {
-  return Capacitor.getPlatform() === 'android';
+const isNativeApp = async () => {
+  const Capacitor = await getCapacitor();
+  return Capacitor?.isNativePlatform() ?? false;
 };
 
-const isIOS = () => {
-  return Capacitor.getPlatform() === 'ios';
+const isAndroid = async () => {
+  const Capacitor = await getCapacitor();
+  return Capacitor?.getPlatform() === 'android';
+};
+
+const isIOS = async () => {
+  const Capacitor = await getCapacitor();
+  return Capacitor?.getPlatform() === 'ios';
 };
 
 // Extract currency symbol from formatted price string (e.g., "$4.99" -> "$", "₵39.99" -> "₵")
@@ -134,7 +145,7 @@ async function getGooglePrice(): Promise<{ price: string; currency: string; form
   // @ts-ignore
   const store = window.CdvPurchase?.store;
   
-  if (!store || !isAndroid()) {
+  if (!store || !(await isAndroid())) {
     return null;
   }
 
@@ -182,7 +193,7 @@ async function getApplePrice(): Promise<{ price: string; currency: string; forma
   // @ts-ignore
   const store = window.CdvPurchase?.store;
   
-  if (!store || !isIOS()) {
+  if (!store || !(await isIOS())) {
     return null;
   }
 
@@ -227,15 +238,15 @@ async function getApplePrice(): Promise<{ price: string; currency: string; forma
 
 // Get IAP price based on platform
 async function getIAPPrice(): Promise<{ price: string; currency: string; formattedPrice: string } | null> {
-  if (!isNativeApp()) {
+  if (!(await isNativeApp())) {
     return null;
   }
 
-  if (isAndroid()) {
+  if (await isAndroid()) {
     return await getGooglePrice();
   }
 
-  if (isIOS()) {
+  if (await isIOS()) {
     return await getApplePrice();
   }
 
@@ -292,19 +303,21 @@ function calculateGHSPrice(price: string, currency: string): string {
 // Load pricing config - platform specific
 async function loadPricingConfig(userId?: string): Promise<PricingConfig> {
   try {
-    console.log('[Pricing] Loading pricing config for platform:', Capacitor.getPlatform());
+    const Capacitor = await getCapacitor();
+    const platform = Capacitor?.getPlatform() || 'web';
+    console.log('[Pricing] Loading pricing config for platform:', platform);
     
     // Load web pricing from database first
     await loadWebPricingFromDB();
     
     // WEB: Use pricing from database
-    if (!isNativeApp()) {
+    if (!(await isNativeApp())) {
       console.log('[Pricing] Web platform - using database pricing');
       return { ...webPricing };
     }
     
     // ANDROID: Use Google Play Console pricing
-    if (isAndroid()) {
+    if (await isAndroid()) {
       console.log('[Pricing] Android - fetching Google Play price');
       const googlePrice = await getIAPPriceWithRetry(5);
       
@@ -333,7 +346,7 @@ async function loadPricingConfig(userId?: string): Promise<PricingConfig> {
     }
     
     // iOS: Use App Store pricing
-    if (isIOS()) {
+    if (await isIOS()) {
       console.log('[Pricing] iOS - fetching App Store price');
       const applePrice = await getIAPPriceWithRetry(5);
       
