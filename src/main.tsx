@@ -127,9 +127,19 @@ const AppWrapper = () => {
         // Initialize heavy operations in the background
         setTimeout(async () => {
           try {
-            // Initialize in-app purchase system (background)
-            const { initIAP } = await import('./iap');
-            await initIAP();
+            // Initialize in-app purchase systems (background)
+            const { Capacitor } = await import('@capacitor/core');
+            const platform = Capacitor.getPlatform();
+            
+            if (platform === 'ios') {
+              // Apple IAP for iOS
+              const { initIAP } = await import('./iap');
+              await initIAP();
+            } else if (platform === 'android') {
+              // Google IAP for Android
+              const { initGoogleIAP } = await import('./iap-google');
+              await initGoogleIAP();
+            }
           } catch (error) {
             console.error('[App] Failed to initialize In-App Purchase:', error);
             // Log but don't crash - IAP is optional feature
