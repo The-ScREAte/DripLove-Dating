@@ -40,10 +40,10 @@ export function initIAP() {
         resolve(); // Resolve to not block app
       }, 15000);
     
-    // 1️⃣ Define possible product IDs
+    // 1️⃣ Define possible product IDs - try newest first
     const PRODUCT_IDS = [
-      'com.driplove.dating.premium.monthlysub2', // older one
-      'com.driplove.dating.premium.monthlysub3'  // new one linked to this build
+      'com.driplove.dating.premium.monthlysub3',  // new one linked to this build
+      'com.driplove.dating.premium.monthlysub2'   // older one (fallback)
     ];
 
     // 2️⃣ Register all of them with the store
@@ -325,10 +325,10 @@ export function initIAP() {
 
 // 🛍 Call to purchase from your UI - auto-selects the valid product
 export const buyMonthly = async () => {
-  // List all possible IDs (same as in initIAP)
+  // List all possible IDs (same as in initIAP) - try newest first
   const PRODUCT_IDS = [
-    'com.driplove.dating.premium.monthlysub2',
-    'com.driplove.dating.premium.monthlysub3'
+    'com.driplove.dating.premium.monthlysub3',
+    'com.driplove.dating.premium.monthlysub2'
   ];
   
   // @ts-ignore

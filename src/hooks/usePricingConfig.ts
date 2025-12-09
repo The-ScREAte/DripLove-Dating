@@ -38,8 +38,8 @@ const currencySymbols: Record<string, string> = {
   AUD: 'A$',
 };
 
-// Default USD pricing for web
-const webPricing: PricingConfig = {
+// Default USD pricing for web (will be loaded from DB)
+let webPricing: PricingConfig = {
   price: '1.99',
   monthlyPrice: '1.99',
   currency: 'USD',
@@ -49,6 +49,40 @@ const webPricing: PricingConfig = {
   loading: false,
   source: 'fallback',
 };
+
+// Load web pricing from database
+async function loadWebPricingFromDB(): Promise<void> {
+  try {
+    const { data, error } = await supabase
+      .from('payment_config')
+      .select('default_international_price, default_international_currency')
+      .order('created_at', { ascending: false })
+      .limit(1)
+      .single();
+
+    if (!error && data) {
+      const price = data.default_international_price?.toString() || '1.99';
+      const currency = data.default_international_currency || 'USD';
+      const symbol = currencySymbols[currency] || currency;
+      const ghsPrice = calculateGHSPrice(price, currency);
+      
+      webPricing = {
+        price,
+        monthlyPrice: price,
+        currency,
+        currencySymbol: symbol,
+        displayPrice: `${symbol}${price}/month`,
+        ghsPrice,
+        loading: false,
+        source: 'fallback',
+      };
+      
+      console.log('[Pricing] Loaded web pricing from DB:', webPricing);
+    }
+  } catch (error) {
+    console.error('[Pricing] Error loading web pricing from DB:', error);
+  }
+}
 
 // Google Play product IDs (must match iap-google.ts)
 const GOOGLE_PRODUCT_IDS = [
@@ -260,9 +294,12 @@ async function loadPricingConfig(userId?: string): Promise<PricingConfig> {
   try {
     console.log('[Pricing] Loading pricing config for platform:', Capacitor.getPlatform());
     
-    // WEB: Always use USD $1.99
+    // Load web pricing from database first
+    await loadWebPricingFromDB();
+    
+    // WEB: Use pricing from database
     if (!isNativeApp()) {
-      console.log('[Pricing] Web platform - using USD pricing');
+      console.log('[Pricing] Web platform - using database pricing');
       return { ...webPricing };
     }
     
@@ -290,8 +327,8 @@ async function loadPricingConfig(userId?: string): Promise<PricingConfig> {
         return config;
       }
       
-      // Fallback for Android if IAP fails
-      console.log('[Pricing] Android IAP failed, using USD fallback');
+      // Fallback for Android if IAP fails - use database pricing
+      console.log('[Pricing] Android IAP failed, using database fallback');
       return { ...webPricing };
     }
     
@@ -319,12 +356,12 @@ async function loadPricingConfig(userId?: string): Promise<PricingConfig> {
         return config;
       }
       
-      // Fallback for iOS if IAP fails
-      console.log('[Pricing] iOS IAP failed, using USD fallback');
+      // Fallback for iOS if IAP fails - use database pricing
+      console.log('[Pricing] iOS IAP failed, using database fallback');
       return { ...webPricing };
     }
     
-    // Default fallback
+    // Default fallback - use database pricing
     return { ...webPricing };
   } catch (error) {
     console.error('[Pricing] Error loading config:', error);

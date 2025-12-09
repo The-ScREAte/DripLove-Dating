@@ -442,7 +442,7 @@ const PremiumUpgrade = ({ currentUser, onClose, preselectedPlan }: PremiumUpgrad
                     {/* Monthly payment option - shows localized IAP price */}
                     <div className="p-1.5 md:p-2 bg-gradient-to-r from-blue-50 to-sky-50 border border-blue-200 rounded-lg">
                       <div className="text-sm sm:text-base md:text-xl font-bold text-gray-800">
-                        {pricingConfig.loading ? '...' : displayPrice}/month
+                        {pricingConfig.loading ? '...' : displayPrice}
                       </div>
                       <div className="text-[9px] md:text-xs text-blue-600 font-medium mt-0.5">📱 {t('premium.monthlySubscription')}</div>
                     </div>

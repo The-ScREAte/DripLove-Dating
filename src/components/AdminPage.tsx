@@ -95,7 +95,7 @@ const AdminPageComponent = ({ currentUser, onLogout }: AdminPageProps) => {
   const [paymentMethods, setPaymentMethods] = useState<PaymentMethod[]>(defaultPaymentMethods);
   const [premiumPriceOneTime, setPremiumPriceOneTime] = useState('50');
   const [premiumPriceMonthly, setPremiumPriceMonthly] = useState('25');
-  const [defaultInternationalPrice, setDefaultInternationalPrice] = useState('5');
+  const [defaultInternationalPrice, setDefaultInternationalPrice] = useState('1.99');
   const [defaultInternationalCurrency, setDefaultInternationalCurrency] = useState('USD');
   // Now an array of { country, currency, price }
   const [countryPrices, setCountryPrices] = useState<{ country: string; currency: string; price: string }[]>([]);
@@ -160,7 +160,7 @@ const AdminPageComponent = ({ currentUser, onLogout }: AdminPageProps) => {
         setPaymentMethods(data.payment_methods as unknown as PaymentMethod[]);
         setPremiumPriceOneTime(data.premium_price?.toString() || '');
         setPremiumPriceMonthly(data.premium_price_monthly?.toString() || '');
-        setDefaultInternationalPrice(data.default_international_price?.toString() || '5');
+        setDefaultInternationalPrice(data.default_international_price?.toString() || '1.99');
         setDefaultInternationalCurrency(data.default_international_currency || 'USD');
         setCountryPrices(Array.isArray(data.country_prices) ? (data.country_prices as { country: string; currency: string; price: string }[]) : []);
       } catch (error) {
@@ -168,7 +168,7 @@ const AdminPageComponent = ({ currentUser, onLogout }: AdminPageProps) => {
         setPaymentMethods(defaultPaymentMethods);
         setPremiumPriceOneTime('');
         setPremiumPriceMonthly('');
-        setDefaultInternationalPrice('5');
+        setDefaultInternationalPrice('1.99');
         setDefaultInternationalCurrency('USD');
         setCountryPrices([]);
       }
@@ -204,7 +204,7 @@ const AdminPageComponent = ({ currentUser, onLogout }: AdminPageProps) => {
             payment_methods: paymentMethods as unknown as any,
             premium_price: Number(premiumPriceOneTime) || 0,
             premium_price_monthly: Number(premiumPriceMonthly) || 0,
-            default_international_price: Number(defaultInternationalPrice) || 5,
+            default_international_price: Number(defaultInternationalPrice) || 1.99,
             default_international_currency: defaultInternationalCurrency || 'USD',
             country_prices: countryPrices,
             updated_at: new Date().toISOString(),
@@ -220,7 +220,7 @@ const AdminPageComponent = ({ currentUser, onLogout }: AdminPageProps) => {
             payment_methods: paymentMethods as unknown as any,
             premium_price: Number(premiumPriceOneTime) || 0,
             premium_price_monthly: Number(premiumPriceMonthly) || 0,
-            default_international_price: Number(defaultInternationalPrice) || 5,
+            default_international_price: Number(defaultInternationalPrice) || 1.99,
             default_international_currency: defaultInternationalCurrency || 'USD',
             country_prices: countryPrices,
           });
@@ -1607,123 +1607,11 @@ const AdminPageComponent = ({ currentUser, onLogout }: AdminPageProps) => {
               {/* User Management */}
               <Card>
                 <CardHeader className="pb-3">
-                  <CardTitle className="flex items-center gap-2 text-sm">
-                    <Users className="w-4 h-4" />
-                    User Management ({filteredUsers.length})
-                  </CardTitle>
-                </CardHeader>
-                <CardContent>
-                  {/* Search and Filter */}
-                  <div className="space-y-2 mb-3">
-                    {/* Search Bar */}
-                    <div className="flex-1 relative">
-                      <Search className="absolute left-2 top-2 h-3 w-3 text-gray-400" />
-                      <Input
-                        placeholder="Search by name, email, city, or country..."
-                        value={searchTerm}
-                        onChange={(e) => setSearchTerm(e.target.value)}
-                        className="pl-7 text-xs h-8"
-                      />
-                    </div>
-                    
-                    {/* First Row: Status, Gender, Premium */}
-                    <div className="flex gap-2 flex-wrap">
-                      <Select value={statusFilter} onValueChange={setStatusFilter}>
-                        <SelectTrigger className="w-28 text-xs h-8">
-                          <SelectValue placeholder="Status" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="all" className="text-xs">All Status</SelectItem>
-                          <SelectItem value="active" className="text-xs">Active</SelectItem>
-                          <SelectItem value="on_hold" className="text-xs">On Hold</SelectItem>
-                          <SelectItem value="blocked" className="text-xs">Blocked</SelectItem>
-                        </SelectContent>
-                      </Select>
-                      
-                      <Select value={genderFilter} onValueChange={setGenderFilter}>
-                        <SelectTrigger className="w-28 text-xs h-8">
-                          <SelectValue placeholder="Gender" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="all" className="text-xs">All Genders</SelectItem>
-                          <SelectItem value="male" className="text-xs">Male</SelectItem>
-                          <SelectItem value="female" className="text-xs">Female</SelectItem>
-                          <SelectItem value="other" className="text-xs">Other</SelectItem>
-                        </SelectContent>
-                      </Select>
-                      
-                      <Select value={premiumFilter} onValueChange={setPremiumFilter}>
-                        <SelectTrigger className="w-28 text-xs h-8">
-                          <SelectValue placeholder="Premium" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="all" className="text-xs">All Users</SelectItem>
-                          <SelectItem value="premium" className="text-xs">Premium</SelectItem>
-                          <SelectItem value="free" className="text-xs">Free</SelectItem>
-                        </SelectContent>
-                      </Select>
-                    </div>
-                    
-                    {/* Second Row: Interested In, Relationship Intent, Country */}
-                    <div className="flex gap-2 flex-wrap">
-                      <Select value={interestedInFilter} onValueChange={setInterestedInFilter}>
-                        <SelectTrigger className="w-32 text-xs h-8">
-                          <SelectValue placeholder="Interested In" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="all" className="text-xs">All Preferences</SelectItem>
-                          <SelectItem value="male" className="text-xs">Interested in Male</SelectItem>
-                          <SelectItem value="female" className="text-xs">Interested in Female</SelectItem>
-                          <SelectItem value="both" className="text-xs">Interested in Both</SelectItem>
-                        </SelectContent>
-                      </Select>
-                      
-                      <Select value={relationshipIntentFilter} onValueChange={setRelationshipIntentFilter}>
-                        <SelectTrigger className="w-36 text-xs h-8">
-                          <SelectValue placeholder="Intent" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="all" className="text-xs">All Intents</SelectItem>
-                          <SelectItem value="serious_relationship" className="text-xs">Serious Relationship</SelectItem>
-                          <SelectItem value="casual_dating" className="text-xs">Casual Dating</SelectItem>
-                          <SelectItem value="friendship" className="text-xs">Friendship</SelectItem>
-                          <SelectItem value="open_to_anything" className="text-xs">Open to Anything</SelectItem>
-                        </SelectContent>
-                      </Select>
-                      
-                      <Select value={countryFilter} onValueChange={setCountryFilter}>
-                        <SelectTrigger className="w-32 text-xs h-8">
-                          <SelectValue placeholder="Country" />
-                        </SelectTrigger>
-                        <SelectContent className="max-h-60">
-                          <SelectItem value="all" className="text-xs">All Countries</SelectItem>
-                          {getCountriesList().map(country => (
-                            <SelectItem key={country.code} value={country.name} className="text-xs">
-                              {country.name}
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                    </div>
-                    
-                    {/* Third Row: Activity Filter */}
-                    <div className="flex gap-2 flex-wrap">
-                      <Select value={activityFilter} onValueChange={setActivityFilter}>
-                        <SelectTrigger className="w-40 text-xs h-8">
-                          <SelectValue placeholder="Activity" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="all" className="text-xs">All Activity</SelectItem>
-                          <SelectItem value="active_week" className="text-xs">Active Last Week</SelectItem>
-                          <SelectItem value="active_month" className="text-xs">Active Last Month</SelectItem>
-                          <SelectItem value="logged_once" className="text-xs">Logged In Once</SelectItem>
-                          <SelectItem value="inactive_month" className="text-xs">Inactive 30+ Days</SelectItem>
-                          <SelectItem value="never_active" className="text-xs">Never Logged In</SelectItem>
-                        </SelectContent>
-                      </Select>
-                    </div>
-                    
-                    {/* Clear Filters Button */}
+                  <div className="flex items-center justify-between">
+                    <CardTitle className="flex items-center gap-2 text-sm">
+                      <Users className="w-4 h-4" />
+                      User Management ({filteredUsers.length})
+                    </CardTitle>
                     {(statusFilter !== 'all' || genderFilter !== 'all' || interestedInFilter !== 'all' || 
                       countryFilter !== 'all' || relationshipIntentFilter !== 'all' || premiumFilter !== 'all' || activityFilter !== 'all') && (
                       <Button
@@ -1740,9 +1628,115 @@ const AdminPageComponent = ({ currentUser, onLogout }: AdminPageProps) => {
                         }}
                         className="text-xs h-7"
                       >
-                        Clear All Filters
+                        Clear Filters
                       </Button>
                     )}
+                  </div>
+                </CardHeader>
+                <CardContent>
+                  {/* Search and Filter */}
+                  <div className="space-y-2 mb-3">
+                    {/* Search Bar */}
+                    <div className="flex-1 relative">
+                      <Search className="absolute left-2 top-2 h-3 w-3 text-gray-400" />
+                      <Input
+                        placeholder="Search by name, email, city, or country..."
+                        value={searchTerm}
+                        onChange={(e) => setSearchTerm(e.target.value)}
+                        className="pl-7 text-xs h-8"
+                      />
+                    </div>
+                    
+                    {/* Filters in 2-column grid */}
+                    <div className="grid grid-cols-2 gap-2">
+                      <Select value={statusFilter} onValueChange={setStatusFilter}>
+                        <SelectTrigger className="text-xs h-8">
+                          <SelectValue placeholder="All Status" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="all" className="text-xs">All Status</SelectItem>
+                          <SelectItem value="active" className="text-xs">Active</SelectItem>
+                          <SelectItem value="on_hold" className="text-xs">On Hold</SelectItem>
+                          <SelectItem value="blocked" className="text-xs">Blocked</SelectItem>
+                        </SelectContent>
+                      </Select>
+                      
+                      <Select value={genderFilter} onValueChange={setGenderFilter}>
+                        <SelectTrigger className="text-xs h-8">
+                          <SelectValue placeholder="All Genders" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="all" className="text-xs">All Genders</SelectItem>
+                          <SelectItem value="male" className="text-xs">Male</SelectItem>
+                          <SelectItem value="female" className="text-xs">Female</SelectItem>
+                          <SelectItem value="other" className="text-xs">Other</SelectItem>
+                        </SelectContent>
+                      </Select>
+                      
+                      <Select value={premiumFilter} onValueChange={setPremiumFilter}>
+                        <SelectTrigger className="text-xs h-8">
+                          <SelectValue placeholder="All Users" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="all" className="text-xs">All Users</SelectItem>
+                          <SelectItem value="premium" className="text-xs">Premium</SelectItem>
+                          <SelectItem value="free" className="text-xs">Free</SelectItem>
+                        </SelectContent>
+                      </Select>
+                      
+                      <Select value={interestedInFilter} onValueChange={setInterestedInFilter}>
+                        <SelectTrigger className="text-xs h-8">
+                          <SelectValue placeholder="All Preferences" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="all" className="text-xs">All Preferences</SelectItem>
+                          <SelectItem value="male" className="text-xs">Interested in Male</SelectItem>
+                          <SelectItem value="female" className="text-xs">Interested in Female</SelectItem>
+                          <SelectItem value="both" className="text-xs">Interested in Both</SelectItem>
+                        </SelectContent>
+                      </Select>
+                      
+                      <Select value={relationshipIntentFilter} onValueChange={setRelationshipIntentFilter}>
+                        <SelectTrigger className="text-xs h-8">
+                          <SelectValue placeholder="All Intents" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="all" className="text-xs">All Intents</SelectItem>
+                          <SelectItem value="serious_relationship" className="text-xs">Serious Relationship</SelectItem>
+                          <SelectItem value="casual_dating" className="text-xs">Casual Dating</SelectItem>
+                          <SelectItem value="friendship" className="text-xs">Friendship</SelectItem>
+                          <SelectItem value="open_to_anything" className="text-xs">Open to Anything</SelectItem>
+                        </SelectContent>
+                      </Select>
+                      
+                      <Select value={countryFilter} onValueChange={setCountryFilter}>
+                        <SelectTrigger className="text-xs h-8">
+                          <SelectValue placeholder="All Countries" />
+                        </SelectTrigger>
+                        <SelectContent className="max-h-60">
+                          <SelectItem value="all" className="text-xs">All Countries</SelectItem>
+                          {getCountriesList().map(country => (
+                            <SelectItem key={country.code} value={country.name} className="text-xs">
+                              {country.name}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                      
+                      <Select value={activityFilter} onValueChange={setActivityFilter}>
+                        <SelectTrigger className="text-xs h-8">
+                          <SelectValue placeholder="All Activity" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="all" className="text-xs">All Activity</SelectItem>
+                          <SelectItem value="active_week" className="text-xs">Active Last Week</SelectItem>
+                          <SelectItem value="active_month" className="text-xs">Active Last Month</SelectItem>
+                          <SelectItem value="logged_once" className="text-xs">Logged In Once</SelectItem>
+                          <SelectItem value="inactive_month" className="text-xs">Inactive 30+ Days</SelectItem>
+                          <SelectItem value="never_active" className="text-xs">Never Logged In</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
                   </div>
 
                   {/* Users List Container */}
