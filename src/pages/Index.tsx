@@ -15,6 +15,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { transformFormDataForSubmission } from '@/utils/formValidation';
 import { videoPreloader } from '@/utils/videoPreloader';
 import VideoBackground from '@/components/VideoBackground';
+import { preloadPricingConfig } from '@/hooks/usePricingConfig';
 
 // Lazy load AdminPage (54KB) - only loads when admin features are accessed
 const LazyAdminPage = lazy(() => import('@/components/AdminPage'));
@@ -80,6 +81,9 @@ const Index = () => {
         
         // Track last login - update profile with login timestamp (non-blocking)
         if (_event === 'SIGNED_IN') {
+          // Preload pricing config in background
+          preloadPricingConfig(session.user.id);
+          
           (async () => {
             try {
               const { data: profileData } = await supabase
