@@ -10,9 +10,10 @@ declare global {
   }
 }
 
-// Google Play product IDs
+// Google Play product IDs - MUST match exactly what's in Google Play Console
 const GOOGLE_PRODUCT_IDS = [
   'premium_monthly',  // Main subscription product ID from Google Play Console
+  'com.driplove.dating.premium.monthly', // Alternative format
 ];
 
 export const isAndroid = () => {
@@ -281,14 +282,31 @@ export const buyGoogleMonthly = async () => {
 
   window.googleIapPurchaseInitiated = true;
 
-  let product;
+  let product = null;
+  let offer = null;
+
+  // Try to find a valid product with an offer
   for (const id of GOOGLE_PRODUCT_IDS) {
     try {
       const p = store.get ? store.get(id) : null;
-      if (p && p.canPurchase) {
-        product = p;
-        console.log('[Google IAP] Found purchasable product:', id);
-        break;
+      console.log(`[Google IAP] Checking product ${id}:`, p ? {
+        id: p.id,
+        canPurchase: p.canPurchase,
+        hasOffer: !!p.getOffer?.()
+      } : 'not found');
+      
+      if (p) {
+        const o = p.getOffer?.();
+        if (o && typeof o.order === 'function') {
+          product = p;
+          offer = o;
+          console.log('[Google IAP] Found valid product with offer:', id);
+          break;
+        } else if (p.canPurchase) {
+          // Fallback: product is purchasable but getOffer might work differently
+          product = p;
+          console.log('[Google IAP] Found purchasable product:', id);
+        }
       }
     } catch (err) {
       console.warn(`[Google IAP] Could not load product ${id}:`, err);
@@ -296,23 +314,34 @@ export const buyGoogleMonthly = async () => {
   }
 
   if (!product) {
-    console.error('[Google IAP] No valid product found');
+    console.error('[Google IAP] No valid product found. Available products:', 
+      store.products?.map((p: any) => ({ id: p.id, canPurchase: p.canPurchase })) || 'none');
     window.googleIapPurchaseInitiated = false;
-    throw new Error('No valid subscription product available');
+    throw new Error('No valid subscription product available. Please check your Google Play account.');
   }
 
   try {
-    const offer = product.getOffer?.();
     if (offer && typeof offer.order === 'function') {
-      console.log('[Google IAP] Ordering product:', product.id);
+      console.log('[Google IAP] Ordering via offer:', product.id);
       await offer.order();
+    } else if (product.getOffer && typeof product.getOffer === 'function') {
+      const productOffer = product.getOffer();
+      if (productOffer && typeof productOffer.order === 'function') {
+        console.log('[Google IAP] Ordering via product.getOffer():', product.id);
+        await productOffer.order();
+      } else {
+        throw new Error('Product offer not available');
+      }
+    } else if (store.order && typeof store.order === 'function') {
+      // Fallback to store.order
+      console.log('[Google IAP] Ordering via store.order:', product.id);
+      await store.order(product);
     } else {
-      console.error('[Google IAP] No valid offer found');
-      window.googleIapPurchaseInitiated = false;
-      throw new Error('No valid offer available');
+      console.error('[Google IAP] No valid purchase method found');
+      throw new Error('Unable to initiate purchase');
     }
-  } catch (error) {
-    console.error('[Google IAP] Order failed:', error);
+  } catch (error: any) {
+    console.error('[Google IAP] Order failed:', error?.message || error);
     window.googleIapPurchaseInitiated = false;
     throw error;
   }

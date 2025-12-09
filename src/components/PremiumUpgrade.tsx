@@ -621,16 +621,27 @@ const PremiumUpgrade = ({ currentUser, onClose, preselectedPlan }: PremiumUpgrad
                 </div>
               )}
               
+              {/* Paystack/Card Payment Options - show on web AND Android native */}
+              {(!isNativeApp() || isAndroid()) && (
+                <button
+                  onClick={() => handlePaymentTypeSelection('subscription')}
+                  className="w-full p-4 bg-gradient-to-r from-green-500 to-emerald-600 text-white rounded-lg hover:from-green-600 hover:to-emerald-700 transition-all duration-200 font-semibold"
+                >
+                  <div className="text-lg">💳 Pay with Paystack</div>
+                  <div className="text-sm opacity-90">${monthlyPrice}/month • {t('premium.paymentOptions.monthly.subtitle')}</div>
+                </button>
+              )}
+              
               {/* Google IAP - show on Android native when available */}
               {isAndroid() && isNativeApp() && canBuyGoogle && (
                 <>
                   <button
                     onClick={() => handlePaymentTypeSelection('google_iap')}
                     disabled={googleIapLoading}
-                    className="w-full p-4 bg-gradient-to-r from-green-600 to-green-700 text-white rounded-lg hover:from-green-700 hover:to-green-800 transition-all duration-200 font-semibold disabled:opacity-50"
+                    className="w-full p-4 bg-gradient-to-r from-gray-800 to-black text-white rounded-lg hover:from-gray-700 hover:to-gray-900 transition-all duration-200 font-semibold disabled:opacity-50"
                   >
-                    <div className="text-lg">{googleIapLoading ? '🤖 Processing...' : '🤖 Pay with Google Play'}</div>
-                    <div className="text-sm opacity-90">{googlePrice || `$${monthlyPrice}`}/month • Secure & Fast</div>
+                    <div className="text-lg">{googleIapLoading ? '🤖 Processing...' : '🤖 Pay with Google'}</div>
+                    <div className="text-sm opacity-90">{googlePrice || `$${monthlyPrice}`}/month • Google Play</div>
                   </button>
                   
                   {/* Auto-renewal disclosure */}
@@ -640,31 +651,21 @@ const PremiumUpgrade = ({ currentUser, onClose, preselectedPlan }: PremiumUpgrad
                 </>
               )}
               
-              {/* Loading message when Google IAP is not ready on Android */}
+              {/* Loading message when Google IAP is not ready on Android - only show if not timed out */}
               {isAndroid() && isNativeApp() && !canBuyGoogle && !googleIapLoadingTimeout && (
                 <div className="text-center p-4 bg-blue-50 rounded-lg border border-blue-200">
                   <div className="text-blue-600 mb-2 font-semibold">{t('premium.paymentOptions.loading.title')}</div>
                   <div className="text-sm text-blue-500">{t('premium.paymentOptions.loading.message')}</div>
                 </div>
               )}
+              
+              {/* Note when Google IAP is unavailable on Android */}
               {isAndroid() && isNativeApp() && !canBuyGoogle && googleIapLoadingTimeout && (
-                <div className="text-center p-4 bg-amber-50 rounded-lg border border-amber-200">
-                  <div className="text-amber-800 mb-2 font-semibold">{t('premium.paymentOptions.unavailable.title')}</div>
-                  <div className="text-sm text-amber-700">
-                    {t('premium.paymentOptions.unavailable.message')}
+                <div className="text-center p-3 bg-gray-50 rounded-lg border border-gray-200">
+                  <div className="text-xs text-gray-500">
+                    Google Play payment unavailable. Use Paystack above.
                   </div>
                 </div>
-              )}
-              
-              {/* Paystack/Card Payment Options - show on web only, NOT on iOS or Android native */}
-              {!isNativeApp() && (
-                <button
-                  onClick={() => handlePaymentTypeSelection('subscription')}
-                  className="w-full p-4 bg-gradient-to-r from-green-500 to-emerald-600 text-white rounded-lg hover:from-green-600 hover:to-emerald-700 transition-all duration-200 font-semibold"
-                >
-                  <div className="text-lg">{t('premium.paymentOptions.monthly.button')}</div>
-                  <div className="text-sm opacity-90">${monthlyPrice}/month • {t('premium.paymentOptions.monthly.subtitle')}</div>
-                </button>
               )}
             </div>
           </div>
