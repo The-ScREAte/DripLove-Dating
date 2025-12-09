@@ -69,7 +69,10 @@ const PaystackPaymentModal: React.FC<PaystackPaymentModalProps> = ({
 
   React.useEffect(() => {
     if (isOpen) {
-      loadPaystackScript();
+      console.log('[PaystackModal] Modal opened, loading Paystack script...');
+      loadPaystackScript()
+        .then(() => console.log('[PaystackModal] Paystack script loaded successfully'))
+        .catch(err => console.error('[PaystackModal] Failed to load Paystack script:', err));
       if (!isOneTime) setSelectedPaymentMethod('card'); // enforce card for subscriptions
     }
   }, [isOpen, isOneTime]);

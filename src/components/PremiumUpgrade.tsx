@@ -632,15 +632,35 @@ const PremiumUpgrade = ({ currentUser, onClose, preselectedPlan }: PremiumUpgrad
                 </button>
               )}
               
-              {/* Google IAP - show on Android native when available */}
-              {isAndroid() && isNativeApp() && canBuyGoogle && (
+              {/* Google IAP - show on Android native */}
+              {isAndroid() && isNativeApp() && (
                 <>
                   <button
                     onClick={() => handlePaymentTypeSelection('google_iap')}
-                    disabled={googleIapLoading}
+                    disabled={googleIapLoading || !canBuyGoogle}
                     className="w-full p-4 bg-gradient-to-r from-gray-800 to-black text-white rounded-lg hover:from-gray-700 hover:to-gray-900 transition-all duration-200 font-semibold disabled:opacity-50"
                   >
-                    <div className="text-lg">{googleIapLoading ? '🤖 Processing...' : '🤖 Pay with Google'}</div>
+                    <div className="text-lg flex items-center justify-center gap-2">
+                      {googleIapLoading ? (
+                        <>
+                          <svg className="animate-spin h-5 w-5" viewBox="0 0 24 24">
+                            <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" fill="none"/>
+                            <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"/>
+                          </svg>
+                          Processing...
+                        </>
+                      ) : (
+                        <>
+                          <svg className="h-5 w-5" viewBox="0 0 24 24">
+                            <path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"/>
+                            <path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"/>
+                            <path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z"/>
+                            <path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"/>
+                          </svg>
+                          Pay with Google
+                        </>
+                      )}
+                    </div>
                     <div className="text-sm opacity-90">{googlePrice || `$${monthlyPrice}`}/month • Google Play</div>
                   </button>
                   
@@ -648,45 +668,33 @@ const PremiumUpgrade = ({ currentUser, onClose, preselectedPlan }: PremiumUpgrad
                   <div className="text-xs text-gray-600 text-center px-2 -mt-2">
                     Subscription automatically renews unless auto-renew is turned off at least 24 hours before the end of the current period.
                   </div>
+                  
+                  {/* Show status message if Google IAP not available */}
+                  {!canBuyGoogle && googleIapLoadingTimeout && (
+                    <div className="text-center text-xs text-gray-500 -mt-1">
+                      Google Play billing may not be configured. Use Paystack above.
+                    </div>
+                  )}
                 </>
-              )}
-              
-              {/* Loading message when Google IAP is not ready on Android - only show if not timed out */}
-              {isAndroid() && isNativeApp() && !canBuyGoogle && !googleIapLoadingTimeout && (
-                <div className="text-center p-4 bg-blue-50 rounded-lg border border-blue-200">
-                  <div className="text-blue-600 mb-2 font-semibold">{t('premium.paymentOptions.loading.title')}</div>
-                  <div className="text-sm text-blue-500">{t('premium.paymentOptions.loading.message')}</div>
-                </div>
-              )}
-              
-              {/* Note when Google IAP is unavailable on Android */}
-              {isAndroid() && isNativeApp() && !canBuyGoogle && googleIapLoadingTimeout && (
-                <div className="text-center p-3 bg-gray-50 rounded-lg border border-gray-200">
-                  <div className="text-xs text-gray-500">
-                    Google Play payment unavailable. Use Paystack above.
-                  </div>
-                </div>
               )}
             </div>
           </div>
         </div>
       )}
 
-      {/* Payment Modals - Show on Web and Android (non-iOS platforms) */}
-      {(!isIOS() || !isNativeApp()) && (
-        <PaystackPaymentModal
-          isOpen={showPaymentModal}
-          onClose={() => setShowPaymentModal(false)}
-          amount={parseFloat(ghsPrice || '0')}
-          currency="GHS"
-          displayAmount={parseFloat(monthlyPrice || '0')}
-          displayCurrency="USD"
-          email={currentUser?.email || ''}
-          onSuccess={handlePaymentSuccess}
-          paymentMethod={paymentMethods[0]?.type || 'card'}
-          isOneTime={paymentType === 'one-time'}
-        />
-      )}
+      {/* Payment Modals - Show on Web and Android (NOT on iOS native) */}
+      <PaystackPaymentModal
+        isOpen={showPaymentModal && (!isNativeApp() || !isIOS())}
+        onClose={() => setShowPaymentModal(false)}
+        amount={parseFloat(ghsPrice || '0')}
+        currency="GHS"
+        displayAmount={parseFloat(monthlyPrice || '0')}
+        displayCurrency="USD"
+        email={currentUser?.email || ''}
+        onSuccess={handlePaymentSuccess}
+        paymentMethod={paymentMethods[0]?.type || 'card'}
+        isOneTime={paymentType === 'one-time'}
+      />
     </div>
   );
 };
