@@ -3,7 +3,7 @@ import React, { useState } from 'react';
 import PaystackPaymentModal from './PaystackPaymentModal';
 import { getPremiumPaymentConfig } from '@/utils/paymentConfig';
 import { isIOS, isNativeApp } from '@/utils/iap';
-import { buyMonthly, debugIAPState, restorePurchases, loadAppleProductPrice } from '../iap';
+import { buyMonthly, debugIAPState, restorePurchases } from '../iap';
 import { isAndroid, initGoogleIAP, buyGooglePremium, restoreGooglePurchases, loadGoogleProducts, isGoogleIapReady } from '@/utils/googleIap';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -31,7 +31,6 @@ const PremiumUpgrade = ({ currentUser, onClose, preselectedPlan }: PremiumUpgrad
   const [canBuy, setCanBuy] = useState(false);
   const [iapLoadingTimeout, setIapLoadingTimeout] = useState(false);
   const [restoreLoading, setRestoreLoading] = useState(false);
-  const [applePrice, setApplePrice] = useState<string | null>(null);
   
   // Google IAP state
   const [googleIapLoading, setGoogleIapLoading] = useState(false);
@@ -62,20 +61,9 @@ const PremiumUpgrade = ({ currentUser, onClose, preselectedPlan }: PremiumUpgrad
       const hasOffer = !!product?.getOffer?.();
       setCanBuy(hasOffer);
       
-      // If product becomes available, clear the timeout flag and load price
+      // If product becomes available, clear the timeout flag
       if (hasOffer) {
         setIapLoadingTimeout(false);
-        
-        // Load Apple product price
-        try {
-          const priceStr = await loadAppleProductPrice();
-          if (priceStr) {
-            console.log('[PremiumUpgrade] Apple price loaded:', priceStr);
-            setApplePrice(priceStr);
-          }
-        } catch (err) {
-          console.warn('[PremiumUpgrade] Failed to load Apple price:', err);
-        }
       }
       
       // Check if initialization failed
@@ -610,7 +598,7 @@ const PremiumUpgrade = ({ currentUser, onClose, preselectedPlan }: PremiumUpgrad
                   >
                     <div className="text-lg">{iapLoading ? t('premium.paymentOptions.iap.processing') : t('premium.paymentOptions.iap.button')}</div>
                     <div className="text-sm opacity-90">
-                      {applePrice || `$${monthlyPrice}`}/month • Secure & Easy
+                      ${monthlyPrice}/month • Secure & Easy
                     </div>
                   </button>
                   
