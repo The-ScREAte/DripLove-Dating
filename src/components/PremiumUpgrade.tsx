@@ -209,10 +209,12 @@ const PremiumUpgrade = ({ currentUser, onClose, preselectedPlan }: PremiumUpgrad
     
     return () => clearTimeout(loadingTimeout);
   }, [canBuyGoogle]);
-  // Use pricing config hook with background loading
+  
+  // Use pricing config hook - now fetches localized IAP prices directly
   const pricingConfig = usePricingConfig();
   
-  const price = pricingConfig.monthlyPrice;
+  // Extract pricing info - displayPrice contains the full localized price from IAP
+  const displayPrice = pricingConfig.displayPrice; // e.g., "$4.99", "₵39.99", "₦4,499"
   const monthlyPrice = pricingConfig.monthlyPrice;
   const currency = pricingConfig.currency;
   const currencySymbol = pricingConfig.currencySymbol;
@@ -437,15 +439,13 @@ const PremiumUpgrade = ({ currentUser, onClose, preselectedPlan }: PremiumUpgrad
                 </CardTitle>
                 <div className="mt-2 md:mt-3">
                   <div className="space-y-2 md:space-y-3">
-                    {/* Monthly payment option */}
-                    {monthlyPrice && (
-                      <div className="p-1.5 md:p-2 bg-gradient-to-r from-blue-50 to-sky-50 border border-blue-200 rounded-lg">
-                        <div className="text-sm sm:text-base md:text-xl font-bold text-gray-800">
-                          {isAndroid() && isNativeApp() && googlePrice ? googlePrice : `${currencySymbol}${monthlyPrice}`}/month
-                        </div>
-                        <div className="text-[9px] md:text-xs text-blue-600 font-medium mt-0.5">📱 {t('premium.monthlySubscription')}</div>
+                    {/* Monthly payment option - shows localized IAP price */}
+                    <div className="p-1.5 md:p-2 bg-gradient-to-r from-blue-50 to-sky-50 border border-blue-200 rounded-lg">
+                      <div className="text-sm sm:text-base md:text-xl font-bold text-gray-800">
+                        {pricingConfig.loading ? '...' : displayPrice}/month
                       </div>
-                    )}
+                      <div className="text-[9px] md:text-xs text-blue-600 font-medium mt-0.5">📱 {t('premium.monthlySubscription')}</div>
+                    </div>
                   </div>
                 </div>
               </CardHeader>

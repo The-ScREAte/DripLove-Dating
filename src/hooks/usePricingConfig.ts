@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { Capacitor } from '@capacitor/core';
 import { supabase } from '@/integrations/supabase/client';
 
 interface PricingConfig {
@@ -9,13 +10,14 @@ interface PricingConfig {
   displayPrice: string;
   ghsPrice: string;
   loading: boolean;
+  source: 'iap' | 'fallback';
 }
 
 // Cache for pricing config
 let cachedConfig: PricingConfig | null = null;
 let configPromise: Promise<PricingConfig> | null = null;
 
-// Currency symbols map
+// Currency symbols map (fallback only)
 const currencySymbols: Record<string, string> = {
   USD: '$',
   GHS: '₵',
@@ -36,37 +38,7 @@ const currencySymbols: Record<string, string> = {
   AUD: 'A$',
 };
 
-// Country to currency mapping
-const countryCurrencyMap: Record<string, { currency: string; price: string }> = {
-  US: { currency: 'USD', price: '1.99' },
-  GH: { currency: 'GHS', price: '32' },
-  NG: { currency: 'NGN', price: '3200' },
-  GB: { currency: 'GBP', price: '1.59' },
-  CA: { currency: 'CAD', price: '2.79' },
-  AU: { currency: 'AUD', price: '2.99' },
-  ZA: { currency: 'ZAR', price: '39' },
-  KE: { currency: 'KES', price: '280' },
-  TZ: { currency: 'TZS', price: '5200' },
-  UG: { currency: 'UGX', price: '7500' },
-  RW: { currency: 'RWF', price: '2800' },
-  SN: { currency: 'XOF', price: '1200' },
-  CI: { currency: 'XOF', price: '1200' },
-  CM: { currency: 'XAF', price: '1200' },
-  EG: { currency: 'EGP', price: '99' },
-  MA: { currency: 'MAD', price: '20' },
-  IN: { currency: 'INR', price: '169' },
-  DE: { currency: 'EUR', price: '1.79' },
-  FR: { currency: 'EUR', price: '1.79' },
-  IT: { currency: 'EUR', price: '1.79' },
-  ES: { currency: 'EUR', price: '1.79' },
-  NL: { currency: 'EUR', price: '1.79' },
-  BE: { currency: 'EUR', price: '1.79' },
-  AT: { currency: 'EUR', price: '1.79' },
-  IE: { currency: 'EUR', price: '1.79' },
-  PT: { currency: 'EUR', price: '1.79' },
-};
-
-// Default pricing
+// Default pricing (fallback for web when IAP not available)
 const defaultPricing: PricingConfig = {
   price: '1.99',
   monthlyPrice: '1.99',
@@ -75,83 +47,288 @@ const defaultPricing: PricingConfig = {
   displayPrice: '$1.99',
   ghsPrice: '32',
   loading: false,
+  source: 'fallback',
 };
 
-// Detect user's country from profile or IP
-async function detectUserCountry(userId?: string): Promise<string> {
-  // First try to get from user profile
-  if (userId) {
-    try {
-      const { data } = await supabase
-        .from('profiles')
-        .select('country_code')
-        .eq('id', userId)
-        .single();
-      
-      if (data?.country_code) {
-        return data.country_code.toUpperCase();
-      }
-    } catch (e) {
-      console.log('[Pricing] Could not fetch user country from profile');
-    }
-  }
+// Google Play product IDs (must match iap-google.ts)
+const GOOGLE_PRODUCT_IDS = [
+  'premium_monthly',
+  'com.driplove.dating.premium.monthly',
+];
 
-  // Fallback to IP geolocation
-  try {
-    const response = await fetch('https://ipapi.co/json/', { 
-      signal: AbortSignal.timeout(3000) 
-    });
-    if (response.ok) {
-      const data = await response.json();
-      if (data.country_code) {
-        return data.country_code.toUpperCase();
-      }
-    }
-  } catch (e) {
-    console.log('[Pricing] IP geolocation failed, using default');
-  }
+// Apple product IDs (must match iap.ts)
+const APPLE_PRODUCT_IDS = [
+  'com.driplove.dating.premium.monthlysub3',
+  'com.driplove.dating.premium.monthlysub2',
+];
 
-  return 'US'; // Default to US
+// Check if running as native app
+const isNativeApp = () => {
+  return Capacitor.isNativePlatform();
+};
+
+const isAndroid = () => {
+  return Capacitor.getPlatform() === 'android';
+};
+
+const isIOS = () => {
+  return Capacitor.getPlatform() === 'ios';
+};
+
+// Extract currency symbol from formatted price string (e.g., "$4.99" -> "$", "₵39.99" -> "₵")
+function extractCurrencySymbol(formattedPrice: string): string {
+  // Match currency symbols at the start or end of the string
+  const match = formattedPrice.match(/^([^\d\s.,]+)|([^\d\s.,]+)$/);
+  if (match) {
+    return match[1] || match[2] || '';
+  }
+  return '';
 }
 
-// Load pricing config
+// Extract numeric price from formatted price string (e.g., "$4.99" -> "4.99")
+function extractNumericPrice(formattedPrice: string): string {
+  const match = formattedPrice.match(/[\d.,]+/);
+  if (match) {
+    // Handle both "4.99" and "4,99" formats
+    return match[0].replace(',', '.');
+  }
+  return '0';
+}
+
+// Get Google Play localized price
+async function getGooglePrice(): Promise<{ price: string; currency: string; formattedPrice: string } | null> {
+  // @ts-ignore
+  const store = window.CdvPurchase?.store;
+  
+  if (!store || !isAndroid()) {
+    return null;
+  }
+
+  // Wait a bit for store to be ready
+  await new Promise(resolve => setTimeout(resolve, 500));
+
+  try {
+    for (const id of GOOGLE_PRODUCT_IDS) {
+      const product = store.get ? store.get(id) : null;
+      console.log(`[Pricing] Checking Google product ${id}:`, product);
+      
+      if (product) {
+        // Try different ways to get pricing info
+        const pricing = product.pricing;
+        
+        if (pricing) {
+          console.log('[Pricing] Found Google pricing:', pricing);
+          return {
+            formattedPrice: pricing.price || product.price || '',
+            price: extractNumericPrice(pricing.price || product.price || ''),
+            currency: pricing.currency || 'USD',
+          };
+        }
+        
+        // Fallback to product.price directly
+        if (product.price) {
+          console.log('[Pricing] Using product.price:', product.price);
+          return {
+            formattedPrice: product.price,
+            price: extractNumericPrice(product.price),
+            currency: product.priceCurrency || 'USD',
+          };
+        }
+      }
+    }
+  } catch (error) {
+    console.error('[Pricing] Error getting Google price:', error);
+  }
+
+  return null;
+}
+
+// Get Apple StoreKit localized price
+async function getApplePrice(): Promise<{ price: string; currency: string; formattedPrice: string } | null> {
+  // @ts-ignore
+  const store = window.CdvPurchase?.store;
+  
+  if (!store || !isIOS()) {
+    return null;
+  }
+
+  // Wait a bit for store to be ready
+  await new Promise(resolve => setTimeout(resolve, 500));
+
+  try {
+    for (const id of APPLE_PRODUCT_IDS) {
+      const product = store.get ? store.get(id) : null;
+      console.log(`[Pricing] Checking Apple product ${id}:`, product);
+      
+      if (product) {
+        // Try different ways to get pricing info
+        const pricing = product.pricing;
+        
+        if (pricing) {
+          console.log('[Pricing] Found Apple pricing:', pricing);
+          return {
+            formattedPrice: pricing.price || product.price || '',
+            price: extractNumericPrice(pricing.price || product.price || ''),
+            currency: pricing.currency || 'USD',
+          };
+        }
+        
+        // Fallback to product.price directly
+        if (product.price) {
+          console.log('[Pricing] Using product.price:', product.price);
+          return {
+            formattedPrice: product.price,
+            price: extractNumericPrice(product.price),
+            currency: product.priceCurrency || 'USD',
+          };
+        }
+      }
+    }
+  } catch (error) {
+    console.error('[Pricing] Error getting Apple price:', error);
+  }
+
+  return null;
+}
+
+// Get IAP price based on platform
+async function getIAPPrice(): Promise<{ price: string; currency: string; formattedPrice: string } | null> {
+  if (!isNativeApp()) {
+    return null;
+  }
+
+  if (isAndroid()) {
+    return await getGooglePrice();
+  }
+
+  if (isIOS()) {
+    return await getApplePrice();
+  }
+
+  return null;
+}
+
+// Retry getting IAP price with multiple attempts
+async function getIAPPriceWithRetry(maxAttempts: number = 5): Promise<{ price: string; currency: string; formattedPrice: string } | null> {
+  for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+    console.log(`[Pricing] IAP price fetch attempt ${attempt}/${maxAttempts}`);
+    
+    const iapPrice = await getIAPPrice();
+    if (iapPrice && iapPrice.price && parseFloat(iapPrice.price) > 0) {
+      console.log('[Pricing] IAP price fetched successfully:', iapPrice);
+      return iapPrice;
+    }
+    
+    // Wait before retry (exponential backoff: 500ms, 1s, 2s, 4s, 8s)
+    if (attempt < maxAttempts) {
+      const delay = 500 * Math.pow(2, attempt - 1);
+      console.log(`[Pricing] Waiting ${delay}ms before retry...`);
+      await new Promise(resolve => setTimeout(resolve, delay));
+    }
+  }
+  
+  return null;
+}
+
+// Calculate GHS price for Paystack based on IAP price
+function calculateGHSPrice(price: string, currency: string): string {
+  const numericPrice = parseFloat(price);
+  
+  if (currency === 'GHS') {
+    return price;
+  }
+  
+  // Approximate conversion rates to GHS
+  const toGHSRates: Record<string, number> = {
+    USD: 16,
+    EUR: 17,
+    GBP: 20,
+    NGN: 0.01,
+    ZAR: 0.85,
+    KES: 0.12,
+  };
+  
+  const rate = toGHSRates[currency] || 16;
+  const ghsAmount = numericPrice * rate;
+  
+  // Round to nearest whole number for GHS
+  return Math.round(ghsAmount).toString();
+}
+
+// Load pricing config - fetches from IAP first, falls back to defaults
 async function loadPricingConfig(userId?: string): Promise<PricingConfig> {
   try {
-    // Detect country
-    const countryCode = await detectUserCountry(userId);
-    console.log('[Pricing] Detected country:', countryCode);
-
-    // Get pricing for country
-    const countryPricing = countryCurrencyMap[countryCode] || countryCurrencyMap.US;
-    const currency = countryPricing.currency;
-    const price = countryPricing.price;
-    const currencySymbol = currencySymbols[currency] || currency;
-
-    // Calculate GHS price for Paystack (always needed)
-    // Use direct GHS price if in Ghana, otherwise convert
-    let ghsPrice = '32';
-    if (countryCode === 'GH') {
-      ghsPrice = price;
-    } else if (currency === 'USD') {
-      // USD to GHS rate
-      ghsPrice = (parseFloat(price) * 16).toFixed(0);
-    } else {
-      // For other currencies, use a fixed GHS amount
-      ghsPrice = '32';
+    console.log('[Pricing] Loading pricing config...');
+    
+    // On native platforms, try to get IAP price first
+    if (isNativeApp()) {
+      const iapPrice = await getIAPPriceWithRetry(5);
+      
+      if (iapPrice && iapPrice.formattedPrice) {
+        const symbol = extractCurrencySymbol(iapPrice.formattedPrice) || currencySymbols[iapPrice.currency] || iapPrice.currency;
+        const ghsPrice = calculateGHSPrice(iapPrice.price, iapPrice.currency);
+        
+        const config: PricingConfig = {
+          price: iapPrice.price,
+          monthlyPrice: iapPrice.price,
+          currency: iapPrice.currency,
+          currencySymbol: symbol,
+          displayPrice: iapPrice.formattedPrice,
+          ghsPrice,
+          loading: false,
+          source: 'iap',
+        };
+        
+        console.log('[Pricing] Loaded IAP config:', config);
+        return config;
+      }
     }
-
-    const config: PricingConfig = {
-      price,
-      monthlyPrice: price,
-      currency,
-      currencySymbol,
-      displayPrice: `${currencySymbol}${price}`,
-      ghsPrice,
-      loading: false,
-    };
-
-    console.log('[Pricing] Loaded config:', config);
-    return config;
+    
+    // Fallback: Use Android price if available (for web/Paystack)
+    // This ensures consistency across platforms
+    // Default fallback pricing for web
+    console.log('[Pricing] Using fallback pricing for web');
+    
+    // Try to detect country for better defaults
+    let fallbackConfig = { ...defaultPricing };
+    
+    // Check user profile for country
+    if (userId) {
+      try {
+        const { data } = await supabase
+          .from('profiles')
+          .select('country_code')
+          .eq('id', userId)
+          .single();
+        
+        if (data?.country_code === 'GH') {
+          fallbackConfig = {
+            ...fallbackConfig,
+            price: '32',
+            monthlyPrice: '32',
+            currency: 'GHS',
+            currencySymbol: '₵',
+            displayPrice: '₵32',
+            ghsPrice: '32',
+          };
+        } else if (data?.country_code === 'NG') {
+          fallbackConfig = {
+            ...fallbackConfig,
+            price: '3200',
+            monthlyPrice: '3200',
+            currency: 'NGN',
+            currencySymbol: '₦',
+            displayPrice: '₦3,200',
+            ghsPrice: '32',
+          };
+        }
+      } catch (e) {
+        console.log('[Pricing] Could not fetch user country from profile');
+      }
+    }
+    
+    console.log('[Pricing] Using fallback config:', fallbackConfig);
+    return fallbackConfig;
   } catch (error) {
     console.error('[Pricing] Error loading config:', error);
     return defaultPricing;
