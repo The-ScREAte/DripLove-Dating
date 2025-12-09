@@ -12,6 +12,7 @@ import { ScrollArea } from '@/components/ui/scroll-area';
 import { Loader2, Send, Users, Globe, CheckCircle2, AlertCircle, Trash2, RotateCw, Eye, History, Copy } from 'lucide-react';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 import {
   Dialog,
   DialogContent,
@@ -19,6 +20,51 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog';
+import { ChevronDown, ChevronUp } from 'lucide-react';
+
+// Collapsible countries badge component
+const CountriesBadge = ({ countries }: { countries: string[] }) => {
+  const [isOpen, setIsOpen] = React.useState(false);
+  
+  if (!countries || countries.length === 0) {
+    return null;
+  }
+  
+  if (countries.length === 1) {
+    return (
+      <Badge variant="outline" className="text-[10px] h-4">
+        {countries[0]}
+      </Badge>
+    );
+  }
+  
+  return (
+    <Collapsible open={isOpen} onOpenChange={setIsOpen}>
+      <CollapsibleTrigger asChild>
+        <Badge 
+          variant="outline" 
+          className="text-[10px] h-4 cursor-pointer hover:bg-muted transition-colors"
+        >
+          {countries[0]}...
+          {isOpen ? (
+            <ChevronUp className="w-2.5 h-2.5 ml-1" />
+          ) : (
+            <ChevronDown className="w-2.5 h-2.5 ml-1" />
+          )}
+        </Badge>
+      </CollapsibleTrigger>
+      <CollapsibleContent className="mt-1">
+        <div className="flex flex-wrap gap-1">
+          {countries.map((country, idx) => (
+            <Badge key={idx} variant="outline" className="text-[10px] h-4">
+              {country}
+            </Badge>
+          ))}
+        </div>
+      </CollapsibleContent>
+    </Collapsible>
+  );
+};
 
 interface Country {
   code: string;
@@ -897,9 +943,7 @@ export default function BroadcastNotifications() {
                               {campaign.failed_sends} failed
                             </Badge>
                           )}
-                          <Badge variant="outline" className="text-[10px] h-4">
-                            {campaign.target_countries.join(', ')}
-                          </Badge>
+                          <CountriesBadge countries={campaign.target_countries} />
                         </div>
 
                         <div className="space-y-2">
