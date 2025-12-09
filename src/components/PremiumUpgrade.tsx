@@ -621,8 +621,8 @@ const PremiumUpgrade = ({ currentUser, onClose, preselectedPlan }: PremiumUpgrad
                 </div>
               )}
               
-              {/* Paystack/Card Payment Options - show on web AND Android native */}
-              {(!isNativeApp() || isAndroid()) && (
+              {/* Paystack/Card Payment Options - show on web AND Android native, NOT on iOS */}
+              {(!isNativeApp() || (isAndroid() && isNativeApp())) && !isIOS() && (
                 <button
                   onClick={() => handlePaymentTypeSelection('subscription')}
                   className="w-full p-4 bg-gradient-to-r from-green-500 to-emerald-600 text-white rounded-lg hover:from-green-600 hover:to-emerald-700 transition-all duration-200 font-semibold"

@@ -48,6 +48,36 @@ interface Campaign {
   admin_id: string;
 }
 
+// Collapsible countries badge component
+const CountriesBadge = ({ countries }: { countries: string[] }) => {
+  const [expanded, setExpanded] = useState(false);
+  
+  if (!countries || countries.length === 0) {
+    return <Badge variant="outline" className="text-[10px] h-4">All countries</Badge>;
+  }
+  
+  if (countries.length === 1) {
+    return <Badge variant="outline" className="text-[10px] h-4">{countries[0]}</Badge>;
+  }
+  
+  return (
+    <Badge 
+      variant="outline" 
+      className="text-[10px] h-4 cursor-pointer hover:bg-gray-100 transition-colors"
+      onClick={(e) => {
+        e.stopPropagation();
+        setExpanded(!expanded);
+      }}
+    >
+      {expanded ? (
+        <span>{countries.join(', ')}</span>
+      ) : (
+        <span>{countries[0]} +{countries.length - 1} more</span>
+      )}
+    </Badge>
+  );
+};
+
 interface Recipient {
   id: string;
   user_id: string;
@@ -897,9 +927,7 @@ export default function BroadcastNotifications() {
                               {campaign.failed_sends} failed
                             </Badge>
                           )}
-                          <Badge variant="outline" className="text-[10px] h-4">
-                            {campaign.target_countries.join(', ')}
-                          </Badge>
+                          <CountriesBadge countries={campaign.target_countries} />
                         </div>
 
                         <div className="space-y-2">
