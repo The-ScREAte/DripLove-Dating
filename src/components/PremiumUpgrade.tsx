@@ -465,40 +465,40 @@ const PremiumUpgrade = ({ currentUser, onClose, preselectedPlan }: PremiumUpgrad
                     {/* Monthly payment option */}
                     {monthlyPrice && (
                       <div className="p-2 md:p-3 bg-gradient-to-r from-blue-50 to-sky-50 border border-blue-200 rounded-lg">
-                        <div className="text-lg sm:text-xl md:text-2xl font-bold text-gray-800 responsive-text">
-                          ${monthlyPrice}/month
+                        <div className="text-base sm:text-lg md:text-2xl font-bold text-gray-800 responsive-text">
+                          {isAndroid() && isNativeApp() && googlePrice ? googlePrice : `$${monthlyPrice}`}/month
                         </div>
-                        <div className="text-xs md:text-sm text-blue-600 font-medium mt-1">📱 {t('premium.monthlySubscription')}</div>
+                        <div className="text-[10px] md:text-sm text-blue-600 font-medium mt-1">📱 {t('premium.monthlySubscription')}</div>
                       </div>
                     )}
                   </div>
                 </div>
               </CardHeader>
               
-              <CardContent className="space-y-2 md:space-y-4 px-2 md:px-5 pb-4 md:pb-7">
+              <CardContent className="space-y-1.5 md:space-y-4 px-2 md:px-5 pb-4 md:pb-7">
                 {features.map((feature, index) => (
-                  <div key={index} className="flex items-center space-x-2 md:space-x-3 p-1.5 md:p-2.5 bg-white/60 rounded-lg">
+                  <div key={index} className="flex items-center space-x-2 md:space-x-3 p-1 md:p-2.5 bg-white/60 rounded-lg">
                     <div className="bg-yellow-100 p-1 md:p-1.5 rounded-full flex-shrink-0">
-                      <feature.icon className="w-4 h-4 md:w-5 md:h-5 text-yellow-600" />
+                      <feature.icon className="w-3.5 h-3.5 md:w-5 md:h-5 text-yellow-600" />
                     </div>
                     <div className="flex-1 min-w-0">
-                      <div className="font-semibold text-gray-800 text-xs md:text-base responsive-text truncate">{feature.name}</div>
-                      <div className="text-xs md:text-sm text-green-600 font-medium responsive-text">{feature.premium}</div>
+                      <div className="font-semibold text-gray-800 text-[11px] md:text-base responsive-text truncate">{feature.name}</div>
+                      <div className="text-[10px] md:text-sm text-green-600 font-medium responsive-text">{feature.premium}</div>
                     </div>
-                    <Check className="w-4 h-4 md:w-5 md:h-5 text-green-500 flex-shrink-0" />
+                    <Check className="w-3.5 h-3.5 md:w-5 md:h-5 text-green-500 flex-shrink-0" />
                   </div>
                 ))}
                 
                 {/* Extra Premium Features */}
-                <div className="flex items-center space-x-2 md:space-x-3 p-1.5 md:p-2.5 bg-gradient-to-r from-yellow-50 to-orange-50 rounded-lg border border-yellow-200">
+                <div className="flex items-center space-x-2 md:space-x-3 p-1 md:p-2.5 bg-gradient-to-r from-yellow-50 to-orange-50 rounded-lg border border-yellow-200">
                   <div className="bg-yellow-100 p-1 md:p-1.5 rounded-full flex-shrink-0">
-                    <Crown className="w-4 h-4 md:w-5 md:h-5 text-yellow-600" />
+                    <Crown className="w-3.5 h-3.5 md:w-5 md:h-5 text-yellow-600" />
                   </div>
                   <div className="flex-1 min-w-0">
-                    <div className="font-semibold text-gray-800 text-xs md:text-base responsive-text truncate">{t('premium.features.allFutureFeatures.name')}</div>
-                    <div className="text-xs md:text-sm text-green-600 font-medium responsive-text">{t('premium.features.allFutureFeatures.premium')}</div>
+                    <div className="font-semibold text-gray-800 text-[11px] md:text-base responsive-text truncate">{t('premium.features.allFutureFeatures.name')}</div>
+                    <div className="text-[10px] md:text-sm text-green-600 font-medium responsive-text">{t('premium.features.allFutureFeatures.premium')}</div>
                   </div>
-                  <Check className="w-4 h-4 md:w-5 md:h-5 text-green-500 flex-shrink-0" />
+                  <Check className="w-3.5 h-3.5 md:w-5 md:h-5 text-green-500 flex-shrink-0" />
                 </div>
 
                 {/* CTA Button */}
@@ -536,17 +536,17 @@ const PremiumUpgrade = ({ currentUser, onClose, preselectedPlan }: PremiumUpgrad
                   <div className="text-xs md:text-sm text-gray-500 mt-1">{t('premium.basicFeaturesOnly')}</div>
                 </div>
               </CardHeader>
-              <CardContent className="space-y-2 md:space-y-3 px-2 md:px-5 pb-4 md:pb-7">
+              <CardContent className="space-y-1.5 md:space-y-3 px-2 md:px-5 pb-4 md:pb-7">
                 {features.map((feature, index) => (
-                  <div key={index} className="flex items-center space-x-2 md:space-x-3 p-1.5 md:p-2.5 bg-gray-50 rounded-lg">
+                  <div key={index} className="flex items-center space-x-2 md:space-x-3 p-1 md:p-2.5 bg-gray-50 rounded-lg">
                     <div className="bg-gray-100 p-1 md:p-1.5 rounded-full flex-shrink-0">
-                      <feature.icon className="w-4 h-4 md:w-5 md:h-5 text-gray-400" />
+                      <feature.icon className="w-3.5 h-3.5 md:w-5 md:h-5 text-gray-400" />
                     </div>
                     <div className="flex-1 min-w-0">
-                      <div className="font-medium text-gray-700 text-xs md:text-base responsive-text truncate">{feature.name}</div>
-                      <div className="text-xs md:text-sm text-gray-500 responsive-text">{feature.free}</div>
+                      <div className="font-medium text-gray-700 text-[11px] md:text-base responsive-text truncate">{feature.name}</div>
+                      <div className="text-[10px] md:text-sm text-gray-500 responsive-text">{feature.free}</div>
                     </div>
-                    <X className="w-4 h-4 md:w-5 md:h-5 text-gray-400 flex-shrink-0" />
+                    <X className="w-3.5 h-3.5 md:w-5 md:h-5 text-gray-400 flex-shrink-0" />
                   </div>
                 ))}
                 <div className="pt-3 md:pt-5 text-center">
