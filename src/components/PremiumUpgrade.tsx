@@ -68,10 +68,10 @@ const PremiumUpgrade = ({ currentUser, onClose, preselectedPlan }: PremiumUpgrad
         
         // Load Apple product price
         try {
-          const priceData = await loadAppleProductPrice();
-          if (priceData && priceData.price) {
-            console.log('[PremiumUpgrade] Apple price loaded:', priceData.price);
-            setApplePrice(priceData.price);
+          const priceStr = await loadAppleProductPrice();
+          if (priceStr) {
+            console.log('[PremiumUpgrade] Apple price loaded:', priceStr);
+            setApplePrice(priceStr);
           }
         } catch (err) {
           console.warn('[PremiumUpgrade] Failed to load Apple price:', err);

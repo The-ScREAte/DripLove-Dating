@@ -437,13 +437,8 @@ export function restorePurchases(): Promise<void> {
 }
 
 // Load Apple product price (localized from App Store)
-export function loadAppleProductPrice(): Promise<{
-  id: string;
-  price: string;
-  currency: string;
-  title: string;
-  description: string;
-} | null> {
+// This uses the simple price string from the product which is already formatted
+export function loadAppleProductPrice(): Promise<string | null> {
   return new Promise((resolve) => {
     // @ts-ignore
     const store = window.CdvPurchase?.store;
@@ -464,62 +459,35 @@ export function loadAppleProductPrice(): Promise<{
     for (const id of PRODUCT_IDS) {
       try {
         const product = store.get ? store.get(id) : null;
-        if (product && product.pricing) {
-          console.log('[IAP] Found Apple product with pricing:', {
-            id: product.id,
-            price: product.pricing.price,
-            currency: product.pricing.currency,
-            title: product.title
-          });
-          
-          resolve({
-            id: product.id,
-            price: product.pricing.price || product.price || '',
-            currency: product.pricing.currency || '',
-            title: product.title || '',
-            description: product.description || ''
-          });
+        
+        if (!product) continue;
+        
+        // Try pricing object first
+        if (product.pricing && product.pricing.price) {
+          console.log('[IAP] Found Apple product pricing.price:', product.pricing.price);
+          resolve(product.pricing.price);
           return;
         }
         
-        // Fallback: check if product has a price string directly
-        if (product && product.price) {
-          console.log('[IAP] Found Apple product with price:', {
-            id: product.id,
-            price: product.price
-          });
-          
-          resolve({
-            id: product.id,
-            price: product.price,
-            currency: product.currency || '',
-            title: product.title || '',
-            description: product.description || ''
-          });
+        // Try direct price property
+        if (product.price) {
+          console.log('[IAP] Found Apple product price:', product.price);
+          resolve(product.price);
           return;
         }
         
-        // Check offer pricing
-        const offer = product?.getOffer?.();
+        // Try offer pricing
+        const offer = product.getOffer?.();
         if (offer && offer.pricingPhases && offer.pricingPhases.length > 0) {
           const phase = offer.pricingPhases[0];
-          console.log('[IAP] Found Apple product offer with pricing:', {
-            id: product.id,
-            price: phase.price,
-            currency: phase.currency
-          });
-          
-          resolve({
-            id: product.id,
-            price: phase.price || '',
-            currency: phase.currency || '',
-            title: product.title || '',
-            description: product.description || ''
-          });
-          return;
+          if (phase.price) {
+            console.log('[IAP] Found Apple offer price:', phase.price);
+            resolve(phase.price);
+            return;
+          }
         }
       } catch (err) {
-        console.warn(`[IAP] Could not check product ${id}:`, err);
+        console.warn(`[IAP] Error getting product ${id}:`, err);
       }
     }
     
