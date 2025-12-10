@@ -18,16 +18,16 @@ export async function loadFaceModels(): Promise<void> {
   }
 
   try {
-    // Use relative path for better Capacitor compatibility
-    const MODEL_URL = './models';
+    // Use CDN for reliable model loading across all platforms (trailing slash required)
+    const MODEL_URL = 'https://cdn.jsdelivr.net/npm/@vladmandic/face-api/model/';
     
     console.log('🔄 Loading face recognition models from:', MODEL_URL);
     console.log('📍 Current location:', window.location.href);
 
     // Load all required models in parallel with timeout
     const loadPromise = Promise.all([
-      faceapi.nets.tinyFaceDetector.loadFromUri(MODEL_URL),      // Detect faces
-      faceapi.nets.faceLandmark68Net.loadFromUri(MODEL_URL),     // Find 68 facial landmarks
+      faceapi.nets.tinyFaceDetector.loadFromUri(MODEL_URL),      // Detect faces (Tiny - works in WebViews)
+      faceapi.nets.faceLandmark68TinyNet.loadFromUri(MODEL_URL), // Tiny landmarks for TinyFaceDetector
       faceapi.nets.faceRecognitionNet.loadFromUri(MODEL_URL)     // Generate face descriptor for comparison
     ]);
 
@@ -37,6 +37,11 @@ export async function loadFaceModels(): Promise<void> {
     );
 
     await Promise.race([loadPromise, timeoutPromise]);
+
+    // Inspect params to ensure models actually hydrated their weights
+    console.log('TinyFaceDetector params:', faceapi.nets.tinyFaceDetector.params);
+    console.log('Landmarks params:', faceapi.nets.faceLandmark68TinyNet.params);
+    console.log('Recognition params:', faceapi.nets.faceRecognitionNet.params);
 
     modelsLoaded = true;
     console.log('✅ Face recognition models loaded successfully');

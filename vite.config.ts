@@ -70,8 +70,6 @@ export default defineConfig(({ mode }) => ({
     // Force re-bundling on certain changes
     force: false
   },
-  // Include these file types as assets (don't process them)
-  assetsInclude: ['**/*.json', '**/*.bin', '**/*.shard1', '**/*.shard2'],
   // Build configuration
   build: {
     chunkSizeWarningLimit: 1000, // Increase from default 500kb to 1000kb
