@@ -878,7 +878,7 @@ const ProfileCompletionPage = () => {
                       <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
                         {images.map((image, index) => (
                           <div key={index} className="relative">
-                            <img
+                            <img loading="lazy" decoding="async"
                               src={image.preview}
                               alt={`Upload ${index + 1}`}
                               className="w-full h-32 object-cover rounded-lg"

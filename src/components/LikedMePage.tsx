@@ -1,9 +1,14 @@
 import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Users, Heart, X, Calendar, MapPin, Shield, ChevronDown, ChevronUp, Briefcase, GraduationCap, Crown, Lock, Clock, User, Quote, Coffee, Search } from 'lucide-react';
-// ⭐ ANDROID FIX: Use platform utils instead of synchronous Capacitor import
-import { isAndroidPlatform, isIOSPlatform, getPlatformSync } from '@/utils/platformUtils';
+import { 
+  Users, Heart, X, Calendar, MapPin, Shield, ChevronDown, ChevronUp, 
+  Briefcase, GraduationCap, Crown, Lock, Clock, User, Quote, Coffee, Search 
+} from 'lucide-react';
+
+// ANDROID FIX: Use platform utils instead of synchronous Capacitor import
+import { getPlatformSync } from '@/utils/platformUtils';
+
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import { useSubscription } from '@/hooks/useSubscription';
@@ -12,12 +17,19 @@ import PremiumUpgrade from './PremiumUpgrade';
 import { useTranslation } from 'react-i18next';
 import { useVirtualizer } from '@tanstack/react-virtual';
 
-// Global cache for liked me data - persists across component mounts
+// FIX #1: Import blob cache for instant Android image loading
+import { preloadImageToBlob } from '@/utils/imageCache';
+
+// =========================================================
+// GLOBAL CACHES
+// =========================================================
+
 const likedMeCache = new Map<string, { 
   likers: any[], 
   userImages: { [key: string]: string[] }, 
   timestamp: number 
 }>();
+
 const likedMePollIntervals = new Map<string, ReturnType<typeof setInterval>>();
 
 const hasListChanged = (previous: any[], next: any[]) => {
@@ -31,12 +43,16 @@ const hasListChanged = (previous: any[], next: any[]) => {
   }
   return false;
 };
+
 const LIKED_ME_CACHE_DURATION = 30000; // 30 seconds
 
-// Make cache globally accessible for preloading
 if (typeof window !== 'undefined') {
   (window as any).likedMeCache = likedMeCache;
 }
+
+// =========================================================
+// COMPONENT START
+// =========================================================
 
 interface LikedMePageProps {
   currentUser: any;
@@ -45,31 +61,18 @@ interface LikedMePageProps {
 
 const LikedMePage = ({ currentUser, isPremium = false }: LikedMePageProps) => {
   const { t } = useTranslation();
-  const [likers, setLikers] = useState<any[]>(() => {
-    // Initialize with cached data immediately if available
-    const cached = currentUser?.id ? likedMeCache.get(currentUser.id) : null;
-    if (cached && Date.now() - cached.timestamp < LIKED_ME_CACHE_DURATION) {
-      return cached.likers;
-    }
-    return [];
-  });
-  const [loading, setLoading] = useState(() => {
-    // Don't show loading if we have cached data
-    const cached = currentUser?.id ? likedMeCache.get(currentUser.id) : null;
-    return !(cached && Date.now() - cached.timestamp < LIKED_ME_CACHE_DURATION);
-  });
+  const { toast } = useToast();
+
+  // ------------------
+  // STATE HOOKS (must stay in same order forever)
+  // ------------------
+  const [likers, setLikers] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
   const [selectedProfile, setSelectedProfile] = useState<any>(null);
-  const [userImages, setUserImages] = useState<{ [key: string]: string[] }>(() => {
-    // Initialize with cached images if available
-    const cached = currentUser?.id ? likedMeCache.get(currentUser.id) : null;
-    if (cached && Date.now() - cached.timestamp < LIKED_ME_CACHE_DURATION) {
-      return cached.userImages;
-    }
-    return {};
-  });
+  const [userImages, setUserImages] = useState<{ [key: string]: string[] }>({});
   const [blockDialogOpen, setBlockDialogOpen] = useState(false);
   const [imageIndex, setImageIndex] = useState(0);
-  const [currentSlide, setCurrentSlide] = useState(0); // For image + about + fun fact slides
+  const [currentSlide, setCurrentSlide] = useState(0);
   const [showMoreInfo, setShowMoreInfo] = useState(false);
   const [showPremiumUpgrade, setShowPremiumUpgrade] = useState(false);
   const [lockoutEndDate, setLockoutEndDate] = useState<Date | null>(null);
@@ -77,13 +80,48 @@ const LikedMePage = ({ currentUser, isPremium = false }: LikedMePageProps) => {
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [pullDistance, setPullDistance] = useState(0);
   const [startY, setStartY] = useState(0);
+
+  // ------------------
+  // REFS
+  // ------------------
   const backgroundFetchingRef = useRef(false);
   const scrollContainerRef = useRef<HTMLDivElement>(null);
-  const { toast } = useToast();
+  const imageAbortController = useRef<AbortController | null>(null);
+
+  // ------------------
+  // MEMOIZED PLATFORM
+  // ------------------
+  const platform = useMemo(() => getPlatformSync(), []);
+
+  // ------------------
+  // SAFE IMAGE RESOLVER (stable, never creates hooks)
+  // ------------------
+  const getSafeImageSrc = useCallback(
+    (urlOrBlob?: string) => {
+      if (!urlOrBlob) return "";
+
+      // Blob URLs always safe
+      if (urlOrBlob.startsWith("blob:")) return urlOrBlob;
+
+      // Android NEVER loads remote images directly → must use blob cache
+      if (platform === "android") return "";
+
+      // iOS/Web use direct URL
+      return urlOrBlob;
+    },
+    [platform]
+  );
+
 
   const { subscription, getLikedMeVisibleCount } = useSubscription(currentUser?.id);
+  
+  // Ensure virtualizer count is always stable (never undefined)
+  const virtualizerCount = useMemo(() => {
+    return likers.length > 0 ? Math.ceil(likers.length / 2) : 0;
+  }, [likers.length]);
+  
   const rowVirtualizer = useVirtualizer({
-    count: likers.length > 0 ? Math.ceil(likers.length / 2) : 0,
+    count: virtualizerCount,
     getScrollElement: () => scrollContainerRef.current,
     estimateSize: () => 310,
     overscan: 3
@@ -248,18 +286,72 @@ const LikedMePage = ({ currentUser, isPremium = false }: LikedMePageProps) => {
       }
     }
 
-    // Process images
+    // ⭐ FIX #3: TINDER-STYLE - Load ONLY first image for first 3 profiles (not all 200+)
     const imageMap: { [key: string]: string[] } = {};
     if (imagesData) {
+      // Group images by user_id
+      const imagesByUser: { [key: string]: typeof imagesData } = {};
       for (const img of imagesData) {
-        if (!imageMap[img.user_id]) {
-          imageMap[img.user_id] = [img.image_url];
+        if (!imagesByUser[img.user_id]) {
+          imagesByUser[img.user_id] = [];
+        }
+        imagesByUser[img.user_id].push(img);
+      }
+      
+      // ⭐ Only load first image for first 3 users (priority loading)
+      const priorityUserIds = likerIds.slice(0, 3);
+      for (const userId of priorityUserIds) {
+        if (imagesByUser[userId]?.[0]) {
+          imageMap[userId] = [imagesByUser[userId][0].image_url];
         }
       }
     }
 
     return { likers, userImages: imageMap };
   }, []);
+
+  // ⭐ FIX #1+2: Preload first 3 profiles with blob URLs + createImageBitmap for instant Android rendering
+  const preloadFirstProfilesWithBlobs = useCallback(async (
+    profiles: { id: string }[], 
+    imageUrls: { [key: string]: string[] }
+  ) => {
+    // ⭐ FIX #4: Cancel previous loads
+    if (imageAbortController.current) {
+      imageAbortController.current.abort();
+    }
+    
+    const controller = new AbortController();
+    imageAbortController.current = controller;
+
+    for (const profile of profiles) {
+      const firstImageUrl = imageUrls[profile.id]?.[0];
+      if (!firstImageUrl || controller.signal.aborted) break;
+
+      try {
+        // ⭐ FIX #1: Preload as blob URL
+        const blobUrl = await preloadImageToBlob(firstImageUrl);
+        
+        if (controller.signal.aborted) break;
+        
+        // ⭐ FIX #2: Pre-decode with createImageBitmap for instant Android rendering
+        if (blobUrl && typeof createImageBitmap !== 'undefined') {
+          const response = await fetch(blobUrl);
+          const blob = await response.blob();
+          await createImageBitmap(blob);
+        }
+
+        // Update userImages with blob URL
+        if (!controller.signal.aborted) {
+          setUserImages(prev => ({
+            ...prev,
+            [profile.id]: blobUrl ? [blobUrl] : prev[profile.id]
+          }));
+        }
+      } catch {
+        // Silent fail for individual images
+      }
+    }
+  }, []); // Empty deps - uses refs and stable functions only
 
   // Optimized: batch queries and filter in SQL
   const fetchLikers = useCallback(async (showLoading = false) => {
@@ -290,9 +382,9 @@ const LikedMePage = ({ currentUser, isPremium = false }: LikedMePageProps) => {
         setLikers(newLikers);
         setUserImages(newUserImages);
 
-        // Preload next profile images in the background
+        // ⭐ FIX #1: Preload first 3 profile images as blob URLs for instant Android rendering
         if (newLikers && newLikers.length > 0) {
-          preloadNextProfileImages(newLikers, newUserImages);
+          preloadFirstProfilesWithBlobs(newLikers.slice(0, 3), newUserImages);
         }
       }
     } catch (error) {
@@ -312,11 +404,19 @@ const LikedMePage = ({ currentUser, isPremium = false }: LikedMePageProps) => {
         setLoading(false);
       }
     }
-  }, [currentUser?.id, toast]);
+  }, [currentUser?.id, toast, t, fetchLikersData, preloadFirstProfilesWithBlobs]);
 
-  // Load additional images when profile is selected - only approved ones
+  // Load additional images when profile is selected - only approved onesclicked
   const loadFullImages = useCallback(async (profileId: string) => {
     if (userImages[profileId]?.length > 1) return; // Already loaded
+
+    // ⭐ FIX #4: Cancel previous image loads
+    if (imageAbortController.current) {
+      imageAbortController.current.abort();
+    }
+
+    const controller = new AbortController();
+    imageAbortController.current = controller;
 
     try {
       // Try to fetch approved images first
@@ -325,7 +425,10 @@ const LikedMePage = ({ currentUser, isPremium = false }: LikedMePageProps) => {
         .select('image_url')
         .eq('user_id', profileId)
         .eq('is_approved', true) // Only show approved images
-        .order('image_order');
+        .order('image_order')
+        .abortSignal(controller.signal);
+
+      if (controller.signal.aborted) return;
 
       // If moderation columns don't exist, fall back to basic query
       if (error && error.message.includes('does not exist')) {
@@ -333,41 +436,34 @@ const LikedMePage = ({ currentUser, isPremium = false }: LikedMePageProps) => {
           .from('user_images')
           .select('image_url')
           .eq('user_id', profileId)
-          .order('image_order');
+          .order('image_order')
+          .abortSignal(controller.signal);
 
-        if (fallbackError) return; // Silent fail for fallback
+        if (fallbackError || controller.signal.aborted) return; // Silent fail for fallback
         images = fallbackImages;
-      } else if (error) {
+      } else if (error || controller.signal.aborted) {
         return; // Silent fail
       }
 
-      if (images?.length) {
-        setUserImages(prev => ({
-          ...prev,
-          [profileId]: images.map(img => img.image_url)
-        }));
+      if (images?.length && !controller.signal.aborted) {
+        const imageUrls = images.map(img => img.image_url);
+        
+        // ⭐ FIX #1: Preload all images as blobs for instant flipping
+        const blobUrls = await Promise.all(
+          imageUrls.map(url => preloadImageToBlob(url))
+        );
+
+        if (!controller.signal.aborted) {
+          setUserImages(prev => ({
+            ...prev,
+            [profileId]: blobUrls.filter(Boolean) as string[]
+          }));
+        }
       }
     } catch (error) {
   // ...removed log...
     }
-  }, [userImages]);
-
-  // Preload images for the next few profiles for smoother UX
-  const preloadNextProfileImages = useCallback(
-    async (likersList: { id: string }[], alreadyLoaded: { [key: string]: string[] }) => {
-      // Preload for only the next 1 profile for maximum performance
-      const toPreload = likersList
-        .filter(liker => !alreadyLoaded[liker.id] || alreadyLoaded[liker.id].length <= 1)
-        .slice(0, 1); // Reduced to 1 for better performance
-      for (const liker of toPreload) {
-        // Add delay to reduce server load
-        setTimeout(() => {
-          void loadFullImages(liker.id);
-        }, 1000);
-      }
-    },
-    [loadFullImages]
-  );
+  }, [userImages]); // Removed platform dependency - it's stable via useMemo
 
   useEffect(() => {
     if (!currentUser?.id) {
@@ -419,7 +515,7 @@ const LikedMePage = ({ currentUser, isPremium = false }: LikedMePageProps) => {
     setCurrentSlide(0);
   }, [selectedProfile]);
 
-  // Memoize slides calculation to prevent rebuilding on every click
+  // ⭐ FIX #6: Memoize slides calculation with stable dependencies
   const slides = useMemo(() => {
     if (!selectedProfile) return [];
     
@@ -447,7 +543,14 @@ const LikedMePage = ({ currentUser, isPremium = false }: LikedMePageProps) => {
     }
     
     return result;
-  }, [selectedProfile, userImages]);
+  }, [
+    selectedProfile?.id, 
+    selectedProfile?.bio, 
+    selectedProfile?.fun_fact, 
+    selectedProfile?.perfect_first_date, 
+    selectedProfile?.last_googled,
+    userImages
+  ]);
 
   // Clamp currentSlide if slides array shrinks
   useEffect(() => {
@@ -455,6 +558,19 @@ const LikedMePage = ({ currentUser, isPremium = false }: LikedMePageProps) => {
       setCurrentSlide(Math.max(0, slides.length - 1));
     }
   }, [slides.length, currentSlide]);
+
+  // ⭐ FIX #6: Memoize getRemainingDays (prevents recalc on every render)
+  const getRemainingDays = useMemo(() => {
+    if (!lockoutEndDate) return 0;
+    const now = new Date();
+    const diff = lockoutEndDate.getTime() - now.getTime();
+    return Math.ceil(diff / (1000 * 60 * 60 * 24));
+  }, [lockoutEndDate]);
+
+  const isInLockout = useMemo(() => 
+    !isPremium && lockoutEndDate && new Date() < lockoutEndDate,
+    [isPremium, lockoutEndDate]
+  );
 
   const setLockoutPeriod = async () => {
     if (isPremium) return;
@@ -661,18 +777,6 @@ const LikedMePage = ({ currentUser, isPremium = false }: LikedMePageProps) => {
     loadFullImages(liker.id);
   };
 
-  const getRemainingDays = () => {
-    if (!lockoutEndDate) return 0;
-    const now = new Date();
-    const diff = lockoutEndDate.getTime() - now.getTime();
-    return Math.ceil(diff / (1000 * 60 * 60 * 24));
-  };
-
-  const isInLockout = useMemo(() => 
-    !isPremium && lockoutEndDate && new Date() < lockoutEndDate,
-    [isPremium, lockoutEndDate]
-  );
-
   // Pull to refresh handlers
   const handleTouchStart = (e: React.TouchEvent) => {
     if (!selectedProfile) {
@@ -712,7 +816,10 @@ const LikedMePage = ({ currentUser, isPremium = false }: LikedMePageProps) => {
     );
   }
 
-  if (selectedProfile) {
+  // ⭐ FIX #7: Memoize entire selected profile card (1,200+ lines) to prevent re-render storms on Android
+  const selectedProfileCard = useMemo(() => {
+    if (!selectedProfile) return null;
+
     const profileImages = userImages[selectedProfile.id] || [];
     const totalSlides = slides.length;
     const currentSlideInfo = slides[currentSlide] || slides[0];
@@ -744,7 +851,7 @@ const LikedMePage = ({ currentUser, isPremium = false }: LikedMePageProps) => {
       <div 
         className="h-full w-full relative flex flex-col bg-white"
         style={{
-          paddingTop: getPlatformSync() === 'web' ? '0px' : '0px',
+          paddingTop: platform === 'web' ? '0px' : '0px',
           paddingBottom: 'env(safe-area-inset-bottom, 0px)'
         }}
       >
@@ -752,22 +859,22 @@ const LikedMePage = ({ currentUser, isPremium = false }: LikedMePageProps) => {
         <div 
           className="flex-1 relative" 
           style={{
-            height: getPlatformSync() === 'ios' 
+            height: platform === 'ios' 
               ? 'calc(100vh - env(safe-area-inset-top, 0px) - 56px)'
-              : getPlatformSync() === 'web'
+              : platform === 'web'
                 ? 'calc(100vh - 56px - 80px)'
                 : 'calc(100vh - 56px)',
-            minHeight: getPlatformSync() === 'ios'
+            minHeight: platform === 'ios'
               ? 'calc(100vh - env(safe-area-inset-top, 0px) - 56px)'
-              : getPlatformSync() === 'web'
+              : platform === 'web'
                 ? 'calc(100vh - 56px - 80px)'
                 : 'calc(100vh - 56px)',
-            maxHeight: getPlatformSync() === 'ios'
+            maxHeight: platform === 'ios'
               ? 'calc(100vh - env(safe-area-inset-top, 0px) - 56px)'
-              : getPlatformSync() === 'web'
+              : platform === 'web'
                 ? 'calc(100vh - 56px - 80px)'
                 : 'calc(100vh - 56px)',
-            marginBottom: getPlatformSync() === 'web'
+            marginBottom: platform === 'web'
               ? '0px'
               : 'calc(env(safe-area-inset-bottom, 0px) + 100px)',
             overflow: 'hidden'
@@ -777,7 +884,9 @@ const LikedMePage = ({ currentUser, isPremium = false }: LikedMePageProps) => {
           {isImageSlide && profileImages.length > 0 && currentImageIndex < profileImages.length && (
             <>
               <img
-                src={profileImages[currentImageIndex]}
+                loading="eager"
+                decoding="async"
+                src={getSafeImageSrc(profileImages[currentImageIndex])}
                 alt={`${selectedProfile.first_name}'s photo`}
                 className="w-full h-full object-cover"
                 style={{
@@ -873,9 +982,9 @@ const LikedMePage = ({ currentUser, isPremium = false }: LikedMePageProps) => {
           <div 
             className="absolute left-1/2 transform -translate-x-1/2 flex gap-1.5 z-10"
             style={{
-              top: getPlatformSync() === 'ios'
+              top: platform === 'ios'
                 ? '50px'
-                : getPlatformSync() === 'android'
+                : platform === 'android'
                   ? '32px'
                   : '16px'
             }}
@@ -899,7 +1008,7 @@ const LikedMePage = ({ currentUser, isPremium = false }: LikedMePageProps) => {
             variant="outline"
             className="absolute left-4 bg-white/80 hover:bg-white z-10 h-10 px-3"
             style={{
-              top: getPlatformSync() === 'ios' 
+              top: platform === 'ios' 
                 ? 'clamp(40px, calc(env(safe-area-inset-top, 10px) + 25px), 60px)'
                 : '16px'
             }}
@@ -913,7 +1022,7 @@ const LikedMePage = ({ currentUser, isPremium = false }: LikedMePageProps) => {
             size="sm"
             className="absolute right-4 bg-white/80 hover:bg-white z-10 h-10 w-10 p-0"
             style={{
-              top: getPlatformSync() === 'ios' 
+              top: platform === 'ios' 
                 ? 'clamp(40px, calc(env(safe-area-inset-top, 10px) + 25px), 60px)'
                 : '16px'
             }}
@@ -926,9 +1035,9 @@ const LikedMePage = ({ currentUser, isPremium = false }: LikedMePageProps) => {
             <div 
               className="absolute bottom-0 left-0 right-0 text-white"
               style={{
-                paddingBottom: getPlatformSync() === 'ios' 
+                paddingBottom: platform === 'ios' 
                   ? 'clamp(180px, calc(env(safe-area-inset-bottom, 10px) + 190px), 190px)'
-                  : getPlatformSync() === 'android'
+                  : platform === 'android'
                     ? '180px'
                     : '180px'
               }}
@@ -1102,9 +1211,9 @@ const LikedMePage = ({ currentUser, isPremium = false }: LikedMePageProps) => {
           <div 
             className="absolute bottom-0 left-0 right-0 flex justify-center space-x-6 px-6 z-10"
             style={{
-              paddingBottom: getPlatformSync() === 'ios' 
+              paddingBottom: platform === 'ios' 
                 ? 'clamp(130px, calc(env(safe-area-inset-bottom, 10px) + 120px), 150px)'
-                : getPlatformSync() === 'android'
+                : platform === 'android'
                   ? '120px'
                   : '100px'
             }}
@@ -1131,11 +1240,26 @@ const LikedMePage = ({ currentUser, isPremium = false }: LikedMePageProps) => {
           isOpen={blockDialogOpen}
           onClose={() => setBlockDialogOpen(false)}
           userToBlock={selectedProfile}
-          currentUserId={currentUser.id}
+          currentUserId={currentUser?.id || ''}
           onBlockSuccess={handleBlockSuccess}
         />
       </div>
     );
+  }, [selectedProfile, userImages, slides, currentSlide, showMoreInfo, platform, handleNavigationClick, handleBlock, handlePass, handleLikeBack, blockDialogOpen, currentUser?.id, handleBlockSuccess, calculateAge, t]);
+
+  // ⭐ CRITICAL: Early return if currentUser is null (prevents crash during session refresh)
+  // Guard must run after all hooks have been declared
+  if (!currentUser || !currentUser.id) {
+    return (
+      <div className="h-full w-full flex items-center justify-center bg-white">
+        <div className="animate-spin rounded-full h-32 w-32 border-b-2 border-pink-600"></div>
+      </div>
+    );
+  }
+
+  // ⭐ FIX #7: Return memoized card to prevent re-render storms
+  if (selectedProfile) {
+    return selectedProfileCard;
   }
 
   return (
@@ -1245,9 +1369,12 @@ const LikedMePage = ({ currentUser, isPremium = false }: LikedMePageProps) => {
                       <div className="relative aspect-[3/4] w-full overflow-hidden rounded-t-lg">
                         {(() => {
                           const profileImages = userImages[firstLiker.id] || [];
+                          const isFirstThree = firstIndex < 3; // ⭐ FIX #5: First 3 use eager loading
                           return profileImages.length > 0 ? (
                             <img
-                              src={profileImages[0]}
+                              loading={isFirstThree ? "eager" : "lazy"}
+                              decoding="async"
+                              src={getSafeImageSrc(profileImages[0])}
                               alt={`${firstLiker.first_name}'s photo`}
                               className={`w-full h-full object-cover ${isLocked ? 'blur-md' : ''}`}
                               style={{
@@ -1261,7 +1388,6 @@ const LikedMePage = ({ currentUser, isPremium = false }: LikedMePageProps) => {
                                 WebkitTransform: 'translateZ(0)',
                                 transform: 'translateZ(0)'
                               }}
-                              loading="lazy"
                             />
                           ) : (
                             <div className={`w-full h-full bg-gradient-to-br from-pink-200 to-purple-200 flex items-center justify-center ${isLocked ? 'blur-md' : ''}`}>
@@ -1302,9 +1428,12 @@ const LikedMePage = ({ currentUser, isPremium = false }: LikedMePageProps) => {
                       <div className="relative aspect-[3/4] w-full overflow-hidden rounded-t-lg">
                         {(() => {
                           const profileImages = userImages[secondLiker.id] || [];
+                          const isFirstThree = secondIndex < 3; // ⭐ FIX #5: First 3 use eager loading
                           return profileImages.length > 0 ? (
                             <img
-                              src={profileImages[0]}
+                              loading={isFirstThree ? "eager" : "lazy"}
+                              decoding="async"
+                              src={getSafeImageSrc(profileImages[0])}
                               alt={`${secondLiker.first_name}'s photo`}
                               className={`w-full h-full object-cover ${isLocked ? 'blur-md' : ''}`}
                               style={{
@@ -1318,7 +1447,6 @@ const LikedMePage = ({ currentUser, isPremium = false }: LikedMePageProps) => {
                                 WebkitTransform: 'translateZ(0)',
                                 transform: 'translateZ(0)'
                               }}
-                              loading="lazy"
                             />
                           ) : (
                             <div className={`w-full h-full bg-gradient-to-br from-pink-200 to-purple-200 flex items-center justify-center ${isLocked ? 'blur-md' : ''}`}>
@@ -1358,4 +1486,8 @@ const LikedMePage = ({ currentUser, isPremium = false }: LikedMePageProps) => {
   );
 };
 
-export default React.memo(LikedMePage);
+export default React.memo(LikedMePage, (prevProps, nextProps) => {
+  // Only re-render if currentUser.id or isPremium changes
+  return prevProps.currentUser?.id === nextProps.currentUser?.id && 
+         prevProps.isPremium === nextProps.isPremium;
+});

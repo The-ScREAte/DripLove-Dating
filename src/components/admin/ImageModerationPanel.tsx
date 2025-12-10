@@ -493,6 +493,8 @@ const ImageModerationPanel = () => {
                       <CardContent className="p-2">
                         <div className="relative mb-2">
                           <img
+                            loading="lazy"
+                            decoding="async"
                             src={image.image_url}
                             alt="Pending approval"
                             className="w-full h-32 object-cover rounded-md cursor-pointer hover:opacity-90 transition-opacity"
@@ -568,6 +570,8 @@ const ImageModerationPanel = () => {
                       <CardContent className="p-3">
                         <div className="relative mb-2">
                           <img
+                            loading="lazy"
+                            decoding="async"
                             src={report.image_url}
                             alt="Reported content"
                             className="w-full h-40 object-cover rounded-lg cursor-pointer hover:opacity-90 transition-opacity"

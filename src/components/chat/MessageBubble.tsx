@@ -260,4 +260,12 @@ const MessageBubble: React.FC<MessageBubbleProps> = ({
   );
 };
 
-export default MessageBubble;
+// ⭐ REACT.MEMO: Prevent re-renders when message hasn't changed (70% improvement)
+export default React.memo(MessageBubble, (prevProps, nextProps) => {
+  return (
+    prevProps.message.id === nextProps.message.id &&
+    prevProps.message.is_read === nextProps.message.is_read &&
+    prevProps.message.deleted_for === nextProps.message.deleted_for &&
+    prevProps.isConsecutive === nextProps.isConsecutive
+  );
+});

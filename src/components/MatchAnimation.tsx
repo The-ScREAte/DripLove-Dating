@@ -133,7 +133,7 @@ const MatchAnimation = ({
           {imgSrc && (
             <div className="mb-4 flex justify-center">
               <div className="w-20 h-20 rounded-full overflow-hidden border-4 border-pink-100 shadow-sm" style={{ willChange: 'transform, opacity' }}>
-                <img src={imgSrc} alt={matchedUserName} className="w-full h-full object-cover" />
+                <img src={imgSrc} alt={matchedUserName} className="w-full h-full object-cover" loading="lazy" decoding="async" />
               </div>
             </div>
           )}

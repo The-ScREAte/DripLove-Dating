@@ -899,7 +899,9 @@ const RegistrationForm = ({ onSubmit, onBackToLogin }: RegistrationFormProps) =>
                   <div className="grid grid-cols-2 sm:grid-cols-3 gap-4">
                     {images.map((image, index) => (
                       <div key={image.preview} className="relative group">
-                        <img 
+                        <img
+                          loading="lazy"
+                          decoding="async"
                           src={image.preview} 
                           alt={`Upload ${index + 1}`}
                           className="w-full h-32 object-cover rounded-lg shadow-sm"

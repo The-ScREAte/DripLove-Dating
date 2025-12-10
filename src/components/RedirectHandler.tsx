@@ -102,7 +102,7 @@ const RedirectHandler = () => {
         <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-pink-50 to-purple-50">
           <div className="text-center space-y-4 p-8">
             <div className="flex justify-center">
-              <img 
+              <img loading="lazy" decoding="async" 
                 src="/driplove-logo.webp"
                 loading="lazy"
                 decoding="async" 

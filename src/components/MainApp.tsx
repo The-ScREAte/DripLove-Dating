@@ -24,7 +24,22 @@ const ProfilePage = lazy(() => import('@/components/ProfilePage'));
 const TabLoader = () => (
   <div className="flex items-center justify-center h-full">
     <div className="text-center">
-      <div className="w-8 h-8 border-4 border-pink-500 border-t-transparent rounded-full animate-spin mx-auto mb-2"></div>
+      <style>{`
+        @keyframes logoHop {
+          0%, 100% { transform: translateY(0) scale(1); }
+          50% { transform: translateY(-15px) scale(1.05); }
+        }
+      `}</style>
+      <div className="mb-2" style={{ animation: 'logoHop 0.8s ease-in-out infinite' }}>
+        <img 
+          src="/images/drip-love-logo.svg" 
+          alt="Drip Love" 
+          className="w-16 h-16 mx-auto"
+          onError={(e) => {
+            e.currentTarget.src = '/images/drip-love-logo.png';
+          }}
+        />
+      </div>
       <p className="text-sm text-gray-500">Loading...</p>
     </div>
   </div>
@@ -1022,13 +1037,22 @@ const MainApp = ({ user, onLogout }: MainAppProps) => {
 
   // Memoize the current page component to prevent unnecessary re-renders
   const currentPageComponent = useMemo(() => {
+    // Don't render pages until profile is loaded
+    if (!profile) {
+      return (
+        <div className="h-full w-full flex items-center justify-center bg-white">
+          <div className="animate-spin rounded-full h-32 w-32 border-b-2 border-pink-600"></div>
+        </div>
+      );
+    }
+    
     switch (activeTab) {
       case 'dripcheck':
         return <DiscoverPage currentUser={profile} onNavigateToChat={handleNavigateToChat} isPremium={isPremium} />;
       case 'chat':
         return <ChatPage currentUser={profile} onUnreadChange={fetchUnreadCount} onDetailViewChange={setIsChatDetailOpen} />;
       case 'liked':
-        return <LikedMePage currentUser={profile} isPremium={isPremium} />;
+        return <LikedMePage key={profile.id} currentUser={profile} isPremium={isPremium} />;
       case 'profile':
         return (
           <ProfilePage 

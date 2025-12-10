@@ -26,7 +26,7 @@ const AdCard: React.FC<AdCardProps> = ({ ad, onSwipe }) => {
     <div className="w-full h-full flex flex-col bg-white">
       {/* Full-page Ad Image */}
       <div className="flex-1 relative overflow-hidden">
-        <img
+        <img loading="lazy" decoding="async"
           src={ad.image_url}
           alt={ad.name}
           className="w-full h-full object-cover"

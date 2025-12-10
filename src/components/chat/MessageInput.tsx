@@ -126,4 +126,5 @@ const MessageInput: React.FC<MessageInputProps> = ({
   );
 };
 
-export default MessageInput;
+// ⭐ REACT.MEMO: Prevent re-renders when props haven't changed
+export default React.memo(MessageInput);

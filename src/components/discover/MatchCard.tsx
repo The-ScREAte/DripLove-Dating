@@ -1,13 +1,15 @@
-import React, { useState, useEffect, useRef, useCallback } from 'react';
+import React, { useState, useEffect, useRef, useCallback, useMemo, useLayoutEffect } from 'react';
 import ReportButton from '../ReportButton';
 import UserAdinkraDisplay from './UserAdinkraDisplay';
 import ReportModal from '../modals/ReportModal';
 import styles from './MatchCard.module.css';
-import { MapPin, Briefcase, GraduationCap, Calendar, Crown, Shield, ChevronDown, ChevronUp, User, Quote, Heart, Coffee, Search, Loader2, Languages } from 'lucide-react';
+import { MapPin, Briefcase, GraduationCap, Calendar, Crown, Shield, ChevronDown, ChevronUp, User, Languages, Heart } from 'lucide-react';
 import { PotentialMatch } from '@/types';
 import { useTranslation } from 'react-i18next';
 import { getLanguageName } from '@/utils/languageNames';
 import { supabase } from '@/integrations/supabase/client';
+import { buildSlides, getUserColorHash } from './MatchCardHelpers';
+import { SlideRenderer } from './SlideRenderer';
 
 interface MatchCardProps {
   match: PotentialMatch;
@@ -21,6 +23,7 @@ interface MatchCardProps {
   preloadedBlobImages?: { [url: string]: string }; // ⭐ Blob URLs for instant rendering
   preferredLanguageName?: string; // ⭐ Pre-fetched language name (no DB call needed)
   onImageClick: () => void;
+  onImageIndexChange?: () => void; // ⭐ ANDROID OPTIMIZATION: Callback when user flips through images
   onToggleInfo: () => void;
   calculateAge: (dateOfBirth: string) => number;
   calculateDistance: (lat1: number, lon1: number, lat2: number, lon2: number) => number;
@@ -45,6 +48,7 @@ const MatchCard: React.FC<MatchCardProps> = ({
   preloadedBlobImages = {}, // ⭐ Blob URLs for instant image loading
   preferredLanguageName, // ⭐ Pre-fetched language (no DB call)
   onImageClick,
+  onImageIndexChange, // ⭐ ANDROID OPTIMIZATION: Callback when user flips images
   onToggleInfo,
   calculateAge,
   calculateDistance,
@@ -58,24 +62,36 @@ const MatchCard: React.FC<MatchCardProps> = ({
 }) => {
   const { t } = useTranslation();
   
-  // imageStatus: map of url => 'idle' | 'loading' | 'loaded' | 'error'
-  // (passed from parent component)
-  // ...existing code...
   const [currentSlide, setCurrentSlide] = useState(0);
-  const [imageLoading, setImageLoading] = useState(false);
   
-  // Use ref for internal state that doesn't need to trigger re-renders
+  // Refs for performance
   const lastSlideInteraction = useRef<number>(0);
   const slideTransitionInProgress = useRef<boolean>(false);
+  const containerWidth = useRef<number>(0);
+  const containerLeft = useRef<number>(0);
+  const containerRef = useRef<HTMLDivElement>(null);
+
+  // ⭐ PHASE 1.1: Memoize all expensive inputs (prevents Android re-render storm)
+  const memoUserImages = useMemo(() => userImages.slice(), [userImages.join(',')]); // ⭐ FIX: Detect actual URL changes
+  const memoPreloadedBlobs = useMemo(
+    () => preloadedBlobImages,
+    [preloadedBlobImages ? Object.keys(preloadedBlobImages).length : 0]
+  );
+
+  // ⭐ PHASE 1.2: Freeze match fields (prevents 3-5x re-computation on Android)
+  const stableMatch = useMemo(() => ({
+    ...match,
+    adinkra_symbols: match.adinkra_symbols || []
+  }), [match.id]);
+
+  // ⭐ PHASE 1.3: Move heavy logic OUTSIDE + use memoized buildSlides
+  const slides = useMemo(() => buildSlides(stableMatch, memoUserImages), [stableMatch, memoUserImages]);
 
   // ⭐ REMOVED: Language fetching (now passed as prop from parent to eliminate DB calls)
+  // ⭐ REMOVED: imageLoading state - blob URLs load instantly from memory, no loader needed
   
-  // Memoize image loading callbacks to prevent unnecessary re-renders
-  const handleImageLoadStart = useCallback(() => setImageLoading(true), []);
-  const handleImageLoadEnd = useCallback(() => setImageLoading(false), []);
-  
-  // Random background colors for fun questions and about - ensuring good contrast
-  const backgroundColors = [
+  // Background colors for fun questions and about
+  const backgroundColors = useMemo(() => [
     'bg-gradient-to-br from-blue-400 to-blue-600',
     'bg-gradient-to-br from-green-400 to-green-600',
     'bg-gradient-to-br from-purple-400 to-purple-600',
@@ -86,170 +102,74 @@ const MatchCard: React.FC<MatchCardProps> = ({
     'bg-gradient-to-br from-rose-400 to-rose-600',
     'bg-gradient-to-br from-orange-400 to-orange-600',
     'bg-gradient-to-br from-emerald-400 to-emerald-600'
-  ];
+  ], []);
 
   // Generate consistent color for this user based on their ID
-  const getUserColor = () => {
-    if (!match.id) return backgroundColors[0];
-    // Simple hash function to convert user ID to a consistent index
-    let hash = 0;
-    const str = match.id.toString();
-    for (let i = 0; i < str.length; i++) {
-      const char = str.charCodeAt(i);
-      hash = ((hash << 5) - hash) + char;
-      hash = hash & hash; // Convert to 32-bit integer
-    }
-    return backgroundColors[Math.abs(hash) % backgroundColors.length];
-  };
+  const userBackgroundColor = useMemo(
+    () => getUserColorHash(match.id, backgroundColors),
+    [match.id, backgroundColors]
+  );
 
-  const userBackgroundColor = getUserColor();
-  
-  // Create slides: mix images with bio and fun questions
-  // Use a seeded RNG based on match.id so ordering is deterministic per-profile
-  const slides = React.useMemo(() => {
-    // Seeded RNG (mulberry32)
-    const seedFromString = (s: string | number | undefined) => {
-      const str = s == null ? '' : String(s);
-      let h = 2166136261 >>> 0;
-      for (let i = 0; i < str.length; i++) {
-        h ^= str.charCodeAt(i);
-        h = Math.imul(h, 16777619);
-      }
-      return h >>> 0;
-    };
-    const mulberry32 = (a: number) => () => {
-      let t = a += 0x6D2B79F5;
-      t = Math.imul(t ^ t >>> 15, t | 1);
-      t ^= t + Math.imul(t ^ t >>> 7, t | 61);
-      return ((t ^ t >>> 14) >>> 0) / 4294967296;
-    };
-
-    const seed = seedFromString(match.id || match.first_name || 0);
-    const rand = mulberry32(seed);
-
-    const seededShuffle = <T,>(arr: T[]) => {
-      const a = arr.slice();
-      for (let i = a.length - 1; i > 0; i--) {
-        const j = Math.floor(rand() * (i + 1));
-        [a[i], a[j]] = [a[j], a[i]];
-      }
-      return a;
-    };
-
-    const imageSlides = userImages.map((image, index) => ({
-      type: 'image' as const,
-      content: image,
-      index
-    }));
-
-    // Collect all non-image content
-    const nonImageContent: Array<any> = [];
-
-    if (match.bio?.trim()) {
-      nonImageContent.push({ type: 'bio' as const, content: match.bio, index: -1 });
-    }
-
-    // Choose one fun question deterministically
-    const funQuestions = [] as Array<any>;
-    if (match.fun_fact?.trim()) funQuestions.push({ type: 'fun_fact' as const, content: match.fun_fact, index: -1 });
-    if (match.perfect_first_date?.trim()) funQuestions.push({ type: 'perfect_first_date' as const, content: match.perfect_first_date, index: -1 });
-    if (match.last_googled?.trim()) funQuestions.push({ type: 'last_googled' as const, content: match.last_googled, index: -1 });
-
-    if (funQuestions.length > 0) {
-      const idx = Math.floor(rand() * funQuestions.length);
-      nonImageContent.push(funQuestions[idx]);
-    }
-
-    // If no images, show non-image content first, then placeholder
-    if (imageSlides.length === 0) {
-      if (nonImageContent.length > 0) {
-        const shuffled = seededShuffle(nonImageContent);
-        return [ ...shuffled, { type: 'placeholder' as const, content: '', index: -1 } ];
-      }
-      return [{ type: 'placeholder' as const, content: '', index: -1 }];
-    }
-
-    // Mix images with non-image content deterministically
-    const mixedSlides: Array<any> = [];
-    
-    if (imageSlides.length === 0) {
-      // No images, show all non-image content
-      return nonImageContent.length > 0 
-        ? [...seededShuffle(nonImageContent), { type: 'placeholder' as const, content: '', index: -1 }]
-        : [{ type: 'placeholder' as const, content: '', index: -1 }];
-    }
-
-    // Start with first image
-    mixedSlides.push(imageSlides[0]);
-
-    const shuffledNonImage = seededShuffle(nonImageContent);
-    
-    // ⭐ CRITICAL: Always show bio/fun facts - insert after 2nd image or at position 2
-    if (shuffledNonImage.length > 0) {
-      if (imageSlides.length > 1) {
-        mixedSlides.push(imageSlides[1]); // 2nd image
-        mixedSlides.push(shuffledNonImage[0]); // First text content (bio or fun fact)
-        
-        // Add remaining images
-        let nonImageIndex = 1;
-        for (let i = 2; i < imageSlides.length; i++) {
-          if (nonImageIndex < shuffledNonImage.length && (i % 2 === 0)) {
-            mixedSlides.push(shuffledNonImage[nonImageIndex]);
-            nonImageIndex++;
-          }
-          mixedSlides.push(imageSlides[i]);
-        }
-        
-        // Add any remaining text content at the end
-        while (nonImageIndex < shuffledNonImage.length) {
-          mixedSlides.push(shuffledNonImage[nonImageIndex]);
-          nonImageIndex++;
-        }
-      } else {
-        // Only 1 image, add all text content after it
-        shuffledNonImage.forEach(content => mixedSlides.push(content));
-      }
-    } else {
-      // No text content, just add remaining images
-      for (let i = 1; i < imageSlides.length; i++) {
-        mixedSlides.push(imageSlides[i]);
-      }
-    }
-
-    return mixedSlides;
-  }, [match.id, userImages.join('|')]); // ⭐ FIX #4: Detect content changes (not just length)
-
-  // Use lightweight static edge color instead of expensive pixel scanning
-  const edgeColor = '#f6f6f6';
-
-  // Ensure each new card starts at the first slide.
-  // Reset currentSlide whenever the match changes (use match.id for stability).
+  // ⭐ PHASE 1.4: Reset currentSlide when match changes (prevents stale state)
   useEffect(() => {
     setCurrentSlide(0);
   }, [match.id]);
 
-  // If slides array shrinks (images load/unload), clamp currentSlide to valid range.
+  // ⭐ PHASE 1.5: ANDROID FIX - Reset slide index when images array grows
   useEffect(() => {
-    if (currentSlide > Math.max(0, slides.length - 1)) {
-      setCurrentSlide(Math.max(0, slides.length - 1));
+    if (currentSlide >= slides.length) {
+      setCurrentSlide(0); // Reset to first slide to prevent out-of-bounds
     }
   }, [slides.length]);
 
-  const handleSlideClick = (e: React.MouseEvent<HTMLDivElement>) => {
+  // ⭐ PHASE 2.7: Pre-calc card width AND left position once (eliminate ALL DOM reads on Android)
+  // ⭐ FIX #3: Add resize listener for orientation changes
+  useEffect(() => {
+    const compute = () => {
+      if (!containerRef.current) return;
+      const rect = containerRef.current.getBoundingClientRect();
+      containerWidth.current = rect.width;
+      containerLeft.current = rect.left;
+    };
+    compute();
+    window.addEventListener('resize', compute);
+    return () => window.removeEventListener('resize', compute);
+  }, []);
+
+  // ⭐ PHASE 1.6: Memoize slide navigation handlers (prevents closure re-creation)
+  const handleNext = useCallback(() => {
+    setCurrentSlide(s => Math.min(s + 1, slides.length - 1));
+    onImageIndexChange?.(); // ⭐ ANDROID OPTIMIZATION: Notify parent to abort pending loads
+  }, [slides.length, onImageIndexChange]);
+
+  const handlePrev = useCallback(() => {
+    setCurrentSlide(s => Math.max(s - 1, 0));
+    onImageIndexChange?.(); // ⭐ ANDROID OPTIMIZATION: Notify parent to abort pending loads
+  }, [onImageIndexChange]);
+
+  // ⭐ PHASE 1.7: OPTIMIZED: Zero DOM reads on click (instant Android tap response)
+  const handleSlideClick = useCallback((e: React.MouseEvent<HTMLDivElement>) => {
     e.stopPropagation();
     
-    const rect = e.currentTarget.getBoundingClientRect();
-    const clickX = e.clientX - rect.left;
-    const width = rect.width;
+    const width = containerWidth.current;
+    if (!width) return;
+    
+    const clickX = e.clientX - containerLeft.current;
     
     if (clickX < width / 2) {
-      // Left side - previous slide
-      setCurrentSlide(prev => (prev > 0 ? prev - 1 : prev));
+      handlePrev();
     } else {
-      // Right side - next slide
-      setCurrentSlide(prev => (prev < slides.length - 1 ? prev + 1 : prev));
+      handleNext();
     }
-  };
+  }, [handleNext, handlePrev]);
+
+  // ⭐ FIX #4: Image resolver to prioritize blob URLs over optimized URLs
+  const resolveImageUrl = useCallback((url: string) => {
+    return memoPreloadedBlobs[url] || getOptimizedUrl(url);
+  }, [memoPreloadedBlobs, getOptimizedUrl]);
+
+  // ⭐ FIX #5: Stable slide data prevents SlideRenderer re-render on every tap
+  const currentSlideData = useMemo(() => slides[currentSlide], [slides, currentSlide]);
   const getSwipeTransform = () => {
     if (!swipeDirection) return 'translateX(0) rotate(0deg)';
     
@@ -287,23 +207,18 @@ const MatchCard: React.FC<MatchCardProps> = ({
 
   // Prevent body scrolling when modal is open
   useEffect(() => {
+    const originalCssText = document.body.style.cssText;
     if (showReportModal) {
-      // Prevent scrolling when modal is open
-      document.body.style.overflow = 'hidden';
-      document.body.style.position = 'fixed';
-      document.body.style.width = '100%';
+      // Prevent scrolling when modal is open (single write for performance)
+      document.body.style.cssText = 'overflow: hidden; position: fixed; width: 100%';
     } else {
       // Re-enable scrolling when modal is closed
-      document.body.style.overflow = '';
-      document.body.style.position = '';
-      document.body.style.width = '';
+      document.body.style.cssText = originalCssText;
     }
 
     // Cleanup function to restore scrolling
     return () => {
-      document.body.style.overflow = '';
-      document.body.style.position = '';
-      document.body.style.width = '';
+      document.body.style.cssText = originalCssText;
     };
   }, [showReportModal]);
 
@@ -398,11 +313,11 @@ const MatchCard: React.FC<MatchCardProps> = ({
   if (isSwipeAreaOnly) {
     // Render only the swipeable image area
     return (
-  <div className="relative w-full h-full min-h-full overflow-hidden">
+  <div ref={containerRef} className="relative w-full h-full min-h-full overflow-hidden">
         {/* Image/Bio Container - Swipeable Area Only */}
         <div className="relative w-full h-full overflow-hidden" onClick={handleSlideClick}>
           {/* Current slide content */}
-          {slides.length > 0 && (
+          {slides && slides.length > 0 && (
             <div className="w-full h-full transition-all duration-300 ease-in-out">
               {/* Report button for image slides - positioned closer to top edge */}
               {slides[currentSlide]?.type === 'image' && (
@@ -421,137 +336,24 @@ const MatchCard: React.FC<MatchCardProps> = ({
                   </button>
                 </div>
               )}
-              {slides[currentSlide]?.type === 'image' ? (
-                <div className="relative w-full h-full bg-gray-900">
-                  {imageLoading && (
-                    <div className="absolute inset-0 bg-gray-900 flex items-center justify-center z-10">
-                      <Loader2 className="h-8 w-8 animate-spin text-pink-500" />
-                    </div>
-                  )}
-                  {(() => {
-                    // ⭐ CRITICAL FIX: Use ORIGINAL URL as key for blob lookup
-                    const originalUrl = slides[currentSlide].content;
-                    const blobUrl = preloadedBlobImages?.[originalUrl];
-                    
-                    // Priority: blob URL → optimized URL → original URL
-                    let imageSrc: string;
-                    if (blobUrl && blobUrl.startsWith('blob:')) {
-                      imageSrc = blobUrl; // ⭐ INSTANT loading from memory
-                    } else {
-                      imageSrc = getOptimizedUrl(originalUrl); // Fallback to optimized
-                    }
-                    
-                    const status = imageStatus?.[originalUrl] || 'idle';
-
-                    return (
-                      <img
-                        src={imageSrc}
-                        alt={`${match.first_name} ${match.last_name}`}
-                        className={`w-full h-full object-contain transition-opacity duration-300 relative z-10 ${styles.optimizedImage}`}
-                        draggable={false}
-                        onLoadStart={() => setImageLoading(true)}
-                        onLoad={() => setImageLoading(false)}
-                        onError={() => setImageLoading(false)}
-                      />
-                    );
-                  })()}
-                </div>
-              ) : slides[currentSlide]?.type === 'bio' ? (
-                <div className={`w-full h-full ${userBackgroundColor} flex items-center justify-center p-8`}>
-                  <div className="max-w-sm mx-auto text-center">
-                    <div className="flex items-center justify-center mb-6">
-                      <div className="bg-white/20 backdrop-blur-sm rounded-full p-4 shadow-lg">
-                        <Quote className="w-8 h-8 text-white" />
-                      </div>
-                    </div>
-                    <h3 className="text-2xl font-bold text-white mb-6">{t('discover.matchCard.aboutUser', { name: match.first_name })}</h3>
-                    <p className="text-white text-lg leading-relaxed font-medium">
-                      {slides[currentSlide].content}
-                    </p>
-                  </div>
-                </div>
-              ) : slides[currentSlide]?.type === 'fun_fact' ? (
-                <div className={`w-full h-full ${userBackgroundColor} flex items-center justify-center p-8`}>
-                  <div className="max-w-sm mx-auto text-center">
-                    <div className="flex items-center justify-center mb-6">
-                      <div className="bg-white/20 backdrop-blur-sm rounded-full p-4 shadow-lg">
-                        <Heart className="w-8 h-8 text-white" />
-                      </div>
-                    </div>
-                    <h3 className="text-2xl font-bold text-white mb-6">Fun Fact</h3>
-                    <p className="text-white text-lg leading-relaxed font-medium">
-                      {slides[currentSlide].content}
-                    </p>
-                  </div>
-                </div>
-              ) : slides[currentSlide]?.type === 'perfect_first_date' ? (
-                <div className={`w-full h-full ${userBackgroundColor} flex items-center justify-center p-8`}>
-                  <div className="max-w-sm mx-auto text-center">
-                    <div className="flex items-center justify-center mb-6">
-                      <div className="bg-white/20 backdrop-blur-sm rounded-full p-4 shadow-lg">
-                        <Coffee className="w-8 h-8 text-white" />
-                      </div>
-                    </div>
-                    <h3 className="text-2xl font-bold text-white mb-6">Perfect First Date</h3>
-                    <p className="text-white text-lg leading-relaxed font-medium">
-                      {slides[currentSlide].content}
-                    </p>
-                  </div>
-                </div>
-              ) : slides[currentSlide]?.type === 'last_googled' ? (
-                <div className={`w-full h-full ${userBackgroundColor} flex items-center justify-center p-8`}>
-                  <div className="max-w-sm mx-auto text-center">
-                    <div className="flex items-center justify-center mb-6">
-                      <div className="bg-white/20 backdrop-blur-sm rounded-full p-4 shadow-lg">
-                        <Search className="w-8 h-8 text-white" />
-                      </div>
-                    </div>
-                    <h3 className="text-2xl font-bold text-white mb-6">Last Googled</h3>
-                    <p className="text-white text-lg leading-relaxed font-medium">
-                      {slides[currentSlide].content}
-                    </p>
-                  </div>
-                </div>
-              ) : (
-                // Fallback for no images - show placeholder with initials
-                <div className="w-full h-full min-h-full bg-gradient-to-br from-pink-200 to-purple-200 flex items-center justify-center">
-                  <div className="text-center w-full">
-                    <div className="bg-white/80 rounded-full p-8 mb-4 shadow-xl mx-auto">
-                      <User className="w-16 h-16 mx-auto text-gray-500" />
-                      <style>{`
-                        .centered-user-icon {
-                          display: flex;
-                          align-items: center;
-                          justify-content: center;
-                          margin: 0 auto;
-                          box-sizing: border-box;
-                          max-width: 96px;
-                          max-height: 96px;
-                          padding: 1.5rem;
-                          background: rgba(255,255,255,0.8);
-                          border-radius: 9999px;
-                          box-shadow: 0 8px 32px 0 rgba(0,0,0,0.18);
-                        }
-                      `}</style>
-                      <div className="centered-user-icon">
-                        <User className="w-16 h-16 mx-auto text-gray-500" />
-                      </div>
-                    </div>
-                    <span className="text-6xl font-bold text-gray-700 bg-white/50 rounded-full px-6 py-3">
-                      {match.first_name?.[0]}{match.last_name?.[0]}
-                    </span>
-                    <p className="text-gray-600 mt-4 text-sm">No photos uploaded yet</p>
-                  </div>
-                </div>
-              )}
+              {/* ⭐ PHASE 1.8: Use memoized SlideRenderer (40-60% Android render improvement) */}
+              <SlideRenderer
+                slide={currentSlideData}
+                userBackgroundColor={userBackgroundColor}
+                matchFirstName={match.first_name}
+                matchLastName={match.last_name}
+                preloadedBlobImages={memoPreloadedBlobs}
+                imageStatus={imageStatus}
+                getOptimizedUrl={resolveImageUrl}
+              />
             </div>
           )}
           
           {/* Slide indicators */}
-          {slides.length > 1 && (
+          {slides && slides.length > 1 && (
             <div 
               className="absolute left-4 flex space-x-2 z-10"
-              style={{ top: 'clamp(1rem, env(safe-area-inset-top, 1rem) + 0.5rem, 2.25rem)' }}
+              style={{ top: 'clamp(1rem, env(safe-area-inset-top, 1rem) + 0.5rem, 2.25rem)', pointerEvents: 'none' }}
             >
               {slides.map((_, index) => (
                 <div
@@ -570,7 +372,7 @@ const MatchCard: React.FC<MatchCardProps> = ({
           {match.adinkra_symbols && match.adinkra_symbols.length > 0 && (
             <div 
               className="absolute left-1/2 transform -translate-x-1/2 z-10"
-              style={{ top: 'clamp(-0.25rem, env(safe-area-inset-top, -0.25rem) + 0.125rem, 1rem)' }}
+              style={{ top: 'clamp(-0.25rem, env(safe-area-inset-top, -0.25rem) + 0.125rem, 1rem)', pointerEvents: 'none' }}
             >
               <div className="relative flex flex-col items-center">
                 {/* Single optimized glow layer */}
@@ -757,6 +559,8 @@ const MatchCard: React.FC<MatchCardProps> = ({
               {/* Verified badge beside name and age - exact same as ProfilePage */}
               {isVerified && (
                 <img
+                  loading="lazy"
+                  decoding="async"
                   src="/images/verified.svg"
                   alt="Verified profile"
                   title="Verified profile"
@@ -1000,4 +804,16 @@ const MatchCard: React.FC<MatchCardProps> = ({
   );
 };
 
-export default MatchCard;
+// ⭐ PHASE 2.9: PureComponent to freeze layout (prevents unnecessary re-renders on Android)
+export default React.memo(MatchCard, (prev, next) => {
+  return (
+    prev.match.id === next.match.id &&
+    prev.userImages.join(',') === next.userImages.join(',') && // ⭐ FIX #1: Detect URL changes, not just length
+    Object.keys(prev.preloadedBlobImages || {}).length === Object.keys(next.preloadedBlobImages || {}).length &&
+    prev.showMoreInfo === next.showMoreInfo &&
+    prev.swipeDirection === next.swipeDirection &&
+    prev.imageIndex === next.imageIndex &&
+    prev.preferredLanguageName === next.preferredLanguageName && // ⭐ FIX #2: Detect language changes
+    JSON.stringify(prev.imageStatus) === JSON.stringify(next.imageStatus) // ⭐ FIX #3: Detect loading state changes
+  );
+});

@@ -180,7 +180,7 @@ const UserProfileModal = ({ isOpen, onClose, userId, isAdmin = false }: UserProf
               <div className="text-center">
               {userImages.length > 0 ? (
                 <div className="relative w-32 h-32 mx-auto mb-4">
-                  <img 
+                  <img loading="lazy" decoding="async"
                     src={userImages[0]} 
                     alt={`${profile?.first_name} ${profile?.last_name}`}
                     className="w-32 h-32 rounded-full object-cover cursor-pointer hover:opacity-90 transition-opacity border-4 border-blue-100"
@@ -239,6 +239,8 @@ const UserProfileModal = ({ isOpen, onClose, userId, isAdmin = false }: UserProf
                       {userImages.slice(0, 6).map((image, index) => (
                         <div key={index} className="relative group">
                           <img
+                            loading="lazy"
+                            decoding="async"
                             src={image}
                             alt={`Photo ${index + 1}`}
                             className="w-full h-24 object-cover rounded-lg cursor-pointer hover:opacity-90 transition-opacity"

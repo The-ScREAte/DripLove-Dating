@@ -203,7 +203,9 @@ const AdsManagement = () => {
                   className="flex-1"
                 />
                 {formData.image_url && (
-                  <img 
+                  <img
+                    loading="lazy"
+                    decoding="async"
                     src={formData.image_url} 
                     alt="Preview" 
                     className="w-20 h-20 object-cover rounded"
@@ -254,7 +256,9 @@ const AdsManagement = () => {
               <Card key={ad.id}>
                 <CardContent className="pt-6">
                   <div className="flex gap-4">
-                    <img 
+                    <img
+                      loading="lazy"
+                      decoding="async"
                       src={ad.image_url} 
                       alt={ad.name}
                       className="w-24 h-24 object-cover rounded"

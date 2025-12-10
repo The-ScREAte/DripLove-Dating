@@ -24,7 +24,23 @@ const LazyAdminPage = lazy(() => import('@/components/AdminPage'));
 const PageLoader = () => (
   <div className="min-h-fill bg-gradient-to-br from-pink-50 to-purple-50 flex items-center justify-center">
     <div className="text-center">
-      <div className="w-8 h-8 border-4 border-pink-500 border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
+      <style>{`
+        @keyframes logoHop {
+          0%, 100% { transform: translateY(0) scale(1); }
+          50% { transform: translateY(-20px) scale(1.05); }
+        }
+      `}</style>
+      <div className="animate-pulse" style={{ animation: 'logoHop 1s ease-in-out infinite' }}>
+        <img 
+          src="/images/drip-love-logo.svg" 
+          alt="Drip Love" 
+          className="w-24 h-24 mx-auto mb-4"
+          onError={(e) => {
+            // Fallback to PNG if SVG fails
+            e.currentTarget.src = '/images/drip-love-logo.png';
+          }}
+        />
+      </div>
       <p className="text-gray-600">Loading...</p>
     </div>
   </div>

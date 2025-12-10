@@ -27,7 +27,22 @@ const PrivacyPolicy = lazy(() => import('./PrivacyPolicy'));
 const PageLoader = () => (
   <div className="w-full h-screen flex items-center justify-center bg-gradient-to-br from-pink-50 to-purple-50">
     <div className="text-center">
-      <div className="w-12 h-12 mx-auto rounded-full bg-pink-500 animate-pulse mb-4"></div>
+      <style>{`
+        @keyframes logoHop {
+          0%, 100% { transform: translateY(0) scale(1); }
+          50% { transform: translateY(-20px) scale(1.05); }
+        }
+      `}</style>
+      <div className="mb-4" style={{ animation: 'logoHop 1s ease-in-out infinite' }}>
+        <img 
+          src="/images/drip-love-logo.svg" 
+          alt="Drip Love" 
+          className="w-24 h-24 mx-auto"
+          onError={(e) => {
+            e.currentTarget.src = '/images/drip-love-logo.png';
+          }}
+        />
+      </div>
       <p className="text-gray-600">Loading...</p>
     </div>
   </div>

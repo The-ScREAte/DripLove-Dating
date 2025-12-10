@@ -578,7 +578,7 @@ const ProfilePage = ({ currentUser, profile, onProfileUpdate, onLogout, onShowTe
               <span className="text-sm font-semibold text-gray-700 min-w-[45px] text-right flex items-center justify-end gap-2">
                 <span>{completion}%</span>
                 {showVerifiedBadge && (
-                  <img
+                  <img loading="lazy" decoding="async"
                     src="/images/verified.svg"
                     alt="Verified profile"
                     title="Verified profile"

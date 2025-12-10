@@ -111,4 +111,5 @@ const ChatUserList: React.FC<ChatUserListProps> = ({
   );
 };
 
-export default ChatUserList;
+// ⭐ REACT.MEMO: Prevent re-renders when props haven't changed
+export default React.memo(ChatUserList);

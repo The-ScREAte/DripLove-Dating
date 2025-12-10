@@ -61,7 +61,7 @@ const ImageViewer = ({ isOpen, onClose, images, initialIndex = 0 }: ImageViewerP
               {images.map((image, index) => (
                 <CarouselItem key={index}>
                   <div className="flex items-center justify-center h-[80vh] p-4">
-                    <img
+                    <img loading="lazy" decoding="async"
                       src={image}
                       alt={`Image ${index + 1}`}
                       className="max-w-full max-h-full object-contain rounded-lg"
