@@ -87,12 +87,16 @@ export const optimizeImageUrl = (url: string, maxWidth: number = 300): string =>
   // Get optimal quality based on device
   const quality = getOptimalImageQuality();
   
-  // Android devices get more aggressive optimization
-  const width = isAndroid() ? Math.min(maxWidth, 800) : maxWidth;
+  // ⭐ ANDROID OPTIMIZATION: More aggressive size reduction for Android
+  const isAndroidDevice = isAndroid();
+  const width = isAndroidDevice ? Math.min(maxWidth, 600) : maxWidth; // Reduced from 800 to 600 for Android
+  const format = 'webp';
   
   // Ultra-aggressive optimization for maximum speed and concurrent users
   if (url.includes('supabase')) {
-    return `${url}?width=${width}&quality=${quality}&format=webp&resize=fill`;
+    // ⭐ ANDROID FIX: Use resize=contain for better performance
+    const resizeMode = isAndroidDevice ? 'contain' : 'fill';
+    return `${url}?width=${width}&quality=${quality}&format=${format}&resize=${resizeMode}`;
   }
   return url;
 };

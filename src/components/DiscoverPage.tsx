@@ -1,7 +1,36 @@
 // Use shared IAP actions
 import { buyMonthly, restorePurchases } from '../iap';
-import { Capacitor } from '@capacitor/core';
 import { useTranslation } from 'react-i18next';
+
+// ⭐ ANDROID PERFORMANCE FIX: Lazy platform detection with caching
+// Avoids synchronous Capacitor import that blocks Android main thread
+let cachedPlatform: string | null = null;
+let capacitorModule: any = null;
+
+const getPlatformSafe = async (): Promise<string> => {
+  if (cachedPlatform) return cachedPlatform;
+  try {
+    if (!capacitorModule) {
+      capacitorModule = await import('@capacitor/core');
+    }
+    cachedPlatform = capacitorModule.Capacitor.getPlatform();
+    return cachedPlatform;
+  } catch {
+    cachedPlatform = 'web';
+    return 'web';
+  }
+};
+
+// Synchronous version using cached value (safe after first async call)
+const getPlatformSync = (): string => {
+  return cachedPlatform || 'web';
+};
+
+// Initialize platform detection early (non-blocking)
+getPlatformSafe();
+
+const isAndroidPlatform = (): boolean => getPlatformSync() === 'android';
+const isIOSPlatform = (): boolean => getPlatformSync() === 'ios';
 import { memo } from 'react';
 
 // ⭐ GLOBAL IMAGE CACHE - Shared across all components for instant loading
@@ -9,6 +38,7 @@ const globalImageCache = new Map<string, string>(); // url => blobURL
 const failedImages = new Set<string>(); // Track failed images to avoid retry loops
 
 // ⭐ EFFICIENT IMAGE PRELOADER - Converts images to blob URLs for instant rendering
+// ⭐ ANDROID OPTIMIZATION: Shorter timeout and smaller blob cache for Android
 const preloadImageToBlob = async (url: string): Promise<string> => {
   // Return cached blob URL if available
   if (globalImageCache.has(url)) {
@@ -21,9 +51,12 @@ const preloadImageToBlob = async (url: string): Promise<string> => {
   }
 
   try {
-    // Add timeout to prevent hanging requests
+    // ⭐ ANDROID FIX: Shorter timeout for Android (5s vs 10s for iOS)
+    const isAndroid = isAndroidPlatform();
+    const timeoutMs = isAndroid ? 5000 : 10000;
+    
     const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 10000); // 10 second timeout
+    const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
     
     // Fetch image as blob with timeout
     const res = await fetch(url, { signal: controller.signal });
@@ -69,6 +102,9 @@ const cleanupOldBlobUrls = () => {
 function DominantColorImageBg({ imageUrl, children }) {
   // Use lightweight static background color instead of expensive pixel scanning
   const edgeColor = '#f6f6f6';
+  // ⭐ ANDROID OPTIMIZATION: Reduce blur for Android (CPU intensive on Android WebView)
+  const blurAmount = isAndroidPlatform() ? '3px' : '6px';
+  
   return (
     <div className="absolute inset-0 z-0 pointer-events-none">
       {/* Solid color overlay fills all space */}
@@ -84,16 +120,19 @@ function DominantColorImageBg({ imageUrl, children }) {
           aria-hidden="true"
           className="absolute inset-0 w-full h-full object-cover"
           style={{
-            // Use a lighter blur for performance; thumbnail provides most of the blur effect
-            filter: 'blur(6px) brightness(1.04)',
+            // ⭐ ANDROID FIX: Lighter blur for Android performance
+            filter: `blur(${blurAmount}) brightness(1.04)`,
             zIndex: 1,
             objectFit: 'cover',
             width: '100%',
             height: '100%',
             transform: 'scale(1.4)',
-            imageRendering: 'auto'
+            imageRendering: 'auto',
+            // ⭐ ANDROID FIX: Force GPU acceleration
+            willChange: isAndroidPlatform() ? 'transform' : 'auto'
           }}
           draggable={false}
+          loading="lazy"
         />
       )}
       <div className="absolute inset-0 z-10">
@@ -1217,9 +1256,11 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, isPremium }: DiscoverPage
   }, [preloadedImages]);
 
   // ⭐ PARALLEL IMAGE PRELOADING - Load images in background without blocking
+  // ⭐ ANDROID OPTIMIZATION: Reduced batch size for Android (4 vs 10 for iOS)
   const preloadProfileImages = useCallback((profiles: PotentialMatch[], startIndex: number = 0) => {
-    // Load up to 10 profiles ahead in parallel
-    const profilesToLoad = profiles.slice(startIndex, startIndex + 10);
+    // Android: Load 4 profiles ahead, iOS: Load 10 profiles ahead
+    const batchSize = isAndroidPlatform() ? 4 : 10;
+    const profilesToLoad = profiles.slice(startIndex, startIndex + batchSize);
     
     profilesToLoad.forEach((user) => {
       if (!user?.id) return;
@@ -2803,7 +2844,7 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, isPremium }: DiscoverPage
                 minHeight: showMoreInfo ? 'min(20vh, 200px)' : 'auto',
                 paddingBottom: showMoreInfo 
                   ? `calc(${
-                      Capacitor.getPlatform() === 'ios' 
+                      isIOSPlatform() 
                         ? (window.innerHeight < 700 ? '190px' : '180px')
                         : (window.innerHeight < 700 ? '190px' : '180px')
                     } + env(safe-area-inset-bottom, 0px))` 
