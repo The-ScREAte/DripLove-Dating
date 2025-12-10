@@ -72,7 +72,7 @@ const TermsAcceptance = ({ user, onAccept }: TermsAcceptanceProps) => {
       <Card className="w-full max-w-2xl mx-auto bg-white shadow-xl border-0 rounded-2xl">
         <CardHeader className="text-center pb-3 pt-6">
           <div className="mx-auto w-16 h-16 mb-3">
-            <img loading="lazy" decoding="async" 
+            <img 
               src="/driplove-logo.webp"
               loading="lazy"
               decoding="async" 

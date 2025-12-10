@@ -123,7 +123,7 @@ const LikedMePage = ({ currentUser, isPremium = false }: LikedMePageProps) => {
   const rowVirtualizer = useVirtualizer({
     count: virtualizerCount,
     getScrollElement: () => scrollContainerRef.current,
-    estimateSize: () => 310,
+    estimateSize: () => 230, // Square aspect ratio + card content (approx 180px image + 50px content)
     overscan: 3
   });
 
@@ -1366,7 +1366,7 @@ const LikedMePage = ({ currentUser, isPremium = false }: LikedMePageProps) => {
                       className={`cursor-pointer hover:shadow-lg transition-shadow flex flex-col relative ${isLocked ? 'opacity-75' : ''}`}
                       onClick={() => handleProfileClick(firstLiker, firstIndex)}
                     >
-                      <div className="relative aspect-[3/4] w-full overflow-hidden rounded-t-lg">
+                      <div className="relative aspect-square w-full overflow-hidden rounded-t-lg">
                         {(() => {
                           const profileImages = userImages[firstLiker.id] || [];
                           const isFirstThree = firstIndex < 3; // ⭐ FIX #5: First 3 use eager loading
@@ -1425,7 +1425,7 @@ const LikedMePage = ({ currentUser, isPremium = false }: LikedMePageProps) => {
                       className={`cursor-pointer hover:shadow-lg transition-shadow flex flex-col relative ${isLocked ? 'opacity-75' : ''}`}
                       onClick={() => handleProfileClick(secondLiker, secondIndex)}
                     >
-                      <div className="relative aspect-[3/4] w-full overflow-hidden rounded-t-lg">
+                      <div className="relative aspect-square w-full overflow-hidden rounded-t-lg">
                         {(() => {
                           const profileImages = userImages[secondLiker.id] || [];
                           const isFirstThree = secondIndex < 3; // ⭐ FIX #5: First 3 use eager loading
