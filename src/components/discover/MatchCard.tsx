@@ -18,6 +18,7 @@ interface MatchCardProps {
   currentUserLatitude?: number;
   currentUserLongitude?: number;
   userImages: string[]; // New prop for user images
+  preloadedBlobImages?: { [url: string]: string }; // ⭐ Blob URLs for instant rendering
   preferredLanguageName?: string; // ⭐ Pre-fetched language name (no DB call needed)
   onImageClick: () => void;
   onToggleInfo: () => void;
@@ -41,6 +42,7 @@ const MatchCard: React.FC<MatchCardProps> = ({
   currentUserLatitude,
   currentUserLongitude,
   userImages,
+  preloadedBlobImages = {}, // ⭐ Blob URLs for instant image loading
   preferredLanguageName, // ⭐ Pre-fetched language (no DB call)
   onImageClick,
   onToggleInfo,
@@ -50,7 +52,7 @@ const MatchCard: React.FC<MatchCardProps> = ({
   swipeDistance,
   isSwipeAreaOnly = false,
   isDetailsAreaOnly = false,
-  getOptimizedUrl = (url: string) => url.includes('supabase') ? `${url}?width=800&quality=75&format=webp` : url,
+  getOptimizedUrl = (url: string) => url.includes('supabase') ? `${url}?width=800&quality=85&format=webp` : url,
   preCalculatedDistance
   , imageStatus
 }) => {
@@ -427,9 +429,18 @@ const MatchCard: React.FC<MatchCardProps> = ({
                     </div>
                   )}
                   {(() => {
-                    // ⭐ OPTIMIZED: Use optimized URL directly (no blob caching)
+                    // ⭐ CRITICAL FIX: Use ORIGINAL URL as key for blob lookup
                     const originalUrl = slides[currentSlide].content;
-                    const imageSrc = getOptimizedUrl(originalUrl);
+                    const blobUrl = preloadedBlobImages?.[originalUrl];
+                    
+                    // Priority: blob URL → optimized URL → original URL
+                    let imageSrc: string;
+                    if (blobUrl && blobUrl.startsWith('blob:')) {
+                      imageSrc = blobUrl; // ⭐ INSTANT loading from memory
+                    } else {
+                      imageSrc = getOptimizedUrl(originalUrl); // Fallback to optimized
+                    }
+                    
                     const status = imageStatus?.[originalUrl] || 'idle';
 
                     return (
