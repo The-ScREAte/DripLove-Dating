@@ -2,7 +2,8 @@ import React, { useState, useEffect, useCallback, useMemo, lazy, Suspense } from
 import { useTranslation } from 'react-i18next';
 import { Button } from '@/components/ui/button';
 import { Heart, MessageCircle, Users, User } from 'lucide-react';
-import { Capacitor } from '@capacitor/core';
+// ⭐ ANDROID FIX: Use platform utils instead of synchronous Capacitor import
+import { isAndroidPlatform, isIOSPlatform, getPlatformSync, getPlatformSafe } from '@/utils/platformUtils';
 import TermsOfService from '@/components/TermsOfService';
 import PrivacyPolicy from '@/components/PrivacyPolicy';
 import DripCoupleIcon from '@/components/DripCoupleIcon';
@@ -1069,9 +1070,9 @@ const MainApp = ({ user, onLogout }: MainAppProps) => {
               <div 
                 className="px-2 py-2 flex justify-between items-center"
                 style={{
-                  paddingTop: Capacitor.getPlatform() === 'ios' 
+                  paddingTop: getPlatformSync() === 'ios' 
                     ? 'clamp(10px, env(safe-area-inset-top, 10px), 40px)' 
-                    : Capacitor.getPlatform() === 'android'
+                    : getPlatformSync() === 'android'
                     ? '24px'
                     : '8px'
                 }}
@@ -1144,12 +1145,12 @@ const MainApp = ({ user, onLogout }: MainAppProps) => {
           <div
             className="fixed bottom-0 left-0 right-0 w-full bg-white z-[99999]"
             style={{ 
-              paddingBottom: Capacitor.getPlatform() === 'android' 
+              paddingBottom: getPlatformSync() === 'android' 
                 ? '24px' 
                 : 'clamp(4px, env(safe-area-inset-bottom, 0px), 6px)' 
             }}
           >
-            <div className={`flex justify-around items-center ${Capacitor.getPlatform() === 'ios' ? 'pb-5' : ''}`}>
+            <div className={`flex justify-around items-center ${getPlatformSync() === 'ios' ? 'pb-5' : ''}`}>
               {[
                 { label: t('discover.title'), value: 'dripcheck', icon: DripCoupleIcon }, 
                 { label: t('chat.title'), value: 'chat', icon: MessageCircle }, 

@@ -3,8 +3,8 @@ import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import { usePushNotifications } from '@/hooks/usePushNotifications';
 import { requestNotificationPermission, sendPushNotification } from '@/services/pushNotifications';
-import { Capacitor } from '@capacitor/core';
-import { PushNotifications } from '@capacitor/push-notifications';
+// ⭐ ANDROID FIX: Use platform utils instead of synchronous Capacitor import
+import { isAndroidPlatform, isIOSPlatform, getPlatformSync } from '@/utils/platformUtils';
 // SafeAreaView removed — use plain divs with env(...) padding where necessary
 import UserProfileModal from './UserProfileModal';
 import BlockDialog from './BlockDialog';
@@ -95,12 +95,20 @@ const ChatPage = ({ currentUser, onUnreadChange, onDetailViewChange }: ChatPageP
   useEffect(() => {
     if (!currentUser || !currentUser.id) return;
     
-    // Clear badge count when user opens chat page
-    if (Capacitor.isNativePlatform()) {
-      PushNotifications.removeAllDeliveredNotifications().catch(() => {
+    // Clear badge count when user opens chat page - dynamic import for Android performance
+    (async () => {
+      try {
+        const { Capacitor } = await import('@capacitor/core');
+        if (Capacitor.isNativePlatform()) {
+          const { PushNotifications } = await import('@capacitor/push-notifications');
+          PushNotifications.removeAllDeliveredNotifications().catch(() => {
+            // Ignore errors
+          });
+        }
+      } catch {
         // Ignore errors
-      });
-    }
+      }
+    })();
     
     // Check if we have fresh cached data first
     const cached = chatMatchesCache.get(currentUser.id);
@@ -1618,18 +1626,18 @@ const ChatPage = ({ currentUser, onUnreadChange, onDetailViewChange }: ChatPageP
         <div 
           className="sticky top-0 z-30 bg-white text-gray-900 shadow-sm border-b border-gray-100" 
           style={{ 
-            paddingTop: Capacitor.getPlatform() === 'web' 
+            paddingTop: getPlatformSync() === 'web' 
               ? '64px' 
-              : Capacitor.getPlatform() === 'ios' 
+              : getPlatformSync() === 'ios' 
                 ? '44px' 
-                : '64px' 
+                : '64px'
           }}
         >
           <div 
             className="px-4"
             style={{
-              paddingTop: Capacitor.getPlatform() === 'ios' ? '4px' : '12px',
-              paddingBottom: Capacitor.getPlatform() === 'ios' ? '6px' : '12px'
+              paddingTop: getPlatformSync() === 'ios' ? '4px' : '12px',
+              paddingBottom: getPlatformSync() === 'ios' ? '6px' : '12px'
             }}
           >
             <h2 className="text-xl font-bold bg-gradient-to-r from-pink-500 to-purple-600 bg-clip-text text-transparent">
@@ -1643,7 +1651,7 @@ const ChatPage = ({ currentUser, onUnreadChange, onDetailViewChange }: ChatPageP
           <div 
             className="px-4 py-3 border-b bg-white"
             style={{
-              marginTop: Capacitor.getPlatform() === 'ios' ? '54px' : '0px'
+              marginTop: getPlatformSync() === 'ios' ? '54px' : '0px'
             }}
           >
             <h3 className="text-sm font-semibold text-gray-900 mb-3">{t('chat.newMatches')}</h3>
@@ -1686,7 +1694,7 @@ const ChatPage = ({ currentUser, onUnreadChange, onDetailViewChange }: ChatPageP
     className="flex-1 overflow-y-auto pb-35"
     style={{ 
       WebkitOverflowScrolling: 'touch',
-      paddingTop: Capacitor.getPlatform() === 'android' ? '0px' : (newMatchList.length > 0 ? '0px' : '54px')
+      paddingTop: getPlatformSync() === 'android' ? '0px' : (newMatchList.length > 0 ? '0px' : '54px')
     }}
     onTouchStart={handleTouchStart}
     onTouchMove={handleTouchMove}
@@ -1751,8 +1759,8 @@ const ChatPage = ({ currentUser, onUnreadChange, onDetailViewChange }: ChatPageP
                     selectedMatch?.id === match.id ? 'bg-pink-50 border-pink-200' : 'bg-white'
                   } ${match.unread_messages > 0 ? 'font-bold bg-purple-50' : ''}`}
                   style={{
-                    marginTop: index === 0 && newMatchList.length === 0 && Capacitor.getPlatform() === 'ios' 
-                      ? '0px' 
+                    marginTop: index === 0 && newMatchList.length === 0 && getPlatformSync() === 'ios' 
+                      ? '0px'
                       : undefined
                   }}
                   onClick={() => setSelectedMatch(match)}
@@ -1852,9 +1860,9 @@ const ChatPage = ({ currentUser, onUnreadChange, onDetailViewChange }: ChatPageP
         className="flex-1 overflow-y-auto px-4 space-y-2 bg-gray-50 chat-messages-container"
         style={{ 
           WebkitOverflowScrolling: 'touch', 
-          paddingTop: Capacitor.getPlatform() === 'ios' 
+          paddingTop: getPlatformSync() === 'ios' 
             ? 'clamp(160px, calc(env(safe-area-inset-top, 10px) + 140px), 180px)'
-            : Capacitor.getPlatform() === 'web'
+            : getPlatformSync() === 'web'
               ? '140px'
               : '140px'
         }}
