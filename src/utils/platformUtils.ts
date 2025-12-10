@@ -2,6 +2,36 @@
  * Platform detection utilities for mobile app and web environments
  */
 
+// ⭐ ANDROID PERFORMANCE FIX: Lazy platform detection with caching
+// Avoids synchronous Capacitor import that blocks Android main thread
+let cachedPlatform: string | null = null;
+let capacitorModule: any = null;
+
+export const getPlatformSafe = async (): Promise<string> => {
+  if (cachedPlatform) return cachedPlatform;
+  try {
+    if (!capacitorModule) {
+      capacitorModule = await import('@capacitor/core');
+    }
+    cachedPlatform = capacitorModule.Capacitor.getPlatform();
+    return cachedPlatform;
+  } catch {
+    cachedPlatform = 'web';
+    return 'web';
+  }
+};
+
+// Synchronous version using cached value (safe after first async call)
+export const getPlatformSync = (): string => {
+  return cachedPlatform || 'web';
+};
+
+// Initialize platform detection early (non-blocking)
+getPlatformSafe();
+
+export const isAndroidPlatform = (): boolean => getPlatformSync() === 'android';
+export const isIOSPlatform = (): boolean => getPlatformSync() === 'ios';
+
 /**
  * Check if the app is running in a mobile Capacitor environment
  */

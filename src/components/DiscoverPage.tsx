@@ -1,241 +1,36 @@
 // Use shared IAP actions
 import { buyMonthly, restorePurchases } from '../iap';
 import { useTranslation } from 'react-i18next';
+import React, { useState, useEffect, useCallback, useMemo, useRef, lazy, Suspense, memo } from 'react';
 
-// ⭐ ANDROID PERFORMANCE FIX: Lazy platform detection with caching
-// Avoids synchronous Capacitor import that blocks Android main thread
-let cachedPlatform: string | null = null;
-let capacitorModule: any = null;
+// ⭐ Import platform utilities from shared module
+import { getPlatformSafe, getPlatformSync, isAndroidPlatform, isIOSPlatform } from '@/utils/platformUtils';
 
-const getPlatformSafe = async (): Promise<string> => {
-  if (cachedPlatform) return cachedPlatform;
-  try {
-    if (!capacitorModule) {
-      capacitorModule = await import('@capacitor/core');
-    }
-    cachedPlatform = capacitorModule.Capacitor.getPlatform();
-    return cachedPlatform;
-  } catch {
-    cachedPlatform = 'web';
-    return 'web';
-  }
-};
+// ⭐ Import image cache utilities from shared module
+import { preloadImageToBlob, globalImageCache, failedImages, cleanupOldBlobUrls } from '@/utils/imageCache';
 
-// Synchronous version using cached value (safe after first async call)
-const getPlatformSync = (): string => {
-  return cachedPlatform || 'web';
-};
+// ⭐ Import discover cache utilities from shared module
+import { discoverCache, DISCOVER_CACHE_DURATION, DISCOVER_CACHE_MAX_ENTRIES, trimDiscoverCacheIfNeeded, calculateAge, createDeterministicShuffle } from '@/utils/discoverCache';
 
-// Initialize platform detection early (non-blocking)
-getPlatformSafe();
+// ⭐ Import background component
+import DominantColorImageBg from './discover/DominantColorImageBg';
 
-const isAndroidPlatform = (): boolean => getPlatformSync() === 'android';
-const isIOSPlatform = (): boolean => getPlatformSync() === 'ios';
-import { memo } from 'react';
+// ⭐ Lazy load AdinkraBar for performance
+const AdinkraBar = lazy(() => import('./discover/AdinkraBar'));
 
-// ⭐ GLOBAL IMAGE CACHE - Shared across all components for instant loading
-const globalImageCache = new Map<string, string>(); // url => blobURL
-const failedImages = new Set<string>(); // Track failed images to avoid retry loops
+// Fallback for AdinkraBar while loading
+const AdinkraBarFallback = () => (
+  <div className="w-full h-9 bg-gradient-to-r from-blue-500 via-yellow-400 to-blue-500" />
+);
 
-// ⭐ EFFICIENT IMAGE PRELOADER - Converts images to blob URLs for instant rendering
-// ⭐ ANDROID OPTIMIZATION: Shorter timeout and smaller blob cache for Android
-const preloadImageToBlob = async (url: string): Promise<string> => {
-  // Return cached blob URL if available
-  if (globalImageCache.has(url)) {
-    return globalImageCache.get(url)!;
-  }
+// ⭐ Wrapped lazy AdinkraBar with suspense
+const LazyAdinkraBar = memo(() => (
+  <Suspense fallback={<AdinkraBarFallback />}>
+    <AdinkraBar />
+  </Suspense>
+));
+LazyAdinkraBar.displayName = 'LazyAdinkraBar';
 
-  // Don't retry failed images
-  if (failedImages.has(url)) {
-    return url;
-  }
-
-  try {
-    // ⭐ ANDROID FIX: Shorter timeout for Android (5s vs 10s for iOS)
-    const isAndroid = isAndroidPlatform();
-    const timeoutMs = isAndroid ? 5000 : 10000;
-    
-    const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
-    
-    // Fetch image as blob with timeout
-    const res = await fetch(url, { signal: controller.signal });
-    clearTimeout(timeoutId);
-    
-    if (!res.ok) {
-      failedImages.add(url);
-      return url;
-    }
-    
-    const blob = await res.blob();
-    
-    // Verify it's actually an image
-    if (!blob.type.startsWith('image/')) {
-      failedImages.add(url);
-      return url;
-    }
-    
-    const blobUrl = URL.createObjectURL(blob);
-    
-    // Cache the blob URL
-    globalImageCache.set(url, blobUrl);
-    return blobUrl;
-  } catch (error) {
-    // Mark as failed and return original URL
-    failedImages.add(url);
-    return url;
-  }
-};
-
-// Cleanup blob URLs when needed (optional, for memory management)
-const cleanupOldBlobUrls = () => {
-  if (globalImageCache.size > 100) {
-    const entries = Array.from(globalImageCache.entries());
-    const toRemove = entries.slice(0, 20);
-    toRemove.forEach(([url, blobUrl]) => {
-      URL.revokeObjectURL(blobUrl);
-      globalImageCache.delete(url);
-    });
-  }
-};
-
-function DominantColorImageBg({ imageUrl, children }) {
-  // Use lightweight static background color instead of expensive pixel scanning
-  const edgeColor = '#f6f6f6';
-  // ⭐ ANDROID OPTIMIZATION: Reduce blur for Android (CPU intensive on Android WebView)
-  const blurAmount = isAndroidPlatform() ? '3px' : '6px';
-  
-  return (
-    <div className="absolute inset-0 z-0 pointer-events-none">
-      {/* Solid color overlay fills all space */}
-      <div
-        className="absolute inset-0"
-        style={{ background: edgeColor, zIndex: 0 }}
-        aria-hidden="true"
-      />
-      {/* Low-res thumbnail as background (cheap to decode). We intentionally request a tiny optimized image and lightly blur it. */}
-      {imageUrl && (
-        <img
-          src={`${imageUrl}?width=40&quality=20&format=webp`}
-          aria-hidden="true"
-          className="absolute inset-0 w-full h-full object-cover"
-          style={{
-            // ⭐ ANDROID FIX: Lighter blur for Android performance
-            filter: `blur(${blurAmount}) brightness(1.04)`,
-            zIndex: 1,
-            objectFit: 'cover',
-            width: '100%',
-            height: '100%',
-            transform: 'scale(1.4)',
-            imageRendering: 'auto',
-            // ⭐ ANDROID FIX: Force GPU acceleration
-            willChange: isAndroidPlatform() ? 'transform' : 'auto'
-          }}
-          draggable={false}
-          loading="lazy"
-        />
-      )}
-      <div className="absolute inset-0 z-10">
-        {children}
-      </div>
-    </div>
-  );
-}
-import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
-
-// --- AdinkraBar component and symbols ---
-const adinkraSymbols = [
-  // 30 Adinkra symbols (SVGs are illustrative, not all unique for brevity)
-  { name: 'Aya', meaning: 'The fern. Symbol of endurance and resourcefulness.', svg: (<svg width="24" height="24"><ellipse cx="12" cy="12" rx="10" ry="6" fill="#A5D6A7" stroke="#388E3C" strokeWidth="2" /><path d="M12 6v12M9 9l6 6M15 9l-6 6" stroke="#388E3C" strokeWidth="2" /></svg>) },
-  { name: 'Nkyinkyim', meaning: 'Twisting. Symbol of initiative, dynamism, and versatility.', svg: (<svg width="24" height="24"><path d="M6 18c6-12 12 0 12-12" stroke="#E53935" strokeWidth="2" fill="none"/><circle cx="6" cy="18" r="1.5" fill="#F9A825" /><circle cx="18" cy="6" r="1.5" fill="#43A047" /></svg>) },
-  { name: 'Eban', meaning: 'Fence. Symbol of love, safety, and security.', svg: (<svg width="24" height="24"><rect x="4" y="4" width="16" height="16" rx="4" fill="#FFFDE7" stroke="#E53935" strokeWidth="2" /><path d="M7 4v16M12 4v16M17 4v16" stroke="#43A047" strokeWidth="2" /></svg>) },
-  { name: 'Fihankra', meaning: 'House/compound. Symbol of security and safety.', svg: (<svg width="24" height="24"><rect x="6" y="10" width="12" height="8" fill="#E3F2FD" stroke="#1E88E5" strokeWidth="2" /><polygon points="12,4 6,10 18,10" fill="#F9A825" stroke="#E53935" strokeWidth="2"/></svg>) },
-  { name: 'Gye Nyame', meaning: 'Except for God. Symbol of the supremacy of God.', svg: (<svg width="24" height="24"><circle cx="12" cy="12" r="11" stroke="#F9A825" strokeWidth="2" fill="#FFFDE7" /><path d="M12 5c-1.5 1.5-1.5 4.5 0 6s1.5 4.5 0 6" stroke="#E53935" strokeWidth="2" fill="none"/><path d="M12 19c1.5-1.5 1.5-4.5 0-6s-1.5-4.5 0-6" stroke="#43A047" strokeWidth="2" fill="none"/><circle cx="12" cy="12" r="1.5" fill="#1E88E5" /></svg>) },
-  { name: 'Sankofa', meaning: 'Go back and get it. Symbol of learning from the past.', svg: (<svg width="24" height="24"><circle cx="12" cy="12" r="11" stroke="#43A047" strokeWidth="2" fill="#E8F5E9" /><path d="M16 12c0-2.2-1.8-4-4-4s-4 1.8-4 4 1.8 4 4 4c1.5 0 3-1.2 3-3" stroke="#E53935" strokeWidth="2" fill="none"/><path d="M12 15l3-3-3-3" stroke="#F9A825" strokeWidth="2" fill="none"/></svg>) },
-  { name: 'Duafe', meaning: 'Wooden comb. Symbol of beauty, cleanliness, feminine qualities.', svg: (<svg width="24" height="24"><rect x="3" y="6" width="18" height="12" rx="6" fill="#FFF3E0" stroke="#E53935" strokeWidth="2" /><rect x="9" y="3" width="6" height="6" rx="3" fill="#F9A825" stroke="#43A047" strokeWidth="2" /><rect x="7" y="15" width="1.5" height="4" fill="#1E88E5" /><rect x="11" y="15" width="1.5" height="4" fill="#1E88E5" /><rect x="15" y="15" width="1.5" height="4" fill="#1E88E5" /></svg>) },
-  { name: 'Fawohodie', meaning: 'Independence. Symbol of freedom, emancipation, independence.', svg: (<svg width="24" height="24"><rect x="6" y="6" width="12" height="12" rx="6" fill="#E3F2FD" stroke="#1E88E5" strokeWidth="2" /><path d="M12 6v12M6 12h12" stroke="#E53935" strokeWidth="2" /><circle cx="12" cy="12" r="2" fill="#F9A825" /></svg>) },
-  { name: 'Akoma', meaning: 'The heart. Symbol of patience and tolerance.', svg: (<svg width="24" height="24"><path d="M12 21s-6-4.5-6-9a6 6 0 0 1 12 0c0 4.5-6 9-6 9z" fill="#E53935" stroke="#F9A825" strokeWidth="2" /><circle cx="9" cy="10.5" r="1.5" fill="#FFFDE7" /><circle cx="15" cy="10.5" r="1.5" fill="#FFFDE7" /></svg>) },
-  { name: 'Akoben', meaning: 'War horn. Symbol of vigilance and wariness.', svg: (<svg width="24" height="24"><ellipse cx="12" cy="12" rx="14" ry="8" fill="#a5d6a7" stroke="#388e3c" strokeWidth="2"/><path d="M16 8v16M12 12l8 8M20 12l-8 8" stroke="#388e3c" strokeWidth="2"/></svg>) },
-  { name: 'Adinkrahene', meaning: 'Chief of the adinkra symbols. Symbol of greatness, charisma, and leadership.', svg: (<svg width="24" height="24"><circle cx="12" cy="12" r="14" fill="#f9a825" stroke="#e53935" strokeWidth="2"/><circle cx="12" cy="12" r="8" fill="#43a047"/></svg>) },
-  { name: 'Bese Saka', meaning: 'Sack of cola nuts. Symbol of affluence, power, abundance, unity.', svg: (<svg width="24" height="24"><ellipse cx="16" cy="20" rx="10" ry="6" fill="#e3f2fd" stroke="#1e88e5" strokeWidth="2"/><ellipse cx="16" cy="12" rx="6" ry="4" fill="#f9a825" stroke="#e53935" strokeWidth="2"/></svg>) },
-  { name: 'Dame-Dame', meaning: 'Checkerboard. Symbol of intelligence and ingenuity.', svg: (<svg width="24" height="24"><rect x="4" y="4" width="24" height="24" fill="#fffde7" stroke="#e53935" strokeWidth="2"/><rect x="4" y="4" width="12" height="12" fill="#43a047"/><rect x="16" y="16" width="12" height="12" fill="#f9a825"/></svg>) },
-  { name: 'Fihankra', meaning: 'House/compound. Symbol of security and safety.', svg: (<svg width="24" height="24"><rect x="8" y="14" width="16" height="10" fill="#e3f2fd" stroke="#1e88e5" strokeWidth="2"/><polygon points="16,6 8,14 24,14" fill="#f9a825" stroke="#e53935" strokeWidth="2"/></svg>) },
-  { name: 'Dwennimmen', meaning: 'Ram’s horns. Symbol of humility together with strength.', svg: (<svg width="24" height="24"><circle cx="12" cy="12" r="15" fill="#fff3e0" stroke="#e53935" strokeWidth="2"/><path d="M10 20c-4-4 4-12 8-8" stroke="#43a047" strokeWidth="2" fill="none"/><path d="M22 20c4-4-4-12-8-8" stroke="#43a047" strokeWidth="2" fill="none"/></svg>) },
-  { name: 'Nyame Dua', meaning: 'Tree of God. Symbol of God’s presence and protection.', svg: (<svg width="24" height="24"><rect x="14" y="18" width="4" height="10" fill="#43a047"/><circle cx="16" cy="14" r="8" fill="#f9a825" stroke="#e53935" strokeWidth="2"/></svg>) },
-  { name: 'Boa Me Na Me Mmoa Wo', meaning: 'Help me and let me help you. Symbol of cooperation and interdependence.', svg: (<svg width="24" height="24"><rect x="8" y="8" width="16" height="16" rx="8" fill="#e3f2fd" stroke="#1e88e5" strokeWidth="2"/><path d="M16 8v16M8 16h16" stroke="#e53935" strokeWidth="2"/></svg>) },
-  { name: 'Nkyinkyim', meaning: 'Twisting. Symbol of initiative, dynamism, and versatility.', svg: (<svg width="24" height="24"><path d="M8 24c8-16 16 0 16-16" stroke="#e53935" strokeWidth="3" fill="none"/><circle cx="8" cy="24" r="2" fill="#f9a825"/><circle cx="24" cy="8" r="2" fill="#43a047"/></svg>) },
-  { name: 'Eban', meaning: 'Fence. Symbol of love, safety, and security.', svg: (<svg width="24" height="24"><rect x="6" y="6" width="20" height="20" rx="6" fill="#fffde7" stroke="#e53935" strokeWidth="2"/><path d="M10 6v20M16 6v20M22 6v20" stroke="#43a047" strokeWidth="2"/></svg>) },
-  { name: 'Akoben', meaning: 'War horn. Symbol of vigilance and wariness.', svg: (<svg width="24" height="24"><ellipse cx="12" cy="12" rx="14" ry="8" fill="#a5d6a7" stroke="#388e3c" strokeWidth="2"/><path d="M16 8v16M12 12l8 8M20 12l-8 8" stroke="#388e3c" strokeWidth="2"/></svg>) },
-  { name: 'Adinkrahene', meaning: 'Chief of the adinkra symbols. Symbol of greatness, charisma, and leadership.', svg: (<svg width="24" height="24"><circle cx="12" cy="12" r="14" fill="#f9a825" stroke="#e53935" strokeWidth="2"/><circle cx="12" cy="12" r="8" fill="#43a047"/></svg>) },
-  { name: 'Bese Saka', meaning: 'Sack of cola nuts. Symbol of affluence, power, abundance, unity.', svg: (<svg width="24" height="24"><ellipse cx="16" cy="20" rx="10" ry="6" fill="#e3f2fd" stroke="#1e88e5" strokeWidth="2"/><ellipse cx="16" cy="12" rx="6" ry="4" fill="#f9a825" stroke="#e53935" strokeWidth="2"/></svg>) },
-  { name: 'Dame-Dame', meaning: 'Checkerboard. Symbol of intelligence and ingenuity.', svg: (<svg width="24" height="24"><rect x="4" y="4" width="24" height="24" fill="#fffde7" stroke="#e53935" strokeWidth="2"/><rect x="4" y="4" width="12" height="12" fill="#43a047"/><rect x="16" y="16" width="12" height="12" fill="#f9a825"/></svg>) },
-  { name: 'Fihankra', meaning: 'House/compound. Symbol of security and safety.', svg: (<svg width="24" height="24"><rect x="8" y="14" width="16" height="10" fill="#e3f2fd" stroke="#1e88e5" strokeWidth="2"/><polygon points="16,6 8,14 24,14" fill="#f9a825" stroke="#e53935" strokeWidth="2"/></svg>) },
-  { name: 'Dwennimmen', meaning: 'Ram’s horns. Symbol of humility together with strength.', svg: (<svg width="24" height="24"><circle cx="12" cy="12" r="15" fill="#fff3e0" stroke="#e53935" strokeWidth="2"/><path d="M10 20c-4-4 4-12 8-8" stroke="#43a047" strokeWidth="2" fill="none"/><path d="M22 20c4-4-4-12-8-8" stroke="#43a047" strokeWidth="2" fill="none"/></svg>) },
-  { name: 'Nyame Dua', meaning: 'Tree of God. Symbol of God’s presence and protection.', svg: (<svg width="24" height="24"><rect x="14" y="18" width="4" height="10" fill="#43a047"/><circle cx="16" cy="14" r="8" fill="#f9a825" stroke="#e53935" strokeWidth="2"/></svg>) },
-  { name: 'Boa Me Na Me Mmoa Wo', meaning: 'Help me and let me help you. Symbol of cooperation and interdependence.', svg: (<svg width="24" height="24"><rect x="8" y="8" width="16" height="16" rx="8" fill="#e3f2fd" stroke="#1e88e5" strokeWidth="2"/><path d="M16 8v16M8 16h16" stroke="#e53935" strokeWidth="2"/></svg>) },
-  { name: 'Nkyinkyim', meaning: 'Twisting. Symbol of initiative, dynamism, and versatility.', svg: (<svg width="24" height="24"><path d="M8 24c8-16 16 0 16-16" stroke="#e53935" strokeWidth="3" fill="none"/><circle cx="8" cy="24" r="2" fill="#f9a825"/><circle cx="24" cy="8" r="2" fill="#43a047"/></svg>) },
-  { name: 'Eban', meaning: 'Fence. Symbol of love, safety, and security.', svg: (<svg width="24" height="24"><rect x="6" y="6" width="20" height="20" rx="6" fill="#fffde7" stroke="#e53935" strokeWidth="2"/><path d="M10 6v20M16 6v20M22 6v20" stroke="#43a047" strokeWidth="2"/></svg>) },
-  { name: 'Akoben', meaning: 'War horn. Symbol of vigilance and wariness.', svg: (<svg width="24" height="24"><ellipse cx="12" cy="12" rx="14" ry="8" fill="#a5d6a7" stroke="#388e3c" strokeWidth="2"/><path d="M16 8v16M12 12l8 8M20 12l-8 8" stroke="#388e3c" strokeWidth="2"/></svg>) },
-  { name: 'Adinkrahene', meaning: 'Chief of the adinkra symbols. Symbol of greatness, charisma, and leadership.', svg: (<svg width="24" height="24"><circle cx="12" cy="12" r="14" fill="#f9a825" stroke="#e53935" strokeWidth="2"/><circle cx="12" cy="12" r="8" fill="#43a047"/></svg>) },
-  { name: 'Bese Saka', meaning: 'Sack of cola nuts. Symbol of affluence, power, abundance, unity.', svg: (<svg width="24" height="24"><ellipse cx="16" cy="20" rx="10" ry="6" fill="#e3f2fd" stroke="#1e88e5" strokeWidth="2"/><ellipse cx="16" cy="12" rx="6" ry="4" fill="#f9a825" stroke="#e53935" strokeWidth="2"/></svg>) },
-  { name: 'Dame-Dame', meaning: 'Checkerboard. Symbol of intelligence and ingenuity.', svg: (<svg width="24" height="24"><rect x="4" y="4" width="24" height="24" fill="#fffde7" stroke="#e53935" strokeWidth="2"/><rect x="4" y="4" width="12" height="12" fill="#43a047"/><rect x="16" y="16" width="12" height="12" fill="#f9a825"/></svg>) },
-  { name: 'Fihankra', meaning: 'House/compound. Symbol of security and safety.', svg: (<svg width="24" height="24"><rect x="8" y="14" width="16" height="10" fill="#e3f2fd" stroke="#1e88e5" strokeWidth="2"/><polygon points="16,6 8,14 24,14" fill="#f9a825" stroke="#e53935" strokeWidth="2"/></svg>) },
-];
-
-const ROTATE_INTERVAL_MS = 2 * 60 * 1000; // 2 minutes
-const AdinkraBar: React.FC = () => {
-  const { t } = useTranslation();
-  const SYMBOLS_PER_SET = 4;
-  const [tooltipIdx, setTooltipIdx] = useState<number | null>(null);
-  const [setIndex, setSetIndex] = useState(() => Math.floor(Math.random() * Math.ceil(adinkraSymbols.length / SYMBOLS_PER_SET)));
-  useEffect(() => {
-    const interval = setInterval(() => {
-      let next;
-      do {
-        next = Math.floor(Math.random() * Math.ceil(adinkraSymbols.length / SYMBOLS_PER_SET));
-      } while (next === setIndex && Math.ceil(adinkraSymbols.length / SYMBOLS_PER_SET) > 1);
-      setSetIndex(next);
-    }, ROTATE_INTERVAL_MS);
-    return () => clearInterval(interval);
-  }, [setIndex]);
-  const start = setIndex * SYMBOLS_PER_SET;
-  const visibleSymbols = adinkraSymbols.slice(start, start + SYMBOLS_PER_SET);
-  return (
-    <div
-      className="w-full flex justify-center items-center gap-2 relative select-none z-40 leading-none"
-      style={{
-        backgroundImage: `url('data:image/svg+xml;utf8,<svg width=\"240\" height=\"36\" viewBox=\"0 0 240 36\" fill=\"none\" xmlns=\"http://www.w3.org/2000/svg\"><rect width=\"240\" height=\"36\" fill=\"%23007bdb\"/><g><rect x=\"0\" y=\"0\" width=\"24\" height=\"36\" fill=\"%23ffc72c\"/><rect x=\"24\" y=\"0\" width=\"24\" height=\"36\" fill=\"%23007bdb\"/><rect x=\"48\" y=\"0\" width=\"24\" height=\"36\" fill=\"%23ffc72c\"/><rect x=\"72\" y=\"0\" width=\"24\" height=\"36\" fill=\"%23007bdb\"/><rect x=\"96\" y=\"0\" width=\"24\" height=\"36\" fill=\"%23ffc72c\"/><rect x=\"120\" y=\"0\" width=\"24\" height=\"36\" fill=\"%23007bdb\"/><rect x=\"144\" y=\"0\" width=\"24\" height=\"36\" fill=\"%23ffc72c\"/><rect x=\"168\" y=\"0\" width=\"24\" height=\"36\" fill=\"%23007bdb\"/><rect x=\"192\" y=\"0\" width=\"24\" height=\"36\" fill=\"%23ffc72c\"/><rect x=\"216\" y=\"0\" width=\"24\" height=\"36\" fill=\"%23007bdb\"/></g><g><polygon points=\"24,0 36,18 24,36 48,36 36,18 48,0\" fill=\"%23e63946\"/><polygon points=\"72,0 84,18 72,36 96,36 84,18 96,0\" fill=\"%2300b159\"/><polygon points=\"120,0 132,18 120,36 144,36 132,18 144,0\" fill=\"%23e63946\"/><polygon points=\"168,0 180,18 168,36 192,36 180,18 192,0\" fill=\"%2300b159\"/></g><g><rect x=\"0\" y=\"0\" width=\"240\" height=\"6\" fill=\"%23fff\" fill-opacity=\"0.15\"/><rect x=\"0\" y=\"30\" width=\"240\" height=\"6\" fill=\"%23fff\" fill-opacity=\"0.15\"/></g><g><rect x=\"23\" y=\"0\" width=\"2\" height=\"36\" fill=\"%23fff\"/><rect x=\"47\" y=\"0\" width=\"2\" height=\"36\" fill=\"%23fff\"/><rect x=\"71\" y=\"0\" width=\"2\" height=\"36\" fill=\"%23fff\"/><rect x=\"95\" y=\"0\" width=\"2\" height=\"36\" fill=\"%23fff\"/><rect x=\"119\" y=\"0\" width=\"2\" height=\"36\" fill=\"%23fff\"/><rect x=\"143\" y=\"0\" width=\"2\" height=\"36\" fill=\"%23fff\"/><rect x=\"167\" y=\"0\" width=\"2\" height=\"36\" fill=\"%23fff\"/><rect x=\"191\" y=\"0\" width=\"2\" height=\"36\" fill=\"%23fff\"/><rect x=\"215\" y=\"0\" width=\"2\" height=\"36\" fill=\"%23fff\"/></g></svg>')`,
-        backgroundRepeat: 'repeat',
-        backgroundSize: '240px 36px',
-        transform: 'translateY(-1px)',
-      }}
-    >
-      {visibleSymbols.map((symbol, idx) => (
-        <button
-          key={symbol.name}
-          className="focus:outline-none bg-white rounded-full shadow hover:scale-110 transition-transform border border-yellow-300"
-          style={{ width: 32, height: 28, display: 'flex', alignItems: 'center', justifyContent: 'center' }}
-          onClick={() => setTooltipIdx(start + idx)}
-          tabIndex={0}
-          aria-label={symbol.name + ' symbol'}
-        >
-          {symbol.svg}
-        </button>
-      ))}
-      {tooltipIdx !== null && (
-        <div
-          className="fixed left-1/2 top-1/12 z-50 px-4 py-3 rounded-lg shadow-lg bg-white border border-gray-300 text-xs text-gray-800 animate-fade-in flex flex-col items-center"
-          style={{ transform: 'translate(-50%, -75%)', minWidth: 180, maxWidth: 260 }}
-          onClick={() => setTooltipIdx(null)}
-        >
-          <strong className="text-base mb-1">{adinkraSymbols[tooltipIdx].name}</strong>
-          <div className="mt-1 text-center">{t(`adinkraMeanings.${adinkraSymbols[tooltipIdx].name}`)}</div>
-          <div className="text-[10px] text-gray-400 mt-2">({t('common.clickToClose')})</div>
-        </div>
-      )}
-    </div>
-  );
-};
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Heart, X, Crown, Calendar, MapPin, ChevronDown, ChevronUp, Briefcase, GraduationCap, Undo2 } from 'lucide-react';
@@ -273,47 +68,10 @@ interface AdData {
 // Union type for matches and ads
 type MatchOrAd = PotentialMatch | AdData;
 
-// Global cache for discover page data - persists across component mounts
-const discoverCache = new Map<string, { 
-  potentialMatches: MatchOrAd[], 
-  userImages: { [key: string]: string[] },
-  userDistances: { [key: string]: number },
-  currentIndex: number,
-  timestamp: number 
-}>();
-const DISCOVER_CACHE_DURATION = 3 * 60 * 60 * 1000; // 3 hours
-const DISCOVER_CACHE_MAX_ENTRIES = 60; // keep cache bounded
-
-const trimDiscoverCacheIfNeeded = () => {
-  try {
-    if (discoverCache.size <= DISCOVER_CACHE_MAX_ENTRIES) return;
-    // delete oldest entries
-    const entries = Array.from(discoverCache.entries()).sort((a, b) => a[1].timestamp - b[1].timestamp);
-    const toDelete = entries.slice(0, discoverCache.size - DISCOVER_CACHE_MAX_ENTRIES);
-    toDelete.forEach(([key]) => discoverCache.delete(key));
-  } catch (e) {
-    // ignore
-  }
-};
-
 // Make cache globally accessible for preloading
 if (typeof window !== 'undefined') {
   (window as any).discoverCache = discoverCache;
 }
-
-// Helper function to calculate age from date of birth
-const calculateAge = (dateOfBirth: string): number => {
-  const today = new Date();
-  const birthDate = new Date(dateOfBirth);
-  let age = today.getFullYear() - birthDate.getFullYear();
-  const monthDiff = today.getMonth() - birthDate.getMonth();
-  
-  if (monthDiff < 0 || (monthDiff === 0 && today.getDate() < birthDate.getDate())) {
-    age--;
-  }
-  
-  return age;
-};
 
 interface DiscoverPageProps {
   currentUser: CurrentUser;
@@ -325,33 +83,6 @@ interface PassedUser {
   user_id: string;
   passed_at: Date;
 }
-
-// Deterministic shuffle function to ensure consistent profile order
-const createDeterministicShuffle = (array: any[], seed: string) => {
-  const arr = [...array];
-  
-  // Simple hash function to convert seed string to number
-  let hash = 0;
-  for (let i = 0; i < seed.length; i++) {
-    const char = seed.charCodeAt(i);
-    hash = ((hash << 5) - hash) + char;
-    hash = hash & hash; // Convert to 32bit integer
-  }
-  
-  // Use seeded random for Fisher-Yates shuffle
-  const seededRandom = (seed: number) => {
-    const x = Math.sin(seed) * 10000;
-    return x - Math.floor(x);
-  };
-  
-  for (let i = arr.length - 1; i > 0; i--) {
-    hash = (hash * 9301 + 49297) % 233280; // Linear congruential generator
-    const j = Math.floor(seededRandom(hash) * (i + 1));
-    [arr[i], arr[j]] = [arr[j], arr[i]];
-  }
-  
-  return arr;
-};
 
 const DiscoverPage = ({ currentUser, onNavigateToChat, isPremium }: DiscoverPageProps) => {
   const { t } = useTranslation();
@@ -2436,7 +2167,7 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, isPremium }: DiscoverPage
              onTouchEnd={handleTouchEnd}
              onMouseDown={handleMouseDown}>
           <AdCard ad={currentMatch} onSwipe={moveToNext} />
-          <AdinkraBar />
+          <LazyAdinkraBar />
           <SwipeButtons
             onPass={handlePass}
             onReverse={handleReverse}
@@ -2826,7 +2557,7 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, isPremium }: DiscoverPage
           </div>
           
           {/* AdinkraBar - between image and info sections */}
-          <AdinkraBar />
+          <LazyAdinkraBar />
 
           {/* Info section - dynamic height that fits content exactly */}
           <div className={`discover-info-area bg-white transition-all duration-300 flex-shrink-0 -mt-0.1 ${
