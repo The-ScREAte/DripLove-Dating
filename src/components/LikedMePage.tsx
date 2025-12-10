@@ -803,19 +803,6 @@ const LikedMePage = ({ currentUser, isPremium = false }: LikedMePageProps) => {
     }
     setStartY(0);
   };
-
-  if (showPremiumUpgrade) {
-    return <PremiumUpgrade currentUser={currentUser} onClose={() => setShowPremiumUpgrade(false)} preselectedPlan="premium" />;
-  }
-
-  if (loading) {
-    return (
-      <div className="h-full w-full flex items-center justify-center bg-white">
-        <div className="animate-spin rounded-full h-32 w-32 border-b-2 border-pink-600"></div>
-      </div>
-    );
-  }
-
   // ⭐ FIX #7: Memoize entire selected profile card (1,200+ lines) to prevent re-render storms on Android
   const selectedProfileCard = useMemo(() => {
     if (!selectedProfile) return null;
@@ -1246,6 +1233,19 @@ const LikedMePage = ({ currentUser, isPremium = false }: LikedMePageProps) => {
       </div>
     );
   }, [selectedProfile, userImages, slides, currentSlide, showMoreInfo, platform, handleNavigationClick, handleBlock, handlePass, handleLikeBack, blockDialogOpen, currentUser?.id, handleBlockSuccess, calculateAge, t]);
+
+  // ⭐ All early returns MUST be after all hooks
+  if (showPremiumUpgrade) {
+    return <PremiumUpgrade currentUser={currentUser} onClose={() => setShowPremiumUpgrade(false)} preselectedPlan="premium" />;
+  }
+
+  if (loading) {
+    return (
+      <div className="h-full w-full flex items-center justify-center bg-white">
+        <div className="animate-spin rounded-full h-32 w-32 border-b-2 border-pink-600"></div>
+      </div>
+    );
+  }
 
   // ⭐ CRITICAL: Early return if currentUser is null (prevents crash during session refresh)
   // Guard must run after all hooks have been declared
