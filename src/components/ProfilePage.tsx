@@ -1,6 +1,7 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { Capacitor } from '@capacitor/core';
 import { useTranslation } from 'react-i18next';
+import { getPlatformSync } from '@/utils/platformUtils';
 // import { PushNotifications } from '@capacitor/push-notifications'; // Uncomment if you use PushNotifications
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -40,6 +41,7 @@ interface ProfilePageProps {
 
 const ProfilePage = ({ currentUser, profile, onProfileUpdate, onLogout, onShowTerms, onShowPrivacy, isPremium }: ProfilePageProps) => {
   const { t, i18n } = useTranslation();
+  const platform = useMemo(() => getPlatformSync(), []);
   const [isEditing, setIsEditing] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const [showPremiumUpgrade, setShowPremiumUpgrade] = useState(false);
@@ -511,7 +513,9 @@ const ProfilePage = ({ currentUser, profile, onProfileUpdate, onLogout, onShowTe
         className="fixed left-0 right-0 z-40 bg-white border-b border-gray-200 shadow-sm"
         style={{
           // Start from where main header ends - pushed up higher
-          top: 'clamp(56px, calc(env(safe-area-inset-top, 10px) + 36px), 86px)',
+          top: platform === 'android' 
+            ? 'clamp(90px, calc(env(safe-area-inset-top, 10px) + 70px), 120px)'
+            : 'clamp(56px, calc(env(safe-area-inset-top, 10px) + 36px), 86px)',
           paddingTop: '4px',
           width: '100%',
         }}

@@ -10,6 +10,7 @@ import { getLanguageName } from '@/utils/languageNames';
 import { supabase } from '@/integrations/supabase/client';
 import { buildSlides, getUserColorHash } from './MatchCardHelpers';
 import { SlideRenderer } from './SlideRenderer';
+import { getPlatformSync } from '@/utils/platformUtils';
 
 interface MatchCardProps {
   match: PotentialMatch;
@@ -63,6 +64,7 @@ const MatchCard: React.FC<MatchCardProps> = ({
   const { t } = useTranslation();
   
   const [currentSlide, setCurrentSlide] = useState(0);
+  const platform = useMemo(() => getPlatformSync(), []);
   
   // Refs for performance
   const lastSlideInteraction = useRef<number>(0);
@@ -323,7 +325,11 @@ const MatchCard: React.FC<MatchCardProps> = ({
               {slides[currentSlide]?.type === 'image' && (
                 <div 
                   className="absolute right-3 z-50"
-                  style={{ top: 'clamp(1rem, env(safe-area-inset-top, 1rem) + 0.5rem, 2.25rem)' }}
+                  style={{ 
+                    top: platform === 'android' 
+                      ? '2rem' 
+                      : 'clamp(1rem, env(safe-area-inset-top, 1rem) + 0.5rem, 2.25rem)' 
+                  }}
                 >
                   <button
                     className={styles.reportButton}
@@ -353,7 +359,12 @@ const MatchCard: React.FC<MatchCardProps> = ({
           {slides && slides.length > 1 && (
             <div 
               className="absolute left-4 flex space-x-2 z-10"
-              style={{ top: 'clamp(1rem, env(safe-area-inset-top, 1rem) + 0.5rem, 2.25rem)', pointerEvents: 'none' }}
+              style={{ 
+                top: platform === 'android' 
+                  ? '2rem' 
+                  : 'clamp(1rem, env(safe-area-inset-top, 1rem) + 0.5rem, 2.25rem)', 
+                pointerEvents: 'none' 
+              }}
             >
               {slides.map((_, index) => (
                 <div

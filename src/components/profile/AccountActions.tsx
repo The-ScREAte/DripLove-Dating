@@ -118,7 +118,7 @@ const AccountActions = ({ currentUser, onLogout, onShowTerms, onShowPrivacy, hid
   return (
     <Card>
       <CardHeader>
-        <CardTitle>{t('settings.accountActions')}</CardTitle>
+        <CardTitle>{t('profile.accountActions')}</CardTitle>
       </CardHeader>
       <CardContent className="space-y-4">
         {/* Language Selector */}

@@ -115,15 +115,79 @@ const LikedMePage = ({ currentUser, isPremium = false }: LikedMePageProps) => {
 
   const { subscription, getLikedMeVisibleCount } = useSubscription(currentUser?.id);
   
+  // Responsive columns per row
+  const [columnsPerRow, setColumnsPerRow] = useState(2);
+  
+  useEffect(() => {
+    const updateColumns = () => {
+      const width = window.innerWidth;
+      if (width >= 1024) setColumnsPerRow(4); // lg
+      else if (width >= 768) setColumnsPerRow(3); // md
+      else setColumnsPerRow(2); // small
+    };
+    updateColumns();
+    window.addEventListener('resize', updateColumns);
+    return () => window.removeEventListener('resize', updateColumns);
+  }, []);
+  
   // Ensure virtualizer count is always stable (never undefined)
   const virtualizerCount = useMemo(() => {
-    return likers.length > 0 ? Math.ceil(likers.length / 2) : 0;
-  }, [likers.length]);
-  
+    return likers.length > 0 ? Math.ceil(likers.length / columnsPerRow) : 0;
+  }, [likers.length, columnsPerRow]);
+  // dynamic estimated row height (computed from container width + cols)
+  const [estimatedRowHeight, setEstimatedRowHeight] = useState<number>(400);
+  const [rowVerticalGap, setRowVerticalGap] = useState<number>(12);
+  const [rowPaddingHorizontal, setRowPaddingHorizontal] = useState<number>(8);
+  const [rowColumnGap, setRowColumnGap] = useState<number>(12);
+
+  useEffect(() => {
+    const calculate = () => {
+      try {
+        const maxWidth = 1400;
+        const container = scrollContainerRef.current;
+        const containerWidth = container ? Math.min(container.clientWidth, maxWidth) : Math.min(window.innerWidth, maxWidth);
+
+        // responsive padding (matches our responsive classes)
+        let rowPadding = 8; // small
+        if (columnsPerRow === 3) rowPadding = 32; // md:px-8 -> 2*16 but we used px-16 earlier; use conservative 32
+        if (columnsPerRow === 4) rowPadding = 48; // lg:px-12
+
+        // horizontal gap per breakpoint
+        const horizontalGapMap: Record<number, number> = {2: 12, 3: 40, 4: 56};
+        const gapPx = horizontalGapMap[columnsPerRow] ?? 12;
+
+        // vertical gap to use between rows (sm/md/lg)
+        const verticalGapMap: Record<number, number> = {2: 100, 3: 175, 4: 220};
+        const vGap = verticalGapMap[columnsPerRow] ?? 180;
+        setRowVerticalGap(vGap);
+        setRowPaddingHorizontal(rowPadding);
+        setRowColumnGap(gapPx);
+
+        const innerWidth = Math.max(0, containerWidth - rowPadding * 2);
+        const totalGaps = gapPx * (columnsPerRow - 1);
+        const cardWidth = (innerWidth - totalGaps) / Math.max(1, columnsPerRow);
+
+        const imageHeight = Math.round(cardWidth * 3 / 4);
+        const contentHeight = 56; // approx height of CardContent area
+        const extra = 8; // shadow / safety margin
+
+        const cardHeight = imageHeight + contentHeight + extra;
+        setEstimatedRowHeight(Math.max(200, Math.round(cardHeight)));
+      } catch (e) {
+        setEstimatedRowHeight(400);
+        setRowVerticalGap(16);
+      }
+    };
+
+    calculate();
+    window.addEventListener('resize', calculate);
+    return () => window.removeEventListener('resize', calculate);
+  }, [columnsPerRow, scrollContainerRef]);
+
   const rowVirtualizer = useVirtualizer({
     count: virtualizerCount,
     getScrollElement: () => scrollContainerRef.current,
-    estimateSize: () => 230, // Square aspect ratio + card content (approx 180px image + 50px content)
+    estimateSize: () => estimatedRowHeight,
     overscan: 3
   });
 
@@ -630,30 +694,15 @@ const LikedMePage = ({ currentUser, isPremium = false }: LikedMePageProps) => {
       }
     }
 
-    // Show success message immediately
-    // Removed: Match success toast
-
     try {
-      const { data: existingLike } = await supabase
-        .from('likes')
-        .select('*')
-        .eq('liker_id', currentUser.id)
-        .eq('liked_id', profileId)
-        .maybeSingle();
+      // Use the proper function that creates matches on mutual likes
+      const { data, error } = await supabase.rpc('like_and_usage_batched', {
+        liker_id_param: currentUser.id,
+        liked_id_param: profileId,
+        premium_param: isPremium || false
+      });
 
-      if (existingLike) {
-        // Already liked - this shouldn't happen with optimistic UI, but handle gracefully
-        return;
-      }
-
-      const { error: likeError } = await supabase
-        .from('likes')
-        .insert({
-          liker_id: currentUser.id,
-          liked_id: profileId
-        });
-
-      if (likeError) throw likeError;
+      if (error) throw error;
 
       // Set lockout period for free users
       if (!isPremium && !hasInteractedToday) {
@@ -687,6 +736,8 @@ const LikedMePage = ({ currentUser, isPremium = false }: LikedMePageProps) => {
   };
 
   const handlePass = async (profileId: string) => {
+    console.log('handlePass called - removing from liked me for profileId:', profileId);
+    
     // Optimistic update - remove profile immediately
     const profileToRemove = likers.find(liker => liker.id === profileId);
     setLikers(prev => prev.filter(liker => liker.id !== profileId));
@@ -715,20 +766,36 @@ const LikedMePage = ({ currentUser, isPremium = false }: LikedMePageProps) => {
     });
 
     try {
-      const { error } = await supabase
+      // Simply delete their like - they won't show up again unless they like you again
+      const { data: deletedLike, error: deleteError } = await supabase
         .from('likes')
         .delete()
         .eq('liker_id', profileId)
-        .eq('liked_id', currentUser.id);
+        .eq('liked_id', currentUser.id)
+        .select();
 
-      if (error) throw error;
+      console.log('Deleted like:', deletedLike, 'Error:', deleteError);
 
+      if (deleteError) {
+        console.error('Error deleting like:', deleteError);
+        throw deleteError;
+      }
+
+      // Invalidate cache to force refresh on next load
+      if (currentUser?.id) {
+        likedMeCache.delete(currentUser.id);
+        console.log('Cache cleared for user:', currentUser.id);
+      }
+      
       // Set lockout period for free users
       if (!isPremium && !hasInteractedToday) {
         await setLockoutPeriod();
         setHasInteractedToday(true);
       }
+
+      console.log('Pass completed - user removed from liked me');
     } catch (error) {
+      console.error('Error in handlePass:', error);
       // Revert optimistic update on error
       if (profileToRemove) {
         setLikers(prev => [profileToRemove, ...prev]);
@@ -1337,14 +1404,12 @@ const LikedMePage = ({ currentUser, isPremium = false }: LikedMePageProps) => {
           <div
             style={{
               position: 'relative',
-              height: `${rowVirtualizer.getTotalSize()}px`
+              height: `${rowVirtualizer.getTotalSize() + virtualizerCount * rowVerticalGap}px`
             }}
           >
             {rowVirtualizer.getVirtualItems().map(row => {
-              const firstIndex = row.index * 2;
-              const secondIndex = firstIndex + 1;
-              const firstLiker = likers[firstIndex];
-              const secondLiker = secondIndex < likers.length ? likers[secondIndex] : null;
+              const startIndex = row.index * columnsPerRow;
+              const rowLikers = likers.slice(startIndex, startIndex + columnsPerRow);
               const isLocked = !isPremium;
               
               return (
@@ -1352,30 +1417,38 @@ const LikedMePage = ({ currentUser, isPremium = false }: LikedMePageProps) => {
                   key={row.index}
                   style={{
                     position: 'absolute',
-                    top: `${row.start}px`,
-                    left: 0,
+                    top: `${row.start + row.index * rowVerticalGap}px`,
+                    left: '50%',
+                    transform: 'translateX(-50%)',
+                    maxWidth: '1400px',
                     width: '100%',
-                    padding: '0 4px'
+                    height: `${row.size}px`,
+                    paddingLeft: `${rowPaddingHorizontal}px`,
+                    paddingRight: `${rowPaddingHorizontal}px`,
+                    columnGap: `${rowColumnGap}px`,
+                    rowGap: `${rowVerticalGap}px`,
+                    boxSizing: 'border-box'
                   }}
-                  className="grid grid-cols-2 gap-3"
+                  className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4"
                 >
-                  {/* first column */}
-                  {firstLiker ? (
+                  {rowLikers.map((liker, colIndex) => {
+                    const likerIndex = startIndex + colIndex;
+                    const isFirstThree = likerIndex < 3;
+                    return (
                     <Card
-                      key={firstLiker.id}
-                      className={`cursor-pointer hover:shadow-lg transition-shadow flex flex-col relative ${isLocked ? 'opacity-75' : ''}`}
-                      onClick={() => handleProfileClick(firstLiker, firstIndex)}
+                      key={liker.id}
+                      className={`cursor-pointer hover:shadow-lg transition-shadow flex flex-col h-full ${isLocked ? 'opacity-75' : ''}`}
+                      onClick={() => handleProfileClick(liker, likerIndex)}
                     >
-                      <div className="relative aspect-square w-full overflow-hidden rounded-t-lg">
+                      <div className="relative aspect-[3/4] w-full overflow-hidden rounded-t-lg">
                         {(() => {
-                          const profileImages = userImages[firstLiker.id] || [];
-                          const isFirstThree = firstIndex < 3; // ⭐ FIX #5: First 3 use eager loading
+                          const profileImages = userImages[liker.id] || [];
                           return profileImages.length > 0 ? (
                             <img
                               loading={isFirstThree ? "eager" : "lazy"}
                               decoding="async"
                               src={getSafeImageSrc(profileImages[0])}
-                              alt={`${firstLiker.first_name}'s photo`}
+                              alt={`${liker.first_name}'s photo`}
                               className={`w-full h-full object-cover ${isLocked ? 'blur-md' : ''}`}
                               style={{
                                 height: '100%',
@@ -1392,7 +1465,7 @@ const LikedMePage = ({ currentUser, isPremium = false }: LikedMePageProps) => {
                           ) : (
                             <div className={`w-full h-full bg-gradient-to-br from-pink-200 to-purple-200 flex items-center justify-center ${isLocked ? 'blur-md' : ''}`}>
                               <span className="text-2xl font-bold text-gray-700">
-                                {firstLiker.first_name?.[0]}{firstLiker.last_name?.[0]}
+                                {liker.first_name?.[0]}{liker.last_name?.[0]}
                               </span>
                             </div>
                           );
@@ -1407,75 +1480,15 @@ const LikedMePage = ({ currentUser, isPremium = false }: LikedMePageProps) => {
                       </div>
                       <CardContent className="p-3 flex-1">
                         <h3 className={`font-semibold text-gray-800 truncate text-sm ${isLocked ? 'blur-sm' : ''}`}>
-                          {firstLiker.first_name}, {calculateAge(firstLiker.date_of_birth)}
+                          {liker.first_name}, {calculateAge(liker.date_of_birth)}
                         </h3>
-                        <p className={`text-xs text-gray-600 truncate ${isLocked ? 'blur-sm' : ''}`}>
-                          {firstLiker.city}
+                        <p className="text-xs text-gray-600 truncate">
+                          {liker.country}, {liker.city}
                         </p>
                       </CardContent>
                     </Card>
-                  ) : (
-                    <div />
-                  )}
-
-                  {/* second column */}
-                  {secondLiker ? (
-                    <Card
-                      key={secondLiker.id}
-                      className={`cursor-pointer hover:shadow-lg transition-shadow flex flex-col relative ${isLocked ? 'opacity-75' : ''}`}
-                      onClick={() => handleProfileClick(secondLiker, secondIndex)}
-                    >
-                      <div className="relative aspect-square w-full overflow-hidden rounded-t-lg">
-                        {(() => {
-                          const profileImages = userImages[secondLiker.id] || [];
-                          const isFirstThree = secondIndex < 3; // ⭐ FIX #5: First 3 use eager loading
-                          return profileImages.length > 0 ? (
-                            <img
-                              loading={isFirstThree ? "eager" : "lazy"}
-                              decoding="async"
-                              src={getSafeImageSrc(profileImages[0])}
-                              alt={`${secondLiker.first_name}'s photo`}
-                              className={`w-full h-full object-cover ${isLocked ? 'blur-md' : ''}`}
-                              style={{
-                                height: '100%',
-                                width: '100%',
-                                objectFit: 'cover',
-                                objectPosition: 'center',
-                                display: 'block',
-                                minHeight: '100%',
-                                minWidth: '100%',
-                                WebkitTransform: 'translateZ(0)',
-                                transform: 'translateZ(0)'
-                              }}
-                            />
-                          ) : (
-                            <div className={`w-full h-full bg-gradient-to-br from-pink-200 to-purple-200 flex items-center justify-center ${isLocked ? 'blur-md' : ''}`}>
-                              <span className="text-2xl font-bold text-gray-700">
-                                {secondLiker.first_name?.[0]}{secondLiker.last_name?.[0]}
-                              </span>
-                            </div>
-                          );
-                        })()}
-                        {isLocked && (
-                          <div className="absolute inset-0 flex items-center justify-center bg-black/20">
-                            <div className="bg-white/90 backdrop-blur-sm rounded-full p-3">
-                              <Lock className="w-6 h-6 text-gray-700" />
-                            </div>
-                          </div>
-                        )}
-                      </div>
-                      <CardContent className="p-3 flex-1">
-                        <h3 className={`font-semibold text-gray-800 truncate text-sm ${isLocked ? 'blur-sm' : ''}`}>
-                          {secondLiker.first_name}, {calculateAge(secondLiker.date_of_birth)}
-                        </h3>
-                        <p className={`text-xs text-gray-600 truncate ${isLocked ? 'blur-sm' : ''}`}>
-                          {secondLiker.city}
-                        </p>
-                      </CardContent>
-                    </Card>
-                  ) : (
-                    <div />
-                  )}
+                  );
+                  })}
                 </div>
               );
             })}
