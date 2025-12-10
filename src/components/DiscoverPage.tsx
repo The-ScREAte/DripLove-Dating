@@ -1,15 +1,34 @@
 // Use shared IAP actions
 import { buyMonthly, restorePurchases } from '../iap';
-import { Capacitor } from '@capacitor/core';
 import { useTranslation } from 'react-i18next';
 import { memo } from 'react';
+
+// ⭐ SAFE PLATFORM DETECTION - Async to avoid Capacitor initialization issues
+let cachedPlatform: string | null = null;
+const getPlatformSafe = async (): Promise<string> => {
+  if (cachedPlatform) return cachedPlatform;
+  try {
+    const { Capacitor } = await import('@capacitor/core');
+    cachedPlatform = Capacitor.getPlatform();
+    return cachedPlatform;
+  } catch {
+    cachedPlatform = 'web';
+    return 'web';
+  }
+};
+
+// Sync version for use in render - returns cached value or 'web' as fallback
+const getPlatformSync = (): string => cachedPlatform || 'web';
+
+// Initialize platform detection early (non-blocking)
+getPlatformSafe().catch(() => {});
 
 // ⭐ OPTIMIZED IMAGE URL HELPER - Generate progressive image URLs
 const getOptimizedImageUrl = (url: string, priority: 'thumbnail' | 'full' = 'full'): string => {
   if (!url.includes('supabase')) return url;
   
-  // Detect platform for Android-specific optimizations
-  const isAndroid = Capacitor.getPlatform() === 'android';
+  // Use cached platform (defaults to 'web' if not yet detected)
+  const isAndroid = getPlatformSync() === 'android';
   
   if (priority === 'thumbnail') {
     // Thumbnail: Low quality, small size for instant display
@@ -1154,7 +1173,7 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, isPremium }: DiscoverPage
 
         // ⭐ Step 3: Load remaining profiles (4-8) progressively in background
         const loadRemainingProfiles = async () => {
-          const isAndroid = Capacitor.getPlatform() === 'android';
+          const isAndroid = getPlatformSync() === 'android';
           const maxProfiles = isAndroid ? 6 : 8;
           const remainingProfiles = matches.slice(3, maxProfiles); // Profiles 4-6 or 4-8
           
@@ -1243,7 +1262,7 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, isPremium }: DiscoverPage
   const preloadProfileImages = useCallback((profiles: PotentialMatch[], startIndex: number = 0) => {
     // ⭐ OPTIMIZED: Load profiles ahead with platform-specific limits
     // Detect Android for platform-specific limits
-    const isAndroid = Capacitor.getPlatform() === 'android';
+    const isAndroid = getPlatformSync() === 'android';
     const maxProfiles = isAndroid ? 6 : 8; // Android: 6, Others: 8
     const profilesToLoad = profiles.slice(startIndex, startIndex + maxProfiles);
     
@@ -1801,7 +1820,7 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, isPremium }: DiscoverPage
     if (!hasCompletedInitialFetch || potentialMatches.length === 0) return;
 
     // ⭐ OPTIMIZED: Load profiles ahead with platform-specific limits
-    const isAndroid = Capacitor.getPlatform() === 'android';
+    const isAndroid = getPlatformSync() === 'android';
     const maxPreload = isAndroid ? 6 : 8; // Android: 6, Others: 8
     
     const profilesToPreload = potentialMatches.slice(currentIndex, currentIndex + maxPreload)
@@ -1819,7 +1838,7 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, isPremium }: DiscoverPage
     if (potentialMatches.length === 0) return;
     
     // Platform-specific targets for opportunistic loading
-    const isAndroid = Capacitor.getPlatform() === 'android';
+    const isAndroid = getPlatformSync() === 'android';
     const targetProfileCount = isAndroid ? 10 : 15; // Android: 10, Others: 15
     
     // Only load extra if we have fewer profiles than target
@@ -2884,7 +2903,7 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, isPremium }: DiscoverPage
                 minHeight: showMoreInfo ? 'min(20vh, 200px)' : 'auto',
                 paddingBottom: showMoreInfo 
                   ? `calc(${
-                      Capacitor.getPlatform() === 'ios' 
+                      getPlatformSync() === 'ios' 
                         ? (window.innerHeight < 700 ? '190px' : '180px')
                         : (window.innerHeight < 700 ? '190px' : '180px')
                     } + env(safe-area-inset-bottom, 0px))` 
