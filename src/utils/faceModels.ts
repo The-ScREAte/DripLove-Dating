@@ -18,22 +18,32 @@ export async function loadFaceModels(): Promise<void> {
   }
 
   try {
-    const MODEL_URL = '/models';
+    // Use relative path for better Capacitor compatibility
+    const MODEL_URL = './models';
     
-    console.log('🔄 Loading face recognition models...');
+    console.log('🔄 Loading face recognition models from:', MODEL_URL);
+    console.log('📍 Current location:', window.location.href);
 
-    // Load all required models in parallel
-    await Promise.all([
+    // Load all required models in parallel with timeout
+    const loadPromise = Promise.all([
       faceapi.nets.tinyFaceDetector.loadFromUri(MODEL_URL),      // Detect faces
       faceapi.nets.faceLandmark68Net.loadFromUri(MODEL_URL),     // Find 68 facial landmarks
       faceapi.nets.faceRecognitionNet.loadFromUri(MODEL_URL)     // Generate face descriptor for comparison
     ]);
 
+    // Add timeout to prevent hanging
+    const timeoutPromise = new Promise((_, reject) => 
+      setTimeout(() => reject(new Error('Model loading timeout (30s)')), 30000)
+    );
+
+    await Promise.race([loadPromise, timeoutPromise]);
+
     modelsLoaded = true;
     console.log('✅ Face recognition models loaded successfully');
   } catch (error) {
     console.error('❌ Error loading face recognition models:', error);
-    throw new Error('Failed to load face recognition models. Please check your internet connection.');
+    modelsLoaded = false;
+    throw new Error(`Failed to load face recognition models: ${error instanceof Error ? error.message : 'Unknown error'}`);
   }
 }
 

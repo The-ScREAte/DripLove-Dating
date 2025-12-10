@@ -28,6 +28,8 @@ export const FaceScanner: React.FC<FaceScannerProps> = ({ onScanComplete, onSkip
   const [error, setError] = useState<string | null>(null);
   const [faceDetected, setFaceDetected] = useState(false);
   const [modelsReady, setModelsReady] = useState(false);
+  const [initAttempts, setInitAttempts] = useState(0);
+  const [retryKey, setRetryKey] = useState(0);
 
   // Initialize camera and load models
   useEffect(() => {
@@ -37,21 +39,37 @@ export const FaceScanner: React.FC<FaceScannerProps> = ({ onScanComplete, onSkip
       try {
         setLoading(true);
         setError(null);
+        setInitAttempts(prev => prev + 1);
+
+        console.log(`🎥 Starting camera initialization (attempt ${initAttempts + 1})...`);
+        console.log('📱 Environment:', {
+          userAgent: navigator.userAgent,
+          platform: navigator.platform,
+          mediaDevices: !!navigator.mediaDevices,
+          getUserMedia: !!(navigator.mediaDevices?.getUserMedia),
+          origin: window.location.origin,
+          href: window.location.href
+        });
 
         // Load face recognition models
+        console.log('📦 Loading face recognition models...');
         await loadFaceModels();
         
         if (!mounted) return;
         setModelsReady(true);
+        console.log('✅ Face models loaded successfully');
 
-        // Request camera access
-        const stream = await navigator.mediaDevices.getUserMedia({
+        // Request camera access with iOS-compatible constraints
+        console.log('📸 Requesting camera access...');
+        const constraints = {
           video: {
-            facingMode: 'user', // Front camera
-            width: { ideal: 640 },
-            height: { ideal: 480 }
-          }
-        });
+            facingMode: 'user'
+          },
+          audio: false
+        };
+
+        const stream = await navigator.mediaDevices.getUserMedia(constraints);
+        console.log('✅ Camera stream obtained');
 
         if (!mounted) {
           stream.getTracks().forEach(track => track.stop());
@@ -61,27 +79,62 @@ export const FaceScanner: React.FC<FaceScannerProps> = ({ onScanComplete, onSkip
         streamRef.current = stream;
 
         if (videoRef.current) {
-          videoRef.current.srcObject = stream;
+          const video = videoRef.current;
           
-          videoRef.current.onloadedmetadata = () => {
-            if (videoRef.current && mounted) {
-              videoRef.current.play();
-              setLoading(false);
-              startFaceDetection();
-            }
-          };
+          // Set attributes for iOS compatibility
+          video.setAttribute('autoplay', 'true');
+          video.setAttribute('playsinline', 'true');
+          video.setAttribute('muted', 'true');
+          video.srcObject = stream;
+
+          // Wait for video to be ready
+          await new Promise<void>((resolve, reject) => {
+            const timeout = setTimeout(() => {
+              reject(new Error('Video load timeout'));
+            }, 15000);
+
+            video.onloadedmetadata = async () => {
+              clearTimeout(timeout);
+              console.log('📹 Video metadata loaded');
+              
+              try {
+                await video.play();
+                console.log('▶️ Video playing');
+                
+                if (mounted) {
+                  setLoading(false);
+                  console.log('🎬 Starting face detection');
+                  startFaceDetection();
+                }
+                resolve();
+              } catch (playErr) {
+                console.error('Play error:', playErr);
+                reject(playErr);
+              }
+            };
+
+            video.onerror = (err) => {
+              clearTimeout(timeout);
+              console.error('Video error:', err);
+              reject(err);
+            };
+          });
         }
       } catch (err: any) {
         if (!mounted) return;
         
-        console.error('Error initializing face scanner:', err);
+        console.error('❌ Error initializing camera:', err);
         
         if (err.name === 'NotAllowedError' || err.name === 'PermissionDeniedError') {
-          setError('Camera access denied. Please allow camera permissions to verify your face.');
-        } else if (err.name === 'NotFoundError') {
-          setError('No camera found. Please ensure your device has a working camera.');
+          setError('Camera access denied. Please allow camera in Settings, or tap Skip to continue without face verification.');
+        } else if (err.name === 'NotFoundError' || err.name === 'DevicesNotFoundError') {
+          setError('No camera found. If you\'re on a device without a camera, tap Skip to continue.');
+        } else if (err.message?.includes('timeout')) {
+          setError('Camera timed out. Try the Retry button below, or tap Skip to continue.');
+        } else if (err.message?.includes('models') || err.message?.includes('load')) {
+          setError('Failed to load face recognition. Check your internet connection and retry, or tap Skip.');
         } else {
-          setError('Failed to initialize camera. Please try again.');
+          setError(`Camera error: ${err.message || 'Unknown'}. Try Retry below, or tap Skip to continue.`);
         }
         
         setLoading(false);
@@ -94,7 +147,8 @@ export const FaceScanner: React.FC<FaceScannerProps> = ({ onScanComplete, onSkip
       mounted = false;
       stopCamera();
     };
-  }, []);
+  }, [retryKey]);
+
 
   // Stop camera and cleanup
   const stopCamera = () => {
@@ -175,6 +229,22 @@ export const FaceScanner: React.FC<FaceScannerProps> = ({ onScanComplete, onSkip
     }
   };
 
+  // Retry initialization
+  const retryInit = () => {
+    console.log('🔄 Retrying camera initialization...');
+    stopCamera();
+    
+    // Reset all state
+    setError(null);
+    setLoading(true);
+    setModelsReady(false);
+    setFaceDetected(false);
+    setScanning(false);
+    
+    // Increment retry key to force useEffect to re-run
+    setRetryKey(prev => prev + 1);
+  };
+
   return (
     <Card className="w-full max-w-md mx-auto">
       <CardHeader className="text-center">
@@ -195,11 +265,13 @@ export const FaceScanner: React.FC<FaceScannerProps> = ({ onScanComplete, onSkip
             autoPlay
             playsInline
             muted
+            webkit-playsinline="true"
             className="w-full h-full object-cover"
+            style={{ objectFit: 'cover' }}
           />
           <canvas
             ref={canvasRef}
-            className="absolute top-0 left-0 w-full h-full"
+            className="absolute top-0 left-0 w-full h-full pointer-events-none"
           />
 
           {/* Loading overlay */}
@@ -240,9 +312,24 @@ export const FaceScanner: React.FC<FaceScannerProps> = ({ onScanComplete, onSkip
 
         {/* Error message */}
         {error && (
-          <div className="flex items-start gap-2 p-3 bg-red-50 border border-red-200 rounded-lg text-red-800">
-            <XCircle className="w-5 h-5 flex-shrink-0 mt-0.5" />
-            <p className="text-sm">{error}</p>
+          <div className="space-y-2">
+            <div className="flex items-start gap-2 p-3 bg-red-50 border border-red-200 rounded-lg text-red-800">
+              <XCircle className="w-5 h-5 flex-shrink-0 mt-0.5" />
+              <div className="flex-1">
+                <p className="text-sm font-medium">{error}</p>
+                <p className="text-xs mt-1 text-red-600">
+                  Attempt {initAttempts} • Models: {modelsReady ? '✓' : '✗'} • Camera: ✗
+                </p>
+              </div>
+            </div>
+            <Button
+              onClick={retryInit}
+              variant="outline"
+              className="w-full"
+              size="sm"
+            >
+              Retry Camera Initialization
+            </Button>
           </div>
         )}
 

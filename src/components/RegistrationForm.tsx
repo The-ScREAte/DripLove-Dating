@@ -392,30 +392,24 @@ const RegistrationForm = ({ onSubmit, onBackToLogin }: RegistrationFormProps) =>
     // Prevent double submission
     if (isSubmitting) return;
     
+    // Step 1: Face scan (handled by FaceScanner onScanComplete/onSkip)
     if (currentStep === 1) {
+      // This shouldn't be reached as FaceScanner handles progression
+      return;
+    }
+    
+    // Step 2: Basic info (name, email, password, etc)
+    if (currentStep === 2) {
       handleContinue();
       return;
     }
     
-    if (currentStep === 2) {
+    // Step 3: Additional info (bio, interests, etc)
+    if (currentStep === 3) {
       // Validate second step
       const validationErrors = validateRegistrationForm(formData);
       if (Object.keys(validationErrors).length > 0) {
         setErrors(validationErrors);
-        return;
-      }
-      setCurrentStep(3); // Move to face scan step
-      return;
-    }
-
-    if (currentStep === 3) {
-      // Face scan step - check if face was scanned
-      if (!faceDescriptor) {
-        toast({
-          title: 'Face Verification Required',
-          description: 'Please scan your face to continue. This helps prevent fake profiles.',
-          variant: "destructive"
-        });
         return;
       }
       setCurrentStep(4); // Move to photo upload step
@@ -457,7 +451,7 @@ const RegistrationForm = ({ onSubmit, onBackToLogin }: RegistrationFormProps) =>
       return;
     }
 
-    // Validate photos against scanned face
+    // Validate photos against scanned face - AT LEAST 1 PHOTO MUST MATCH
     if (faceDescriptor) {
       toast({
         title: 'Validating Photos',
@@ -466,8 +460,16 @@ const RegistrationForm = ({ onSubmit, onBackToLogin }: RegistrationFormProps) =>
 
       const validation = await validatePhotosAgainstScan(
         faceDescriptor,
-        imagesWithFiles.map(img => img.file)
+        imagesWithFiles.map(img => img.file),
+        0.6 // Threshold: lower = stricter, higher = more lenient
       );
+
+      console.log('📸 Face Validation Results:', {
+        isValid: validation.isValid,
+        matchedPhotos: validation.matchedPhotos,
+        totalPhotos: validation.totalPhotos,
+        message: validation.message
+      });
 
       if (!validation.isValid) {
         toast({
@@ -475,13 +477,23 @@ const RegistrationForm = ({ onSubmit, onBackToLogin }: RegistrationFormProps) =>
           description: validation.message,
           variant: "destructive"
         });
+        setIsSubmitting(false);
         return;
       }
 
       toast({
-        title: 'Photos Verified',
-        description: validation.message,
+        title: 'Photos Verified ✓',
+        description: `${validation.matchedPhotos} of ${validation.totalPhotos} photos matched your verified face`,
       });
+    } else {
+      // Should not happen, but just in case
+      toast({
+        title: 'Face Verification Missing',
+        description: 'Please go back and verify your face before uploading photos.',
+        variant: "destructive"
+      });
+      setIsSubmitting(false);
+      return;
     }
 
     // Set loading state
@@ -517,11 +529,22 @@ const RegistrationForm = ({ onSubmit, onBackToLogin }: RegistrationFormProps) =>
       if (faceDescriptor) {
         const faceHash = descriptorToHash(faceDescriptor);
         
+        console.log('🔍 Checking for duplicate face:', {
+          faceHashLength: faceHash.length,
+          faceHashPreview: faceHash.substring(0, 20) + '...'
+        });
+        
         const { data: existingFace, error: faceCheckError } = await supabase
           .from('profiles')
           .select('id, first_name')
           .eq('face_descriptor', faceHash)
           .maybeSingle();
+
+        console.log('🔍 Duplicate face check result:', {
+          foundDuplicate: !!existingFace,
+          existingFaceId: existingFace?.id,
+          error: faceCheckError?.message
+        });
 
         if (existingFace) {
           toast({
@@ -616,6 +639,12 @@ const RegistrationForm = ({ onSubmit, onBackToLogin }: RegistrationFormProps) =>
         adinkra_symbols: formData.adinkraSymbols || [],
         face_descriptor: faceDescriptor ? descriptorToHash(faceDescriptor) : null
       };
+
+      console.log('💾 Saving profile with face descriptor:', {
+        userId,
+        hasFaceDescriptor: !!faceDescriptor,
+        faceDescriptorLength: faceDescriptor ? descriptorToHash(faceDescriptor).length : 0
+      });
 
       if (existingProfile) {
         // Profile exists, update it
@@ -788,17 +817,40 @@ const RegistrationForm = ({ onSubmit, onBackToLogin }: RegistrationFormProps) =>
         </div>
         <CardTitle className="text-2xl font-bold bg-gradient-to-r from-pink-600 to-purple-600 bg-clip-text text-transparent animate-fade-in">
           {currentStep === 1 
-            ? t('registration.createAccount') 
-            : currentStep === 2 
-            ? t('registration.tellUsMore') 
-            : currentStep === 3
             ? 'Verify Your Face'
+            : currentStep === 2 
+            ? t('registration.createAccount') 
+            : currentStep === 3
+            ? t('registration.tellUsMore') 
             : t('registration.addPhotos')}
         </CardTitle>
       </CardHeader>
       <CardContent className="animate-fade-in pb-8">
         <form onSubmit={handleSubmit} className="space-y-8">
           {currentStep === 1 && (
+            <div className="space-y-6 animate-fade-in">
+              <FaceScanner
+                onScanComplete={(descriptor) => {
+                  setFaceDescriptor(descriptor);
+                  toast({
+                    title: 'Face Verified',
+                    description: '✓ Your face has been verified successfully!',
+                  });
+                  // Auto-advance to next step
+                  setCurrentStep(2);
+                }}
+                onSkip={() => {
+                  toast({
+                    title: 'Face Scan Skipped',
+                    description: 'You can continue without face verification, but it helps prevent fake profiles.',
+                  });
+                  setCurrentStep(2);
+                }}
+              />
+            </div>
+          )}
+
+          {currentStep === 2 && (
             <div className="space-y-6 animate-fade-in">
           <BasicInfoSection
             formData={formData}
@@ -883,7 +935,7 @@ const RegistrationForm = ({ onSubmit, onBackToLogin }: RegistrationFormProps) =>
           </div>
           )}
 
-          {currentStep === 2 && (
+          {currentStep === 3 && (
             <div className="space-y-6 animate-fade-in">
 
           {/* Gender and Preference */}
@@ -944,24 +996,6 @@ const RegistrationForm = ({ onSubmit, onBackToLogin }: RegistrationFormProps) =>
               {errors.adinkraSymbols && <p className="text-red-500 text-xs mt-1">{errors.adinkraSymbols}</p>}
             </div>
           </div>
-          )}
-
-          {currentStep === 3 && (
-            <div className="space-y-6 animate-fade-in">
-              <FaceScanner
-                onScanComplete={(descriptor) => {
-                  setFaceDescriptor(descriptor);
-                  toast({
-                    title: 'Face Verified',
-                    description: '✓ Your face has been verified successfully!',
-                  });
-                }}
-                onSkip={() => {
-                  // Optional: Allow skip for testing, remove in production
-                  setCurrentStep(4);
-                }}
-              />
-            </div>
           )}
 
           {currentStep === 4 && (
@@ -1036,22 +1070,23 @@ const RegistrationForm = ({ onSubmit, onBackToLogin }: RegistrationFormProps) =>
                 {t('registration.back')}
               </Button>
             )}
-            <Button 
-              type="submit" 
-              disabled={isSubmitting}
-              className="w-full bg-gradient-to-r from-pink-500 to-purple-600 hover:from-pink-600 hover:to-purple-700 text-white font-semibold py-3 rounded-lg transition-all duration-200 animate-fade-in disabled:opacity-50 disabled:cursor-not-allowed"
-            >
-              {isSubmitting 
-                ? t('registration.creatingAccount')
-                : currentStep === 1 
-                  ? t('registration.continue')
+            {/* Hide submit button on step 1 since FaceScanner has its own buttons */}
+            {currentStep !== 1 && (
+              <Button 
+                type="submit" 
+                disabled={isSubmitting}
+                className="w-full bg-gradient-to-r from-pink-500 to-purple-600 hover:from-pink-600 hover:to-purple-700 text-white font-semibold py-3 rounded-lg transition-all duration-200 animate-fade-in disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                {isSubmitting 
+                  ? t('registration.creatingAccount')
                   : currentStep === 2 
-                    ? 'Verify Face'
+                    ? t('registration.continue')
                     : currentStep === 3
                     ? t('registration.addPhoto')
                     : t('registration.createAccount')
-              }
-            </Button>
+                }
+              </Button>
+            )}
           </div>
           <div className="text-center animate-fade-in">
             <button

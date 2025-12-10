@@ -1,4 +1,4 @@
-import "./chunk-VHXUCOYC.js";
+import "./chunk-HXA6O6EE.js";
 
 // node_modules/i18next-browser-languagedetector/dist/esm/i18nextBrowserLanguageDetector.js
 var {
