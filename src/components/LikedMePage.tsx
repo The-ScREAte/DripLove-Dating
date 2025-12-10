@@ -2,7 +2,8 @@ import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Users, Heart, X, Calendar, MapPin, Shield, ChevronDown, ChevronUp, Briefcase, GraduationCap, Crown, Lock, Clock, User, Quote, Coffee, Search } from 'lucide-react';
-import { Capacitor } from '@capacitor/core';
+// ⭐ ANDROID FIX: Use platform utils instead of synchronous Capacitor import
+import { isAndroidPlatform, isIOSPlatform, getPlatformSync } from '@/utils/platformUtils';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import { useSubscription } from '@/hooks/useSubscription';
@@ -743,7 +744,7 @@ const LikedMePage = ({ currentUser, isPremium = false }: LikedMePageProps) => {
       <div 
         className="h-full w-full relative flex flex-col bg-white"
         style={{
-          paddingTop: Capacitor.getPlatform() === 'web' ? '0px' : '0px',
+          paddingTop: getPlatformSync() === 'web' ? '0px' : '0px',
           paddingBottom: 'env(safe-area-inset-bottom, 0px)'
         }}
       >
@@ -751,22 +752,22 @@ const LikedMePage = ({ currentUser, isPremium = false }: LikedMePageProps) => {
         <div 
           className="flex-1 relative" 
           style={{
-            height: Capacitor.getPlatform() === 'ios' 
+            height: getPlatformSync() === 'ios' 
               ? 'calc(100vh - env(safe-area-inset-top, 0px) - 56px)'
-              : Capacitor.getPlatform() === 'web'
+              : getPlatformSync() === 'web'
                 ? 'calc(100vh - 56px - 80px)'
                 : 'calc(100vh - 56px)',
-            minHeight: Capacitor.getPlatform() === 'ios'
+            minHeight: getPlatformSync() === 'ios'
               ? 'calc(100vh - env(safe-area-inset-top, 0px) - 56px)'
-              : Capacitor.getPlatform() === 'web'
+              : getPlatformSync() === 'web'
                 ? 'calc(100vh - 56px - 80px)'
                 : 'calc(100vh - 56px)',
-            maxHeight: Capacitor.getPlatform() === 'ios'
+            maxHeight: getPlatformSync() === 'ios'
               ? 'calc(100vh - env(safe-area-inset-top, 0px) - 56px)'
-              : Capacitor.getPlatform() === 'web'
+              : getPlatformSync() === 'web'
                 ? 'calc(100vh - 56px - 80px)'
                 : 'calc(100vh - 56px)',
-            marginBottom: Capacitor.getPlatform() === 'web'
+            marginBottom: getPlatformSync() === 'web'
               ? '0px'
               : 'calc(env(safe-area-inset-bottom, 0px) + 100px)',
             overflow: 'hidden'
@@ -872,9 +873,9 @@ const LikedMePage = ({ currentUser, isPremium = false }: LikedMePageProps) => {
           <div 
             className="absolute left-1/2 transform -translate-x-1/2 flex gap-1.5 z-10"
             style={{
-              top: Capacitor.getPlatform() === 'ios'
+              top: getPlatformSync() === 'ios'
                 ? '50px'
-                : Capacitor.getPlatform() === 'android'
+                : getPlatformSync() === 'android'
                   ? '32px'
                   : '16px'
             }}
@@ -898,7 +899,7 @@ const LikedMePage = ({ currentUser, isPremium = false }: LikedMePageProps) => {
             variant="outline"
             className="absolute left-4 bg-white/80 hover:bg-white z-10 h-10 px-3"
             style={{
-              top: Capacitor.getPlatform() === 'ios' 
+              top: getPlatformSync() === 'ios' 
                 ? 'clamp(40px, calc(env(safe-area-inset-top, 10px) + 25px), 60px)'
                 : '16px'
             }}
@@ -912,7 +913,7 @@ const LikedMePage = ({ currentUser, isPremium = false }: LikedMePageProps) => {
             size="sm"
             className="absolute right-4 bg-white/80 hover:bg-white z-10 h-10 w-10 p-0"
             style={{
-              top: Capacitor.getPlatform() === 'ios' 
+              top: getPlatformSync() === 'ios' 
                 ? 'clamp(40px, calc(env(safe-area-inset-top, 10px) + 25px), 60px)'
                 : '16px'
             }}
@@ -925,9 +926,9 @@ const LikedMePage = ({ currentUser, isPremium = false }: LikedMePageProps) => {
             <div 
               className="absolute bottom-0 left-0 right-0 text-white"
               style={{
-                paddingBottom: Capacitor.getPlatform() === 'ios' 
+                paddingBottom: getPlatformSync() === 'ios' 
                   ? 'clamp(180px, calc(env(safe-area-inset-bottom, 10px) + 190px), 190px)'
-                  : Capacitor.getPlatform() === 'android'
+                  : getPlatformSync() === 'android'
                     ? '180px'
                     : '180px'
               }}
@@ -1101,9 +1102,9 @@ const LikedMePage = ({ currentUser, isPremium = false }: LikedMePageProps) => {
           <div 
             className="absolute bottom-0 left-0 right-0 flex justify-center space-x-6 px-6 z-10"
             style={{
-              paddingBottom: Capacitor.getPlatform() === 'ios' 
+              paddingBottom: getPlatformSync() === 'ios' 
                 ? 'clamp(130px, calc(env(safe-area-inset-bottom, 10px) + 120px), 150px)'
-                : Capacitor.getPlatform() === 'android'
+                : getPlatformSync() === 'android'
                   ? '120px'
                   : '100px'
             }}
@@ -1165,7 +1166,7 @@ const LikedMePage = ({ currentUser, isPremium = false }: LikedMePageProps) => {
   <div 
     className="flex-shrink-0 bg-white border-b px-4 py-4 mx-4"
     style={{
-      marginTop: Capacitor.getPlatform() === 'ios' 
+      marginTop: getPlatformSync() === 'ios' 
         ? 'clamp(20px, calc(env(safe-area-inset-top, 10px) + 23px), 50px)'
         : '0'
     }}
