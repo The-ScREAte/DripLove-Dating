@@ -276,8 +276,8 @@ const LikedMePage = ({ currentUser, isPremium = false }: LikedMePageProps) => {
       return { likers: [], userImages: {} };
     }
 
-    // 2. Get all matches and blocks in one go
-    const [matchesRes, blocksRes] = await Promise.all([
+    // 2. Get all matches, blocks, and passes in one go
+    const [matchesRes, blocksRes, passesRes] = await Promise.all([
       supabase
         .from('matches')
         .select('user1_id, user2_id')
@@ -285,25 +285,32 @@ const LikedMePage = ({ currentUser, isPremium = false }: LikedMePageProps) => {
       supabase
         .from('blocks')
         .select('blocked_id, blocker_id')
-        .or(`blocker_id.eq.${userId},blocked_id.eq.${userId}`)
+        .or(`blocker_id.eq.${userId},blocked_id.eq.${userId}`),
+      supabase
+        .from('passes')
+        .select('passed_id')
+        .eq('passer_id', userId)
     ]);
 
     if (matchesRes.error) throw matchesRes.error;
     if (blocksRes.error) throw blocksRes.error;
+    if (passesRes.error) throw passesRes.error;
 
     const matches = matchesRes.data || [];
     const blockedUsers = blocksRes.data || [];
+    const passes = passesRes.data || [];
     const matchedIds = matches.map(match =>
       match.user1_id === userId ? match.user2_id : match.user1_id
     );
     const blockedIds = blockedUsers.map(block =>
       block.blocker_id === userId ? block.blocked_id : block.blocker_id
     );
+    const passedIds = passes.map(pass => pass.passed_id);
 
-    // 3. Filter likerIds
+    // 3. Filter likerIds - exclude matched, blocked, and passed profiles
     const likerIds = likes
       .map(like => like.liker_id)
-      .filter(id => !matchedIds.includes(id) && !blockedIds.includes(id));
+      .filter(id => !matchedIds.includes(id) && !blockedIds.includes(id) && !passedIds.includes(id));
 
     if (likerIds.length === 0) {
       return { likers: [], userImages: {} };
@@ -584,7 +591,7 @@ const LikedMePage = ({ currentUser, isPremium = false }: LikedMePageProps) => {
     if (!selectedProfile) return [];
     
     const profileImages = userImages[selectedProfile.id] || [];
-    const result: Array<{ type: 'image' | 'about' | 'funfact', imageIndex?: number }> = [];
+    const result: Array<{ type: 'image' | 'about' | 'funfact' | 'placeholder', imageIndex?: number }> = [];
     
     const hasContent = (type: string) => {
       if (type === 'image') return true;
@@ -602,6 +609,8 @@ const LikedMePage = ({ currentUser, isPremium = false }: LikedMePageProps) => {
         }
       }
     } else {
+      // When no images, show placeholder with initials first
+      result.push({ type: 'placeholder' });
       if (hasContent('about')) result.push({ type: 'about' });
       if (hasContent('funfact')) result.push({ type: 'funfact' });
     }
@@ -736,7 +745,7 @@ const LikedMePage = ({ currentUser, isPremium = false }: LikedMePageProps) => {
   };
 
   const handlePass = async (profileId: string) => {
-    console.log('handlePass called - removing from liked me for profileId:', profileId);
+    console.log('handlePass called - passing on profileId:', profileId);
     
     // Optimistic update - remove profile immediately
     const profileToRemove = likers.find(liker => liker.id === profileId);
@@ -766,19 +775,33 @@ const LikedMePage = ({ currentUser, isPremium = false }: LikedMePageProps) => {
     });
 
     try {
-      // Simply delete their like - they won't show up again unless they like you again
-      const { data: deletedLike, error: deleteError } = await supabase
-        .from('likes')
-        .delete()
-        .eq('liker_id', profileId)
-        .eq('liked_id', currentUser.id)
-        .select();
+      // Use the same RPC as DiscoverPage for consistency
+      const rpcName = 'pass_and_usage_batched';
+      const { data: rpcData, error: rpcError } = await supabase.rpc((rpcName as any), {
+        passer_id_param: currentUser.id,
+        passed_id_param: profileId,
+        premium_param: !!isPremium
+      } as any);
 
-      console.log('Deleted like:', deletedLike, 'Error:', deleteError);
+      if (rpcError) {
+        console.error('RPC error:', rpcError);
+        // Fallback: insert pass directly
+        const { data: existingPass } = await supabase
+          .from('passes')
+          .select('id')
+          .match({ passer_id: currentUser.id, passed_id: profileId })
+          .maybeSingle();
 
-      if (deleteError) {
-        console.error('Error deleting like:', deleteError);
-        throw deleteError;
+        if (!existingPass) {
+          const { error: insertError } = await supabase
+            .from('passes')
+            .insert({ passer_id: currentUser.id, passed_id: profileId });
+          
+          if (insertError) {
+            console.error('Error inserting pass:', insertError);
+            throw insertError;
+          }
+        }
       }
 
       // Invalidate cache to force refresh on next load
@@ -793,7 +816,7 @@ const LikedMePage = ({ currentUser, isPremium = false }: LikedMePageProps) => {
         setHasInteractedToday(true);
       }
 
-      console.log('Pass completed - user removed from liked me');
+      console.log('Pass completed - user will be filtered out on next refresh');
     } catch (error) {
       console.error('Error in handlePass:', error);
       // Revert optimistic update on error
@@ -812,7 +835,7 @@ const LikedMePage = ({ currentUser, isPremium = false }: LikedMePageProps) => {
           }
         }
       }
-      
+
       toast({
         title: "Error",
         description: "Failed to pass. Profile has been restored.",
@@ -881,6 +904,7 @@ const LikedMePage = ({ currentUser, isPremium = false }: LikedMePageProps) => {
     const isImageSlide = currentSlideInfo.type === 'image';
     const isAboutSlide = currentSlideInfo.type === 'about';
     const isFunFactSlide = currentSlideInfo.type === 'funfact';
+    const isPlaceholderSlide = currentSlideInfo.type === 'placeholder';
     const currentImageIndex = currentSlideInfo.imageIndex || 0;
 
     // Background colors for cards
@@ -934,6 +958,22 @@ const LikedMePage = ({ currentUser, isPremium = false }: LikedMePageProps) => {
             overflow: 'hidden'
           }}
         >
+          {/* Placeholder Slide - when no images */}
+          {isPlaceholderSlide && (
+            <div 
+              className="w-full h-full bg-gradient-to-br from-pink-200 to-purple-200 flex items-center justify-center relative"
+              onClick={handleNavigationClick}
+              style={{ cursor: 'pointer' }}
+            >
+              <div className="text-center">
+                <span className="text-6xl font-bold text-gray-700">
+                  {selectedProfile.first_name?.[0]}{selectedProfile.last_name?.[0]}
+                </span>
+                <p className="text-gray-600 mt-4 text-sm">No photos uploaded yet</p>
+              </div>
+            </div>
+          )}
+
           {/* Image Slide */}
           {isImageSlide && profileImages.length > 0 && currentImageIndex < profileImages.length && (
             <>

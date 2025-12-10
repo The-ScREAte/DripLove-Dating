@@ -12,6 +12,7 @@ import { Heart, MapPin, Briefcase, GraduationCap, Upload, Shield, CheckCircle, A
 import BasicInfoSection from '@/components/forms/BasicInfoSection';
 import LocationInput from '@/components/forms/LocationInput';
 import AdinkraSymbolSelector from '@/components/forms/AdinkraSymbolSelector';
+import { FaceScanner } from '@/components/FaceScanner';
 import { validateRegistrationForm, transformFormDataForSubmission } from '@/utils/formValidation';
 import { initialFormData } from '@/constants/formData';
 import { occupationOptions, industryOptions } from '@/constants/professionOptions';
@@ -20,6 +21,7 @@ import { compressImage } from '@/utils/imageCompression';
 import { useToast } from '@/hooks/use-toast';
 import { useTranslation } from 'react-i18next';
 import { videoPreloader } from '@/utils/videoPreloader';
+import { FaceDescriptor, validatePhotosAgainstScan, descriptorToHash } from '@/utils/faceComparison';
 
 interface RegistrationFormProps {
   onSubmit: (data: any) => void;
@@ -41,6 +43,7 @@ const RegistrationForm = ({ onSubmit, onBackToLogin }: RegistrationFormProps) =>
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [currentStep, setCurrentStep] = useState(1);
   const [images, setImages] = useState<ImageUpload[]>([]);
+  const [faceDescriptor, setFaceDescriptor] = useState<FaceDescriptor | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const { toast } = useToast();
   const { t } = useTranslation();
@@ -401,11 +404,25 @@ const RegistrationForm = ({ onSubmit, onBackToLogin }: RegistrationFormProps) =>
         setErrors(validationErrors);
         return;
       }
-      setCurrentStep(3);
+      setCurrentStep(3); // Move to face scan step
       return;
     }
 
-    // Final step - validate images
+    if (currentStep === 3) {
+      // Face scan step - check if face was scanned
+      if (!faceDescriptor) {
+        toast({
+          title: 'Face Verification Required',
+          description: 'Please scan your face to continue. This helps prevent fake profiles.',
+          variant: "destructive"
+        });
+        return;
+      }
+      setCurrentStep(4); // Move to photo upload step
+      return;
+    }
+
+    // Final step (step 4) - validate images and face match
     const approvedImages = images.filter(img => img.status === 'approved' || img.status === 'pending');
     
     if (approvedImages.length < 2) {
@@ -440,6 +457,33 @@ const RegistrationForm = ({ onSubmit, onBackToLogin }: RegistrationFormProps) =>
       return;
     }
 
+    // Validate photos against scanned face
+    if (faceDescriptor) {
+      toast({
+        title: 'Validating Photos',
+        description: 'Checking if your photos match your verified face...',
+      });
+
+      const validation = await validatePhotosAgainstScan(
+        faceDescriptor,
+        imagesWithFiles.map(img => img.file)
+      );
+
+      if (!validation.isValid) {
+        toast({
+          title: 'Photo Verification Failed',
+          description: validation.message,
+          variant: "destructive"
+        });
+        return;
+      }
+
+      toast({
+        title: 'Photos Verified',
+        description: validation.message,
+      });
+    }
+
     // Set loading state
     setIsSubmitting(true);
     
@@ -467,6 +511,27 @@ const RegistrationForm = ({ onSubmit, onBackToLogin }: RegistrationFormProps) =>
         });
         setIsSubmitting(false);
         return;
+      }
+
+      // Check for duplicate face descriptor
+      if (faceDescriptor) {
+        const faceHash = descriptorToHash(faceDescriptor);
+        
+        const { data: existingFace, error: faceCheckError } = await supabase
+          .from('profiles')
+          .select('id, first_name')
+          .eq('face_descriptor', faceHash)
+          .maybeSingle();
+
+        if (existingFace) {
+          toast({
+            title: "Account Already Exists",
+            description: "It looks like you already have an account with us. Please try signing in instead.",
+            variant: "destructive"
+          });
+          setIsSubmitting(false);
+          return;
+        }
       }
       
       // Create new user account directly (no existing user checks in auth.users)
@@ -548,7 +613,8 @@ const RegistrationForm = ({ onSubmit, onBackToLogin }: RegistrationFormProps) =>
         is_custom_city: formData.isCustomCity || false,
         max_distance: formData.maxDistance || 250,
         country_code: formData.countryCode || '',
-        adinkra_symbols: formData.adinkraSymbols || []
+        adinkra_symbols: formData.adinkraSymbols || [],
+        face_descriptor: faceDescriptor ? descriptorToHash(faceDescriptor) : null
       };
 
       if (existingProfile) {
@@ -721,7 +787,13 @@ const RegistrationForm = ({ onSubmit, onBackToLogin }: RegistrationFormProps) =>
           />
         </div>
         <CardTitle className="text-2xl font-bold bg-gradient-to-r from-pink-600 to-purple-600 bg-clip-text text-transparent animate-fade-in">
-          {currentStep === 1 ? t('registration.createAccount') : currentStep === 2 ? t('registration.tellUsMore') : t('registration.addPhotos')}
+          {currentStep === 1 
+            ? t('registration.createAccount') 
+            : currentStep === 2 
+            ? t('registration.tellUsMore') 
+            : currentStep === 3
+            ? 'Verify Your Face'
+            : t('registration.addPhotos')}
         </CardTitle>
       </CardHeader>
       <CardContent className="animate-fade-in pb-8">
@@ -876,6 +948,24 @@ const RegistrationForm = ({ onSubmit, onBackToLogin }: RegistrationFormProps) =>
 
           {currentStep === 3 && (
             <div className="space-y-6 animate-fade-in">
+              <FaceScanner
+                onScanComplete={(descriptor) => {
+                  setFaceDescriptor(descriptor);
+                  toast({
+                    title: 'Face Verified',
+                    description: '✓ Your face has been verified successfully!',
+                  });
+                }}
+                onSkip={() => {
+                  // Optional: Allow skip for testing, remove in production
+                  setCurrentStep(4);
+                }}
+              />
+            </div>
+          )}
+
+          {currentStep === 4 && (
+            <div className="space-y-6 animate-fade-in">
               <div className="text-center">
                 <div className="flex items-center justify-center mb-4">
                   <Shield className="w-5 h-5 text-purple-600 mr-2" />
@@ -956,6 +1046,8 @@ const RegistrationForm = ({ onSubmit, onBackToLogin }: RegistrationFormProps) =>
                 : currentStep === 1 
                   ? t('registration.continue')
                   : currentStep === 2 
+                    ? 'Verify Face'
+                    : currentStep === 3
                     ? t('registration.addPhoto')
                     : t('registration.createAccount')
               }

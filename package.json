@@ -63,6 +63,7 @@
     "@tanstack/react-query": "^5.83.0",
     "@tanstack/react-virtual": "^3.13.13",
     "@types/react-window": "^1.8.8",
+    "@vladmandic/face-api": "^1.7.15",
     "autoprefixer": "^10.4.21",
     "browser-image-compression": "^2.0.2",
     "capacitor-rate-app": "^4.0.3",
