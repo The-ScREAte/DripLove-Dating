@@ -4,65 +4,21 @@ import { Capacitor } from '@capacitor/core';
 import { useTranslation } from 'react-i18next';
 import { memo } from 'react';
 
-// ⭐ GLOBAL IMAGE CACHE - Shared across all components for instant loading
-const globalImageCache = new Map<string, string>(); // url => blobURL
-const failedImages = new Set<string>(); // Track failed images to avoid retry loops
-
-// ⭐ EFFICIENT IMAGE PRELOADER - Converts images to blob URLs for instant rendering
-const preloadImageToBlob = async (url: string): Promise<string> => {
-  // Return cached blob URL if available
-  if (globalImageCache.has(url)) {
-    return globalImageCache.get(url)!;
-  }
-
-  // Don't retry failed images
-  if (failedImages.has(url)) {
-    return url;
-  }
-
-  try {
-    // Add timeout to prevent hanging requests
-    const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 10000); // 10 second timeout
-    
-    // Fetch image as blob with timeout
-    const res = await fetch(url, { signal: controller.signal });
-    clearTimeout(timeoutId);
-    
-    if (!res.ok) {
-      failedImages.add(url);
-      return url;
-    }
-    
-    const blob = await res.blob();
-    
-    // Verify it's actually an image
-    if (!blob.type.startsWith('image/')) {
-      failedImages.add(url);
-      return url;
-    }
-    
-    const blobUrl = URL.createObjectURL(blob);
-    
-    // Cache the blob URL
-    globalImageCache.set(url, blobUrl);
-    return blobUrl;
-  } catch (error) {
-    // Mark as failed and return original URL
-    failedImages.add(url);
-    return url;
-  }
-};
-
-// Cleanup blob URLs when needed (optional, for memory management)
-const cleanupOldBlobUrls = () => {
-  if (globalImageCache.size > 100) {
-    const entries = Array.from(globalImageCache.entries());
-    const toRemove = entries.slice(0, 20);
-    toRemove.forEach(([url, blobUrl]) => {
-      URL.revokeObjectURL(blobUrl);
-      globalImageCache.delete(url);
-    });
+// ⭐ OPTIMIZED IMAGE URL HELPER - Generate progressive image URLs
+const getOptimizedImageUrl = (url: string, priority: 'thumbnail' | 'full' = 'full'): string => {
+  if (!url.includes('supabase')) return url;
+  
+  // Detect platform for Android-specific optimizations
+  const isAndroid = Capacitor.getPlatform() === 'android';
+  
+  if (priority === 'thumbnail') {
+    // Thumbnail: Low quality, small size for instant display
+    const quality = isAndroid ? 35 : 40;
+    return `${url}?width=400&quality=${quality}&format=webp`;
+  } else {
+    // Full: Optimized quality for swipe area
+    const quality = isAndroid ? 70 : 75;
+    return `${url}?width=800&quality=${quality}&format=webp`;
   }
 };
 
@@ -344,6 +300,7 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, isPremium }: DiscoverPage
   const [isLoading, setIsLoading] = useState(true);
   const [isLoadingMore, setIsLoadingMore] = useState(false);
   const [hasCompletedInitialFetch, setHasCompletedInitialFetch] = useState(false);
+  const [hasLoadedExtraProfiles, setHasLoadedExtraProfiles] = useState(false); // Track opportunistic background load
   const [noMoreProfiles, setNoMoreProfiles] = useState(false); // Track when truly no more profiles available
   const [passedUsers, setPassedUsers] = useState<PassedUser[]>([]);
   const [showMoreInfo, setShowMoreInfo] = useState(false);
@@ -360,8 +317,7 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, isPremium }: DiscoverPage
   const [preloadedImages, setPreloadedImages] = useState<{ [key: string]: string[] }>({});
   // Store distances from location service
   const [userDistances, setUserDistances] = useState<{ [key: string]: number }>({});
-  // Store preloaded blob URLs for instant image rendering
-  const [preloadedBlobImages, setPreloadedBlobImages] = useState<{ [key: string]: { [url: string]: string } }>({});
+  // ⭐ REMOVED: preloadedBlobImages (no longer using blob caching)
   // Store fetched language names to avoid DB calls in MatchCard
   const [userLanguages, setUserLanguages] = useState<{ [key: string]: string }>({});
   const [reverseUsageToday, setReverseUsageToday] = useState(0);
@@ -377,6 +333,9 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, isPremium }: DiscoverPage
   const backgroundFetchingRef = useRef(false);
   // Suppress immediate full fetch when we have fresh cached data and the component remounts
   const suppressFetchRef = useRef(false);
+  // ⭐ Track swipe state for intelligent image loading
+  const isSwipingRef = useRef(false);
+  const swipeAbortControllersRef = useRef<Map<string, AbortController>>(new Map());
   // Track optimistic/pending swipes to avoid local overshoot while background RPCs complete
   const pendingSwipesRef = useRef(0);
   // Track locally swiped profile IDs with action type and timestamp
@@ -830,7 +789,7 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, isPremium }: DiscoverPage
     if (locationProfileIds.length > 0) {
       let query = supabase
         .from('profiles')
-        .select('id, first_name, last_name, bio, city, country, country_code, occupation, education_level, date_of_birth, interests, gender, latitude, longitude, fun_fact, perfect_first_date, last_googled, relationship_intent, smoking, drinking, exercise_level, sleeping_schedule, introvert_extrovert, spontaneous_planner, messy_organized, adinkra_symbols')
+        .select('id, first_name, last_name, bio, city, country, country_code, occupation, education_level, date_of_birth, interests, gender, latitude, longitude, fun_fact, perfect_first_date, last_googled, relationship_intent, smoking, drinking, exercise_level, sleeping_schedule, introvert_extrovert, spontaneous_planner, messy_organized, adinkra_symbols, created_at, last_login_at')
         .in('id', locationProfileIds);
       
       // ⭐ CRITICAL FIX: Use array for .not() instead of string
@@ -850,7 +809,7 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, isPremium }: DiscoverPage
       // Fallback: get profiles from same country
       let query = supabase
         .from('profiles')
-        .select('id, first_name, last_name, bio, city, country, country_code, occupation, education_level, date_of_birth, interests, gender, latitude, longitude, fun_fact, perfect_first_date, last_googled, relationship_intent, smoking, drinking, exercise_level, sleeping_schedule, introvert_extrovert, spontaneous_planner, messy_organized, adinkra_symbols');
+        .select('id, first_name, last_name, bio, city, country, country_code, occupation, education_level, date_of_birth, interests, gender, latitude, longitude, fun_fact, perfect_first_date, last_googled, relationship_intent, smoking, drinking, exercise_level, sleeping_schedule, introvert_extrovert, spontaneous_planner, messy_organized, adinkra_symbols, created_at, last_login_at');
       
       // ⭐ CRITICAL FIX: Use array for .not() instead of string
       if (excludedIds.length > 0) {
@@ -875,7 +834,7 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, isPremium }: DiscoverPage
       
       let unlockedQuery = supabase
         .from('profiles')
-        .select('id, first_name, last_name, bio, city, country, country_code, occupation, education_level, date_of_birth, interests, gender, latitude, longitude, fun_fact, perfect_first_date, last_googled, relationship_intent, smoking, drinking, exercise_level, sleeping_schedule, introvert_extrovert, spontaneous_planner, messy_organized, adinkra_symbols')
+        .select('id, first_name, last_name, bio, city, country, country_code, occupation, education_level, date_of_birth, interests, gender, latitude, longitude, fun_fact, perfect_first_date, last_googled, relationship_intent, smoking, drinking, exercise_level, sleeping_schedule, introvert_extrovert, spontaneous_planner, messy_organized, adinkra_symbols, created_at, last_login_at')
         .in('country_code', unlockedCountries);
       
       if (allExcludedIds.length > 0) {
@@ -922,9 +881,9 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, isPremium }: DiscoverPage
       new Map(profilesWithImages.map(p => [p.id, p])).values()
     );
 
-    // Deterministic shuffle function to ensure consistent profile order
+    // ⭐ FAIR VISIBILITY SYSTEM - Ensure all users get seen
     // Create seed using user ID and today's date to maintain consistent order per day
-    const today = new Date().toISOString().split('T')[0]; // e.g., "2025-10-08"
+    const today = new Date().toISOString().split('T')[0]; // e.g., "2025-12-09"
     const profileHash = uniqueProfiles.map(p => p.id).sort().join('');
     const shuffleSeed = `${userId}_${today}_${profileHash.slice(0, 10)}`;
     
@@ -935,7 +894,7 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, isPremium }: DiscoverPage
     let shuffled: typeof uniqueProfiles;
     
     if (savedOrder) {
-      // Restore saved order
+      // Restore saved order - ALWAYS pin first profile at index 0
       try {
         const orderIds: string[] = JSON.parse(savedOrder);
         const orderMap = new Map(uniqueProfiles.map(p => [p.id, p]));
@@ -951,14 +910,81 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, isPremium }: DiscoverPage
         
         shuffled = [...orderedProfiles, ...newProfiles];
       } catch (error) {
-        // If parse fails, shuffle normally
+        // If parse fails, use fair visibility shuffle
         shuffled = createDeterministicShuffle(uniqueProfiles, shuffleSeed);
       }
     } else {
-      // First time today - shuffle and save order
-      shuffled = createDeterministicShuffle(uniqueProfiles, shuffleSeed);
+      // ⭐ FAIR VISIBILITY ALGORITHM
+      // Keep first 3 profiles in original filtered order (no fair visibility applied)
+      // Apply fair visibility only to profiles 4 and beyond
+      const firstThreeProfiles = uniqueProfiles.slice(0, 3);
+      const remainingProfiles = uniqueProfiles.slice(3);
       
-      // Save profile order to localStorage
+      if (remainingProfiles.length === 0) {
+        // Less than 3 profiles total - no fair visibility needed
+        shuffled = firstThreeProfiles;
+      } else {
+        // Apply fair visibility to remaining profiles (7+)
+        const now = new Date();
+        const sevenDaysAgo = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
+        const threeDaysAgo = new Date(now.getTime() - 3 * 24 * 60 * 60 * 1000);
+        
+        // Categorize remaining profiles for fair distribution
+        const newUsers: typeof remainingProfiles = []; // Created within 7 days
+        const recentActiveUsers: typeof remainingProfiles = []; // Active in last 3 days
+        const regularUsers: typeof remainingProfiles = [];
+        
+        remainingProfiles.forEach(profile => {
+          const createdAt = (profile as any).created_at ? new Date((profile as any).created_at) : null;
+          const lastLogin = (profile as any).last_login_at ? new Date((profile as any).last_login_at) : null;
+          
+          if (createdAt && createdAt > sevenDaysAgo) {
+            // New user (created within 7 days) - highest priority
+            newUsers.push(profile);
+          } else if (lastLogin && lastLogin > threeDaysAgo) {
+            // Active user (logged in within 3 days) - medium priority
+            recentActiveUsers.push(profile);
+          } else {
+            // Regular user - normal priority
+            regularUsers.push(profile);
+          }
+        });
+        
+        // ⭐ HANDLE NO NEW USERS: Replace new user slots with regular users
+        let shuffledNew: typeof newUsers;
+        let shuffledRegular: typeof regularUsers;
+        
+        if (newUsers.length === 0 && regularUsers.length > 0) {
+          // No new users - redistribute regular users to fill new user slots
+          shuffledNew = []; // Empty - will be skipped in interleave
+          shuffledRegular = createDeterministicShuffle(regularUsers, `${shuffleSeed}_regular`);
+        } else {
+          // Normal case - shuffle each category independently
+          shuffledNew = createDeterministicShuffle(newUsers, `${shuffleSeed}_new`);
+          shuffledRegular = createDeterministicShuffle(regularUsers, `${shuffleSeed}_regular`);
+        }
+        
+        const shuffledActive = createDeterministicShuffle(recentActiveUsers, `${shuffleSeed}_active`);
+        
+        // ⭐ INTERLEAVE STRATEGY: Mix categories to ensure fair visibility
+        // Pattern: New, Active, Regular, Active, New, Regular...
+        // When no new users exist, pattern becomes: Active, Regular, Active, Regular...
+        const interleaved: typeof remainingProfiles = [];
+        const maxLength = Math.max(shuffledNew.length, shuffledActive.length, shuffledRegular.length);
+        
+        for (let i = 0; i < maxLength; i++) {
+          // Add from each category in rotation
+          if (i < shuffledNew.length) interleaved.push(shuffledNew[i]);
+          if (i < shuffledActive.length) interleaved.push(shuffledActive[i]);
+          if (i < shuffledRegular.length) interleaved.push(shuffledRegular[i]);
+        }
+        
+        // ⭐ Combine: First 3 stay as-is + Fair visibility for rest
+        shuffled = [...firstThreeProfiles, ...interleaved];
+      }
+      
+      // ⭐ ALWAYS PIN FIRST PROFILE: Ensure first profile never changes on refresh
+      // Save profile order to localStorage with first profile locked
       try {
         const profileIds = shuffled.map(p => p.id);
         localStorage.setItem(savedOrderKey, JSON.stringify(profileIds));
@@ -982,37 +1008,57 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, isPremium }: DiscoverPage
       }
     }
 
-    // Load first few profile images - optimized for speed
+    // ⭐ SWIPE-AWARE IMAGE LOADING - Prioritize first profile, then load rest
+    // Load ALL images for all profiles, but first profile gets priority
     const imageMap: { [key: string]: string[] } = {};
     if (shuffled.length > 0) {
-      // Load first 3 profiles in parallel for faster initial display
-      const firstProfiles = shuffled.slice(0, 3);
-      const imagePromises = firstProfiles.map(async (profile) => {
-        try {
-          const { data: images } = await supabase
-            .from('user_images')
-            .select('user_id, image_url, image_order')
-            .eq('user_id', profile.id)
-            .eq('is_approved', true)
-            .order('image_order', { ascending: true })
-            .limit(2); // Only load 2 images per profile initially
+      // Step 1: PRIORITY - Load first profile's ALL images IMMEDIATELY
+      const firstProfile = shuffled[0];
+      try {
+        const { data: images } = await supabase
+          .from('user_images')
+          .select('user_id, image_url, image_order')
+          .eq('user_id', firstProfile.id)
+          .eq('is_approved', true)
+          .order('image_order', { ascending: true });
+          // No limit - load ALL images
 
-          if (images?.length) {
-            return { profileId: profile.id, urls: images.map(img => img.image_url) };
+        if (images?.length) {
+          imageMap[firstProfile.id] = images.map(img => img.image_url);
+        }
+      } catch (error) {
+        console.error('Failed to load first profile images:', error);
+      }
+
+      // Step 2: Load profiles 2-3 in parallel (ALL images each) - AWAIT to ensure they're in imageMap
+      const profilesTwoThree = shuffled.slice(1, 3);
+      if (profilesTwoThree.length > 0) {
+        const twoThreePromises = profilesTwoThree.map(async (profile) => {
+          try {
+            const { data: images } = await supabase
+              .from('user_images')
+              .select('user_id, image_url, image_order')
+              .eq('user_id', profile.id)
+              .eq('is_approved', true)
+              .order('image_order', { ascending: true });
+
+            if (images?.length) {
+              return { profileId: profile.id, urls: images.map(img => img.image_url) };
+            }
+          } catch (error) {
+            console.error(`Failed to load profile ${profile.id}:`, error);
           }
-        } catch (error) {
-          // Silently handle individual image loading errors
-        }
-        return null;
-      });
+          return null;
+        });
 
-      // Wait for all parallel requests
-      const results = await Promise.all(imagePromises);
-      results.forEach(result => {
-        if (result) {
-          imageMap[result.profileId] = result.urls;
-        }
-      });
+        // Wait for profiles 2-3 to complete before returning
+        const results = await Promise.all(twoThreePromises);
+        results.forEach(result => {
+          if (result) {
+            imageMap[result.profileId] = result.urls;
+          }
+        });
+      }
     }
 
     return {
@@ -1075,6 +1121,9 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, isPremium }: DiscoverPage
           }
           return matchesWithAds;
         });
+        
+        console.log('📸 Setting initial images for profiles:', Object.keys(images).length, 'profiles');
+        console.log('📸 Image details:', Object.entries(images).map(([id, urls]) => ({ id: id.slice(0, 8), count: urls.length })));
         setUserImages(images);
         setUserDistances(distances);
         setCurrentIndex(index);
@@ -1099,94 +1148,68 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, isPremium }: DiscoverPage
           batchFetchLanguages(profileIds);
         }
 
-        // Immediately load images for current profile and preload next ones
-        if (matches.length > 0) {
-          const currentProfile = matches[index];
-          if (currentProfile && !images[currentProfile.id]) {
-            loadFullImages(currentProfile.id);
-          }
+        // Images for first 3 profiles are already loaded and set in state
+        // No need to reload them - the state is already updated above
+        console.log('✅ Initial images loaded, skipping redundant preload calls');
+
+        // ⭐ Step 3: Load remaining profiles (4-8) progressively in background
+        const loadRemainingProfiles = async () => {
+          const isAndroid = Capacitor.getPlatform() === 'android';
+          const maxProfiles = isAndroid ? 6 : 8;
+          const remainingProfiles = matches.slice(3, maxProfiles); // Profiles 4-6 or 4-8
           
-          // Preload next profiles immediately and aggressively
-          preloadNextProfileImages(matches, images, index + 1);
+          console.log(`💾 Starting background load for ${remainingProfiles.length} profiles (4-${maxProfiles})`);
           
-          // Only preload current profile for maximum performance
-          if (matches.length > 0) {
-            const currentProfile = matches[index];
-            if (currentProfile && !images[currentProfile.id]) {
-              loadFullImages(currentProfile.id);
-            }
-          }
-        }
-
-        // Start continuous loading immediately after initial load
-        setTimeout(() => {
-          loadMoreMatches(); // Load first batch of additional profiles
-
-          // Visibility-aware chained loader instead of setInterval
-          const continuousLoaderActive = { running: true };
-          const CONTINUOUS_INTERVAL_MS = 30000; // base interval
-          const continuousLoaderTimerRef = { current: null as any };
-          const currentFetchController = { current: null as AbortController | null };
-
-          const stopLoader = () => {
-            continuousLoaderActive.running = false;
-            if (continuousLoaderTimerRef.current) {
-              clearTimeout(continuousLoaderTimerRef.current);
-              continuousLoaderTimerRef.current = null;
-            }
-            if (currentFetchController.current) {
-              currentFetchController.current.abort();
-              currentFetchController.current = null;
-            }
-          };
-
-          const scheduleNext = (delay = CONTINUOUS_INTERVAL_MS) => {
-            if (!continuousLoaderActive.running) return;
-            continuousLoaderTimerRef.current = setTimeout(runOnce, delay);
-          };
-
-          const runOnce = async () => {
-            if (!continuousLoaderActive.running) return;
-
-            // Pause if tab is hidden
-            if (typeof document !== 'undefined' && document.hidden) {
-              scheduleNext(CONTINUOUS_INTERVAL_MS);
-              return;
+          for (const profile of remainingProfiles) {
+            // Check if user started swiping - if yes, pause loading
+            if (isSwipingRef.current) {
+              console.log('🚫 Swipe detected - pausing background loading');
+              // Wait for swipe to complete, then continue
+              await new Promise(resolve => {
+                const checkInterval = setInterval(() => {
+                  if (!isSwipingRef.current) {
+                    clearInterval(checkInterval);
+                    console.log('✅ Swipe ended - resuming loading');
+                    resolve(undefined);
+                  }
+                }, 100);
+              });
             }
 
             try {
-              if (!backgroundFetchingRef.current && !isLoadingMore) {
-                const remainingProfiles = potentialMatches.length - currentIndex;
-                if (remainingProfiles < 10) {
-                  // Use AbortController to allow cancellation
-                  currentFetchController.current = new AbortController();
-                  const signal = currentFetchController.current.signal;
-                  // If loadMoreMatches supports abort via signal, pass it; otherwise, just use fetchPotentialMatchesInBackground
-                  // We'll call fetchPotentialMatchesInBackground which internally uses supabase (no signal), so we just guard with backgroundFetchingRef
-                  await fetchPotentialMatchesInBackground();
-                  // Trim cache if needed after refresh
-                  trimDiscoverCacheIfNeeded();
-                }
+              const { data: profileImages } = await supabase
+                .from('user_images')
+                .select('user_id, image_url, image_order')
+                .eq('user_id', profile.id)
+                .eq('is_approved', true)
+                .order('image_order', { ascending: true });
+
+              if (profileImages?.length) {
+                const imageUrls = profileImages.map(img => img.image_url);
+                console.log(`📸 Loaded ${imageUrls.length} images for profile ${profile.id.slice(0, 8)}`);
+                // Update state directly for background loads
+                setUserImages(prev => ({ ...prev, [profile.id]: imageUrls }));
               }
-            } catch (err) {
-              // ignore background errors
-            } finally {
-              if (currentFetchController.current) {
-                currentFetchController.current = null;
-              }
-              // schedule next run
-              scheduleNext();
+            } catch (error) {
+              console.error(`Failed to load profile ${profile.id}:`, error);
             }
-          };
 
-          // Start the loop
-          scheduleNext(CONTINUOUS_INTERVAL_MS);
-
-          // Expose stop function for cleanup
-          if (typeof window !== 'undefined') {
-            (window as any).stopDiscoverContinuousLoader = stopLoader;
+            // Small delay between profiles to avoid blocking
+            await new Promise(resolve => setTimeout(resolve, 150));
           }
-        }, 2000); // Start 2 seconds after initial load
+          
+          console.log('✅ Background loading complete');
+        };
+
+        // Start loading remaining profiles in background (non-blocking)
+        setTimeout(() => {
+          loadRemainingProfiles().catch(err => console.error('Background loading failed:', err));
+        }, 100);
+
+        // Load first batch of additional profiles after initial load
+        setTimeout(() => {
+          loadMoreMatches();
+        }, 2000);
       }
     } catch (error) {
   // ...removed log...
@@ -1218,18 +1241,27 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, isPremium }: DiscoverPage
 
   // ⭐ PARALLEL IMAGE PRELOADING - Load images in background without blocking
   const preloadProfileImages = useCallback((profiles: PotentialMatch[], startIndex: number = 0) => {
-    // Load up to 10 profiles ahead in parallel
-    const profilesToLoad = profiles.slice(startIndex, startIndex + 10);
+    // ⭐ OPTIMIZED: Load profiles ahead with platform-specific limits
+    // Detect Android for platform-specific limits
+    const isAndroid = Capacitor.getPlatform() === 'android';
+    const maxProfiles = isAndroid ? 6 : 8; // Android: 6, Others: 8
+    const profilesToLoad = profiles.slice(startIndex, startIndex + maxProfiles);
     
-    profilesToLoad.forEach((user) => {
-      if (!user?.id) return;
-      if (userImages[user.id]?.length > 0) return; // Already loaded
-      if (requestedImageProfileIds.current.has(user.id)) return; // Already loading
-      
-      requestedImageProfileIds.current.add(user.id);
-      
-      // Load in background - don't await
-      (async () => {
+    // Load each profile sequentially with swipe detection
+    (async () => {
+      for (let index = 0; index < profilesToLoad.length; index++) {
+        const user = profilesToLoad[index];
+        if (!user?.id) continue;
+        if (userImages[user.id]?.length > 0) continue; // Already loaded
+        if (requestedImageProfileIds.current.has(user.id)) continue; // Already loading
+        
+        // Check if user is swiping - if yes, wait
+        while (isSwipingRef.current) {
+          await new Promise(resolve => setTimeout(resolve, 50));
+        }
+        
+        requestedImageProfileIds.current.add(user.id);
+        
         try {
           const { data: images } = await supabase
             .from('user_images')
@@ -1240,36 +1272,28 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, isPremium }: DiscoverPage
 
           if (!images || images.length === 0) {
             requestedImageProfileIds.current.delete(user.id);
-            return;
+            continue;
           }
 
-          const imageUrls = images.map(img => img.image_url);
+          // ⭐ Use optimized URLs directly (no blob conversion)
+          const imageUrls = images.map(img => getOptimizedImageUrl(img.image_url, 'full'));
 
-          // Update state immediately
+          // Update state immediately with optimized URLs
           setUserImages(prev => ({ ...prev, [user.id]: imageUrls }));
 
-          // Preload blobs in parallel (non-blocking)
-          const blobMap: { [url: string]: string } = {};
-          await Promise.all(
-            imageUrls.map(async (originalUrl) => {
-              try {
-                const blobUrl = await preloadImageToBlob(originalUrl);
-                blobMap[originalUrl] = blobUrl;
-              } catch {
-                blobMap[originalUrl] = originalUrl;
-              }
-            })
-          );
-
-          setPreloadedBlobImages(prev => ({ ...prev, [user.id]: blobMap }));
+          // ⭐ REMOVED: Blob preloading (causes profile repetition)
+          // Let browser cache handle image storage naturally
         } catch (error) {
           console.error(`Failed to preload profile ${user.id}:`, error);
         } finally {
           requestedImageProfileIds.current.delete(user.id);
         }
-      })();
-    });
-  }, []);
+        
+        // Small delay between profiles
+        await new Promise(resolve => setTimeout(resolve, 100));
+      }
+    })();
+  }, [userImages]);
 
   // Legacy compatibility
   const loadFullImages = useCallback((profileId: string) => {
@@ -1377,18 +1401,23 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, isPremium }: DiscoverPage
     
     // Load images for current match immediately
     const currentMatch = potentialMatches[currentIndex];
-    if (currentMatch) {
-      // Load current profile images immediately (even if already loaded)
+    if (currentMatch && !isAd(currentMatch)) {
+      // Load current profile images immediately
       loadFullImages(currentMatch.id);
       
-      // Only load next 1 profile for maximum performance
-      const nextMatch = potentialMatches[currentIndex + 1];
-      if (nextMatch) {
-        loadFullImages(nextMatch.id);
+      // ⭐ ONE-BY-ONE REFILL: Load next 2 profiles for smooth swiping
+      const nextMatch1 = potentialMatches[currentIndex + 1];
+      const nextMatch2 = potentialMatches[currentIndex + 2];
+      
+      if (nextMatch1 && !isAd(nextMatch1)) {
+        loadFullImages(nextMatch1.id);
+      }
+      if (nextMatch2 && !isAd(nextMatch2)) {
+        loadFullImages(nextMatch2.id);
       }
     }
     
-    // Ultra-aggressive preloading: preload many profiles ahead
+    // ⭐ OPTIMIZED: Preload remaining profiles in background (up to 6 total)
     const realMatches = potentialMatches.filter((m): m is PotentialMatch => !isAd(m));
     preloadNextProfileImages(realMatches, userImages, currentIndex + 1);
   }, [currentIndex, potentialMatches, userImages, preloadNextProfileImages, loadFullImages]);
@@ -1431,6 +1460,10 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, isPremium }: DiscoverPage
   startYRef.current = touch.clientY;
   currentXRef.current = touch.clientX;
   currentYRef.current = touch.clientY;
+  
+  // ⭐ Signal that user is swiping - pause background image loading
+  isSwipingRef.current = true;
+  
   setSwipeUI(prev => ({ ...prev, isDragging: true, swipeDirection: null, swipeDistance: 0, dragOffset: 0 }));
   };
 
@@ -1461,6 +1494,8 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, isPremium }: DiscoverPage
   const handleTouchEnd = (e: React.TouchEvent) => {
     if (!swipeUI.isDragging) return;
   setSwipeUI(prev => ({ ...prev, isDragging: false }));
+  
+  // ⭐ Check if swipe was reversed (didn't meet threshold)
 
     const changedTouch = e.changedTouches && e.changedTouches[0];
     const endX = changedTouch ? changedTouch.clientX : currentXRef.current;
@@ -1477,6 +1512,9 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, isPremium }: DiscoverPage
     setSwipeUI(prev => ({ ...prev, dragOffset: 0, swipeDistance: 0 }));
 
     if (Math.abs(deltaX) > minSwipeDistance && Math.abs(deltaX) > deltaY) {
+      // ⭐ Successful swipe - clear swiping flag (will load next profiles after move)
+      isSwipingRef.current = false;
+      
       // Trigger exit animation
       setExitDirection(deltaX > 0 ? 'right' : 'left');
       setExitingCard(true);
@@ -1493,6 +1531,9 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, isPremium }: DiscoverPage
         setExitDirection(null);
       }, 400); // Animation duration
     } else {
+      // ⭐ Swipe was reversed - clear flag (background loader will auto-resume)
+      isSwipingRef.current = false;
+      
       setSwipeUI(prev => ({ ...prev, swipeDirection: null }));
     }
   };
@@ -1503,6 +1544,10 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, isPremium }: DiscoverPage
   startYRef.current = e.clientY;
   currentXRef.current = e.clientX;
   currentYRef.current = e.clientY;
+  
+  // ⭐ Signal that user is swiping - pause background image loading
+  isSwipingRef.current = true;
+  
   setSwipeUI(prev => ({ ...prev, isDragging: true, swipeDirection: null, swipeDistance: 0, dragOffset: 0 }));
 
     // Attach global mouse listeners to ensure we capture mouseup/move even if pointer leaves the element
@@ -1540,6 +1585,9 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, isPremium }: DiscoverPage
       if (rafScheduledRef.current) rafScheduledRef.current = false;
       setSwipeUI(prev => ({ ...prev, dragOffset: 0, swipeDistance: 0, swipeDirection: null }));
       if (Math.abs(deltaX) > minSwipeDistance && Math.abs(deltaX) > deltaY) {
+        // ⭐ Successful swipe - clear swiping flag
+        isSwipingRef.current = false;
+        
         // Trigger exit animation
         setExitDirection(deltaX > 0 ? 'right' : 'left');
         setExitingCard(true);
@@ -1550,6 +1598,9 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, isPremium }: DiscoverPage
           setExitingCard(false);
           setExitDirection(null);
         }, 400); // Animation duration
+      } else {
+        // ⭐ Swipe was reversed - clear flag (background loader will auto-resume)
+        isSwipingRef.current = false;
       }
       window.removeEventListener('mousemove', onWindowMouseMove);
       window.removeEventListener('mouseup', onWindowMouseUp);
@@ -1744,18 +1795,57 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, isPremium }: DiscoverPage
     }
   }, [potentialMatches.length, currentIndex, isLoadingMore, hasCompletedInitialFetch, noMoreProfiles, loadMoreMatches]);
 
-  // ⭐ CONTINUOUS IMAGE PRELOADER - Preload next 10 profiles as user swipes
+  // ⭐ CONTINUOUS IMAGE PRELOADER - Preload next 6 profiles as user swipes
+  // ⭐ ONE-BY-ONE REFILL: When user swipes, immediately load the next profile in queue
   useEffect(() => {
     if (!hasCompletedInitialFetch || potentialMatches.length === 0) return;
 
-    // Preload images for next 10 profiles
-    const profilesToPreload = potentialMatches.slice(currentIndex, currentIndex + 10)
+    // ⭐ OPTIMIZED: Load profiles ahead with platform-specific limits
+    const isAndroid = Capacitor.getPlatform() === 'android';
+    const maxPreload = isAndroid ? 6 : 8; // Android: 6, Others: 8
+    
+    const profilesToPreload = potentialMatches.slice(currentIndex, currentIndex + maxPreload)
       .filter(match => !isAd(match) && 'first_name' in match);
 
     if (profilesToPreload.length > 0) {
       preloadProfileImages(profilesToPreload as PotentialMatch[], 0);
     }
   }, [currentIndex, potentialMatches, hasCompletedInitialFetch, preloadProfileImages]);
+
+  // ⭐ OPPORTUNISTIC BACKGROUND LOADER - Load extra profiles when app is stable and idle
+  // Waits for: initial fetch complete, not currently loading, has some profiles, and user is idle
+  useEffect(() => {
+    if (!hasCompletedInitialFetch || hasLoadedExtraProfiles || isLoadingMore || noMoreProfiles) return;
+    if (potentialMatches.length === 0) return;
+    
+    // Platform-specific targets for opportunistic loading
+    const isAndroid = Capacitor.getPlatform() === 'android';
+    const targetProfileCount = isAndroid ? 10 : 15; // Android: 10, Others: 15
+    
+    // Only load extra if we have fewer profiles than target
+    if (potentialMatches.length >= targetProfileCount) {
+      setHasLoadedExtraProfiles(true); // Already have enough
+      return;
+    }
+    
+    // Wait for app to be stable (5 seconds after initial load + images preloaded)
+    const stabilityTimer = setTimeout(async () => {
+      // Double-check conditions before loading (user might have swiped during wait)
+      if (isLoadingMore || noMoreProfiles || hasLoadedExtraProfiles) return;
+      
+      console.log(`🔄 Opportunistic background load: App stable, loading extra profiles (target: ${targetProfileCount})`);
+      
+      try {
+        await loadMoreMatches();
+        setHasLoadedExtraProfiles(true); // Mark as done
+      } catch (error) {
+        console.error('Opportunistic load failed:', error);
+        setHasLoadedExtraProfiles(true); // Don't retry to avoid loops
+      }
+    }, 5000); // Wait 5 seconds for stability
+    
+    return () => clearTimeout(stabilityTimer);
+  }, [hasCompletedInitialFetch, hasLoadedExtraProfiles, isLoadingMore, noMoreProfiles, potentialMatches.length, loadMoreMatches]);
 
   // Optimistic UI: move to next card instantly, then process like in background
   const handleLike = async () => {
@@ -1808,11 +1898,7 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, isPremium }: DiscoverPage
       delete updated[prevMatch.id];
       return updated;
     });
-    setPreloadedBlobImages(prev => {
-      const updated = { ...prev };
-      delete updated[prevMatch.id];
-      return updated;
-    });
+    // ⭐ REMOVED: preloadedBlobImages cleanup (no longer using blob caching)
 
     // Increment local/pending counters immediately for a snappy feel
     pendingSwipesRef.current += 1;
@@ -2043,11 +2129,7 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, isPremium }: DiscoverPage
       delete updated[prevMatch.id];
       return updated;
     });
-    setPreloadedBlobImages(prev => {
-      const updated = { ...prev };
-      delete updated[prevMatch.id];
-      return updated;
-    });
+    // ⭐ REMOVED: preloadedBlobImages cleanup (no longer using blob caching)
 
     // Optimistically add to passed list and increment counters
     setPassedUsers(prev => [{ user_id: prevMatch.id, passed_at: new Date() }, ...prev.slice(0, 9)]);
@@ -2764,7 +2846,6 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, isPremium }: DiscoverPage
                 showMoreInfo={showMoreInfo}
                 isPremium={isPremium}
                 userImages={currentMatchImages}
-                preloadedBlobImages={preloadedBlobImages[currentMatch.id]} // ⭐ Instant image rendering
                 preferredLanguageName={userLanguages[currentMatch.id]} // ⭐ No DB call needed
                 currentUserLatitude={currentUser.latitude}
                 currentUserLongitude={currentUser.longitude}
@@ -2818,7 +2899,6 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, isPremium }: DiscoverPage
                 showMoreInfo={showMoreInfo}
                 isPremium={isPremium}
                 userImages={currentMatchImages}
-                preloadedBlobImages={preloadedBlobImages[currentMatch.id]}
                 preferredLanguageName={userLanguages[currentMatch.id]}
                 currentUserLatitude={currentUser.latitude}
                 currentUserLongitude={currentUser.longitude}

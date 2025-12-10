@@ -6,6 +6,7 @@ import { visualizer } from 'rollup-plugin-visualizer';
 
 // https://vitejs.dev/config/
 export default defineConfig(({ mode }) => ({
+  // Use relative paths for Capacitor (mobile), absolute for web
   base: mode === 'production' ? './' : '/',
   server: {
     host: "::",
@@ -93,18 +94,50 @@ export default defineConfig(({ mode }) => ({
     },
     rollupOptions: {
       output: {
-        manualChunks: (id) => {
-          // Vendor chunks
+        manualChunks(id) {
+          // CRITICAL: React must load before anything that depends on it
           if (id.includes('node_modules')) {
-            // React ecosystem
-            if (id.includes('react') || id.includes('react-dom') || id.includes('react-router')) {
+            // 1. React ecosystem - MUST be first (no libraries that use createContext!)
+            if (id.includes('/react/') || id.includes('/react-dom/') || 
+                id.includes('/scheduler/')) {
               return 'react-vendor';
             }
-            // Supabase
-            if (id.includes('@supabase')) {
+            
+            // 2. React-dependent libraries (use createContext) - load AFTER react-vendor
+            if (id.includes('/react-router') || id.includes('next-themes') || 
+                id.includes('react-helmet')) {
+              return 'react-libs';
+            }
+            
+            // 2. Core dependencies (loaded after React)
+            if (id.includes('@supabase/supabase-js') || id.includes('@supabase/postgrest-js') ||
+                id.includes('@supabase/realtime-js') || id.includes('@supabase/storage-js') ||
+                id.includes('@supabase/functions-js') || id.includes('@supabase/auth-js')) {
               return 'supabase-vendor';
             }
-            // Radix UI - split by category
+            
+            if (id.includes('@tanstack/react-query') || id.includes('@tanstack/query-core')) {
+              return 'query-vendor';
+            }
+            
+            if (id.includes('i18next') || id.includes('react-i18next')) {
+              return 'i18n-vendor';
+            }
+            
+            // 3. UI dependencies
+            if (id.includes('class-variance-authority') || id.includes('/clsx/') || id.includes('tailwind-merge')) {
+              return 'ui-utils';
+            }
+            
+            if (id.includes('sonner')) {
+              return 'toast-vendor';
+            }
+            
+            if (id.includes('lucide-react')) {
+              return 'icons-vendor';
+            }
+            
+            // 4. Radix UI components (depend on React)
             if (id.includes('@radix-ui/react-dialog') || id.includes('@radix-ui/react-alert-dialog')) {
               return 'radix-dialog';
             }
@@ -115,38 +148,27 @@ export default defineConfig(({ mode }) => ({
             if (id.includes('@radix-ui')) {
               return 'radix-ui-other';
             }
-            // UI utilities
-            if (id.includes('lucide-react')) {
-              return 'icons-vendor';
-            }
-            if (id.includes('class-variance-authority') || id.includes('clsx') || id.includes('tailwind-merge')) {
-              return 'ui-utils';
-            }
-            // Capacitor plugins - split by functionality
+            
+            // 5. Capacitor
             if (id.includes('@capacitor/core') || id.includes('@capacitor/app')) {
               return 'capacitor-core';
             }
-            if (id.includes('@capacitor/')) {
+            if (id.includes('@capacitor/') || id.includes('@capacitor-')) {
               return 'capacitor-plugins';
             }
-            // i18next - separate chunk for translations
-            if (id.includes('i18next') || id.includes('react-i18next')) {
-              return 'i18n-vendor';
+            
+            // 6. Tanstack Virtual
+            if (id.includes('@tanstack/react-virtual') || id.includes('@tanstack/virtual-core')) {
+              return 'virtual-vendor';
             }
-            // Tanstack Query
-            if (id.includes('@tanstack/react-query')) {
-              return 'query-vendor';
-            }
-            // Sonner toasts
-            if (id.includes('sonner')) {
-              return 'toast-vendor';
-            }
-            // Date utilities
+            
+            // 7. Date utilities
             if (id.includes('date-fns')) {
               return 'date-vendor';
             }
-            // All other small vendors (keep this small!)
-            return 'vendor-libs';
+            
+            // Don't create vendor-libs - let other dependencies stay in main bundle
+            // to avoid loading order issues
           }
           
           // Split large app components for better Android performance

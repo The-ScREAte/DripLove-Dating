@@ -684,8 +684,8 @@ const PremiumUpgrade = ({ currentUser, onClose, preselectedPlan }: PremiumUpgrad
         onClose={() => setShowPaymentModal(false)}
         amount={parseFloat(ghsPrice)}
         currency="GHS"
-        displayAmount={parseFloat(monthlyPrice)}
-        displayCurrency={currency}
+        displayAmount={parseFloat(paystackPrice)}
+        displayCurrency="USD"
         email={currentUser?.email || ''}
         onSuccess={handlePaymentSuccess}
         paymentMethod={paymentMethods[0]?.type || 'card'}
