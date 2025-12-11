@@ -88,10 +88,10 @@ export const NativeFaceScanner: React.FC<NativeFaceScannerProps> = ({ onScanComp
     [descriptors]
   );
 
-  // More forgiving thresholds for better UX across all devices
-  const FRONT_TOLERANCE = isWeb ? 25 : 15;
-  const SIDE_THRESHOLD = isWeb ? 30 : 22;
-  const MAX_ROLL = 25;
+  // Very forgiving thresholds for smooth UX across all devices
+  const FRONT_TOLERANCE = isWeb ? 35 : 25;
+  const SIDE_THRESHOLD = isWeb ? 18 : 15;
+  const MAX_ROLL = 35;
 
   const evaluateAlignment = (currentYaw: number, currentRoll: number) => {
     // Use ref for latest step index to avoid stale closure issues
@@ -107,14 +107,14 @@ export const NativeFaceScanner: React.FC<NativeFaceScannerProps> = ({ onScanComp
 
     setAlignmentGood(aligned);
 
-    // Only cancel capture if SEVERELY misaligned (more forgiving)
+    // Only cancel if user completely moves away (very forgiving)
     if (!aligned && captureLocked.current) {
-      const severelyMisaligned = Math.abs(currentRoll) > MAX_ROLL + 15 || 
-        (angle === 'front' && Math.abs(currentYaw) > FRONT_TOLERANCE + 20) ||
-        (angle === 'left' && currentYaw > 0) ||
-        (angle === 'right' && currentYaw < 0);
+      const completelyMisaligned = Math.abs(currentRoll) > 50 || 
+        (angle === 'front' && Math.abs(currentYaw) > 50) ||
+        (angle === 'left' && currentYaw > 15) ||
+        (angle === 'right' && currentYaw < -15);
       
-      if (severelyMisaligned) {
+      if (completelyMisaligned) {
         if (captureTimeoutRef.current) {
           clearTimeout(captureTimeoutRef.current);
           captureTimeoutRef.current = null;
@@ -485,6 +485,31 @@ export const NativeFaceScanner: React.FC<NativeFaceScannerProps> = ({ onScanComp
         </div>
 
         <div className="relative mx-auto" style={{ width: '250px', height: '300px' }}>
+          {/* Blue spinner overlay - OUTSIDE overflow-hidden so it's visible on top */}
+          {capturing && (
+            <svg 
+              className="absolute inset-0 w-full h-full pointer-events-none" 
+              style={{ transform: 'rotate(-90deg)', zIndex: 50 }}
+              viewBox="0 0 250 300"
+            >
+              <ellipse
+                cx="125"
+                cy="150"
+                rx="121"
+                ry="146"
+                fill="none"
+                stroke="#3b82f6"
+                strokeWidth="6"
+                strokeDasharray="850"
+                strokeDashoffset="850"
+                style={{
+                  animation: 'ellipse-dash 1.5s linear forwards'
+                }}
+                strokeLinecap="round"
+              />
+            </svg>
+          )}
+          
           {/* Oval frame with video */}
           <div
             className={`relative overflow-hidden w-full h-full transition-colors duration-200 ${
@@ -494,30 +519,6 @@ export const NativeFaceScanner: React.FC<NativeFaceScannerProps> = ({ onScanComp
             }`}
             style={{ borderRadius: '50%' }}
           >
-            {/* Blue racing spinner - always on top of video when green border is shown */}
-            {(alignmentGood || capturing) && (
-              <svg 
-                className="absolute inset-0 w-full h-full z-30 pointer-events-none" 
-                style={{ transform: 'rotate(-90deg)' }}
-                viewBox="0 0 250 300"
-              >
-                <ellipse
-                  cx="125"
-                  cy="150"
-                  rx="110"
-                  ry="133"
-                  fill="none"
-                  stroke="#3b82f6"
-                  strokeWidth="8"
-                  strokeDasharray="850"
-                  strokeDashoffset="850"
-                  style={{
-                    animation: capturing ? 'ellipse-dash 1.5s linear forwards' : undefined
-                  }}
-                  strokeLinecap="round"
-                />
-              </svg>
-            )}
             <video
               ref={videoRef}
               autoPlay
