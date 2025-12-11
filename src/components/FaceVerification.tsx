@@ -1,5 +1,6 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { CameraPreview } from '@capacitor-community/camera-preview';
+import { Capacitor } from '@capacitor/core';
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Camera, CheckCircle2, ArrowLeft, ArrowRight } from "lucide-react";
@@ -7,23 +8,36 @@ import { Camera, CheckCircle2, ArrowLeft, ArrowRight } from "lucide-react";
 export default function FaceVerification() {
   const [step, setStep] = useState(0);
   const [isLoading, setIsLoading] = useState(false);
+  const videoRef = useRef<HTMLVideoElement>(null);
+  const streamRef = useRef<MediaStream | null>(null);
+  const isNative = Capacitor.isNativePlatform();
 
-  // Add CSS to ensure camera stays in the container
+  // Add CSS to ensure camera video displays properly in circular container
   useEffect(() => {
     const style = document.createElement('style');
     style.innerHTML = `
-      .cameraPreview {
+      #cameraPreview, .camera-feed {
+        position: relative !important;
+        overflow: hidden !important;
+        border-radius: 50% !important;
         width: 320px !important;
         height: 320px !important;
-        border-radius: 50% !important;
-        overflow: hidden !important;
-        position: relative !important;
       }
-      #cameraPreview video {
+      
+      .camera-feed video,
+      .camera-feed canvas {
         width: 100% !important;
         height: 100% !important;
         object-fit: cover !important;
         border-radius: 50% !important;
+        position: absolute !important;
+        top: 0 !important;
+        left: 0 !important;
+      }
+
+      /* 🔥 FINAL FIX — force the card BELOW camera layers */
+      .Card, .card, .registration-container, .page-container {
+        z-index: 0 !important;
       }
     `;
     document.head.appendChild(style);
@@ -31,6 +45,18 @@ export default function FaceVerification() {
       document.head.removeChild(style);
     };
   }, []);
+  
+  // Cleanup camera on unmount
+  useEffect(() => {
+    return () => {
+      if (isNative) {
+        CameraPreview.stop().catch(() => {});
+      } else if (streamRef.current) {
+        streamRef.current.getTracks().forEach(track => track.stop());
+      }
+    };
+  }, [isNative]);
+  
   const [images, setImages] = useState<{
     front: string | null;
     left: string | null;
@@ -44,18 +70,36 @@ export default function FaceVerification() {
   async function startCamera() {
     try {
       setIsLoading(true);
-      await CameraPreview.start({
-        position: "front",
-        parent: "cameraPreview",
-        className: "cameraPreview",
-        toBack: false,
-        width: 320,
-        height: 320,
-        enableZoom: false,
-        disableAudio: true,
-        storeToFile: false,
-        disableExifHeaderStripping: false
-      });
+      
+      if (isNative) {
+        // Native mobile camera - render inside circular container
+        await CameraPreview.start({
+          parent: "cameraPreview",
+          position: "front",
+          toBack: false,
+          className: "camera-feed",
+          width: 320,
+          height: 320,
+          disableAudio: true
+        });
+      } else {
+        // Web browser camera
+        const stream = await navigator.mediaDevices.getUserMedia({
+          video: { 
+            facingMode: 'user',
+            width: { ideal: 320 },
+            height: { ideal: 320 }
+          },
+          audio: false
+        });
+        
+        if (videoRef.current) {
+          videoRef.current.srcObject = stream;
+          streamRef.current = stream;
+          await videoRef.current.play();
+        }
+      }
+      
       setStep(1);
     } catch (error) {
       console.error("Camera error:", error);
@@ -68,15 +112,36 @@ export default function FaceVerification() {
   async function takePicture(angle: "front" | "left" | "right") {
     try {
       setIsLoading(true);
-      const result = await CameraPreview.capture({ quality: 90 });
-      const base64 = result.value;
+      let base64 = "";
+      
+      if (isNative) {
+        // Native mobile capture
+        const result = await CameraPreview.capture({ quality: 90 });
+        base64 = result.value;
+      } else {
+        // Web browser capture
+        if (videoRef.current) {
+          const canvas = document.createElement('canvas');
+          canvas.width = 320;
+          canvas.height = 320;
+          const ctx = canvas.getContext('2d');
+          if (ctx) {
+            ctx.drawImage(videoRef.current, 0, 0, 320, 320);
+            base64 = canvas.toDataURL('image/jpeg', 0.9);
+          }
+        }
+      }
 
       setImages(prev => ({ ...prev, [angle]: base64 }));
 
       if (angle === "front") setStep(2);
       if (angle === "left") setStep(3);
       if (angle === "right") {
-        await CameraPreview.stop();
+        if (isNative) {
+          await CameraPreview.stop();
+        } else if (streamRef.current) {
+          streamRef.current.getTracks().forEach(track => track.stop());
+        }
         setStep(4);
       }
     } catch (error) {
@@ -159,30 +224,40 @@ export default function FaceVerification() {
             {/* Camera Video Container */}
             <div 
               id="cameraPreview" 
-              className="rounded-full overflow-hidden border-4 border-purple-500 shadow-2xl mx-auto bg-gray-900"
+              className="camera-feed rounded-full overflow-hidden border-4 border-purple-500 shadow-2xl mx-auto bg-gray-900"
               style={{ 
                 width: 320, 
                 height: 320,
                 position: 'relative',
-                zIndex: 1
+                zIndex: 2
               }} 
             >
+              {/* Web browser video element */}
+              {!isNative && (
+                <video
+                  ref={videoRef}
+                  autoPlay
+                  playsInline
+                  muted
+                  className="w-full h-full object-cover rounded-full"
+                  style={{ transform: 'scaleX(-1)' }}
+                />
+              )}
+              
               {/* Loading state while camera initializes */}
               {isLoading && step === 1 && (
-                <div className="absolute inset-0 flex items-center justify-center bg-gray-900 rounded-full">
+                <div className="absolute inset-0 flex items-center justify-center bg-gray-900 rounded-full" style={{ zIndex: 4 }}>
                   <div className="text-center text-white">
                     <Camera className="w-12 h-12 mx-auto mb-2 animate-pulse" />
                     <p className="text-sm">Loading camera...</p>
                   </div>
                 </div>
               )}
-            </div>
-            {/* Overlay border to ensure circular shape */}
-            <div className="absolute inset-0 rounded-full border-4 border-purple-500 pointer-events-none" style={{ zIndex: 999 }} />
-            
-            {/* Face outline guide */}
-            <div className="absolute inset-0 flex items-center justify-center pointer-events-none" style={{ zIndex: 998 }}>
-              <div className="w-48 h-64 border-2 border-white/50 rounded-full"></div>
+              
+              {/* Face outline guide - inside container with proper z-index */}
+              <div className="absolute inset-0 flex items-center justify-center pointer-events-none" style={{ zIndex: 3 }}>
+                <div className="w-48 h-64 border-2 border-white/40 rounded-full"></div>
+              </div>
             </div>
           </div>
           
@@ -192,8 +267,8 @@ export default function FaceVerification() {
           </p>
           
           {/* Tip text */}
-          <p className="text-center text-xs text-gray-500">
-            Position your face in the oval guide
+          <p className="text-center text-[11px] text-gray-500 mt-1">
+            Align your face within the circle
           </p>
         </div>
       )}

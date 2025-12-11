@@ -737,20 +737,19 @@ const RegistrationForm = ({ onSubmit, onBackToLogin }: RegistrationFormProps) =>
           {currentStep === 1 && (
             <div className="space-y-6 animate-fade-in">
               {/* Face Verification Section */}
-              <div className="space-y-4 p-4 bg-gradient-to-r from-purple-50 to-pink-50 rounded-lg border-2 border-purple-200">
-                <div className="text-center">
-                  <h3 className="text-lg font-semibold text-purple-800 mb-2">
-                    🔐 Face Verification Required
-                  </h3>
-                  <p className="text-sm text-gray-600 mb-4">
-                    To prevent duplicate accounts, we use AWS Rekognition to verify your identity.
-                  </p>
-                  <div className="text-xs text-gray-500 space-y-1">
-                    <p>✓ Take 3 photos: Front, Left, Right</p>
-                    <p>✓ Checks for duplicate faces (90% threshold)</p>
-                    <p>✓ Secure & private verification</p>
-                  </div>
-                </div>
+              <div className="p-4 bg-white/70 rounded-xl border shadow-sm space-y-3 text-center">
+                <h3 className="text-lg font-semibold text-purple-700 flex items-center justify-center gap-2">
+                  🔐 Face Verification
+                </h3>
+
+                <p className="text-xs text-gray-600">
+                  Quick 3-step facial check to keep accounts real.
+                </p>
+
+                <p className="text-[11px] text-gray-500">
+                  We never store videos. Only 3 photos are used securely.
+                </p>
+
                 <FaceVerification />
               </div>
 
