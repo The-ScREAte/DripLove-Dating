@@ -3,12 +3,12 @@ import {
   browser_default,
   browser_exports,
   init_browser
-} from "./chunk-LIEENW5U.js";
+} from "./chunk-GSJ7ZZSB.js";
 import {
   __commonJS,
   __toCommonJS,
   __toESM
-} from "./chunk-HXA6O6EE.js";
+} from "./chunk-VHXUCOYC.js";
 
 // node_modules/@supabase/postgrest-js/dist/cjs/PostgrestError.js
 var require_PostgrestError = __commonJS({
@@ -1252,7 +1252,7 @@ var resolveFetch = (customFetch) => {
   if (customFetch) {
     _fetch = customFetch;
   } else if (typeof fetch === "undefined") {
-    _fetch = (...args) => import("./browser-OEGO7DCU.js").then(({ default: fetch2 }) => fetch2(...args));
+    _fetch = (...args) => import("./browser-MZFJOU3E.js").then(({ default: fetch2 }) => fetch2(...args));
   } else {
     _fetch = fetch;
   }
@@ -2551,7 +2551,7 @@ var RealtimeClient = class {
       if (customFetch) {
         _fetch = customFetch;
       } else if (typeof fetch === "undefined") {
-        _fetch = (...args) => import("./browser-OEGO7DCU.js").then(({ default: fetch2 }) => fetch2(...args));
+        _fetch = (...args) => import("./browser-MZFJOU3E.js").then(({ default: fetch2 }) => fetch2(...args));
       } else {
         _fetch = fetch;
       }
@@ -3009,7 +3009,7 @@ var resolveFetch2 = (customFetch) => {
   if (customFetch) {
     _fetch = customFetch;
   } else if (typeof fetch === "undefined") {
-    _fetch = (...args) => import("./browser-OEGO7DCU.js").then(({ default: fetch2 }) => fetch2(...args));
+    _fetch = (...args) => import("./browser-MZFJOU3E.js").then(({ default: fetch2 }) => fetch2(...args));
   } else {
     _fetch = fetch;
   }
@@ -3017,7 +3017,7 @@ var resolveFetch2 = (customFetch) => {
 };
 var resolveResponse = () => __awaiter2(void 0, void 0, void 0, function* () {
   if (typeof Response === "undefined") {
-    return (yield import("./browser-OEGO7DCU.js")).Response;
+    return (yield import("./browser-MZFJOU3E.js")).Response;
   }
   return Response;
 });
@@ -4361,7 +4361,7 @@ var resolveFetch4 = (customFetch) => {
   if (customFetch) {
     _fetch = customFetch;
   } else if (typeof fetch === "undefined") {
-    _fetch = (...args) => import("./browser-OEGO7DCU.js").then(({ default: fetch2 }) => fetch2(...args));
+    _fetch = (...args) => import("./browser-MZFJOU3E.js").then(({ default: fetch2 }) => fetch2(...args));
   } else {
     _fetch = fetch;
   }

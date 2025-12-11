@@ -1,6 +1,8 @@
 import { useState, useEffect, useRef } from "react";
 import { CameraPreview } from '@capacitor-community/camera-preview';
+import type { CameraPreviewOptions } from '@capacitor-community/camera-preview';
 import { Capacitor } from '@capacitor/core';
+import * as faceapi from '@vladmandic/face-api';
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Camera, CheckCircle2, ArrowLeft, ArrowRight } from "lucide-react";
@@ -10,6 +12,7 @@ export default function FaceVerification() {
   const [isLoading, setIsLoading] = useState(false);
   const [isFaceDetected, setIsFaceDetected] = useState(false);
   const [faceAngleCorrect, setFaceAngleCorrect] = useState(false);
+  const [faceApiReady, setFaceApiReady] = useState(false);
   const videoRef = useRef<HTMLVideoElement>(null);
   const streamRef = useRef<MediaStream | null>(null);
   const cameraContainerRef = useRef<HTMLDivElement>(null);
@@ -52,6 +55,27 @@ export default function FaceVerification() {
       document.head.removeChild(style);
     };
   }, []);
+
+  useEffect(() => {
+    let mounted = true;
+    async function loadModels() {
+      const MODEL_URL = '/models';
+      try {
+        await Promise.all([
+          faceapi.nets.tinyFaceDetector.loadFromUri(MODEL_URL),
+          faceapi.nets.faceLandmark68TinyNet.loadFromUri(MODEL_URL)
+        ]);
+        if (mounted) {
+          setFaceApiReady(true);
+        }
+      } catch (error) {
+        console.error('Failed to load face-api models', error);
+      }
+    }
+
+    loadModels();
+    return () => { mounted = false; };
+  }, []);
   
   // Cleanup camera on unmount
   useEffect(() => {
@@ -76,6 +100,11 @@ export default function FaceVerification() {
     left: null,
     right: null
   });
+
+  function getImageSrc(value: string | null): string | null {
+    if (!value) return null;
+    return value.startsWith('data:') ? value : `data:image/jpeg;base64,${value}`;
+  }
 
   async function startCamera() {
     try {
@@ -102,18 +131,23 @@ export default function FaceVerification() {
         await new Promise(resolve => setTimeout(resolve, 100));
         
         // Native mobile camera - render inside circular container
-        const parentId = cameraContainerRef.current?.id ?? "cameraPreview";
-        console.log('[Camera] Starting preview with parent:', parentId);
-        
-        await CameraPreview.start({
-          parent: parentId,
+        const platform = Capacitor.getPlatform();
+        const rect = cameraContainerRef.current?.getBoundingClientRect();
+        const previewOptions: CameraPreviewOptions = {
           position: "front",
-          toBack: false,
           className: "camera-feed",
-          width: CAMERA_SIZE,
-          height: CAMERA_SIZE,
-          disableAudio: true
-        });
+          disableAudio: true,
+          width: rect?.width ?? CAMERA_SIZE,
+          height: rect?.height ?? CAMERA_SIZE,
+          x: rect?.left ?? 0,
+          y: rect?.top ?? 0,
+          toBack: platform === 'android'
+        };
+        
+        console.log('[Camera] Starting preview at', previewOptions);
+        
+        await CameraPreview.stop().catch(() => {});
+        await CameraPreview.start(previewOptions);
         
         console.log('[Camera] Preview started successfully');
       } else {
@@ -147,6 +181,12 @@ export default function FaceVerification() {
     try {
       setIsLoading(true);
       let base64 = "";
+      const isOrientationValid = await ensureRequiredAngle(angle);
+      if (!isOrientationValid) {
+        alert(angle === 'left' ? 'Please turn your head to the left before capturing.' : 'Please turn your head to the right before capturing.');
+        setIsLoading(false);
+        return;
+      }
       
       if (isNative) {
         // Native mobile capture
@@ -184,6 +224,73 @@ export default function FaceVerification() {
     } finally {
       setIsLoading(false);
     }
+  }
+
+  async function ensureRequiredAngle(angle: "front" | "left" | "right") {
+    if (angle === 'front') return true;
+    if (!faceApiReady) return false;
+
+    try {
+      if (!isNative) {
+        if (!videoRef.current) return false;
+        const currentAngle = await detectFaceAngleFromElement(videoRef.current);
+        return currentAngle === angle;
+      }
+
+      const sample = await CameraPreview.captureSample({ quality: 60 });
+      if (!sample.value) return false;
+      const imageElement = await loadImageFromBase64(sample.value);
+      const currentAngle = await detectFaceAngleFromElement(imageElement);
+      return currentAngle === angle;
+    } catch (error) {
+      console.error('[Camera] Orientation validation failed', error);
+      return false;
+    }
+  }
+
+  async function detectFaceAngleFromElement(
+    element: HTMLVideoElement | HTMLImageElement | HTMLCanvasElement
+  ): Promise<'front' | 'left' | 'right' | null> {
+    if (!faceApiReady) return null;
+    const detection = await faceapi
+      .detectSingleFace(element, new faceapi.TinyFaceDetectorOptions({ inputSize: 128 }))
+      .withFaceLandmarks(true);
+
+    if (!detection) return null;
+    const nose = detection.landmarks.getNose();
+    const nosePoint = nose[Math.floor(nose.length / 2)];
+    const frameWidth = getElementWidth(element);
+    if (!frameWidth) return null;
+
+    const ratio = nosePoint.x / frameWidth;
+    if (ratio < 0.40) return 'right';
+    if (ratio > 0.60) return 'left';
+    return 'front';
+  }
+
+  function getElementWidth(element: HTMLVideoElement | HTMLImageElement | HTMLCanvasElement) {
+    if (element instanceof HTMLVideoElement) {
+      return element.videoWidth || element.clientWidth;
+    }
+    if (element instanceof HTMLImageElement) {
+      return element.naturalWidth || element.width;
+    }
+    return element.width;
+  }
+
+  async function loadImageFromBase64(base64: string) {
+    return new Promise<HTMLImageElement>((resolve, reject) => {
+      const img = new Image();
+      img.decoding = 'async';
+      img.onload = () => resolve(img);
+      img.onerror = reject;
+      const src = getImageSrc(base64);
+      if (!src) {
+        reject(new Error('Invalid sample data.'));
+        return;
+      }
+      img.src = src;
+    });
   }
 
   async function submit() {
@@ -238,68 +345,31 @@ export default function FaceVerification() {
     }
   }
   function startFaceDetection() {
+    if (!faceApiReady) return;
     if (detectionIntervalRef.current) {
       clearInterval(detectionIntervalRef.current);
     }
 
-    // Simple face detection using video brightness and face-like patterns
-    detectionIntervalRef.current = window.setInterval(() => {
+    const checkFrame = async () => {
       if (!videoRef.current) return;
-
-      const video = videoRef.current;
-      const canvas = document.createElement('canvas');
-      canvas.width = 160;
-      canvas.height = 160;
-      const ctx = canvas.getContext('2d');
-      
-      if (!ctx) return;
-
-      // Draw current frame
-      ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
-      const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
-      
-      // Analyze center region for face detection
-      const centerX = canvas.width / 2;
-      const centerY = canvas.height / 2;
-      const regionSize = 60;
-      
-      let totalBrightness = 0;
-      let pixelCount = 0;
-      let darkPixels = 0;
-      
-      for (let y = centerY - regionSize; y < centerY + regionSize; y++) {
-        for (let x = centerX - regionSize; x < centerX + regionSize; x++) {
-          if (x >= 0 && x < canvas.width && y >= 0 && y < canvas.height) {
-            const i = (y * canvas.width + x) * 4;
-            const r = imageData.data[i];
-            const g = imageData.data[i + 1];
-            const b = imageData.data[i + 2];
-            const brightness = (r + g + b) / 3;
-            
-            totalBrightness += brightness;
-            pixelCount++;
-            
-            if (brightness < 30) darkPixels++;
-          }
+      try {
+        const currentAngle = await detectFaceAngleFromElement(videoRef.current);
+        const hasFace = currentAngle !== null;
+        setIsFaceDetected(hasFace);
+        if (hasFace) {
+          setFaceAngleCorrect(currentAngle === getCurrentRequiredAngle());
+        } else {
+          setFaceAngleCorrect(false);
         }
-      }
-      
-      const avgBrightness = totalBrightness / pixelCount;
-      const darkRatio = darkPixels / pixelCount;
-      
-      // Face detected if average brightness is reasonable and not too many dark pixels
-      const faceDetected = avgBrightness > 40 && avgBrightness < 240 && darkRatio < 0.6;
-      setIsFaceDetected(faceDetected);
-      
-      // Check angle based on brightness distribution
-      if (faceDetected) {
-        const currentAngle = getCurrentRequiredAngle();
-        const angleCorrect = checkFaceAngle(imageData, canvas.width, canvas.height, currentAngle);
-        setFaceAngleCorrect(angleCorrect);
-      } else {
+      } catch (error) {
+        console.error('Face detection error', error);
+        setIsFaceDetected(false);
         setFaceAngleCorrect(false);
       }
-    }, 200);
+    };
+
+    checkFrame();
+    detectionIntervalRef.current = window.setInterval(checkFrame, 600);
   }
 
   function getCurrentRequiredAngle(): 'front' | 'left' | 'right' {
@@ -309,202 +379,18 @@ export default function FaceVerification() {
     return 'front';
   }
 
-  function checkFaceAngle(
-    imageData: ImageData,
-    width: number,
-    height: number,
-    requiredAngle: 'front' | 'left' | 'right'
-  ): boolean {
-    // Analyze left vs right brightness to detect head angle
-    const centerX = width / 2;
-    const leftRegionBrightness = getRegionBrightness(imageData, width, height, 0, centerX);
-    const rightRegionBrightness = getRegionBrightness(imageData, width, height, centerX, width);
-    
-    const brightnessDiff = Math.abs(leftRegionBrightness - rightRegionBrightness);
-    const leftBrighter = leftRegionBrightness > rightRegionBrightness;
-    
-    if (requiredAngle === 'front') {
-      // Front: Both sides should be similar brightness
-      return brightnessDiff < 20;
-    } else if (requiredAngle === 'left') {
-      // Left turn: Right side of frame (left side of face) should be brighter
-      return leftBrighter && brightnessDiff > 15;
-    } else {
-      // Right turn: Left side of frame (right side of face) should be brighter
-      return !leftBrighter && brightnessDiff > 15;
-    }
-  }
-
-  function getRegionBrightness(
-    imageData: ImageData,
-    width: number,
-    height: number,
-    startX: number,
-    endX: number
-  ): number {
-    let totalBrightness = 0;
-    let pixelCount = 0;
-    
-    const centerY = height / 2;
-    const regionHeight = 80;
-    
-    for (let y = centerY - regionHeight / 2; y < centerY + regionHeight / 2; y++) {
-      for (let x = startX; x < endX; x++) {
-        if (x >= 0 && x < width && y >= 0 && y < height) {
-          const i = (Math.floor(y) * width + Math.floor(x)) * 4;
-          const r = imageData.data[i];
-          const g = imageData.data[i + 1];
-          const b = imageData.data[i + 2];
-          totalBrightness += (r + g + b) / 3;
-          pixelCount++;
-        }
-      }
-    }
-    
-    return totalBrightness / pixelCount;
-  }
-
   function getInstructionText(): string {
     if (step === 1) return 'Look Straight';
     if (step === 2) return 'Turn Left';
     if (step === 3) return 'Turn Right';
     return '';
   }
-  function startFaceDetection() {
-    if (detectionIntervalRef.current) {
-      clearInterval(detectionIntervalRef.current);
-    }
 
-    // Simple face detection using video brightness and face-like patterns
-    detectionIntervalRef.current = window.setInterval(() => {
-      if (!videoRef.current) return;
-
-      const video = videoRef.current;
-      const canvas = document.createElement('canvas');
-      canvas.width = 160;
-      canvas.height = 160;
-      const ctx = canvas.getContext('2d');
-      
-      if (!ctx) return;
-
-      // Draw current frame
-      ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
-      const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
-      
-      // Analyze center region for face detection
-      const centerX = canvas.width / 2;
-      const centerY = canvas.height / 2;
-      const regionSize = 60;
-      
-      let totalBrightness = 0;
-      let pixelCount = 0;
-      let darkPixels = 0;
-      
-      for (let y = centerY - regionSize; y < centerY + regionSize; y++) {
-        for (let x = centerX - regionSize; x < centerX + regionSize; x++) {
-          if (x >= 0 && x < canvas.width && y >= 0 && y < canvas.height) {
-            const i = (y * canvas.width + x) * 4;
-            const r = imageData.data[i];
-            const g = imageData.data[i + 1];
-            const b = imageData.data[i + 2];
-            const brightness = (r + g + b) / 3;
-            
-            totalBrightness += brightness;
-            pixelCount++;
-            
-            if (brightness < 30) darkPixels++;
-          }
-        }
-      }
-      
-      const avgBrightness = totalBrightness / pixelCount;
-      const darkRatio = darkPixels / pixelCount;
-      
-      // Face detected if:
-      // - Average brightness is reasonable (not too dark, not too bright)
-      // - Not too many completely dark pixels (indicates face is visible)
-      const faceDetected = avgBrightness > 40 && avgBrightness < 240 && darkRatio < 0.6;
-      setIsFaceDetected(faceDetected);
-      
-      // Check angle based on brightness distribution
-      if (faceDetected) {
-        const currentAngle = getCurrentRequiredAngle();
-        const angleCorrect = checkFaceAngle(imageData, canvas.width, canvas.height, currentAngle);
-        setFaceAngleCorrect(angleCorrect);
-      } else {
-        setFaceAngleCorrect(false);
-      }
-    }, 200);
-  }
-
-  function getCurrentRequiredAngle(): 'front' | 'left' | 'right' {
-    if (step === 1) return 'front';
-    if (step === 2) return 'left';
-    if (step === 3) return 'right';
-    return 'front';
-  }
-
-  function checkFaceAngle(
-    imageData: ImageData,
-    width: number,
-    height: number,
-    requiredAngle: 'front' | 'left' | 'right'
-  ): boolean {
-    // Analyze left vs right brightness to detect head angle
-    const centerX = width / 2;
-    const leftRegionBrightness = getRegionBrightness(imageData, width, height, 0, centerX);
-    const rightRegionBrightness = getRegionBrightness(imageData, width, height, centerX, width);
-    
-    const brightnessDiff = Math.abs(leftRegionBrightness - rightRegionBrightness);
-    const leftBrighter = leftRegionBrightness > rightRegionBrightness;
-    
-    if (requiredAngle === 'front') {
-      // Front: Both sides should be similar brightness
-      return brightnessDiff < 20;
-    } else if (requiredAngle === 'left') {
-      // Left turn: Right side of frame (left side of face) should be brighter
-      return leftBrighter && brightnessDiff > 15;
-    } else {
-      // Right turn: Left side of frame (right side of face) should be brighter
-      return !leftBrighter && brightnessDiff > 15;
-    }
-  }
-
-  function getRegionBrightness(
-    imageData: ImageData,
-    width: number,
-    height: number,
-    startX: number,
-    endX: number
-  ): number {
-    let totalBrightness = 0;
-    let pixelCount = 0;
-    
-    const centerY = height / 2;
-    const regionHeight = 80;
-    
-    for (let y = centerY - regionHeight / 2; y < centerY + regionHeight / 2; y++) {
-      for (let x = startX; x < endX; x++) {
-        if (x >= 0 && x < width && y >= 0 && y < height) {
-          const i = (Math.floor(y) * width + Math.floor(x)) * 4;
-          const r = imageData.data[i];
-          const g = imageData.data[i + 1];
-          const b = imageData.data[i + 2];
-          totalBrightness += (r + g + b) / 3;
-          pixelCount++;
-        }
-      }
-    }
-    
-    return totalBrightness / pixelCount;
-  }
-
-  function getInstructionText(): string {
-    if (step === 1) return 'Look Straight';
-    if (step === 2) return 'Turn Left';
-    if (step === 3) return 'Turn Right';
-    return '';
-  }
+  const captureOrder: Array<{ key: keyof typeof images; label: string }> = [
+    { key: 'front', label: 'Front' },
+    { key: 'left', label: 'Left' },
+    { key: 'right', label: 'Right' }
+  ];
 
   return (
     <div className="space-y-4">
@@ -516,12 +402,13 @@ export default function FaceVerification() {
             <div 
               id="cameraPreview" 
               ref={cameraContainerRef}
-              className="camera-feed rounded-full overflow-hidden border-4 border-purple-500 shadow-2xl mx-auto bg-gray-900"
+              className="camera-feed rounded-full overflow-hidden border-4 border-white/40 shadow-2xl mx-auto bg-transparent"
               style={{ 
                 width: CAMERA_SIZE, 
                 height: CAMERA_SIZE,
                 position: 'relative',
-                zIndex: 2
+                zIndex: 2,
+                backgroundColor: 'transparent'
               }} 
             >
               {/* Web browser video element */}
@@ -553,8 +440,8 @@ export default function FaceVerification() {
               
               {/* Instruction overlay */}
               <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none" style={{ zIndex: 5 }}>
-                <div className="bg-black/40 px-6 py-2 rounded-full backdrop-blur-sm">
-                  <p className="text-white font-normal text-base tracking-wide">{getInstructionText()}</p>
+                <div className="bg-black/30 px-6 py-2 rounded-full backdrop-blur-sm">
+                  <p className="text-white/90 font-normal text-sm tracking-wide">{getInstructionText()}</p>
                 </div>
                 {!isNative && !isFaceDetected && (
                   <div className="mt-3 bg-red-500/80 px-4 py-2 rounded-full">
@@ -577,6 +464,29 @@ export default function FaceVerification() {
         </div>
       )}
 
+      {/* Capture thumbnails */}
+      <div className="mt-4">
+        <div className="flex items-center justify-center gap-3">
+          {captureOrder.map(({ key, label }) => (
+            <div key={key} className="flex flex-col items-center gap-1">
+              <div className="h-16 w-16 rounded-full border border-white/20 overflow-hidden bg-white/5 flex items-center justify-center">
+                {images[key] ? (
+                  <img
+                    src={getImageSrc(images[key]) ?? undefined}
+                    alt={`${label} capture`}
+                    className="h-full w-full object-cover"
+                  />
+                ) : (
+                  <span className="text-[10px] uppercase text-white/50 tracking-widest">{label}</span>
+                )}
+              </div>
+              <p className="text-[10px] uppercase text-white/60 tracking-widest">
+                {images[key] ? 'Captured' : 'Pending'}
+              </p>
+            </div>
+          ))}
+        </div>
+      </div>
       {/* Completed Photos Preview */}
       <div className="mt-6">
         {/* Single action button, label changes per step */}

@@ -66,6 +66,7 @@
     "@types/react-window": "^1.8.8",
     "autoprefixer": "^10.4.21",
     "browser-image-compression": "^2.0.2",
+    "@vladmandic/face-api": "^1.7.15",
     "capacitor-rate-app": "^4.0.3",
     "capacitor-video-player": "^6.0.2",
     "class-variance-authority": "^0.7.1",

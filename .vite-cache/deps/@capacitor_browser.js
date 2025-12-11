@@ -1,9 +1,9 @@
-import "./chunk-HXA6O6EE.js";
+import "./chunk-VHXUCOYC.js";
 
 // node_modules/@capacitor/browser/dist/esm/index.js
 import { registerPlugin } from "@capacitor/core";
 var Browser = registerPlugin("Browser", {
-  web: () => import("./web-BCVUFJQR.js").then((m) => new m.BrowserWeb())
+  web: () => import("./web-2S2SIT44.js").then((m) => new m.BrowserWeb())
 });
 export {
   Browser

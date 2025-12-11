@@ -1,4 +1,4 @@
-import "./chunk-HXA6O6EE.js";
+import "./chunk-VHXUCOYC.js";
 
 // node_modules/@capacitor/keyboard/dist/esm/index.js
 import { registerPlugin } from "@capacitor/core";
