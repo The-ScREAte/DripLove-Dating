@@ -89,9 +89,9 @@ export const NativeFaceScanner: React.FC<NativeFaceScannerProps> = ({ onScanComp
   );
 
   // More forgiving thresholds for better UX across all devices
-  const FRONT_TOLERANCE = isWeb ? 20 : 10;
-  const SIDE_THRESHOLD = isWeb ? 35 : 25;
-  const MAX_ROLL = 18;
+  const FRONT_TOLERANCE = isWeb ? 25 : 15;
+  const SIDE_THRESHOLD = isWeb ? 30 : 22;
+  const MAX_ROLL = 25;
 
   const evaluateAlignment = (currentYaw: number, currentRoll: number) => {
     // Use ref for latest step index to avoid stale closure issues
@@ -107,14 +107,21 @@ export const NativeFaceScanner: React.FC<NativeFaceScannerProps> = ({ onScanComp
 
     setAlignmentGood(aligned);
 
-    // If user moves out of position during capture, cancel and restart
+    // Only cancel capture if SEVERELY misaligned (more forgiving)
     if (!aligned && captureLocked.current) {
-      if (captureTimeoutRef.current) {
-        clearTimeout(captureTimeoutRef.current);
-        captureTimeoutRef.current = null;
+      const severelyMisaligned = Math.abs(currentRoll) > MAX_ROLL + 15 || 
+        (angle === 'front' && Math.abs(currentYaw) > FRONT_TOLERANCE + 20) ||
+        (angle === 'left' && currentYaw > 0) ||
+        (angle === 'right' && currentYaw < 0);
+      
+      if (severelyMisaligned) {
+        if (captureTimeoutRef.current) {
+          clearTimeout(captureTimeoutRef.current);
+          captureTimeoutRef.current = null;
+        }
+        captureLocked.current = false;
+        setCapturing(false);
       }
-      captureLocked.current = false;
-      setCapturing(false);
       return;
     }
 
@@ -122,10 +129,10 @@ export const NativeFaceScanner: React.FC<NativeFaceScannerProps> = ({ onScanComp
       captureLocked.current = true;
       setCapturing(true);
 
-      // Start capture after 3 second animation
+      // Start capture after 1.5 second animation
       captureTimeoutRef.current = setTimeout(() => {
         captureWithThumbnail();
-      }, 3000);
+      }, 1500);
     }
   };
 
@@ -478,40 +485,39 @@ export const NativeFaceScanner: React.FC<NativeFaceScannerProps> = ({ onScanComp
         </div>
 
         <div className="relative mx-auto" style={{ width: '250px', height: '300px' }}>
-          {/* Spinner overlay - ON TOP of frame */}
-          {capturing && (
-            <svg 
-              className="absolute inset-0 w-full h-full z-20 pointer-events-none" 
-              viewBox="0 0 250 300"
-              style={{ transform: 'rotate(90deg)' }}
-            >
-              <ellipse
-                cx="125"
-                cy="150"
-                rx="121"
-                ry="146"
-                fill="none"
-                stroke="#22c55e"
-                strokeWidth="6"
-                strokeDasharray="850"
-                strokeDashoffset="850"
-                className="animate-[ellipse-dash_3s_linear_forwards]"
-                strokeLinecap="round"
-              />
-            </svg>
-          )}
-          
           {/* Oval frame with video */}
           <div
             className={`relative overflow-hidden w-full h-full transition-colors duration-200 ${
-              alignmentGood && !capturing
-                ? 'ring-4 ring-green-500'
-                : capturing
+              alignmentGood || capturing
                 ? 'ring-4 ring-green-500'
                 : 'ring-4 ring-red-500'
             }`}
             style={{ borderRadius: '50%' }}
           >
+            {/* Blue racing spinner - always on top of video when green border is shown */}
+            {(alignmentGood || capturing) && (
+              <svg 
+                className="absolute inset-0 w-full h-full z-30 pointer-events-none" 
+                style={{ transform: 'rotate(-90deg)' }}
+                viewBox="0 0 250 300"
+              >
+                <ellipse
+                  cx="125"
+                  cy="150"
+                  rx="110"
+                  ry="133"
+                  fill="none"
+                  stroke="#3b82f6"
+                  strokeWidth="8"
+                  strokeDasharray="850"
+                  strokeDashoffset="850"
+                  style={{
+                    animation: capturing ? 'ellipse-dash 1.5s linear forwards' : undefined
+                  }}
+                  strokeLinecap="round"
+                />
+              </svg>
+            )}
             <video
               ref={videoRef}
               autoPlay
