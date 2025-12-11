@@ -1,6 +1,11 @@
 import { serve } from "https://deno.land/std/http/server.ts";
 import { RekognitionClient, IndexFacesCommand, SearchFacesByImageCommand } from "npm:@aws-sdk/client-rekognition";
 
+const corsHeaders = {
+  'Access-Control-Allow-Origin': '*',
+  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
+};
+
 const client = new RekognitionClient({
   region: "us-east-1",
   credentials: {
@@ -12,7 +17,13 @@ const client = new RekognitionClient({
 const COLLECTION = "driplove_faces";
 
 serve(async (req) => {
-  const { front, left, right, userId } = await req.json();
+  // Handle CORS preflight requests
+  if (req.method === 'OPTIONS') {
+    return new Response('ok', { headers: corsHeaders });
+  }
+
+  try {
+    const { front, left, right, userId } = await req.json();
 
   // Convert base64 → Buffer
   function decode(base64: string) {
@@ -37,7 +48,10 @@ serve(async (req) => {
       return new Response(JSON.stringify({
         success: false,
         reason: "duplicate"
-      }), { status: 409 });
+      }), { 
+        status: 409,
+        headers: { ...corsHeaders, "Content-Type": "application/json" }
+      });
     }
   } catch (err) {
     console.error("search error:", err);
@@ -53,6 +67,15 @@ serve(async (req) => {
   await client.send(indexCmd);
 
   return new Response(JSON.stringify({ success: true }), {
-    headers: { "Content-Type": "application/json" }
+    headers: { ...corsHeaders, "Content-Type": "application/json" }
   });
+  } catch (error) {
+    return new Response(JSON.stringify({ 
+      success: false, 
+      error: error.message 
+    }), {
+      status: 500,
+      headers: { ...corsHeaders, "Content-Type": "application/json" }
+    });
+  }
 });

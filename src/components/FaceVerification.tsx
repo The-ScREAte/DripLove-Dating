@@ -8,9 +8,16 @@ import { Camera, CheckCircle2, ArrowLeft, ArrowRight } from "lucide-react";
 export default function FaceVerification() {
   const [step, setStep] = useState(0);
   const [isLoading, setIsLoading] = useState(false);
+  const [isFaceDetected, setIsFaceDetected] = useState(false);
+  const [faceAngleCorrect, setFaceAngleCorrect] = useState(false);
   const videoRef = useRef<HTMLVideoElement>(null);
   const streamRef = useRef<MediaStream | null>(null);
+  const cameraContainerRef = useRef<HTMLDivElement>(null);
+  const detectionIntervalRef = useRef<number | null>(null);
   const isNative = Capacitor.isNativePlatform();
+  const CAMERA_SIZE = 280;
+
+  const waitForNextFrame = () => new Promise<void>((resolve) => requestAnimationFrame(() => resolve()));
 
   // Add CSS to ensure camera video displays properly in circular container
   useEffect(() => {
@@ -20,8 +27,8 @@ export default function FaceVerification() {
         position: relative !important;
         overflow: hidden !important;
         border-radius: 50% !important;
-        width: 320px !important;
-        height: 320px !important;
+        width: ${CAMERA_SIZE}px !important;
+        height: ${CAMERA_SIZE}px !important;
       }
       
       .camera-feed video,
@@ -49,6 +56,9 @@ export default function FaceVerification() {
   // Cleanup camera on unmount
   useEffect(() => {
     return () => {
+      if (detectionIntervalRef.current) {
+        clearInterval(detectionIntervalRef.current);
+      }
       if (isNative) {
         CameraPreview.stop().catch(() => {});
       } else if (streamRef.current) {
@@ -70,25 +80,49 @@ export default function FaceVerification() {
   async function startCamera() {
     try {
       setIsLoading(true);
+      setStep(1);
+      await waitForNextFrame();
       
       if (isNative) {
+        // Check and request camera permissions on mobile
+        const permissions = await CameraPreview.checkPermissions();
+        console.log('[Camera] Permissions status:', permissions);
+        
+        if (permissions.camera !== 'granted') {
+          console.log('[Camera] Requesting permissions...');
+          const requestResult = await CameraPreview.requestPermissions();
+          console.log('[Camera] Permission request result:', requestResult);
+          
+          if (requestResult.camera !== 'granted') {
+            throw new Error('Camera permission denied. Please enable camera access in settings.');
+          }
+        }
+        
+        // Wait for DOM to be ready
+        await new Promise(resolve => setTimeout(resolve, 100));
+        
         // Native mobile camera - render inside circular container
+        const parentId = cameraContainerRef.current?.id ?? "cameraPreview";
+        console.log('[Camera] Starting preview with parent:', parentId);
+        
         await CameraPreview.start({
-          parent: "cameraPreview",
+          parent: parentId,
           position: "front",
           toBack: false,
           className: "camera-feed",
-          width: 320,
-          height: 320,
+          width: CAMERA_SIZE,
+          height: CAMERA_SIZE,
           disableAudio: true
         });
+        
+        console.log('[Camera] Preview started successfully');
       } else {
         // Web browser camera
         const stream = await navigator.mediaDevices.getUserMedia({
           video: { 
             facingMode: 'user',
-            width: { ideal: 320 },
-            height: { ideal: 320 }
+            width: { ideal: CAMERA_SIZE },
+            height: { ideal: CAMERA_SIZE }
           },
           audio: false
         });
@@ -97,13 +131,13 @@ export default function FaceVerification() {
           videoRef.current.srcObject = stream;
           streamRef.current = stream;
           await videoRef.current.play();
+          startFaceDetection();
         }
       }
-      
-      setStep(1);
     } catch (error) {
       console.error("Camera error:", error);
       alert("Failed to start camera. Please allow camera permissions.");
+      setStep(0);
     } finally {
       setIsLoading(false);
     }
@@ -122,11 +156,11 @@ export default function FaceVerification() {
         // Web browser capture
         if (videoRef.current) {
           const canvas = document.createElement('canvas');
-          canvas.width = 320;
-          canvas.height = 320;
+          canvas.width = CAMERA_SIZE;
+          canvas.height = CAMERA_SIZE;
           const ctx = canvas.getContext('2d');
           if (ctx) {
-            ctx.drawImage(videoRef.current, 0, 0, 320, 320);
+            ctx.drawImage(videoRef.current, 0, 0, CAMERA_SIZE, CAMERA_SIZE);
             base64 = canvas.toDataURL('image/jpeg', 0.9);
           }
         }
@@ -155,11 +189,16 @@ export default function FaceVerification() {
   async function submit() {
     try {
       setIsLoading(true);
+      
+      // Generate a temporary unique ID for this verification
+      const tempUserId = `temp_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+      
       const { data, error } = await supabase.functions.invoke("face-verify", {
         body: {
           front: images.front,
           left: images.left,
-          right: images.right
+          right: images.right,
+          userId: tempUserId
         }
       });
 
@@ -170,12 +209,11 @@ export default function FaceVerification() {
 
       if (data.success) {
         alert("✅ Face verified! You can now complete your registration.");
-        setStep(5);
       } else {
         alert("⚠️ Duplicate account detected! This face is already registered.");
-        setStep(0);
-        setImages({ front: null, left: null, right: null });
       }
+
+      resetVerification();
     } catch (error) {
       console.error("Submit error:", error);
       alert("Failed to verify. Please try again.");
@@ -184,50 +222,304 @@ export default function FaceVerification() {
     }
   }
 
-  const getStepIndicator = () => {
-    return (
-      <div className="flex justify-center gap-2 mb-4">
-        {[1, 2, 3].map((i) => (
-          <div
-            key={i}
-            className={`h-2 w-2 rounded-full transition-all ${
-              step >= i ? "bg-purple-600 w-8" : "bg-gray-300"
-            }`}
-          />
-        ))}
-      </div>
-    );
-  };
-
-  const getInstructions = () => {
-    switch (step) {
-      case 1:
-        return "📸 Look straight at the camera";
-      case 2:
-        return "← Turn your head LEFT";
-      case 3:
-        return "Turn your head RIGHT →";
-      case 4:
-        return "✓ All photos captured!";
-      default:
-        return "";
+  function resetVerification() {
+    setStep(0);
+    setImages({ front: null, left: null, right: null });
+    setIsFaceDetected(false);
+    setFaceAngleCorrect(false);
+    if (detectionIntervalRef.current) {
+      clearInterval(detectionIntervalRef.current);
     }
-  };
+    if (isNative) {
+      CameraPreview.stop().catch(() => {});
+    } else if (streamRef.current) {
+      streamRef.current.getTracks().forEach(track => track.stop());
+      streamRef.current = null;
+    }
+  }
+  function startFaceDetection() {
+    if (detectionIntervalRef.current) {
+      clearInterval(detectionIntervalRef.current);
+    }
+
+    // Simple face detection using video brightness and face-like patterns
+    detectionIntervalRef.current = window.setInterval(() => {
+      if (!videoRef.current) return;
+
+      const video = videoRef.current;
+      const canvas = document.createElement('canvas');
+      canvas.width = 160;
+      canvas.height = 160;
+      const ctx = canvas.getContext('2d');
+      
+      if (!ctx) return;
+
+      // Draw current frame
+      ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+      const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+      
+      // Analyze center region for face detection
+      const centerX = canvas.width / 2;
+      const centerY = canvas.height / 2;
+      const regionSize = 60;
+      
+      let totalBrightness = 0;
+      let pixelCount = 0;
+      let darkPixels = 0;
+      
+      for (let y = centerY - regionSize; y < centerY + regionSize; y++) {
+        for (let x = centerX - regionSize; x < centerX + regionSize; x++) {
+          if (x >= 0 && x < canvas.width && y >= 0 && y < canvas.height) {
+            const i = (y * canvas.width + x) * 4;
+            const r = imageData.data[i];
+            const g = imageData.data[i + 1];
+            const b = imageData.data[i + 2];
+            const brightness = (r + g + b) / 3;
+            
+            totalBrightness += brightness;
+            pixelCount++;
+            
+            if (brightness < 30) darkPixels++;
+          }
+        }
+      }
+      
+      const avgBrightness = totalBrightness / pixelCount;
+      const darkRatio = darkPixels / pixelCount;
+      
+      // Face detected if average brightness is reasonable and not too many dark pixels
+      const faceDetected = avgBrightness > 40 && avgBrightness < 240 && darkRatio < 0.6;
+      setIsFaceDetected(faceDetected);
+      
+      // Check angle based on brightness distribution
+      if (faceDetected) {
+        const currentAngle = getCurrentRequiredAngle();
+        const angleCorrect = checkFaceAngle(imageData, canvas.width, canvas.height, currentAngle);
+        setFaceAngleCorrect(angleCorrect);
+      } else {
+        setFaceAngleCorrect(false);
+      }
+    }, 200);
+  }
+
+  function getCurrentRequiredAngle(): 'front' | 'left' | 'right' {
+    if (step === 1) return 'front';
+    if (step === 2) return 'left';
+    if (step === 3) return 'right';
+    return 'front';
+  }
+
+  function checkFaceAngle(
+    imageData: ImageData,
+    width: number,
+    height: number,
+    requiredAngle: 'front' | 'left' | 'right'
+  ): boolean {
+    // Analyze left vs right brightness to detect head angle
+    const centerX = width / 2;
+    const leftRegionBrightness = getRegionBrightness(imageData, width, height, 0, centerX);
+    const rightRegionBrightness = getRegionBrightness(imageData, width, height, centerX, width);
+    
+    const brightnessDiff = Math.abs(leftRegionBrightness - rightRegionBrightness);
+    const leftBrighter = leftRegionBrightness > rightRegionBrightness;
+    
+    if (requiredAngle === 'front') {
+      // Front: Both sides should be similar brightness
+      return brightnessDiff < 20;
+    } else if (requiredAngle === 'left') {
+      // Left turn: Right side of frame (left side of face) should be brighter
+      return leftBrighter && brightnessDiff > 15;
+    } else {
+      // Right turn: Left side of frame (right side of face) should be brighter
+      return !leftBrighter && brightnessDiff > 15;
+    }
+  }
+
+  function getRegionBrightness(
+    imageData: ImageData,
+    width: number,
+    height: number,
+    startX: number,
+    endX: number
+  ): number {
+    let totalBrightness = 0;
+    let pixelCount = 0;
+    
+    const centerY = height / 2;
+    const regionHeight = 80;
+    
+    for (let y = centerY - regionHeight / 2; y < centerY + regionHeight / 2; y++) {
+      for (let x = startX; x < endX; x++) {
+        if (x >= 0 && x < width && y >= 0 && y < height) {
+          const i = (Math.floor(y) * width + Math.floor(x)) * 4;
+          const r = imageData.data[i];
+          const g = imageData.data[i + 1];
+          const b = imageData.data[i + 2];
+          totalBrightness += (r + g + b) / 3;
+          pixelCount++;
+        }
+      }
+    }
+    
+    return totalBrightness / pixelCount;
+  }
+
+  function getInstructionText(): string {
+    if (step === 1) return 'Look Straight';
+    if (step === 2) return 'Turn Left';
+    if (step === 3) return 'Turn Right';
+    return '';
+  }
+  function startFaceDetection() {
+    if (detectionIntervalRef.current) {
+      clearInterval(detectionIntervalRef.current);
+    }
+
+    // Simple face detection using video brightness and face-like patterns
+    detectionIntervalRef.current = window.setInterval(() => {
+      if (!videoRef.current) return;
+
+      const video = videoRef.current;
+      const canvas = document.createElement('canvas');
+      canvas.width = 160;
+      canvas.height = 160;
+      const ctx = canvas.getContext('2d');
+      
+      if (!ctx) return;
+
+      // Draw current frame
+      ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+      const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+      
+      // Analyze center region for face detection
+      const centerX = canvas.width / 2;
+      const centerY = canvas.height / 2;
+      const regionSize = 60;
+      
+      let totalBrightness = 0;
+      let pixelCount = 0;
+      let darkPixels = 0;
+      
+      for (let y = centerY - regionSize; y < centerY + regionSize; y++) {
+        for (let x = centerX - regionSize; x < centerX + regionSize; x++) {
+          if (x >= 0 && x < canvas.width && y >= 0 && y < canvas.height) {
+            const i = (y * canvas.width + x) * 4;
+            const r = imageData.data[i];
+            const g = imageData.data[i + 1];
+            const b = imageData.data[i + 2];
+            const brightness = (r + g + b) / 3;
+            
+            totalBrightness += brightness;
+            pixelCount++;
+            
+            if (brightness < 30) darkPixels++;
+          }
+        }
+      }
+      
+      const avgBrightness = totalBrightness / pixelCount;
+      const darkRatio = darkPixels / pixelCount;
+      
+      // Face detected if:
+      // - Average brightness is reasonable (not too dark, not too bright)
+      // - Not too many completely dark pixels (indicates face is visible)
+      const faceDetected = avgBrightness > 40 && avgBrightness < 240 && darkRatio < 0.6;
+      setIsFaceDetected(faceDetected);
+      
+      // Check angle based on brightness distribution
+      if (faceDetected) {
+        const currentAngle = getCurrentRequiredAngle();
+        const angleCorrect = checkFaceAngle(imageData, canvas.width, canvas.height, currentAngle);
+        setFaceAngleCorrect(angleCorrect);
+      } else {
+        setFaceAngleCorrect(false);
+      }
+    }, 200);
+  }
+
+  function getCurrentRequiredAngle(): 'front' | 'left' | 'right' {
+    if (step === 1) return 'front';
+    if (step === 2) return 'left';
+    if (step === 3) return 'right';
+    return 'front';
+  }
+
+  function checkFaceAngle(
+    imageData: ImageData,
+    width: number,
+    height: number,
+    requiredAngle: 'front' | 'left' | 'right'
+  ): boolean {
+    // Analyze left vs right brightness to detect head angle
+    const centerX = width / 2;
+    const leftRegionBrightness = getRegionBrightness(imageData, width, height, 0, centerX);
+    const rightRegionBrightness = getRegionBrightness(imageData, width, height, centerX, width);
+    
+    const brightnessDiff = Math.abs(leftRegionBrightness - rightRegionBrightness);
+    const leftBrighter = leftRegionBrightness > rightRegionBrightness;
+    
+    if (requiredAngle === 'front') {
+      // Front: Both sides should be similar brightness
+      return brightnessDiff < 20;
+    } else if (requiredAngle === 'left') {
+      // Left turn: Right side of frame (left side of face) should be brighter
+      return leftBrighter && brightnessDiff > 15;
+    } else {
+      // Right turn: Left side of frame (right side of face) should be brighter
+      return !leftBrighter && brightnessDiff > 15;
+    }
+  }
+
+  function getRegionBrightness(
+    imageData: ImageData,
+    width: number,
+    height: number,
+    startX: number,
+    endX: number
+  ): number {
+    let totalBrightness = 0;
+    let pixelCount = 0;
+    
+    const centerY = height / 2;
+    const regionHeight = 80;
+    
+    for (let y = centerY - regionHeight / 2; y < centerY + regionHeight / 2; y++) {
+      for (let x = startX; x < endX; x++) {
+        if (x >= 0 && x < width && y >= 0 && y < height) {
+          const i = (Math.floor(y) * width + Math.floor(x)) * 4;
+          const r = imageData.data[i];
+          const g = imageData.data[i + 1];
+          const b = imageData.data[i + 2];
+          totalBrightness += (r + g + b) / 3;
+          pixelCount++;
+        }
+      }
+    }
+    
+    return totalBrightness / pixelCount;
+  }
+
+  function getInstructionText(): string {
+    if (step === 1) return 'Look Straight';
+    if (step === 2) return 'Turn Left';
+    if (step === 3) return 'Turn Right';
+    return '';
+  }
 
   return (
     <div className="space-y-4">
       {/* Live Video Preview - Circular Camera Feed (Like Tinder) */}
       {step > 0 && step < 4 && (
         <div className="space-y-4 animate-fade-in">
-          {getStepIndicator()}
-          <div className="relative mx-auto" style={{ width: 320, height: 320 }}>
+          <div className="relative mx-auto" style={{ width: CAMERA_SIZE, height: CAMERA_SIZE }}>
             {/* Camera Video Container */}
             <div 
               id="cameraPreview" 
+              ref={cameraContainerRef}
               className="camera-feed rounded-full overflow-hidden border-4 border-purple-500 shadow-2xl mx-auto bg-gray-900"
               style={{ 
-                width: 320, 
-                height: 320,
+                width: CAMERA_SIZE, 
+                height: CAMERA_SIZE,
                 position: 'relative',
                 zIndex: 2
               }} 
@@ -258,127 +550,119 @@ export default function FaceVerification() {
               <div className="absolute inset-0 flex items-center justify-center pointer-events-none" style={{ zIndex: 3 }}>
                 <div className="w-48 h-64 border-2 border-white/40 rounded-full"></div>
               </div>
+              
+              {/* Instruction overlay */}
+              <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none" style={{ zIndex: 5 }}>
+                <div className="bg-black/40 px-6 py-2 rounded-full backdrop-blur-sm">
+                  <p className="text-white font-normal text-base tracking-wide">{getInstructionText()}</p>
+                </div>
+                {!isNative && !isFaceDetected && (
+                  <div className="mt-3 bg-red-500/80 px-4 py-2 rounded-full">
+                    <p className="text-white text-sm font-medium">No face detected</p>
+                  </div>
+                )}
+                {!isNative && isFaceDetected && !faceAngleCorrect && (
+                  <div className="mt-3 bg-yellow-500/80 px-4 py-2 rounded-full">
+                    <p className="text-white text-sm font-medium">Adjust position</p>
+                  </div>
+                )}
+                {!isNative && isFaceDetected && faceAngleCorrect && (
+                  <div className="mt-3 bg-green-500/80 px-4 py-2 rounded-full">
+                    <p className="text-white text-sm font-medium">✓ Ready</p>
+                  </div>
+                )}
+              </div>
             </div>
           </div>
-          
-          {/* Live instructions */}
-          <p className="text-center text-sm font-medium text-purple-700 animate-pulse">
-            {getInstructions()}
-          </p>
-          
-          {/* Tip text */}
-          <p className="text-center text-[11px] text-gray-500 mt-1">
-            Align your face within the circle
-          </p>
         </div>
       )}
 
       {/* Completed Photos Preview */}
-      {step === 4 && (
-        <div className="space-y-4">
-          <div className="flex justify-center gap-2">
-            {images.front && (
-              <div className="relative">
-                <img 
-                  src={images.front} 
-                  alt="Front" 
-                  className="w-20 h-20 rounded-full object-cover border-2 border-green-500"
-                />
-                <CheckCircle2 className="absolute -top-1 -right-1 w-5 h-5 text-green-500 bg-white rounded-full" />
-              </div>
-            )}
-            {images.left && (
-              <div className="relative">
-                <img 
-                  src={images.left} 
-                  alt="Left" 
-                  className="w-20 h-20 rounded-full object-cover border-2 border-green-500"
-                />
-                <CheckCircle2 className="absolute -top-1 -right-1 w-5 h-5 text-green-500 bg-white rounded-full" />
-              </div>
-            )}
-            {images.right && (
-              <div className="relative">
-                <img 
-                  src={images.right} 
-                  alt="Right" 
-                  className="w-20 h-20 rounded-full object-cover border-2 border-green-500"
-                />
-                <CheckCircle2 className="absolute -top-1 -right-1 w-5 h-5 text-green-500 bg-white rounded-full" />
-              </div>
-            )}
-          </div>
-          <p className="text-center text-sm text-green-600 font-medium">
-            ✓ All 3 angles captured successfully!
-          </p>
-        </div>
-      )}
-
-      {/* Success State */}
-      {step === 5 && (
-        <div className="text-center py-6">
-          <CheckCircle2 className="w-16 h-16 text-green-500 mx-auto mb-3 animate-bounce" />
-          <p className="text-lg font-semibold text-green-700">Face Verified!</p>
-          <p className="text-sm text-gray-600 mt-2">You can now continue with registration</p>
-        </div>
-      )}
-
-      {/* Action Buttons */}
-      <div className="space-y-2">
-        {step === 0 && (
-          <Button 
-            onClick={startCamera}
-            disabled={isLoading}
-            className="w-full bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700 text-white font-semibold py-6 rounded-xl shadow-lg transition-all"
-          >
-            <Camera className="mr-2 h-5 w-5" />
-            {isLoading ? "Starting Camera..." : "Start Verification"}
-          </Button>
-        )}
-
-        {step === 1 && (
-          <Button 
-            onClick={() => takePicture("front")}
-            disabled={isLoading}
-            className="w-full bg-purple-600 hover:bg-purple-700 text-white font-semibold py-6 rounded-xl shadow-lg"
-          >
-            📸 Capture Front Photo
-          </Button>
-        )}
-
-        {step === 2 && (
-          <Button 
-            onClick={() => takePicture("left")}
-            disabled={isLoading}
-            className="w-full bg-purple-600 hover:bg-purple-700 text-white font-semibold py-6 rounded-xl shadow-lg"
-          >
-            <ArrowLeft className="mr-2 h-5 w-5" />
-            Capture Left Angle
-          </Button>
-        )}
-
-        {step === 3 && (
-          <Button 
-            onClick={() => takePicture("right")}
-            disabled={isLoading}
-            className="w-full bg-purple-600 hover:bg-purple-700 text-white font-semibold py-6 rounded-xl shadow-lg"
-          >
-            <ArrowRight className="mr-2 h-5 w-5" />
-            Capture Right Angle
-          </Button>
-        )}
-
-        {step === 4 && (
-          <Button 
-            onClick={submit}
-            disabled={isLoading}
-            className="w-full bg-gradient-to-r from-green-600 to-emerald-600 hover:from-green-700 hover:to-emerald-700 text-white font-semibold py-6 rounded-xl shadow-lg"
-          >
-            <CheckCircle2 className="mr-2 h-5 w-5" />
-            {isLoading ? "Verifying..." : "Submit for Verification"}
-          </Button>
-        )}
+      <div className="mt-6">
+        {/* Single action button, label changes per step */}
+        <ActionButton 
+          step={step} 
+          isLoading={isLoading} 
+          isNative={isNative}
+          isFaceDetected={isFaceDetected}
+          faceAngleCorrect={faceAngleCorrect}
+          startCamera={startCamera} 
+          takePicture={takePicture} 
+          submit={submit} 
+        />
       </div>
     </div>
+  );
+}
+
+type ActionButtonProps = {
+  step: number;
+  isLoading: boolean;
+  isNative: boolean;
+  isFaceDetected: boolean;
+  faceAngleCorrect: boolean;
+  startCamera: () => Promise<void>;
+  takePicture: (angle: "front" | "left" | "right") => Promise<void>;
+  submit: () => Promise<void>;
+};
+
+function ActionButton({ step, isLoading, isNative, isFaceDetected, faceAngleCorrect, startCamera, takePicture, submit }: ActionButtonProps) {
+  // Disable capture buttons if face not detected or angle incorrect (web only)
+  const isCaptureDisabled = !isNative && step > 0 && step < 4 && (!isFaceDetected || !faceAngleCorrect);
+  const getConfig = () => {
+    switch (step) {
+      case 1:
+        return {
+          label: "Capture Photo",
+          loadingLabel: "Capturing...",
+          action: () => takePicture("front"),
+          icon: null
+        };
+      case 2:
+        return {
+          label: "Capture Photo",
+          loadingLabel: "Capturing...",
+          action: () => takePicture("left"),
+          icon: null
+        };
+      case 3:
+        return {
+          label: "Capture Photo",
+          loadingLabel: "Capturing...",
+          action: () => takePicture("right"),
+          icon: null
+        };
+      case 4:
+        return {
+          label: "Submit for Verification",
+          loadingLabel: "Verifying...",
+          action: submit,
+          icon: <CheckCircle2 className="mr-2 h-5 w-5" />
+        };
+      default:
+        return {
+          label: "Start Verification",
+          loadingLabel: "Starting Camera...",
+          action: startCamera,
+          icon: <Camera className="mr-2 h-5 w-5" />
+        };
+    }
+  };
+
+  const config = getConfig();
+
+  return (
+    <Button
+      onClick={config.action}
+      disabled={isLoading || isCaptureDisabled}
+      className={`w-full font-semibold py-5 rounded-xl shadow-2xl flex items-center justify-center transition-all ${
+        isCaptureDisabled 
+          ? 'bg-gray-400 cursor-not-allowed opacity-60' 
+          : 'bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700'
+      } text-white`}
+    >
+      {config.icon}
+      {isLoading ? config.loadingLabel : config.label}
+    </Button>
   );
 }
