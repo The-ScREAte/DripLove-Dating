@@ -12,7 +12,6 @@ import { Heart, MapPin, Briefcase, GraduationCap, Upload, Shield, CheckCircle, A
 import BasicInfoSection from '@/components/forms/BasicInfoSection';
 import LocationInput from '@/components/forms/LocationInput';
 import AdinkraSymbolSelector from '@/components/forms/AdinkraSymbolSelector';
-import NativeFaceScanner from '@/components/NativeFaceScanner';
 import { validateRegistrationForm, transformFormDataForSubmission } from '@/utils/formValidation';
 import { initialFormData } from '@/constants/formData';
 import { occupationOptions, industryOptions } from '@/constants/professionOptions';
@@ -20,13 +19,9 @@ import { moderateImage, ModerationResult } from '@/utils/photoModeration';
 import { compressImage } from '@/utils/imageCompression';
 import { useToast } from '@/hooks/use-toast';
 import { useTranslation } from 'react-i18next';
-import { videoPreloader } from '@/utils/videoPreloader';
-import type { FaceDescriptor } from '@/utils/nativeFaceComparison';
-import { descriptorToHash } from '@/utils/nativeFaceComparison';
-import { preloadFaceMesh } from '@/utils/facePreload';
 
-interface RegistrationFormProps {
-  onSubmit: (data: any) => void;
+interface RegistrationFormProps { 
+  onSubmit: (data: any) => void; 
   onBackToLogin: () => void;
 }
 
@@ -45,17 +40,9 @@ const RegistrationForm = ({ onSubmit, onBackToLogin }: RegistrationFormProps) =>
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [currentStep, setCurrentStep] = useState(1);
   const [images, setImages] = useState<ImageUpload[]>([]);
-  const [faceDescriptor, setFaceDescriptor] = useState<FaceDescriptor | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const { toast } = useToast();
   const { t } = useTranslation();
-
-  // 🔥 Aggressively preload MediaPipe immediately on registration page
-  React.useEffect(() => {
-    preloadFaceMesh().catch((err) => {
-      console.warn('MediaPipe preload failed (non-critical):', err);
-    });
-  }, []);
 
   // Restore images from sessionStorage on mount
   React.useEffect(() => {
@@ -247,7 +234,8 @@ const RegistrationForm = ({ onSubmit, onBackToLogin }: RegistrationFormProps) =>
           const serializable = images.map(img => ({
             preview: img.preview,
             moderationResult: img.moderationResult,
-            status: img.status
+            status: img.status,
+            hash: img.hash
           }));
           sessionStorage.setItem('registration_images', JSON.stringify(serializable));
         }, 0);
@@ -287,7 +275,8 @@ const RegistrationForm = ({ onSubmit, onBackToLogin }: RegistrationFormProps) =>
           const serializable = images.map(img => ({
             preview: img.preview,
             moderationResult: img.moderationResult,
-            status: img.status
+            status: img.status,
+            hash: img.hash
           }));
           sessionStorage.setItem('registration_images', JSON.stringify(serializable));
         }, 0);
@@ -403,29 +392,25 @@ const RegistrationForm = ({ onSubmit, onBackToLogin }: RegistrationFormProps) =>
     
     // Step 1: Face scan (handled by FaceScanner onScanComplete/onSkip)
     if (currentStep === 1) {
-      // This shouldn't be reached as FaceScanner handles progression
-      return;
-    }
-    
-    // Step 2: Basic info (name, email, password, etc)
-    if (currentStep === 2) {
+    // Step 1: Basic info (name, email, password, etc)
+    if (currentStep === 1) {
       handleContinue();
       return;
     }
     
-    // Step 3: Additional info (bio, interests, etc)
-    if (currentStep === 3) {
+    // Step 2: Additional info (bio, interests, etc)
+    if (currentStep === 2) {
       // Validate second step
       const validationErrors = validateRegistrationForm(formData);
       if (Object.keys(validationErrors).length > 0) {
         setErrors(validationErrors);
         return;
       }
-      setCurrentStep(4); // Move to photo upload step
+      setCurrentStep(3); // Move to photo upload step
       return;
     }
 
-    // Final step (step 4) - validate images and face match
+    // Final step (step 3) - validate images
     const approvedImages = images.filter(img => img.status === 'approved' || img.status === 'pending');
     
     if (approvedImages.length < 2) {
@@ -460,24 +445,6 @@ const RegistrationForm = ({ onSubmit, onBackToLogin }: RegistrationFormProps) =>
       return;
     }
 
-    // Note: Photo validation against face descriptor is disabled for now
-    // Native descriptors need to be compared with descriptors from uploaded photos
-    // which requires implementing photo analysis in the native plugin
-    // For now, we just store the face descriptor for future matching
-    if (faceDescriptor) {
-      console.log('✅ Face descriptor captured:', faceDescriptor.substring(0, 50) + '...');
-      toast({
-        title: 'Face Verified ✓',
-        description: 'Your face has been verified and will be used for authentication',
-      });
-    } else {
-      toast({
-        title: 'Face Verification Recommended',
-        description: 'Face verification helps keep the community safe.',
-        variant: "default"
-      });
-    }
-
     // Set loading state
     setIsSubmitting(true);
     
@@ -505,38 +472,6 @@ const RegistrationForm = ({ onSubmit, onBackToLogin }: RegistrationFormProps) =>
         });
         setIsSubmitting(false);
         return;
-      }
-
-      // Check for duplicate face descriptor
-      if (faceDescriptor) {
-        const faceHash = descriptorToHash(faceDescriptor);
-        
-        console.log('🔍 Checking for duplicate face:', {
-          faceHashLength: faceHash.length,
-          faceHashPreview: faceHash.substring(0, 20) + '...'
-        });
-        
-        const { data: existingFace, error: faceCheckError } = await supabase
-          .from('profiles')
-          .select('id, first_name')
-          .eq('face_descriptor', faceHash)
-          .maybeSingle();
-
-        console.log('🔍 Duplicate face check result:', {
-          foundDuplicate: !!existingFace,
-          existingFaceId: existingFace?.id,
-          error: faceCheckError?.message
-        });
-
-        if (existingFace) {
-          toast({
-            title: "Account Already Exists",
-            description: "It looks like you already have an account with us. Please try signing in instead.",
-            variant: "destructive"
-          });
-          setIsSubmitting(false);
-          return;
-        }
       }
       
       // Create new user account directly (no existing user checks in auth.users)
@@ -618,15 +553,8 @@ const RegistrationForm = ({ onSubmit, onBackToLogin }: RegistrationFormProps) =>
         is_custom_city: formData.isCustomCity || false,
         max_distance: formData.maxDistance || 250,
         country_code: formData.countryCode || '',
-        adinkra_symbols: formData.adinkraSymbols || [],
-        face_descriptor: faceDescriptor ? descriptorToHash(faceDescriptor) : null
+        adinkra_symbols: formData.adinkraSymbols || []
       };
-
-      console.log('💾 Saving profile with face descriptor:', {
-        userId,
-        hasFaceDescriptor: !!faceDescriptor,
-        faceDescriptorLength: faceDescriptor ? descriptorToHash(faceDescriptor).length : 0
-      });
 
       if (existingProfile) {
         // Profile exists, update it
@@ -765,7 +693,7 @@ const RegistrationForm = ({ onSubmit, onBackToLogin }: RegistrationFormProps) =>
           webkit-playsinline="true"
           x5-playsinline="true"
           preload="auto"
-          src={videoPreloader.getVideoUrl()}
+          src="/welcome-video.mp4"
           className="absolute top-0 left-0 w-full h-full object-cover opacity-30"
           onLoadedData={(e) => {
             e.currentTarget.playbackRate = 1.2;
@@ -799,10 +727,8 @@ const RegistrationForm = ({ onSubmit, onBackToLogin }: RegistrationFormProps) =>
         </div>
         <CardTitle className="text-2xl font-bold bg-gradient-to-r from-pink-600 to-purple-600 bg-clip-text text-transparent animate-fade-in">
           {currentStep === 1 
-            ? 'Verify Your Face'
-            : currentStep === 2 
             ? t('registration.createAccount') 
-            : currentStep === 3
+            : currentStep === 2
             ? t('registration.tellUsMore') 
             : t('registration.addPhotos')}
         </CardTitle>
@@ -811,40 +737,16 @@ const RegistrationForm = ({ onSubmit, onBackToLogin }: RegistrationFormProps) =>
         <form onSubmit={handleSubmit} className="space-y-8">
           {currentStep === 1 && (
             <div className="space-y-6 animate-fade-in">
-              <NativeFaceScanner
-                onScanComplete={(descriptors) => {
-                  // Convert MultiAngleFaceDescriptors to JSON string for storage
-                  setFaceDescriptor(JSON.stringify(descriptors));
-                  toast({
-                    title: 'Face Verified ⚡',
-                    description: '✓ Your face has been verified successfully with native speed!',
-                  });
-                  // Auto-advance to next step
-                  setCurrentStep(2);
-                }}
-                onSkip={() => {
-                  toast({
-                    title: 'Face Scan Skipped',
-                    description: 'You can continue without face verification, but it helps prevent fake profiles.',
-                  });
-                  setCurrentStep(2);
-                }}
+              <BasicInfoSection
+                formData={formData}
+                errors={errors}
+                showPassword={showPassword}
+                showConfirmPassword={showConfirmPassword}
+                onInputChange={handleInputChange}
+                onSelectChange={handleSelectChange}
+                onTogglePassword={() => setShowPassword(!showPassword)}
+                onToggleConfirmPassword={() => setShowConfirmPassword(!showConfirmPassword)}
               />
-            </div>
-          )}
-
-          {currentStep === 2 && (
-            <div className="space-y-6 animate-fade-in">
-          <BasicInfoSection
-            formData={formData}
-            errors={errors}
-            showPassword={showPassword}
-            showConfirmPassword={showConfirmPassword}
-            onInputChange={handleInputChange}
-            onSelectChange={handleSelectChange}
-            onTogglePassword={() => setShowPassword(!showPassword)}
-            onToggleConfirmPassword={() => setShowConfirmPassword(!showConfirmPassword)}
-          />
 
           {/* Work & Education */}
           <div className="space-y-4 animate-scale-in">
@@ -915,10 +817,9 @@ const RegistrationForm = ({ onSubmit, onBackToLogin }: RegistrationFormProps) =>
               autoDetect={true}
             />
           </div>
-          </div>
           )}
 
-          {currentStep === 3 && (
+          {currentStep === 2 && (
             <div className="space-y-6 animate-fade-in">
 
           {/* Gender and Preference */}
@@ -981,7 +882,7 @@ const RegistrationForm = ({ onSubmit, onBackToLogin }: RegistrationFormProps) =>
           </div>
           )}
 
-          {currentStep === 4 && (
+          {currentStep === 3 && (
             <div className="space-y-6 animate-fade-in">
               <div className="text-center">
                 <div className="flex items-center justify-center mb-4">
@@ -1062,9 +963,9 @@ const RegistrationForm = ({ onSubmit, onBackToLogin }: RegistrationFormProps) =>
               >
                 {isSubmitting 
                   ? t('registration.creatingAccount')
-                  : currentStep === 2 
+                  : currentStep === 1 
                     ? t('registration.continue')
-                    : currentStep === 3
+                    : currentStep === 2
                     ? t('registration.addPhoto')
                     : t('registration.createAccount')
                 }

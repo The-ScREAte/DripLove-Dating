@@ -88,13 +88,23 @@ export default {
         'ellipse-dash': {
           '0%': { strokeDashoffset: '850' },
           '100%': { strokeDashoffset: '0' }
+        },
+        'clock-fill': {
+          '0%': { strokeDashoffset: '251.2' },
+          '100%': { strokeDashoffset: '0' }
+        },
+        'clock-rotate': {
+          '0%': { transform: 'rotate(0deg)' },
+          '100%': { transform: 'rotate(360deg)' }
         }
       },
       animation: {
         'accordion-down': 'accordion-down 0.2s ease-out',
         'accordion-up': 'accordion-up 0.2s ease-out',
         'dash': 'dash 5s linear forwards',
-        'ellipse-dash': 'ellipse-dash 1.5s linear forwards'
+        'ellipse-dash': 'ellipse-dash 1.5s linear forwards',
+        'clock-fill': 'clock-fill 1.5s linear forwards',
+        'clock-rotate': 'clock-rotate 4s linear forwards'
       }
     }
   },

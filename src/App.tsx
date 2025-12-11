@@ -8,13 +8,9 @@ import AppRoutes from "@/components/AppRoutes";
 import { initKeyboardHandler, destroyKeyboardHandler } from "@/utils/keyboardHandler";
 import { detectDeviceLanguage } from "@/utils/languageSync";
 import i18n from "@/i18n/config";
-import { preloadFaceMesh } from "@/utils/facePreload";
-
-// Preload MediaPipe models early for instant face scanning
-preloadFaceMesh();
 
 const queryClient = new QueryClient();
-
+ 
 const App = () => {
   // Add error boundary to prevent crashes
   const [hasError, setHasError] = React.useState(false);

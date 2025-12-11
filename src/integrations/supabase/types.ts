@@ -527,7 +527,6 @@ export type Database = {
           education_level: string | null
           email: string
           exercise_level: string | null
-          face_descriptor: string | null
           first_name: string
           fun_fact: string | null
           gender: string | null
@@ -577,7 +576,6 @@ export type Database = {
           education_level?: string | null
           email: string
           exercise_level?: string | null
-          face_descriptor?: string | null
           first_name: string
           fun_fact?: string | null
           gender?: string | null
@@ -627,7 +625,6 @@ export type Database = {
           education_level?: string | null
           email?: string
           exercise_level?: string | null
-          face_descriptor?: string | null
           first_name?: string
           fun_fact?: string | null
           gender?: string | null

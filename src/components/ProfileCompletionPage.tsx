@@ -393,7 +393,7 @@ const ProfileCompletionPage = () => {
     navigate('/');
   };
 
-  const handleSubmit = async (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => { 
     e.preventDefault();
     
     // Prevent double submission
@@ -611,8 +611,8 @@ const ProfileCompletionPage = () => {
           webkit-playsinline="true"
           x5-playsinline="true"
           preload="auto"
-          src={videoPreloader.getVideoUrl()}
-          className="absolute top-0 left-0 w-full h-full object-cover opacity-25"
+          src="/welcome-video.mp4"
+          className="absolute top-0 left-0 w-full h-full object-cover opacity-30"
           onTimeUpdate={(e) => {
             const video = e.currentTarget;
             if (video.duration && video.currentTime >= video.duration - 0.1) {

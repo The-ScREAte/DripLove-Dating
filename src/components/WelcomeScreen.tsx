@@ -2,7 +2,6 @@ import React from 'react';
 import { Button } from '@/components/ui/button';
 import { useTranslation } from 'react-i18next';
 import GlobalLanguageSelector from './GlobalLanguageSelector';
-import { videoPreloader } from '@/utils/videoPreloader';
 import { useNavigate } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
@@ -11,7 +10,6 @@ import { saveLanguageToProfile } from '@/utils/languageSync';
 import { getRedirectUri } from '@/config/oauth';
 import { Capacitor } from '@capacitor/core';
 import { cleanupSafariViewController } from '@/utils/safariViewController';
-import { preloadFaceMesh } from '@/utils/facePreload';
 
 interface WelcomeScreenProps {
   onLogin: () => void;
@@ -35,18 +33,8 @@ const WelcomeScreen: React.FC<WelcomeScreenProps> = ({ onLogin, onAbout, onTerms
   const isIOS = platform === 'ios';
 
   React.useEffect(() => {
-    // On iOS, use direct URL instead of blob URL for better compatibility
-    if (isIOS) {
-      setVideoSrc('/welcome-video.mp4');
-      return;
-    }
-
-    // Update to blob URL when ready (non-blocking) - non-iOS only
-    videoPreloader.preloadVideo().then((url) => {
-      setVideoSrc(url);
-    }).catch((error) => {
-      console.error('Video preload failed, using direct URL:', error);
-    });
+    // Use direct video URL
+    setVideoSrc('/welcome-video.mp4');
 
     // Preload Google Auth on Android in background for instant sign-in
     if (isNative && platform === 'android') {
@@ -62,7 +50,7 @@ const WelcomeScreen: React.FC<WelcomeScreenProps> = ({ onLogin, onAbout, onTerms
         }, 500); // Delay 500ms to avoid blocking initial render
       }).catch(() => {});
     }
-  }, [isNative, platform, isIOS]);
+  }, [isNative, platform, isIOS]); 
 
   // Cleanup Safari View Controller listeners on unmount
   React.useEffect(() => {

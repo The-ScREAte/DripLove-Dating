@@ -13,14 +13,13 @@ import ErrorBoundary from '@/components/ErrorBoundary';
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
 import { transformFormDataForSubmission } from '@/utils/formValidation';
-import { videoPreloader } from '@/utils/videoPreloader';
 import VideoBackground from '@/components/VideoBackground';
 import { preloadPricingConfig } from '@/hooks/usePricingConfig';
 
 // Lazy load AdminPage (54KB) - only loads when admin features are accessed
 const LazyAdminPage = lazy(() => import('@/components/AdminPage'));
 
-// Loading component for lazy-loaded pages
+// Loading component for lazy-loaded pages 
 const PageLoader = () => (
   <div className="min-h-fill bg-gradient-to-br from-pink-50 to-purple-50 flex items-center justify-center">
     <div className="text-center">
