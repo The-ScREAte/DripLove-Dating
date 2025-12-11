@@ -390,8 +390,6 @@ const RegistrationForm = ({ onSubmit, onBackToLogin }: RegistrationFormProps) =>
     // Prevent double submission
     if (isSubmitting) return;
     
-    // Step 1: Face scan (handled by FaceScanner onScanComplete/onSkip)
-    if (currentStep === 1) {
     // Step 1: Basic info (name, email, password, etc)
     if (currentStep === 1) {
       handleContinue();
