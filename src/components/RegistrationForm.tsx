@@ -817,13 +817,13 @@ const RegistrationForm = ({ onSubmit, onBackToLogin }: RegistrationFormProps) =>
               autoDetect={true}
             />
           </div>
+            </div>
           )}
 
           {currentStep === 2 && (
             <div className="space-y-6 animate-fade-in">
-
-          {/* Gender and Preference */}
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 animate-scale-in">
+              {/* Gender and Preference */}
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4 animate-scale-in">
             <div className="space-y-2">
               <Label className="text-sm font-medium">{t('registration.iAm')} *</Label>
               <Select value={formData.gender} onValueChange={(value) => handleSelectChange('gender', value)}>
@@ -879,7 +879,7 @@ const RegistrationForm = ({ onSubmit, onBackToLogin }: RegistrationFormProps) =>
               />
               {errors.adinkraSymbols && <p className="text-red-500 text-xs mt-1">{errors.adinkraSymbols}</p>}
             </div>
-          </div>
+            </div>
           )}
 
           {currentStep === 3 && (
@@ -954,9 +954,7 @@ const RegistrationForm = ({ onSubmit, onBackToLogin }: RegistrationFormProps) =>
                 {t('registration.back')}
               </Button>
             )}
-            {/* Hide submit button on step 1 since FaceScanner has its own buttons */}
-            {currentStep !== 1 && (
-              <Button 
+            <Button 
                 type="submit" 
                 disabled={isSubmitting}
                 className="w-full bg-gradient-to-r from-pink-500 to-purple-600 hover:from-pink-600 hover:to-purple-700 text-white font-semibold py-3 rounded-lg transition-all duration-200 animate-fade-in disabled:opacity-50 disabled:cursor-not-allowed"
@@ -970,7 +968,6 @@ const RegistrationForm = ({ onSubmit, onBackToLogin }: RegistrationFormProps) =>
                     : t('registration.createAccount')
                 }
               </Button>
-            )}
           </div>
           <div className="text-center animate-fade-in">
             <button
