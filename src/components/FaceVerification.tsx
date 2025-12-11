@@ -19,6 +19,10 @@ export default function FaceVerification() {
   const detectionIntervalRef = useRef<number | null>(null);
   const isNative = Capacitor.isNativePlatform();
   const CAMERA_SIZE = 280;
+  const DETECTION_SIZE = 416;
+  const DETECTION_TIMEOUT_MS = 3000;
+  const [detectionLagging, setDetectionLagging] = useState(false);
+  const detectionLagRef = useRef<number | null>(null);
 
   const waitForNextFrame = () => new Promise<void>((resolve) => requestAnimationFrame(() => resolve()));
 
@@ -193,14 +197,16 @@ export default function FaceVerification() {
         const result = await CameraPreview.capture({ quality: 90 });
         base64 = result.value;
       } else {
-        // Web browser capture
+        // Web browser capture (unmirrored)
         if (videoRef.current) {
           const canvas = document.createElement('canvas');
           canvas.width = CAMERA_SIZE;
           canvas.height = CAMERA_SIZE;
           const ctx = canvas.getContext('2d');
+
           if (ctx) {
-            ctx.drawImage(videoRef.current, 0, 0, CAMERA_SIZE, CAMERA_SIZE);
+            ctx.scale(-1, 1);
+            ctx.drawImage(videoRef.current, -CAMERA_SIZE, 0, CAMERA_SIZE, CAMERA_SIZE);
             base64 = canvas.toDataURL('image/jpeg', 0.9);
           }
         }
@@ -233,11 +239,13 @@ export default function FaceVerification() {
     try {
       if (!isNative) {
         if (!videoRef.current) return false;
-        const currentAngle = await detectFaceAngleFromElement(videoRef.current);
+        const frame = getUnmirroredCanvas(videoRef.current, DETECTION_SIZE);
+        if (!frame) return false;
+        const currentAngle = await detectFaceAngleFromElement(frame);
         return currentAngle === angle;
       }
 
-      const sample = await CameraPreview.captureSample({ quality: 60 });
+      const sample = await CameraPreview.captureSample({ quality: 90 });
       if (!sample.value) return false;
       const imageElement = await loadImageFromBase64(sample.value);
       const currentAngle = await detectFaceAngleFromElement(imageElement);
@@ -253,7 +261,13 @@ export default function FaceVerification() {
   ): Promise<'front' | 'left' | 'right' | null> {
     if (!faceApiReady) return null;
     const detection = await faceapi
-      .detectSingleFace(element, new faceapi.TinyFaceDetectorOptions({ inputSize: 128 }))
+      .detectSingleFace(
+        element,
+        new faceapi.TinyFaceDetectorOptions({
+          inputSize: DETECTION_SIZE,
+          scoreThreshold: 0.02
+        })
+      )
       .withFaceLandmarks(true);
 
     if (!detection) return null;
@@ -291,6 +305,19 @@ export default function FaceVerification() {
       }
       img.src = src;
     });
+  }
+
+  function getUnmirroredCanvas(video: HTMLVideoElement, size = CAMERA_SIZE) {
+    const canvas = document.createElement('canvas');
+    canvas.width = size;
+    canvas.height = size;
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return null;
+    ctx.save();
+    ctx.scale(-1, 1);
+    ctx.drawImage(video, -size, 0, size, size);
+    ctx.restore();
+    return canvas;
   }
 
   async function submit() {
@@ -350,26 +377,49 @@ export default function FaceVerification() {
       clearInterval(detectionIntervalRef.current);
     }
 
-    const checkFrame = async () => {
-      if (!videoRef.current) return;
-      try {
-        const currentAngle = await detectFaceAngleFromElement(videoRef.current);
+          const frame = getUnmirroredCanvas(videoRef.current, DETECTION_SIZE);
+    setDetectionLagging(false);
+
+    const resetDetectionLag = () => {
+      detectionLagRef.current = null;
+      setDetectionLagging(false);
+    };
+
+    const registerDetectionFailure = () => {
+      if (detectionLagRef.current === null) {
+        detectionLagRef.current = Date.now();
+        return;
+      }
+      if (Date.now() - detectionLagRef.current >= DETECTION_TIMEOUT_MS) {
+        setDetectionLagging(true);
+      }
+    };
+
+      const checkFrame = async () => {
+        if (!videoRef.current || !faceApiReady) return;
+        try {
+          const frame = getUnmirroredCanvas(videoRef.current, DETECTION_SIZE);
+        if (!frame) return;
+        const currentAngle = await detectFaceAngleFromElement(frame);
         const hasFace = currentAngle !== null;
         setIsFaceDetected(hasFace);
         if (hasFace) {
+          resetDetectionLag();
           setFaceAngleCorrect(currentAngle === getCurrentRequiredAngle());
         } else {
+          registerDetectionFailure();
           setFaceAngleCorrect(false);
         }
       } catch (error) {
         console.error('Face detection error', error);
+        registerDetectionFailure();
         setIsFaceDetected(false);
         setFaceAngleCorrect(false);
       }
     };
 
     checkFrame();
-    detectionIntervalRef.current = window.setInterval(checkFrame, 600);
+    detectionIntervalRef.current = window.setInterval(checkFrame, 150);
   }
 
   function getCurrentRequiredAngle(): 'front' | 'left' | 'right' {
@@ -412,16 +462,16 @@ export default function FaceVerification() {
               }} 
             >
               {/* Web browser video element */}
-              {!isNative && (
-                <video
-                  ref={videoRef}
-                  autoPlay
-                  playsInline
-                  muted
-                  className="w-full h-full object-cover rounded-full"
-                  style={{ transform: 'scaleX(-1)' }}
-                />
-              )}
+                {!isNative && (
+                  <video
+                    ref={videoRef}
+                    autoPlay
+                    playsInline
+                    muted
+                    className="w-full h-full object-cover rounded-full"
+                    style={{ transform: 'scaleX(-1)' }}
+                  />
+                )}
               
               {/* Loading state while camera initializes */}
               {isLoading && step === 1 && (
@@ -443,6 +493,11 @@ export default function FaceVerification() {
                 <div className="bg-black/30 px-6 py-2 rounded-full backdrop-blur-sm">
                   <p className="text-white/90 font-normal text-sm tracking-wide">{getInstructionText()}</p>
                 </div>
+                {!isNative && detectionLagging && (
+                  <div className="mt-3 bg-blue-500/80 px-4 py-2 rounded-full">
+                    <p className="text-white text-sm font-medium">Hold still for a moment—we're finding your face</p>
+                  </div>
+                )}
                 {!isNative && !isFaceDetected && (
                   <div className="mt-3 bg-red-500/80 px-4 py-2 rounded-full">
                     <p className="text-white text-sm font-medium">No face detected</p>
