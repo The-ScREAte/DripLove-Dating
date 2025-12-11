@@ -12,6 +12,7 @@ import { Heart, MapPin, Briefcase, GraduationCap, Upload, Shield, CheckCircle, A
 import BasicInfoSection from '@/components/forms/BasicInfoSection';
 import LocationInput from '@/components/forms/LocationInput';
 import AdinkraSymbolSelector from '@/components/forms/AdinkraSymbolSelector';
+import FaceVerification from '@/components/FaceVerification';
 import { validateRegistrationForm, transformFormDataForSubmission } from '@/utils/formValidation';
 import { initialFormData } from '@/constants/formData';
 import { occupationOptions, industryOptions } from '@/constants/professionOptions';
@@ -735,6 +736,24 @@ const RegistrationForm = ({ onSubmit, onBackToLogin }: RegistrationFormProps) =>
         <form onSubmit={handleSubmit} className="space-y-8">
           {currentStep === 1 && (
             <div className="space-y-6 animate-fade-in">
+              {/* Face Verification Section */}
+              <div className="space-y-4 p-4 bg-gradient-to-r from-purple-50 to-pink-50 rounded-lg border-2 border-purple-200">
+                <div className="text-center">
+                  <h3 className="text-lg font-semibold text-purple-800 mb-2">
+                    🔐 Face Verification Required
+                  </h3>
+                  <p className="text-sm text-gray-600 mb-4">
+                    To prevent duplicate accounts, we use AWS Rekognition to verify your identity.
+                  </p>
+                  <div className="text-xs text-gray-500 space-y-1">
+                    <p>✓ Take 3 photos: Front, Left, Right</p>
+                    <p>✓ Checks for duplicate faces (90% threshold)</p>
+                    <p>✓ Secure & private verification</p>
+                  </div>
+                </div>
+                <FaceVerification />
+              </div>
+
               <BasicInfoSection
                 formData={formData}
                 errors={errors}

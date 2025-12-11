@@ -1,0 +1,7 @@
+{
+  "version": 3,
+  "sources": ["../../node_modules/@capacitor-community/camera-preview/src/index.ts"],
+  "sourcesContent": ["import { registerPlugin } from '@capacitor/core';\n\nimport type { CameraPreviewPlugin } from './definitions';\n\nconst CameraPreview = registerPlugin<CameraPreviewPlugin>('CameraPreview', {\n  web: () => import('./web').then((m) => new m.CameraPreviewWeb()),\n});\n\nexport * from './definitions';\nexport { CameraPreview };\n"],
+  "mappings": ";;;AAAA,SAAS,sBAAsB;AAI/B,IAAM,gBAAgB,eAAoC,iBAAiB;EACzE,KAAK,MAAM,OAAO,mBAAO,EAAE,KAAK,CAAC,MAAM,IAAI,EAAE,iBAAgB,CAAE;CAChE;",
+  "names": []
+}
