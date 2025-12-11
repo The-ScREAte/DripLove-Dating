@@ -62,11 +62,13 @@ export const NativeFaceScanner: React.FC<NativeFaceScannerProps> = ({ onScanComp
   const [roll, setRoll] = useState(0);
   const [alignmentGood, setAlignmentGood] = useState(false);
   const [capturingProgress, setCapturingProgress] = useState(0);
+  const [thumbnails, setThumbnails] = useState<Record<string, string>>({});
 
   const videoRef = useRef<HTMLVideoElement>(null);
   const streamRef = useRef<MediaStream | null>(null);
   const captureLocked = useRef(false);
   const stepIndexRef = useRef(currentStepIndex);
+  const captureTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
   // Keep ref in sync with state
   useEffect(() => {
@@ -105,15 +107,45 @@ export const NativeFaceScanner: React.FC<NativeFaceScannerProps> = ({ onScanComp
 
     setAlignmentGood(aligned);
 
+    // If user moves out of position during capture, cancel and restart
+    if (!aligned && captureLocked.current) {
+      if (captureTimeoutRef.current) {
+        clearTimeout(captureTimeoutRef.current);
+        captureTimeoutRef.current = null;
+      }
+      captureLocked.current = false;
+      setCapturing(false);
+      return;
+    }
+
     if (aligned && !captureLocked.current) {
       captureLocked.current = true;
       setCapturing(true);
 
       // Start capture after 3 second animation
-      setTimeout(() => {
-        startCapture();
+      captureTimeoutRef.current = setTimeout(() => {
+        captureWithThumbnail();
       }, 3000);
     }
+  };
+
+  const captureWithThumbnail = () => {
+    // Capture thumbnail from video
+    if (videoRef.current) {
+      const canvas = document.createElement('canvas');
+      canvas.width = 100;
+      canvas.height = 120;
+      const ctx = canvas.getContext('2d');
+      if (ctx) {
+        ctx.save();
+        ctx.scale(-1, 1);
+        ctx.drawImage(videoRef.current, -100, 0, 100, 120);
+        ctx.restore();
+        const thumbnail = canvas.toDataURL('image/jpeg', 0.7);
+        setThumbnails(prev => ({ ...prev, [currentAngle]: thumbnail }));
+      }
+    }
+    startCapture();
   };
 
   useEffect(() => {
@@ -152,6 +184,9 @@ export const NativeFaceScanner: React.FC<NativeFaceScannerProps> = ({ onScanComp
       listener.then(l => l.remove());
       if (streamRef.current) {
         streamRef.current.getTracks().forEach(track => track.stop());
+      }
+      if (captureTimeoutRef.current) {
+        clearTimeout(captureTimeoutRef.current);
       }
     };
   }, [capturing]); // Removed currentStepIndex - using ref instead
@@ -342,9 +377,16 @@ export const NativeFaceScanner: React.FC<NativeFaceScannerProps> = ({ onScanComp
 
   const resetFlow = () => {
     setDescriptors({});
+    setThumbnails({});
     setCurrentStepIndex(0);
     setProgressMessage('');
     setError(null);
+    if (captureTimeoutRef.current) {
+      clearTimeout(captureTimeoutRef.current);
+      captureTimeoutRef.current = null;
+    }
+    captureLocked.current = false;
+    setCapturing(false);
     if (canPreview) {
       startPreview().catch(() => {});
     }
@@ -439,9 +481,9 @@ export const NativeFaceScanner: React.FC<NativeFaceScannerProps> = ({ onScanComp
           {/* Spinner overlay - ON TOP of frame */}
           {capturing && (
             <svg 
-              className="absolute inset-0 w-full h-full -rotate-90 z-20 pointer-events-none" 
+              className="absolute inset-0 w-full h-full z-20 pointer-events-none" 
               viewBox="0 0 250 300"
-              style={{ transform: 'rotate(-90deg)' }}
+              style={{ transform: 'rotate(90deg)' }}
             >
               <ellipse
                 cx="125"
@@ -532,6 +574,37 @@ export const NativeFaceScanner: React.FC<NativeFaceScannerProps> = ({ onScanComp
             )}
           </div>
         </div>
+
+        {/* Captured thumbnails */}
+        {Object.keys(thumbnails).length > 0 && (
+          <div className="flex justify-center gap-3">
+            {CAPTURE_STEPS.map((angle) => (
+              <div key={angle} className="text-center">
+                <div 
+                  className={`w-14 h-16 rounded-lg overflow-hidden border-2 ${
+                    thumbnails[angle] ? 'border-green-500' : 'border-muted'
+                  }`}
+                  style={{ borderRadius: '40%' }}
+                >
+                  {thumbnails[angle] ? (
+                    <img 
+                      src={thumbnails[angle]} 
+                      alt={`${angle} capture`}
+                      className="w-full h-full object-cover"
+                    />
+                  ) : (
+                    <div className="w-full h-full bg-muted/30 flex items-center justify-center">
+                      <Camera className="w-4 h-4 text-muted-foreground/50" />
+                    </div>
+                  )}
+                </div>
+                <span className="text-[10px] text-muted-foreground mt-1 block">
+                  {STEP_LABELS[angle]}
+                </span>
+              </div>
+            ))}
+          </div>
+        )}
 
         {progressMessage && !error && (
           <div className="text-sm text-center font-medium text-muted-foreground">{progressMessage}</div>
