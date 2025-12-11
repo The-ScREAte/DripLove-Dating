@@ -66,7 +66,7 @@ export default defineConfig(({ mode }) => ({
       'react-i18next'
     ],
     // Exclude heavy deps that should be lazy loaded
-    exclude: ['@capacitor/core', '@vladmandic/face-api'],
+    exclude: ['@capacitor/core'],
     // Force re-bundling on certain changes
     force: false
   },

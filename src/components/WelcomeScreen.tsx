@@ -11,6 +11,7 @@ import { saveLanguageToProfile } from '@/utils/languageSync';
 import { getRedirectUri } from '@/config/oauth';
 import { Capacitor } from '@capacitor/core';
 import { cleanupSafariViewController } from '@/utils/safariViewController';
+import { preloadFaceMesh } from '@/utils/facePreload';
 
 interface WelcomeScreenProps {
   onLogin: () => void;

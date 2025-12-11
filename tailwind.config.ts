@@ -80,11 +80,16 @@ export default {
         'accordion-up': {
           from: { height: 'var(--radix-accordion-content-height)' },
           to: { height: '0' }
+        },
+        'dash': {
+          '0%': { strokeDashoffset: '301.59' },
+          '100%': { strokeDashoffset: '0' }
         }
       },
       animation: {
         'accordion-down': 'accordion-down 0.2s ease-out',
-        'accordion-up': 'accordion-up 0.2s ease-out'
+        'accordion-up': 'accordion-up 0.2s ease-out',
+        'dash': 'dash 5s linear forwards'
       }
     }
   },
