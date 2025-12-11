@@ -812,8 +812,9 @@ const RegistrationForm = ({ onSubmit, onBackToLogin }: RegistrationFormProps) =>
           {currentStep === 1 && (
             <div className="space-y-6 animate-fade-in">
               <NativeFaceScanner
-                onScanComplete={(descriptor) => {
-                  setFaceDescriptor(descriptor);
+                onScanComplete={(descriptors) => {
+                  // Convert MultiAngleFaceDescriptors to JSON string for storage
+                  setFaceDescriptor(JSON.stringify(descriptors));
                   toast({
                     title: 'Face Verified ⚡',
                     description: '✓ Your face has been verified successfully with native speed!',
