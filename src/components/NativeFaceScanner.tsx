@@ -66,6 +66,12 @@ export const NativeFaceScanner: React.FC<NativeFaceScannerProps> = ({ onScanComp
   const videoRef = useRef<HTMLVideoElement>(null);
   const streamRef = useRef<MediaStream | null>(null);
   const captureLocked = useRef(false);
+  const stepIndexRef = useRef(currentStepIndex);
+
+  // Keep ref in sync with state
+  useEffect(() => {
+    stepIndexRef.current = currentStepIndex;
+  }, [currentStepIndex]);
 
   // Ensure currentStepIndex never exceeds bounds
   const safeStepIndex = Math.min(currentStepIndex, CAPTURE_STEPS.length - 1);
@@ -86,7 +92,8 @@ export const NativeFaceScanner: React.FC<NativeFaceScannerProps> = ({ onScanComp
   const MAX_ROLL = 18;
 
   const evaluateAlignment = (currentYaw: number, currentRoll: number) => {
-    const angle = CAPTURE_STEPS[currentStepIndex];
+    // Use ref for latest step index to avoid stale closure issues
+    const angle = CAPTURE_STEPS[stepIndexRef.current];
 
     let aligned = false;
 
@@ -102,10 +109,10 @@ export const NativeFaceScanner: React.FC<NativeFaceScannerProps> = ({ onScanComp
       captureLocked.current = true;
       setCapturing(true);
 
-      // Show loading animation for 5 seconds
+      // Start capture after 3 second animation
       setTimeout(() => {
         startCapture();
-      }, 5000);   // 🔥 5-second border animation
+      }, 3000);
     }
   };
 
@@ -147,7 +154,7 @@ export const NativeFaceScanner: React.FC<NativeFaceScannerProps> = ({ onScanComp
         streamRef.current.getTracks().forEach(track => track.stop());
       }
     };
-  }, [currentStepIndex, capturing]);
+  }, [capturing]); // Removed currentStepIndex - using ref instead
 
   const checkPermission = async () => {
     try {
@@ -428,64 +435,73 @@ export const NativeFaceScanner: React.FC<NativeFaceScannerProps> = ({ onScanComp
           {renderInstructions()}
         </div>
 
-        <div className="relative mx-auto max-w-full" style={{ width: '250px', height: '300px' }}>
+        <div className="relative mx-auto" style={{ width: '250px', height: '300px' }}>
+          {/* Spinner overlay - ON TOP of frame */}
+          {capturing && (
+            <svg 
+              className="absolute inset-0 w-full h-full -rotate-90 z-20 pointer-events-none" 
+              viewBox="0 0 250 300"
+              style={{ transform: 'rotate(-90deg)' }}
+            >
+              <ellipse
+                cx="125"
+                cy="150"
+                rx="121"
+                ry="146"
+                fill="none"
+                stroke="#22c55e"
+                strokeWidth="6"
+                strokeDasharray="850"
+                strokeDashoffset="850"
+                className="animate-[ellipse-dash_3s_linear_forwards]"
+                strokeLinecap="round"
+              />
+            </svg>
+          )}
+          
+          {/* Oval frame with video */}
           <div
-            className={`relative rounded-full overflow-hidden border-4 transition-all w-full h-full ${
+            className={`relative overflow-hidden w-full h-full transition-colors duration-200 ${
               alignmentGood && !capturing
-                ? 'border-green-500'
+                ? 'ring-4 ring-green-500'
                 : capturing
-                ? 'border-green-500 bg-green-50 dark:bg-green-950'
-                : 'border-red-500'
+                ? 'ring-4 ring-green-500'
+                : 'ring-4 ring-red-500'
             }`}
+            style={{ borderRadius: '50%' }}
           >
             <video
               ref={videoRef}
               autoPlay
               playsInline
               muted
-              className={`w-full h-full object-cover object-center bg-black transition-opacity duration-300 ${
-                previewActive ? 'opacity-100' : 'opacity-0 pointer-events-none'
+              className={`w-full h-full object-cover bg-black transition-opacity duration-200 ${
+                previewActive ? 'opacity-100' : 'opacity-0'
               }`}
               style={{ transform: 'scaleX(-1)', objectPosition: '50% 40%' }}
             />
 
-            {previewActive && (
-              <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
-                {capturing && (
-                  <>
-                    <svg className="absolute w-full h-full -rotate-90" viewBox="0 0 100 100">
-                      <circle
-                        cx="50"
-                        cy="50"
-                        r="48"
-                        fill="none"
-                        stroke="#22c55e"
-                        strokeWidth="4"
-                        strokeDasharray="301.59"
-                        strokeDashoffset="0"
-                        className="animate-[dash_5s_linear_forwards]"
-                        strokeLinecap="round"
-                      />
-                    </svg>
-                    <p className="absolute bottom-8 text-lg font-bold text-white bg-green-500/90 px-6 py-2 rounded-full shadow-lg">Scanning...</p>
-                  </>
+            {/* Direction icons overlay */}
+            {previewActive && !capturing && (
+              <div className="absolute inset-0 flex items-center justify-center pointer-events-none z-10">
+                {alignmentGood ? (
+                  <CheckCircle className="w-16 h-16 text-green-400 drop-shadow-lg" />
+                ) : currentAngle === 'left' ? (
+                  <ArrowLeft className="w-14 h-14 text-white drop-shadow-lg animate-pulse" />
+                ) : currentAngle === 'right' ? (
+                  <ArrowRight className="w-14 h-14 text-white drop-shadow-lg animate-pulse" />
+                ) : (
+                  <ArrowUp className="w-14 h-14 text-white drop-shadow-lg animate-pulse" />
                 )}
-                {!capturing && alignmentGood && (
-                  <>
-                    <div className="absolute w-full h-full rounded-full border-4 border-green-500 animate-pulse" />
-                    <div className="absolute w-[90%] h-[90%] rounded-full border-4 border-green-400 animate-ping" />
-                    <CheckCircle className="w-20 h-20 text-green-400 drop-shadow-lg" />
-                  </>
-                )}
-                {!capturing && !alignmentGood && currentAngle === 'left' && yaw > -SIDE_THRESHOLD && (
-                  <ArrowLeft className="w-16 h-16 text-white drop-shadow-lg animate-pulse" />
-                )}
-                {!capturing && !alignmentGood && currentAngle === 'right' && yaw < SIDE_THRESHOLD && (
-                  <ArrowRight className="w-16 h-16 text-white drop-shadow-lg animate-pulse" />
-                )}
-                {!capturing && !alignmentGood && currentAngle === 'front' && Math.abs(yaw) > FRONT_TOLERANCE && (
-                  <Camera className="w-16 h-16 text-white drop-shadow-lg animate-pulse" />
-                )}
+              </div>
+            )}
+            
+            {/* Scanning text */}
+            {capturing && (
+              <div className="absolute bottom-6 left-0 right-0 flex justify-center z-10">
+                <p className="text-sm font-semibold text-white bg-green-500/90 px-4 py-1.5 rounded-full">
+                  Scanning...
+                </p>
               </div>
             )}
             {!previewActive && (

@@ -84,12 +84,17 @@ export default {
         'dash': {
           '0%': { strokeDashoffset: '301.59' },
           '100%': { strokeDashoffset: '0' }
+        },
+        'ellipse-dash': {
+          '0%': { strokeDashoffset: '850' },
+          '100%': { strokeDashoffset: '0' }
         }
       },
       animation: {
         'accordion-down': 'accordion-down 0.2s ease-out',
         'accordion-up': 'accordion-up 0.2s ease-out',
-        'dash': 'dash 5s linear forwards'
+        'dash': 'dash 5s linear forwards',
+        'ellipse-dash': 'ellipse-dash 3s linear forwards'
       }
     }
   },
