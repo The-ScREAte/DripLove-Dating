@@ -86,7 +86,9 @@
     "authenticationCancelled": "Authentication Cancelled",
     "googleSignInCancelled": "Google sign-in was cancelled.",
     "authenticationError": "Authentication Error",
-    "failedToOpenGoogleSignIn": "Failed to open Google Sign-In popup"
+    "failedToOpenGoogleSignIn": "Failed to open Google Sign-In popup",
+    "noConnection": "No Internet Connection",
+    "checkConnection": "Please check your internet connection and try again."
   },
   "profile": {
     "title": "Profile",
