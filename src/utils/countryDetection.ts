@@ -110,29 +110,61 @@ async function reverseGeocode(latitude: number, longitude: number): Promise<stri
 }
 
 /**
- * Get country from IP address using free IP geolocation service
+ * Get country from IP address using multiple fallback services
  */
 async function getCountryFromIP(): Promise<string | null> {
-  try {
-    // Try ipapi.co first (100 requests per day, no key needed)
-    const response = await fetch('https://ipapi.co/json/');
-    if (response.ok) {
-      const data = await response.json();
-      return data.country_code || null;
+  // List of IP geolocation services to try in order
+  const services = [
+    {
+      url: 'https://ipapi.co/json/',
+      getCountry: (data: any) => data.country_code
+    },
+    {
+      url: 'https://ipwho.is/',
+      getCountry: (data: any) => data.country_code
+    },
+    {
+      url: 'https://api.country.is/',
+      getCountry: (data: any) => data.country
+    },
+    {
+      url: 'https://freeipapi.com/api/json',
+      getCountry: (data: any) => data.countryCode
+    },
+    {
+      url: 'http://ip-api.com/json/',
+      getCountry: (data: any) => data.countryCode
     }
-    
-    // Fallback to ip-api.com (no key needed, no limit)
-    const fallbackResponse = await fetch('http://ip-api.com/json/');
-    if (fallbackResponse.ok) {
-      const data = await fallbackResponse.json();
-      return data.countryCode || null;
+  ];
+
+  for (const service of services) {
+    try {
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 5000); // 5 second timeout
+      
+      const response = await fetch(service.url, { 
+        signal: controller.signal,
+        headers: { 'Accept': 'application/json' }
+      });
+      
+      clearTimeout(timeoutId);
+      
+      if (response.ok) {
+        const data = await response.json();
+        const countryCode = service.getCountry(data);
+        if (countryCode) {
+          console.log(`IP geolocation success from ${service.url}:`, countryCode);
+          return countryCode;
+        }
+      }
+    } catch (error) {
+      console.log(`IP service ${service.url} failed:`, error);
+      // Continue to next service
     }
-    
-    return null;
-  } catch (error) {
-    console.error('IP geolocation error:', error);
-    return null;
   }
+  
+  console.error('All IP geolocation services failed');
+  return null;
 }
 
 /**

@@ -9,11 +9,12 @@ import {
   AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription,
   AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger
 } from '@/components/ui/alert-dialog';
-import { Upload, Trash2, Shield, AlertTriangle, CheckCircle, RefreshCw } from 'lucide-react';
+import { Upload, Trash2, Shield, AlertTriangle, CheckCircle, RefreshCw, BadgeCheck, Camera } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import { moderateImage, saveModerationResult, ModerationResult } from '@/utils/photoModeration';
 import { compressImage } from '@/utils/imageCompression';
+import FaceVerification from '@/components/FaceVerification';
 
 interface ImageManagementProps {
   currentUser: {
@@ -28,6 +29,12 @@ interface UserImage {
   moderation_status?: string;
 }
 
+interface ProfileData {
+  first_name: string;
+  last_name: string;
+  face_descriptor: string | null;
+}
+
 const ImageManagement = ({ currentUser }: ImageManagementProps) => {
   const { t } = useTranslation();
   const [userImages, setUserImages] = useState<UserImage[]>([]);
@@ -36,6 +43,9 @@ const ImageManagement = ({ currentUser }: ImageManagementProps) => {
   const [moderating, setModerating] = useState(false);
   const [moderationResult, setModerationResult] = useState<ModerationResult | null>(null);
   const [replacingImageUrl, setReplacingImageUrl] = useState<string | null>(null);
+  const [showFaceVerification, setShowFaceVerification] = useState(false);
+  const [faceVerified, setFaceVerified] = useState(false);
+  const [profileData, setProfileData] = useState<ProfileData | null>(null);
   const { toast } = useToast();
 
   const fetchUserImages = useCallback(async () => {
@@ -84,9 +94,30 @@ const ImageManagement = ({ currentUser }: ImageManagementProps) => {
     }
   }, [currentUser?.id]);
 
+  // Fetch profile data (including face verification status)
+  const fetchProfileData = useCallback(async () => {
+    if (!currentUser?.id) return;
+    
+    try {
+      const { data: profile, error } = await supabase
+        .from('profiles')
+        .select('first_name, last_name, face_descriptor')
+        .eq('id', currentUser.id)
+        .single();
+      
+      if (error) throw error;
+      
+      setProfileData(profile);
+      setFaceVerified(!!profile?.face_descriptor);
+    } catch (error) {
+      console.error('Error fetching profile:', error);
+    }
+  }, [currentUser?.id]);
+
   useEffect(() => {
     fetchUserImages();
-  }, [fetchUserImages, currentUser?.id]);
+    fetchProfileData();
+  }, [fetchUserImages, fetchProfileData, currentUser?.id]);
 
   const handleImageUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
@@ -450,11 +481,66 @@ const ImageManagement = ({ currentUser }: ImageManagementProps) => {
     }
   };
 
+  // Handle face verification completion
+  const handleFaceVerified = async (faceImage: string) => {
+    if (!currentUser?.id || !profileData) return;
+    
+    try {
+      // Index the face with user's name
+      const { data, error } = await supabase.functions.invoke('face-verify', {
+        body: {
+          action: 'index_face',
+          front: faceImage,
+          userId: currentUser.id,
+          userName: `${profileData.first_name} ${profileData.last_name}`
+        }
+      });
+      
+      if (error) throw error;
+      
+      if (data?.success) {
+        // Save the face descriptor indicator to profile
+        await supabase
+          .from('profiles')
+          .update({ face_descriptor: data.faceId || 'verified' })
+          .eq('id', currentUser.id);
+        
+        setFaceVerified(true);
+        setShowFaceVerification(false);
+        
+        toast({
+          title: "Face Verified!",
+          description: "Your identity has been verified successfully.",
+        });
+        
+        // Refresh profile data
+        fetchProfileData();
+      } else {
+        throw new Error(data?.error || 'Verification failed');
+      }
+    } catch (error: any) {
+      console.error('Face verification error:', error);
+      toast({
+        title: "Verification Failed",
+        description: error.message || "Could not verify your face. Please try again.",
+        variant: "destructive"
+      });
+    }
+  };
+
   return (
     <Card>
       <CardHeader>
         <CardTitle className="flex items-center justify-between">
-          <span>{t('profile.yourPhotos')} ({userImages.length}/7)</span>
+          <div className="flex items-center gap-2">
+            <span>{t('profile.yourPhotos')} ({userImages.length}/7)</span>
+            {faceVerified && (
+              <span className="flex items-center gap-1 text-xs bg-green-100 text-green-700 px-2 py-0.5 rounded-full">
+                <BadgeCheck className="w-3 h-3" />
+                Verified
+              </span>
+            )}
+          </div>
           <div className="flex items-center space-x-2">
             <div className="relative group">
               <Shield className="w-4 h-4 text-purple-600" />
@@ -467,6 +553,52 @@ const ImageManagement = ({ currentUser }: ImageManagementProps) => {
         </CardTitle>
       </CardHeader>
       <CardContent>
+        {/* Face Verification Section */}
+        {!faceVerified && (
+          <div className="mb-6 p-4 bg-gradient-to-br from-purple-50 to-pink-50 rounded-xl border border-purple-100">
+            {showFaceVerification ? (
+              <div className="space-y-4">
+                <div className="flex items-center justify-between">
+                  <h4 className="font-semibold text-gray-800 flex items-center gap-2">
+                    <Shield className="w-5 h-5 text-purple-600" />
+                    Face Verification
+                  </h4>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => setShowFaceVerification(false)}
+                    className="text-xs"
+                  >
+                    Cancel
+                  </Button>
+                </div>
+                <FaceVerification
+                  onVerified={handleFaceVerified}
+                />
+              </div>
+            ) : (
+              <div className="flex items-center justify-between">
+                <div>
+                  <h4 className="font-semibold text-gray-800 flex items-center gap-2">
+                    <Camera className="w-5 h-5 text-purple-600" />
+                    Verify Your Identity
+                  </h4>
+                  <p className="text-xs text-gray-600 mt-1">
+                    Complete face verification to show others you're a real person
+                  </p>
+                </div>
+                <Button
+                  onClick={() => setShowFaceVerification(true)}
+                  className="bg-gradient-to-r from-purple-600 to-pink-600 text-white"
+                  size="sm"
+                >
+                  Verify Now
+                </Button>
+              </div>
+            )}
+          </div>
+        )}
+
         {userImages.length < 7 && (
           <div className="mb-6">
             <Label htmlFor="image_upload" className="block mb-2">{t('profile.uploadImage')}</Label>

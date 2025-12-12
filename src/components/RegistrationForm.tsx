@@ -360,6 +360,16 @@ const RegistrationForm = ({ onSubmit, onBackToLogin }: RegistrationFormProps) =>
     // Country is now optional per Apple's guidelines
     if (!formData.city.trim()) firstStepErrors.city = 'City is required';
     
+    // Face verification is required
+    if (!faceVerified) {
+      firstStepErrors.faceVerification = 'Face verification is required to continue';
+      toast({
+        title: "Face Verification Required",
+        description: "Please complete face verification before continuing.",
+        variant: "destructive"
+      });
+    }
+    
     // Email validation
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
     if (formData.email && !emailRegex.test(formData.email)) {
@@ -668,8 +678,37 @@ const RegistrationForm = ({ onSubmit, onBackToLogin }: RegistrationFormProps) =>
 
     setIsSubmitting(false); // Reset loading state
     
+    // Index face in Rekognition if face was verified
+    if (faceImageBase64 && userId) {
+      try {
+        const { data: faceData, error: faceError } = await supabase.functions.invoke('face-verify', {
+          body: {
+            action: 'index_face',
+            front: faceImageBase64,
+            userId: userId,
+            userName: `${formData.firstName} ${formData.lastName}`
+          }
+        });
+        
+        if (faceError) {
+          console.error('Face indexing error:', faceError);
+        } else if (faceData?.success) {
+          // Update profile with face descriptor
+          await supabase
+            .from('profiles')
+            .update({ face_descriptor: faceData.faceId || 'verified' })
+            .eq('id', userId);
+        }
+      } catch (faceIndexError) {
+        console.error('Face indexing failed:', faceIndexError);
+        // Don't block registration if face indexing fails
+      }
+    }
+    
     // Clear sessionStorage after successful registration
     sessionStorage.removeItem('registration_images');
+    sessionStorage.removeItem('registration_face_verified');
+    sessionStorage.removeItem('registration_face_image');
     
     // Fetch the new user from supabase and pass to onSubmit so app state updates
     try {
