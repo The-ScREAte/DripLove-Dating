@@ -530,44 +530,43 @@ const ImageManagement = ({ currentUser }: ImageManagementProps) => {
 
   return (
     <Card>
-      <CardHeader>
-        <CardTitle className="flex items-center justify-between">
+      <CardHeader className="pb-3">
+        <CardTitle className="flex items-center justify-between text-base">
           <div className="flex items-center gap-2">
-            <span>{t('profile.yourPhotos')} ({userImages.length}/7)</span>
+            <span>Photos ({userImages.length}/7)</span>
             {faceVerified && (
-              <span className="flex items-center gap-1 text-xs bg-green-100 text-green-700 px-2 py-0.5 rounded-full">
-                <BadgeCheck className="w-3 h-3" />
-                Personality Verified
+              <span className="flex items-center gap-1 text-[10px] bg-gradient-to-r from-green-100 to-emerald-100 text-green-700 px-2 py-1 rounded-full border border-green-200 shadow-sm">
+                <BadgeCheck className="w-3 h-3 text-green-600" />
+                <span className="font-medium">Verified ✨</span>
               </span>
             )}
           </div>
           <div className="flex items-center space-x-2">
             <div className="relative group">
               <Shield className="w-4 h-4 text-purple-600" />
-              <div className="absolute bottom-6 left-1/2 transform -translate-x-1/2 bg-gray-800 text-white text-xs rounded py-1 px-2 opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap">
+              <div className="absolute bottom-6 left-1/2 transform -translate-x-1/2 bg-gray-800 text-white text-xs rounded py-1 px-2 opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap z-10">
                 {t('profile.aiContentModeration')}
               </div>
             </div>
-            <Upload className="w-5 h-5 text-pink-600" />
           </div>
         </CardTitle>
       </CardHeader>
-      <CardContent>
+      <CardContent className="pt-0">
         {/* Face Verification Section */}
         {!faceVerified && (
-          <div className="mb-6 p-4 bg-gradient-to-br from-purple-50 to-pink-50 rounded-xl border border-purple-100">
+          <div className="mb-4 p-3 bg-gradient-to-br from-purple-50 to-pink-50 rounded-xl border border-purple-100">
             {showFaceVerification ? (
-              <div className="space-y-4">
+              <div className="space-y-3">
                 <div className="flex items-center justify-between">
-                  <h4 className="font-semibold text-gray-800 flex items-center gap-2">
-                    <Shield className="w-5 h-5 text-purple-600" />
+                  <h4 className="font-medium text-gray-800 text-sm flex items-center gap-2">
+                    <Shield className="w-4 h-4 text-purple-600" />
                     Face Verification
                   </h4>
                   <Button
                     variant="ghost"
                     size="sm"
                     onClick={() => setShowFaceVerification(false)}
-                    className="text-xs"
+                    className="text-xs h-7"
                   >
                     Cancel
                   </Button>
@@ -577,22 +576,22 @@ const ImageManagement = ({ currentUser }: ImageManagementProps) => {
                 />
               </div>
             ) : (
-              <div className="flex items-center justify-between">
-                <div>
-                  <h4 className="font-semibold text-gray-800 flex items-center gap-2">
-                    <Camera className="w-5 h-5 text-purple-600" />
+              <div className="flex items-center justify-between gap-3">
+                <div className="flex-1">
+                  <h4 className="font-medium text-gray-800 text-sm flex items-center gap-2">
+                    <Camera className="w-4 h-4 text-purple-600" />
                     Verify Your Identity
                   </h4>
-                  <p className="text-xs text-gray-600 mt-1">
-                    Complete face verification to show others you're a real person
+                  <p className="text-xs text-gray-600 mt-0.5">
+                    Show others you're real
                   </p>
                 </div>
                 <Button
                   onClick={() => setShowFaceVerification(true)}
-                  className="bg-gradient-to-r from-purple-600 to-pink-600 text-white"
+                  className="bg-gradient-to-r from-purple-600 to-pink-600 text-white text-xs h-8 px-3"
                   size="sm"
                 >
-                  Verify Now
+                  Verify
                 </Button>
               </div>
             )}
@@ -600,12 +599,10 @@ const ImageManagement = ({ currentUser }: ImageManagementProps) => {
         )}
 
         {userImages.length < 7 && (
-          <div className="mb-6">
-            <Label htmlFor="image_upload" className="block mb-2">{t('profile.uploadImage')}</Label>
-            
+          <div className="mb-4">
             {replacingImageUrl && (
-              <div className="mb-2 p-2 bg-blue-50 border border-blue-200 rounded text-sm text-blue-700 flex items-center justify-between">
-                <span>🔄 Replace mode active - Click to cancel and upload new image instead</span>
+              <div className="mb-2 p-2 bg-blue-50 border border-blue-200 rounded text-xs text-blue-700 flex items-center justify-between">
+                <span>🔄 Replace mode - Select new image</span>
                 <Button 
                   variant="ghost" 
                   size="sm" 
@@ -613,13 +610,13 @@ const ImageManagement = ({ currentUser }: ImageManagementProps) => {
                     setReplacingImageUrl(null);
                     toast({ 
                       title: "Replace cancelled", 
-                      description: "You can now upload a new image normally.",
+                      description: "You can now upload normally.",
                       variant: "default"
                     });
                   }}
                   className="h-6 px-2 text-xs hover:bg-blue-100"
                 >
-                  Cancel Replace
+                  Cancel
                 </Button>
               </div>
             )}
@@ -630,34 +627,33 @@ const ImageManagement = ({ currentUser }: ImageManagementProps) => {
               accept="image/*" 
               onChange={handleImageUpload} 
               disabled={uploading || moderating} 
-              className="w-full"
+              className="w-full text-sm"
               onClick={() => {
-                // Clear replace mode when user clicks the upload button directly
                 if (replacingImageUrl) {
                   setReplacingImageUrl(null);
                 }
               }}
             />
             {moderating && (
-              <div className="text-sm text-purple-600 mt-2 flex items-center">
-                <Shield className="animate-pulse w-4 h-4 mr-2" />
-                Checking image content...
+              <div className="text-xs text-purple-600 mt-2 flex items-center">
+                <Shield className="animate-pulse w-3 h-3 mr-1.5" />
+                Checking...
               </div>
             )}
             {uploading && (
-              <div className="text-sm text-gray-500 mt-2 flex items-center">
-                <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-pink-600 mr-2"></div>
+              <div className="text-xs text-gray-500 mt-2 flex items-center">
+                <div className="animate-spin rounded-full h-3 w-3 border-b-2 border-pink-600 mr-1.5"></div>
                 Uploading...
               </div>
             )}
             {moderationResult && !uploading && (
-              <div className={`text-sm mt-2 flex items-center ${
+              <div className={`text-xs mt-2 flex items-center ${
                 moderationResult.isApproved ? 'text-green-600' : 'text-red-600'
               }`}>
                 {moderationResult.isApproved ? (
-                  <CheckCircle className="w-4 h-4 mr-2" />
+                  <CheckCircle className="w-3 h-3 mr-1.5" />
                 ) : (
-                  <AlertTriangle className="w-4 h-4 mr-2" />
+                  <AlertTriangle className="w-3 h-3 mr-1.5" />
                 )}
                 {moderationResult.message}
               </div>
@@ -670,15 +666,34 @@ const ImageManagement = ({ currentUser }: ImageManagementProps) => {
             <div key={userImage.image_url} className="relative group">
               <img 
                 src={userImage.image_url} 
-                alt={`User Image ${index + 1}`} 
-                className="w-full h-28 sm:h-36 object-cover rounded-lg shadow-sm bg-gray-100"
+                alt={`Photo ${index + 1}`} 
+                className="w-full h-28 sm:h-36 object-cover rounded-lg shadow-sm bg-gray-200"
+                loading="lazy"
+                onLoad={(e) => {
+                  // Successfully loaded - ensure visible
+                  const target = e.target as HTMLImageElement;
+                  target.style.opacity = '1';
+                }}
                 onError={(e) => {
-                  // Retry loading the image once with a cache-busting query param
+                  // Retry loading the image with cache-busting
                   const target = e.target as HTMLImageElement;
                   if (!target.dataset.retried) {
                     target.dataset.retried = 'true';
-                    const separator = target.src.includes('?') ? '&' : '?';
+                    const separator = userImage.image_url.includes('?') ? '&' : '?';
                     target.src = `${userImage.image_url}${separator}t=${Date.now()}`;
+                  } else if (!target.dataset.retried2) {
+                    // Second retry with longer delay
+                    target.dataset.retried2 = 'true';
+                    setTimeout(() => {
+                      const sep = userImage.image_url.includes('?') ? '&' : '?';
+                      target.src = `${userImage.image_url}${sep}t=${Date.now()}&retry=2`;
+                    }, 1000);
+                  } else {
+                    // Show placeholder on final failure
+                    target.style.display = 'none';
+                    target.insertAdjacentHTML('afterend', 
+                      '<div class="w-full h-28 sm:h-36 bg-gray-200 rounded-lg flex items-center justify-center text-gray-400 text-xs">Loading...</div>'
+                    );
                   }
                 }}
               />
