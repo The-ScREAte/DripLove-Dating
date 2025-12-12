@@ -40,10 +40,23 @@ const RegistrationForm = ({ onSubmit, onBackToLogin }: RegistrationFormProps) =>
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [currentStep, setCurrentStep] = useState(1);
+  const [showFaceVerification, setShowFaceVerification] = useState(true);
+  const [faceVerified, setFaceVerified] = useState(false);
   const [images, setImages] = useState<ImageUpload[]>([]);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const { toast } = useToast();
   const { t } = useTranslation();
+
+  // Restore face verification state on mount
+  React.useEffect(() => {
+    try {
+      const saved = sessionStorage.getItem('registration_face_verified');
+      if (saved === '1') {
+        setFaceVerified(true);
+        setShowFaceVerification(false);
+      }
+    } catch {}
+  }, []);
 
   // Restore images from sessionStorage on mount
   React.useEffect(() => {
@@ -680,6 +693,53 @@ const RegistrationForm = ({ onSubmit, onBackToLogin }: RegistrationFormProps) =>
     }
   };
 
+  // Face verification must be the first step, on a stable full-screen layout.
+  if (showFaceVerification) {
+    return (
+      <div className="keyboard-safe-form relative min-h-screen bg-transparent">
+        {/* IMPORTANT: For native CameraPreview with toBack:true, the camera is behind the WebView.
+            Any painted background behind the circle (video/gradient/card bg) will hide the camera.
+            Keep this screen mostly transparent and only paint UI elements above/below the circle. */}
+
+        <div className="relative z-10 min-h-screen w-full flex items-start justify-center px-4 pt-12 pb-8 bg-transparent">
+          <div className="w-full max-w-md">
+            <div className="text-center mb-4">
+              <h2 className="text-xl font-semibold text-white">Face Verification</h2>
+              <p className="text-xs text-white/80 mt-1">Complete this first to continue registration.</p>
+            </div>
+
+            <FaceVerification
+              onVerified={() => {
+                setFaceVerified(true);
+                try { sessionStorage.setItem('registration_face_verified', '1'); } catch {}
+              }}
+            />
+
+            <div className="mt-4">
+              <Button
+                type="button"
+                disabled={!faceVerified}
+                onClick={() => setShowFaceVerification(false)}
+                className="w-full bg-white text-purple-700 hover:bg-white/90 font-semibold"
+              >
+                Continue
+              </Button>
+
+              <Button
+                type="button"
+                variant="outline"
+                onClick={onBackToLogin}
+                className="w-full mt-3 border-white/40 text-white hover:bg-white/10"
+              >
+                Back
+              </Button>
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="keyboard-safe-form input-scroll-container relative min-h-screen">
       {/* Video Background */}
@@ -736,23 +796,6 @@ const RegistrationForm = ({ onSubmit, onBackToLogin }: RegistrationFormProps) =>
         <form onSubmit={handleSubmit} className="space-y-8">
           {currentStep === 1 && (
             <div className="space-y-6 animate-fade-in">
-              {/* Face Verification Section */}
-              <div className="p-4 bg-white/70 rounded-xl border shadow-sm space-y-3 text-center">
-                <h3 className="text-lg font-semibold text-purple-700 flex items-center justify-center gap-2">
-                  🔐 Face Verification
-                </h3>
-
-                <p className="text-xs text-gray-600">
-                  Quick 3-step facial check to keep accounts real.
-                </p>
-
-                <p className="text-[11px] text-gray-500">
-                  We never store videos. Only 3 photos are used securely.
-                </p>
-
-                <FaceVerification />
-              </div>
-
               <BasicInfoSection
                 formData={formData}
                 errors={errors}

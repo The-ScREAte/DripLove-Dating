@@ -68,6 +68,8 @@ body.keyboard-open .chat-messages-container {
     top: 0;
     left: 0;
     overflow: hidden;
+    background: transparent !important;
+    background-color: transparent !important;
     /* Disable double-tap zoom */
     touch-action: manipulation;
     -webkit-touch-callout: none;

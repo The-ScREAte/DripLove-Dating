@@ -18,6 +18,7 @@ const OAuthCallback = lazy(() => import('./OAuthCallback'));
 const OAuthDebug = lazy(() => import('./OAuthDebug'));
 const PaymentSuccess = lazy(() => import('../pages/PaymentSuccess'));
 const Unsubscribe = lazy(() => import('../pages/Unsubscribe'));
+const FaceVerificationPage = lazy(() => import('../pages/FaceVerificationPage'));
 const ResetPasswordPage = lazy(() => import('./ResetPasswordPage'));
 const RedirectHandler = lazy(() => import('./RedirectHandler'));
 const TermsOfService = lazy(() => import('./TermsOfService'));
@@ -58,6 +59,7 @@ const AppRoutes = () => {
       <Routes>
         <Route path="/" element={<Index />} />
         <Route path="/discover" element={<DiscoverPage currentUser={null} />} />
+        <Route path="/face-verification" element={<FaceVerificationPage />} />
         <Route path="/payment-success" element={<PaymentSuccess />} />
         <Route path="/unsubscribe" element={<Unsubscribe />} />
         <Route path="/auth/callback" element={<OAuthCallback />} />

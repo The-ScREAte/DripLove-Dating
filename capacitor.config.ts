@@ -4,6 +4,9 @@ const config: CapacitorConfig = {
   appId: 'com.driplove.dating',
   appName: 'DripLove',
   webDir: 'dist',
+  // Transparent background is required on iOS for native CameraPreview with toBack:true
+  // (otherwise the WKWebView paints an opaque layer and the camera appears "blank").
+  backgroundColor: '#00000000',
   server: {
     androidScheme: 'https',
     iosScheme: 'capacitor',
@@ -20,14 +23,21 @@ const config: CapacitorConfig = {
     scheme: 'driplove',
     scrollEnabled: true,
     // Performance optimizations for iOS
-    preferredContentMode: 'mobile'
+    preferredContentMode: 'mobile',
+    // Ensure WKWebView itself is transparent (needed for CameraPreview toBack:true)
+    // Capacitor typings may not include this, but Capacitor will still read it.
+    webView: {
+      backgroundColor: '#00000000'
+    } as any,
+    backgroundColor: '#00000000'
   },
   android: {
     allowMixedContent: true,
     captureInput: true,
     webContentsDebuggingEnabled: false,
     // Performance optimizations for Android WebView
-    backgroundColor: '#ffffff',
+    // Transparent background is required for native CameraPreview with toBack:true
+    backgroundColor: '#00000000',
     // Enable hardware acceleration
     hardwareAccelerated: true,
     // Optimize WebView loading
