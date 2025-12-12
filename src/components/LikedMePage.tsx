@@ -96,14 +96,21 @@ const LikedMePage = ({ currentUser, isPremium = false }: LikedMePageProps) => {
   
   // ⭐ CRITICAL FIX: Track when scroll container is mounted for virtualizer
   useEffect(() => {
-    // Use a small delay to ensure DOM is ready
-    const timer = setTimeout(() => {
-      if (scrollContainerRef.current) {
+    // Use requestAnimationFrame to ensure DOM is fully painted
+    let mounted = true;
+    const checkMount = () => {
+      if (mounted && scrollContainerRef.current) {
         setScrollContainerMounted(true);
       }
-    }, 0);
-    return () => clearTimeout(timer);
-  }, []);
+    };
+    // Check immediately and also after a frame
+    checkMount();
+    const rafId = requestAnimationFrame(checkMount);
+    return () => {
+      mounted = false;
+      cancelAnimationFrame(rafId);
+    };
+  }, [loading]); // Re-run when loading changes (component structure changes)
 
   // ------------------
   // SAFE IMAGE RESOLVER (stable, never creates hooks)
@@ -204,9 +211,20 @@ const LikedMePage = ({ currentUser, isPremium = false }: LikedMePageProps) => {
     count: virtualizerCount,
     getScrollElement,
     estimateSize: getEstimateSize,
-    overscan: 3,
-    enabled: scrollContainerMounted // ⭐ Only enable when container is mounted
+    overscan: 5, // Increase overscan for better initial render
+    enabled: scrollContainerMounted && !loading // ⭐ Only enable when container is mounted AND not loading
   });
+  
+  // ⭐ Force virtualizer to re-measure when it becomes enabled
+  useEffect(() => {
+    if (scrollContainerMounted && !loading && likers.length > 0) {
+      // Small delay to ensure DOM is ready
+      const timer = setTimeout(() => {
+        rowVirtualizer.measure();
+      }, 50);
+      return () => clearTimeout(timer);
+    }
+  }, [scrollContainerMounted, loading, likers.length]);
 
   const calculateAge = useCallback((dateOfBirth: string) => {
     const today = new Date();
