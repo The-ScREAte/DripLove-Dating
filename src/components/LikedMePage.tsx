@@ -80,6 +80,7 @@ const LikedMePage = ({ currentUser, isPremium = false }: LikedMePageProps) => {
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [pullDistance, setPullDistance] = useState(0);
   const [startY, setStartY] = useState(0);
+  const [scrollContainerMounted, setScrollContainerMounted] = useState(false); // ⭐ For virtualizer safety
 
   // ------------------
   // REFS
@@ -92,6 +93,17 @@ const LikedMePage = ({ currentUser, isPremium = false }: LikedMePageProps) => {
   // MEMOIZED PLATFORM
   // ------------------
   const platform = useMemo(() => getPlatformSync(), []);
+  
+  // ⭐ CRITICAL FIX: Track when scroll container is mounted for virtualizer
+  useEffect(() => {
+    // Use a small delay to ensure DOM is ready
+    const timer = setTimeout(() => {
+      if (scrollContainerRef.current) {
+        setScrollContainerMounted(true);
+      }
+    }, 0);
+    return () => clearTimeout(timer);
+  }, []);
 
   // ------------------
   // SAFE IMAGE RESOLVER (stable, never creates hooks)
@@ -146,10 +158,12 @@ const LikedMePage = ({ currentUser, isPremium = false }: LikedMePageProps) => {
   const virtualizerCount = useMemo(() => {
     return likers.length > 0 ? Math.ceil(likers.length / columnsPerRow) : 0;
   }, [likers.length, columnsPerRow]);
+  
   // ⭐ ANDROID OPTIMIZATION: Memoized row config calculation (replaces 4 separate useStates + useEffect)
   const rowConfig = useMemo(() => {
     const maxWidth = 1400;
-    const containerWidth = scrollContainerRef.current 
+    // ⭐ FIX: Only access scrollContainerRef.current when mounted
+    const containerWidth = scrollContainerMounted && scrollContainerRef.current 
       ? Math.min(scrollContainerRef.current.clientWidth, maxWidth) 
       : Math.min(typeof window !== 'undefined' ? window.innerWidth : 375, maxWidth);
 
@@ -177,16 +191,20 @@ const LikedMePage = ({ currentUser, isPremium = false }: LikedMePageProps) => {
       rowPaddingHorizontal: rowPadding,
       rowColumnGap: horizontalGap
     };
-  }, [columnsPerRow]);
+  }, [columnsPerRow, scrollContainerMounted]);
 
   // Destructure for backwards compatibility
   const { estimatedRowHeight, rowVerticalGap, rowPaddingHorizontal, rowColumnGap } = rowConfig;
 
+  // ⭐ CRITICAL FIX: Create a stable scroll element getter that handles null safely
+  const getScrollElement = useCallback(() => scrollContainerRef.current, []);
+
   const rowVirtualizer = useVirtualizer({
     count: virtualizerCount,
-    getScrollElement: () => scrollContainerRef.current,
-    estimateSize: () => estimatedRowHeight,
-    overscan: 3
+    getScrollElement,
+    estimateSize: useCallback(() => estimatedRowHeight, [estimatedRowHeight]),
+    overscan: 3,
+    enabled: scrollContainerMounted // ⭐ Only enable when container is mounted
   });
 
   const calculateAge = useCallback((dateOfBirth: string) => {
