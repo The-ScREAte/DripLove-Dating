@@ -522,7 +522,7 @@ const RegistrationForm = ({ onSubmit, onBackToLogin }: RegistrationFormProps) =>
       userId = signUpData?.user?.id;
       userCreated = !!userId;
     } catch (err) {
-      setIsSubmitting(false);
+      setIsSubmitting(false); // Reset loading state
       toast({
         title: 'Account Creation Error',
         description: err.message || 'Failed to create account. Please try a different email or sign in if you already have an account.',
@@ -728,7 +728,14 @@ const RegistrationForm = ({ onSubmit, onBackToLogin }: RegistrationFormProps) =>
               <Button
                 type="button"
                 variant="outline"
-                onClick={onBackToLogin}
+                onClick={() => {
+                  // Clear face verification cache if user clicks back
+                  try { sessionStorage.removeItem('registration_face_verified'); } catch {}
+                  try { sessionStorage.removeItem('registration_images'); } catch {}
+                  setFaceVerified(false);
+                  setImages({ front: null, left: null, right: null });
+                  onBackToLogin();
+                }}
                 className="w-full mt-3 border-white/40 text-white hover:bg-white/10"
               >
                 Back

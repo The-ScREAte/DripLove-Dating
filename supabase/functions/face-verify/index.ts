@@ -1,4 +1,4 @@
-import { serve } from "https://deno.land/std/http/server.ts";
+import { serve } from "https://deno.land/std@0.208.0/http/server.ts";
 import { RekognitionClient, IndexFacesCommand, SearchFacesByImageCommand } from "npm:@aws-sdk/client-rekognition";
 
 const corsHeaders = {
@@ -9,14 +9,14 @@ const corsHeaders = {
 const client = new RekognitionClient({
   region: "us-east-1",
   credentials: {
-    accessKeyId: Deno.env.get("AWS_ACCESS_KEY_ID")!,
-    secretAccessKey: Deno.env.get("AWS_SECRET_ACCESS_KEY")!,
+    accessKeyId: Deno.env.get("AWS_ACCESS_KEY_ID") || "",
+    secretAccessKey: Deno.env.get("AWS_SECRET_ACCESS_KEY") || "",
   }
 });
 
 const COLLECTION = "driplove_faces";
 
-serve(async (req) => {
+serve(async (req: Request) => {
   // Handle CORS preflight requests
   if (req.method === 'OPTIONS') {
     return new Response('ok', { headers: corsHeaders });
@@ -27,7 +27,11 @@ serve(async (req) => {
 
   // Convert base64 → Buffer
   function decode(base64: string) {
-    return Buffer.from(base64.replace(/^data:image\/\w+;base64,/, ""), "base64");
+    return new Uint8Array(
+      atob(base64.replace(/^data:image\/\w+;base64,/, ""))
+        .split("")
+        .map(c => c.charCodeAt(0))
+    );
   }
 
   // Create a single combined image (AWS requires one image per indexing)
@@ -69,10 +73,11 @@ serve(async (req) => {
   return new Response(JSON.stringify({ success: true }), {
     headers: { ...corsHeaders, "Content-Type": "application/json" }
   });
-  } catch (error) {
+  } catch (error: unknown) {
+    const errorMessage = error instanceof Error ? error.message : String(error);
     return new Response(JSON.stringify({ 
       success: false, 
-      error: error.message 
+      error: errorMessage 
     }), {
       status: 500,
       headers: { ...corsHeaders, "Content-Type": "application/json" }
