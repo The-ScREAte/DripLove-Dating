@@ -44,7 +44,6 @@ const authOptions = {
     fetch: customFetch,
     headers: {
       'Accept': 'application/json',
-      'Content-Type': 'application/json',
     }
   }
 };
