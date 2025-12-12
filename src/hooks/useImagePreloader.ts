@@ -17,20 +17,19 @@ interface PreloadedImageData {
 
 export const useImagePreloader = (options: ImagePreloaderOptions = {}) => {
   const {
-    maxConcurrent = 4,
+    maxConcurrent = 3,
     quality = 85,
     width = 800,
     format = 'webp'
   } = options;
 
-  // imageStatus stores simple status for each URL: 'idle' | 'loading' | 'loaded' | 'error'
-  const [imageStatus, setImageStatus] = useState<Record<string, 'idle'|'loading'|'loaded'|'error'>>({});
+  const [preloadedImages, setPreloadedImages] = useState<Map<string, PreloadedImageData>>(new Map());
   const loadingQueue = useRef<string[]>([]);
-  const inFlight = useRef(0);
+  const isProcessing = useRef(false);
 
   const optimizeImageUrl = useCallback((url: string): string => {
     if (url.includes('supabase')) {
-      return `${url}?width=${width}&quality=${quality}&format=${format}&resize=contain`;
+      return `${url}?width=${width}&quality=${quality}&format=${format}`;
     }
     return url;
   }, [width, quality, format]);
@@ -38,74 +37,127 @@ export const useImagePreloader = (options: ImagePreloaderOptions = {}) => {
   const preloadImage = useCallback((url: string): Promise<void> => {
     return new Promise((resolve, reject) => {
       const optimizedUrl = optimizeImageUrl(url);
-
-      const status = imageStatus[url];
-      if (status === 'loaded') {
+      
+      // Check if already loaded or loading
+      const existing = preloadedImages.get(url);
+      if (existing?.loaded) {
         resolve();
         return;
       }
-      if (status === 'loading') {
-        // Poll until loaded or error
-        const check = () => {
-          const s = (imageStatus as any)[url];
-          if (s === 'loaded') return resolve();
-          if (s === 'error') return reject(new Error('Image failed to load'));
-          setTimeout(check, 50);
+      if (existing?.loading) {
+        // Wait for existing load to complete
+        const checkLoaded = () => {
+          const current = preloadedImages.get(url);
+          if (current?.loaded) {
+            resolve();
+          } else if (current?.error) {
+            reject(new Error('Image failed to load'));
+          } else {
+            setTimeout(checkLoaded, 100);
+          }
         };
-        check();
+        checkLoaded();
         return;
       }
 
-      // Mark loading
-      setImageStatus(prev => ({ ...prev, [url]: 'loading' }));
-      inFlight.current++;
+      // Mark as loading
+      setPreloadedImages(prev => new Map(prev.set(url, {
+        url,
+        loaded: false,
+        loading: true,
+        error: false,
+        optimizedUrl
+      })));
 
       const img = new Image();
-      img.loading = 'eager';
-      img.src = optimizedUrl;
-
+      
       img.onload = () => {
-        setImageStatus(prev => ({ ...prev, [url]: 'loaded' }));
-        inFlight.current = Math.max(0, inFlight.current - 1);
+        setPreloadedImages(prev => new Map(prev.set(url, {
+          url,
+          loaded: true,
+          loading: false,
+          error: false,
+          optimizedUrl
+        })));
         resolve();
       };
-
+      
       img.onerror = () => {
-        setImageStatus(prev => ({ ...prev, [url]: 'error' }));
-        inFlight.current = Math.max(0, inFlight.current - 1);
+        setPreloadedImages(prev => new Map(prev.set(url, {
+          url,
+          loaded: false,
+          loading: false,
+          error: true,
+          optimizedUrl
+        })));
         reject(new Error('Image failed to load'));
       };
+      
+      img.src = optimizedUrl;
     });
-  }, [optimizeImageUrl, imageStatus]);
+  }, [optimizeImageUrl, preloadedImages]);
 
   const processQueue = useCallback(async () => {
-    // Process queue respecting maxConcurrent and current inFlight
-    while (loadingQueue.current.length > 0 && inFlight.current < maxConcurrent) {
-      const next = loadingQueue.current.shift();
-      if (!next) break;
-      // Start preload but don't await serially here
-      preloadImage(next).catch(() => {});
+    if (isProcessing.current || loadingQueue.current.length === 0) return;
+    
+    isProcessing.current = true;
+    
+    while (loadingQueue.current.length > 0) {
+      const batch = loadingQueue.current.splice(0, maxConcurrent);
+      const promises = batch.map(url => preloadImage(url).catch(error => {
+      }));
+      
+      await Promise.all(promises);
+      
+      // Small delay between batches to prevent overwhelming the browser
+      if (loadingQueue.current.length > 0) {
+        await new Promise(resolve => setTimeout(resolve, 50));
+      }
     }
+    
+    isProcessing.current = false;
   }, [maxConcurrent, preloadImage]);
 
   const preloadImages = useCallback((urls: string[]) => {
-    const newUrls = urls.filter(url => !loadingQueue.current.includes(url) && (imageStatus[url] !== 'loaded' && imageStatus[url] !== 'loading'));
+    // Add new URLs to queue (avoid duplicates)
+    const newUrls = urls.filter(url => 
+      !loadingQueue.current.includes(url) && 
+      !preloadedImages.get(url)?.loaded
+    );
+    
     loadingQueue.current.push(...newUrls);
     processQueue();
-  }, [processQueue, imageStatus]);
+  }, [processQueue, preloadedImages]);
 
   const getOptimizedUrl = useCallback((url: string): string => {
-    return optimizeImageUrl(url);
-  }, [optimizeImageUrl]);
+    const imageData = preloadedImages.get(url);
+    return imageData?.optimizedUrl || optimizeImageUrl(url);
+  }, [preloadedImages, optimizeImageUrl]);
 
-  const isImageLoaded = useCallback((url: string): boolean => imageStatus[url] === 'loaded', [imageStatus]);
-  const isImageLoading = useCallback((url: string): boolean => imageStatus[url] === 'loading', [imageStatus]);
+  const isImageLoaded = useCallback((url: string): boolean => {
+    return preloadedImages.get(url)?.loaded || false;
+  }, [preloadedImages]);
+
+  const isImageLoading = useCallback((url: string): boolean => {
+    return preloadedImages.get(url)?.loading || false;
+  }, [preloadedImages]);
 
   const clearCache = useCallback(() => {
-    setImageStatus({});
+    setPreloadedImages(new Map());
     loadingQueue.current = [];
-    inFlight.current = 0;
   }, []);
+
+  // Build imageStatus record for compatibility
+  const imageStatus = useCallback((): Record<string, 'idle'|'loading'|'loaded'|'error'> => {
+    const status: Record<string, 'idle'|'loading'|'loaded'|'error'> = {};
+    preloadedImages.forEach((data, url) => {
+      if (data.loaded) status[url] = 'loaded';
+      else if (data.loading) status[url] = 'loading';
+      else if (data.error) status[url] = 'error';
+      else status[url] = 'idle';
+    });
+    return status;
+  }, [preloadedImages]);
 
   return {
     preloadImages,
@@ -113,7 +165,7 @@ export const useImagePreloader = (options: ImagePreloaderOptions = {}) => {
     getOptimizedUrl,
     isImageLoaded,
     isImageLoading,
-    imageStatus,
+    imageStatus: imageStatus(),
     clearCache
   };
 };
