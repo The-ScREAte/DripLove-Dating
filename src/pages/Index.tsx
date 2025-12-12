@@ -378,31 +378,7 @@ const Index = () => {
   };
 
   if (loading) {
-    // Show hopping logo during initial auth check
-    return (
-      <div className="w-full h-screen flex items-center justify-center bg-gradient-to-br from-pink-50 to-purple-50">
-        <div className="text-center">
-          <style>{`
-            @keyframes logoHop {
-              0%, 100% { transform: translateY(0) scale(1); }
-              50% { transform: translateY(-20px) scale(1.05); }
-            }
-          `}</style>
-          <div className="mb-4" style={{ animation: 'logoHop 1s ease-in-out infinite' }}>
-            <svg className="w-24 h-24 mx-auto" viewBox="0 0 100 100" fill="none" xmlns="http://www.w3.org/2000/svg">
-              <defs>
-                <linearGradient id="heartGrad" x1="0%" y1="0%" x2="100%" y2="100%">
-                  <stop offset="0%" stopColor="#ec4899" />
-                  <stop offset="100%" stopColor="#8b5cf6" />
-                </linearGradient>
-              </defs>
-              <path d="M50 88C50 88 12 58 12 35C12 20 24 10 38 10C44 10 50 14 50 14C50 14 56 10 62 10C76 10 88 20 88 35C88 58 50 88 50 88Z" fill="url(#heartGrad)"/>
-              <circle cx="35" cy="35" r="6" fill="white" opacity="0.6"/>
-            </svg>
-          </div>
-        </div>
-      </div>
-    );
+    return null;
   }
   
   if (currentView === 'admin') {
