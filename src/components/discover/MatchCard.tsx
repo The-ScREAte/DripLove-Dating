@@ -171,7 +171,14 @@ const MatchCard: React.FC<MatchCardProps> = ({
   }, [memoPreloadedBlobs, getOptimizedUrl]);
 
   // ⭐ FIX #5: Stable slide data prevents SlideRenderer re-render on every tap
-  const currentSlideData = useMemo(() => slides[currentSlide], [slides, currentSlide]);
+  // ⭐ CRITICAL FIX: Guard against out-of-bounds access during rapid swiping
+  const currentSlideData = useMemo(() => {
+    if (!slides || slides.length === 0) {
+      return { type: 'placeholder' as const, content: '', index: 0 };
+    }
+    const safeIndex = Math.min(Math.max(0, currentSlide), slides.length - 1);
+    return slides[safeIndex] || { type: 'placeholder' as const, content: '', index: 0 };
+  }, [slides, currentSlide]);
   const getSwipeTransform = () => {
     if (!swipeDirection) return 'translateX(0) rotate(0deg)';
     

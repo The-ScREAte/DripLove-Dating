@@ -152,9 +152,17 @@ export const SlideRenderer = React.memo<SlideRendererProps>(({
   imageStatus,
   getOptimizedUrl
 }) => {
+  // ⭐ CRITICAL FIX: Guard against undefined slide to prevent crash during rapid swiping
+  if (!slide || !slide.type) {
+    return <PlaceholderSlide matchFirstName={matchFirstName || ''} matchLastName={matchLastName || ''} />;
+  }
+
   switch (slide.type) {
     case 'image': {
       const originalUrl = slide.content;
+      if (!originalUrl) {
+        return <PlaceholderSlide matchFirstName={matchFirstName || ''} matchLastName={matchLastName || ''} />;
+      }
       const blobUrl = preloadedBlobImages?.[originalUrl];
       const usingBlob = blobUrl && blobUrl.startsWith('blob:');
       const imageSrc = usingBlob ? blobUrl : getOptimizedUrl(originalUrl);
@@ -174,24 +182,28 @@ export const SlideRenderer = React.memo<SlideRendererProps>(({
     case 'bio':
       return (
         <BioSlide
-          content={slide.content}
+          content={slide.content || ''}
           userBackgroundColor={userBackgroundColor}
           matchFirstName={matchFirstName}
         />
       );
     case 'fun_fact':
-      return <FunFactSlide content={slide.content} userBackgroundColor={userBackgroundColor} />;
+      return <FunFactSlide content={slide.content || ''} userBackgroundColor={userBackgroundColor} />;
     case 'perfect_first_date':
-      return <PerfectFirstDateSlide content={slide.content} userBackgroundColor={userBackgroundColor} />;
+      return <PerfectFirstDateSlide content={slide.content || ''} userBackgroundColor={userBackgroundColor} />;
     case 'last_googled':
-      return <LastGoogledSlide content={slide.content} userBackgroundColor={userBackgroundColor} />;
+      return <LastGoogledSlide content={slide.content || ''} userBackgroundColor={userBackgroundColor} />;
     case 'placeholder':
-      return <PlaceholderSlide matchFirstName={matchFirstName} matchLastName={matchLastName} />;
+      return <PlaceholderSlide matchFirstName={matchFirstName || ''} matchLastName={matchLastName || ''} />;
     default:
-      return null;
+      return <PlaceholderSlide matchFirstName={matchFirstName || ''} matchLastName={matchLastName || ''} />;
   }
 }, (prev, next) => {
   // ⭐ CRITICAL: Value-based comparison to prevent re-renders when parent regenerates objects
+  // ⭐ CRITICAL FIX: Guard against undefined slides
+  if (!prev.slide || !next.slide) {
+    return prev.slide === next.slide;
+  }
   return (
     prev.slide.type === next.slide.type &&
     prev.slide.content === next.slide.content &&
