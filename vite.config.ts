@@ -48,6 +48,8 @@ export default defineConfig(({ mode }) => ({
     alias: {
       "@": path.resolve(__dirname, "./src"),
     },
+    // CRITICAL: Force all dependencies to use the same React instance
+    dedupe: ['react', 'react-dom'],
   },
   // Optimize dependency pre-bundling
   optimizeDeps: {
