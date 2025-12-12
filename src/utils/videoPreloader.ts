@@ -2,6 +2,7 @@
 
 class VideoPreloader {
   private preloadedUrls: Set<string> = new Set();
+  private defaultVideoUrl: string = '/welcome-video.mp4';
 
   preload(url: string): void {
     if (this.preloadedUrls.has(url)) return;
@@ -21,6 +22,10 @@ class VideoPreloader {
 
   isPreloaded(url: string): boolean {
     return this.preloadedUrls.has(url);
+  }
+
+  getVideoUrl(): string {
+    return this.defaultVideoUrl;
   }
 }
 
