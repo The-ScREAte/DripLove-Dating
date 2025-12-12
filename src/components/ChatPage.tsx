@@ -264,7 +264,8 @@ const ChatPage = ({ currentUser, onUnreadChange, onDetailViewChange }: ChatPageP
     };
   }, [currentUser?.id]);
 
-  // Periodic refresh for live updates when NOT in a chat
+  // ⭐ ANDROID OPTIMIZATION: Reduced polling frequency (5s instead of 2s)
+  // Real-time subscription handles instant updates, polling is just a fallback
   useEffect(() => {
     if (!currentUser?.id || selectedMatch) return;
     
@@ -273,33 +274,33 @@ const ChatPage = ({ currentUser, onUnreadChange, onDetailViewChange }: ChatPageP
       if (!isCacheValid()) {
         fetchMatches();
       }
-    }, 2000); // Ultra-fast refresh every 2 seconds for instant updates
+    }, 5000); // ⭐ ANDROID FIX: Reduced from 2s to 5s - realtime handles instant updates
 
     return () => {
       clearInterval(interval);
     };
   }, [currentUser?.id, selectedMatch]);
 
-  // Preload messages for visible chats in background for instant access
+  // ⭐ ANDROID OPTIMIZATION: Lazy preload only top 3 chats, with longer delays
   useEffect(() => {
     if (!currentUser?.id || selectedMatch || matches.length === 0) return;
     
-    // Preload first 5 chat conversations in background
+    // ⭐ ANDROID FIX: Only preload top 3 chats (reduced from 5)
     const preloadChats = async () => {
-      const topChats = matches.slice(0, 5);
+      const topChats = matches.slice(0, 3); // Reduced from 5 to 3
       for (const match of topChats) {
         const cached = chatMessagesCache.get(match.id);
         // Only preload if not cached or cache is very old
         if (!cached || cached.messages.length === 0) {
           await fetchMessagesInBackground(match.id);
-          // Small delay between preloads to avoid overwhelming
-          await new Promise(resolve => setTimeout(resolve, 200));
+          // ⭐ ANDROID FIX: Increased delay between preloads (500ms instead of 200ms)
+          await new Promise(resolve => setTimeout(resolve, 500));
         }
       }
     };
     
-    // Start preloading after a short delay (don't block initial render)
-    const timer = setTimeout(preloadChats, 1000);
+    // ⭐ ANDROID FIX: Start preloading after 2s delay (increased from 1s)
+    const timer = setTimeout(preloadChats, 2000);
     return () => clearTimeout(timer);
   }, [currentUser?.id, selectedMatch, matches]);
 
@@ -400,14 +401,15 @@ const ChatPage = ({ currentUser, onUnreadChange, onDetailViewChange }: ChatPageP
     }
   }, [messages, selectedMatch, currentUser?.id]);
 
-  // Poll for new messages every 1 second when chat is open (for ultra-live updates)
+  // ⭐ ANDROID OPTIMIZATION: Reduced message polling (3s instead of 1s)
+  // Real-time subscription handles instant updates, polling is just a fallback
   useEffect(() => {
     if (!selectedMatch || !currentUser?.id) return;
     
     const interval = setInterval(() => {
       // Fetch new messages in background
       fetchMessagesInBackground(selectedMatch.id);
-    }, 1000); // Check every 1 second for instant live feel
+    }, 3000); // ⭐ ANDROID FIX: Reduced from 1s to 3s - realtime handles instant updates
     
     return () => clearInterval(interval);
   }, [selectedMatch, currentUser?.id]);

@@ -113,76 +113,74 @@ const LikedMePage = ({ currentUser, isPremium = false }: LikedMePageProps) => {
   );
 
 
-  const { subscription, getLikedMeVisibleCount } = useSubscription(currentUser?.id);
-  
-  // Responsive columns per row
-  const [columnsPerRow, setColumnsPerRow] = useState(2);
+  // ⭐ ANDROID OPTIMIZATION: Single debounced resize handler
+  const [columnsPerRow, setColumnsPerRow] = useState(() => {
+    const width = typeof window !== 'undefined' ? window.innerWidth : 375;
+    if (width >= 1024) return 4;
+    if (width >= 768) return 3;
+    return 2;
+  });
   
   useEffect(() => {
+    let rafId: number | null = null;
+    
     const updateColumns = () => {
-      const width = window.innerWidth;
-      if (width >= 1024) setColumnsPerRow(4); // lg
-      else if (width >= 768) setColumnsPerRow(3); // md
-      else setColumnsPerRow(2); // small
+      if (rafId) return; // Skip if already scheduled
+      
+      rafId = requestAnimationFrame(() => {
+        const width = window.innerWidth;
+        const newColumns = width >= 1024 ? 4 : width >= 768 ? 3 : 2;
+        setColumnsPerRow(prev => prev !== newColumns ? newColumns : prev);
+        rafId = null;
+      });
     };
-    updateColumns();
-    window.addEventListener('resize', updateColumns);
-    return () => window.removeEventListener('resize', updateColumns);
+    
+    window.addEventListener('resize', updateColumns, { passive: true });
+    return () => {
+      window.removeEventListener('resize', updateColumns);
+      if (rafId) cancelAnimationFrame(rafId);
+    };
   }, []);
   
   // Ensure virtualizer count is always stable (never undefined)
   const virtualizerCount = useMemo(() => {
     return likers.length > 0 ? Math.ceil(likers.length / columnsPerRow) : 0;
   }, [likers.length, columnsPerRow]);
-  // dynamic estimated row height (computed from container width + cols)
-  const [estimatedRowHeight, setEstimatedRowHeight] = useState<number>(400);
-  const [rowVerticalGap, setRowVerticalGap] = useState<number>(12);
-  const [rowPaddingHorizontal, setRowPaddingHorizontal] = useState<number>(8);
-  const [rowColumnGap, setRowColumnGap] = useState<number>(12);
+  // ⭐ ANDROID OPTIMIZATION: Memoized row config calculation (replaces 4 separate useStates + useEffect)
+  const rowConfig = useMemo(() => {
+    const maxWidth = 1400;
+    const containerWidth = scrollContainerRef.current 
+      ? Math.min(scrollContainerRef.current.clientWidth, maxWidth) 
+      : Math.min(typeof window !== 'undefined' ? window.innerWidth : 375, maxWidth);
 
-  useEffect(() => {
-    const calculate = () => {
-      try {
-        const maxWidth = 1400;
-        const container = scrollContainerRef.current;
-        const containerWidth = container ? Math.min(container.clientWidth, maxWidth) : Math.min(window.innerWidth, maxWidth);
+    // Responsive padding based on columns
+    const paddingMap: Record<number, number> = { 2: 8, 3: 32, 4: 48 };
+    const gapMap: Record<number, number> = { 2: 12, 3: 40, 4: 56 };
+    const vGapMap: Record<number, number> = { 2: 100, 3: 175, 4: 220 };
 
-        // responsive padding (matches our responsive classes)
-        let rowPadding = 8; // small
-        if (columnsPerRow === 3) rowPadding = 32; // md:px-8 -> 2*16 but we used px-16 earlier; use conservative 32
-        if (columnsPerRow === 4) rowPadding = 48; // lg:px-12
+    const rowPadding = paddingMap[columnsPerRow] ?? 8;
+    const horizontalGap = gapMap[columnsPerRow] ?? 12;
+    const verticalGap = vGapMap[columnsPerRow] ?? 180;
 
-        // horizontal gap per breakpoint
-        const horizontalGapMap: Record<number, number> = {2: 12, 3: 40, 4: 56};
-        const gapPx = horizontalGapMap[columnsPerRow] ?? 12;
+    const innerWidth = Math.max(0, containerWidth - rowPadding * 2);
+    const totalGaps = horizontalGap * (columnsPerRow - 1);
+    const cardWidth = (innerWidth - totalGaps) / Math.max(1, columnsPerRow);
 
-        // vertical gap to use between rows (sm/md/lg)
-        const verticalGapMap: Record<number, number> = {2: 100, 3: 175, 4: 220};
-        const vGap = verticalGapMap[columnsPerRow] ?? 180;
-        setRowVerticalGap(vGap);
-        setRowPaddingHorizontal(rowPadding);
-        setRowColumnGap(gapPx);
+    const imageHeight = Math.round(cardWidth * 3 / 4);
+    const contentHeight = 56;
+    const extra = 8;
+    const cardHeight = imageHeight + contentHeight + extra;
 
-        const innerWidth = Math.max(0, containerWidth - rowPadding * 2);
-        const totalGaps = gapPx * (columnsPerRow - 1);
-        const cardWidth = (innerWidth - totalGaps) / Math.max(1, columnsPerRow);
-
-        const imageHeight = Math.round(cardWidth * 3 / 4);
-        const contentHeight = 56; // approx height of CardContent area
-        const extra = 8; // shadow / safety margin
-
-        const cardHeight = imageHeight + contentHeight + extra;
-        setEstimatedRowHeight(Math.max(200, Math.round(cardHeight)));
-      } catch (e) {
-        setEstimatedRowHeight(400);
-        setRowVerticalGap(16);
-      }
+    return {
+      estimatedRowHeight: Math.max(200, cardHeight),
+      rowVerticalGap: verticalGap,
+      rowPaddingHorizontal: rowPadding,
+      rowColumnGap: horizontalGap
     };
+  }, [columnsPerRow]);
 
-    calculate();
-    window.addEventListener('resize', calculate);
-    return () => window.removeEventListener('resize', calculate);
-  }, [columnsPerRow, scrollContainerRef]);
+  // Destructure for backwards compatibility
+  const { estimatedRowHeight, rowVerticalGap, rowPaddingHorizontal, rowColumnGap } = rowConfig;
 
   const rowVirtualizer = useVirtualizer({
     count: virtualizerCount,
@@ -381,7 +379,7 @@ const LikedMePage = ({ currentUser, isPremium = false }: LikedMePageProps) => {
     return { likers, userImages: imageMap };
   }, []);
 
-  // ⭐ FIX #1+2: Preload first 3 profiles with blob URLs + createImageBitmap for instant Android rendering
+  // ⭐ ANDROID OPTIMIZATION: Lighter preload - skip createImageBitmap on Android (causes lag)
   const preloadFirstProfilesWithBlobs = useCallback(async (
     profiles: { id: string }[], 
     imageUrls: { [key: string]: string[] }
@@ -394,7 +392,10 @@ const LikedMePage = ({ currentUser, isPremium = false }: LikedMePageProps) => {
     const controller = new AbortController();
     imageAbortController.current = controller;
 
-    for (const profile of profiles) {
+    // ⭐ ANDROID FIX: Only preload first 2 profiles (reduced from 3)
+    const profilesToPreload = profiles.slice(0, 2);
+
+    for (const profile of profilesToPreload) {
       const firstImageUrl = imageUrls[profile.id]?.[0];
       if (!firstImageUrl || controller.signal.aborted) break;
 
@@ -404,11 +405,16 @@ const LikedMePage = ({ currentUser, isPremium = false }: LikedMePageProps) => {
         
         if (controller.signal.aborted) break;
         
-        // ⭐ FIX #2: Pre-decode with createImageBitmap for instant Android rendering
-        if (blobUrl && typeof createImageBitmap !== 'undefined') {
-          const response = await fetch(blobUrl);
-          const blob = await response.blob();
-          await createImageBitmap(blob);
+        // ⭐ ANDROID FIX: Skip createImageBitmap on Android - it causes main thread blocking
+        // Standard image preloading is sufficient for smooth rendering
+        if (blobUrl && platform !== 'android' && typeof createImageBitmap !== 'undefined') {
+          try {
+            const response = await fetch(blobUrl);
+            const blob = await response.blob();
+            await createImageBitmap(blob);
+          } catch {
+            // Silent fail - image still works without pre-decode
+          }
         }
 
         // Update userImages with blob URL
@@ -422,7 +428,7 @@ const LikedMePage = ({ currentUser, isPremium = false }: LikedMePageProps) => {
         // Silent fail for individual images
       }
     }
-  }, []); // Empty deps - uses refs and stable functions only
+  }, [platform]); // Add platform dependency
 
   // Optimized: batch queries and filter in SQL
   const fetchLikers = useCallback(async (showLoading = false) => {
@@ -561,6 +567,7 @@ const LikedMePage = ({ currentUser, isPremium = false }: LikedMePageProps) => {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [currentUser?.id]);
 
+  // ⭐ ANDROID OPTIMIZATION: Increased polling interval (60s instead of 30s)
   useEffect(() => {
     if (!currentUser?.id) return;
     const existingInterval = likedMePollIntervals.get(currentUser.id);
@@ -568,9 +575,10 @@ const LikedMePage = ({ currentUser, isPremium = false }: LikedMePageProps) => {
       return () => clearInterval(existingInterval);
     }
 
+    // ⭐ ANDROID FIX: Reduced polling frequency from 30s to 60s
     const interval = setInterval(() => {
       void fetchLikersInBackground();
-    }, 30000);
+    }, 60000);
 
     likedMePollIntervals.set(currentUser.id, interval);
 
