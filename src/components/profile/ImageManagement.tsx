@@ -13,6 +13,7 @@ import { Upload, Trash2, Shield, AlertTriangle, CheckCircle, RefreshCw, BadgeChe
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import { moderateImage, saveModerationResult, ModerationResult } from '@/utils/photoModeration';
+import { compressImage } from '@/utils/imageCompression';
 import FaceVerification from '@/components/FaceVerification';
 
 interface ImageManagementProps {
@@ -33,89 +34,6 @@ interface ProfileData {
   last_name: string;
   face_descriptor: string | null;
 }
-
-// Simple image component - no loading states, just display
-const ImageWithRetry = ({ src, alt, className }: { src: string; alt: string; className: string }) => {
-  const [resolvedSrc, setResolvedSrc] = useState(src);
-  const [attempt, setAttempt] = useState(0);
-
-  useEffect(() => {
-    setResolvedSrc(src);
-    setAttempt(0);
-  }, [src]);
-
-  const extractStoragePath = (urlOrPath: string): string | null => {
-    if (!urlOrPath) return null;
-
-    // If we already have a bucket-relative path
-    if (!urlOrPath.startsWith('http')) {
-      return urlOrPath.replace(/^\/+/, '');
-    }
-
-    // Public URL format: .../storage/v1/object/public/user-photos/<path>
-    const publicMarker = '/storage/v1/object/public/user-photos/';
-    const publicIdx = urlOrPath.indexOf(publicMarker);
-    if (publicIdx !== -1) {
-      return urlOrPath.substring(publicIdx + publicMarker.length);
-    }
-
-    // Signed URL format: .../storage/v1/object/sign/user-photos/<path>?token=...
-    const signMarker = '/storage/v1/object/sign/user-photos/';
-    const signIdx = urlOrPath.indexOf(signMarker);
-    if (signIdx !== -1) {
-      const rest = urlOrPath.substring(signIdx + signMarker.length);
-      return rest.split('?')[0];
-    }
-
-    return null;
-  };
-
-  const handleError = async () => {
-    // Attempt 1: cache-bust (handles CDN propagation delays)
-    if (attempt === 0) {
-      const separator = resolvedSrc.includes('?') ? '&' : '?';
-      setAttempt(1);
-      setResolvedSrc(`${resolvedSrc}${separator}t=${Date.now()}`);
-      return;
-    }
-
-    // Attempt 2: signed URL fallback (handles private buckets / RLS)
-    if (attempt === 1) {
-      try {
-        const path = extractStoragePath(src);
-        if (!path) {
-          setAttempt(2);
-          return;
-        }
-
-        const { data, error } = await supabase.storage
-          .from('user-photos')
-          .createSignedUrl(path, 60 * 60); // 1 hour
-
-        if (!error && data?.signedUrl) {
-          setAttempt(2);
-          setResolvedSrc(data.signedUrl);
-          return;
-        }
-      } catch {
-        // ignore
-      }
-      setAttempt(2);
-    }
-  };
-
-  return (
-    <img
-      src={resolvedSrc}
-      alt={alt}
-      className={`${className} bg-gray-100`}
-      loading="lazy"
-      decoding="async"
-      onError={handleError}
-      referrerPolicy="no-referrer"
-    />
-  );
-};
 
 const ImageManagement = ({ currentUser }: ImageManagementProps) => {
   const { t } = useTranslation();
@@ -170,6 +88,9 @@ const ImageManagement = ({ currentUser }: ImageManagementProps) => {
           is_approved: img.is_approved ?? true,
           moderation_status: img.moderation_status ?? 'approved'
         })));
+        
+        // DEBUG: Log fetched images
+        console.log('🖼️ Fetched images from DB:', typedImages.map(img => ({ url: img.image_url, approved: img.is_approved })));
       }
     } catch (error) {
   // ...removed log...
@@ -221,16 +142,19 @@ const ImageManagement = ({ currentUser }: ImageManagementProps) => {
       return;
     }
 
-    // Step 1: Moderate the image
+    // Step 1: Compress and convert to WebP before moderation
     setModerating(true);
     setModerationResult(null);
+
+    // Compress image
+    const compressedFile = await compressImage(file);
 
     let moderationResult: ModerationResult | null = null;
 
     try {
       const moderationTimeoutMs = 7000;
       moderationResult = await Promise.race([
-        moderateImage(file),
+        moderateImage(compressedFile),
         new Promise<ModerationResult>((_, reject) =>
           setTimeout(() => reject(new Error('Moderation timeout')), moderationTimeoutMs)
         )
@@ -280,10 +204,10 @@ const ImageManagement = ({ currentUser }: ImageManagementProps) => {
       // Upload to storage with correct content type
       const { data: uploadData, error: uploadError } = await supabase.storage
         .from('user-photos')
-        .upload(fileName, file, { 
+        .upload(fileName, compressedFile, { 
           cacheControl: '3600', 
           upsert: false,
-          contentType: file.type || `image/${fileExt}`
+          contentType: compressedFile.type || `image/${fileExt}`
         });
 
       if (uploadError) throw uploadError;
@@ -295,6 +219,9 @@ const ImageManagement = ({ currentUser }: ImageManagementProps) => {
       if (!urlData?.publicUrl) throw new Error("Failed to generate public image URL");
 
       const publicUrl = urlData.publicUrl;
+      
+      // DEBUG: Log the URL being saved
+      console.log('💾 Saving image URL to DB:', publicUrl);
       
       // If replacing an existing image
       if (replacingImageUrl) {
@@ -707,19 +634,16 @@ const ImageManagement = ({ currentUser }: ImageManagementProps) => {
         <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-4">
           {userImages.map((userImage, index) => (
             <div key={userImage.image_url} className="relative group">
-              <ImageWithRetry 
-                src={userImage.image_url}
-                alt={`Photo ${index + 1}`}
-                className="w-full h-28 sm:h-36 object-cover rounded-lg shadow-sm"
+              <img 
+                src={userImage.image_url} 
+                alt={`User Image ${index + 1}`} 
+                className="w-full h-32 sm:h-40 object-cover rounded-lg shadow-sm" 
               />
               
               {/* Pending approval indicator */}
               {userImage.is_approved === false && (
-                <div className="absolute inset-0 bg-black/40 rounded-lg flex items-center justify-center">
-                  <div className="bg-orange-500/90 backdrop-blur-sm text-white text-[10px] px-2 py-1 rounded-full flex items-center gap-1 shadow-lg">
-                    <Shield className="w-3 h-3" />
-                    <span>Reviewing</span>
-                  </div>
+                <div className="absolute top-2 left-2 bg-orange-500 text-white text-xs px-2 py-1 rounded-full flex items-center">
+                  🔒 Pending Review, Max 24hrs
                 </div>
               )}
               
@@ -737,44 +661,25 @@ const ImageManagement = ({ currentUser }: ImageManagementProps) => {
                     <RefreshCw className="w-3 h-3" />
                   </Button>
                 ) : (
-                  <>
-                    {/* Replace button - always available */}
-                    <Button 
-                      variant="default"
-                      size="sm" 
-                      onClick={() => handleReplaceImage(userImage.image_url)}
-                      className="opacity-0 group-hover:opacity-100 transition-opacity h-6 w-6 p-0 bg-blue-600 hover:bg-blue-700 rounded-full shadow-md"
-                      title="Replace image"
-                    >
-                      <RefreshCw className="w-3 h-3" />
-                    </Button>
-                    
-                    {/* Delete button - only when more than 2 images */}
-                    <AlertDialog>
-                      <AlertDialogTrigger asChild>
-                        <Button 
-                          variant="destructive" 
-                          size="sm" 
-                          className="opacity-0 group-hover:opacity-100 transition-opacity h-6 w-6 p-0 rounded-full shadow-md"
-                          title="Delete image"
-                        >
-                          <Trash2 className="w-3 h-3" />
-                        </Button>
-                      </AlertDialogTrigger>
-                      <AlertDialogContent className="sm:max-w-md">
-                        <AlertDialogHeader>
-                          <AlertDialogTitle>Delete Image</AlertDialogTitle>
-                          <AlertDialogDescription>Are you sure you want to delete this image? This action cannot be undone.</AlertDialogDescription>
-                        </AlertDialogHeader>
-                        <AlertDialogFooter>
-                          <AlertDialogCancel>Cancel</AlertDialogCancel>
-                          <AlertDialogAction disabled={deleting} onClick={() => handleDeleteImage(userImage.image_url)} className="bg-red-600 hover:bg-red-700">
-                            {deleting ? 'Deleting...' : 'Delete'}
-                          </AlertDialogAction>
-                        </AlertDialogFooter>
-                      </AlertDialogContent>
-                    </AlertDialog>
-                  </>
+                  <AlertDialog>
+                    <AlertDialogTrigger asChild>
+                      <Button variant="destructive" size="sm" className="opacity-0 group-hover:opacity-100 transition-opacity p-1 h-8 w-8">
+                        <Trash2 className="w-4 h-4" />
+                      </Button>
+                    </AlertDialogTrigger>
+                    <AlertDialogContent className="sm:max-w-md">
+                      <AlertDialogHeader>
+                        <AlertDialogTitle>Delete Image</AlertDialogTitle>
+                        <AlertDialogDescription>Are you sure you want to delete this image? This action cannot be undone.</AlertDialogDescription>
+                      </AlertDialogHeader>
+                      <AlertDialogFooter>
+                        <AlertDialogCancel>Cancel</AlertDialogCancel>
+                        <AlertDialogAction disabled={deleting} onClick={() => handleDeleteImage(userImage.image_url)} className="bg-red-600 hover:bg-red-700">
+                          {deleting ? 'Deleting...' : 'Delete'}
+                        </AlertDialogAction>
+                      </AlertDialogFooter>
+                    </AlertDialogContent>
+                  </AlertDialog>
                 )}
               </div>
             </div>
