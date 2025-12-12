@@ -32,11 +32,11 @@ const TabLoader = () => (
       `}</style>
       <div className="mb-2" style={{ animation: 'logoHop 0.8s ease-in-out infinite' }}>
         <img 
-          src="/images/drip-love-logo.svg" 
+          src="/driplove-logo.png" 
           alt="Drip Love" 
           className="w-16 h-16 mx-auto"
           onError={(e) => {
-            e.currentTarget.src = '/images/drip-love-logo.png';
+            e.currentTarget.src = '/driplove-logo.webp';
           }}
         />
       </div>
