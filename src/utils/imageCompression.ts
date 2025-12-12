@@ -2,11 +2,12 @@ import imageCompression from 'browser-image-compression';
 
 export async function compressImage(file: File): Promise<File> {
   const options = {
-    maxSizeMB: 1.5,
-    maxWidthOrHeight: 2048,
+    maxSizeMB: 3,
+    maxWidthOrHeight: 4096,
     useWebWorker: true,
-    fileType: 'image/webp',
-    initialQuality: 0.85,
+    // Keep original image format instead of forcing WebP
+    fileType: file.type && file.type.startsWith('image/') ? file.type : undefined,
+    initialQuality: 0.9,
   };
   
   try {
