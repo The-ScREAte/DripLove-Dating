@@ -1,18 +1,21 @@
 import imageCompression from 'browser-image-compression';
 
 export async function compressImage(file: File): Promise<File> {
-  // Accept any image - only compress if it's very large (over 5MB)
-  // This ensures all images work regardless of format
-  if (file.size <= 5 * 1024 * 1024) {
+  // Accept ALL images without any compression - just return as-is
+  // This ensures maximum compatibility with all image formats and sizes
+  // The server and storage will handle the images directly
+  
+  // Only compress if extremely large (over 15MB) to prevent upload failures
+  if (file.size <= 15 * 1024 * 1024) {
     return file;
   }
 
   const options = {
-    maxSizeMB: 3,
-    maxWidthOrHeight: 2048,
+    maxSizeMB: 10,
+    maxWidthOrHeight: 4096,
     useWebWorker: true,
-    // Don't force WebP conversion - keep original format for better compatibility
-    initialQuality: 0.9,
+    preserveExif: true,
+    initialQuality: 0.95,
   };
   
   try {

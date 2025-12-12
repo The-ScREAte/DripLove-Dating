@@ -14,7 +14,9 @@ const COLLECTION_ID = "driplove_faces";
 // AWS Signature V4 helper
 async function sha256(message: string | Uint8Array): Promise<ArrayBuffer> {
   const data = typeof message === 'string' ? new TextEncoder().encode(message) : message;
-  return await crypto.subtle.digest('SHA-256', data);
+  // Create a new ArrayBuffer to satisfy TypeScript's type requirements
+  const buffer = new Uint8Array(data).buffer as ArrayBuffer;
+  return await crypto.subtle.digest('SHA-256', buffer);
 }
 
 async function hmacSha256(key: ArrayBuffer, message: string): Promise<ArrayBuffer> {
@@ -35,7 +37,8 @@ function toHex(buffer: ArrayBuffer): string {
 }
 
 async function getSignatureKey(key: string, dateStamp: string, regionName: string, serviceName: string): Promise<ArrayBuffer> {
-  const kDate = await hmacSha256(new TextEncoder().encode('AWS4' + key), dateStamp);
+  const keyData = new TextEncoder().encode('AWS4' + key);
+  const kDate = await hmacSha256(keyData.buffer as ArrayBuffer, dateStamp);
   const kRegion = await hmacSha256(kDate, regionName);
   const kService = await hmacSha256(kRegion, serviceName);
   const kSigning = await hmacSha256(kService, 'aws4_request');
