@@ -1,8 +1,9 @@
 import { useState, useEffect } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Trash2, CheckCircle2, AlertTriangle, Scan, RefreshCw, User } from "lucide-react";
+import { Trash2, CheckCircle2, AlertTriangle, Scan, RefreshCw, User, Search } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 
 interface Face {
@@ -17,6 +18,7 @@ export default function FaceManagement() {
   const [isLoading, setIsLoading] = useState(false);
   const [deletingFaceId, setDeletingFaceId] = useState<string | null>(null);
   const [faces, setFaces] = useState<Face[]>([]);
+  const [searchQuery, setSearchQuery] = useState("");
   const [result, setResult] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const { toast } = useToast();
@@ -150,22 +152,64 @@ export default function FaceManagement() {
   }
 
   // Parse the externalImageId to get user name
-  function parseUserName(externalImageId: string): string {
-    if (!externalImageId || externalImageId === 'Unknown') return 'Unknown User';
+  function parseUserInfo(externalImageId: string): { name: string; userId: string } {
+    if (!externalImageId || externalImageId === 'Unknown') {
+      return { name: 'Unknown User', userId: '' };
+    }
     
-    // Format is: Name_Surname_userId or just userId
+    // Format is: FirstName_LastName_userId or just userId
     const parts = externalImageId.split('_');
+    
     if (parts.length >= 3) {
-      // Remove the last part (userId) and join the rest
-      const nameParts = parts.slice(0, -1);
-      return nameParts.join(' ');
+      // Has name: FirstName_LastName_userId
+      const firstName = parts[0].replace(/%20/g, ' ');
+      const lastName = parts[1].replace(/%20/g, ' ');
+      const userId = parts.slice(2).join('_');
+      return { 
+        name: `${firstName} ${lastName}`,
+        userId: userId.substring(0, 8) + '...'
+      };
+    } else if (parts.length === 2) {
+      // Maybe FirstName_userId
+      const firstName = parts[0].replace(/%20/g, ' ');
+      return {
+        name: firstName,
+        userId: parts[1].substring(0, 8) + '...'
+      };
     }
-    // If it's just an ID, return it shortened
+    
+    // Just an ID
+    if (externalImageId.startsWith('temp_')) {
+      return { 
+        name: 'Temp User', 
+        userId: externalImageId.replace('temp_', '').substring(0, 12) + '...'
+      };
+    }
+    
     if (externalImageId.length > 20) {
-      return externalImageId.substring(0, 8) + '...';
+      return { 
+        name: 'Unknown User', 
+        userId: externalImageId.substring(0, 8) + '...'
+      };
     }
-    return externalImageId;
+    
+    return { name: externalImageId, userId: '' };
   }
+
+  // Filter faces based on search query
+  const filteredFaces = faces.filter(face => {
+    if (!searchQuery.trim()) return true;
+    
+    const query = searchQuery.toLowerCase();
+    const { name, userId } = parseUserInfo(face.externalImageId);
+    
+    return (
+      name.toLowerCase().includes(query) ||
+      userId.toLowerCase().includes(query) ||
+      face.externalImageId.toLowerCase().includes(query) ||
+      face.faceId.toLowerCase().includes(query)
+    );
+  });
 
   return (
     <Card>
@@ -191,37 +235,75 @@ export default function FaceManagement() {
         </div>
       </CardHeader>
       <CardContent className="space-y-4">
+        {/* Search Bar */}
+        <div className="relative">
+          <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-gray-400" />
+          <Input
+            placeholder="Search by name or ID..."
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            className="pl-10"
+          />
+        </div>
+
+        {/* Info about image storage */}
+        <div className="bg-blue-50 border border-blue-200 rounded-lg p-3">
+          <p className="text-xs text-blue-800">
+            <strong>Note:</strong> AWS Rekognition stores face vectors, not actual images. 
+            Names are saved with face data for identification.
+          </p>
+        </div>
+
         {/* Face List */}
-        {faces.length > 0 && (
-          <div className="space-y-2 max-h-64 overflow-y-auto">
-            {faces.map((face) => (
-              <div
-                key={face.faceId}
-                className="flex items-center justify-between p-3 bg-gray-50 rounded-lg border"
-              >
-                <div className="flex items-center gap-3">
-                  <div className="w-10 h-10 rounded-full bg-purple-100 flex items-center justify-center">
-                    <User className="w-5 h-5 text-purple-600" />
-                  </div>
-                  <div>
-                    <p className="text-sm font-medium text-gray-800">
-                      {parseUserName(face.externalImageId)}
-                    </p>
-                    <p className="text-xs text-gray-500">
-                      Confidence: {face.confidence?.toFixed(1)}%
-                    </p>
-                  </div>
-                </div>
-                <Button
-                  variant="destructive"
-                  size="sm"
-                  onClick={() => deleteFace(face.faceId)}
-                  disabled={deletingFaceId === face.faceId}
+        {filteredFaces.length > 0 && (
+          <div className="space-y-2 max-h-80 overflow-y-auto">
+            {filteredFaces.map((face) => {
+              const { name, userId } = parseUserInfo(face.externalImageId);
+              return (
+                <div
+                  key={face.faceId}
+                  className="flex items-center justify-between p-3 bg-gray-50 rounded-lg border hover:bg-gray-100 transition-colors"
                 >
-                  <Trash2 className="w-4 h-4" />
-                </Button>
-              </div>
-            ))}
+                  <div className="flex items-center gap-3">
+                    <div className="w-12 h-12 rounded-full bg-gradient-to-br from-purple-100 to-pink-100 flex items-center justify-center border-2 border-purple-200">
+                      <User className="w-6 h-6 text-purple-600" />
+                    </div>
+                    <div>
+                      <p className="text-sm font-semibold text-gray-800">
+                        {name}
+                      </p>
+                      {userId && (
+                        <p className="text-xs text-gray-500">
+                          ID: {userId}
+                        </p>
+                      )}
+                      <p className="text-xs text-gray-400">
+                        Confidence: {face.confidence?.toFixed(1)}%
+                      </p>
+                    </div>
+                  </div>
+                  <Button
+                    variant="destructive"
+                    size="sm"
+                    onClick={() => deleteFace(face.faceId)}
+                    disabled={deletingFaceId === face.faceId}
+                    className="shrink-0"
+                  >
+                    {deletingFaceId === face.faceId ? (
+                      <RefreshCw className="w-4 h-4 animate-spin" />
+                    ) : (
+                      <Trash2 className="w-4 h-4" />
+                    )}
+                  </Button>
+                </div>
+              );
+            })}
+          </div>
+        )}
+
+        {filteredFaces.length === 0 && faces.length > 0 && (
+          <div className="text-center py-6 text-gray-500 text-sm">
+            No faces match "{searchQuery}"
           </div>
         )}
 
@@ -233,6 +315,7 @@ export default function FaceManagement() {
 
         {isLoading && (
           <div className="text-center py-6 text-gray-500 text-sm">
+            <RefreshCw className="w-5 h-5 animate-spin mx-auto mb-2" />
             Loading faces...
           </div>
         )}
