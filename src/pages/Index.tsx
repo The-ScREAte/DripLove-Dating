@@ -31,12 +31,11 @@ const PageLoader = () => (
       `}</style>
       <div className="animate-pulse" style={{ animation: 'logoHop 1s ease-in-out infinite' }}>
         <img 
-          src="/images/drip-love-logo.svg" 
+          src="/driplove-logo.png" 
           alt="Drip Love" 
           className="w-24 h-24 mx-auto mb-4"
           onError={(e) => {
-            // Fallback to PNG if SVG fails
-            e.currentTarget.src = '/images/drip-love-logo.png';
+            e.currentTarget.src = '/driplove-logo.webp';
           }}
         />
       </div>
