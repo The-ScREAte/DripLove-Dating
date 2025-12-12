@@ -531,7 +531,7 @@ const ProfilePage = ({ currentUser, profile, onProfileUpdate, onLogout, onShowTe
                   onClick={() => setShowPremiumUpgrade(true)}
                   className="bg-gradient-to-r from-yellow-400 to-yellow-500 hover:from-yellow-500 hover:to-yellow-600 text-white font-semibold w-full sm:w-auto shadow-md hover:shadow-lg transition-all duration-200"
                 >
-                  {t('likeMe.upgrade')}
+                  {t('Upgrade')}
                 </Button>
               )}
               {/* Single toggle button - Edit becomes Cancel */}
