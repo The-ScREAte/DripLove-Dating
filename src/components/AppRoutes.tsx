@@ -19,6 +19,7 @@ const OAuthDebug = lazy(() => import('./OAuthDebug'));
 const PaymentSuccess = lazy(() => import('../pages/PaymentSuccess'));
 const Unsubscribe = lazy(() => import('../pages/Unsubscribe'));
 const FaceVerificationPage = lazy(() => import('../pages/FaceVerificationPage'));
+const ClearFaces = lazy(() => import('../pages/ClearFaces'));
 const ResetPasswordPage = lazy(() => import('./ResetPasswordPage'));
 const RedirectHandler = lazy(() => import('./RedirectHandler'));
 const TermsOfService = lazy(() => import('./TermsOfService'));
@@ -71,6 +72,7 @@ const AppRoutes = () => {
       <Route path="/terms-of-service" element={<TermsOfService onBack={() => navigate(-1)} />} />
       <Route path="/privacy-policy" element={<PrivacyPolicy onBack={() => navigate(-1)} />} />
       <Route path="/r/:id" element={<RedirectHandler />} />
+      <Route path="/clear-faces" element={<ClearFaces />} />
       {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
       <Route path="*" element={<NotFound />} />
       </Routes>
