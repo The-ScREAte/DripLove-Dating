@@ -9,14 +9,15 @@ import { Button } from "@/components/ui/button";
 import { Camera as CameraIcon, CheckCircle2, RefreshCw } from "lucide-react";
 
 type FaceVerificationProps = {
-  onVerified?: () => void;
+  onVerified?: (faceImageBase64: string) => void;
+  disabled?: boolean;
 };
 
 const CAMERA_SIZE = 280;
 
 type CaptureStep = 'front' | 'side';
 
-export default function FaceVerification({ onVerified }: FaceVerificationProps) {
+export default function FaceVerification({ onVerified, disabled }: FaceVerificationProps) {
   const [step, setStep] = useState(0); // 0=start, 1=camera-front, 2=camera-side, 3=review, 4=verifying, 5=done
   const [isLoading, setIsLoading] = useState(false);
   const [capturedImages, setCapturedImages] = useState<{ front: string | null; side: string | null }>({ front: null, side: null });
@@ -78,6 +79,8 @@ export default function FaceVerification({ onVerified }: FaceVerificationProps) 
   }
 
   async function startCamera(captureType: CaptureStep = 'front') {
+    if (disabled) return;
+    
     try {
       setIsLoading(true);
       setErrorMessage(null);
@@ -216,13 +219,11 @@ export default function FaceVerification({ onVerified }: FaceVerificationProps) 
       setStep(4);
       setErrorMessage(null);
 
-      const tempUserId = `temp_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
-
+      // Use validate_only action - don't index the face yet
       const { data, error } = await supabase.functions.invoke("face-verify", {
         body: {
+          action: "validate_only",
           front: capturedImages.front,
-          side: capturedImages.side,
-          userId: tempUserId,
         },
       });
 
@@ -260,8 +261,9 @@ export default function FaceVerification({ onVerified }: FaceVerificationProps) 
       if (data?.success === true) {
         setVerificationResult('success');
         setStep(5);
-        if (onVerified) {
-          onVerified();
+        // Pass the face image to parent - it will be indexed when account is created
+        if (onVerified && capturedImages.front) {
+          onVerified(capturedImages.front);
         }
         return;
       }
@@ -314,7 +316,7 @@ export default function FaceVerification({ onVerified }: FaceVerificationProps) 
       return;
     }
 
-    if (code === 'INDEX_FAILED') {
+    if (code === 'INDEX_FAILED' || code === 'VALIDATION_FAILED') {
       setVerificationResult('error');
       setErrorMessage("Could not process your photo. Try again with better lighting.");
       setStep(3);
@@ -371,13 +373,13 @@ export default function FaceVerification({ onVerified }: FaceVerificationProps) 
             <div className={`w-3 h-3 rounded-full ${step >= 2 ? 'bg-purple-500' : 'bg-white/30'}`} />
           </div>
 
-          <p className="text-center text-white/80 text-sm font-medium">{getCaptureLabel()}</p>
+          <p className="text-center text-gray-700 text-sm font-medium">{getCaptureLabel()}</p>
 
           <div className="relative mx-auto" style={{ width: CAMERA_SIZE, height: CAMERA_SIZE }}>
             {/* Native preview */}
             {isNative && (
               <div
-                className="rounded-full overflow-hidden border-4 border-white/40 shadow-2xl bg-black"
+                className="rounded-full overflow-hidden border-4 border-purple-200 shadow-2xl bg-black"
                 style={{ width: CAMERA_SIZE, height: CAMERA_SIZE, position: 'relative', margin: '0 auto', borderRadius: '50%' }}
               >
                 {nativeLiveFrame ? (
@@ -400,7 +402,7 @@ export default function FaceVerification({ onVerified }: FaceVerificationProps) 
               <div
                 id="cameraPreview"
                 ref={cameraContainerRef}
-                className="camera-feed rounded-full overflow-hidden border-4 border-white/40 shadow-2xl bg-black"
+                className="camera-feed rounded-full overflow-hidden border-4 border-purple-200 shadow-2xl bg-black"
                 style={{ width: CAMERA_SIZE, height: CAMERA_SIZE, position: 'relative', margin: '0 auto', borderRadius: '50%' }}
               >
                 <video
@@ -416,7 +418,7 @@ export default function FaceVerification({ onVerified }: FaceVerificationProps) 
 
             {/* Face guide overlay */}
             <div className="absolute inset-0 flex items-center justify-center pointer-events-none" style={{ zIndex: 10 }}>
-              <div className="w-48 h-64 border-2 border-white/60 rounded-full" />
+              <div className="w-48 h-64 border-2 border-purple-400/60 rounded-full" />
             </div>
 
             {/* Instruction */}
@@ -430,24 +432,24 @@ export default function FaceVerification({ onVerified }: FaceVerificationProps) 
           {/* Thumbnails */}
           <div className="flex justify-center gap-4">
             <div className="flex flex-col items-center">
-              <div className={`w-14 h-14 rounded-full border-2 overflow-hidden ${capturedImages.front ? 'border-green-400' : 'border-white/30'} bg-black/30`}>
+              <div className={`w-14 h-14 rounded-full border-2 overflow-hidden ${capturedImages.front ? 'border-green-400' : 'border-gray-300'} bg-gray-100`}>
                 {capturedImages.front ? (
                   <img src={capturedImages.front} alt="Front" className="w-full h-full object-cover" style={{ transform: 'scaleX(-1)' }} />
                 ) : (
-                  <div className="w-full h-full flex items-center justify-center text-white/40 text-xs">Front</div>
+                  <div className="w-full h-full flex items-center justify-center text-gray-400 text-xs">Front</div>
                 )}
               </div>
-              <span className="text-xs text-white/60 mt-1">{capturedImages.front ? '✓' : '1'}</span>
+              <span className="text-xs text-gray-500 mt-1">{capturedImages.front ? '✓' : '1'}</span>
             </div>
             <div className="flex flex-col items-center">
-              <div className={`w-14 h-14 rounded-full border-2 overflow-hidden ${capturedImages.side ? 'border-green-400' : 'border-white/30'} bg-black/30`}>
+              <div className={`w-14 h-14 rounded-full border-2 overflow-hidden ${capturedImages.side ? 'border-green-400' : 'border-gray-300'} bg-gray-100`}>
                 {capturedImages.side ? (
                   <img src={capturedImages.side} alt="Side" className="w-full h-full object-cover" style={{ transform: 'scaleX(-1)' }} />
                 ) : (
-                  <div className="w-full h-full flex items-center justify-center text-white/40 text-xs">Side</div>
+                  <div className="w-full h-full flex items-center justify-center text-gray-400 text-xs">Side</div>
                 )}
               </div>
-              <span className="text-xs text-white/60 mt-1">{capturedImages.side ? '✓' : '2'}</span>
+              <span className="text-xs text-gray-500 mt-1">{capturedImages.side ? '✓' : '2'}</span>
             </div>
           </div>
 
@@ -455,7 +457,7 @@ export default function FaceVerification({ onVerified }: FaceVerificationProps) 
           <Button
             onClick={capturePhoto}
             disabled={isLoading}
-            className="w-full font-semibold py-5 rounded-xl shadow-2xl bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700 text-white"
+            className="w-full font-semibold py-5 rounded-xl shadow-lg bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700 text-white"
           >
             <CameraIcon className="mr-2 h-5 w-5" />
             {isLoading ? "Capturing..." : "Take Photo"}
@@ -466,44 +468,40 @@ export default function FaceVerification({ onVerified }: FaceVerificationProps) 
       {/* Review Captured Images */}
       {step === 3 && (
         <div className="space-y-4 animate-fade-in">
-          <p className="text-center text-white/80 text-sm font-medium">Review your photos</p>
+          <p className="text-center text-gray-700 text-sm font-medium">Review your photos</p>
 
           <div className="flex justify-center gap-4">
             <div className="flex flex-col items-center">
-              <div className={`w-24 h-24 rounded-full border-4 overflow-hidden shadow-lg ${verificationResult === 'error' || verificationResult === 'duplicate' ? 'border-red-400' : 'border-white/40'}`}>
+              <div className={`w-24 h-24 rounded-full border-4 overflow-hidden shadow-lg ${verificationResult === 'error' || verificationResult === 'duplicate' ? 'border-red-400' : 'border-purple-200'}`}>
                 {capturedImages.front && (
                   <img src={capturedImages.front} alt="Front" className="w-full h-full object-cover" style={{ transform: 'scaleX(-1)' }} />
                 )}
               </div>
-              <span className="text-xs text-white/70 mt-2">Front</span>
+              <span className="text-xs text-gray-500 mt-2">Front</span>
             </div>
             <div className="flex flex-col items-center">
-              <div className={`w-24 h-24 rounded-full border-4 overflow-hidden shadow-lg ${verificationResult === 'error' || verificationResult === 'duplicate' ? 'border-red-400' : 'border-white/40'}`}>
+              <div className={`w-24 h-24 rounded-full border-4 overflow-hidden shadow-lg ${verificationResult === 'error' || verificationResult === 'duplicate' ? 'border-red-400' : 'border-purple-200'}`}>
                 {capturedImages.side && (
                   <img src={capturedImages.side} alt="Side" className="w-full h-full object-cover" style={{ transform: 'scaleX(-1)' }} />
                 )}
               </div>
-              <span className="text-xs text-white/70 mt-2">Side</span>
+              <span className="text-xs text-gray-500 mt-2">Side</span>
             </div>
           </div>
 
-          {verificationResult === 'duplicate' && (
-            <div className="bg-red-500/20 border border-red-500/40 rounded-lg p-3">
-              <p className="text-red-200 text-sm text-center font-medium">Duplicate Account Detected</p>
-            </div>
-          )}
-
+          {/* Error Message */}
           {errorMessage && (
-            <div className="bg-red-500/20 border border-red-500/40 rounded-lg p-3">
-              <p className="text-red-200 text-sm text-center">{errorMessage}</p>
+            <div className={`p-3 rounded-lg text-sm text-center ${verificationResult === 'duplicate' ? 'bg-amber-50 text-amber-800 border border-amber-200' : 'bg-red-50 text-red-800 border border-red-200'}`}>
+              {errorMessage}
             </div>
           )}
 
+          {/* Action Buttons */}
           <div className="flex gap-3">
             <Button
               onClick={() => retakePhoto('all')}
               variant="outline"
-              className="flex-1 py-5 rounded-xl border-white/40 text-white hover:bg-white/10"
+              className="flex-1 border-gray-300"
             >
               <RefreshCw className="mr-2 h-4 w-4" />
               Retake
@@ -511,77 +509,53 @@ export default function FaceVerification({ onVerified }: FaceVerificationProps) 
             <Button
               onClick={submitVerification}
               disabled={isLoading}
-              className="flex-1 font-semibold py-5 rounded-xl shadow-2xl bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700 text-white"
+              className="flex-1 bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700 text-white"
             >
-              <CheckCircle2 className="mr-2 h-5 w-5" />
-              {isLoading ? "Verifying..." : "Verify"}
+              {isLoading ? "Verifying..." : "Verify Face"}
             </Button>
           </div>
         </div>
       )}
 
-      {/* Verifying State */}
+      {/* Verifying */}
       {step === 4 && (
-        <div className="space-y-4 animate-fade-in">
-          <div className="flex justify-center gap-4">
-            <div className="w-20 h-20 rounded-full border-4 border-purple-400 overflow-hidden shadow-lg animate-pulse">
-              {capturedImages.front && (
-                <img src={capturedImages.front} alt="Front" className="w-full h-full object-cover opacity-70" style={{ transform: 'scaleX(-1)' }} />
-              )}
-            </div>
-            <div className="w-20 h-20 rounded-full border-4 border-purple-400 overflow-hidden shadow-lg animate-pulse">
-              {capturedImages.side && (
-                <img src={capturedImages.side} alt="Side" className="w-full h-full object-cover opacity-70" style={{ transform: 'scaleX(-1)' }} />
-              )}
-            </div>
-          </div>
-          <div className="flex justify-center">
-            <div className="bg-purple-600/90 px-6 py-3 rounded-full">
-              <p className="text-white font-medium">Driplove verifying...</p>
-            </div>
-          </div>
+        <div className="text-center space-y-4 animate-fade-in py-8">
+          <div className="animate-spin h-12 w-12 border-4 border-purple-600 border-t-transparent rounded-full mx-auto" />
+          <p className="text-gray-700 font-medium">Verifying your identity...</p>
+          <p className="text-sm text-gray-500">This may take a moment</p>
         </div>
       )}
 
-      {/* Success State */}
+      {/* Success */}
       {step === 5 && (
-        <div className="space-y-4 animate-fade-in">
-          <div className="flex justify-center gap-4">
-            <div className="w-20 h-20 rounded-full border-4 border-green-400 overflow-hidden shadow-lg">
-              {capturedImages.front && (
-                <img src={capturedImages.front} alt="Front" className="w-full h-full object-cover" style={{ transform: 'scaleX(-1)' }} />
-              )}
-            </div>
-            <div className="w-20 h-20 rounded-full border-4 border-green-400 overflow-hidden shadow-lg">
-              {capturedImages.side && (
-                <img src={capturedImages.side} alt="Side" className="w-full h-full object-cover" style={{ transform: 'scaleX(-1)' }} />
-              )}
-            </div>
+        <div className="text-center space-y-4 animate-fade-in">
+          <div className="w-16 h-16 bg-green-100 rounded-full flex items-center justify-center mx-auto">
+            <CheckCircle2 className="w-10 h-10 text-green-600" />
           </div>
-          <div className="flex justify-center">
-            <div className="bg-green-600 px-6 py-3 rounded-full flex items-center gap-2">
-              <CheckCircle2 className="h-5 w-5 text-white" />
-              <p className="text-white font-medium">Verified!</p>
-            </div>
+          <div>
+            <p className="text-green-700 font-semibold">Face Verified!</p>
+            <p className="text-sm text-gray-600 mt-1">Your identity has been confirmed</p>
           </div>
         </div>
       )}
 
       {/* Start Button */}
       {step === 0 && (
-        <Button
-          onClick={() => startCamera('front')}
-          disabled={isLoading}
-          className="w-full font-semibold py-5 rounded-xl shadow-2xl bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700 text-white"
-        >
-          <CameraIcon className="mr-2 h-5 w-5" />
-          {isLoading ? "Starting Camera..." : "Start Face Verification"}
-        </Button>
-      )}
-
-      {errorMessage && step === 0 && (
-        <div className="bg-red-500/20 border border-red-500/40 rounded-lg p-3">
-          <p className="text-red-200 text-sm text-center">{errorMessage}</p>
+        <div className="space-y-3">
+          <Button
+            onClick={() => startCamera('front')}
+            disabled={isLoading || disabled}
+            className="w-full font-semibold py-5 rounded-xl shadow-lg bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700 text-white disabled:opacity-50"
+          >
+            <CameraIcon className="mr-2 h-5 w-5" />
+            {isLoading ? "Opening Camera..." : "Start Verification"}
+          </Button>
+          {disabled && (
+            <p className="text-xs text-amber-600 text-center">Enter your first and last name to enable verification</p>
+          )}
+          {errorMessage && (
+            <p className="text-xs text-red-600 text-center">{errorMessage}</p>
+          )}
         </div>
       )}
     </div>

@@ -46,12 +46,35 @@ const PageLoader = () => (
 );
 
 const Index = () => {
-  const [currentView, setCurrentView] = useState<'welcome' | 'login' | 'register' | 'profile-completion' | 'terms-acceptance' | 'app' | 'admin' | 'about' | 'terms' | 'privacy'>('welcome');
+  // Restore view from sessionStorage to persist on reload
+  const getInitialView = () => {
+    try {
+      const savedView = sessionStorage.getItem('driplove_current_view');
+      if (savedView === 'register' || savedView === 'profile-completion') {
+        return savedView as 'register' | 'profile-completion';
+      }
+    } catch {}
+    return 'welcome' as const;
+  };
+  
+  const [currentView, setCurrentView] = useState<'welcome' | 'login' | 'register' | 'profile-completion' | 'terms-acceptance' | 'app' | 'admin' | 'about' | 'terms' | 'privacy'>(getInitialView());
   const [user, setUser] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [showAuthDialog, setShowAuthDialog] = useState(false);
   const [isLoginMode, setIsLoginMode] = useState(true);
   const { toast } = useToast();
+
+  // Save view to sessionStorage when it changes (only for registration/profile-completion)
+  React.useEffect(() => {
+    try {
+      if (currentView === 'register' || currentView === 'profile-completion') {
+        sessionStorage.setItem('driplove_current_view', currentView);
+      } else {
+        // Clear saved view when user leaves registration flow
+        sessionStorage.removeItem('driplove_current_view');
+      }
+    } catch {}
+  }, [currentView]);
 
   useEffect(() => {
     // Check for existing session

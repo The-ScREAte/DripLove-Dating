@@ -148,6 +148,79 @@ serve(async (req: Request) => {
   try {
     const body = await req.json();
     
+    // Handle list faces request (for admin)
+    if (body.action === 'list_faces') {
+      console.log('📋 Listing all faces...');
+      try {
+        await ensureCollection();
+        
+        const listResult = await rekognitionRequest('RekognitionService.ListFaces', {
+          CollectionId: COLLECTION_ID,
+          MaxResults: 100,
+        }, ['ResourceNotFoundException']);
+        
+        if (listResult.__allowedError) {
+          return new Response(JSON.stringify({ 
+            success: true, 
+            faces: [] 
+          }), {
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+          });
+        }
+        
+        const faces = (listResult.Faces || []).map((face: any) => ({
+          faceId: face.FaceId,
+          externalImageId: face.ExternalImageId || 'Unknown',
+          imageId: face.ImageId,
+          confidence: face.Confidence
+        }));
+        
+        return new Response(JSON.stringify({ 
+          success: true, 
+          faces 
+        }), {
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+        });
+      } catch (listError: any) {
+        console.error('List faces error:', listError);
+        return new Response(JSON.stringify({ 
+          success: false, 
+          error: 'Failed to list faces' 
+        }), {
+          status: 500,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+        });
+      }
+    }
+    
+    // Handle delete single face request
+    if (body.action === 'delete_face' && body.faceId) {
+      console.log('🗑️ Deleting face:', body.faceId);
+      try {
+        await rekognitionRequest('RekognitionService.DeleteFaces', {
+          CollectionId: COLLECTION_ID,
+          FaceIds: [body.faceId],
+        });
+        
+        console.log('✅ Deleted face:', body.faceId);
+        return new Response(JSON.stringify({ 
+          success: true, 
+          message: 'Face deleted successfully' 
+        }), {
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+        });
+      } catch (deleteError: any) {
+        console.error('Delete face error:', deleteError);
+        return new Response(JSON.stringify({ 
+          success: false, 
+          error: 'Failed to delete face' 
+        }), {
+          status: 500,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+        });
+      }
+    }
+    
     // Handle delete/clear collection request
     if (body.action === 'clear_collection') {
       console.log('🗑️ Clearing face collection...');
@@ -203,7 +276,273 @@ serve(async (req: Request) => {
       }
     }
 
-    // Regular face verification
+    // Handle validate_only action - check for duplicates WITHOUT indexing
+    if (body.action === 'validate_only') {
+      const { front } = body;
+      
+      console.log('🔍 Validating face (no indexing)...');
+      
+      if (!front) {
+        return new Response(JSON.stringify({
+          success: false,
+          error: 'Front image is required',
+          code: 'MISSING_IMAGE'
+        }), {
+          status: 400,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+        });
+      }
+
+      if (!AWS_ACCESS_KEY_ID || !AWS_SECRET_ACCESS_KEY) {
+        console.error('AWS credentials not configured');
+        return new Response(JSON.stringify({
+          success: false,
+          error: 'AWS credentials not configured'
+        }), {
+          status: 500,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+        });
+      }
+
+      await ensureCollection();
+      
+      const imageBytes = base64ToBytes(front);
+      const imageBase64 = btoa(String.fromCharCode(...imageBytes));
+      
+      console.log('📸 Image size:', imageBytes.length, 'bytes');
+
+      // Search for existing face (duplicate check)
+      try {
+        console.log('🔍 Checking if face already registered...');
+        const searchResult = await rekognitionRequest('RekognitionService.SearchFacesByImage', {
+          CollectionId: COLLECTION_ID,
+          Image: { Bytes: imageBase64 },
+          FaceMatchThreshold: 90,
+          MaxFaces: 1,
+        });
+
+        if (searchResult.FaceMatches && searchResult.FaceMatches.length > 0) {
+          const matchConfidence = searchResult.FaceMatches[0].Similarity || 0;
+          console.log('⚠️ Duplicate face found with similarity:', matchConfidence);
+          return new Response(JSON.stringify({
+            success: false,
+            error: 'This face already exists in our system. Each person can only have one account.',
+            code: 'DUPLICATE_FACE'
+          }), {
+            status: 409,
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+          });
+        }
+        console.log('✅ No duplicate found - face is valid');
+        
+        // Return success - face is valid and not a duplicate
+        return new Response(JSON.stringify({ 
+          success: true,
+          message: 'Face validated successfully'
+        }), {
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+        });
+        
+      } catch (searchError: any) {
+        const errorMsg = searchError.message || '';
+        
+        // No face detected in image
+        if (errorMsg.includes('InvalidParameterException') && errorMsg.includes('no faces')) {
+          console.log('❌ No face detected in search');
+          return new Response(JSON.stringify({
+            success: false,
+            error: 'No face detected. Please take a clear photo showing your face.',
+            code: 'NO_FACE'
+          }), {
+            status: 400,
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+          });
+        }
+        
+        // Collection is empty - that's fine, face is valid
+        if (errorMsg.includes('There are no faces in the collection')) {
+          console.log('Collection is empty - face is valid');
+          return new Response(JSON.stringify({ 
+            success: true,
+            message: 'Face validated successfully (first face)'
+          }), {
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+          });
+        }
+        
+        // Other errors
+        console.error('Search error:', errorMsg);
+        return new Response(JSON.stringify({
+          success: false,
+          error: 'Failed to validate face. Please try again.',
+          code: 'VALIDATION_FAILED'
+        }), {
+          status: 500,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+        });
+      }
+    }
+
+    // Handle index_face action - actually save the face to collection
+    if (body.action === 'index_face') {
+      const { front, userId, userName } = body;
+      
+      console.log('📝 Indexing face for user:', userId, 'name:', userName);
+      
+      if (!front) {
+        return new Response(JSON.stringify({
+          success: false,
+          error: 'Front image is required'
+        }), {
+          status: 400,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+        });
+      }
+
+      if (!AWS_ACCESS_KEY_ID || !AWS_SECRET_ACCESS_KEY) {
+        return new Response(JSON.stringify({
+          success: false,
+          error: 'AWS credentials not configured'
+        }), {
+          status: 500,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+        });
+      }
+
+      await ensureCollection();
+      
+      const imageBytes = base64ToBytes(front);
+      const imageBase64 = btoa(String.fromCharCode(...imageBytes));
+      
+      // Create external ID with user name for easy identification
+      const externalId = userName ? `${userName.replace(/\s+/g, '_')}_${userId}` : userId;
+      
+      try {
+        const indexResult = await rekognitionRequest('RekognitionService.IndexFaces', {
+          CollectionId: COLLECTION_ID,
+          ExternalImageId: externalId,
+          Image: { Bytes: imageBase64 },
+          DetectionAttributes: ['DEFAULT'],
+        });
+        
+        if (!indexResult?.FaceRecords || indexResult.FaceRecords.length === 0) {
+          return new Response(JSON.stringify({
+            success: false,
+            error: 'No face detected in image',
+            code: 'NO_FACE'
+          }), {
+            status: 400,
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+          });
+        }
+
+        console.log('✅ Face indexed successfully');
+        return new Response(JSON.stringify({ 
+          success: true,
+          faceId: indexResult.FaceRecords[0].Face?.FaceId 
+        }), {
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+        });
+        
+      } catch (indexError: any) {
+        const errorMsg = indexError.message || '';
+        
+        if (errorMsg.includes('InvalidParameterException') && (errorMsg.includes('no faces') || errorMsg.includes('No faces'))) {
+          return new Response(JSON.stringify({
+            success: false,
+            error: 'No face detected. Please take a clear photo showing your face.',
+            code: 'NO_FACE'
+          }), {
+            status: 400,
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+          });
+        }
+        
+        console.error('Index error:', errorMsg);
+        return new Response(JSON.stringify({
+          success: false,
+          error: 'Could not save face. Please try again.',
+          code: 'INDEX_FAILED'
+        }), {
+          status: 500,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+        });
+      }
+    }
+
+    // Handle compare_faces action - compare uploaded images with verified face
+    if (body.action === 'compare_faces') {
+      const { sourceImage, targetImages } = body;
+      
+      console.log('🔍 Comparing faces...');
+      
+      if (!sourceImage || !targetImages || targetImages.length === 0) {
+        return new Response(JSON.stringify({
+          success: false,
+          error: 'Source image and target images are required'
+        }), {
+          status: 400,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+        });
+      }
+
+      if (!AWS_ACCESS_KEY_ID || !AWS_SECRET_ACCESS_KEY) {
+        return new Response(JSON.stringify({
+          success: false,
+          error: 'AWS credentials not configured'
+        }), {
+          status: 500,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+        });
+      }
+
+      const sourceBytes = base64ToBytes(sourceImage);
+      const sourceBase64 = btoa(String.fromCharCode(...sourceBytes));
+      
+      // Try each target image until we find a match
+      for (let i = 0; i < targetImages.length; i++) {
+        try {
+          const targetBytes = base64ToBytes(targetImages[i]);
+          const targetBase64 = btoa(String.fromCharCode(...targetBytes));
+          
+          console.log(`Comparing with target image ${i + 1}/${targetImages.length}`);
+          
+          const compareResult = await rekognitionRequest('RekognitionService.CompareFaces', {
+            SourceImage: { Bytes: sourceBase64 },
+            TargetImage: { Bytes: targetBase64 },
+            SimilarityThreshold: 80, // 80% similarity threshold
+          });
+          
+          if (compareResult.FaceMatches && compareResult.FaceMatches.length > 0) {
+            const similarity = compareResult.FaceMatches[0].Similarity;
+            console.log(`✅ Face match found! Similarity: ${similarity}%`);
+            return new Response(JSON.stringify({ 
+              success: true,
+              matchFound: true,
+              matchIndex: i,
+              similarity: similarity
+            }), {
+              headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+            });
+          }
+        } catch (compareError: any) {
+          console.log(`Target image ${i + 1} comparison failed:`, compareError.message);
+          // Continue to next image
+        }
+      }
+      
+      // No match found in any image
+      console.log('❌ No face match found in any uploaded image');
+      return new Response(JSON.stringify({ 
+        success: true,
+        matchFound: false,
+        error: 'None of your uploaded photos match your verified face. At least one photo must be of you.'
+      }), {
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+      });
+    }
+
+    // Legacy: Regular face verification (validate + index in one step)
     const { front, side, userId } = body;
     
     console.log('🔍 Face verification started');
