@@ -681,7 +681,7 @@ const ImageManagement = ({ currentUser, profile, onProfileUpdate }: ImageManagem
               {/* Pending approval indicator */}
               {userImage.is_approved === false && (
                 <div className="absolute top-2 left-2 bg-orange-500 text-white text-xs px-2 py-1 rounded-full flex items-center">
-                  🔒 Pending Review, Max 24hrs
+                  🔒 Reviewing...
                 </div>
               )}
               

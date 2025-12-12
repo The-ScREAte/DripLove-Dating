@@ -138,7 +138,7 @@ const AboutUs = ({ onBack }: AboutUsProps) => {
             </p>
             <div className="bg-pink-50 border border-pink-200 rounded-lg p-4 space-y-2">
               <p className="text-pink-800 font-semibold">
-                {t('aboutUs.sections.contact.email')} <a href="mailto:info@screate.org" className="hover:underline">info@screate.org</a>
+                {t('aboutUs.sections.contact.email')} <a href="mailto:driploveinfo@gmail.com" className="hover:underline">driploveinfo@gmail.com</a>
               </p>
               <p className="text-pink-700">
                 📍 {t('aboutUs.sections.contact.support')}
