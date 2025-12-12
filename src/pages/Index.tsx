@@ -67,6 +67,7 @@ const Index = () => {
   const [loading, setLoading] = useState(true);
   const [showAuthDialog, setShowAuthDialog] = useState(false);
   const [isLoginMode, setIsLoginMode] = useState(true);
+  const [authInitialized, setAuthInitialized] = useState(false);
   const { toast } = useToast();
 
   // Save view to sessionStorage when it changes
@@ -87,6 +88,9 @@ const Index = () => {
   }, [currentView]);
 
   useEffect(() => {
+    // Prevent re-initialization
+    if (authInitialized) return;
+    
     // Check for existing session
     supabase.auth.getSession().then(({ data: { session }, error }) => {
       if (error) {
@@ -94,6 +98,7 @@ const Index = () => {
         sessionStorage.removeItem('driplove_user_session');
         setLoading(false);
         setCurrentView('welcome');
+        setAuthInitialized(true);
         return;
       }
       
@@ -102,28 +107,35 @@ const Index = () => {
         if (!session.user.email_confirmed_at) {
           setLoading(false);
           setCurrentView('welcome');
+          setAuthInitialized(true);
           return;
         }
         
         setUser(session.user);
         checkUserTypeAndRedirect(session.user.id);
+        setAuthInitialized(true);
       } else {
         // No session - clear any saved session state and show welcome
         sessionStorage.removeItem('driplove_user_session');
         setCurrentView('welcome');
         setLoading(false);
+        setAuthInitialized(true);
       }
     }).catch(() => {
       // Handle any errors by showing welcome screen
       sessionStorage.removeItem('driplove_user_session');
       setLoading(false);
       setCurrentView('welcome');
+      setAuthInitialized(true);
     });
 
-    // Listen for auth changes
+    // Listen for auth changes (but only respond to actual sign in/out events)
     const {
       data: { subscription },
     } = supabase.auth.onAuthStateChange(async (_event, session) => {
+      // Skip initial session event - we handle that above
+      if (_event === 'INITIAL_SESSION') return;
+      
       if (session?.user) {
         // Check if email is confirmed before proceeding
         if (!session.user.email_confirmed_at) {
@@ -163,8 +175,10 @@ const Index = () => {
         // Auth state changed for user ID: session.user.id
         setUser(session.user);
         checkUserTypeAndRedirect(session.user.id);
-      } else {
+      } else if (_event === 'SIGNED_OUT') {
+        // Only clear on explicit sign out, not on every state change
         setUser(null);
+        sessionStorage.removeItem('driplove_user_session');
         setCurrentView('welcome');
         setLoading(false);
       }
