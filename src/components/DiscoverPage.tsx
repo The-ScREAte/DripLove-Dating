@@ -904,9 +904,9 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, isPremium }: DiscoverPage
         setTimeout(() => {
           loadMoreMatches(); // Load first batch of additional profiles
 
-          // Visibility-aware chained loader instead of setInterval
+          // ⭐ ANDROID OPTIMIZATION: Visibility-aware chained loader with longer interval
           const continuousLoaderActive = { running: true };
-          const CONTINUOUS_INTERVAL_MS = 30000; // base interval
+          const CONTINUOUS_INTERVAL_MS = 45000; // ⭐ ANDROID FIX: Increased from 30s to 45s
           const continuousLoaderTimerRef = { current: null as any };
           const currentFetchController = { current: null as AbortController | null };
 
