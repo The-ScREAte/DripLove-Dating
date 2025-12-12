@@ -19,30 +19,8 @@ import { preloadPricingConfig } from '@/hooks/usePricingConfig';
 // Lazy load AdminPage (54KB) - only loads when admin features are accessed
 const LazyAdminPage = lazy(() => import('@/components/AdminPage'));
 
-// Loading component for lazy-loaded pages 
-const PageLoader = () => (
-  <div className="min-h-fill bg-gradient-to-br from-pink-50 to-purple-50 flex items-center justify-center">
-    <div className="text-center">
-      <style>{`
-        @keyframes logoHop {
-          0%, 100% { transform: translateY(0) scale(1); }
-          50% { transform: translateY(-20px) scale(1.05); }
-        }
-      `}</style>
-      <div className="animate-pulse" style={{ animation: 'logoHop 1s ease-in-out infinite' }}>
-        <img 
-          src="/driplove-logo.png" 
-          alt="Drip Love" 
-          className="w-24 h-24 mx-auto mb-4"
-          onError={(e) => {
-            e.currentTarget.src = '/driplove-logo.webp';
-          }}
-        />
-      </div>
-      <p className="text-gray-600">Loading...</p>
-    </div>
-  </div>
-);
+// Loading component for lazy-loaded pages - minimal spinner
+const PageLoader = () => null;
 
 const Index = () => {
   // Restore view from sessionStorage to persist on reload

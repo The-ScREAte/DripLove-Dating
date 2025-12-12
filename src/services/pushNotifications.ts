@@ -521,6 +521,11 @@ class SupabasePushNotificationService {
 
   async removeToken(userId: string): Promise<void> {
     try {
+      if (!userId) {
+        console.warn('⚠️ Cannot remove push token: userId is missing');
+        return;
+      }
+      
       // Get the current device token before removing
       const platform = Capacitor.getPlatform();
       
@@ -532,7 +537,8 @@ class SupabasePushNotificationService {
         .eq('platform', platform);
 
       if (error) {
-        console.error('❌ Failed to remove push token:', error);
+        // Silently handle errors - user is logging out anyway
+        console.debug('Push token removal skipped:', error.message);
       } else {
         console.log('✅ Push token removed for user:', userId, 'platform:', platform);
       }
@@ -540,7 +546,8 @@ class SupabasePushNotificationService {
       // Clear the stored device token
       this.deviceToken = null;
     } catch (error) {
-      console.error('❌ Error removing push token:', error);
+      // Silently handle errors during logout - don't block user
+      console.debug('Error removing push token:', error);
     }
   }
 

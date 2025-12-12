@@ -13,7 +13,6 @@ import { Upload, Trash2, Shield, AlertTriangle, CheckCircle, RefreshCw, BadgeChe
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import { moderateImage, saveModerationResult, ModerationResult } from '@/utils/photoModeration';
-import { compressImage } from '@/utils/imageCompression';
 import FaceVerification from '@/components/FaceVerification';
 
 interface ImageManagementProps {
@@ -35,67 +34,86 @@ interface ProfileData {
   face_descriptor: string | null;
 }
 
-// Robust image component with proper retry logic
+// Simple image component - no loading states, just display
 const ImageWithRetry = ({ src, alt, className }: { src: string; alt: string; className: string }) => {
-  const [imageSrc, setImageSrc] = useState(src);
-  const [loading, setLoading] = useState(true);
-  const [failed, setFailed] = useState(false);
-  const [retryCount, setRetryCount] = useState(0);
+  const [resolvedSrc, setResolvedSrc] = useState(src);
+  const [attempt, setAttempt] = useState(0);
 
   useEffect(() => {
-    // Reset state when src changes
-    setImageSrc(src);
-    setLoading(true);
-    setFailed(false);
-    setRetryCount(0);
+    setResolvedSrc(src);
+    setAttempt(0);
   }, [src]);
 
-  const handleError = () => {
-    if (retryCount < 3) {
-      // Retry with cache-busting after a delay
-      setTimeout(() => {
-        const separator = src.includes('?') ? '&' : '?';
-        setImageSrc(`${src}${separator}t=${Date.now()}&retry=${retryCount + 1}`);
-        setRetryCount(prev => prev + 1);
-      }, 500 * (retryCount + 1)); // Increasing delay
-    } else {
-      setFailed(true);
-      setLoading(false);
+  const extractStoragePath = (urlOrPath: string): string | null => {
+    if (!urlOrPath) return null;
+
+    // If we already have a bucket-relative path
+    if (!urlOrPath.startsWith('http')) {
+      return urlOrPath.replace(/^\/+/, '');
+    }
+
+    // Public URL format: .../storage/v1/object/public/user-photos/<path>
+    const publicMarker = '/storage/v1/object/public/user-photos/';
+    const publicIdx = urlOrPath.indexOf(publicMarker);
+    if (publicIdx !== -1) {
+      return urlOrPath.substring(publicIdx + publicMarker.length);
+    }
+
+    // Signed URL format: .../storage/v1/object/sign/user-photos/<path>?token=...
+    const signMarker = '/storage/v1/object/sign/user-photos/';
+    const signIdx = urlOrPath.indexOf(signMarker);
+    if (signIdx !== -1) {
+      const rest = urlOrPath.substring(signIdx + signMarker.length);
+      return rest.split('?')[0];
+    }
+
+    return null;
+  };
+
+  const handleError = async () => {
+    // Attempt 1: cache-bust (handles CDN propagation delays)
+    if (attempt === 0) {
+      const separator = resolvedSrc.includes('?') ? '&' : '?';
+      setAttempt(1);
+      setResolvedSrc(`${resolvedSrc}${separator}t=${Date.now()}`);
+      return;
+    }
+
+    // Attempt 2: signed URL fallback (handles private buckets / RLS)
+    if (attempt === 1) {
+      try {
+        const path = extractStoragePath(src);
+        if (!path) {
+          setAttempt(2);
+          return;
+        }
+
+        const { data, error } = await supabase.storage
+          .from('user-photos')
+          .createSignedUrl(path, 60 * 60); // 1 hour
+
+        if (!error && data?.signedUrl) {
+          setAttempt(2);
+          setResolvedSrc(data.signedUrl);
+          return;
+        }
+      } catch {
+        // ignore
+      }
+      setAttempt(2);
     }
   };
 
-  const handleLoad = () => {
-    setLoading(false);
-    setFailed(false);
-  };
-
-  if (failed) {
-    return (
-      <div className={`${className} bg-muted flex items-center justify-center`}>
-        <div className="text-center p-2">
-          <RefreshCw className="w-4 h-4 text-muted-foreground mx-auto mb-1" />
-          <span className="text-[10px] text-muted-foreground">Tap to retry</span>
-        </div>
-      </div>
-    );
-  }
-
   return (
-    <>
-      {loading && (
-        <div className={`${className} bg-muted animate-pulse flex items-center justify-center absolute inset-0 z-10`}>
-          <div className="w-5 h-5 border-2 border-primary/30 border-t-primary rounded-full animate-spin" />
-        </div>
-      )}
-      <img 
-        src={imageSrc}
-        alt={alt}
-        className={`${className} ${loading ? 'opacity-0' : 'opacity-100'} transition-opacity duration-300 bg-muted`}
-        onLoad={handleLoad}
-        onError={handleError}
-        loading="lazy"
-      />
-    </>
+    <img
+      src={resolvedSrc}
+      alt={alt}
+      className={`${className} bg-gray-100`}
+      loading="lazy"
+      decoding="async"
+      onError={handleError}
+      referrerPolicy="no-referrer"
+    />
   );
 };
 
@@ -203,63 +221,20 @@ const ImageManagement = ({ currentUser }: ImageManagementProps) => {
       return;
     }
 
-    // Helper function to generate file hash for duplicate detection
-    const getFileHash = async (file: File): Promise<string> => {
-      const arrayBuffer = await file.arrayBuffer();
-      const uint8Array = new Uint8Array(arrayBuffer);
-      // Simple hash: combine file size with first and last bytes
-      const firstBytes = Array.from(uint8Array.slice(0, 100)).join(',');
-      const lastBytes = Array.from(uint8Array.slice(-100)).join(',');
-      return `${file.size}-${file.type}-${firstBytes}-${lastBytes}`;
-    };
-
-    // Step 1: Compress and convert to WebP first
+    // Step 1: Moderate the image
     setModerating(true);
     setModerationResult(null);
-
-    // Compress image
-    const compressedFile = await compressImage(file);
-    
-    // Generate hash AFTER compression for accurate duplicate detection
-    const newFileHash = await getFileHash(compressedFile);
-
-    // Check against existing images in the database by downloading and comparing
-    let isDuplicate = false;
-    for (const existingImage of userImages) {
-      try {
-        // Fetch the existing image
-        const response = await fetch(existingImage.image_url);
-        if (response.ok) {
-          const blob = await response.blob();
-          const existingFile = new File([blob], 'existing.jpg', { type: blob.type });
-          const existingHash = await getFileHash(existingFile);
-          
-          if (existingHash === newFileHash) {
-            isDuplicate = true;
-            break;
-          }
-        }
-      } catch (err) {
-        // Continue checking other images if fetch fails
-        console.error('Error checking duplicate:', err);
-      }
-    }
-
-    if (isDuplicate) {
-      toast({ 
-        title: "Duplicate image", 
-        description: "This image has already been uploaded.", 
-        variant: "destructive" 
-      });
-      setModerating(false);
-      event.target.value = '';
-      return;
-    }
 
     let moderationResult: ModerationResult | null = null;
 
     try {
-      moderationResult = await moderateImage(compressedFile);
+      const moderationTimeoutMs = 7000;
+      moderationResult = await Promise.race([
+        moderateImage(file),
+        new Promise<ModerationResult>((_, reject) =>
+          setTimeout(() => reject(new Error('Moderation timeout')), moderationTimeoutMs)
+        )
+      ]);
       setModerationResult(moderationResult);
       
       // Only block if image is completely rejected (not approved)
@@ -305,7 +280,7 @@ const ImageManagement = ({ currentUser }: ImageManagementProps) => {
       // Upload to storage
       const { data: uploadData, error: uploadError } = await supabase.storage
         .from('user-photos')
-        .upload(fileName, compressedFile, { cacheControl: '3600', upsert: false });
+        .upload(fileName, file, { cacheControl: '3600', upsert: false });
 
       if (uploadError) throw uploadError;
 

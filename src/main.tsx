@@ -15,22 +15,10 @@ if (import.meta.env.PROD) {
   // Keep console.error for critical issues
 }
 
-// Create a loading screen component
+// Minimal loading screen component - no branding
 const LoadingScreen = () => (
-  <div className="w-full h-screen flex items-center justify-center bg-gradient-to-br from-pink-500 to-purple-600">
-    <div className="text-center">
-      <div className="mb-6">
-        <div className="w-16 h-16 mx-auto rounded-full bg-white/20 flex items-center justify-center animate-pulse">
-          <span className="text-2xl">💕</span>
-        </div>
-      </div>
-      <h1 className="text-2xl font-bold text-white mb-2">DripLove</h1>
-      <div className="flex items-center justify-center space-x-1">
-        <div className="w-2 h-2 bg-white/60 rounded-full animate-bounce" style={{ animationDelay: '0ms' }}></div>
-        <div className="w-2 h-2 bg-white/60 rounded-full animate-bounce" style={{ animationDelay: '150ms' }}></div>
-        <div className="w-2 h-2 bg-white/60 rounded-full animate-bounce" style={{ animationDelay: '300ms' }}></div>
-      </div>
-    </div>
+  <div className="w-full h-screen flex items-center justify-center bg-white">
+    <div className="w-8 h-8 border-4 border-gray-200 border-t-purple-500 rounded-full animate-spin"></div>
   </div>
 );
 
@@ -273,7 +261,12 @@ const AppWrapper = () => {
   return <App />;
 };
 
-ReactDOM.createRoot(document.getElementById("root")!).render(
+// Store root to prevent double mount warning in development
+const rootElement = document.getElementById("root")!;
+if (!(rootElement as any)._reactRoot) {
+  (rootElement as any)._reactRoot = ReactDOM.createRoot(rootElement);
+}
+(rootElement as any)._reactRoot.render(
   <React.StrictMode>
     <AppWrapper />
   </React.StrictMode>,
