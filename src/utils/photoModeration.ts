@@ -937,19 +937,20 @@ class PhotoModerationService {
       message = 'Image file is corrupted or invalid and cannot be uploaded.';
       // Image blocked: Invalid file
     }
-    // PRIORITY 2: Check for person detection
+    // PRIORITY 2: Skip person detection check - allow any image type
+    // The requirement for at least one user photo is handled at the form level, not per-image
+    // This allows users to upload landscapes, pets, food, etc. as additional photos
     else if (allFlags.includes(MODERATION_FLAGS.NO_PERSON_DETECTED)) {
-      // No person detected - REJECT the image
-      isApproved = false;
+      // Auto-approve images without people - they're allowed now
+      isApproved = true;
       confidence = 90;
-      message = 'No person detected in image. Profile photos must clearly show a person.';
+      message = 'Image approved. Note: This image does not contain a person.';
     }
-    // PRIORITY 3: If person detection has low confidence, send to admin for review
+    // PRIORITY 3: If person detection has low confidence, auto-approve (no longer strict)
     else if (combinedDetails.personDetected && combinedDetails.humanConfidence && combinedDetails.humanConfidence < 75) {
       isApproved = true;
-      requiresReview = true;
-      confidence = 40;
-      message = 'Image uploaded but requires admin approval to verify it shows a person.';
+      confidence = 85;
+      message = 'Image approved and uploaded successfully.';
     }
     // PRIORITY 4: For explicit nudity, allow upload but require admin review
     else if (combinedDetails.explicitContent && combinedDetails.explicitContent >= 95) {
