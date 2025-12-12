@@ -35,6 +35,70 @@ interface ProfileData {
   face_descriptor: string | null;
 }
 
+// Robust image component with proper retry logic
+const ImageWithRetry = ({ src, alt, className }: { src: string; alt: string; className: string }) => {
+  const [imageSrc, setImageSrc] = useState(src);
+  const [loading, setLoading] = useState(true);
+  const [failed, setFailed] = useState(false);
+  const [retryCount, setRetryCount] = useState(0);
+
+  useEffect(() => {
+    // Reset state when src changes
+    setImageSrc(src);
+    setLoading(true);
+    setFailed(false);
+    setRetryCount(0);
+  }, [src]);
+
+  const handleError = () => {
+    if (retryCount < 3) {
+      // Retry with cache-busting after a delay
+      setTimeout(() => {
+        const separator = src.includes('?') ? '&' : '?';
+        setImageSrc(`${src}${separator}t=${Date.now()}&retry=${retryCount + 1}`);
+        setRetryCount(prev => prev + 1);
+      }, 500 * (retryCount + 1)); // Increasing delay
+    } else {
+      setFailed(true);
+      setLoading(false);
+    }
+  };
+
+  const handleLoad = () => {
+    setLoading(false);
+    setFailed(false);
+  };
+
+  if (failed) {
+    return (
+      <div className={`${className} bg-muted flex items-center justify-center`}>
+        <div className="text-center p-2">
+          <RefreshCw className="w-4 h-4 text-muted-foreground mx-auto mb-1" />
+          <span className="text-[10px] text-muted-foreground">Tap to retry</span>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <>
+      {loading && (
+        <div className={`${className} bg-muted animate-pulse flex items-center justify-center absolute inset-0 z-10`}>
+          <div className="w-5 h-5 border-2 border-primary/30 border-t-primary rounded-full animate-spin" />
+        </div>
+      )}
+      <img 
+        src={imageSrc}
+        alt={alt}
+        className={`${className} ${loading ? 'opacity-0' : 'opacity-100'} transition-opacity duration-300 bg-muted`}
+        onLoad={handleLoad}
+        onError={handleError}
+        loading="lazy"
+      />
+    </>
+  );
+};
+
 const ImageManagement = ({ currentUser }: ImageManagementProps) => {
   const { t } = useTranslation();
   const [userImages, setUserImages] = useState<UserImage[]>([]);
@@ -664,38 +728,10 @@ const ImageManagement = ({ currentUser }: ImageManagementProps) => {
         <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-4">
           {userImages.map((userImage, index) => (
             <div key={userImage.image_url} className="relative group">
-              <img 
-                src={userImage.image_url} 
-                alt={`Photo ${index + 1}`} 
-                className="w-full h-28 sm:h-36 object-cover rounded-lg shadow-sm bg-gray-200"
-                loading="lazy"
-                onLoad={(e) => {
-                  // Successfully loaded - ensure visible
-                  const target = e.target as HTMLImageElement;
-                  target.style.opacity = '1';
-                }}
-                onError={(e) => {
-                  // Retry loading the image with cache-busting
-                  const target = e.target as HTMLImageElement;
-                  if (!target.dataset.retried) {
-                    target.dataset.retried = 'true';
-                    const separator = userImage.image_url.includes('?') ? '&' : '?';
-                    target.src = `${userImage.image_url}${separator}t=${Date.now()}`;
-                  } else if (!target.dataset.retried2) {
-                    // Second retry with longer delay
-                    target.dataset.retried2 = 'true';
-                    setTimeout(() => {
-                      const sep = userImage.image_url.includes('?') ? '&' : '?';
-                      target.src = `${userImage.image_url}${sep}t=${Date.now()}&retry=2`;
-                    }, 1000);
-                  } else {
-                    // Show placeholder on final failure
-                    target.style.display = 'none';
-                    target.insertAdjacentHTML('afterend', 
-                      '<div class="w-full h-28 sm:h-36 bg-gray-200 rounded-lg flex items-center justify-center text-gray-400 text-xs">Loading...</div>'
-                    );
-                  }
-                }}
+              <ImageWithRetry 
+                src={userImage.image_url}
+                alt={`Photo ${index + 1}`}
+                className="w-full h-28 sm:h-36 object-cover rounded-lg shadow-sm"
               />
               
               {/* Pending approval indicator */}
