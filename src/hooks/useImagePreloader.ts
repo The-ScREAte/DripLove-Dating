@@ -147,25 +147,11 @@ export const useImagePreloader = (options: ImagePreloaderOptions = {}) => {
     loadingQueue.current = [];
   }, []);
 
-  // Build imageStatus record for compatibility
-  const imageStatus = useCallback((): Record<string, 'idle'|'loading'|'loaded'|'error'> => {
-    const status: Record<string, 'idle'|'loading'|'loaded'|'error'> = {};
-    preloadedImages.forEach((data, url) => {
-      if (data.loaded) status[url] = 'loaded';
-      else if (data.loading) status[url] = 'loading';
-      else if (data.error) status[url] = 'error';
-      else status[url] = 'idle';
-    });
-    return status;
-  }, [preloadedImages]);
-
   return {
     preloadImages,
-    preloadImage,
     getOptimizedUrl,
     isImageLoaded,
     isImageLoading,
-    imageStatus: imageStatus(),
     clearCache
   };
 };
