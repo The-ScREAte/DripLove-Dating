@@ -237,54 +237,7 @@ serve(async (req: Request) => {
     
     console.log('📸 Image size:', imageBytes.length, 'bytes');
 
-    // STEP 1: Detect if there's actually a human face in the image first
-    console.log('🔍 Detecting face in image...');
-    let detectResult;
-    try {
-      detectResult = await rekognitionRequest('RekognitionService.DetectFaces', {
-        Image: { Bytes: imageBase64 },
-        Attributes: ['DEFAULT'],
-      });
-    } catch (detectError: any) {
-      console.error('Face detection failed:', detectError.message);
-      return new Response(JSON.stringify({
-        success: false,
-        error: 'Could not analyze image. Please try again.',
-        code: 'DETECTION_FAILED'
-      }), {
-        status: 400,
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' }
-      });
-    }
-
-    if (!detectResult.FaceDetails || detectResult.FaceDetails.length === 0) {
-      console.log('❌ No human face detected in image');
-      return new Response(JSON.stringify({
-        success: false,
-        error: 'No human face detected. Please take a clear photo of your face.',
-        code: 'NO_FACE'
-      }), {
-        status: 400,
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' }
-      });
-    }
-
-    const faceConfidence = detectResult.FaceDetails[0].Confidence || 0;
-    console.log('✅ Face detected with confidence:', faceConfidence);
-
-    if (faceConfidence < 90) {
-      console.log('⚠️ Face confidence too low:', faceConfidence);
-      return new Response(JSON.stringify({
-        success: false,
-        error: 'Face not clear enough. Please ensure good lighting and face the camera directly.',
-        code: 'LOW_CONFIDENCE'
-      }), {
-        status: 400,
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' }
-      });
-    }
-
-    // STEP 2: Search for existing face (duplicate check)
+    // STEP 1: Search for existing face (duplicate check) - this also validates if there's a face
     try {
       console.log('🔍 Checking if face already registered...');
       const searchResult = await rekognitionRequest('RekognitionService.SearchFacesByImage', {
@@ -299,7 +252,7 @@ serve(async (req: Request) => {
         console.log('⚠️ Duplicate face found with similarity:', matchConfidence);
         return new Response(JSON.stringify({
           success: false,
-          error: 'This face is already registered with another account.',
+          error: 'This face already exists in our system. Each person can only have one account.',
           code: 'DUPLICATE_FACE'
         }), {
           status: 409,
@@ -308,27 +261,73 @@ serve(async (req: Request) => {
       }
       console.log('✅ No duplicate found');
     } catch (searchError: any) {
-      // If no faces in collection yet, search will fail - that's OK
-      if (!searchError.message?.includes('InvalidParameterException')) {
-        console.log('Search check passed (collection may be empty)');
+      const errorMsg = searchError.message || '';
+      
+      // No face detected in image
+      if (errorMsg.includes('InvalidParameterException') && errorMsg.includes('no faces')) {
+        console.log('❌ No face detected in search');
+        return new Response(JSON.stringify({
+          success: false,
+          error: 'No face detected. Please take a clear photo showing your face.',
+          code: 'NO_FACE'
+        }), {
+          status: 400,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+        });
+      }
+      
+      // Collection is empty - that's fine, continue to index
+      if (errorMsg.includes('There are no faces in the collection')) {
+        console.log('Collection is empty - no duplicates possible');
+      } else if (!errorMsg.includes('InvalidParameterException')) {
+        // Other errors - log but continue
+        console.log('Search error (continuing):', errorMsg);
       }
     }
 
-    // STEP 3: Index (save) this new face
+    // STEP 2: Index (save) this new face
     console.log('📝 Indexing new face...');
-    const indexResult = await rekognitionRequest('RekognitionService.IndexFaces', {
-      CollectionId: COLLECTION_ID,
-      ExternalImageId: userId || `user_${Date.now()}`,
-      Image: { Bytes: imageBase64 },
-      DetectionAttributes: ['DEFAULT'],
-    });
-
-    if (!indexResult.FaceRecords || indexResult.FaceRecords.length === 0) {
-      console.log('❌ Failed to index face');
+    let indexResult;
+    try {
+      indexResult = await rekognitionRequest('RekognitionService.IndexFaces', {
+        CollectionId: COLLECTION_ID,
+        ExternalImageId: userId || `user_${Date.now()}`,
+        Image: { Bytes: imageBase64 },
+        DetectionAttributes: ['DEFAULT'],
+      });
+    } catch (indexError: any) {
+      const errorMsg = indexError.message || '';
+      
+      // No face in image
+      if (errorMsg.includes('InvalidParameterException') && (errorMsg.includes('no faces') || errorMsg.includes('No faces'))) {
+        console.log('❌ No face detected during indexing');
+        return new Response(JSON.stringify({
+          success: false,
+          error: 'No face detected. Please take a clear photo showing your face.',
+          code: 'NO_FACE'
+        }), {
+          status: 400,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+        });
+      }
+      
+      console.error('Index error:', errorMsg);
       return new Response(JSON.stringify({
         success: false,
-        error: 'Failed to register face. Please try again.',
+        error: 'Could not process your photo. Please try again with better lighting.',
         code: 'INDEX_FAILED'
+      }), {
+        status: 400,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+      });
+    }
+    
+    if (!indexResult?.FaceRecords || indexResult.FaceRecords.length === 0) {
+      console.log('❌ No face records returned');
+      return new Response(JSON.stringify({
+        success: false,
+        error: 'No face detected. Please take a clear photo showing your face.',
+        code: 'NO_FACE'
       }), {
         status: 400,
         headers: { ...corsHeaders, 'Content-Type': 'application/json' }
