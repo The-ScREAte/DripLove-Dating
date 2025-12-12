@@ -217,7 +217,7 @@ export default function FaceVerification({ onVerified }: FaceVerificationProps) 
 
       const tempUserId = `temp_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
 
-      const { data, error } = await supabase.functions.invoke("face-verify", {
+      const response = await supabase.functions.invoke("face-verify", {
         body: {
           front: capturedImages.front,
           side: capturedImages.side,
@@ -225,10 +225,23 @@ export default function FaceVerification({ onVerified }: FaceVerificationProps) 
         },
       });
 
-      if (error) {
+      // Handle both success responses and error responses with data
+      const data = response.data;
+      const error = response.error;
+
+      // If there's an error but also data (non-2xx with JSON body), use the data
+      if (error && !data) {
         console.error("Face verification error:", error);
         setVerificationResult('error');
-        setErrorMessage(error.message || "Verification failed");
+        setErrorMessage("Something went wrong. Please try again.");
+        setStep(3);
+        return;
+      }
+
+      // Process the response
+      if (!data) {
+        setVerificationResult('error');
+        setErrorMessage("Something went wrong. Please try again.");
         setStep(3);
         return;
       }
@@ -241,33 +254,29 @@ export default function FaceVerification({ onVerified }: FaceVerificationProps) 
         }
       } else if (data.code === 'DUPLICATE_FACE') {
         setVerificationResult('duplicate');
-        setErrorMessage("We found your face already registered with another account. If this is a mistake, please contact support.");
+        setErrorMessage("This face already exists. Each person can only have one account.");
         setStep(3);
       } else if (data.code === 'NO_FACE') {
         setVerificationResult('error');
-        setErrorMessage("We couldn't detect a face in your photo. Please make sure your face is clearly visible and try again.");
+        setErrorMessage("No face detected. Please take a clear photo showing your face.");
         setStep(3);
       } else if (data.code === 'LOW_CONFIDENCE') {
         setVerificationResult('error');
-        setErrorMessage("Your photo wasn't clear enough. Please find better lighting and look directly at the camera.");
-        setStep(3);
-      } else if (data.code === 'DETECTION_FAILED') {
-        setVerificationResult('error');
-        setErrorMessage("Something went wrong while checking your photo. Please try again.");
+        setErrorMessage("Photo not clear. Get better lighting and try again.");
         setStep(3);
       } else if (data.code === 'INDEX_FAILED') {
         setVerificationResult('error');
-        setErrorMessage("We couldn't save your face. Please try taking another photo.");
+        setErrorMessage("Could not save your face. Please try again with better lighting.");
         setStep(3);
       } else {
         setVerificationResult('error');
         setErrorMessage(data.error || "Something went wrong. Please try again.");
         setStep(3);
       }
-    } catch (error) {
-      console.error("Submit error:", error);
+    } catch (err) {
+      console.error("Submit error:", err);
       setVerificationResult('error');
-      setErrorMessage("Failed to verify. Please try again.");
+      setErrorMessage("Something went wrong. Please try again.");
       setStep(3);
     } finally {
       setIsLoading(false);
