@@ -18,7 +18,6 @@ import { compressImage } from '@/utils/imageCompression';
 import TermsAcceptance from './TermsAcceptance';
 import { getLanguageForCountry } from '@/i18n/config';
 import { videoPreloader } from '@/utils/videoPreloader';
-import FaceVerification from '@/components/FaceVerification';
 
 interface ImageUpload {
   file: File;
@@ -26,7 +25,6 @@ interface ImageUpload {
   moderationResult?: ModerationResult;
   status: 'uploading' | 'moderating' | 'approved' | 'pending' | 'rejected';
   hash?: string; // Store hash for duplicate detection
-  faceMatched?: boolean; // Whether this image matches the verified face
 }
 
 const ProfileCompletionPage = () => {
@@ -42,10 +40,6 @@ const ProfileCompletionPage = () => {
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [images, setImages] = useState<ImageUpload[]>([]);
   const [isSubmitting, setIsSubmitting] = useState(false);
-  
-  // Face verification state
-  const [faceVerified, setFaceVerified] = useState(false);
-  const [faceImageBase64, setFaceImageBase64] = useState<string | null>(null);
 
   // iOS detection for other potential optimizations
   const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent);
@@ -93,18 +87,6 @@ const ProfileCompletionPage = () => {
         })));
       } catch {}
     }
-  }, []);
-
-  // Restore face verification state on mount
-  useEffect(() => {
-    try {
-      const savedVerified = sessionStorage.getItem('profilecompletion_face_verified');
-      const savedFaceImage = sessionStorage.getItem('profilecompletion_face_image');
-      if (savedVerified === '1' && savedFaceImage) {
-        setFaceVerified(true);
-        setFaceImageBase64(savedFaceImage);
-      }
-    } catch {}
   }, []);
 
   // Save images to sessionStorage whenever they change
@@ -276,49 +258,16 @@ const ProfileCompletionPage = () => {
       try {
         const moderationResult = await moderateImage(compressedFile);
         
-        let imageStatus: 'approved' | 'pending' | 'rejected' = !moderationResult.isApproved 
-          ? 'rejected' 
-          : moderationResult.details?.requiresReview 
-            ? 'pending' 
-            : 'approved';
-        
-        // If image passed moderation and face verification is done, check if face matches
-        let faceMatched = false;
-        if (imageStatus !== 'rejected' && faceImageBase64) {
-          try {
-            // Convert the compressed file to base64
-            const reader = new FileReader();
-            const imageBase64 = await new Promise<string>((resolve) => {
-              reader.onload = () => resolve(reader.result as string);
-              reader.readAsDataURL(compressedFile);
-            });
-            
-            // Compare with verified face
-            const { data: compareResult } = await supabase.functions.invoke('face-verify', {
-              body: {
-                action: 'compare_faces',
-                sourceImage: faceImageBase64,
-                targetImages: [imageBase64]
-              }
-            });
-            
-            if (compareResult?.matchFound) {
-              faceMatched = true;
-              console.log('Face match found in uploaded image');
-            }
-          } catch (faceError) {
-            console.log('Face comparison skipped:', faceError);
-            // If comparison fails, we don't block - just don't mark as matched
-          }
-        }
-        
         setImages(prev => prev.map(img => 
           img.preview === preview 
             ? { 
                 ...img, 
                 moderationResult,
-                status: imageStatus,
-                faceMatched
+                status: !moderationResult.isApproved 
+                  ? 'rejected' 
+                  : moderationResult.details?.requiresReview 
+                    ? 'pending' 
+                    : 'approved'
               }
             : img
         ));
@@ -336,10 +285,9 @@ const ProfileCompletionPage = () => {
             variant: "default"
           });
         } else {
-          const faceMessage = faceMatched ? " (matches your verified face)" : "";
           toast({
             title: t('profileCompletion.imageApproved'),
-            description: t('profileCompletion.imageLooksGood') + faceMessage,
+            description: t('profileCompletion.imageLooksGood'),
             variant: "default"
           });
         }
@@ -383,13 +331,13 @@ const ProfileCompletionPage = () => {
         );
       case 'approved':
         return (
-          <div className="absolute bottom-2 left-2 bg-green-500/90 text-white p-1 rounded-full shadow-sm">
-            <CheckCircle className="w-3 h-3" />
+          <div className="absolute top-2 left-2 bg-green-500 text-white p-1 rounded-full">
+            <CheckCircle className="w-4 h-4" />
           </div>
         );
       case 'pending':
         return (
-          <div className="absolute bottom-2 left-2 bg-orange-500/90 text-white text-[10px] px-1.5 py-0.5 rounded-full shadow-sm">
+          <div className="absolute top-2 left-2 bg-orange-500 text-white text-xs px-2 py-1 rounded-full">
             {t('profileCompletion.pending')}
           </div>
         );
@@ -445,7 +393,7 @@ const ProfileCompletionPage = () => {
     navigate('/');
   };
 
-  const handleSubmit = async (e: React.FormEvent) => { 
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
     // Prevent double submission
@@ -469,16 +417,6 @@ const ProfileCompletionPage = () => {
     if (!formData.industry) validationErrors.industry = t('profileCompletion.errors.industryRequired');
     if (!formData.educationLevel) validationErrors.educationLevel = t('profileCompletion.errors.educationRequired');
     if (!formData.adinkraSymbols || formData.adinkraSymbols.length === 0) validationErrors.adinkraSymbols = 'Please select at least 1 cultural sign';
-    
-    // Face verification is required
-    if (!faceVerified) {
-      validationErrors.faceVerification = 'Face verification is required';
-      toast({
-        title: "Face Verification Required",
-        description: "Please complete face verification before continuing.",
-        variant: "destructive"
-      });
-    }
 
     // Validate images
     const approvedImages = images.filter(img => img.status === 'approved' || img.status === 'pending');
@@ -498,19 +436,6 @@ const ProfileCompletionPage = () => {
       validationErrors.images = t('profileCompletion.errors.reuploadPhotos');
       // Clear images that don't have files and ask user to re-upload
       setImages(prev => prev.filter(img => img.file !== null));
-    }
-
-    // Check that at least one image matches the verified face
-    if (faceVerified && faceImageBase64) {
-      const faceMatchedImages = images.filter(img => img.faceMatched === true);
-      if (faceMatchedImages.length === 0 && approvedImages.length >= 2) {
-        validationErrors.images = 'At least one photo must clearly show your face (matching your verification).';
-        toast({
-          title: "Face Match Required",
-          description: "None of your photos match your verified face. Please upload at least one photo of yourself.",
-          variant: "destructive"
-        });
-      }
     }
 
     // Age validation (must be 18+)
@@ -537,31 +462,8 @@ const ProfileCompletionPage = () => {
     }
 
     try {
-      // Index face in Rekognition if face was verified
-      if (faceImageBase64 && user?.id) {
-        try {
-          const { data: faceData, error: faceError } = await supabase.functions.invoke('face-verify', {
-            body: {
-              action: 'index_face',
-              front: faceImageBase64,
-              userId: user.id,
-              userName: `${formData.firstName} ${formData.lastName}`
-            }
-          });
-          
-          if (faceError) {
-            console.error('Face indexing error:', faceError);
-          }
-          // We'll save the face_descriptor when updating the profile below
-        } catch (faceIndexError) {
-          console.error('Face indexing failed:', faceIndexError);
-        }
-      }
-      
       // Clear sessionStorage after successful completion
       sessionStorage.removeItem('profilecompletion_images');
-      sessionStorage.removeItem('profilecompletion_face_verified');
-      sessionStorage.removeItem('profilecompletion_face_image');
       // Save profile data for the already existing user
       const profileData = {
         first_name: formData.firstName,
@@ -615,14 +517,12 @@ const ProfileCompletionPage = () => {
       for (const image of approvedImages) {
         try {
           if (!image.file) continue;
-          const fileExt = image.file?.name.split('.').pop()?.toLowerCase() || 'jpg';
+          const fileExt = image.file?.name.split('.').pop() || 'jpg';
           const fileName = `${Date.now()}-${Math.random().toString(36).substr(2, 9)}.${fileExt}`;
           const filePath = `${user.id}/${fileName}`;
           const { error: uploadError } = await supabase.storage
             .from('user-photos')
-            .upload(filePath, image.file, {
-              contentType: image.file.type || `image/${fileExt}`
-            });
+            .upload(filePath, image.file);
           if (uploadError) throw uploadError;
           const { data: { publicUrl } } = supabase.storage
             .from('user-photos')
@@ -672,7 +572,7 @@ const ProfileCompletionPage = () => {
   if (loading) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-pink-400 via-purple-500 to-indigo-600 flex flex-col items-center justify-center">
-        <img src="/driplove-logo.webp" alt="DripLove Logo" className="w-32 h-32 mb-8 animate-bounce" loading="lazy" decoding="async" />
+        <img src="/driplove-logo.png" alt="DripLove Logo" className="w-32 h-32 mb-8 animate-bounce" />
         <p className="text-white text-lg font-semibold tracking-wide">{t('profileCompletion.loadingDripLove')}</p>
       </div>
     );
@@ -711,8 +611,8 @@ const ProfileCompletionPage = () => {
           webkit-playsinline="true"
           x5-playsinline="true"
           preload="auto"
-          src="/welcome-video.mp4"
-          className="absolute top-0 left-0 w-full h-full object-cover opacity-30"
+          src={videoPreloader.getVideoUrl()}
+          className="absolute top-0 left-0 w-full h-full object-cover opacity-25"
           onTimeUpdate={(e) => {
             const video = e.currentTarget;
             if (video.duration && video.currentTime >= video.duration - 0.1) {
@@ -794,50 +694,6 @@ const ProfileCompletionPage = () => {
                         />
                         {errors.lastName && <p className="text-sm text-red-500">{errors.lastName}</p>}
                       </div>
-                    </div>
-
-                    {/* Face Verification Section - After name fields */}
-                    <div className="space-y-3">
-                      <h4 className="text-lg font-semibold text-gray-800 flex items-center gap-2">
-                        <Shield className="w-5 h-5 text-purple-600" />
-                        Face Verification *
-                      </h4>
-                      <p className="text-xs text-gray-600">
-                        Verify your identity to keep our community safe. This is required to continue.
-                      </p>
-                      
-                      <div className="bg-gradient-to-br from-purple-50 to-pink-50 rounded-xl p-4 border border-purple-100">
-                        {faceVerified ? (
-                          <div className="flex items-center gap-3 text-green-700">
-                            <CheckCircle className="w-6 h-6" />
-                            <div>
-                              <p className="font-medium">Face Verified</p>
-                              <p className="text-xs text-green-600">Your identity has been confirmed</p>
-                            </div>
-                          </div>
-                        ) : (
-                          <FaceVerification
-                            disabled={!formData.firstName.trim() || !formData.lastName.trim()}
-                            onVerified={(faceImage: string) => {
-                              setFaceVerified(true);
-                              setFaceImageBase64(faceImage);
-                              try { 
-                                sessionStorage.setItem('profilecompletion_face_verified', '1');
-                                sessionStorage.setItem('profilecompletion_face_image', faceImage);
-                              } catch {}
-                            }}
-                          />
-                        )}
-                      </div>
-                      {!faceVerified && (
-                        <p className="text-xs text-amber-600 flex items-center gap-1">
-                          <AlertTriangle className="w-3 h-3" />
-                          {(!formData.firstName.trim() || !formData.lastName.trim()) 
-                            ? "Enter your first and last name first"
-                            : "Face verification is required to proceed"}
-                        </p>
-                      )}
-                      {errors.faceVerification && <p className="text-sm text-red-500">{errors.faceVerification}</p>}
                     </div>
 
                     <div className="space-y-2">
@@ -1002,16 +858,6 @@ const ProfileCompletionPage = () => {
                     <h3 className="text-lg font-semibold text-gray-800">{t('profileCompletion.profilePhotos')} *</h3>
                     <p className="text-sm text-gray-600">{t('profileCompletion.uploadAtLeastTwoPhotos')}</p>
                     
-                    {/* Face match requirement notice */}
-                    {faceVerified && (
-                      <div className="flex items-start gap-2 p-2 bg-purple-50 rounded-lg border border-purple-100">
-                        <Shield className="w-4 h-4 text-purple-600 mt-0.5 flex-shrink-0" />
-                        <p className="text-xs text-purple-800">
-                          <span className="font-medium">Important:</span> At least one photo must clearly show your face (matching your verification).
-                        </p>
-                      </div>
-                    )}
-                    
                     <div className="border-2 border-dashed border-gray-300 rounded-lg p-6 text-center hover:border-pink-400 transition-colors">
                       <Input
                         type="file"
@@ -1032,7 +878,7 @@ const ProfileCompletionPage = () => {
                       <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
                         {images.map((image, index) => (
                           <div key={index} className="relative">
-                            <img loading="lazy" decoding="async"
+                            <img
                               src={image.preview}
                               alt={`Upload ${index + 1}`}
                               className="w-full h-32 object-cover rounded-lg"
@@ -1046,13 +892,6 @@ const ProfileCompletionPage = () => {
                             >
                               ×
                             </Button>
-                            {/* Face match indicator */}
-                            {image.faceMatched && (
-                              <div className="absolute top-2 left-2 bg-green-500/90 text-white text-[10px] px-1.5 py-0.5 rounded-full flex items-center gap-0.5">
-                                <CheckCircle className="w-2.5 h-2.5" />
-                                <span>You</span>
-                              </div>
-                            )}
                             {renderImageStatus(image)}
                           </div>
                         ))}
