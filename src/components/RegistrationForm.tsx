@@ -42,6 +42,7 @@ const RegistrationForm = ({ onSubmit, onBackToLogin }: RegistrationFormProps) =>
   const [currentStep, setCurrentStep] = useState(1);
   const [showFaceVerification, setShowFaceVerification] = useState(true);
   const [faceVerified, setFaceVerified] = useState(false);
+  const [faceImageBase64, setFaceImageBase64] = useState<string | null>(null); // Store face image locally
   const [images, setImages] = useState<ImageUpload[]>([]);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const { toast } = useToast();
@@ -50,9 +51,11 @@ const RegistrationForm = ({ onSubmit, onBackToLogin }: RegistrationFormProps) =>
   // Restore face verification state on mount
   React.useEffect(() => {
     try {
-      const saved = sessionStorage.getItem('registration_face_verified');
-      if (saved === '1') {
+      const savedVerified = sessionStorage.getItem('registration_face_verified');
+      const savedFaceImage = sessionStorage.getItem('registration_face_image');
+      if (savedVerified === '1' && savedFaceImage) {
         setFaceVerified(true);
+        setFaceImageBase64(savedFaceImage);
         setShowFaceVerification(false);
       }
     } catch {}
@@ -763,7 +766,7 @@ const RegistrationForm = ({ onSubmit, onBackToLogin }: RegistrationFormProps) =>
                 onToggleConfirmPassword={() => setShowConfirmPassword(!showConfirmPassword)}
               />
 
-              {/* Face Verification Section - Right after basic info */}
+              {/* Face Verification Section - Right after name fields */}
               <div className="space-y-3 animate-scale-in">
                 <h4 className="text-lg font-semibold text-gray-800 flex items-center gap-2">
                   <Shield className="w-5 h-5 text-purple-600" />
@@ -784,9 +787,14 @@ const RegistrationForm = ({ onSubmit, onBackToLogin }: RegistrationFormProps) =>
                     </div>
                   ) : (
                     <FaceVerification
-                      onVerified={() => {
+                      disabled={!formData.firstName.trim() || !formData.lastName.trim()}
+                      onVerified={(faceImage: string) => {
                         setFaceVerified(true);
-                        try { sessionStorage.setItem('registration_face_verified', '1'); } catch {}
+                        setFaceImageBase64(faceImage);
+                        try { 
+                          sessionStorage.setItem('registration_face_verified', '1');
+                          sessionStorage.setItem('registration_face_image', faceImage);
+                        } catch {}
                       }}
                     />
                   )}
@@ -794,7 +802,9 @@ const RegistrationForm = ({ onSubmit, onBackToLogin }: RegistrationFormProps) =>
                 {!faceVerified && (
                   <p className="text-xs text-amber-600 flex items-center gap-1">
                     <AlertTriangle className="w-3 h-3" />
-                    Face verification is required to proceed
+                    {(!formData.firstName.trim() || !formData.lastName.trim()) 
+                      ? "Enter your first and last name first"
+                      : "Face verification is required to proceed"}
                   </p>
                 )}
               </div>
