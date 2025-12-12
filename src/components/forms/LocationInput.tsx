@@ -417,7 +417,7 @@ const LocationInput = ({
     <div className="space-y-4">
       {/* Upgrade note for free users */}
       {/* Checking location indicator for profile edit */}
-      {/* Message when country is unlocked (user is outside their profile country) - with Change button */}
+      {/* Message when country is unlocked (user is outside their profile country) */}
       {isProfileEdit && outsideCountryStatus.isOutside && outsideCountryStatus.checked && !isCheckingOutsideCountry && (
         <div className="flex items-center justify-between gap-3 p-2 bg-green-50 dark:bg-green-950/30 rounded-lg border border-green-200 dark:border-green-800 text-xs">
           <div className="flex flex-col gap-0.5">
@@ -427,22 +427,25 @@ const LocationInput = ({
             </span>
             <span className="text-green-600 dark:text-green-300 text-[11px]">
               You appear to be in {outsideCountryStatus.currentLocation || 'a different country'}.
+              {disabled && ' Go to Edit mode to apply the change.'}
             </span>
           </div>
-          {/* Note: Country change button is NOT disabled when form is disabled - this is a special action */}
-          <Button
-            type="button"
-            size="sm"
-            onClick={handleAutoChangeCountry}
-            disabled={isChangingCountry}
-            className="text-xs px-3 py-1 bg-green-600 hover:bg-green-700 text-white"
-          >
-            {isChangingCountry ? (
-              <Loader2 className="w-4 h-4 animate-spin" />
-            ) : (
-              <>Change to {outsideCountryStatus.currentLocation}</>
-            )}
-          </Button>
+          {/* Only show Change button when in edit mode (not disabled) */}
+          {!disabled && (
+            <Button
+              type="button"
+              size="sm"
+              onClick={handleAutoChangeCountry}
+              disabled={isChangingCountry}
+              className="text-xs px-3 py-1 bg-green-600 hover:bg-green-700 text-white"
+            >
+              {isChangingCountry ? (
+                <Loader2 className="w-4 h-4 animate-spin" />
+              ) : (
+                <>Change to {outsideCountryStatus.currentLocation}</>
+              )}
+            </Button>
+          )}
         </div>
       )}
 
