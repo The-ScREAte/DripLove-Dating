@@ -90,7 +90,8 @@ const Index = () => {
     // Check for existing session
     supabase.auth.getSession().then(({ data: { session }, error }) => {
       if (error) {
-        // Session error (e.g., invalid refresh token) - show welcome screen
+        // Session error - clear session storage and show welcome
+        sessionStorage.removeItem('driplove_user_session');
         setLoading(false);
         setCurrentView('welcome');
         return;
@@ -100,16 +101,21 @@ const Index = () => {
         // Check if email is confirmed before proceeding
         if (!session.user.email_confirmed_at) {
           setLoading(false);
+          setCurrentView('welcome');
           return;
         }
         
         setUser(session.user);
         checkUserTypeAndRedirect(session.user.id);
       } else {
+        // No session - clear any saved session state and show welcome
+        sessionStorage.removeItem('driplove_user_session');
+        setCurrentView('welcome');
         setLoading(false);
       }
     }).catch(() => {
       // Handle any errors by showing welcome screen
+      sessionStorage.removeItem('driplove_user_session');
       setLoading(false);
       setCurrentView('welcome');
     });
@@ -388,14 +394,6 @@ const Index = () => {
   };
 
   
-  if (currentView === 'admin') {
-    return (
-      <Suspense fallback={<PageLoader />}>
-        <LazyAdminPage currentUser={user} onLogout={handleLogout} />
-      </Suspense>
-    );
-  }
-  
   
   return (
     <div className="w-full h-fill flex justify-center bg-transparent" style={{ margin: 0, padding: 0 }}>
@@ -468,10 +466,16 @@ const Index = () => {
           />
         )}
 
-        {currentView === 'app' && (
+        {currentView === 'app' && user && (
           <ErrorBoundary>
             <MainApp user={user} onLogout={handleLogout} />
           </ErrorBoundary>
+        )}
+
+        {currentView === 'admin' && (
+          <Suspense fallback={null}>
+            <LazyAdminPage currentUser={user} onLogout={handleLogout} />
+          </Suspense>
         )}
       </div>
     </div>
