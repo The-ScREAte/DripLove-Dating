@@ -1485,33 +1485,34 @@ const LikedMePage = ({ currentUser, isPremium = false }: LikedMePageProps) => {
         : '0'
     }}
   >
-        <div className="flex items-center justify-between mb-2">
-          <div className="flex items-center space-x-2">
-            <Users className="w-6 h-6 text-pink-600" />
-            <h1 className="text-xl font-bold text-gray-800">{t('matches.peopleWhoLikedYou')}</h1>
+        <div className="flex items-center justify-between mb-1">
+          <div className="flex items-center space-x-1.5">
+            <Users className="w-4 h-4 text-pink-600" />
+            <h1 className="text-sm font-bold text-gray-800">{t('matches.peopleWhoLikedYou')}</h1>
           </div>
           {!isPremium && (
             <Button
               onClick={() => setShowPremiumUpgrade(true)}
-              className="bg-gradient-to-r from-yellow-400 to-yellow-600 hover:from-yellow-500 hover:to-yellow-700 text-black font-bold text-xs px-2 py-1"
+              size="sm"
+              className="bg-gradient-to-r from-yellow-400 to-yellow-600 hover:from-yellow-500 hover:to-yellow-700 text-black font-semibold text-[10px] px-2 py-0.5 h-6"
             >
-              <Crown className="w-4 h-4 mr-1" />
+              <Crown className="w-3 h-3 mr-0.5" />
               {t('matches.upgrade')}
             </Button>
           )}
         </div>
-        <p className="text-gray-600 text-sm">({t('matches.peopleCount', { count: likers.length })})</p>
+        <p className="text-gray-500 text-xs">({t('matches.peopleCount', { count: likers.length })})</p>
         
         {!isPremium && (
-          <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-3 mt-3">
-            <div className="flex items-center space-x-2 text-yellow-800">
-              <Lock className="w-4 h-4" />
-              <span className="text-xs font-medium">
+          <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-2 mt-2">
+            <div className="flex items-center space-x-1.5 text-yellow-800">
+              <Lock className="w-3 h-3" />
+              <span className="text-[10px] font-medium">
                 {t('matches.upgradeToPremium')}
               </span>
             </div>
           </div>
-        )} 
+        )}
       </div>
       
       <div className="flex-1 overflow-y-auto p-4 pb-24 bg-white" ref={scrollContainerRef}>
