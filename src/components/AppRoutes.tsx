@@ -44,7 +44,6 @@ const PageLoader = () => (
           }}
         />
       </div>
-      <p className="text-gray-600">Loading...</p>
     </div>
   </div>
 );
