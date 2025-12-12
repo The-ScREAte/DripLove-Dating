@@ -1,8 +1,8 @@
 import imageCompression from 'browser-image-compression';
 
 export async function compressImage(file: File): Promise<File> {
-  // Check if file is already small enough and in WebP format
-  if (file.size <= 1024 * 1024 && file.type === 'image/webp') {
+  // Check if file is already small enough and in JPEG format
+  if (file.size <= 1024 * 1024 && file.type === 'image/jpeg') {
     return file;
   }
 
@@ -10,8 +10,8 @@ export async function compressImage(file: File): Promise<File> {
     maxSizeMB: 1,
     maxWidthOrHeight: 1024,
     useWebWorker: true,
-    fileType: 'image/webp',
-    initialQuality: 0.8,
+    fileType: 'image/jpeg', // Use JPEG - WebP has content-type issues with Supabase Storage
+    initialQuality: 0.85,
   };
   
   try {
