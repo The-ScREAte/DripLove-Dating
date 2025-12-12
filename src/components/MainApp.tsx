@@ -60,7 +60,18 @@ interface MainAppProps {
 const MainApp = ({ user, onLogout }: MainAppProps) => {
   const { t, i18n } = useTranslation();
   
-  // Safety check - if no user data, show error
+  // ⭐ CRITICAL FIX: Move ALL hooks BEFORE any conditional returns
+  const [activeTab, setActiveTab] = useState('dripcheck');
+  const [isChatDetailOpen, setIsChatDetailOpen] = useState(false);
+  const [isKeyboardOpen, setIsKeyboardOpen] = useState(false);
+  const [showTerms, setShowTerms] = useState(false);
+  const [showPrivacy, setShowPrivacy] = useState(false);
+  const [profile, setProfile] = useState<any>(null);
+  const [isPremium, setIsPremium] = useState(false);
+  const [unreadCount, setUnreadCount] = useState(0);
+  const { toast } = useToast();
+
+  // Safety check - if no user data, show error (AFTER all hooks)
   if (!user || !user.id) {
     return (
       <div className="min-h-fill flex items-center justify-center bg-gradient-to-br from-pink-50 to-purple-50 p-4">
@@ -79,10 +90,6 @@ const MainApp = ({ user, onLogout }: MainAppProps) => {
       </div>
     );
   }
-
-  const [activeTab, setActiveTab] = useState('dripcheck');
-  const [isChatDetailOpen, setIsChatDetailOpen] = useState(false);
-  const [isKeyboardOpen, setIsKeyboardOpen] = useState(false);
 
   // Simple keyboard detection for mobile
   useEffect(() => {
@@ -215,12 +222,6 @@ const MainApp = ({ user, onLogout }: MainAppProps) => {
     // Add a small delay to prevent race conditions
     setTimeout(registerDeviceToken, 1000);
   }, [user?.id]);
-  const [showTerms, setShowTerms] = useState(false);
-  const [showPrivacy, setShowPrivacy] = useState(false);
-  const [profile, setProfile] = useState<any>(null);
-  const [isPremium, setIsPremium] = useState(false);
-  const [unreadCount, setUnreadCount] = useState(0);
-  const { toast } = useToast();
 
   /**
    * PROGRESSIVE LOADING SYSTEM FOR DISCOVER PAGE
