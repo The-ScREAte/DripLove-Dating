@@ -127,7 +127,7 @@ async function ensureCollection(): Promise<void> {
   }
 }
 
-// Convert base64 to Uint8Array
+// Convert base64 to Uint8Array (handles large images without stack overflow)
 function base64ToBytes(base64: string): Uint8Array {
   // Remove data URI prefix if present
   const cleanBase64 = base64.replace(/^data:image\/\w+;base64,/, '');
@@ -137,6 +137,18 @@ function base64ToBytes(base64: string): Uint8Array {
     bytes[i] = binaryString.charCodeAt(i);
   }
   return bytes;
+}
+
+// Convert Uint8Array to base64 safely (avoids stack overflow on large images)
+function bytesToBase64(bytes: Uint8Array): string {
+  // Process in chunks to avoid "Maximum call stack size exceeded"
+  const CHUNK_SIZE = 8192;
+  let result = '';
+  for (let i = 0; i < bytes.length; i += CHUNK_SIZE) {
+    const chunk = bytes.slice(i, i + CHUNK_SIZE);
+    result += String.fromCharCode(...chunk);
+  }
+  return btoa(result);
 }
 
 serve(async (req: Request) => {
@@ -307,7 +319,7 @@ serve(async (req: Request) => {
       await ensureCollection();
       
       const imageBytes = base64ToBytes(front);
-      const imageBase64 = btoa(String.fromCharCode(...imageBytes));
+      const imageBase64 = bytesToBase64(imageBytes);
       
       console.log('📸 Image size:', imageBytes.length, 'bytes');
 
@@ -412,7 +424,7 @@ serve(async (req: Request) => {
       await ensureCollection();
       
       const imageBytes = base64ToBytes(front);
-      const imageBase64 = btoa(String.fromCharCode(...imageBytes));
+      const imageBase64 = bytesToBase64(imageBytes);
       
       // Create external ID with user name for easy identification
       const externalId = userName ? `${userName.replace(/\s+/g, '_')}_${userId}` : userId;
@@ -497,13 +509,13 @@ serve(async (req: Request) => {
       }
 
       const sourceBytes = base64ToBytes(sourceImage);
-      const sourceBase64 = btoa(String.fromCharCode(...sourceBytes));
+      const sourceBase64 = bytesToBase64(sourceBytes);
       
       // Try each target image until we find a match
       for (let i = 0; i < targetImages.length; i++) {
         try {
           const targetBytes = base64ToBytes(targetImages[i]);
-          const targetBase64 = btoa(String.fromCharCode(...targetBytes));
+          const targetBase64 = bytesToBase64(targetBytes);
           
           console.log(`Comparing with target image ${i + 1}/${targetImages.length}`);
           
@@ -572,7 +584,7 @@ serve(async (req: Request) => {
     await ensureCollection();
     
     const imageBytes = base64ToBytes(front);
-    const imageBase64 = btoa(String.fromCharCode(...imageBytes));
+    const imageBase64 = bytesToBase64(imageBytes);
     
     console.log('📸 Image size:', imageBytes.length, 'bytes');
 
