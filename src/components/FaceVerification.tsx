@@ -4,6 +4,7 @@ import type { CameraPreviewOptions } from '@capacitor-community/camera-preview';
 import { Capacitor } from '@capacitor/core';
 import { Camera as CapacitorCamera } from '@capacitor/camera';
 import { supabase } from "@/integrations/supabase/client";
+import { FunctionsHttpError } from "@supabase/supabase-js";
 import { Button } from "@/components/ui/button";
 import { Camera as CameraIcon, CheckCircle2, RefreshCw } from "lucide-react";
 
@@ -217,7 +218,7 @@ export default function FaceVerification({ onVerified }: FaceVerificationProps) 
 
       const tempUserId = `temp_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
 
-      const response = await supabase.functions.invoke("face-verify", {
+      const { data, error } = await supabase.functions.invoke("face-verify", {
         body: {
           front: capturedImages.front,
           side: capturedImages.side,
@@ -225,62 +226,113 @@ export default function FaceVerification({ onVerified }: FaceVerificationProps) 
         },
       });
 
-      // Handle both success responses and error responses with data
-      const data = response.data;
-      const error = response.error;
+      console.log("Face verify response - data:", data, "error:", error);
 
-      // If there's an error but also data (non-2xx with JSON body), use the data
-      if (error && !data) {
-        console.error("Face verification error:", error);
+      // If error is FunctionsHttpError, it contains the response body
+      if (error) {
+        console.log("Error type:", error.constructor.name);
+        
+        if (error instanceof FunctionsHttpError) {
+          // Get the error response body
+          const errorBody = await error.context.json();
+          console.log("Error body from FunctionsHttpError:", errorBody);
+          
+          if (errorBody) {
+            handleErrorResponse(errorBody);
+            return;
+          }
+        }
+        
+        // If we have data alongside error (some edge cases)
+        if (data) {
+          handleErrorResponse(data);
+          return;
+        }
+        
+        // Fallback
         setVerificationResult('error');
-        setErrorMessage("Something went wrong. Please try again.");
+        setErrorMessage("Connection error. Please try again.");
         setStep(3);
         return;
       }
 
-      // Process the response
-      if (!data) {
-        setVerificationResult('error');
-        setErrorMessage("Something went wrong. Please try again.");
-        setStep(3);
-        return;
-      }
-
-      if (data.success) {
+      // Success case - no error
+      if (data?.success === true) {
         setVerificationResult('success');
         setStep(5);
         if (onVerified) {
           onVerified();
         }
-      } else if (data.code === 'DUPLICATE_FACE') {
-        setVerificationResult('duplicate');
-        setErrorMessage("This face already exists. Each person can only have one account.");
-        setStep(3);
-      } else if (data.code === 'NO_FACE') {
-        setVerificationResult('error');
-        setErrorMessage("No face detected. Please take a clear photo showing your face.");
-        setStep(3);
-      } else if (data.code === 'LOW_CONFIDENCE') {
-        setVerificationResult('error');
-        setErrorMessage("Photo not clear. Get better lighting and try again.");
-        setStep(3);
-      } else if (data.code === 'INDEX_FAILED') {
-        setVerificationResult('error');
-        setErrorMessage("Could not save your face. Please try again with better lighting.");
-        setStep(3);
-      } else {
-        setVerificationResult('error');
-        setErrorMessage(data.error || "Something went wrong. Please try again.");
-        setStep(3);
+        return;
       }
-    } catch (err) {
-      console.error("Submit error:", err);
+
+      // Data returned but not success (shouldn't happen with 2xx)
+      if (data) {
+        handleErrorResponse(data);
+        return;
+      }
+
+      // No data at all
       setVerificationResult('error');
-      setErrorMessage("Something went wrong. Please try again.");
+      setErrorMessage("No response from server. Please try again.");
+      setStep(3);
+
+    } catch (err: any) {
+      console.error("Submit exception:", err);
+      setVerificationResult('error');
+      setErrorMessage("Network error. Check your connection and try again.");
       setStep(3);
     } finally {
       setIsLoading(false);
     }
+  }
+
+  function handleErrorResponse(responseData: any) {
+    console.log("Handling error response:", responseData);
+    
+    const code = responseData?.code;
+    const errorMsg = responseData?.error;
+
+    if (code === 'DUPLICATE_FACE') {
+      setVerificationResult('duplicate');
+      setErrorMessage("This face is already registered. Each person can only create one account.");
+      setStep(3);
+      return;
+    }
+
+    if (code === 'NO_FACE') {
+      setVerificationResult('error');
+      setErrorMessage("No face detected in your photo. Make sure your face is clearly visible.");
+      setStep(3);
+      return;
+    }
+
+    if (code === 'LOW_CONFIDENCE') {
+      setVerificationResult('error');
+      setErrorMessage("Photo quality too low. Find better lighting and try again.");
+      setStep(3);
+      return;
+    }
+
+    if (code === 'INDEX_FAILED') {
+      setVerificationResult('error');
+      setErrorMessage("Could not process your photo. Try again with better lighting.");
+      setStep(3);
+      return;
+    }
+
+    // Use server error message if available
+    if (errorMsg) {
+      setVerificationResult('error');
+      setErrorMessage(errorMsg);
+      setStep(3);
+      return;
+    }
+
+    // Generic fallback
+    setVerificationResult('error');
+    setErrorMessage("Verification failed. Please try again.");
+    setStep(3);
   }
 
   function getInstruction(): string {
