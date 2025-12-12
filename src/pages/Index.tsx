@@ -201,9 +201,16 @@ const Index = () => {
           .single();
           
         if (retryResult.error || !retryResult.data) {
-          console.error('Profile still not found after retry, redirecting to profile completion');
+          console.error('Profile still not found after retry, signing out user');
+          // Sign out user since no profile exists - they need to register
+          await supabase.auth.signOut();
+          toast({
+            title: "Account Not Found",
+            description: "This account doesn't exist in our system. Please register first.",
+            variant: "destructive",
+          });
           setLoading(false);
-          setCurrentView('profile-completion');
+          setCurrentView('welcome');
           return;
         }
         
