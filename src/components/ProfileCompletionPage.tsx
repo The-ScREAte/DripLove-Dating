@@ -18,6 +18,7 @@ import { compressImage } from '@/utils/imageCompression';
 import TermsAcceptance from './TermsAcceptance';
 import { getLanguageForCountry } from '@/i18n/config';
 import { videoPreloader } from '@/utils/videoPreloader';
+import FaceVerification from '@/components/FaceVerification';
 
 interface ImageUpload {
   file: File;
@@ -40,6 +41,10 @@ const ProfileCompletionPage = () => {
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [images, setImages] = useState<ImageUpload[]>([]);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  
+  // Face verification state
+  const [faceVerified, setFaceVerified] = useState(false);
+  const [faceImageBase64, setFaceImageBase64] = useState<string | null>(null);
 
   // iOS detection for other potential optimizations
   const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent);
@@ -87,6 +92,18 @@ const ProfileCompletionPage = () => {
         })));
       } catch {}
     }
+  }, []);
+
+  // Restore face verification state on mount
+  useEffect(() => {
+    try {
+      const savedVerified = sessionStorage.getItem('profilecompletion_face_verified');
+      const savedFaceImage = sessionStorage.getItem('profilecompletion_face_image');
+      if (savedVerified === '1' && savedFaceImage) {
+        setFaceVerified(true);
+        setFaceImageBase64(savedFaceImage);
+      }
+    } catch {}
   }, []);
 
   // Save images to sessionStorage whenever they change
@@ -417,6 +434,16 @@ const ProfileCompletionPage = () => {
     if (!formData.industry) validationErrors.industry = t('profileCompletion.errors.industryRequired');
     if (!formData.educationLevel) validationErrors.educationLevel = t('profileCompletion.errors.educationRequired');
     if (!formData.adinkraSymbols || formData.adinkraSymbols.length === 0) validationErrors.adinkraSymbols = 'Please select at least 1 cultural sign';
+    
+    // Face verification is required
+    if (!faceVerified) {
+      validationErrors.faceVerification = 'Face verification is required';
+      toast({
+        title: "Face Verification Required",
+        description: "Please complete face verification before continuing.",
+        variant: "destructive"
+      });
+    }
 
     // Validate images
     const approvedImages = images.filter(img => img.status === 'approved' || img.status === 'pending');
@@ -462,8 +489,31 @@ const ProfileCompletionPage = () => {
     }
 
     try {
+      // Index face in Rekognition if face was verified
+      if (faceImageBase64 && user?.id) {
+        try {
+          const { data: faceData, error: faceError } = await supabase.functions.invoke('face-verify', {
+            body: {
+              action: 'index_face',
+              front: faceImageBase64,
+              userId: user.id,
+              userName: `${formData.firstName} ${formData.lastName}`
+            }
+          });
+          
+          if (faceError) {
+            console.error('Face indexing error:', faceError);
+          }
+          // We'll save the face_descriptor when updating the profile below
+        } catch (faceIndexError) {
+          console.error('Face indexing failed:', faceIndexError);
+        }
+      }
+      
       // Clear sessionStorage after successful completion
       sessionStorage.removeItem('profilecompletion_images');
+      sessionStorage.removeItem('profilecompletion_face_verified');
+      sessionStorage.removeItem('profilecompletion_face_image');
       // Save profile data for the already existing user
       const profileData = {
         first_name: formData.firstName,
@@ -694,6 +744,50 @@ const ProfileCompletionPage = () => {
                         />
                         {errors.lastName && <p className="text-sm text-red-500">{errors.lastName}</p>}
                       </div>
+                    </div>
+
+                    {/* Face Verification Section - After name fields */}
+                    <div className="space-y-3">
+                      <h4 className="text-lg font-semibold text-gray-800 flex items-center gap-2">
+                        <Shield className="w-5 h-5 text-purple-600" />
+                        Face Verification *
+                      </h4>
+                      <p className="text-xs text-gray-600">
+                        Verify your identity to keep our community safe. This is required to continue.
+                      </p>
+                      
+                      <div className="bg-gradient-to-br from-purple-50 to-pink-50 rounded-xl p-4 border border-purple-100">
+                        {faceVerified ? (
+                          <div className="flex items-center gap-3 text-green-700">
+                            <CheckCircle className="w-6 h-6" />
+                            <div>
+                              <p className="font-medium">Face Verified</p>
+                              <p className="text-xs text-green-600">Your identity has been confirmed</p>
+                            </div>
+                          </div>
+                        ) : (
+                          <FaceVerification
+                            disabled={!formData.firstName.trim() || !formData.lastName.trim()}
+                            onVerified={(faceImage: string) => {
+                              setFaceVerified(true);
+                              setFaceImageBase64(faceImage);
+                              try { 
+                                sessionStorage.setItem('profilecompletion_face_verified', '1');
+                                sessionStorage.setItem('profilecompletion_face_image', faceImage);
+                              } catch {}
+                            }}
+                          />
+                        )}
+                      </div>
+                      {!faceVerified && (
+                        <p className="text-xs text-amber-600 flex items-center gap-1">
+                          <AlertTriangle className="w-3 h-3" />
+                          {(!formData.firstName.trim() || !formData.lastName.trim()) 
+                            ? "Enter your first and last name first"
+                            : "Face verification is required to proceed"}
+                        </p>
+                      )}
+                      {errors.faceVerification && <p className="text-sm text-red-500">{errors.faceVerification}</p>}
                     </div>
 
                     <div className="space-y-2">
