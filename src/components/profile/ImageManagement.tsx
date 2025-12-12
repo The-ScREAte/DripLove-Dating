@@ -214,10 +214,14 @@ const ImageManagement = ({ currentUser }: ImageManagementProps) => {
       const fileExt = mimeToExt[compressedFile.type] || file.name.split('.').pop() || 'jpg';
       const fileName = `${currentUser.id}/${Date.now()}-${Math.random().toString(36).substring(2)}.${fileExt}`;
 
-      // Upload to storage
+      // Upload to storage with explicit content type
       const { data: uploadData, error: uploadError } = await supabase.storage
         .from('user-photos')
-        .upload(fileName, compressedFile, { cacheControl: '3600', upsert: false });
+        .upload(fileName, compressedFile, { 
+          cacheControl: '3600', 
+          upsert: false,
+          contentType: compressedFile.type || 'image/jpeg' // Explicitly set content type
+        });
 
       if (uploadError) {
         console.error('Storage upload failed:', uploadError);
