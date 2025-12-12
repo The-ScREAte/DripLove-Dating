@@ -226,7 +226,7 @@ const ProfileCompletionPage = () => {
         continue;
       }
 
-      // Compress and convert to WebP first
+      // Compress (typically to JPEG) to keep uploads small and consistent
       const compressedFile = await compressImage(file);
       
       // Generate hash AFTER compression for accurate duplicate detection
@@ -517,7 +517,13 @@ const ProfileCompletionPage = () => {
       for (const image of approvedImages) {
         try {
           if (!image.file) continue;
-          const fileExt = image.file?.name.split('.').pop() || 'jpg';
+          const mimeToExt: Record<string, string> = {
+            'image/jpeg': 'jpg',
+            'image/png': 'png',
+            'image/webp': 'webp',
+            'image/gif': 'gif'
+          };
+          const fileExt = mimeToExt[image.file.type] || 'jpg';
           const fileName = `${Date.now()}-${Math.random().toString(36).substr(2, 9)}.${fileExt}`;
           const filePath = `${user.id}/${fileName}`;
           const { error: uploadError } = await supabase.storage

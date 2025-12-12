@@ -6,6 +6,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { useToast } from '@/hooks/use-toast';
 import { Trash2, Upload } from 'lucide-react';
 import { Card, CardContent } from '@/components/ui/card';
+import { compressImage } from '@/utils/imageCompression';
 
 interface Ad {
   id: string;
@@ -62,14 +63,22 @@ const AdsManagement = () => {
 
     setUploading(true);
     try {
-      const fileExt = file.name.split('.').pop();
-      const fileName = `${Math.random()}.${fileExt}`;
+      const compressedFile = await compressImage(file);
+
+      const mimeToExt: Record<string, string> = {
+        'image/jpeg': 'jpg',
+        'image/png': 'png',
+        'image/webp': 'webp',
+        'image/gif': 'gif'
+      };
+      const fileExt = mimeToExt[compressedFile.type] || 'jpg';
+      const fileName = `${Math.random().toString(36).slice(2)}.${fileExt}`;
       const filePath = `ads/${fileName}`;
 
       const { error: uploadError } = await supabase.storage
         .from('user-photos')
-        .upload(filePath, file, {
-          contentType: file.type,
+        .upload(filePath, compressedFile, {
+          contentType: compressedFile.type,
           cacheControl: '3600'
         });
 

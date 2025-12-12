@@ -118,7 +118,7 @@ const ImageManagement = ({ currentUser }: ImageManagementProps) => {
       return `${file.size}-${file.type}-${firstBytes}-${lastBytes}`;
     };
 
-    // Step 1: Compress and convert to WebP first
+    // Step 1: Compress (typically to JPEG) to keep uploads small and consistent
     setModerating(true);
     setModerationResult(null);
 

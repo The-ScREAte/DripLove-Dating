@@ -185,7 +185,7 @@ const RegistrationForm = ({ onSubmit, onBackToLogin }: RegistrationFormProps) =>
         continue;
       }
 
-      // Compress and convert to WebP first
+      // Compress (typically to JPEG) to keep uploads small and consistent
       const compressedFile = await compressImage(file);
       
       // Generate hash AFTER compression for accurate duplicate detection
@@ -600,8 +600,14 @@ const RegistrationForm = ({ onSubmit, onBackToLogin }: RegistrationFormProps) =>
           continue;
         }
         
-        // Upload to storage
-        const fileExt = image.file.name?.split('.').pop() || 'jpg';
+        // Upload to storage (extension must match MIME type after compression)
+        const mimeToExt: Record<string, string> = {
+          'image/jpeg': 'jpg',
+          'image/png': 'png',
+          'image/webp': 'webp',
+          'image/gif': 'gif'
+        };
+        const fileExt = mimeToExt[image.file.type] || 'jpg';
         const fileName = `${Date.now()}-${Math.random().toString(36).substr(2, 9)}.${fileExt}`;
         const filePath = `${userId}/${fileName}`;
         
