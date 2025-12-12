@@ -607,7 +607,10 @@ const RegistrationForm = ({ onSubmit, onBackToLogin }: RegistrationFormProps) =>
         
         const { error: uploadError } = await supabase.storage
           .from('user-photos')
-          .upload(filePath, image.file);
+          .upload(filePath, image.file, {
+            contentType: image.file.type,
+            cacheControl: '3600'
+          });
           
         if (uploadError) {
           throw uploadError;
