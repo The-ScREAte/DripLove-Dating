@@ -1,4 +1,4 @@
-import "./chunk-VHXUCOYC.js";
+import "./chunk-HXA6O6EE.js";
 
 // node_modules/@capacitor/camera/dist/esm/index.js
 import { registerPlugin } from "@capacitor/core";

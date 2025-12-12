@@ -1,9 +1,9 @@
-import "./chunk-VHXUCOYC.js";
+import "./chunk-HXA6O6EE.js";
 
 // node_modules/@capacitor-community/camera-preview/dist/esm/index.js
 import { registerPlugin } from "@capacitor/core";
 var CameraPreview = registerPlugin("CameraPreview", {
-  web: () => import("./web-GYKAQ5TW.js").then((m) => new m.CameraPreviewWeb())
+  web: () => import("./web-5PZINXBZ.js").then((m) => new m.CameraPreviewWeb())
 });
 export {
   CameraPreview

@@ -1,4 +1,4 @@
-import "./chunk-VHXUCOYC.js";
+import "./chunk-HXA6O6EE.js";
 
 // node_modules/@capacitor-firebase/messaging/dist/esm/index.js
 import { registerPlugin } from "@capacitor/core";
@@ -21,7 +21,7 @@ var Visibility;
 
 // node_modules/@capacitor-firebase/messaging/dist/esm/index.js
 var FirebaseMessaging = registerPlugin("FirebaseMessaging", {
-  web: () => import("./web-WCWS2OBO.js").then((m) => new m.FirebaseMessagingWeb())
+  web: () => import("./web-4AG7YORW.js").then((m) => new m.FirebaseMessagingWeb())
 });
 export {
   FirebaseMessaging,
