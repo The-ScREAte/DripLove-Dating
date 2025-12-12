@@ -733,7 +733,7 @@ const RegistrationForm = ({ onSubmit, onBackToLogin }: RegistrationFormProps) =>
                   try { sessionStorage.removeItem('registration_face_verified'); } catch {}
                   try { sessionStorage.removeItem('registration_images'); } catch {}
                   setFaceVerified(false);
-                  setImages({ front: null, left: null, right: null });
+                  setImages([]);
                   onBackToLogin();
                 }}
                 className="w-full mt-3 border-white/40 text-white hover:bg-white/10"

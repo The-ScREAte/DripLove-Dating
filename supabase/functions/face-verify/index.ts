@@ -1,86 +1,243 @@
 import { serve } from "https://deno.land/std@0.208.0/http/server.ts";
-import { RekognitionClient, IndexFacesCommand, SearchFacesByImageCommand } from "npm:@aws-sdk/client-rekognition";
+import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
 
-const client = new RekognitionClient({
-  region: "us-east-1",
-  credentials: {
-    accessKeyId: Deno.env.get("AWS_ACCESS_KEY_ID") || "",
-    secretAccessKey: Deno.env.get("AWS_SECRET_ACCESS_KEY") || "",
-  }
-});
+const AWS_ACCESS_KEY_ID = Deno.env.get("AWS_ACCESS_KEY_ID") || "";
+const AWS_SECRET_ACCESS_KEY = Deno.env.get("AWS_SECRET_ACCESS_KEY") || "";
+const AWS_REGION = "us-east-1";
+const COLLECTION_ID = "driplove_faces";
 
-const COLLECTION = "driplove_faces";
+// AWS Signature V4 helper
+async function sha256(message: string | Uint8Array): Promise<ArrayBuffer> {
+  const data = typeof message === 'string' ? new TextEncoder().encode(message) : message;
+  return await crypto.subtle.digest('SHA-256', data);
+}
+
+async function hmacSha256(key: ArrayBuffer, message: string): Promise<ArrayBuffer> {
+  const cryptoKey = await crypto.subtle.importKey(
+    'raw',
+    key,
+    { name: 'HMAC', hash: 'SHA-256' },
+    false,
+    ['sign']
+  );
+  return await crypto.subtle.sign('HMAC', cryptoKey, new TextEncoder().encode(message));
+}
+
+function toHex(buffer: ArrayBuffer): string {
+  return Array.from(new Uint8Array(buffer))
+    .map(b => b.toString(16).padStart(2, '0'))
+    .join('');
+}
+
+async function getSignatureKey(key: string, dateStamp: string, regionName: string, serviceName: string): Promise<ArrayBuffer> {
+  const kDate = await hmacSha256(new TextEncoder().encode('AWS4' + key), dateStamp);
+  const kRegion = await hmacSha256(kDate, regionName);
+  const kService = await hmacSha256(kRegion, serviceName);
+  const kSigning = await hmacSha256(kService, 'aws4_request');
+  return kSigning;
+}
+
+async function signRequest(method: string, service: string, target: string, payload: string): Promise<Headers> {
+  const host = `${service}.${AWS_REGION}.amazonaws.com`;
+  const endpoint = `https://${host}`;
+  const now = new Date();
+  const amzDate = now.toISOString().replace(/[:-]|\.\d{3}/g, '');
+  const dateStamp = amzDate.slice(0, 8);
+  
+  const canonicalUri = '/';
+  const canonicalQuerystring = '';
+  const payloadHash = toHex(await sha256(payload));
+  
+  const canonicalHeaders = 
+    `content-type:application/x-amz-json-1.1\n` +
+    `host:${host}\n` +
+    `x-amz-date:${amzDate}\n` +
+    `x-amz-target:${target}\n`;
+  
+  const signedHeaders = 'content-type;host;x-amz-date;x-amz-target';
+  
+  const canonicalRequest = 
+    `${method}\n${canonicalUri}\n${canonicalQuerystring}\n${canonicalHeaders}\n${signedHeaders}\n${payloadHash}`;
+  
+  const algorithm = 'AWS4-HMAC-SHA256';
+  const credentialScope = `${dateStamp}/${AWS_REGION}/${service}/aws4_request`;
+  const stringToSign = 
+    `${algorithm}\n${amzDate}\n${credentialScope}\n${toHex(await sha256(canonicalRequest))}`;
+  
+  const signingKey = await getSignatureKey(AWS_SECRET_ACCESS_KEY, dateStamp, AWS_REGION, service);
+  const signature = toHex(await hmacSha256(signingKey, stringToSign));
+  
+  const authorizationHeader = 
+    `${algorithm} Credential=${AWS_ACCESS_KEY_ID}/${credentialScope}, SignedHeaders=${signedHeaders}, Signature=${signature}`;
+  
+  const headers = new Headers();
+  headers.set('Content-Type', 'application/x-amz-json-1.1');
+  headers.set('Host', host);
+  headers.set('X-Amz-Date', amzDate);
+  headers.set('X-Amz-Target', target);
+  headers.set('Authorization', authorizationHeader);
+  
+  return headers;
+}
+
+async function rekognitionRequest(target: string, payload: object): Promise<any> {
+  const payloadStr = JSON.stringify(payload);
+  const headers = await signRequest('POST', 'rekognition', target, payloadStr);
+  
+  const response = await fetch(`https://rekognition.${AWS_REGION}.amazonaws.com/`, {
+    method: 'POST',
+    headers,
+    body: payloadStr,
+  });
+  
+  const responseText = await response.text();
+  
+  if (!response.ok) {
+    console.error('Rekognition error:', responseText);
+    throw new Error(`Rekognition error: ${response.status} - ${responseText}`);
+  }
+  
+  return JSON.parse(responseText);
+}
+
+// Ensure collection exists
+async function ensureCollection(): Promise<void> {
+  try {
+    await rekognitionRequest('RekognitionService.CreateCollection', {
+      CollectionId: COLLECTION_ID,
+    });
+    console.log('Collection created:', COLLECTION_ID);
+  } catch (error: any) {
+    // Collection already exists is fine
+    if (!error.message?.includes('ResourceAlreadyExistsException')) {
+      console.log('Collection exists or created');
+    }
+  }
+}
+
+// Convert base64 to Uint8Array
+function base64ToBytes(base64: string): Uint8Array {
+  // Remove data URI prefix if present
+  const cleanBase64 = base64.replace(/^data:image\/\w+;base64,/, '');
+  const binaryString = atob(cleanBase64);
+  const bytes = new Uint8Array(binaryString.length);
+  for (let i = 0; i < binaryString.length; i++) {
+    bytes[i] = binaryString.charCodeAt(i);
+  }
+  return bytes;
+}
 
 serve(async (req: Request) => {
-  // Handle CORS preflight requests
+  // Handle CORS preflight
   if (req.method === 'OPTIONS') {
     return new Response('ok', { headers: corsHeaders });
   }
 
   try {
-    const { front, left, right, userId } = await req.json();
-
-  // Convert base64 → Buffer
-  function decode(base64: string) {
-    return new Uint8Array(
-      atob(base64.replace(/^data:image\/\w+;base64,/, ""))
-        .split("")
-        .map(c => c.charCodeAt(0))
-    );
-  }
-
-  // Create a single combined image (AWS requires one image per indexing)
-  const mainImage = decode(front);
-
-  // STEP 1 — SEARCH if this face already exists
-  const searchCmd = new SearchFacesByImageCommand({
-    CollectionId: COLLECTION,
-    Image: { Bytes: mainImage },
-    FaceMatchThreshold: 90,
-    MaxFaces: 1,
-  });
-
-  try {
-    const searchResult = await client.send(searchCmd);
-
-    if (searchResult.FaceMatches?.length) {
+    console.log('🔍 Face verification started');
+    
+    const { front, userId } = await req.json();
+    
+    if (!front) {
       return new Response(JSON.stringify({
         success: false,
-        reason: "duplicate"
-      }), { 
-        status: 409,
-        headers: { ...corsHeaders, "Content-Type": "application/json" }
+        error: 'Front image is required'
+      }), {
+        status: 400,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' }
       });
     }
-  } catch (err) {
-    console.error("search error:", err);
-  }
 
-  // STEP 2 — INDEX (save) this new face
-  const indexCmd = new IndexFacesCommand({
-    CollectionId: COLLECTION,
-    ExternalImageId: userId,
-    Image: { Bytes: mainImage },
-  });
+    if (!AWS_ACCESS_KEY_ID || !AWS_SECRET_ACCESS_KEY) {
+      console.error('AWS credentials not configured');
+      return new Response(JSON.stringify({
+        success: false,
+        error: 'AWS credentials not configured'
+      }), {
+        status: 500,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+      });
+    }
 
-  await client.send(indexCmd);
+    // Ensure collection exists
+    await ensureCollection();
+    
+    const imageBytes = base64ToBytes(front);
+    const imageBase64 = btoa(String.fromCharCode(...imageBytes));
+    
+    console.log('📸 Image size:', imageBytes.length, 'bytes');
 
-  return new Response(JSON.stringify({ success: true }), {
-    headers: { ...corsHeaders, "Content-Type": "application/json" }
-  });
-  } catch (error: unknown) {
-    const errorMessage = error instanceof Error ? error.message : String(error);
+    // STEP 1: Search for existing face
+    try {
+      console.log('🔍 Searching for existing face...');
+      const searchResult = await rekognitionRequest('RekognitionService.SearchFacesByImage', {
+        CollectionId: COLLECTION_ID,
+        Image: { Bytes: imageBase64 },
+        FaceMatchThreshold: 90,
+        MaxFaces: 1,
+      });
+
+      if (searchResult.FaceMatches && searchResult.FaceMatches.length > 0) {
+        console.log('⚠️ Duplicate face found');
+        return new Response(JSON.stringify({
+          success: false,
+          reason: 'duplicate',
+          message: 'This face is already registered'
+        }), {
+          status: 409,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+        });
+      }
+      console.log('✅ No duplicate found');
+    } catch (searchError: any) {
+      // If no faces in collection yet, search will fail - that's OK
+      if (!searchError.message?.includes('InvalidParameterException')) {
+        console.log('Search check passed (collection may be empty)');
+      }
+    }
+
+    // STEP 2: Index (save) this new face
+    console.log('📝 Indexing new face...');
+    const indexResult = await rekognitionRequest('RekognitionService.IndexFaces', {
+      CollectionId: COLLECTION_ID,
+      ExternalImageId: userId || `user_${Date.now()}`,
+      Image: { Bytes: imageBase64 },
+      DetectionAttributes: ['DEFAULT'],
+    });
+
+    if (!indexResult.FaceRecords || indexResult.FaceRecords.length === 0) {
+      console.log('❌ No face detected in image');
+      return new Response(JSON.stringify({
+        success: false,
+        error: 'No face detected in image'
+      }), {
+        status: 400,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+      });
+    }
+
+    console.log('✅ Face indexed successfully');
     return new Response(JSON.stringify({ 
-      success: false, 
-      error: errorMessage 
+      success: true,
+      faceId: indexResult.FaceRecords[0].Face?.FaceId 
+    }), {
+      headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+    });
+
+  } catch (error: unknown) {
+    console.error('Face verification error:', error);
+    const errorMessage = error instanceof Error ? error.message : String(error);
+    return new Response(JSON.stringify({
+      success: false,
+      error: errorMessage
     }), {
       status: 500,
-      headers: { ...corsHeaders, "Content-Type": "application/json" }
+      headers: { ...corsHeaders, 'Content-Type': 'application/json' }
     });
   }
 });

@@ -26,3 +26,6 @@ verify_jwt = false
 
 [functions.check-dormant-chats]
 verify_jwt = false
+
+[functions.face-verify]
+verify_jwt = false
