@@ -179,9 +179,56 @@ serve(async (req: Request) => {
     
     console.log('📸 Image size:', imageBytes.length, 'bytes');
 
-    // STEP 1: Search for existing face
+    // STEP 1: Detect if there's actually a human face in the image first
+    console.log('🔍 Detecting face in image...');
+    let detectResult;
     try {
-      console.log('🔍 Searching for existing face...');
+      detectResult = await rekognitionRequest('RekognitionService.DetectFaces', {
+        Image: { Bytes: imageBase64 },
+        Attributes: ['DEFAULT'],
+      });
+    } catch (detectError: any) {
+      console.error('Face detection failed:', detectError.message);
+      return new Response(JSON.stringify({
+        success: false,
+        error: 'Could not analyze image. Please try again.',
+        code: 'DETECTION_FAILED'
+      }), {
+        status: 400,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+      });
+    }
+
+    if (!detectResult.FaceDetails || detectResult.FaceDetails.length === 0) {
+      console.log('❌ No human face detected in image');
+      return new Response(JSON.stringify({
+        success: false,
+        error: 'No human face detected. Please take a clear photo of your face.',
+        code: 'NO_FACE'
+      }), {
+        status: 400,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+      });
+    }
+
+    const faceConfidence = detectResult.FaceDetails[0].Confidence || 0;
+    console.log('✅ Face detected with confidence:', faceConfidence);
+
+    if (faceConfidence < 90) {
+      console.log('⚠️ Face confidence too low:', faceConfidence);
+      return new Response(JSON.stringify({
+        success: false,
+        error: 'Face not clear enough. Please ensure good lighting and face the camera directly.',
+        code: 'LOW_CONFIDENCE'
+      }), {
+        status: 400,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+      });
+    }
+
+    // STEP 2: Search for existing face (duplicate check)
+    try {
+      console.log('🔍 Checking if face already registered...');
       const searchResult = await rekognitionRequest('RekognitionService.SearchFacesByImage', {
         CollectionId: COLLECTION_ID,
         Image: { Bytes: imageBase64 },
@@ -190,11 +237,12 @@ serve(async (req: Request) => {
       });
 
       if (searchResult.FaceMatches && searchResult.FaceMatches.length > 0) {
-        console.log('⚠️ Duplicate face found');
+        const matchConfidence = searchResult.FaceMatches[0].Similarity || 0;
+        console.log('⚠️ Duplicate face found with similarity:', matchConfidence);
         return new Response(JSON.stringify({
           success: false,
-          reason: 'duplicate',
-          message: 'This face is already registered'
+          error: 'This face is already registered with another account.',
+          code: 'DUPLICATE_FACE'
         }), {
           status: 409,
           headers: { ...corsHeaders, 'Content-Type': 'application/json' }
@@ -208,7 +256,7 @@ serve(async (req: Request) => {
       }
     }
 
-    // STEP 2: Index (save) this new face
+    // STEP 3: Index (save) this new face
     console.log('📝 Indexing new face...');
     const indexResult = await rekognitionRequest('RekognitionService.IndexFaces', {
       CollectionId: COLLECTION_ID,
@@ -218,10 +266,11 @@ serve(async (req: Request) => {
     });
 
     if (!indexResult.FaceRecords || indexResult.FaceRecords.length === 0) {
-      console.log('❌ No face detected in image');
+      console.log('❌ Failed to index face');
       return new Response(JSON.stringify({
         success: false,
-        error: 'No face detected in image'
+        error: 'Failed to register face. Please try again.',
+        code: 'INDEX_FAILED'
       }), {
         status: 400,
         headers: { ...corsHeaders, 'Content-Type': 'application/json' }
