@@ -49,6 +49,11 @@ const Index = () => {
   // Restore view from sessionStorage to persist on reload
   const getInitialView = () => {
     try {
+      // Check if user was logged in (has session)
+      const savedSession = sessionStorage.getItem('driplove_user_session');
+      if (savedSession === 'authenticated') {
+        return 'app' as const;
+      }
       const savedView = sessionStorage.getItem('driplove_current_view');
       if (savedView === 'register' || savedView === 'profile-completion') {
         return savedView as 'register' | 'profile-completion';
@@ -59,19 +64,24 @@ const Index = () => {
   
   const [currentView, setCurrentView] = useState<'welcome' | 'login' | 'register' | 'profile-completion' | 'terms-acceptance' | 'app' | 'admin' | 'about' | 'terms' | 'privacy'>(getInitialView());
   const [user, setUser] = useState<any>(null);
-  const [loading, setLoading] = useState(false);
+  const [loading, setLoading] = useState(true);
   const [showAuthDialog, setShowAuthDialog] = useState(false);
   const [isLoginMode, setIsLoginMode] = useState(true);
   const { toast } = useToast();
 
-  // Save view to sessionStorage when it changes (only for registration/profile-completion)
+  // Save view to sessionStorage when it changes
   React.useEffect(() => {
     try {
       if (currentView === 'register' || currentView === 'profile-completion') {
         sessionStorage.setItem('driplove_current_view', currentView);
       } else {
-        // Clear saved view when user leaves registration flow
         sessionStorage.removeItem('driplove_current_view');
+      }
+      // Persist authenticated state
+      if (currentView === 'app' || currentView === 'admin') {
+        sessionStorage.setItem('driplove_user_session', 'authenticated');
+      } else if (currentView === 'welcome' || currentView === 'login') {
+        sessionStorage.removeItem('driplove_user_session');
       }
     } catch {}
   }, [currentView]);
