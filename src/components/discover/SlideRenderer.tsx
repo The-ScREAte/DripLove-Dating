@@ -22,23 +22,50 @@ const ImageSlide = React.memo<{
   matchLastName: string;
   usingBlob: boolean;
   showLoader: boolean;
-}>(({ imageSrc, matchFirstName, matchLastName, usingBlob, showLoader }) => (
-  <div className="relative w-full h-full bg-gray-900">
-    {showLoader && (
-      <div className="absolute inset-0 bg-gray-900 flex items-center justify-center z-10">
-        <Loader2 className="h-8 w-8 animate-spin text-pink-500" />
+}>(({ imageSrc, matchFirstName, matchLastName, usingBlob, showLoader }) => {
+  const [hasError, setHasError] = React.useState(false);
+  
+  // Reset error state when image source changes
+  React.useEffect(() => {
+    setHasError(false);
+  }, [imageSrc]);
+  
+  // Show placeholder if image failed to load
+  if (hasError) {
+    return (
+      <div className="w-full h-full min-h-full bg-gradient-to-br from-pink-200 to-purple-200 flex items-center justify-center">
+        <div className="text-center w-full">
+          <div className="bg-white/80 rounded-full p-8 mb-4 shadow-xl mx-auto max-w-[96px]">
+            <User className="w-16 h-16 mx-auto text-gray-500" />
+          </div>
+          <span className="text-4xl font-bold text-gray-700 bg-white/50 rounded-full px-6 py-3">
+            {matchFirstName?.[0]}{matchLastName?.[0]}
+          </span>
+          <p className="text-gray-600 mt-4 text-sm">Image unavailable</p>
+        </div>
       </div>
-    )}
-    <img
-      loading="lazy"
-      decoding="async"
-      src={imageSrc}
-      alt={`${matchFirstName} ${matchLastName}`}
-      className={`w-full h-full object-contain transition-opacity duration-300 relative z-10 ${styles.optimizedImage}`}
-      draggable={false}
-    />
-  </div>
-));
+    );
+  }
+  
+  return (
+    <div className="relative w-full h-full bg-gray-900">
+      {showLoader && (
+        <div className="absolute inset-0 bg-gray-900 flex items-center justify-center z-10">
+          <Loader2 className="h-8 w-8 animate-spin text-pink-500" />
+        </div>
+      )}
+      <img
+        loading="lazy"
+        decoding="async"
+        src={imageSrc}
+        alt={`${matchFirstName} ${matchLastName}`}
+        className={`w-full h-full object-contain transition-opacity duration-300 relative z-10 ${styles.optimizedImage}`}
+        draggable={false}
+        onError={() => setHasError(true)}
+      />
+    </div>
+  );
+});
 ImageSlide.displayName = 'ImageSlide';
 
 // Bio Slide Component
