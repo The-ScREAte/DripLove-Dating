@@ -85,7 +85,7 @@ async function signRequest(method: string, service: string, target: string, payl
   return headers;
 }
 
-async function rekognitionRequest(target: string, payload: object): Promise<any> {
+async function rekognitionRequest(target: string, payload: object, allowedErrors: string[] = []): Promise<any> {
   const payloadStr = JSON.stringify(payload);
   const headers = await signRequest('POST', 'rekognition', target, payloadStr);
   
@@ -98,6 +98,13 @@ async function rekognitionRequest(target: string, payload: object): Promise<any>
   const responseText = await response.text();
   
   if (!response.ok) {
+    // Check if this is an allowed error (like ResourceAlreadyExistsException)
+    for (const allowedError of allowedErrors) {
+      if (responseText.includes(allowedError)) {
+        console.log(`Allowed error: ${allowedError}`);
+        return { __allowedError: allowedError };
+      }
+    }
     console.error('Rekognition error:', responseText);
     throw new Error(`Rekognition error: ${response.status} - ${responseText}`);
   }
@@ -107,16 +114,16 @@ async function rekognitionRequest(target: string, payload: object): Promise<any>
 
 // Ensure collection exists
 async function ensureCollection(): Promise<void> {
-  try {
-    await rekognitionRequest('RekognitionService.CreateCollection', {
-      CollectionId: COLLECTION_ID,
-    });
+  const result = await rekognitionRequest(
+    'RekognitionService.CreateCollection', 
+    { CollectionId: COLLECTION_ID },
+    ['ResourceAlreadyExistsException'] // Allow this error
+  );
+  
+  if (result.__allowedError) {
+    console.log('Collection already exists:', COLLECTION_ID);
+  } else {
     console.log('Collection created:', COLLECTION_ID);
-  } catch (error: any) {
-    // Collection already exists is fine
-    if (!error.message?.includes('ResourceAlreadyExistsException')) {
-      console.log('Collection exists or created');
-    }
   }
 }
 
