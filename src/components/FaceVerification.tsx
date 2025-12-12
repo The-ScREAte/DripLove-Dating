@@ -13,12 +13,15 @@ type FaceVerificationProps = {
 
 const CAMERA_SIZE = 280;
 
+type CaptureStep = 'front' | 'side';
+
 export default function FaceVerification({ onVerified }: FaceVerificationProps) {
-  const [step, setStep] = useState(0); // 0=start, 1=camera, 2=captured, 3=verifying, 4=done
+  const [step, setStep] = useState(0); // 0=start, 1=camera-front, 2=camera-side, 3=review, 4=verifying, 5=done
   const [isLoading, setIsLoading] = useState(false);
-  const [capturedImage, setCapturedImage] = useState<string | null>(null);
+  const [capturedImages, setCapturedImages] = useState<{ front: string | null; side: string | null }>({ front: null, side: null });
   const [verificationResult, setVerificationResult] = useState<'none' | 'success' | 'duplicate' | 'error'>('none');
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const [currentCapture, setCurrentCapture] = useState<CaptureStep>('front');
 
   const videoRef = useRef<HTMLVideoElement>(null);
   const streamRef = useRef<MediaStream | null>(null);
@@ -62,7 +65,7 @@ export default function FaceVerification({ onVerified }: FaceVerificationProps) 
     };
 
     captureFrame();
-    nativeFrameIntervalRef.current = window.setInterval(captureFrame, 50); // Fast preview
+    nativeFrameIntervalRef.current = window.setInterval(captureFrame, 50);
   }
 
   function stopNativeLiveFrameCapture() {
@@ -73,14 +76,14 @@ export default function FaceVerification({ onVerified }: FaceVerificationProps) 
     setNativeLiveFrame(null);
   }
 
-  async function startCamera() {
+  async function startCamera(captureType: CaptureStep = 'front') {
     try {
       setIsLoading(true);
       setErrorMessage(null);
-      setStep(1);
+      setCurrentCapture(captureType);
+      setStep(captureType === 'front' ? 1 : 2);
 
       if (isNative) {
-        // Permissions
         try {
           const perm = await CapacitorCamera.requestPermissions({ permissions: ['camera'] });
           if (perm.camera !== 'granted') {
@@ -147,8 +150,6 @@ export default function FaceVerification({ onVerified }: FaceVerificationProps) 
       if (isNative) {
         const result = await CameraPreview.capture({ quality: 90 });
         base64 = result.value.startsWith('data:') ? result.value : `data:image/jpeg;base64,${result.value}`;
-        stopNativeLiveFrameCapture();
-        await CameraPreview.stop().catch(() => {});
       } else {
         if (videoRef.current) {
           const canvas = document.createElement('canvas');
@@ -159,15 +160,29 @@ export default function FaceVerification({ onVerified }: FaceVerificationProps) 
             ctx.drawImage(videoRef.current, 0, 0, 640, 640);
             base64 = canvas.toDataURL('image/jpeg', 0.9);
           }
-          if (streamRef.current) {
-            streamRef.current.getTracks().forEach((t) => t.stop());
-            streamRef.current = null;
-          }
         }
       }
 
-      setCapturedImage(base64);
-      setStep(2);
+      if (currentCapture === 'front') {
+        setCapturedImages(prev => ({ ...prev, front: base64 }));
+        // Move to side capture
+        if (isNative) {
+          // Keep camera running for next capture
+        }
+        setCurrentCapture('side');
+        setStep(2);
+      } else {
+        setCapturedImages(prev => ({ ...prev, side: base64 }));
+        // Done capturing, stop camera
+        stopNativeLiveFrameCapture();
+        if (isNative) {
+          await CameraPreview.stop().catch(() => {});
+        } else if (streamRef.current) {
+          streamRef.current.getTracks().forEach((t) => t.stop());
+          streamRef.current = null;
+        }
+        setStep(3);
+      }
     } catch (error) {
       console.error('Capture error:', error);
       setErrorMessage('Failed to capture photo');
@@ -176,26 +191,36 @@ export default function FaceVerification({ onVerified }: FaceVerificationProps) 
     }
   }
 
-  async function retakePhoto() {
-    setCapturedImage(null);
+  async function retakePhoto(which: 'front' | 'side' | 'all') {
     setVerificationResult('none');
     setErrorMessage(null);
-    await startCamera();
+    
+    if (which === 'all') {
+      setCapturedImages({ front: null, side: null });
+      await startCamera('front');
+    } else if (which === 'front') {
+      setCapturedImages(prev => ({ ...prev, front: null }));
+      await startCamera('front');
+    } else {
+      setCapturedImages(prev => ({ ...prev, side: null }));
+      await startCamera('side');
+    }
   }
 
   async function submitVerification() {
-    if (!capturedImage) return;
+    if (!capturedImages.front || !capturedImages.side) return;
 
     try {
       setIsLoading(true);
-      setStep(3);
+      setStep(4);
       setErrorMessage(null);
 
       const tempUserId = `temp_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
 
       const { data, error } = await supabase.functions.invoke("face-verify", {
         body: {
-          front: capturedImage,
+          front: capturedImages.front,
+          side: capturedImages.side,
           userId: tempUserId,
         },
       });
@@ -204,53 +229,55 @@ export default function FaceVerification({ onVerified }: FaceVerificationProps) 
         console.error("Face verification error:", error);
         setVerificationResult('error');
         setErrorMessage(error.message || "Verification failed");
-        setStep(2);
+        setStep(3);
         return;
       }
 
       if (data.success) {
         setVerificationResult('success');
-        setStep(4);
+        setStep(5);
         if (onVerified) {
           onVerified();
         }
       } else if (data.reason === 'duplicate') {
         setVerificationResult('duplicate');
         setErrorMessage("This face is already registered. Each person can only have one account.");
-        setStep(2);
+        setStep(3);
       } else {
         setVerificationResult('error');
         setErrorMessage(data.error || "No face detected in image");
-        setStep(2);
+        setStep(3);
       }
     } catch (error) {
       console.error("Submit error:", error);
       setVerificationResult('error');
       setErrorMessage("Failed to verify. Please try again.");
-      setStep(2);
+      setStep(3);
     } finally {
       setIsLoading(false);
     }
   }
 
-  function resetVerification() {
-    setStep(0);
-    setCapturedImage(null);
-    setVerificationResult('none');
-    setErrorMessage(null);
-    stopNativeLiveFrameCapture();
-    if (isNative) {
-      CameraPreview.stop().catch(() => {});
-    } else if (streamRef.current) {
-      streamRef.current.getTracks().forEach((t) => t.stop());
-      streamRef.current = null;
+  function getInstruction(): string {
+    if (currentCapture === 'front') {
+      return "Look straight at the camera";
     }
+    return "Turn your head slightly to the side";
   }
+
+  function getCaptureLabel(): string {
+    if (currentCapture === 'front') {
+      return "Photo 1 of 2 - Front";
+    }
+    return "Photo 2 of 2 - Side";
+  }
+
+  const isCameraStep = step === 1 || step === 2;
 
   return (
     <div className="space-y-4">
       {/* Camera View */}
-      {step === 1 && (
+      {isCameraStep && (
         <div className="space-y-4 animate-fade-in">
           {/* Hidden native container */}
           {isNative && (
@@ -260,6 +287,14 @@ export default function FaceVerification({ onVerified }: FaceVerificationProps) 
               style={{ position: 'fixed', width: 1, height: 1, opacity: 0, pointerEvents: 'none', zIndex: -9999 }}
             />
           )}
+
+          {/* Progress indicator */}
+          <div className="flex justify-center gap-2 mb-2">
+            <div className={`w-3 h-3 rounded-full ${step >= 1 ? 'bg-purple-500' : 'bg-white/30'}`} />
+            <div className={`w-3 h-3 rounded-full ${step >= 2 ? 'bg-purple-500' : 'bg-white/30'}`} />
+          </div>
+
+          <p className="text-center text-white/80 text-sm font-medium">{getCaptureLabel()}</p>
 
           <div className="relative mx-auto" style={{ width: CAMERA_SIZE, height: CAMERA_SIZE }}>
             {/* Native preview */}
@@ -310,8 +345,32 @@ export default function FaceVerification({ onVerified }: FaceVerificationProps) 
             {/* Instruction */}
             <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none" style={{ zIndex: 20 }}>
               <div className="bg-black/40 px-6 py-2 rounded-full backdrop-blur-sm">
-                <p className="text-white/90 font-medium text-sm">Position your face in the circle</p>
+                <p className="text-white/90 font-medium text-sm">{getInstruction()}</p>
               </div>
+            </div>
+          </div>
+
+          {/* Thumbnails */}
+          <div className="flex justify-center gap-4">
+            <div className="flex flex-col items-center">
+              <div className={`w-14 h-14 rounded-full border-2 overflow-hidden ${capturedImages.front ? 'border-green-400' : 'border-white/30'} bg-black/30`}>
+                {capturedImages.front ? (
+                  <img src={capturedImages.front} alt="Front" className="w-full h-full object-cover" style={{ transform: 'scaleX(-1)' }} />
+                ) : (
+                  <div className="w-full h-full flex items-center justify-center text-white/40 text-xs">Front</div>
+                )}
+              </div>
+              <span className="text-xs text-white/60 mt-1">{capturedImages.front ? '✓' : '1'}</span>
+            </div>
+            <div className="flex flex-col items-center">
+              <div className={`w-14 h-14 rounded-full border-2 overflow-hidden ${capturedImages.side ? 'border-green-400' : 'border-white/30'} bg-black/30`}>
+                {capturedImages.side ? (
+                  <img src={capturedImages.side} alt="Side" className="w-full h-full object-cover" style={{ transform: 'scaleX(-1)' }} />
+                ) : (
+                  <div className="w-full h-full flex items-center justify-center text-white/40 text-xs">Side</div>
+                )}
+              </div>
+              <span className="text-xs text-white/60 mt-1">{capturedImages.side ? '✓' : '2'}</span>
             </div>
           </div>
 
@@ -327,38 +386,35 @@ export default function FaceVerification({ onVerified }: FaceVerificationProps) 
         </div>
       )}
 
-      {/* Review Captured Image */}
-      {step === 2 && capturedImage && (
+      {/* Review Captured Images */}
+      {step === 3 && (
         <div className="space-y-4 animate-fade-in">
-          <div className="relative mx-auto" style={{ width: CAMERA_SIZE, height: CAMERA_SIZE }}>
-            <div
-              className="rounded-full overflow-hidden border-4 border-white/40 shadow-2xl"
-              style={{ width: CAMERA_SIZE, height: CAMERA_SIZE, position: 'relative', margin: '0 auto', borderRadius: '50%' }}
-            >
-              <img
-                src={capturedImage}
-                alt="Captured"
-                className="w-full h-full object-cover rounded-full"
-                style={{ transform: 'scaleX(-1)' }}
-              />
+          <p className="text-center text-white/80 text-sm font-medium">Review your photos</p>
+
+          <div className="flex justify-center gap-4">
+            <div className="flex flex-col items-center">
+              <div className={`w-24 h-24 rounded-full border-4 overflow-hidden shadow-lg ${verificationResult === 'error' || verificationResult === 'duplicate' ? 'border-red-400' : 'border-white/40'}`}>
+                {capturedImages.front && (
+                  <img src={capturedImages.front} alt="Front" className="w-full h-full object-cover" style={{ transform: 'scaleX(-1)' }} />
+                )}
+              </div>
+              <span className="text-xs text-white/70 mt-2">Front</span>
             </div>
-
-            {verificationResult === 'duplicate' && (
-              <div className="absolute inset-0 flex items-center justify-center bg-red-500/30 rounded-full">
-                <div className="bg-red-600 px-4 py-2 rounded-full">
-                  <p className="text-white text-sm font-medium">Duplicate Detected</p>
-                </div>
+            <div className="flex flex-col items-center">
+              <div className={`w-24 h-24 rounded-full border-4 overflow-hidden shadow-lg ${verificationResult === 'error' || verificationResult === 'duplicate' ? 'border-red-400' : 'border-white/40'}`}>
+                {capturedImages.side && (
+                  <img src={capturedImages.side} alt="Side" className="w-full h-full object-cover" style={{ transform: 'scaleX(-1)' }} />
+                )}
               </div>
-            )}
-
-            {verificationResult === 'error' && (
-              <div className="absolute inset-0 flex items-center justify-center bg-yellow-500/30 rounded-full">
-                <div className="bg-yellow-600 px-4 py-2 rounded-full">
-                  <p className="text-white text-sm font-medium">Try Again</p>
-                </div>
-              </div>
-            )}
+              <span className="text-xs text-white/70 mt-2">Side</span>
+            </div>
           </div>
+
+          {verificationResult === 'duplicate' && (
+            <div className="bg-red-500/20 border border-red-500/40 rounded-lg p-3">
+              <p className="text-red-200 text-sm text-center font-medium">Duplicate Account Detected</p>
+            </div>
+          )}
 
           {errorMessage && (
             <div className="bg-red-500/20 border border-red-500/40 rounded-lg p-3">
@@ -368,7 +424,7 @@ export default function FaceVerification({ onVerified }: FaceVerificationProps) 
 
           <div className="flex gap-3">
             <Button
-              onClick={retakePhoto}
+              onClick={() => retakePhoto('all')}
               variant="outline"
               className="flex-1 py-5 rounded-xl border-white/40 text-white hover:bg-white/10"
             >
@@ -388,43 +444,47 @@ export default function FaceVerification({ onVerified }: FaceVerificationProps) 
       )}
 
       {/* Verifying State */}
-      {step === 3 && (
+      {step === 4 && (
         <div className="space-y-4 animate-fade-in">
-          <div className="relative mx-auto" style={{ width: CAMERA_SIZE, height: CAMERA_SIZE }}>
-            <div
-              className="rounded-full overflow-hidden border-4 border-purple-400 shadow-2xl animate-pulse"
-              style={{ width: CAMERA_SIZE, height: CAMERA_SIZE, position: 'relative', margin: '0 auto', borderRadius: '50%' }}
-            >
-              {capturedImage && (
-                <img src={capturedImage} alt="Verifying" className="w-full h-full object-cover rounded-full opacity-70" style={{ transform: 'scaleX(-1)' }} />
+          <div className="flex justify-center gap-4">
+            <div className="w-20 h-20 rounded-full border-4 border-purple-400 overflow-hidden shadow-lg animate-pulse">
+              {capturedImages.front && (
+                <img src={capturedImages.front} alt="Front" className="w-full h-full object-cover opacity-70" style={{ transform: 'scaleX(-1)' }} />
               )}
             </div>
-            <div className="absolute inset-0 flex items-center justify-center">
-              <div className="bg-purple-600/90 px-6 py-3 rounded-full">
-                <p className="text-white font-medium">Verifying with AWS...</p>
-              </div>
+            <div className="w-20 h-20 rounded-full border-4 border-purple-400 overflow-hidden shadow-lg animate-pulse">
+              {capturedImages.side && (
+                <img src={capturedImages.side} alt="Side" className="w-full h-full object-cover opacity-70" style={{ transform: 'scaleX(-1)' }} />
+              )}
+            </div>
+          </div>
+          <div className="flex justify-center">
+            <div className="bg-purple-600/90 px-6 py-3 rounded-full">
+              <p className="text-white font-medium">Driplove verifying...</p>
             </div>
           </div>
         </div>
       )}
 
       {/* Success State */}
-      {step === 4 && (
+      {step === 5 && (
         <div className="space-y-4 animate-fade-in">
-          <div className="relative mx-auto" style={{ width: CAMERA_SIZE, height: CAMERA_SIZE }}>
-            <div
-              className="rounded-full overflow-hidden border-4 border-green-400 shadow-2xl"
-              style={{ width: CAMERA_SIZE, height: CAMERA_SIZE, position: 'relative', margin: '0 auto', borderRadius: '50%' }}
-            >
-              {capturedImage && (
-                <img src={capturedImage} alt="Verified" className="w-full h-full object-cover rounded-full" style={{ transform: 'scaleX(-1)' }} />
+          <div className="flex justify-center gap-4">
+            <div className="w-20 h-20 rounded-full border-4 border-green-400 overflow-hidden shadow-lg">
+              {capturedImages.front && (
+                <img src={capturedImages.front} alt="Front" className="w-full h-full object-cover" style={{ transform: 'scaleX(-1)' }} />
               )}
             </div>
-            <div className="absolute inset-0 flex items-center justify-center bg-green-500/20 rounded-full">
-              <div className="bg-green-600 px-6 py-3 rounded-full flex items-center gap-2">
-                <CheckCircle2 className="h-5 w-5 text-white" />
-                <p className="text-white font-medium">Verified!</p>
-              </div>
+            <div className="w-20 h-20 rounded-full border-4 border-green-400 overflow-hidden shadow-lg">
+              {capturedImages.side && (
+                <img src={capturedImages.side} alt="Side" className="w-full h-full object-cover" style={{ transform: 'scaleX(-1)' }} />
+              )}
+            </div>
+          </div>
+          <div className="flex justify-center">
+            <div className="bg-green-600 px-6 py-3 rounded-full flex items-center gap-2">
+              <CheckCircle2 className="h-5 w-5 text-white" />
+              <p className="text-white font-medium">Verified!</p>
             </div>
           </div>
         </div>
@@ -433,7 +493,7 @@ export default function FaceVerification({ onVerified }: FaceVerificationProps) 
       {/* Start Button */}
       {step === 0 && (
         <Button
-          onClick={startCamera}
+          onClick={() => startCamera('front')}
           disabled={isLoading}
           className="w-full font-semibold py-5 rounded-xl shadow-2xl bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700 text-white"
         >

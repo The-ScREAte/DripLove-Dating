@@ -141,7 +141,7 @@ serve(async (req: Request) => {
   try {
     console.log('🔍 Face verification started');
     
-    const { front, userId } = await req.json();
+    const { front, side, userId } = await req.json();
     
     if (!front) {
       return new Response(JSON.stringify({
