@@ -130,6 +130,17 @@ const AuthForm = ({ isLogin, onToggle, onOAuthSuccess, onBack }: AuthFormProps) 
     setOauthLoading(provider);
     
     try {
+      // Check for network connectivity first
+      if (!navigator.onLine) {
+        toast({
+          title: t('auth.noConnection'),
+          description: t('auth.checkConnection'),
+          variant: 'destructive',
+        });
+        setOauthLoading(null);
+        return;
+      }
+
       // Import OAuth config
       const { getRedirectUri } = await import('@/config/oauth');
       
@@ -717,6 +728,17 @@ const AuthForm = ({ isLogin, onToggle, onOAuthSuccess, onBack }: AuthFormProps) 
     const { email, password } = formData;
 
     try {
+      // Check for network connectivity first
+      if (!navigator.onLine) {
+        toast({
+          title: t('auth.noConnection'),
+          description: t('auth.checkConnection'),
+          variant: "destructive",
+        });
+        setLoading(false);
+        return;
+      }
+
       if (isLogin) {
         // Login flow
         const { data: authData, error: authError } = await supabase.auth.signInWithPassword({
@@ -725,6 +747,22 @@ const AuthForm = ({ isLogin, onToggle, onOAuthSuccess, onBack }: AuthFormProps) 
         });
 
         if (authError) {
+          // Check for network-related errors
+          if (authError.message.includes('Failed to fetch') || 
+              authError.message.includes('NetworkError') ||
+              authError.message.includes('network') ||
+              authError.message.includes('NETWORK') ||
+              authError.message.includes('timeout') ||
+              authError.message.includes('Unable to connect')) {
+            toast({
+              title: t('auth.noConnection'),
+              description: t('auth.checkConnection'),
+              variant: "destructive",
+            });
+            setLoading(false);
+            return;
+          }
+          
           // Check for specific email confirmation error
           if (authError.message.includes('Email not confirmed') || 
               authError.message.includes('email must be confirmed') ||
@@ -943,11 +981,26 @@ const AuthForm = ({ isLogin, onToggle, onOAuthSuccess, onBack }: AuthFormProps) 
       setLoading(false);
     } catch (error: any) {
       console.error('Auth error:', error);
-      toast({
-        title: isLogin ? t('auth.loginError') : t('auth.registrationError'),
-        description: t('auth.unexpectedError'),
-        variant: "destructive",
-      });
+      
+      // Check for network errors in catch block
+      const errorMessage = error?.message?.toLowerCase() || '';
+      if (!navigator.onLine || 
+          errorMessage.includes('fetch') || 
+          errorMessage.includes('network') ||
+          errorMessage.includes('timeout') ||
+          errorMessage.includes('connection')) {
+        toast({
+          title: t('auth.noConnection'),
+          description: t('auth.checkConnection'),
+          variant: "destructive",
+        });
+      } else {
+        toast({
+          title: isLogin ? t('auth.loginError') : t('auth.registrationError'),
+          description: t('auth.unexpectedError'),
+          variant: "destructive",
+        });
+      }
       setLoading(false);
     }
   };

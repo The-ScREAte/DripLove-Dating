@@ -39,6 +39,7 @@ interface LocationInputProps {
   autoDetect?: boolean; // Enable auto-detection on mount
   isProfileEdit?: boolean; // If true, check if user is outside their country
   isPremium?: boolean; // Show upgrade note for free users
+  disabled?: boolean; // Disable all inputs (read-only mode)
 }
 
 const LocationInput = ({
@@ -51,7 +52,8 @@ const LocationInput = ({
   required = false,
   autoDetect = false,
   isProfileEdit = false,
-  isPremium = false
+  isPremium = false,
+  disabled = false
 }: LocationInputProps) => {
   const [selectedCountryCode, setSelectedCountryCode] = useState<string>('');
   const [cityInput, setCityInput] = useState<string>(city);
@@ -427,6 +429,7 @@ const LocationInput = ({
               You appear to be in {outsideCountryStatus.currentLocation || 'a different country'}.
             </span>
           </div>
+          {/* Note: Country change button is NOT disabled when form is disabled - this is a special action */}
           <Button
             type="button"
             size="sm"
@@ -545,12 +548,13 @@ const LocationInput = ({
         <div className="relative">
           <Input
             value={cityInput}
-            onChange={(e) => handleCityInputChange(e.target.value)}
-            onFocus={() => setShowCitySuggestions(cityInput.length >= 2 || selectedCountryCode !== '')}
+            onChange={(e) => !disabled && handleCityInputChange(e.target.value)}
+            onFocus={() => !disabled && setShowCitySuggestions(cityInput.length >= 2 || selectedCountryCode !== '')}
             placeholder={selectedCountryData?.name 
               ? `Select a city in ${selectedCountryData.name} or type to search` 
               : 'Type your city name (at least 2 characters)'}
             className={errors.city ? 'border-red-500' : ''}
+            disabled={disabled}
           />
 
             {/* City Suggestions Dropdown */}
@@ -653,7 +657,7 @@ const LocationInput = ({
           </Label>
           <Input
             value={zipCode}
-            onChange={(e) => handleZipCodeChange(e.target.value)}
+            onChange={(e) => !disabled && handleZipCodeChange(e.target.value)}
             placeholder={
               selectedCountryData?.code === 'US' ? '12345' :
               selectedCountryData?.code === 'GB' ? 'SW1A 1AA' :
@@ -667,6 +671,7 @@ const LocationInput = ({
               'Enter postal code'
             }
             className={errors.zipCode ? 'border-red-500' : ''}
+            disabled={disabled}
           />
           {errors.zipCode && (
             <p className="text-sm text-red-500">{errors.zipCode}</p>

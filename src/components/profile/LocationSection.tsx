@@ -122,58 +122,18 @@ const LocationSection = ({
           {t('profile.location')}
         </h3>
         
-        {isEditing && onLocationChange ? (
-            <LocationInput
-              country={editedProfile.country || ''}
-              city={editedProfile.city || ''}
-              zipCode={editedProfile.zip_code || ''}
-              countryCode={editedProfile.country_code || ''}
-              onLocationChange={onLocationChange}
-              required={false}
-              isProfileEdit={true}
-              isPremium={isPremium}
-            />
-          ) : (
-            // Display mode
-            <div className="space-y-4">
-              <div>
-                <Label htmlFor="country">{t('profile.country')}</Label>
-                <Input
-                  type="text"
-                  id="country"
-                  name="country"
-                  value={editedProfile.country || ''}
-                  onChange={onInputChange}
-                  disabled={!isEditing}
-                  className="w-full"
-                />
-              </div>
-              <div>
-                <Label htmlFor="city">{t('profile.city')}</Label>
-                <Input
-                  type="text"
-                  id="city"
-                  name="city"
-                  value={editedProfile.city || ''}
-                  onChange={onInputChange}
-                  disabled={!isEditing}
-                  className="w-full"
-                />
-              </div>
-              <div>
-                <Label htmlFor="zip_code">{t('profile.zipCode')}</Label>
-                <Input
-                  type="text"
-                  id="zip_code"
-                  name="zip_code"
-                  value={editedProfile.zip_code || ''}
-                  onChange={onInputChange}
-                  disabled={!isEditing}
-                  className="w-full"
-                />
-              </div>
-            </div>
-          )}
+        {/* Always show LocationInput for country availability feature, but disable editing when not in edit mode */}
+        <LocationInput
+          country={editedProfile.country || ''}
+          city={editedProfile.city || ''}
+          zipCode={editedProfile.zip_code || ''}
+          countryCode={editedProfile.country_code || ''}
+          onLocationChange={onLocationChange || (() => {})}
+          required={false}
+          isProfileEdit={true}
+          isPremium={isPremium}
+          disabled={!isEditing}
+        />
 
         {/* Distance Preference */}
         <div className="space-y-3">
