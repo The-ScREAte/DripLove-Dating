@@ -204,23 +204,23 @@ const ImageManagement = ({ currentUser }: ImageManagementProps) => {
     setUploading(true);
 
     try {
-      // Use the MIME type from the compressed file to determine extension
-      const mimeToExt: Record<string, string> = {
-        'image/jpeg': 'jpg',
-        'image/png': 'png',
-        'image/webp': 'webp',
-        'image/gif': 'gif'
-      };
-      const fileExt = mimeToExt[compressedFile.type] || file.name.split('.').pop() || 'jpg';
-      const fileName = `${currentUser.id}/${Date.now()}-${Math.random().toString(36).substring(2)}.${fileExt}`;
+      // 🔒 Wrap compressed result in a proper File object to ensure correct MIME type
+      // This fixes the application/json content-type bug from blob-like compression output
+      const safeFile = new File(
+        [compressedFile], 
+        `${Date.now()}.jpg`, 
+        { type: 'image/jpeg' }
+      );
+
+      const fileName = `${currentUser.id}/${Date.now()}-${Math.random().toString(36).substring(2)}.jpg`;
 
       // Upload to storage with explicit content type
       const { data: uploadData, error: uploadError } = await supabase.storage
         .from('user-photos')
-        .upload(fileName, compressedFile, { 
+        .upload(fileName, safeFile, { 
+          contentType: 'image/jpeg',  // 🔥 REQUIRED - prevents application/json
           cacheControl: '3600', 
           upsert: false,
-          contentType: compressedFile.type || 'image/jpeg' // Explicitly set content type
         });
 
       if (uploadError) {
