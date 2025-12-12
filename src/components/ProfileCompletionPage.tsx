@@ -615,12 +615,14 @@ const ProfileCompletionPage = () => {
       for (const image of approvedImages) {
         try {
           if (!image.file) continue;
-          const fileExt = image.file?.name.split('.').pop() || 'jpg';
+          const fileExt = image.file?.name.split('.').pop()?.toLowerCase() || 'jpg';
           const fileName = `${Date.now()}-${Math.random().toString(36).substr(2, 9)}.${fileExt}`;
           const filePath = `${user.id}/${fileName}`;
           const { error: uploadError } = await supabase.storage
             .from('user-photos')
-            .upload(filePath, image.file);
+            .upload(filePath, image.file, {
+              contentType: image.file.type || `image/${fileExt}`
+            });
           if (uploadError) throw uploadError;
           const { data: { publicUrl } } = supabase.storage
             .from('user-photos')

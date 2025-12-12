@@ -630,14 +630,16 @@ const RegistrationForm = ({ onSubmit, onBackToLogin }: RegistrationFormProps) =>
           continue;
         }
         
-        // Upload to storage
-        const fileExt = image.file.name?.split('.').pop() || 'jpg';
+        // Upload to storage with correct content type
+        const fileExt = image.file.name?.split('.').pop()?.toLowerCase() || 'jpg';
         const fileName = `${Date.now()}-${Math.random().toString(36).substr(2, 9)}.${fileExt}`;
         const filePath = `${userId}/${fileName}`;
         
         const { error: uploadError } = await supabase.storage
           .from('user-photos')
-          .upload(filePath, image.file);
+          .upload(filePath, image.file, {
+            contentType: image.file.type || `image/${fileExt}`
+          });
           
         if (uploadError) {
           throw uploadError;

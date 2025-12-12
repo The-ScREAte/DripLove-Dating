@@ -274,13 +274,17 @@ const ImageManagement = ({ currentUser }: ImageManagementProps) => {
     setUploading(true);
 
     try {
-      const fileExt = file.name.split('.').pop();
+      const fileExt = file.name.split('.').pop()?.toLowerCase() || 'jpg';
       const fileName = `${currentUser.id}/${Date.now()}-${Math.random().toString(36).substring(2)}.${fileExt}`;
 
-      // Upload to storage
+      // Upload to storage with correct content type
       const { data: uploadData, error: uploadError } = await supabase.storage
         .from('user-photos')
-        .upload(fileName, file, { cacheControl: '3600', upsert: false });
+        .upload(fileName, file, { 
+          cacheControl: '3600', 
+          upsert: false,
+          contentType: file.type || `image/${fileExt}`
+        });
 
       if (uploadError) throw uploadError;
 
