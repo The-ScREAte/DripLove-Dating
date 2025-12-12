@@ -542,25 +542,39 @@ export default function FaceVerification({ onVerified }: FaceVerificationProps) 
             <div
               id="cameraPreview"
               ref={cameraContainerRef}
-              className="camera-feed fixed inset-0 bg-transparent"
-              style={{ backgroundColor: 'transparent' }}
+              className="camera-feed fixed inset-0"
+              style={{ backgroundColor: 'transparent', zIndex: -1 }}
             />
           )}
 
           {/* Circular UI overlay (used on both native and web so they match). */}
           <div className="relative mx-auto" style={{ width: CAMERA_SIZE, height: CAMERA_SIZE }}>
-            {/* Web browser video element lives inside the circle */}
-            {!isNative && (
+            {/* Native: transparent circular window to show camera behind */}
+            {isNative && (
               <div
-                id="cameraPreview"
-                ref={cameraContainerRef}
-                className="camera-feed rounded-full overflow-hidden border-4 border-white/40 shadow-2xl bg-transparent"
+                className="rounded-full overflow-hidden border-4 border-white/40 shadow-2xl"
                 style={{
                   width: CAMERA_SIZE,
                   height: CAMERA_SIZE,
                   position: 'relative',
                   margin: '0 auto',
                   backgroundColor: 'transparent',
+                  borderRadius: '50%'
+                }}
+              />
+            )}
+
+            {/* Web browser video element lives inside the circle */}
+            {!isNative && (
+              <div
+                id="cameraPreview"
+                ref={cameraContainerRef}
+                className="camera-feed rounded-full overflow-hidden border-4 border-white/40 shadow-2xl bg-black"
+                style={{
+                  width: CAMERA_SIZE,
+                  height: CAMERA_SIZE,
+                  position: 'relative',
+                  margin: '0 auto',
                   borderRadius: '50%',
                   overflow: 'hidden'
                 }}
@@ -592,8 +606,10 @@ export default function FaceVerification({ onVerified }: FaceVerificationProps) 
               </div>
             )}
 
-            {/* Circular frame (always visible, matches iOS look) */}
-            <div className="absolute inset-0 rounded-full border-4 border-white/40 shadow-2xl pointer-events-none" style={{ zIndex: 5 }} />
+            {/* Circular frame (always visible, matches iOS look) - NOT for native as it blocks transparency */}
+            {!isNative && (
+              <div className="absolute inset-0 rounded-full border-4 border-white/40 shadow-2xl pointer-events-none" style={{ zIndex: 5 }} />
+            )}
 
             {/* Face outline guide */}
             <div className="absolute inset-0 flex items-center justify-center pointer-events-none" style={{ zIndex: 10 }}>
