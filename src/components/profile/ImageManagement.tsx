@@ -204,7 +204,14 @@ const ImageManagement = ({ currentUser }: ImageManagementProps) => {
     setUploading(true);
 
     try {
-      const fileExt = file.name.split('.').pop();
+      // Use the MIME type from the compressed file to determine extension
+      const mimeToExt: Record<string, string> = {
+        'image/jpeg': 'jpg',
+        'image/png': 'png',
+        'image/webp': 'webp',
+        'image/gif': 'gif'
+      };
+      const fileExt = mimeToExt[compressedFile.type] || file.name.split('.').pop() || 'jpg';
       const fileName = `${currentUser.id}/${Date.now()}-${Math.random().toString(36).substring(2)}.${fileExt}`;
 
       // Upload to storage
@@ -212,11 +219,20 @@ const ImageManagement = ({ currentUser }: ImageManagementProps) => {
         .from('user-photos')
         .upload(fileName, compressedFile, { cacheControl: '3600', upsert: false });
 
-      if (uploadError) throw uploadError;
+      if (uploadError) {
+        console.error('Storage upload failed:', uploadError);
+        throw uploadError;
+      }
+
+      // ✅ CRITICAL: Use uploadData.path (what Supabase actually stored), not our fileName
+      const storedPath = uploadData?.path;
+      if (!storedPath) {
+        throw new Error("Upload succeeded but no path returned from storage");
+      }
 
       const { data: urlData } = await supabase.storage
         .from('user-photos')
-        .getPublicUrl(fileName);
+        .getPublicUrl(storedPath);
 
       if (!urlData?.publicUrl) throw new Error("Failed to generate public image URL");
 
