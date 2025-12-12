@@ -239,13 +239,21 @@ export default function FaceVerification({ onVerified }: FaceVerificationProps) 
         if (onVerified) {
           onVerified();
         }
-      } else if (data.reason === 'duplicate') {
+      } else if (data.code === 'DUPLICATE_FACE') {
         setVerificationResult('duplicate');
         setErrorMessage("This face is already registered. Each person can only have one account.");
         setStep(3);
+      } else if (data.code === 'NO_FACE') {
+        setVerificationResult('error');
+        setErrorMessage("No human face detected. Please take clear photos of your face only.");
+        setStep(3);
+      } else if (data.code === 'LOW_CONFIDENCE') {
+        setVerificationResult('error');
+        setErrorMessage("Face not clear. Please ensure good lighting and face the camera directly.");
+        setStep(3);
       } else {
         setVerificationResult('error');
-        setErrorMessage(data.error || "No face detected in image");
+        setErrorMessage(data.error || "Verification failed. Please try again.");
         setStep(3);
       }
     } catch (error) {
