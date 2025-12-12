@@ -693,59 +693,8 @@ const RegistrationForm = ({ onSubmit, onBackToLogin }: RegistrationFormProps) =>
     }
   };
 
-  // Face verification must be the first step, on a stable full-screen layout.
-  if (showFaceVerification) {
-    return (
-      <div className="keyboard-safe-form relative min-h-screen bg-transparent">
-        {/* IMPORTANT: For native CameraPreview with toBack:true, the camera is behind the WebView.
-            Any painted background behind the circle (video/gradient/card bg) will hide the camera.
-            Keep this screen mostly transparent and only paint UI elements above/below the circle. */}
-
-        <div className="relative z-10 min-h-screen w-full flex items-start justify-center px-4 pt-12 pb-8 bg-transparent">
-          <div className="w-full max-w-md">
-            <div className="text-center mb-4">
-              <h2 className="text-xl font-semibold text-white">Face Verification</h2>
-              <p className="text-xs text-white/80 mt-1">Complete this first to continue registration.</p>
-            </div>
-
-            <FaceVerification
-              onVerified={() => {
-                setFaceVerified(true);
-                try { sessionStorage.setItem('registration_face_verified', '1'); } catch {}
-              }}
-            />
-
-            <div className="mt-4">
-              <Button
-                type="button"
-                disabled={!faceVerified}
-                onClick={() => setShowFaceVerification(false)}
-                className="w-full bg-white text-purple-700 hover:bg-white/90 font-semibold"
-              >
-                Continue
-              </Button>
-
-              <Button
-                type="button"
-                variant="outline"
-                onClick={() => {
-                  // Clear face verification cache if user clicks back
-                  try { sessionStorage.removeItem('registration_face_verified'); } catch {}
-                  try { sessionStorage.removeItem('registration_images'); } catch {}
-                  setFaceVerified(false);
-                  setImages([]);
-                  onBackToLogin();
-                }}
-                className="w-full mt-3 border-white/40 text-white hover:bg-white/10"
-              >
-                Back
-              </Button>
-            </div>
-          </div>
-        </div>
-      </div>
-    );
-  }
+  // No longer showing face verification as a separate full-screen step
+  // It's now integrated into step 1 of the form
 
   return (
     <div className="keyboard-safe-form input-scroll-container relative min-h-screen">
@@ -813,6 +762,42 @@ const RegistrationForm = ({ onSubmit, onBackToLogin }: RegistrationFormProps) =>
                 onTogglePassword={() => setShowPassword(!showPassword)}
                 onToggleConfirmPassword={() => setShowConfirmPassword(!showConfirmPassword)}
               />
+
+              {/* Face Verification Section - Right after basic info */}
+              <div className="space-y-3 animate-scale-in">
+                <h4 className="text-lg font-semibold text-gray-800 flex items-center gap-2">
+                  <Shield className="w-5 h-5 text-purple-600" />
+                  Face Verification
+                </h4>
+                <p className="text-xs text-gray-600">
+                  Verify your identity to keep our community safe. This is required to continue.
+                </p>
+                
+                <div className="bg-gradient-to-br from-purple-50 to-pink-50 rounded-xl p-4 border border-purple-100">
+                  {faceVerified ? (
+                    <div className="flex items-center gap-3 text-green-700">
+                      <CheckCircle className="w-6 h-6" />
+                      <div>
+                        <p className="font-medium">Face Verified</p>
+                        <p className="text-xs text-green-600">Your identity has been confirmed</p>
+                      </div>
+                    </div>
+                  ) : (
+                    <FaceVerification
+                      onVerified={() => {
+                        setFaceVerified(true);
+                        try { sessionStorage.setItem('registration_face_verified', '1'); } catch {}
+                      }}
+                    />
+                  )}
+                </div>
+                {!faceVerified && (
+                  <p className="text-xs text-amber-600 flex items-center gap-1">
+                    <AlertTriangle className="w-3 h-3" />
+                    Face verification is required to proceed
+                  </p>
+                )}
+              </div>
 
           {/* Work & Education */}
           <div className="space-y-4 animate-scale-in">

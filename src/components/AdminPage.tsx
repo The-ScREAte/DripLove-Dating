@@ -17,6 +17,7 @@ import AdminErrorBoundary from './admin/AdminErrorBoundary';
 import UserPoolDebugger from './admin/UserPoolDebugger';
 import CountryManagement from './admin/CountryManagement';
 import ImageModerationPanel from './admin/ImageModerationPanel';
+import FaceManagement from './admin/FaceManagement';
 
 import ManualPremiumManager from './admin/ManualPremiumManager';
 import AdsManagement from './admin/AdsManagement';
@@ -46,7 +47,8 @@ import {
   BarChart3,
   Crown,
   Megaphone,
-  Link2
+  Link2,
+  Scan
 } from 'lucide-react';
 
 interface AdminPageProps {
@@ -1391,7 +1393,7 @@ const AdminPageComponent = ({ currentUser, onLogout }: AdminPageProps) => {
                 </TabsList>
 
                 {/* Second Row - Additional Tabs */}
-                <TabsList className="grid w-full grid-cols-4 h-auto">
+                <TabsList className="grid w-full grid-cols-5 h-auto">
                   <TabsTrigger value="ads" className="text-xs flex flex-col gap-1 py-2">
                     <Megaphone className="w-4 h-4" />
                     <span>Ads</span>
@@ -1399,6 +1401,10 @@ const AdminPageComponent = ({ currentUser, onLogout }: AdminPageProps) => {
                   <TabsTrigger value="redirects" className="text-xs flex flex-col gap-1 py-2">
                     <Link2 className="w-4 h-4" />
                     <span>Links</span>
+                  </TabsTrigger>
+                  <TabsTrigger value="faces" className="text-xs flex flex-col gap-1 py-2">
+                    <Scan className="w-4 h-4" />
+                    <span>Faces</span>
                   </TabsTrigger>
                   <TabsTrigger value="debugger" className="text-xs flex flex-col gap-1 py-2">
                     <Search className="w-4 h-4" />
@@ -1992,6 +1998,11 @@ const AdminPageComponent = ({ currentUser, onLogout }: AdminPageProps) => {
                   {isAdmin && renderPaymentMethodsAdmin()}
                 </CardContent>
               </Card>
+            </TabsContent>
+
+            {/* Faces Tab */}
+            <TabsContent value="faces" className="space-y-4">
+              <FaceManagement />
             </TabsContent>
           </Tabs>
           </AdminErrorBoundary>
