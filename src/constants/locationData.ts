@@ -193,11 +193,26 @@ export const locationData: Record<string, CountryData> = {
     currency: 'KES',
     phoneCode: '+254',
     majorCities: [
-      { name: 'Nairobi', latitude: -1.2921, longitude: 36.8219, population: 4500000 },
-      { name: 'Mombasa', latitude: -4.0435, longitude: 39.6682, population: 1200000 },
-      { name: 'Kisumu', latitude: -0.0917, longitude: 34.7680, population: 610000 },
-      { name: 'Nakuru', latitude: -0.3031, longitude: 36.0800, population: 570000 },
-      { name: 'Eldoret', latitude: 0.5143, longitude: 35.2699, population: 475000 }
+      { name: 'Nairobi', state: 'Nairobi', latitude: -1.2921, longitude: 36.8219, population: 4500000 },
+      { name: 'Mombasa', state: 'Coast', latitude: -4.0435, longitude: 39.6682, population: 1200000 },
+      { name: 'Kisumu', state: 'Nyanza', latitude: -0.0917, longitude: 34.7680, population: 610000 },
+      { name: 'Nakuru', state: 'Rift Valley', latitude: -0.3031, longitude: 36.0800, population: 570000 },
+      { name: 'Eldoret', state: 'Rift Valley', latitude: 0.5143, longitude: 35.2699, population: 475000 },
+      { name: 'Thika', state: 'Central', latitude: -1.0334, longitude: 37.0693, population: 200000 },
+      { name: 'Malindi', state: 'Coast', latitude: -3.2138, longitude: 40.1169, population: 120000 },
+      { name: 'Kitale', state: 'Rift Valley', latitude: 1.0156, longitude: 35.0062, population: 160000 },
+      { name: 'Garissa', state: 'North Eastern', latitude: -0.4536, longitude: 39.6401, population: 120000 },
+      { name: 'Nyeri', state: 'Central', latitude: -0.4169, longitude: 36.9511, population: 120000 },
+      { name: 'Machakos', state: 'Eastern', latitude: -1.5177, longitude: 37.2634, population: 115000 },
+      { name: 'Meru', state: 'Eastern', latitude: 0.0500, longitude: 37.6500, population: 95000 },
+      { name: 'Lamu', state: 'Coast', latitude: -2.2686, longitude: 40.9020, population: 25000 },
+      { name: 'Naivasha', state: 'Rift Valley', latitude: -0.7172, longitude: 36.4320, population: 85000 },
+      { name: 'Kakamega', state: 'Western', latitude: 0.2827, longitude: 34.7519, population: 100000 },
+      { name: 'Bungoma', state: 'Western', latitude: 0.5636, longitude: 34.5606, population: 85000 },
+      { name: 'Kericho', state: 'Rift Valley', latitude: -0.3692, longitude: 35.2863, population: 75000 },
+      { name: 'Embu', state: 'Eastern', latitude: -0.5389, longitude: 37.4583, population: 70000 },
+      { name: 'Nanyuki', state: 'Central', latitude: 0.0167, longitude: 37.0667, population: 65000 },
+      { name: 'Kilifi', state: 'Coast', latitude: -3.6305, longitude: 39.8499, population: 60000 }
     ]
   },
   ethiopia: {
@@ -207,11 +222,21 @@ export const locationData: Record<string, CountryData> = {
     currency: 'ETB',
     phoneCode: '+251',
     majorCities: [
-      { name: 'Addis Ababa', latitude: 9.1450, longitude: 38.7617, population: 5000000 },
-      { name: 'Dire Dawa', latitude: 9.5938, longitude: 41.8661, population: 500000 },
-      { name: 'Mek\'ele', latitude: 13.4967, longitude: 39.4753, population: 400000 },
-      { name: 'Gondar', latitude: 12.6089, longitude: 37.4671, population: 350000 },
-      { name: 'Awassa', latitude: 7.0431, longitude: 38.4731, population: 300000 }
+      { name: 'Addis Ababa', state: 'Addis Ababa', latitude: 9.1450, longitude: 38.7617, population: 5000000 },
+      { name: 'Dire Dawa', state: 'Dire Dawa', latitude: 9.5938, longitude: 41.8661, population: 500000 },
+      { name: 'Mek\'ele', state: 'Tigray', latitude: 13.4967, longitude: 39.4753, population: 400000 },
+      { name: 'Gondar', state: 'Amhara', latitude: 12.6089, longitude: 37.4671, population: 350000 },
+      { name: 'Awassa', state: 'Sidama', latitude: 7.0431, longitude: 38.4731, population: 300000 },
+      { name: 'Bahir Dar', state: 'Amhara', latitude: 11.5936, longitude: 37.3908, population: 290000 },
+      { name: 'Dessie', state: 'Amhara', latitude: 11.1333, longitude: 39.6333, population: 185000 },
+      { name: 'Jimma', state: 'Oromia', latitude: 7.6667, longitude: 36.8333, population: 175000 },
+      { name: 'Adama', state: 'Oromia', latitude: 8.5400, longitude: 39.2700, population: 324000 },
+      { name: 'Harar', state: 'Harari', latitude: 9.3114, longitude: 42.1197, population: 130000 },
+      { name: 'Debre Markos', state: 'Amhara', latitude: 10.3500, longitude: 37.7333, population: 100000 },
+      { name: 'Dilla', state: 'SNNPR', latitude: 6.4167, longitude: 38.3167, population: 90000 },
+      { name: 'Nekemte', state: 'Oromia', latitude: 9.0833, longitude: 36.5500, population: 85000 },
+      { name: 'Axum', state: 'Tigray', latitude: 14.1308, longitude: 38.7228, population: 65000 },
+      { name: 'Arba Minch', state: 'SNNPR', latitude: 6.0333, longitude: 37.5500, population: 95000 }
     ]
   },
   uganda: {
@@ -221,10 +246,21 @@ export const locationData: Record<string, CountryData> = {
     currency: 'UGX',
     phoneCode: '+256',
     majorCities: [
-      { name: 'Kampala', latitude: 0.3476, longitude: 32.5825, population: 2000000 },
-      { name: 'Gulu', latitude: 2.7796, longitude: 32.2990, population: 200000 },
-      { name: 'Lira', latitude: 2.2391, longitude: 32.8998, population: 150000 },
-      { name: 'Mbarara', latitude: -0.6063, longitude: 30.6474, population: 200000 }
+      { name: 'Kampala', state: 'Central', latitude: 0.3476, longitude: 32.5825, population: 2000000 },
+      { name: 'Gulu', state: 'Northern', latitude: 2.7796, longitude: 32.2990, population: 200000 },
+      { name: 'Lira', state: 'Northern', latitude: 2.2391, longitude: 32.8998, population: 150000 },
+      { name: 'Mbarara', state: 'Western', latitude: -0.6063, longitude: 30.6474, population: 200000 },
+      { name: 'Jinja', state: 'Eastern', latitude: 0.4478, longitude: 33.2026, population: 120000 },
+      { name: 'Mbale', state: 'Eastern', latitude: 1.0750, longitude: 34.1750, population: 100000 },
+      { name: 'Entebbe', state: 'Central', latitude: 0.0512, longitude: 32.4637, population: 70000 },
+      { name: 'Fort Portal', state: 'Western', latitude: 0.6710, longitude: 30.2750, population: 60000 },
+      { name: 'Masaka', state: 'Central', latitude: -0.3411, longitude: 31.7311, population: 85000 },
+      { name: 'Soroti', state: 'Eastern', latitude: 1.7148, longitude: 33.6111, population: 75000 },
+      { name: 'Kasese', state: 'Western', latitude: 0.1833, longitude: 30.0833, population: 70000 },
+      { name: 'Arua', state: 'West Nile', latitude: 3.0167, longitude: 30.9000, population: 65000 },
+      { name: 'Hoima', state: 'Western', latitude: 1.4333, longitude: 31.3500, population: 55000 },
+      { name: 'Kabale', state: 'Western', latitude: -1.2500, longitude: 29.9833, population: 50000 },
+      { name: 'Mukono', state: 'Central', latitude: 0.3533, longitude: 32.7553, population: 160000 }
     ]
   },
   tanzania: {
@@ -234,11 +270,37 @@ export const locationData: Record<string, CountryData> = {
     currency: 'TZS',
     phoneCode: '+255',
     majorCities: [
-      { name: 'Dar es Salaam', latitude: -6.7924, longitude: 39.2083, population: 6000000 },
-      { name: 'Dodoma', latitude: -6.1722, longitude: 35.7397, population: 765000 },
-      { name: 'Mwanza', latitude: -2.5164, longitude: 32.9175, population: 1200000 },
-      { name: 'Arusha', latitude: -3.3869, longitude: 36.6830, population: 617000 },
-      { name: 'Mbeya', latitude: -8.9094, longitude: 33.4606, population: 385000 }
+      // Major Cities
+      { name: 'Dar es Salaam', state: 'Dar es Salaam', latitude: -6.7924, longitude: 39.2083, population: 6000000 },
+      { name: 'Dodoma', state: 'Dodoma', latitude: -6.1722, longitude: 35.7397, population: 765000 },
+      { name: 'Mwanza', state: 'Mwanza', latitude: -2.5164, longitude: 32.9175, population: 1200000 },
+      { name: 'Arusha', state: 'Arusha', latitude: -3.3869, longitude: 36.6830, population: 617000 },
+      { name: 'Mbeya', state: 'Mbeya', latitude: -8.9094, longitude: 33.4606, population: 385000 },
+      { name: 'Morogoro', state: 'Morogoro', latitude: -6.8217, longitude: 37.6631, population: 320000 },
+      { name: 'Tanga', state: 'Tanga', latitude: -5.0689, longitude: 39.0992, population: 275000 },
+      { name: 'Zanzibar City', state: 'Zanzibar', latitude: -6.1622, longitude: 39.1922, population: 250000 },
+      { name: 'Kigoma', state: 'Kigoma', latitude: -4.8772, longitude: 29.6261, population: 215000 },
+      { name: 'Tabora', state: 'Tabora', latitude: -5.0167, longitude: 32.8000, population: 180000 },
+      { name: 'Moshi', state: 'Kilimanjaro', latitude: -3.3500, longitude: 37.3400, population: 185000 },
+      { name: 'Songea', state: 'Ruvuma', latitude: -10.6828, longitude: 35.6483, population: 150000 },
+      { name: 'Musoma', state: 'Mara', latitude: -1.5000, longitude: 33.8000, population: 140000 },
+      { name: 'Shinyanga', state: 'Shinyanga', latitude: -3.6667, longitude: 33.4167, population: 135000 },
+      { name: 'Iringa', state: 'Iringa', latitude: -7.7667, longitude: 35.7000, population: 130000 },
+      { name: 'Sumbawanga', state: 'Rukwa', latitude: -7.9667, longitude: 31.6167, population: 125000 },
+      { name: 'Mtwara', state: 'Mtwara', latitude: -10.2683, longitude: 40.1833, population: 120000 },
+      { name: 'Singida', state: 'Singida', latitude: -4.8167, longitude: 34.7500, population: 115000 },
+      { name: 'Lindi', state: 'Lindi', latitude: -9.9993, longitude: 39.7111, population: 90000 },
+      { name: 'Bukoba', state: 'Kagera', latitude: -1.3314, longitude: 31.8117, population: 85000 },
+      { name: 'Njombe', state: 'Njombe', latitude: -9.3333, longitude: 34.7667, population: 80000 },
+      { name: 'Babati', state: 'Manyara', latitude: -4.2167, longitude: 35.7500, population: 75000 },
+      { name: 'Mpanda', state: 'Katavi', latitude: -6.3500, longitude: 31.0667, population: 70000 },
+      { name: 'Geita', state: 'Geita', latitude: -2.8667, longitude: 32.2333, population: 65000 },
+      { name: 'Kahama', state: 'Shinyanga', latitude: -3.8333, longitude: 32.6000, population: 60000 },
+      { name: 'Kilwa Masoko', state: 'Lindi', latitude: -8.9333, longitude: 39.5167, population: 35000 },
+      { name: 'Korogwe', state: 'Tanga', latitude: -5.1500, longitude: 38.4500, population: 55000 },
+      { name: 'Same', state: 'Kilimanjaro', latitude: -4.0667, longitude: 37.7167, population: 30000 },
+      { name: 'Kibaha', state: 'Coast', latitude: -6.7667, longitude: 38.9167, population: 75000 },
+      { name: 'Bagamoyo', state: 'Coast', latitude: -6.4333, longitude: 38.9000, population: 45000 }
     ]
   },
   // Southern Africa
@@ -249,12 +311,46 @@ export const locationData: Record<string, CountryData> = {
     currency: 'ZAR',
     phoneCode: '+27',
     majorCities: [
+      // Gauteng
       { name: 'Johannesburg', state: 'Gauteng', latitude: -26.2041, longitude: 28.0473, population: 5000000 },
-      { name: 'Cape Town', state: 'Western Cape', latitude: -33.9249, longitude: 18.4241, population: 4500000 },
-      { name: 'Durban', state: 'KwaZulu-Natal', latitude: -29.8587, longitude: 31.0218, population: 3500000 },
       { name: 'Pretoria', state: 'Gauteng', latitude: -25.7479, longitude: 28.2293, population: 2500000 },
+      { name: 'Soweto', state: 'Gauteng', latitude: -26.2485, longitude: 27.8540, population: 1300000 },
+      { name: 'Sandton', state: 'Gauteng', latitude: -26.1076, longitude: 28.0567, population: 220000 },
+      { name: 'Benoni', state: 'Gauteng', latitude: -26.1883, longitude: 28.3208, population: 160000 },
+      { name: 'Centurion', state: 'Gauteng', latitude: -25.8603, longitude: 28.1894, population: 240000 },
+      { name: 'Roodepoort', state: 'Gauteng', latitude: -26.1625, longitude: 27.8725, population: 325000 },
+      { name: 'Boksburg', state: 'Gauteng', latitude: -26.2125, longitude: 28.2578, population: 180000 },
+      // Western Cape
+      { name: 'Cape Town', state: 'Western Cape', latitude: -33.9249, longitude: 18.4241, population: 4500000 },
+      { name: 'Stellenbosch', state: 'Western Cape', latitude: -33.9346, longitude: 18.8640, population: 90000 },
+      { name: 'Paarl', state: 'Western Cape', latitude: -33.7242, longitude: 18.9725, population: 200000 },
+      { name: 'George', state: 'Western Cape', latitude: -33.9631, longitude: 22.4617, population: 160000 },
+      { name: 'Knysna', state: 'Western Cape', latitude: -34.0356, longitude: 23.0488, population: 80000 },
+      // KwaZulu-Natal
+      { name: 'Durban', state: 'KwaZulu-Natal', latitude: -29.8587, longitude: 31.0218, population: 3500000 },
+      { name: 'Pietermaritzburg', state: 'KwaZulu-Natal', latitude: -29.6006, longitude: 30.3794, population: 750000 },
+      { name: 'Richards Bay', state: 'KwaZulu-Natal', latitude: -28.7833, longitude: 32.0333, population: 60000 },
+      { name: 'Newcastle', state: 'KwaZulu-Natal', latitude: -27.7575, longitude: 29.9317, population: 365000 },
+      // Eastern Cape
       { name: 'Port Elizabeth', state: 'Eastern Cape', latitude: -33.9608, longitude: 25.6022, population: 1300000 },
-      { name: 'Bloemfontein', state: 'Free State', latitude: -29.0852, longitude: 26.1596, population: 520000 }
+      { name: 'East London', state: 'Eastern Cape', latitude: -33.0292, longitude: 27.8546, population: 750000 },
+      { name: 'Mthatha', state: 'Eastern Cape', latitude: -31.5889, longitude: 28.7844, population: 140000 },
+      { name: 'Grahamstown', state: 'Eastern Cape', latitude: -33.3042, longitude: 26.5328, population: 70000 },
+      // Free State
+      { name: 'Bloemfontein', state: 'Free State', latitude: -29.0852, longitude: 26.1596, population: 520000 },
+      { name: 'Welkom', state: 'Free State', latitude: -27.9833, longitude: 26.7167, population: 150000 },
+      // Mpumalanga
+      { name: 'Nelspruit', state: 'Mpumalanga', latitude: -25.4653, longitude: 30.9858, population: 110000 },
+      { name: 'Witbank', state: 'Mpumalanga', latitude: -25.8717, longitude: 29.2333, population: 220000 },
+      // Limpopo
+      { name: 'Polokwane', state: 'Limpopo', latitude: -23.9045, longitude: 29.4688, population: 130000 },
+      { name: 'Tzaneen', state: 'Limpopo', latitude: -23.8333, longitude: 30.1667, population: 55000 },
+      // North West
+      { name: 'Rustenburg', state: 'North West', latitude: -25.6667, longitude: 27.2417, population: 550000 },
+      { name: 'Potchefstroom', state: 'North West', latitude: -26.7167, longitude: 27.1000, population: 175000 },
+      // Northern Cape
+      { name: 'Kimberley', state: 'Northern Cape', latitude: -28.7323, longitude: 24.7623, population: 230000 },
+      { name: 'Upington', state: 'Northern Cape', latitude: -28.4572, longitude: 21.2667, population: 75000 }
     ]
   },
   zimbabwe: {
@@ -264,10 +360,16 @@ export const locationData: Record<string, CountryData> = {
     currency: 'USD',
     phoneCode: '+263',
     majorCities: [
-      { name: 'Harare', latitude: -17.8292, longitude: 31.0522, population: 2100000 },
-      { name: 'Bulawayo', latitude: -20.1594, longitude: 28.5906, population: 1200000 },
-      { name: 'Chitungwiza', latitude: -18.0130, longitude: 31.0767, population: 400000 },
-      { name: 'Mutare', latitude: -18.9707, longitude: 32.6518, population: 280000 }
+      { name: 'Harare', state: 'Harare', latitude: -17.8292, longitude: 31.0522, population: 2100000 },
+      { name: 'Bulawayo', state: 'Bulawayo', latitude: -20.1594, longitude: 28.5906, population: 1200000 },
+      { name: 'Chitungwiza', state: 'Harare', latitude: -18.0130, longitude: 31.0767, population: 400000 },
+      { name: 'Mutare', state: 'Manicaland', latitude: -18.9707, longitude: 32.6518, population: 280000 },
+      { name: 'Gweru', state: 'Midlands', latitude: -19.4500, longitude: 29.8167, population: 150000 },
+      { name: 'Kwekwe', state: 'Midlands', latitude: -18.9333, longitude: 29.8167, population: 100000 },
+      { name: 'Kadoma', state: 'Mashonaland West', latitude: -18.3333, longitude: 29.9167, population: 90000 },
+      { name: 'Masvingo', state: 'Masvingo', latitude: -20.0667, longitude: 30.8333, population: 90000 },
+      { name: 'Chinhoyi', state: 'Mashonaland West', latitude: -17.3500, longitude: 30.2000, population: 80000 },
+      { name: 'Victoria Falls', state: 'Matabeleland North', latitude: -17.9319, longitude: 25.8308, population: 35000 }
     ]
   },
   // North Africa
@@ -307,7 +409,7 @@ export const locationData: Record<string, CountryData> = {
     currency: 'USD',
     phoneCode: '+1',
     majorCities: [
-      // Major Metropolitan Areas
+      // Major Metropolitan Areas (Top 10)
       { name: 'New York', state: 'New York', latitude: 40.7128, longitude: -74.0060, population: 8400000, zipCode: '10001' },
       { name: 'Los Angeles', state: 'California', latitude: 34.0522, longitude: -118.2437, population: 4000000, zipCode: '90001' },
       { name: 'Chicago', state: 'Illinois', latitude: 41.8781, longitude: -87.6298, population: 2700000, zipCode: '60601' },
@@ -319,7 +421,7 @@ export const locationData: Record<string, CountryData> = {
       { name: 'Dallas', state: 'Texas', latitude: 32.7767, longitude: -96.7970, population: 1340000, zipCode: '75201' },
       { name: 'San Jose', state: 'California', latitude: 37.3382, longitude: -121.8863, population: 1030000, zipCode: '95101' },
       
-      // Additional Major Cities
+      // Major Cities (11-30)
       { name: 'Austin', state: 'Texas', latitude: 30.2672, longitude: -97.7431, population: 970000, zipCode: '73301' },
       { name: 'Jacksonville', state: 'Florida', latitude: 30.3322, longitude: -81.6557, population: 920000, zipCode: '32099' },
       { name: 'Fort Worth', state: 'Texas', latitude: 32.7555, longitude: -97.3308, population: 910000, zipCode: '76101' },
@@ -331,7 +433,7 @@ export const locationData: Record<string, CountryData> = {
       { name: 'Denver', state: 'Colorado', latitude: 39.7392, longitude: -104.9903, population: 710000, zipCode: '80201' },
       { name: 'Washington', state: 'District of Columbia', latitude: 38.9072, longitude: -77.0369, population: 700000, zipCode: '20001' },
       
-      // State Capitals and Important Cities
+      // State Capitals and Major Cities (31-50)
       { name: 'Boston', state: 'Massachusetts', latitude: 42.3601, longitude: -71.0589, population: 690000, zipCode: '02101' },
       { name: 'El Paso', state: 'Texas', latitude: 31.7619, longitude: -106.4850, population: 680000, zipCode: '79901' },
       { name: 'Detroit', state: 'Michigan', latitude: 42.3314, longitude: -83.0458, population: 670000, zipCode: '48201' },
@@ -352,6 +454,8 @@ export const locationData: Record<string, CountryData> = {
       { name: 'Colorado Springs', state: 'Colorado', latitude: 38.8339, longitude: -104.8214, population: 480000, zipCode: '80901' },
       { name: 'Raleigh', state: 'North Carolina', latitude: 35.7796, longitude: -78.6382, population: 470000, zipCode: '27601' },
       { name: 'Omaha', state: 'Nebraska', latitude: 41.2565, longitude: -95.9345, population: 470000, zipCode: '68101' },
+      
+      // Additional Important Cities (51-75)
       { name: 'Miami', state: 'Florida', latitude: 25.7617, longitude: -80.1918, population: 460000, zipCode: '33101' },
       { name: 'Long Beach', state: 'California', latitude: 33.7701, longitude: -118.1937, population: 460000, zipCode: '90801' },
       { name: 'Virginia Beach', state: 'Virginia', latitude: 36.8529, longitude: -75.9780, population: 450000, zipCode: '23451' },
@@ -360,7 +464,55 @@ export const locationData: Record<string, CountryData> = {
       { name: 'Tulsa', state: 'Oklahoma', latitude: 36.1540, longitude: -95.9928, population: 410000, zipCode: '74101' },
       { name: 'Tampa', state: 'Florida', latitude: 27.9506, longitude: -82.4572, population: 390000, zipCode: '33601' },
       { name: 'Arlington', state: 'Texas', latitude: 32.7357, longitude: -97.1081, population: 390000, zipCode: '76001' },
-      { name: 'New Orleans', state: 'Louisiana', latitude: 29.9511, longitude: -90.0715, population: 390000, zipCode: '70112' }
+      { name: 'New Orleans', state: 'Louisiana', latitude: 29.9511, longitude: -90.0715, population: 390000, zipCode: '70112' },
+      { name: 'Wichita', state: 'Kansas', latitude: 37.6872, longitude: -97.3301, population: 390000, zipCode: '67202' },
+      { name: 'Cleveland', state: 'Ohio', latitude: 41.4993, longitude: -81.6944, population: 385000, zipCode: '44101' },
+      { name: 'Bakersfield', state: 'California', latitude: 35.3733, longitude: -119.0187, population: 380000, zipCode: '93301' },
+      { name: 'Aurora', state: 'Colorado', latitude: 39.7294, longitude: -104.8319, population: 375000, zipCode: '80010' },
+      { name: 'Anaheim', state: 'California', latitude: 33.8366, longitude: -117.9143, population: 350000, zipCode: '92801' },
+      { name: 'Honolulu', state: 'Hawaii', latitude: 21.3069, longitude: -157.8583, population: 350000, zipCode: '96801' },
+      { name: 'Santa Ana', state: 'California', latitude: 33.7455, longitude: -117.8677, population: 335000, zipCode: '92701' },
+      { name: 'Riverside', state: 'California', latitude: 33.9533, longitude: -117.3962, population: 330000, zipCode: '92501' },
+      { name: 'Corpus Christi', state: 'Texas', latitude: 27.8006, longitude: -97.3964, population: 325000, zipCode: '78401' },
+      { name: 'Lexington', state: 'Kentucky', latitude: 38.0406, longitude: -84.5037, population: 320000, zipCode: '40502' },
+      { name: 'Pittsburgh', state: 'Pennsylvania', latitude: 40.4406, longitude: -79.9959, population: 305000, zipCode: '15219' },
+      { name: 'Anchorage', state: 'Alaska', latitude: 61.2181, longitude: -149.9003, population: 290000, zipCode: '99501' },
+      { name: 'Stockton', state: 'California', latitude: 37.9577, longitude: -121.2908, population: 315000, zipCode: '95201' },
+      { name: 'Cincinnati', state: 'Ohio', latitude: 39.1031, longitude: -84.5120, population: 305000, zipCode: '45202' },
+      { name: 'St. Paul', state: 'Minnesota', latitude: 44.9537, longitude: -93.0900, population: 305000, zipCode: '55101' },
+      { name: 'Toledo', state: 'Ohio', latitude: 41.6528, longitude: -83.5379, population: 275000, zipCode: '43604' },
+      
+      // More Cities across all states (76-100)
+      { name: 'Greensboro', state: 'North Carolina', latitude: 36.0726, longitude: -79.7920, population: 295000, zipCode: '27401' },
+      { name: 'Newark', state: 'New Jersey', latitude: 40.7357, longitude: -74.1724, population: 282000, zipCode: '07102' },
+      { name: 'Plano', state: 'Texas', latitude: 33.0198, longitude: -96.6989, population: 287000, zipCode: '75074' },
+      { name: 'Henderson', state: 'Nevada', latitude: 36.0395, longitude: -114.9817, population: 320000, zipCode: '89002' },
+      { name: 'Lincoln', state: 'Nebraska', latitude: 40.8258, longitude: -96.6852, population: 290000, zipCode: '68501' },
+      { name: 'Buffalo', state: 'New York', latitude: 42.8864, longitude: -78.8784, population: 255000, zipCode: '14201' },
+      { name: 'Jersey City', state: 'New Jersey', latitude: 40.7178, longitude: -74.0431, population: 262000, zipCode: '07302' },
+      { name: 'Chula Vista', state: 'California', latitude: 32.6401, longitude: -117.0842, population: 275000, zipCode: '91910' },
+      { name: 'Fort Wayne', state: 'Indiana', latitude: 41.0793, longitude: -85.1394, population: 265000, zipCode: '46802' },
+      { name: 'Orlando', state: 'Florida', latitude: 28.5383, longitude: -81.3792, population: 285000, zipCode: '32801' },
+      { name: 'St. Petersburg', state: 'Florida', latitude: 27.7676, longitude: -82.6403, population: 265000, zipCode: '33701' },
+      { name: 'Chandler', state: 'Arizona', latitude: 33.3062, longitude: -111.8413, population: 260000, zipCode: '85224' },
+      { name: 'Laredo', state: 'Texas', latitude: 27.5306, longitude: -99.4803, population: 260000, zipCode: '78040' },
+      { name: 'Norfolk', state: 'Virginia', latitude: 36.8508, longitude: -76.2859, population: 245000, zipCode: '23501' },
+      { name: 'Durham', state: 'North Carolina', latitude: 35.9940, longitude: -78.8986, population: 280000, zipCode: '27701' },
+      { name: 'Madison', state: 'Wisconsin', latitude: 43.0731, longitude: -89.4012, population: 260000, zipCode: '53703' },
+      { name: 'Lubbock', state: 'Texas', latitude: 33.5779, longitude: -101.8552, population: 260000, zipCode: '79401' },
+      { name: 'Irvine', state: 'California', latitude: 33.6846, longitude: -117.8265, population: 280000, zipCode: '92602' },
+      { name: 'Winston-Salem', state: 'North Carolina', latitude: 36.0999, longitude: -80.2442, population: 250000, zipCode: '27101' },
+      { name: 'Glendale', state: 'Arizona', latitude: 33.5387, longitude: -112.1860, population: 250000, zipCode: '85301' },
+      { name: 'Garland', state: 'Texas', latitude: 32.9126, longitude: -96.6389, population: 240000, zipCode: '75040' },
+      { name: 'Hialeah', state: 'Florida', latitude: 25.8576, longitude: -80.2781, population: 240000, zipCode: '33010' },
+      { name: 'Reno', state: 'Nevada', latitude: 39.5296, longitude: -119.8138, population: 265000, zipCode: '89501' },
+      { name: 'Chesapeake', state: 'Virginia', latitude: 36.7682, longitude: -76.2875, population: 245000, zipCode: '23320' },
+      { name: 'Gilbert', state: 'Arizona', latitude: 33.3528, longitude: -111.7890, population: 265000, zipCode: '85234' },
+      { name: 'Baton Rouge', state: 'Louisiana', latitude: 30.4583, longitude: -91.1403, population: 225000, zipCode: '70801' },
+      { name: 'Irving', state: 'Texas', latitude: 32.8140, longitude: -96.9489, population: 240000, zipCode: '75060' },
+      { name: 'Scottsdale', state: 'Arizona', latitude: 33.4942, longitude: -111.9261, population: 255000, zipCode: '85251' },
+      { name: 'North Las Vegas', state: 'Nevada', latitude: 36.1989, longitude: -115.1175, population: 265000, zipCode: '89030' },
+      { name: 'Fremont', state: 'California', latitude: 37.5485, longitude: -121.9886, population: 235000, zipCode: '94536' }
     ]
   },
   unitedKingdom: {

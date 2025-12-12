@@ -537,7 +537,7 @@ const ImageManagement = ({ currentUser }: ImageManagementProps) => {
             {faceVerified && (
               <span className="flex items-center gap-1 text-xs bg-green-100 text-green-700 px-2 py-0.5 rounded-full">
                 <BadgeCheck className="w-3 h-3" />
-                Verified
+                Personality Verified
               </span>
             )}
           </div>
