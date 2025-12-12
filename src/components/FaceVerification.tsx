@@ -31,6 +31,10 @@ export default function FaceVerification({ onVerified }: FaceVerificationProps) 
   const DETECTION_TIMEOUT_MS = 3000;
   const [detectionLagging, setDetectionLagging] = useState(false);
   const detectionLagRef = useRef<number | null>(null);
+  
+  // Native camera live preview frame (displayed in img tag for reliability)
+  const [nativeLiveFrame, setNativeLiveFrame] = useState<string | null>(null);
+  const nativeFrameIntervalRef = useRef<number | null>(null);
 
   const waitForNextFrame = () => new Promise<void>((resolve) => requestAnimationFrame(() => resolve()));
 
@@ -78,6 +82,9 @@ export default function FaceVerification({ onVerified }: FaceVerificationProps) 
       if (detectionIntervalRef.current) {
         clearInterval(detectionIntervalRef.current);
       }
+      if (nativeFrameIntervalRef.current) {
+        clearInterval(nativeFrameIntervalRef.current);
+      }
       if (isNative) {
         CameraPreview.stop().catch(() => {});
       } else if (streamRef.current) {
@@ -85,6 +92,36 @@ export default function FaceVerification({ onVerified }: FaceVerificationProps) 
       }
     };
   }, [isNative]);
+  
+  // Start native live frame capture loop (shows camera feed in img tag)
+  function startNativeLiveFrameCapture() {
+    if (nativeFrameIntervalRef.current) {
+      clearInterval(nativeFrameIntervalRef.current);
+    }
+    
+    const captureFrame = async () => {
+      try {
+        const result = await CameraPreview.captureSample({ quality: 60 });
+        if (result?.value) {
+          setNativeLiveFrame(`data:image/jpeg;base64,${result.value}`);
+        }
+      } catch (e) {
+        // Ignore frame capture errors
+      }
+    };
+    
+    // Capture frames at ~15fps for smooth preview
+    captureFrame();
+    nativeFrameIntervalRef.current = window.setInterval(captureFrame, 66);
+  }
+  
+  function stopNativeLiveFrameCapture() {
+    if (nativeFrameIntervalRef.current) {
+      clearInterval(nativeFrameIntervalRef.current);
+      nativeFrameIntervalRef.current = null;
+    }
+    setNativeLiveFrame(null);
+  }
   
   const [images, setImages] = useState<{
     front: string | null;
@@ -192,6 +229,10 @@ export default function FaceVerification({ onVerified }: FaceVerificationProps) 
         await withTimeout(CameraPreview.start(previewOptions), 4500, 'Camera start timed out');
         
         console.log('[Camera] Preview started successfully');
+        
+        // Start live frame capture to show in img tag (more reliable than transparency)
+        startNativeLiveFrameCapture();
+        
         // Start detection on native after camera starts
         await waitForNextFrame();
         startFaceDetection();
@@ -258,6 +299,7 @@ export default function FaceVerification({ onVerified }: FaceVerificationProps) 
       if (angle === "left") setStep(3);
       if (angle === "right") {
         if (isNative) {
+          stopNativeLiveFrameCapture();
           await CameraPreview.stop();
         } else if (streamRef.current) {
           streamRef.current.getTracks().forEach(track => track.stop());
@@ -392,6 +434,7 @@ export default function FaceVerification({ onVerified }: FaceVerificationProps) 
           detectionIntervalRef.current = null;
         }
         if (isNative) {
+          stopNativeLiveFrameCapture();
           await CameraPreview.stop().catch(() => {});
         } else if (streamRef.current) {
           streamRef.current.getTracks().forEach(track => track.stop());
@@ -425,6 +468,7 @@ export default function FaceVerification({ onVerified }: FaceVerificationProps) 
       clearInterval(detectionIntervalRef.current);
     }
     if (isNative) {
+      stopNativeLiveFrameCapture();
       CameraPreview.stop().catch(() => {});
     } else if (streamRef.current) {
       streamRef.current.getTracks().forEach(track => track.stop());
@@ -537,31 +581,49 @@ export default function FaceVerification({ onVerified }: FaceVerificationProps) 
       {/* Live Video Preview - Circular Camera Feed (Like Tinder) */}
       {step > 0 && step < 4 && (
         <div className="space-y-4 animate-fade-in">
-          {/* Native preview target (full-screen behind WebView). */}
+          {/* Hidden native camera container - CameraPreview needs a parent element */}
           {isNative && (
             <div
               id="cameraPreview"
               ref={cameraContainerRef}
-              className="camera-feed fixed inset-0"
-              style={{ backgroundColor: 'transparent', zIndex: -1 }}
+              style={{ position: 'fixed', width: 1, height: 1, opacity: 0, pointerEvents: 'none', zIndex: -9999 }}
             />
           )}
 
           {/* Circular UI overlay (used on both native and web so they match). */}
           <div className="relative mx-auto" style={{ width: CAMERA_SIZE, height: CAMERA_SIZE }}>
-            {/* Native: transparent circular window to show camera behind */}
+            {/* Native: show live camera frames in img tag for reliable display */}
             {isNative && (
               <div
-                className="rounded-full overflow-hidden border-4 border-white/40 shadow-2xl"
+                className="rounded-full overflow-hidden border-4 border-white/40 shadow-2xl bg-black"
                 style={{
                   width: CAMERA_SIZE,
                   height: CAMERA_SIZE,
                   position: 'relative',
                   margin: '0 auto',
-                  backgroundColor: 'transparent',
                   borderRadius: '50%'
                 }}
-              />
+              >
+                {nativeLiveFrame ? (
+                  <img
+                    src={nativeLiveFrame}
+                    alt="Camera preview"
+                    className="w-full h-full object-cover rounded-full"
+                    style={{
+                      transform: 'scaleX(-1)',
+                      position: 'absolute',
+                      top: 0,
+                      left: 0,
+                      width: '100%',
+                      height: '100%'
+                    }}
+                  />
+                ) : (
+                  <div className="w-full h-full flex items-center justify-center">
+                    <CameraIcon className="w-12 h-12 text-white/50 animate-pulse" />
+                  </div>
+                )}
+              </div>
             )}
 
             {/* Web browser video element lives inside the circle */}
