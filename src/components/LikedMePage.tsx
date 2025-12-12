@@ -196,13 +196,14 @@ const LikedMePage = ({ currentUser, isPremium = false }: LikedMePageProps) => {
   // Destructure for backwards compatibility
   const { estimatedRowHeight, rowVerticalGap, rowPaddingHorizontal, rowColumnGap } = rowConfig;
 
-  // ⭐ CRITICAL FIX: Create a stable scroll element getter that handles null safely
+  // ⭐ CRITICAL FIX: Create stable callbacks OUTSIDE useVirtualizer (hooks can't be nested)
   const getScrollElement = useCallback(() => scrollContainerRef.current, []);
+  const getEstimateSize = useCallback(() => estimatedRowHeight, [estimatedRowHeight]);
 
   const rowVirtualizer = useVirtualizer({
     count: virtualizerCount,
     getScrollElement,
-    estimateSize: useCallback(() => estimatedRowHeight, [estimatedRowHeight]),
+    estimateSize: getEstimateSize,
     overscan: 3,
     enabled: scrollContainerMounted // ⭐ Only enable when container is mounted
   });
