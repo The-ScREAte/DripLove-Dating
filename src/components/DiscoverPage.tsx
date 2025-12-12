@@ -181,7 +181,7 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, isPremium }: DiscoverPage
   const { toast } = useToast();
   const { sendMatchNotification, sendMultipleLikesNotification } = usePushNotifications(currentUser?.id);
   const { subscription, checkUsageLimit, refetchSubscription } = useSubscription(currentUser?.id);
-  const { preloadImages, preloadImage, getOptimizedUrl, isImageLoaded, imageStatus } = useImagePreloader({
+  const { preloadImages, getOptimizedUrl, isImageLoaded, isImageLoading, clearCache } = useImagePreloader({
     maxConcurrent: 4, // Cap concurrency to 4
     quality: 50,
     width: 280
@@ -2495,7 +2495,6 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, isPremium }: DiscoverPage
                 isDetailsAreaOnly={false}
                 getOptimizedUrl={getOptimizedUrl}
                 preCalculatedDistance={userDistances[currentMatch.id]}
-                imageStatus={imageStatus}
               />
             )}
           </div>
@@ -2549,7 +2548,6 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, isPremium }: DiscoverPage
                 isDetailsAreaOnly={true} // Render only details/info area
                 getOptimizedUrl={getOptimizedUrl}
                 preCalculatedDistance={userDistances[currentMatch.id]}
-                imageStatus={imageStatus}
               />
             )}
             </div>
