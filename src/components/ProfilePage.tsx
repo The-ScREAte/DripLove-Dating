@@ -19,7 +19,7 @@ import FunQuestionsSection from './profile/FunQuestionsSection';
 import InterestsSection from './profile/InterestsSection';
 import AdinkraSection from './profile/AdinkraSection';
 import ImageManagement from './profile/ImageManagement';
-import FaceVerificationSection from './profile/FaceVerificationSection';
+
 import AccountActions from './profile/AccountActions';
 import ProfileSummaryCard from './ProfileSummaryCard';
 import ReportButton from './ReportButton';
@@ -66,7 +66,7 @@ const ProfilePage = ({ currentUser, profile, onProfileUpdate, onLogout, onShowTe
   const showFunQuestionsSection = openSection === 'funQuestions';
   const showInterestsSection = openSection === 'interests';
   const showAdinkraSection = openSection === 'adinkra';
-  const showFaceVerificationSection = openSection === 'faceVerification';
+  
   const showAccountActionsSection = openSection === 'accountActions';
   
   const { toast } = useToast();
@@ -670,18 +670,9 @@ const ProfilePage = ({ currentUser, profile, onProfileUpdate, onLogout, onShowTe
             onToggle={() => toggleSection('photos')}
             className="mt-3"
           >
-            <ImageManagement currentUser={currentUser} />
-          </CollapsibleSection>
-          <CollapsibleSection
-            title={t('profile.faceVerification', 'Face Verification')}
-            isOpen={showFaceVerificationSection}
-            onToggle={() => toggleSection('faceVerification')}
-            className="mt-3"
-          >
-            <FaceVerificationSection 
-              currentUser={currentUser}
+            <ImageManagement 
+              currentUser={currentUser} 
               profile={profile}
-              isEditing={isEditing}
               onProfileUpdate={onProfileUpdate}
             />
           </CollapsibleSection>

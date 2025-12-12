@@ -9,17 +9,20 @@ import {
   AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription,
   AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger
 } from '@/components/ui/alert-dialog';
-import { Upload, Trash2, Shield, AlertTriangle, CheckCircle, RefreshCw } from 'lucide-react';
+import { Upload, Trash2, Shield, AlertTriangle, CheckCircle, RefreshCw, Camera } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import { moderateImage, saveModerationResult, ModerationResult } from '@/utils/photoModeration';
 import { compressImage } from '@/utils/imageCompression';
+import FaceVerification from '@/components/FaceVerification';
 
 interface ImageManagementProps {
   currentUser: {
     id: string;
     email?: string;
   } | null;
+  profile?: any;
+  onProfileUpdate?: () => void;
 }
 
 interface UserImage {
@@ -28,7 +31,7 @@ interface UserImage {
   moderation_status?: string;
 }
 
-const ImageManagement = ({ currentUser }: ImageManagementProps) => {
+const ImageManagement = ({ currentUser, profile, onProfileUpdate }: ImageManagementProps) => {
   const { t } = useTranslation();
   const [userImages, setUserImages] = useState<UserImage[]>([]);
   const [uploading, setUploading] = useState(false);
@@ -36,7 +39,66 @@ const ImageManagement = ({ currentUser }: ImageManagementProps) => {
   const [moderating, setModerating] = useState(false);
   const [moderationResult, setModerationResult] = useState<ModerationResult | null>(null);
   const [replacingImageUrl, setReplacingImageUrl] = useState<string | null>(null);
+  const [showFaceVerification, setShowFaceVerification] = useState(false);
+  const [isVerifying, setIsVerifying] = useState(false);
   const { toast } = useToast();
+
+  // Check if user is verified (has face_descriptor)
+  const isVerified = !!profile?.face_descriptor;
+
+  const handleFaceVerified = async (faceImageBase64: string) => {
+    setIsVerifying(true);
+    try {
+      const { data, error } = await supabase.functions.invoke("face-verify", {
+        body: {
+          action: "index_face",
+          front: faceImageBase64,
+          userId: currentUser?.id,
+        },
+      });
+
+      if (error) {
+        toast({
+          title: "Verification Failed",
+          description: "Could not complete face verification. Please try again.",
+          variant: "destructive",
+        });
+        return;
+      }
+
+      if (data?.success) {
+        const { error: updateError } = await supabase
+          .from('profiles')
+          .update({ 
+            face_descriptor: data.faceId || 'verified',
+            updated_at: new Date().toISOString()
+          })
+          .eq('id', currentUser?.id);
+
+        toast({
+          title: "Face Verified! ✓",
+          description: "Your identity has been confirmed.",
+        });
+
+        setShowFaceVerification(false);
+        onProfileUpdate?.();
+      } else {
+        toast({
+          title: "Verification Failed",
+          description: data?.error || "Could not verify your face. Please try again.",
+          variant: "destructive",
+        });
+      }
+    } catch (err) {
+      toast({
+        title: "Error",
+        description: "An unexpected error occurred. Please try again.",
+        variant: "destructive",
+      });
+    } finally {
+      setIsVerifying(false);
+    }
+  };
 
   const fetchUserImages = useCallback(async () => {
     if (!currentUser?.id) return;
@@ -474,19 +536,77 @@ const ImageManagement = ({ currentUser }: ImageManagementProps) => {
     <Card>
       <CardHeader>
         <CardTitle className="flex items-center justify-between">
-          <span>{t('profile.yourPhotos')} ({userImages.length}/7)</span>
-          <div className="flex items-center space-x-2">
-            <div className="relative group">
-              <Shield className="w-4 h-4 text-purple-600" />
-              <div className="absolute bottom-6 left-1/2 transform -translate-x-1/2 bg-gray-800 text-white text-xs rounded py-1 px-2 opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap">
-                {t('profile.aiContentModeration')}
-              </div>
-            </div>
-            <Upload className="w-5 h-5 text-pink-600" />
-          </div>
+          <span className="flex items-center gap-2">
+            {t('profile.photos')} ({userImages.length}/7)
+            {isVerified && (
+              <img
+                loading="lazy"
+                src="/images/verified.svg"
+                alt="Verified"
+                className="w-5 h-5"
+              />
+            )}
+          </span>
+          <Upload className="w-5 h-5 text-pink-600" />
         </CardTitle>
       </CardHeader>
       <CardContent>
+        {/* Face Verification Section - Only show if NOT verified */}
+        {!isVerified && !showFaceVerification && (
+          <div className="mb-4 bg-gradient-to-r from-purple-50 to-pink-50 border border-purple-200 rounded-lg p-3">
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 bg-purple-100 rounded-full flex items-center justify-center flex-shrink-0">
+                <Camera className="w-5 h-5 text-purple-600" />
+              </div>
+              <div className="flex-1">
+                <p className="font-medium text-purple-800 text-sm">Get Verified</p>
+                <p className="text-xs text-purple-600">Verified profiles get more matches!</p>
+              </div>
+              <Button
+                onClick={() => setShowFaceVerification(true)}
+                size="sm"
+                className="bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700 text-white text-xs px-3"
+              >
+                <Shield className="w-3 h-3 mr-1" />
+                Verify
+              </Button>
+            </div>
+          </div>
+        )}
+
+        {/* Face Verification Camera View */}
+        {showFaceVerification && (
+          <div className="mb-4 space-y-3">
+            <div className="flex items-center justify-between">
+              <p className="font-medium text-purple-800 text-sm flex items-center gap-2">
+                <Shield className="w-4 h-4" />
+                Face Verification
+              </p>
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => setShowFaceVerification(false)}
+                className="text-xs"
+              >
+                Cancel
+              </Button>
+            </div>
+            <FaceVerification 
+              onVerified={handleFaceVerified}
+              disabled={isVerifying}
+            />
+          </div>
+        )}
+
+        {/* Verified Badge Display */}
+        {isVerified && (
+          <div className="mb-4 bg-green-50 border border-green-200 rounded-lg p-3">
+            <div className="flex items-center gap-2">
+              <CheckCircle className="w-5 h-5 text-green-600" />
+              <span className="font-medium text-green-800 text-sm">Identity Verified</span>
+            </div>
+          </div>
+        )}
         {userImages.length < 7 && (
           <div className="mb-6">
             <Label htmlFor="image_upload" className="block mb-2">{t('profile.uploadImage')}</Label>
