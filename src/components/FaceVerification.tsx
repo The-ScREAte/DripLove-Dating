@@ -241,19 +241,27 @@ export default function FaceVerification({ onVerified }: FaceVerificationProps) 
         }
       } else if (data.code === 'DUPLICATE_FACE') {
         setVerificationResult('duplicate');
-        setErrorMessage("This face is already registered. Each person can only have one account.");
+        setErrorMessage("We found your face already registered with another account. If this is a mistake, please contact support.");
         setStep(3);
       } else if (data.code === 'NO_FACE') {
         setVerificationResult('error');
-        setErrorMessage("No human face detected. Please take clear photos of your face only.");
+        setErrorMessage("We couldn't detect a face in your photo. Please make sure your face is clearly visible and try again.");
         setStep(3);
       } else if (data.code === 'LOW_CONFIDENCE') {
         setVerificationResult('error');
-        setErrorMessage("Face not clear. Please ensure good lighting and face the camera directly.");
+        setErrorMessage("Your photo wasn't clear enough. Please find better lighting and look directly at the camera.");
+        setStep(3);
+      } else if (data.code === 'DETECTION_FAILED') {
+        setVerificationResult('error');
+        setErrorMessage("Something went wrong while checking your photo. Please try again.");
+        setStep(3);
+      } else if (data.code === 'INDEX_FAILED') {
+        setVerificationResult('error');
+        setErrorMessage("We couldn't save your face. Please try taking another photo.");
         setStep(3);
       } else {
         setVerificationResult('error');
-        setErrorMessage(data.error || "Verification failed. Please try again.");
+        setErrorMessage(data.error || "Something went wrong. Please try again.");
         setStep(3);
       }
     } catch (error) {

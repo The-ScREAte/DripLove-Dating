@@ -146,9 +146,67 @@ serve(async (req: Request) => {
   }
 
   try {
-    console.log('🔍 Face verification started');
+    const body = await req.json();
     
-    const { front, side, userId } = await req.json();
+    // Handle delete/clear collection request
+    if (body.action === 'clear_collection') {
+      console.log('🗑️ Clearing face collection...');
+      try {
+        // List all faces in collection
+        const listResult = await rekognitionRequest('RekognitionService.ListFaces', {
+          CollectionId: COLLECTION_ID,
+          MaxResults: 100,
+        }, ['ResourceNotFoundException']);
+        
+        if (listResult.__allowedError) {
+          return new Response(JSON.stringify({ 
+            success: true, 
+            message: 'Collection does not exist - nothing to clear' 
+          }), {
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+          });
+        }
+        
+        if (listResult.Faces && listResult.Faces.length > 0) {
+          const faceIds = listResult.Faces.map((f: any) => f.FaceId);
+          console.log(`Found ${faceIds.length} faces to delete`);
+          
+          await rekognitionRequest('RekognitionService.DeleteFaces', {
+            CollectionId: COLLECTION_ID,
+            FaceIds: faceIds,
+          });
+          
+          console.log('✅ Deleted all faces');
+          return new Response(JSON.stringify({ 
+            success: true, 
+            message: `Deleted ${faceIds.length} faces from collection` 
+          }), {
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+          });
+        } else {
+          return new Response(JSON.stringify({ 
+            success: true, 
+            message: 'Collection is already empty' 
+          }), {
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+          });
+        }
+      } catch (clearError: any) {
+        console.error('Clear collection error:', clearError);
+        return new Response(JSON.stringify({ 
+          success: false, 
+          error: 'Failed to clear collection' 
+        }), {
+          status: 500,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+        });
+      }
+    }
+
+    // Regular face verification
+    const { front, side, userId } = body;
+    
+    console.log('🔍 Face verification started');
     
     if (!front) {
       return new Response(JSON.stringify({
