@@ -59,7 +59,7 @@ const Index = () => {
   
   const [currentView, setCurrentView] = useState<'welcome' | 'login' | 'register' | 'profile-completion' | 'terms-acceptance' | 'app' | 'admin' | 'about' | 'terms' | 'privacy'>(getInitialView());
   const [user, setUser] = useState<any>(null);
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(false);
   const [showAuthDialog, setShowAuthDialog] = useState(false);
   const [isLoginMode, setIsLoginMode] = useState(true);
   const { toast } = useToast();
@@ -377,9 +377,6 @@ const Index = () => {
     setCurrentView('app');
   };
 
-  if (loading) {
-    return null;
-  }
   
   if (currentView === 'admin') {
     return (
