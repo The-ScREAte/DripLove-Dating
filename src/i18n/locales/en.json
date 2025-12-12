@@ -482,7 +482,7 @@
       "unlimitedSwipes": {
         "name": "Daily Swipes",
         "free": "16 per day",
-        "premium": "55 per day"
+        "premium": "unlimitted"
       },
       "reverseDislikes": {
         "name": "Reverse Dislikes",
