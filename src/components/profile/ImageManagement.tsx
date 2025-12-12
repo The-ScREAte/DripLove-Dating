@@ -668,12 +668,28 @@ const ImageManagement = ({ currentUser }: ImageManagementProps) => {
         <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-4">
           {userImages.map((userImage, index) => (
             <div key={userImage.image_url} className="relative group">
-              <img src={userImage.image_url} alt={`User Image ${index + 1}`} className="w-full h-28 sm:h-36 object-cover rounded-lg shadow-sm" />
+              <img 
+                src={userImage.image_url} 
+                alt={`User Image ${index + 1}`} 
+                className="w-full h-28 sm:h-36 object-cover rounded-lg shadow-sm bg-gray-100"
+                onError={(e) => {
+                  // Retry loading the image once with a cache-busting query param
+                  const target = e.target as HTMLImageElement;
+                  if (!target.dataset.retried) {
+                    target.dataset.retried = 'true';
+                    const separator = target.src.includes('?') ? '&' : '?';
+                    target.src = `${userImage.image_url}${separator}t=${Date.now()}`;
+                  }
+                }}
+              />
               
               {/* Pending approval indicator */}
               {userImage.is_approved === false && (
-                <div className="absolute top-2 left-2 bg-orange-500 text-white text-xs px-2 py-1 rounded-full flex items-center">
-                  🔒 Pending Review, Max 24hrs
+                <div className="absolute inset-0 bg-black/40 rounded-lg flex items-center justify-center">
+                  <div className="bg-orange-500/90 backdrop-blur-sm text-white text-[10px] px-2 py-1 rounded-full flex items-center gap-1 shadow-lg">
+                    <Shield className="w-3 h-3" />
+                    <span>Reviewing</span>
+                  </div>
                 </div>
               )}
               

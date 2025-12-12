@@ -26,6 +26,7 @@ interface ImageUpload {
   moderationResult?: ModerationResult;
   status: 'uploading' | 'moderating' | 'approved' | 'pending' | 'rejected';
   hash?: string; // Store hash for duplicate detection
+  faceMatched?: boolean; // Whether this image matches the verified face
 }
 
 const ProfileCompletionPage = () => {
@@ -275,16 +276,49 @@ const ProfileCompletionPage = () => {
       try {
         const moderationResult = await moderateImage(compressedFile);
         
+        let imageStatus: 'approved' | 'pending' | 'rejected' = !moderationResult.isApproved 
+          ? 'rejected' 
+          : moderationResult.details?.requiresReview 
+            ? 'pending' 
+            : 'approved';
+        
+        // If image passed moderation and face verification is done, check if face matches
+        let faceMatched = false;
+        if (imageStatus !== 'rejected' && faceImageBase64) {
+          try {
+            // Convert the compressed file to base64
+            const reader = new FileReader();
+            const imageBase64 = await new Promise<string>((resolve) => {
+              reader.onload = () => resolve(reader.result as string);
+              reader.readAsDataURL(compressedFile);
+            });
+            
+            // Compare with verified face
+            const { data: compareResult } = await supabase.functions.invoke('face-verify', {
+              body: {
+                action: 'compare_faces',
+                sourceImage: faceImageBase64,
+                targetImages: [imageBase64]
+              }
+            });
+            
+            if (compareResult?.matchFound) {
+              faceMatched = true;
+              console.log('Face match found in uploaded image');
+            }
+          } catch (faceError) {
+            console.log('Face comparison skipped:', faceError);
+            // If comparison fails, we don't block - just don't mark as matched
+          }
+        }
+        
         setImages(prev => prev.map(img => 
           img.preview === preview 
             ? { 
                 ...img, 
                 moderationResult,
-                status: !moderationResult.isApproved 
-                  ? 'rejected' 
-                  : moderationResult.details?.requiresReview 
-                    ? 'pending' 
-                    : 'approved'
+                status: imageStatus,
+                faceMatched
               }
             : img
         ));
@@ -302,9 +336,10 @@ const ProfileCompletionPage = () => {
             variant: "default"
           });
         } else {
+          const faceMessage = faceMatched ? " (matches your verified face)" : "";
           toast({
             title: t('profileCompletion.imageApproved'),
-            description: t('profileCompletion.imageLooksGood'),
+            description: t('profileCompletion.imageLooksGood') + faceMessage,
             variant: "default"
           });
         }
@@ -348,13 +383,13 @@ const ProfileCompletionPage = () => {
         );
       case 'approved':
         return (
-          <div className="absolute top-2 left-2 bg-green-500 text-white p-1 rounded-full">
-            <CheckCircle className="w-4 h-4" />
+          <div className="absolute bottom-2 left-2 bg-green-500/90 text-white p-1 rounded-full shadow-sm">
+            <CheckCircle className="w-3 h-3" />
           </div>
         );
       case 'pending':
         return (
-          <div className="absolute top-2 left-2 bg-orange-500 text-white text-xs px-2 py-1 rounded-full">
+          <div className="absolute bottom-2 left-2 bg-orange-500/90 text-white text-[10px] px-1.5 py-0.5 rounded-full shadow-sm">
             {t('profileCompletion.pending')}
           </div>
         );
@@ -463,6 +498,19 @@ const ProfileCompletionPage = () => {
       validationErrors.images = t('profileCompletion.errors.reuploadPhotos');
       // Clear images that don't have files and ask user to re-upload
       setImages(prev => prev.filter(img => img.file !== null));
+    }
+
+    // Check that at least one image matches the verified face
+    if (faceVerified && faceImageBase64) {
+      const faceMatchedImages = images.filter(img => img.faceMatched === true);
+      if (faceMatchedImages.length === 0 && approvedImages.length >= 2) {
+        validationErrors.images = 'At least one photo must clearly show your face (matching your verification).';
+        toast({
+          title: "Face Match Required",
+          description: "None of your photos match your verified face. Please upload at least one photo of yourself.",
+          variant: "destructive"
+        });
+      }
     }
 
     // Age validation (must be 18+)
@@ -952,6 +1000,16 @@ const ProfileCompletionPage = () => {
                     <h3 className="text-lg font-semibold text-gray-800">{t('profileCompletion.profilePhotos')} *</h3>
                     <p className="text-sm text-gray-600">{t('profileCompletion.uploadAtLeastTwoPhotos')}</p>
                     
+                    {/* Face match requirement notice */}
+                    {faceVerified && (
+                      <div className="flex items-start gap-2 p-2 bg-purple-50 rounded-lg border border-purple-100">
+                        <Shield className="w-4 h-4 text-purple-600 mt-0.5 flex-shrink-0" />
+                        <p className="text-xs text-purple-800">
+                          <span className="font-medium">Important:</span> At least one photo must clearly show your face (matching your verification).
+                        </p>
+                      </div>
+                    )}
+                    
                     <div className="border-2 border-dashed border-gray-300 rounded-lg p-6 text-center hover:border-pink-400 transition-colors">
                       <Input
                         type="file"
@@ -986,6 +1044,13 @@ const ProfileCompletionPage = () => {
                             >
                               ×
                             </Button>
+                            {/* Face match indicator */}
+                            {image.faceMatched && (
+                              <div className="absolute top-2 left-2 bg-green-500/90 text-white text-[10px] px-1.5 py-0.5 rounded-full flex items-center gap-0.5">
+                                <CheckCircle className="w-2.5 h-2.5" />
+                                <span>You</span>
+                              </div>
+                            )}
                             {renderImageStatus(image)}
                           </div>
                         ))}
