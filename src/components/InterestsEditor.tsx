@@ -12,11 +12,30 @@ interface InterestsEditorProps {
 }
 
 const PREDEFINED_INTERESTS = [
-  'Travel', 'Photography', 'Cooking', 'Reading', 'Music', 'Movies', 'Sports',
-  'Fitness', 'Yoga', 'Dancing', 'Art', 'Gaming', 'Technology', 'Nature',
-  'Hiking', 'Swimming', 'Running', 'Cycling', 'Meditation', 'Writing',
-  'Fashion', 'Wine', 'Coffee', 'Animals', 'Volunteering', 'Learning',
-  'Adventure', 'Comedy', 'Theatre', 'Concerts'
+  // Travel & Adventure
+  'Travel', 'Adventure', 'Road Trips', 'Backpacking', 'Beach Life', 'Mountains', 'Camping', 'Exploring',
+  // Arts & Creative
+  'Photography', 'Art', 'Music', 'Dancing', 'Singing', 'Writing', 'Poetry', 'Theatre', 'Film Making', 'Painting', 'Crafts',
+  // Sports & Fitness
+  'Sports', 'Fitness', 'Yoga', 'Gym', 'Running', 'Swimming', 'Cycling', 'Hiking', 'Basketball', 'Football', 'Tennis', 'Golf', 'Martial Arts', 'CrossFit',
+  // Food & Drink
+  'Cooking', 'Baking', 'Foodie', 'Wine', 'Coffee', 'Brunch', 'Fine Dining', 'Street Food', 'BBQ', 'Cocktails',
+  // Entertainment
+  'Movies', 'Concerts', 'Live Music', 'Comedy', 'Netflix', 'Anime', 'K-Drama', 'Podcasts', 'Board Games', 'Video Games', 'Gaming',
+  // Lifestyle
+  'Fashion', 'Shopping', 'Skincare', 'Self-Care', 'Meditation', 'Spirituality', 'Astrology', 'Tarot',
+  // Intellectual
+  'Reading', 'Books', 'Learning', 'Philosophy', 'History', 'Science', 'Politics', 'Investing', 'Crypto',
+  // Social
+  'Parties', 'Nightlife', 'Clubbing', 'Networking', 'Volunteering', 'Community Service',
+  // Animals & Nature
+  'Animals', 'Dogs', 'Cats', 'Nature', 'Gardening', 'Plants', 'Bird Watching', 'Sustainability',
+  // Tech & Innovation
+  'Technology', 'Startups', 'AI', 'Coding', 'Design',
+  // Culture
+  'Languages', 'Culture', 'Museums', 'Architecture', 'Vintage', 'Thrifting',
+  // Wellness
+  'Wellness', 'Mental Health', 'Mindfulness', 'Journaling', 'Early Mornings', 'Late Nights'
 ];
 
 const InterestsEditor = ({ interests, onInterestsChange, disabled = false }: InterestsEditorProps) => {

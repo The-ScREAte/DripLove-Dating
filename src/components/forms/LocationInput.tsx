@@ -96,8 +96,11 @@ const LocationInput = ({
   }, []);
 
   // Check if user is outside their profile country when editing profile
+  // For profile edit mode, country is ALWAYS locked unless user is detected outside their country
   useEffect(() => {
     if (isProfileEdit && profileCountryCode && countries.length > 0 && !outsideCountryStatus.checked) {
+      // Lock country immediately for profile edit mode
+      setIsCountryLocked(true);
       checkUserLocation();
     }
   }, [isProfileEdit, profileCountryCode, countries]);
@@ -475,8 +478,9 @@ const LocationInput = ({
             </span>
           )}
           {isProfileEdit && (
-            <span className="text-muted-foreground" aria-label="Location locked">
+            <span className="flex items-center gap-1 text-xs text-muted-foreground" aria-label="Location locked">
               <Lock className="w-3 h-3" />
+              <span className="text-[10px]">Auto-detect only</span>
             </span>
           )}
         </Label>

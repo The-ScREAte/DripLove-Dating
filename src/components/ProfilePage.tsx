@@ -480,9 +480,10 @@ const ProfilePage = ({ currentUser, profile, onProfileUpdate, onLogout, onShowTe
   // --- END: Comprehensive Profile Progress Bar ---
 
   if (showPremiumUpgrade) {
-    // Match LikedMePage: pass preselectedPlan="premium" for correct upgrade modal
     return (
-      <PremiumUpgrade currentUser={currentUser} onClose={() => setShowPremiumUpgrade(false)} preselectedPlan="premium" />
+      <div className="h-full w-full overflow-y-auto">
+        <PremiumUpgrade currentUser={currentUser} onClose={() => setShowPremiumUpgrade(false)} preselectedPlan="premium" />
+      </div>
     );
   }
 

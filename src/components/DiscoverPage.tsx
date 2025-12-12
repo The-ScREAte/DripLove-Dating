@@ -2087,15 +2087,8 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, isPremium }: DiscoverPage
 
   if (showPremiumUpgrade) {
     return (
-      <div className="h-full flex flex-col items-center justify-center">
-        <div className="w-full max-w-lg">
-          <PremiumUpgrade currentUser={currentUser} onClose={() => setShowPremiumUpgrade(false)} />
-          <div className="flex justify-center mt-4">
-            <Button variant="outline" onClick={() => setShowPremiumUpgrade(false)}>
-              Cancel
-            </Button>
-          </div>
-        </div>
+      <div className="h-full w-full overflow-y-auto">
+        <PremiumUpgrade currentUser={currentUser} onClose={() => setShowPremiumUpgrade(false)} preselectedPlan="premium" />
       </div>
     );
   }

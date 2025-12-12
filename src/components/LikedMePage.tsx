@@ -1351,7 +1351,11 @@ const LikedMePage = ({ currentUser, isPremium = false }: LikedMePageProps) => {
 
   // ⭐ All early returns MUST be after all hooks
   if (showPremiumUpgrade) {
-    return <PremiumUpgrade currentUser={currentUser} onClose={() => setShowPremiumUpgrade(false)} preselectedPlan="premium" />;
+    return (
+      <div className="h-full w-full overflow-y-auto">
+        <PremiumUpgrade currentUser={currentUser} onClose={() => setShowPremiumUpgrade(false)} preselectedPlan="premium" />
+      </div>
+    );
   }
 
   if (loading) {

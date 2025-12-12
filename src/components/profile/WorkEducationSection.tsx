@@ -100,12 +100,20 @@ const WorkEducationSection = ({ editedProfile, isEditing, onInputChange }: WorkE
                 <SelectValue placeholder={t('profile.selectEducation')} />
               </SelectTrigger>
               <SelectContent>
+                <SelectItem value="No Formal Education">No Formal Education</SelectItem>
+                <SelectItem value="Primary School">Primary School</SelectItem>
+                <SelectItem value="Junior High School">Junior High / Middle School</SelectItem>
                 <SelectItem value="High School">{t('profile.educationOptions.highSchool')}</SelectItem>
+                <SelectItem value="Vocational/Trade School">Vocational / Trade School</SelectItem>
                 <SelectItem value="Some College">{t('profile.educationOptions.someCollege')}</SelectItem>
                 <SelectItem value="Associate Degree">{t('profile.educationOptions.associate')}</SelectItem>
                 <SelectItem value="Bachelor's Degree">{t('profile.educationOptions.bachelors')}</SelectItem>
+                <SelectItem value="Postgraduate Diploma">Postgraduate Diploma</SelectItem>
                 <SelectItem value="Master's Degree">{t('profile.educationOptions.masters')}</SelectItem>
                 <SelectItem value="Doctorate">{t('profile.educationOptions.doctorate')}</SelectItem>
+                <SelectItem value="Professional Degree">Professional Degree (MD, JD, etc.)</SelectItem>
+                <SelectItem value="Self-Taught">Self-Taught / Autodidact</SelectItem>
+                <SelectItem value="Currently Studying">Currently Studying</SelectItem>
                 <SelectItem value="Other">{t('profile.educationOptions.other')}</SelectItem>
               </SelectContent>
             </Select>
