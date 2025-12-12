@@ -41,7 +41,7 @@ import { useSubscription } from '@/hooks/useSubscription';
 import { useImagePreloader } from '@/hooks/useImagePreloader';
 import { calculateDistance } from '@/constants/locationData';
 import { checkAndTriggerRefill } from '@/utils/performanceOptimizer';
-import { debounce, optimizeImageUrl, createPagination, userDataCache } from '@/utils/performanceOptimizer';
+import { debounce, createPagination, userDataCache } from '@/utils/performanceOptimizer';
 import { locationService } from '@/services/locationService';
 import { calculateProfileCompletion, getTodaySwipeCount, checkSwipeRestrictions } from '@/utils/profileCompletion';
 import { enqueue } from '@/lib/queue';
@@ -420,23 +420,6 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, isPremium }: DiscoverPage
     [currentUser?.preference, getGenderFilter]
   );
 
-  const calculateAge = useCallback((dateOfBirth: string) => {
-    const today = new Date();
-    const birthDate = new Date(dateOfBirth);
-    let age = today.getFullYear() - birthDate.getFullYear();
-    const monthDiff = today.getMonth() - birthDate.getMonth();
-
-    if (monthDiff < 0 || (monthDiff === 0 && today.getDate() < birthDate.getDate())) {
-      age--;
-    }
-
-    return age;
-  }, []);
-
-
-
-
-
   const shouldReshuffle = useCallback(() => {
     const now = Date.now();
     const tenMinutes = 10 * 60 * 1000; // 10 minutes in milliseconds
@@ -577,21 +560,21 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, isPremium }: DiscoverPage
         .from('passes')
         .select('passed_id, passed_at')
         .match({ passer_id: userId })
-        .gte('passed_at', new Date(Date.now() - 720 * 60 * 60 * 1000).toISOString()) // 30 days
+        .gte('passed_at', new Date(Date.now() - 192 * 60 * 60 * 1000).toISOString()) // 8 days
     ]);
 
     const likedUserIds = likedUsers?.map(like => like.liked_id) || [];
     const blockedUserIds = blockedUsers?.flatMap(block => [block.blocked_id, block.blocker_id]) || [];
     const passedUserIds = recentPasses?.map(p => p.passed_id) || [];
-    // ⭐ CRITICAL: Exclude locally swiped IDs, filtering out passed profiles older than 6 days
+    // ⭐ CRITICAL: Exclude locally swiped IDs, filtering out passed profiles older than 8 days
     const now = Date.now();
-    const sixDaysMs = 6 * 24 * 60 * 60 * 1000;
+    const eightDaysMs = 8 * 24 * 60 * 60 * 1000;
     const locallySwipedIds = Array.from(locallySwipedProfileIds.current.entries())
       .filter(([_, data]) => {
         // Always exclude liked profiles
         if (data.action === 'like') return true;
-        // Only exclude passed profiles if less than 6 days old
-        return (now - data.timestamp) < sixDaysMs;
+        // Only exclude passed profiles if less than 8 days old
+        return (now - data.timestamp) < eightDaysMs;
       })
       .map(([id, _]) => id);
     const excludedIds = [...likedUserIds, ...blockedUserIds, ...passedUserIds, ...locallySwipedIds, userId];
@@ -635,7 +618,7 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, isPremium }: DiscoverPage
         .in('gender', allowedGenders)
         .eq('account_status', 'active')
         .eq('is_admin', false)
-        .limit(35);
+        .limit(20);
 
       if (error) throw error;
       filteredProfiles = profiles || [];
@@ -655,7 +638,7 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, isPremium }: DiscoverPage
         .eq('account_status', 'active')
         .eq('is_admin', false)
         .eq('country', currentUserData?.country || 'Ghana')
-        .limit(25);
+        .limit(15);
 
       if (error) throw error;
       filteredProfiles = profiles || [];
@@ -679,7 +662,7 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, isPremium }: DiscoverPage
         .in('gender', allowedGenders)
         .eq('account_status', 'active')
         .eq('is_admin', false)
-        .limit(100); // Increased limit to get more profiles from unlocked countries
+        .limit(20); // Optimized: smaller initial batch, auto-reload will fetch more as needed
 
       if (!unlockedError && unlockedProfiles && unlockedProfiles.length > 0) {
         // ⭐ OPTIMIZED: Add distance info inline while spreading (10ms saved)
@@ -772,26 +755,56 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, isPremium }: DiscoverPage
       }
     }
 
-    // ⭐ TINDER-STYLE: Load FIRST profile completely, then start NEXT profile async
     const imageMap: { [key: string]: string[] } = {};
     if (shuffled.length > 0) {
-      // ⭐ RULE 1: Load ALL images for FIRST profile immediately (await)
-      const firstId = shuffled[0].id;
-      const firstImages = await loadAllImagesForProfile(firstId);
-      
-      if (firstImages && firstImages.length > 0) {
-        imageMap[firstId] = firstImages;
-      }
+      // Take first 6 profiles (or fewer if less exist)
+      const firstSix = shuffled.slice(0, 6);
+      const firstSixIds = firstSix.map(p => p.id);
 
-      // ⭐ RULE 2: Start preloading NEXT profile but do NOT wait (async fire-and-forget)
-      const secondId = shuffled[1]?.id;
-      if (secondId) {
-        loadAllImagesForProfile(secondId).then(imgs => {
-          if (imgs) {
-            setUserImages(prev => ({ ...prev, [secondId]: imgs }));
+      // Get ALL approved images for the first 6 profiles
+      const { data: imageRows, error: imgError } = await supabase
+        .from('user_images')
+        .select('user_id, image_url, image_order')
+        .in('user_id', firstSixIds)
+        .eq('is_approved', true)
+        .order('user_id', { ascending: true })
+        .order('image_order', { ascending: true });
+
+      if (!imgError && imageRows) {
+        // Group by user_id
+        const byUser: Record<string, string[]> = {};
+        for (const row of imageRows) {
+          if (!byUser[row.user_id]) byUser[row.user_id] = [];
+          byUser[row.user_id].push(row.image_url);
+        }
+
+        // Apply limits:
+        // 1st profile: 3 images
+        // 2nd profile: 2 images
+        // 3rd–6th: 1 image each
+        firstSix.forEach((profile, index) => {
+          const imgs = byUser[profile.id] || [];
+          if (imgs.length === 0) return;
+
+          let maxCount = 1;
+          if (index === 0) maxCount = 3;
+          else if (index === 1) maxCount = 2;
+
+          imageMap[profile.id] = imgs.slice(0, maxCount);
+
+          // For the first two, start loading the FULL set in background
+          if (index <= 1) {
+            loadAllImagesForProfile(profile.id).then(fullImgs => {
+              if (fullImgs && fullImgs.length > 0) {
+                setUserImages(prev => ({ ...prev, [profile.id]: fullImgs }));
+              }
+            });
           }
         });
       }
+
+      // If there were fewer than 6 profiles or any without images, it's fine.
+      // The centralized preloader + loadAllImagesForProfile will keep loading the rest as user swipes.
     }
 
     return {
@@ -800,7 +813,7 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, isPremium }: DiscoverPage
       distances: distanceMap,
       index: startIndex
     };
-  }, [loadAllImagesForProfile]);
+  }, [loadAllImagesForProfile, isPremium]);
 
   // ⭐ BATCH LANGUAGE FETCHING - Load all languages at once to avoid per-card DB calls
   const batchFetchLanguages = useCallback(async (profileIds: string[]) => {
@@ -881,94 +894,12 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, isPremium }: DiscoverPage
           batchFetchLanguages(profileIds);
         }
 
-        // Immediately load images for current profile and preload next ones
-        if (matches.length > 0) {
-          const currentProfile = matches[index];
-          if (currentProfile && !images[currentProfile.id]) {
-            loadFullImages(currentProfile.id);
-          }
-          
-          // Preload next profiles immediately and aggressively
-          preloadNextProfileImages(matches, images, index + 1);
-          
-          // Only preload current profile for maximum performance
-          if (matches.length > 0) {
-            const currentProfile = matches[index];
-            if (currentProfile && !images[currentProfile.id]) {
-              loadFullImages(currentProfile.id);
-            }
-          }
-        }
+        // ⭐ REMOVED: Manual preload calls - centralized useEffect (3B) handles all preloading
+        // The new useEffect automatically preloads based on currentIndex changes
 
-        // Start continuous loading immediately after initial load
-        setTimeout(() => {
-          loadMoreMatches(); // Load first batch of additional profiles
-
-          // ⭐ ANDROID OPTIMIZATION: Visibility-aware chained loader with longer interval
-          const continuousLoaderActive = { running: true };
-          const CONTINUOUS_INTERVAL_MS = 45000; // ⭐ ANDROID FIX: Increased from 30s to 45s
-          const continuousLoaderTimerRef = { current: null as any };
-          const currentFetchController = { current: null as AbortController | null };
-
-          const stopLoader = () => {
-            continuousLoaderActive.running = false;
-            if (continuousLoaderTimerRef.current) {
-              clearTimeout(continuousLoaderTimerRef.current);
-              continuousLoaderTimerRef.current = null;
-            }
-            if (currentFetchController.current) {
-              currentFetchController.current.abort();
-              currentFetchController.current = null;
-            }
-          };
-
-          const scheduleNext = (delay = CONTINUOUS_INTERVAL_MS) => {
-            if (!continuousLoaderActive.running) return;
-            continuousLoaderTimerRef.current = setTimeout(runOnce, delay);
-          };
-
-          const runOnce = async () => {
-            if (!continuousLoaderActive.running) return;
-
-            // Pause if tab is hidden
-            if (typeof document !== 'undefined' && document.hidden) {
-              scheduleNext(CONTINUOUS_INTERVAL_MS);
-              return;
-            }
-
-            try {
-              if (!backgroundFetchingRef.current && !isLoadingMore) {
-                const remainingProfiles = potentialMatches.length - currentIndex;
-                if (remainingProfiles < 10) {
-                  // Use AbortController to allow cancellation
-                  currentFetchController.current = new AbortController();
-                  const signal = currentFetchController.current.signal;
-                  // If loadMoreMatches supports abort via signal, pass it; otherwise, just use fetchPotentialMatchesInBackground
-                  // We'll call fetchPotentialMatchesInBackground which internally uses supabase (no signal), so we just guard with backgroundFetchingRef
-                  await fetchPotentialMatchesInBackground();
-                  // Trim cache if needed after refresh
-                  trimDiscoverCacheIfNeeded();
-                }
-              }
-            } catch (err) {
-              // ignore background errors
-            } finally {
-              if (currentFetchController.current) {
-                currentFetchController.current = null;
-              }
-              // schedule next run
-              scheduleNext();
-            }
-          };
-
-          // Start the loop
-          scheduleNext(CONTINUOUS_INTERVAL_MS);
-
-          // Expose stop function for cleanup
-          if (typeof window !== 'undefined') {
-            (window as any).stopDiscoverContinuousLoader = stopLoader;
-          }
-        }, 2000); // Start 2 seconds after initial load
+        // ⭐ OPTIMIZED: Removed 45s continuous loader AND initial loadMoreMatches call
+        // The useEffect auto-reload is the SINGLE SOURCE OF TRUTH - it will trigger when needed
+        // No need for extra calls here - keeps logic simple and centralized
       }
     } catch (error) {
   // ...removed log...
@@ -982,21 +913,6 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, isPremium }: DiscoverPage
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [currentUser, allowedGenders, toast]);
-
-
-  // Enhanced image preloading with actual image objects
-  const preloadUserImages = useCallback(async (imageUrls: string[], userId: string) => {
-    if (preloadedImages[userId]?.length > 0) return; // Already preloaded
-    // Rely on the shared preloader to fetch and dedupe actual image loads
-    try {
-      const optimized = imageUrls.map(u => u.includes('supabase') ? `${u}?width=800&quality=85&format=webp` : u);
-  // Preload only the primary image for this profile
-  if (optimized[0]) preloadImage(optimized[0]);
-      setPreloadedImages(prev => ({ ...prev, [userId]: optimized }));
-    } catch (error) {
-      // ignore individual preload failure
-    }
-  }, [preloadedImages]);
 
   // ⭐ PARALLEL IMAGE PRELOADING - Load images in background without blocking
   // ⭐ ANDROID OPTIMIZATION: Reduced batch size for Android (4 vs 10 for iOS)
@@ -1097,15 +1013,15 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, isPremium }: DiscoverPage
     // to prevent them from reappearing in new fetches
     // locallySwipedProfileIds.current.clear(); // REMOVED
     
-    // ⭐ Clean up sessionStorage: Remove passed profiles older than 6 days
+    // ⭐ Clean up sessionStorage: Remove passed profiles older than 8 days
     // Keep liked profiles permanently (they won't show until unmatched)
     const now = Date.now();
-    const sixDaysMs = 6 * 24 * 60 * 60 * 1000;
+    const eightDaysMs = 8 * 24 * 60 * 60 * 1000;
     
     let needsUpdate = false;
     for (const [id, data] of locallySwipedProfileIds.current.entries()) {
-      // Remove passed profiles older than 6 days
-      if (data.action === 'pass' && (now - data.timestamp) > sixDaysMs) {
+      // Remove passed profiles older than 8 days
+      if (data.action === 'pass' && (now - data.timestamp) > eightDaysMs) {
         locallySwipedProfileIds.current.delete(id);
         needsUpdate = true;
       }
@@ -1146,15 +1062,11 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, isPremium }: DiscoverPage
     fetchReverseUsage();
   }, [currentUser?.id]); // Removed adsLoaded to prevent double-fetching
 
-  // Cleanup continuous loading interval on unmount
+  // Cleanup on unmount (minimal now that continuous loader is removed)
   useEffect(() => {
     return () => {
-      // Stop any continuous loader we started
+      // Cleanup any remaining global references
       try {
-        if (typeof window !== 'undefined' && (window as any).stopDiscoverContinuousLoader) {
-          (window as any).stopDiscoverContinuousLoader();
-          (window as any).stopDiscoverContinuousLoader = null;
-        }
         if (typeof window !== 'undefined' && (window as any).continuousLoadingInterval) {
           clearInterval((window as any).continuousLoadingInterval);
           (window as any).continuousLoadingInterval = null;
@@ -1168,23 +1080,9 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, isPremium }: DiscoverPage
   useEffect(() => {
     setImageIndex(0);
     
-    // Load images for current match immediately
-    const currentMatch = potentialMatches[currentIndex];
-    if (currentMatch) {
-      // Load current profile images immediately (even if already loaded)
-      loadFullImages(currentMatch.id);
-      
-      // Only load next 1 profile for maximum performance
-      const nextMatch = potentialMatches[currentIndex + 1];
-      if (nextMatch) {
-        loadFullImages(nextMatch.id);
-      }
-    }
-    
-    // Ultra-aggressive preloading: preload many profiles ahead
-    const realMatches = potentialMatches.filter((m): m is PotentialMatch => !isAd(m));
-    preloadNextProfileImages(realMatches, userImages, currentIndex + 1);
-  }, [currentIndex, potentialMatches, userImages, preloadNextProfileImages, loadFullImages]);
+    // ⭐ REMOVED: Manual image loading - centralized preload useEffect (3B) handles everything
+    // No need to manually call loadFullImages here - the centralized effect preloads upcoming profiles
+  }, [currentIndex, potentialMatches]);
 
   // Dynamic content height measurement
   useEffect(() => {
@@ -1262,7 +1160,11 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, isPremium }: DiscoverPage
     const deltaX = endX - startXRef.current;
     const deltaY = Math.abs(endY - startYRef.current);
     const screenWidth = window.innerWidth;
-  const minSwipeDistance = screenWidth * 0.65; // Increased to 0.65 for longer swipes
+    
+    // ⭐ 4A: Symmetrical swipe thresholds for mobile
+    // 35% of screen width feels natural and consistent
+    const SWIPE_RATIO = 0.35;
+    const minSwipeDistance = screenWidth * SWIPE_RATIO;
 
     // Reset visual smear (flush any pending rAF)
     latestDeltaRef.current = 0;
@@ -1327,7 +1229,11 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, isPremium }: DiscoverPage
       // compute final deltas
       const deltaX = ev.clientX - startXRef.current;
       const deltaY = Math.abs(ev.clientY - startYRef.current);
-      const minSwipeDistance = 70; // Increased from 50 to 70 for more deliberate mouse swipes
+      
+      // ⭐ 4A: Symmetrical swipe thresholds for desktop
+      // Minimum 80px feels intentional without being too sensitive
+      const SWIPE_MIN_DESKTOP = 80;
+      const minSwipeDistance = SWIPE_MIN_DESKTOP;
       // Reset visual smear (flush any pending rAF)
       latestDeltaRef.current = 0;
       if (rafScheduledRef.current) rafScheduledRef.current = false;
@@ -1375,13 +1281,13 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, isPremium }: DiscoverPage
       
       // Get additional profiles (exclude current ones AND ones we've already seen)
       const currentIds = potentialMatches.map(match => match.id);
-      // CRITICAL: Include locally swiped profiles, filtering out passed profiles older than 6 days
+      // CRITICAL: Include locally swiped profiles, filtering out passed profiles older than 8 days
       const now = Date.now();
-      const sixDaysMs = 6 * 24 * 60 * 60 * 1000;
+      const eightDaysMs = 8 * 24 * 60 * 60 * 1000;
       const locallySwipedIds = Array.from(locallySwipedProfileIds.current.entries())
         .filter(([_, data]) => {
           if (data.action === 'like') return true;
-          return (now - data.timestamp) < sixDaysMs;
+          return (now - data.timestamp) < eightDaysMs;
         })
         .map(([id, _]) => id);
       const excludedIds = [...currentIds, ...locallySwipedIds, currentUser.id];
@@ -1404,7 +1310,7 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, isPremium }: DiscoverPage
           .from('passes')
           .select('passed_id, passed_at')
           .match({ passer_id: currentUser.id })
-          .gte('passed_at', new Date(Date.now() - 720 * 60 * 60 * 1000).toISOString()) // 30 days - same as main fetch
+          .gte('passed_at', new Date(Date.now() - 192 * 60 * 60 * 1000).toISOString()) // 8 days - same as main fetch
       ]);
 
       const likedUserIds = likedUsers?.map(like => like.liked_id) || [];
@@ -1530,28 +1436,39 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, isPremium }: DiscoverPage
   }, [currentUser, allowedGenders, potentialMatches, calculateAge, isLoadingMore, userImages, preloadNextProfileImages, injectAds]);
 
   // ⭐ AUTO-REFILL ON SWIPE - Load more profiles as user swipes
-  // Triggers when 5 profiles remaining to ensure continuous flow
+  // Triggers when 15 REAL profiles remaining (excludes ads) - SINGLE SOURCE OF TRUTH for reloads
   useEffect(() => {
-    const remaining = potentialMatches.length - currentIndex;
+    // Count only real profiles (exclude ads) for accurate reload timing
+    const remainingReal = potentialMatches
+      .slice(currentIndex)
+      .filter(m => !isAd(m))
+      .length;
+
+    const REFILL_THRESHOLD = 15; // Aggressive refill - starts early to keep buffer full
 
     // Only load more if we haven't exhausted all profiles
-    if (!noMoreProfiles && !isLoadingMore && remaining <= 5 && hasCompletedInitialFetch && remaining > 0) {
+    if (!noMoreProfiles && !isLoadingMore && hasCompletedInitialFetch && remainingReal <= REFILL_THRESHOLD && remainingReal > 0) {
       loadMoreMatches();
     }
-  }, [potentialMatches.length, currentIndex, isLoadingMore, hasCompletedInitialFetch, noMoreProfiles, loadMoreMatches]);
+  }, [potentialMatches, currentIndex, noMoreProfiles, isLoadingMore, hasCompletedInitialFetch, loadMoreMatches]);
 
-  // ⭐ CONTINUOUS IMAGE PRELOADER - Preload next 10 profiles as user swipes
+  // ⭐ 3B: CENTRALIZED IMAGE PRELOADING - Single source of truth
+  // Automatically preloads upcoming profiles based on current position
   useEffect(() => {
     if (!hasCompletedInitialFetch || potentialMatches.length === 0) return;
 
-    // Preload images for next 10 profiles
-    const profilesToPreload = potentialMatches.slice(currentIndex, currentIndex + 10)
-      .filter(match => !isAd(match) && 'first_name' in match);
-
-    if (profilesToPreload.length > 0) {
-      preloadProfileImages(profilesToPreload as PotentialMatch[], 0);
+    // Filter out ads - only preload real profiles
+    const realMatches = potentialMatches.filter(m => !isAd(m));
+    
+    // Preload upcoming profiles (4 on Android, 10 on iOS)
+    const batchSize = isAndroidPlatform() ? 4 : 10;
+    const upcoming = realMatches.slice(currentIndex, currentIndex + batchSize);
+    
+    // Preload images for upcoming profiles
+    if (upcoming.length > 0) {
+      preloadProfileImages(upcoming as PotentialMatch[], 0);
     }
-  }, [currentIndex, potentialMatches, hasCompletedInitialFetch, preloadProfileImages]);
+  }, [potentialMatches, currentIndex, hasCompletedInitialFetch, preloadProfileImages]);
 
   // Optimistic UI: move to next card instantly, then process like in background
   const handleLike = async () => {
@@ -1576,8 +1493,8 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, isPremium }: DiscoverPage
     }
 
     // Check daily limit - MUST be checked BEFORE swipe
-    // Free users: 16 swipes, Premium users: 55 swipes
-    const swipeLimit = isPremium ? 55 : 16;
+    // Free users: 16 swipes, Premium users: 65 swipes
+    const swipeLimit = isPremium ? 65 : 16;
     if (todaySwipeCount >= swipeLimit) {
       setIsOutOfSwipes(true);
       toast({
@@ -1799,8 +1716,8 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, isPremium }: DiscoverPage
     }
 
     // Check daily limit - MUST be checked BEFORE swipe
-    // Free users: 16 swipes, Premium users: 55 swipes
-    const swipeLimit = isPremium ? 55 : 16;
+    // Free users: 16 swipes, Premium users: 65 swipes
+    const swipeLimit = isPremium ? 65 : 16;
     if (todaySwipeCount >= swipeLimit) {
       setIsOutOfSwipes(true);
       toast({
@@ -2025,17 +1942,20 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, isPremium }: DiscoverPage
         // Ignore localStorage errors
       }
       
-      // Check if we need to load more (do this in next tick to avoid setState during setState)
-      setTimeout(() => {
-        // Only load more if we haven't exhausted all profiles
-        if (!noMoreProfiles) {
-          if (remainingProfiles <= 5 && !isLoadingMore) {
-            loadMoreMatches();
-          } else if (remainingProfiles === 0 && !isLoadingMore) {
-            loadMoreMatches();
+      // ⭐ REMOVED: Auto-reload logic moved to useEffect (single source of truth)
+      // The useEffect will detect when remainingReal <= 10 and trigger loadMoreMatches
+      // No need for duplicate reload logic here - keeps it simple and predictable
+      
+      // ⭐ FIX 3A: Preload NEXT profile using NEW array (after removal)
+      // This ensures we preload the correct profile from the updated deck
+      const nextProfile = newMatches[1]; // Index 1 in the NEW array
+      if (nextProfile && !isAd(nextProfile)) {
+        loadAllImagesForProfile(nextProfile.id).then(imgs => {
+          if (imgs) {
+            setUserImages(prevImgs => ({ ...prevImgs, [nextProfile.id]: imgs }));
           }
-        }
-      }, 0);
+        });
+      }
       
       return newMatches;
     });
@@ -2043,17 +1963,8 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, isPremium }: DiscoverPage
     // ⭐ RULE 5: Hard-cut instant card removal - always stay at index 0
     setCurrentIndex(0);
     
-    // ⭐ RULE 4: Preload ONLY next card (current becomes 0, next is at index 1)
-    setTimeout(() => {
-      const nextProfile = potentialMatches[1]; // Index 1 becomes new 0 after filter
-      if (nextProfile && !isAd(nextProfile)) {
-        loadAllImagesForProfile(nextProfile.id).then(imgs => {
-          if (imgs) {
-            setUserImages(prev => ({ ...prev, [nextProfile.id]: imgs }));
-          }
-        });
-      }
-    }, 20); // ⭐ Tinder uses 20ms delay for DOM cleanup
+    // ⭐ REMOVED: Old preload logic that used stale potentialMatches array
+    // Now handled inside setPotentialMatches callback with correct newMatches array (3A)
     
     // Progressive Refill System Integration - load more profiles in background when running low
     checkAndTriggerRefill(currentUser.id, 0);

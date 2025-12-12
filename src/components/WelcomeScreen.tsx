@@ -509,7 +509,7 @@ const WelcomeScreen: React.FC<WelcomeScreenProps> = ({ onLogin, onAbout, onTerms
       if (playPromise !== undefined) {
         playPromise
           .then(() => {
-            console.log('Video playing successfully');
+            // Video started playing
           })
           .catch((error) => {
             console.log('Autoplay prevented:', error);
@@ -610,7 +610,7 @@ const WelcomeScreen: React.FC<WelcomeScreenProps> = ({ onLogin, onAbout, onTerms
           alt="DripLove Logo" 
           className="w-28 h-24 sm:w-40 sm:h-32 mb-3 sm:mb-4" 
           loading="eager"
-          fetchPriority="high"
+          fetchpriority="high"
           decoding="async"
           width="160"
           height="128"

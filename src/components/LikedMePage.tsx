@@ -24,11 +24,47 @@ import { preloadImageToBlob } from '@/utils/imageCache';
 // GLOBAL CACHES
 // =========================================================
 
-const likedMeCache = new Map<string, { 
-  likers: any[], 
-  userImages: { [key: string]: string[] }, 
-  timestamp: number 
-}>();
+const LIKED_ME_CACHE_TTL = 5 * 60 * 1000; // 5 minutes
+const LIKED_ME_STORAGE_KEY_PREFIX = 'likedMe_v1_';
+
+type LikedMeCacheValue = { 
+  likers: any[]; 
+  userImages: { [key: string]: string[] }; 
+  timestamp: number;
+};
+
+const getStorageKey = (userId: string) =>
+  `${LIKED_ME_STORAGE_KEY_PREFIX}${userId}`;
+
+const readCacheFromStorage = (userId: string): LikedMeCacheValue | null => {
+  if (typeof window === 'undefined') return null;
+  try {
+    const raw = sessionStorage.getItem(getStorageKey(userId));
+    if (!raw) return null;
+    const parsed = JSON.parse(raw) as LikedMeCacheValue;
+    if (!parsed.timestamp) return null;
+
+    const isExpired = Date.now() - parsed.timestamp > LIKED_ME_CACHE_TTL;
+    if (isExpired) {
+      sessionStorage.removeItem(getStorageKey(userId));
+      return null;
+    }
+    return parsed;
+  } catch {
+    return null;
+  }
+};
+
+const writeCacheToStorage = (userId: string, value: LikedMeCacheValue) => {
+  if (typeof window === 'undefined') return;
+  try {
+    sessionStorage.setItem(getStorageKey(userId), JSON.stringify(value));
+  } catch {
+    // ignore storage errors
+  }
+};
+
+const likedMeCache = new Map<string, LikedMeCacheValue>();
 
 const likedMePollIntervals = new Map<string, ReturnType<typeof setInterval>>();
 
@@ -43,8 +79,6 @@ const hasListChanged = (previous: any[], next: any[]) => {
   }
   return false;
 };
-
-const LIKED_ME_CACHE_DURATION = 30000; // 30 seconds
 
 if (typeof window !== 'undefined') {
   (window as any).likedMeCache = likedMeCache;
@@ -247,16 +281,20 @@ const LikedMePage = ({ currentUser, isPremium = false }: LikedMePageProps) => {
         const shouldUpdate = hasListChanged(cached?.likers || [], newLikers);
 
         if (shouldUpdate) {
-          likedMeCache.set(currentUser.id, {
+          const cacheValue: LikedMeCacheValue = {
             likers: newLikers,
             userImages: newUserImages,
             timestamp: Date.now()
-          });
+          };
+
+          likedMeCache.set(currentUser.id, cacheValue);
+          writeCacheToStorage(currentUser.id, cacheValue);
 
           setLikers(newLikers);
           setUserImages(newUserImages);
         } else if (cached) {
           cached.timestamp = Date.now();
+          writeCacheToStorage(currentUser.id, cached);
         }
       }
     } catch (error) {
@@ -454,12 +492,15 @@ const LikedMePage = ({ currentUser, isPremium = false }: LikedMePageProps) => {
       if (result) {
         const { likers: newLikers, userImages: newUserImages } = result;
         
-        // Update cache
-        likedMeCache.set(currentUser.id, {
+        const cacheValue: LikedMeCacheValue = {
           likers: newLikers,
           userImages: newUserImages,
           timestamp: Date.now()
-        });
+        };
+
+        // Update cache
+        likedMeCache.set(currentUser.id, cacheValue);
+        writeCacheToStorage(currentUser.id, cacheValue);
 
         setLikers(newLikers);
         setUserImages(newUserImages);
@@ -555,19 +596,31 @@ const LikedMePage = ({ currentUser, isPremium = false }: LikedMePageProps) => {
       return;
     }
 
-    // Check if we have fresh cached data first
-    const cached = likedMeCache.get(currentUser.id);
-    if (cached && Date.now() - cached.timestamp < LIKED_ME_CACHE_DURATION) {
+    // 1) Try in-memory cache
+    let cached = likedMeCache.get(currentUser.id) as LikedMeCacheValue | undefined;
+
+    // 2) If no in-memory cache, try sessionStorage
+    if (!cached) {
+      const stored = readCacheFromStorage(currentUser.id);
+      if (stored) {
+        cached = stored;
+        likedMeCache.set(currentUser.id, stored);
+      }
+    }
+
+    if (cached) {
+      // 👉 Show cached UI immediately (no spinner)
       setLikers(cached.likers);
       setUserImages(cached.userImages);
       setLoading(false);
-      // Still fetch in background to get latest data
+
+      // 👉 Always refresh in background (non-blocking)
       fetchLikersInBackground();
-    } else if (likers.length === 0) {
-      // No cache or stale cache, fetch immediately
+    } else {
+      // No cache at all → do a real fetch
       fetchLikers();
     }
-    
+
     checkLockoutStatus();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [currentUser?.id]);
@@ -708,11 +761,14 @@ const LikedMePage = ({ currentUser, isPremium = false }: LikedMePageProps) => {
         const updatedImages = { ...cached.userImages };
         delete updatedImages[profileId];
         
-        likedMeCache.set(currentUser.id, {
+        const cacheValue: LikedMeCacheValue = {
           likers: updatedLikers,
           userImages: updatedImages,
           timestamp: Date.now()
-        });
+        };
+
+        likedMeCache.set(currentUser.id, cacheValue);
+        writeCacheToStorage(currentUser.id, cacheValue);
       }
     }
 
@@ -740,11 +796,14 @@ const LikedMePage = ({ currentUser, isPremium = false }: LikedMePageProps) => {
         if (currentUser?.id) {
           const cached = likedMeCache.get(currentUser.id);
           if (cached) {
-            likedMeCache.set(currentUser.id, {
+            const cacheValue: LikedMeCacheValue = {
               likers: [profileToRemove, ...cached.likers],
               userImages: cached.userImages,
               timestamp: Date.now()
-            });
+            };
+
+            likedMeCache.set(currentUser.id, cacheValue);
+            writeCacheToStorage(currentUser.id, cacheValue);
           }
         }
       }
@@ -773,11 +832,14 @@ const LikedMePage = ({ currentUser, isPremium = false }: LikedMePageProps) => {
         const updatedImages = { ...cached.userImages };
         delete updatedImages[profileId];
         
-        likedMeCache.set(currentUser.id, {
+        const cacheValue: LikedMeCacheValue = {
           likers: updatedLikers,
           userImages: updatedImages,
           timestamp: Date.now()
-        });
+        };
+
+        likedMeCache.set(currentUser.id, cacheValue);
+        writeCacheToStorage(currentUser.id, cacheValue);
       }
     }
 
@@ -820,6 +882,7 @@ const LikedMePage = ({ currentUser, isPremium = false }: LikedMePageProps) => {
       // Invalidate cache to force refresh on next load
       if (currentUser?.id) {
         likedMeCache.delete(currentUser.id);
+        sessionStorage.removeItem(getStorageKey(currentUser.id));
         console.log('Cache cleared for user:', currentUser.id);
       }
       
@@ -840,11 +903,14 @@ const LikedMePage = ({ currentUser, isPremium = false }: LikedMePageProps) => {
         if (currentUser?.id) {
           const cached = likedMeCache.get(currentUser.id);
           if (cached) {
-            likedMeCache.set(currentUser.id, {
+            const cacheValue: LikedMeCacheValue = {
               likers: [profileToRemove, ...cached.likers],
               userImages: cached.userImages,
               timestamp: Date.now()
-            });
+            };
+
+            likedMeCache.set(currentUser.id, cacheValue);
+            writeCacheToStorage(currentUser.id, cacheValue);
           }
         }
       }
@@ -1414,7 +1480,7 @@ const LikedMePage = ({ currentUser, isPremium = false }: LikedMePageProps) => {
   <div 
     className="flex-shrink-0 bg-white border-b px-4 py-4 mx-4"
     style={{
-      marginTop: getPlatformSync() === 'ios' 
+      marginTop: platform === 'ios' 
         ? 'clamp(20px, calc(env(safe-area-inset-top, 10px) + 23px), 50px)'
         : '0'
     }}

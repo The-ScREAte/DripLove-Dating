@@ -42,6 +42,10 @@ const authOptions = {
   global: {
     // Use custom fetch to avoid Android SSL issues
     fetch: customFetch,
+    headers: {
+      'Accept': 'application/json',
+      'Content-Type': 'application/json',
+    }
   }
 };
 

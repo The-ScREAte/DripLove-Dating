@@ -75,8 +75,6 @@ async function loadWebPricingFromDB(): Promise<void> {
         loading: false,
         source: 'fallback',
       };
-      
-      console.log('[Pricing] Loaded web pricing from DB:', webPricing);
     }
   } catch (error) {
     console.error('[Pricing] Error loading web pricing from DB:', error);
@@ -155,14 +153,12 @@ async function getGooglePrice(): Promise<{ price: string; currency: string; form
   try {
     for (const id of GOOGLE_PRODUCT_IDS) {
       const product = store.get ? store.get(id) : null;
-      console.log(`[Pricing] Checking Google product ${id}:`, product);
       
       if (product) {
         // Try different ways to get pricing info
         const pricing = product.pricing;
         
         if (pricing) {
-          console.log('[Pricing] Found Google pricing:', pricing);
           return {
             formattedPrice: pricing.price || product.price || '',
             price: extractNumericPrice(pricing.price || product.price || ''),
@@ -172,7 +168,6 @@ async function getGooglePrice(): Promise<{ price: string; currency: string; form
         
         // Fallback to product.price directly
         if (product.price) {
-          console.log('[Pricing] Using product.price:', product.price);
           return {
             formattedPrice: product.price,
             price: extractNumericPrice(product.price),
@@ -203,14 +198,12 @@ async function getApplePrice(): Promise<{ price: string; currency: string; forma
   try {
     for (const id of APPLE_PRODUCT_IDS) {
       const product = store.get ? store.get(id) : null;
-      console.log(`[Pricing] Checking Apple product ${id}:`, product);
       
       if (product) {
         // Try different ways to get pricing info
         const pricing = product.pricing;
         
         if (pricing) {
-          console.log('[Pricing] Found Apple pricing:', pricing);
           return {
             formattedPrice: pricing.price || product.price || '',
             price: extractNumericPrice(pricing.price || product.price || ''),
@@ -220,7 +213,6 @@ async function getApplePrice(): Promise<{ price: string; currency: string; forma
         
         // Fallback to product.price directly
         if (product.price) {
-          console.log('[Pricing] Using product.price:', product.price);
           return {
             formattedPrice: product.price,
             price: extractNumericPrice(product.price),
@@ -256,18 +248,14 @@ async function getIAPPrice(): Promise<{ price: string; currency: string; formatt
 // Retry getting IAP price with multiple attempts
 async function getIAPPriceWithRetry(maxAttempts: number = 5): Promise<{ price: string; currency: string; formattedPrice: string } | null> {
   for (let attempt = 1; attempt <= maxAttempts; attempt++) {
-    console.log(`[Pricing] IAP price fetch attempt ${attempt}/${maxAttempts}`);
-    
     const iapPrice = await getIAPPrice();
     if (iapPrice && iapPrice.price && parseFloat(iapPrice.price) > 0) {
-      console.log('[Pricing] IAP price fetched successfully:', iapPrice);
       return iapPrice;
     }
     
     // Wait before retry (exponential backoff: 500ms, 1s, 2s, 4s, 8s)
     if (attempt < maxAttempts) {
       const delay = 500 * Math.pow(2, attempt - 1);
-      console.log(`[Pricing] Waiting ${delay}ms before retry...`);
       await new Promise(resolve => setTimeout(resolve, delay));
     }
   }
@@ -305,20 +293,17 @@ async function loadPricingConfig(userId?: string): Promise<PricingConfig> {
   try {
     const Capacitor = await getCapacitor();
     const platform = Capacitor?.getPlatform() || 'web';
-    console.log('[Pricing] Loading pricing config for platform:', platform);
     
     // Load web pricing from database first
     await loadWebPricingFromDB();
     
     // WEB: Use pricing from database
     if (!(await isNativeApp())) {
-      console.log('[Pricing] Web platform - using database pricing');
       return { ...webPricing };
     }
     
     // ANDROID: Use Google Play Console pricing
     if (await isAndroid()) {
-      console.log('[Pricing] Android - fetching Google Play price');
       const googlePrice = await getIAPPriceWithRetry(5);
       
       if (googlePrice && googlePrice.formattedPrice) {
@@ -336,18 +321,15 @@ async function loadPricingConfig(userId?: string): Promise<PricingConfig> {
           source: 'iap',
         };
         
-        console.log('[Pricing] Android Google Play config:', config);
         return config;
       }
       
       // Fallback for Android if IAP fails - use database pricing in USD
-      console.log('[Pricing] Android IAP failed, using database fallback (USD)');
       return { ...webPricing };
     }
     
     // iOS: Use App Store pricing
     if (await isIOS()) {
-      console.log('[Pricing] iOS - fetching App Store price');
       const applePrice = await getIAPPriceWithRetry(5);
       
       if (applePrice && applePrice.formattedPrice) {
@@ -365,12 +347,10 @@ async function loadPricingConfig(userId?: string): Promise<PricingConfig> {
           source: 'iap',
         };
         
-        console.log('[Pricing] iOS App Store config:', config);
         return config;
       }
       
       // Fallback for iOS if IAP fails - use database pricing
-      console.log('[Pricing] iOS IAP failed, using database fallback');
       return { ...webPricing };
     }
     
@@ -386,7 +366,6 @@ async function loadPricingConfig(userId?: string): Promise<PricingConfig> {
 export function preloadPricingConfig(userId?: string): void {
   if (cachedConfig || configPromise) return;
   
-  console.log('[Pricing] Preloading pricing config in background');
   configPromise = loadPricingConfig(userId).then(config => {
     cachedConfig = config;
     configPromise = null;
