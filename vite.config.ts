@@ -52,8 +52,7 @@ export default defineConfig(({ mode }) => ({
   // Optimize dependency pre-bundling
   optimizeDeps: {
     include: [
-      'react',
-      'react-dom',
+      // Let Vite handle React core to avoid duplicate React instances
       'react-router-dom',
       '@supabase/supabase-js',
       'lucide-react',
