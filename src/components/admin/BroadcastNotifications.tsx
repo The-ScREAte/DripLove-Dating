@@ -9,7 +9,8 @@ import { useToast } from '@/hooks/use-toast';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { ScrollArea } from '@/components/ui/scroll-area';
-import { Loader2, Send, Users, Globe, CheckCircle2, AlertCircle, Trash2, RotateCw, Eye, History, Copy } from 'lucide-react';
+import { Loader2, Send, Users, Globe, CheckCircle2, AlertCircle, Trash2, RotateCw, Eye, History, Copy, Mail } from 'lucide-react';
+import EmailExport from './EmailExport';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import {
@@ -628,11 +629,15 @@ export default function BroadcastNotifications() {
       </div>
 
       <Tabs value={activeTab} onValueChange={setActiveTab}>
-        <TabsList className="grid w-full grid-cols-2">
+        <TabsList className="grid w-full grid-cols-3">
           <TabsTrigger value="new">New Broadcast</TabsTrigger>
           <TabsTrigger value="history">
             <History className="w-4 h-4 mr-2" />
-            Campaign History
+            History
+          </TabsTrigger>
+          <TabsTrigger value="emailing">
+            <Mail className="w-4 h-4 mr-2" />
+            Emailing
           </TabsTrigger>
         </TabsList>
 
@@ -991,6 +996,10 @@ export default function BroadcastNotifications() {
               )}
             </CardContent>
           </Card>
+        </TabsContent>
+
+        <TabsContent value="emailing">
+          <EmailExport />
         </TabsContent>
       </Tabs>
 
