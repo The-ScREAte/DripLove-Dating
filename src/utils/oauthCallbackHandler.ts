@@ -12,33 +12,6 @@ export async function handleOAuthRedirect(url?: string) {
   try {
     let sessionData: any = null;
 
-    // Step 0: If URL has an auth code (?code=...), exchange it for a session (PKCE flow)
-    // Supabase commonly uses the code flow on mobile/web now.
-    if (url) {
-      try {
-        const urlObj = new URL(url);
-        const code = urlObj.searchParams.get('code');
-        const errorParam = urlObj.searchParams.get('error') || urlObj.searchParams.get('error_description');
-
-        if (errorParam) {
-          throw new Error(errorParam);
-        }
-
-        if (code) {
-          console.log('[OAuthHandler] Exchanging OAuth code for session');
-          const { data, error } = await supabase.auth.exchangeCodeForSession(code);
-          if (error) {
-            console.warn('[OAuthHandler] exchangeCodeForSession error:', error);
-          } else if (data?.session) {
-            sessionData = data;
-            console.log('[OAuthHandler] Session established via code exchange');
-          }
-        }
-      } catch (e) {
-        // If URL parsing fails, fall back to token parsing + getSession.
-      }
-    }
-
     // Step A: If URL has tokens in fragment, set session immediately (fastest path)
     if (url) {
       const fragment = url.split('#')[1] || '';

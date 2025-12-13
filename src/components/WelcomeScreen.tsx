@@ -162,45 +162,68 @@ const WelcomeScreen: React.FC<WelcomeScreenProps> = ({ onLogin, onAbout, onTerms
         }
       } else {
         // Google OAuth handling
-        // For Google OAuth on iOS native: use improved Safari View Controller flow
+        // For Google OAuth on iOS native: use Safari View Controller (in-app browser)
+        // This keeps the user in-app and satisfies Apple's review guidelines
         if (provider === 'google' && isNative && platform === 'ios') {
+          console.log('[iOS Google OAuth] Starting iOS Google OAuth flow...');
+          
           try {
-            const { signInWithGoogleIOS } = await import('@/utils/googleIOSAuth');
-            
-            const result = await signInWithGoogleIOS();
-            
-            if (result?.user?.id) {
-              await saveLanguageToProfile(result.user.id);
+            // Generate the OAuth URL
+            console.log('[iOS Google OAuth] Generating OAuth URL...');
+            const { data: oauthData, error: oauthError } = await supabase.auth.signInWithOAuth({
+              provider: 'google',
+              options: {
+                redirectTo,
+                queryParams: {
+                  prompt: 'select_account',
+                  access_type: 'offline',
+                },
+                skipBrowserRedirect: true, // Get URL without auto-redirect
+              }
+            });
+
+            if (oauthError || !oauthData?.url) {
+              console.error('[iOS Google OAuth] Failed to generate OAuth URL:', oauthError);
+              throw new Error(oauthError?.message || 'Failed to generate OAuth URL');
             }
+
+            console.log('[iOS Google OAuth] OAuth URL generated:', oauthData.url);
+            console.log('[iOS Google OAuth] Redirect URI:', redirectTo);
             
-            setOauthLoading(null);
+            // Verify the redirect URI in the OAuth URL
+            const urlObj = new URL(oauthData.url);
+            const redirectParam = urlObj.searchParams.get('redirect_to') || urlObj.searchParams.get('redirect_uri');
+            console.log('[iOS Google OAuth] CRITICAL - Redirect param in OAuth URL:', redirectParam);
+            console.log('[iOS Google OAuth] CRITICAL - Expected redirect:', redirectTo);
+
+            // Open OAuth URL in Safari View Controller (in-app browser)
+            const { Browser } = await import('@capacitor/browser');
+            console.log('[iOS Google OAuth] Opening Safari View Controller...');
+            await Browser.open({ 
+              url: oauthData.url,
+              presentationStyle: 'popover', // iOS native presentation
+              toolbarColor: '#000000',
+            });
+
+            console.log('[iOS Google OAuth] Safari View Controller opened - waiting for deep link callback');
             
-            if (result.needsProfileCompletion) {
-              navigate('/complete-profile');
-            } else {
-              navigate('/');
-            }
+            // The deep link handler in useMobileOAuth.ts will catch the callback
+            // and process the tokens when Google redirects to driplove://auth/callback#access_token=...
+            // No polling needed - the callback will trigger directly
+            
+            // Don't set loading to null here - let the deep link handler or browser close handle it
             return;
-            
+
           } catch (err: any) {
-            console.error('❌ iOS Google Sign-In error:', err);
-            
-            if (err.message?.includes('cancel')) {
-              toast({
-                title: t('auth.authenticationCancelled'),
-                description: t('auth.googleSignInCancelled'),
-                variant: 'default',
-              });
-            } else {
-              toast({
-                title: 'Authentication Error',
-                description: err?.message || 'Failed to sign in with Google.',
-                variant: 'destructive',
-              });
-            }
+            console.error('[iOS Google OAuth] ❌ Safari View Controller error:', err);
+            toast({
+              title: 'Authentication Error',
+              description: err?.message || 'Failed to open Google Sign-In',
+              variant: 'destructive',
+            });
             setOauthLoading(null);
-            return;
           }
+          return;
         }
         
         // For Google OAuth on Android: use native Google Sign-In
