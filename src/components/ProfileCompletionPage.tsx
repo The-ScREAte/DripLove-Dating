@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
-import { Heart, ArrowLeft, Upload, Shield, CheckCircle, AlertTriangle } from 'lucide-react';
+import { Heart, ArrowLeft, Upload, Shield, CheckCircle, AlertTriangle, Camera } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
@@ -18,6 +18,7 @@ import { compressImage } from '@/utils/imageCompression';
 import TermsAcceptance from './TermsAcceptance';
 import { getLanguageForCountry } from '@/i18n/config';
 import { videoPreloader } from '@/utils/videoPreloader';
+import FaceVerification from '@/components/FaceVerification';
 
 interface ImageUpload {
   file: File;
@@ -40,6 +41,69 @@ const ProfileCompletionPage = () => {
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [images, setImages] = useState<ImageUpload[]>([]);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [showFaceVerification, setShowFaceVerification] = useState(false);
+  const [faceVerified, setFaceVerified] = useState(false);
+  const [isVerifying, setIsVerifying] = useState(false);
+
+  // Handle face verification completion
+  const handleFaceVerified = async (faceImageBase64: string) => {
+    if (!user) return;
+    
+    setIsVerifying(true);
+    try {
+      // Index the face with the user's ID
+      const { data, error } = await supabase.functions.invoke("face-verify", {
+        body: {
+          action: "index_face",
+          front: faceImageBase64,
+          userId: user.id,
+        },
+      });
+
+      if (error) {
+        console.error('Face indexing error:', error);
+        toast({
+          title: "Verification Failed",
+          description: "Could not complete face verification. Please try again.",
+          variant: "destructive",
+        });
+        return;
+      }
+
+      if (data?.success) {
+        // Update profile with face descriptor
+        await supabase
+          .from('profiles')
+          .update({ 
+            face_descriptor: data.faceId || 'verified',
+            updated_at: new Date().toISOString()
+          })
+          .eq('id', user.id);
+
+        setFaceVerified(true);
+        setShowFaceVerification(false);
+        toast({
+          title: "Face Verified! ✓",
+          description: "Your identity has been confirmed.",
+        });
+      } else {
+        toast({
+          title: "Verification Failed",
+          description: data?.error || "Could not verify your face. Please try again.",
+          variant: "destructive",
+        });
+      }
+    } catch (err) {
+      console.error('Face verification error:', err);
+      toast({
+        title: "Error",
+        description: "An unexpected error occurred. Please try again.",
+        variant: "destructive",
+      });
+    } finally {
+      setIsVerifying(false);
+    }
+  };
 
   // iOS detection for other potential optimizations
   const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent);
@@ -908,6 +972,72 @@ const ProfileCompletionPage = () => {
                     )}
                     
                     {errors.images && <p className="text-sm text-red-500">{errors.images}</p>}
+                  </div>
+
+                  {/* Face Verification Section */}
+                  <div className="space-y-4">
+                    <div className="flex items-center gap-2">
+                      <Shield className="w-5 h-5 text-purple-600" />
+                      <h3 className="text-lg font-semibold text-gray-800">{t('profileCompletion.faceVerification')}</h3>
+                      <span className="text-xs text-gray-500">(Optional)</span>
+                    </div>
+
+                    {showFaceVerification ? (
+                      <div className="space-y-3">
+                        <div className="flex items-center justify-between">
+                          <p className="text-sm text-gray-600">Follow the instructions to verify your face</p>
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => setShowFaceVerification(false)}
+                          >
+                            Cancel
+                          </Button>
+                        </div>
+                        <FaceVerification 
+                          onVerified={handleFaceVerified}
+                          disabled={isVerifying}
+                        />
+                      </div>
+                    ) : faceVerified ? (
+                      <div className="bg-green-50 border border-green-200 rounded-lg p-4">
+                        <div className="flex items-center gap-3">
+                          <div className="w-10 h-10 bg-green-100 rounded-full flex items-center justify-center">
+                            <CheckCircle className="w-6 h-6 text-green-600" />
+                          </div>
+                          <div>
+                            <p className="font-medium text-green-800">Face Verified</p>
+                            <p className="text-sm text-green-600">
+                              Your identity has been confirmed.
+                            </p>
+                          </div>
+                        </div>
+                      </div>
+                    ) : (
+                      <div className="bg-purple-50 border border-purple-200 rounded-lg p-4">
+                        <div className="flex items-start gap-3">
+                          <div className="w-10 h-10 bg-purple-100 rounded-full flex items-center justify-center flex-shrink-0">
+                            <Camera className="w-5 h-5 text-purple-600" />
+                          </div>
+                          <div className="flex-1">
+                            <p className="font-medium text-purple-800">Get Verified</p>
+                            <p className="text-sm text-purple-600 mb-3">
+                              Verify your identity to build trust and show others you're real. Verified profiles get more matches!
+                            </p>
+                            <Button
+                              type="button"
+                              onClick={() => setShowFaceVerification(true)}
+                              className="bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700 text-white"
+                              size="sm"
+                            >
+                              <Shield className="w-4 h-4 mr-2" />
+                              Start Verification
+                            </Button>
+                          </div>
+                        </div>
+                      </div>
+                    )}
                   </div>
 
                   <div className="flex flex-col gap-3">
