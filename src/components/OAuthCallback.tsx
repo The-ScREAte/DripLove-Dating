@@ -10,25 +10,38 @@ const OAuthCallback = () => {
 
   useEffect(() => {
     const handleAuthCallback = async () => {
+      // ✅ CRITICAL: Check if mobile FIRST, before ANY imports or processing
+      // This ensures handleOAuthRedirect is NEVER loaded on native platforms
+      let isNativePlatform = false;
       try {
-        console.log('[OAuthCallback] Starting OAuth callback processing');
+        const { Capacitor } = await import('@capacitor/core');
+        isNativePlatform = Capacitor?.isNativePlatform?.() || false;
+      } catch (e) {
+        // Not mobile
+        isNativePlatform = false;
+      }
+
+      if (isNativePlatform) {
+        console.log('[OAuthCallback] ❌ Native mobile detected - HARD STOP');
+        console.log('[OAuthCallback] ✅ useMobileOAuth owns all mobile OAuth');
+        setLoading(false);
+        // Do NOT import handleOAuthRedirect
+        // Do NOT call setSession
+        // Do NOT do anything - useMobileOAuth is the single source of truth
+        return null;
+      }
+
+      // ═══════════════════════════════════════════════════════════
+      // WEB ONLY - Everything below this line runs ONLY on web
+      // ═══════════════════════════════════════════════════════════
+      
+      try {
+        console.log('[OAuthCallback] Starting OAuth callback processing (WEB ONLY)');
         console.log('[OAuthCallback] URL:', window.location.href);
 
-        // Check if this is a popup window (opened by parent for OAuth)
+        // WEB ONLY: Check if this is a popup window (opened by parent for OAuth)
         const isPopup = window.opener && window.opener !== window;
         console.log('[OAuthCallback] Is popup window:', isPopup);
-
-        // Check if native mobile - if so, skip and let useMobileOAuth handle it
-        try {
-          const { Capacitor } = await import('@capacitor/core');
-          if (Capacitor?.isNativePlatform?.()) {
-            console.log('[OAuthCallback] Native mobile detected - delegating to deep link handler');
-            // Don't navigate - let the deep link handler in main.tsx handle it
-            return;
-          }
-        } catch (e) {
-          // Not mobile, continue with web flow
-        }
 
         // Check for OAuth errors first
         const urlParams = new URLSearchParams(window.location.search);
