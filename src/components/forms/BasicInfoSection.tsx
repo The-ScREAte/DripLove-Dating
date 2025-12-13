@@ -101,17 +101,6 @@ const BasicInfoSection = ({
 
           {showFaceVerification ? (
             <div className="space-y-3 bg-gray-50 rounded-lg p-4">
-              <div className="flex items-center justify-between">
-                <p className="text-sm text-gray-600">Follow the instructions to verify your face</p>
-                <Button
-                  type="button"
-                  variant="ghost"
-                  size="sm"
-                  onClick={() => setShowFaceVerification(false)}
-                >
-                  Cancel
-                </Button>
-              </div>
               <FaceVerification 
                 onVerified={onFaceVerified}
                 disabled={isVerifying}
@@ -119,49 +108,31 @@ const BasicInfoSection = ({
             </div>
           ) : faceVerified ? (
             <div className="bg-green-50 border border-green-200 rounded-lg p-3">
-              <div className="flex items-center gap-3">
-                <div className="w-8 h-8 bg-green-100 rounded-full flex items-center justify-center">
-                  <CheckCircle className="w-5 h-5 text-green-600" />
-                </div>
-                <div>
-                  <p className="font-medium text-green-800 text-sm">Face Verified</p>
-                  <p className="text-xs text-green-600">
-                    Your identity will be confirmed upon registration.
-                  </p>
-                </div>
+              <div className="flex items-center gap-2">
+                <CheckCircle className="w-5 h-5 text-green-600" />
+                <p className="font-medium text-green-800 text-sm">Verified</p>
               </div>
             </div>
           ) : (
             <div className={`bg-purple-50 border rounded-lg p-3 ${faceError ? 'border-red-300' : 'border-purple-200'}`}>
-              <div className="flex items-start gap-3">
-                <div className="w-8 h-8 bg-purple-100 rounded-full flex items-center justify-center flex-shrink-0">
-                  <Camera className="w-4 h-4 text-purple-600" />
-                </div>
-                <div className="flex-1">
-                  <p className="font-medium text-purple-800 text-sm">Verify Your Identity</p>
-                  <p className="text-xs text-purple-600 mb-2">
-                    Face verification is required to continue. This helps keep our community safe.
-                  </p>
-                  <Button
-                    type="button"
-                    onClick={() => setShowFaceVerification(true)}
-                    className="bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700 text-white text-xs"
-                    size="sm"
-                    disabled={isVerifying}
-                  >
-                    {isVerifying ? (
-                      <>
-                        <Loader2 className="w-3 h-3 mr-1 animate-spin" />
-                        Verifying...
-                      </>
-                    ) : (
-                      <>
-                        <Shield className="w-3 h-3 mr-1" />
-                        Start Verification
-                      </>
-                    )}
-                  </Button>
-                </div>
+              <div className="flex items-center justify-between">
+                <p className="text-sm text-purple-800">Verify your face to continue</p>
+                <Button
+                  type="button"
+                  onClick={() => setShowFaceVerification(true)}
+                  className="bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700 text-white text-xs"
+                  size="sm"
+                  disabled={isVerifying}
+                >
+                  {isVerifying ? (
+                    <Loader2 className="w-3 h-3 animate-spin" />
+                  ) : (
+                    <>
+                      <Camera className="w-3 h-3 mr-1" />
+                      Verify
+                    </>
+                  )}
+                </Button>
               </div>
               {faceError && <p className="text-red-500 text-xs mt-2">{faceError}</p>}
             </div>

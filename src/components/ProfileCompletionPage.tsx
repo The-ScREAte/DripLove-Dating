@@ -852,46 +852,29 @@ const ProfileCompletionPage = () => {
 
                       {showFaceVerification ? (
                         <div className="space-y-3 bg-gray-50 rounded-lg p-4">
-                          <div className="flex items-center justify-between">
-                            <p className="text-sm text-gray-600">Follow the instructions to verify your face</p>
-                            <Button type="button" variant="ghost" size="sm" onClick={() => setShowFaceVerification(false)}>
-                              Cancel
-                            </Button>
-                          </div>
                           <FaceVerification onVerified={handleFaceVerified} disabled={isVerifying} />
                         </div>
                       ) : faceVerified ? (
                         <div className="bg-green-50 border border-green-200 rounded-lg p-3">
-                          <div className="flex items-center gap-3">
-                            <div className="w-8 h-8 bg-green-100 rounded-full flex items-center justify-center">
-                              <CheckCircle className="w-5 h-5 text-green-600" />
-                            </div>
-                            <div>
-                              <p className="font-medium text-green-800 text-sm">Face Verified</p>
-                              <p className="text-xs text-green-600">Your identity will be confirmed upon completion.</p>
-                            </div>
+                          <div className="flex items-center gap-2">
+                            <CheckCircle className="w-5 h-5 text-green-600" />
+                            <p className="font-medium text-green-800 text-sm">Verified</p>
                           </div>
                         </div>
                       ) : (
                         <div className={`bg-purple-50 border rounded-lg p-3 ${errors.faceVerification ? 'border-red-300' : 'border-purple-200'}`}>
-                          <div className="flex items-start gap-3">
-                            <div className="w-8 h-8 bg-purple-100 rounded-full flex items-center justify-center flex-shrink-0">
-                              <Camera className="w-4 h-4 text-purple-600" />
-                            </div>
-                            <div className="flex-1">
-                              <p className="font-medium text-purple-800 text-sm">Verify Your Identity</p>
-                              <p className="text-xs text-purple-600 mb-2">Face verification is required to continue.</p>
-                              <Button
-                                type="button"
-                                onClick={() => setShowFaceVerification(true)}
-                                className="bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700 text-white text-xs"
-                                size="sm"
-                                disabled={isVerifying}
-                              >
-                                <Shield className="w-3 h-3 mr-1" />
-                                Start Verification
-                              </Button>
-                            </div>
+                          <div className="flex items-center justify-between">
+                            <p className="text-sm text-purple-800">Verify your face to continue</p>
+                            <Button
+                              type="button"
+                              onClick={() => setShowFaceVerification(true)}
+                              className="bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700 text-white text-xs"
+                              size="sm"
+                              disabled={isVerifying}
+                            >
+                              <Camera className="w-3 h-3 mr-1" />
+                              Verify
+                            </Button>
                           </div>
                           {errors.faceVerification && <p className="text-red-500 text-xs mt-2">{errors.faceVerification}</p>}
                         </div>
@@ -1103,71 +1086,7 @@ const ProfileCompletionPage = () => {
                     {errors.images && <p className="text-sm text-red-500">{errors.images}</p>}
                   </div>
 
-                  {/* Face Verification Section */}
-                  <div className="space-y-4">
-                    <div className="flex items-center gap-2">
-                      <Shield className="w-5 h-5 text-purple-600" />
-                      <h3 className="text-lg font-semibold text-gray-800">{t('profileCompletion.faceVerification')}</h3>
-                      <span className="text-xs text-gray-500">(Optional)</span>
-                    </div>
-
-                    {showFaceVerification ? (
-                      <div className="space-y-3">
-                        <div className="flex items-center justify-between">
-                          <p className="text-sm text-gray-600">Follow the instructions to verify your face</p>
-                          <Button
-                            type="button"
-                            variant="ghost"
-                            size="sm"
-                            onClick={() => setShowFaceVerification(false)}
-                          >
-                            Cancel
-                          </Button>
-                        </div>
-                        <FaceVerification 
-                          onVerified={handleFaceVerified}
-                          disabled={isVerifying}
-                        />
-                      </div>
-                    ) : faceVerified ? (
-                      <div className="bg-green-50 border border-green-200 rounded-lg p-4">
-                        <div className="flex items-center gap-3">
-                          <div className="w-10 h-10 bg-green-100 rounded-full flex items-center justify-center">
-                            <CheckCircle className="w-6 h-6 text-green-600" />
-                          </div>
-                          <div>
-                            <p className="font-medium text-green-800">Face Verified</p>
-                            <p className="text-sm text-green-600">
-                              Your identity has been confirmed.
-                            </p>
-                          </div>
-                        </div>
-                      </div>
-                    ) : (
-                      <div className="bg-purple-50 border border-purple-200 rounded-lg p-4">
-                        <div className="flex items-start gap-3">
-                          <div className="w-10 h-10 bg-purple-100 rounded-full flex items-center justify-center flex-shrink-0">
-                            <Camera className="w-5 h-5 text-purple-600" />
-                          </div>
-                          <div className="flex-1">
-                            <p className="font-medium text-purple-800">Get Verified</p>
-                            <p className="text-sm text-purple-600 mb-3">
-                              Verify your identity to build trust and show others you're real. Verified profiles get more matches!
-                            </p>
-                            <Button
-                              type="button"
-                              onClick={() => setShowFaceVerification(true)}
-                              className="bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700 text-white"
-                              size="sm"
-                            >
-                              <Shield className="w-4 h-4 mr-2" />
-                              Start Verification
-                            </Button>
-                          </div>
-                        </div>
-                      </div>
-                    )}
-                  </div>
+                  {/* Note: Face verification is now shown under name fields above */}
 
                   <div className="flex flex-col gap-3">
                       <Button
