@@ -96,7 +96,7 @@ const BasicInfoSection = ({
         <div className="space-y-3 mt-4">
           <div className="flex items-center gap-2">
             <Shield className="w-5 h-5 text-purple-600" />
-            <Label className="text-sm font-medium">{t('profileCompletion.faceVerification')} *</Label>
+            <Label className="text-sm font-medium">Face Verification *</Label>
           </div>
 
           {showFaceVerification ? (

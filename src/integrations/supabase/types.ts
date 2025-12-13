@@ -76,10 +76,12 @@ export type Database = {
       }
       app_update_config: {
         Row: {
+          android_version: string | null
           app_store_url: string | null
           created_at: string
           current_version: string
           id: string
+          ios_version: string | null
           is_enabled: boolean
           play_store_url: string | null
           target_platform: string
@@ -88,10 +90,12 @@ export type Database = {
           updated_at: string
         }
         Insert: {
+          android_version?: string | null
           app_store_url?: string | null
           created_at?: string
           current_version?: string
           id?: string
+          ios_version?: string | null
           is_enabled?: boolean
           play_store_url?: string | null
           target_platform?: string
@@ -100,10 +104,12 @@ export type Database = {
           updated_at?: string
         }
         Update: {
+          android_version?: string | null
           app_store_url?: string | null
           created_at?: string
           current_version?: string
           id?: string
+          ios_version?: string | null
           is_enabled?: boolean
           play_store_url?: string | null
           target_platform?: string

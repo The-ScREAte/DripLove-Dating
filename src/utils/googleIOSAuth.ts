@@ -1,17 +1,18 @@
 /**
  * Native Google Sign-In for iOS
- * Uses Safari View Controller with improved deep link handling
- * Pattern modeled after Apple Sign-In native modal flow
+ * Uses Safari View Controller with proper deep link handling
+ * Pattern modeled after Apple Sign-In native flow
  */
 
 import { supabase } from '@/integrations/supabase/client';
 import { Capacitor } from '@capacitor/core';
 import { Browser } from '@capacitor/browser';
+import { App } from '@capacitor/app';
 import { getRedirectUri } from '@/config/oauth';
 
 /**
  * Sign in with Google on iOS using Safari View Controller
- * This implements a more robust flow similar to Apple's native approach
+ * This implements a robust flow similar to Apple's native approach
  */
 export const signInWithGoogleIOS = async (): Promise<{
   user: any;
@@ -27,11 +28,15 @@ export const signInWithGoogleIOS = async (): Promise<{
   console.log('[iOS Google] Starting Google Sign-In via Safari View Controller...');
 
   return new Promise(async (resolve, reject) => {
-    let authSubscription: any = null;
     let hasProcessedAuth = false;
-    let browserOpenTime: number;
+    let appUrlListener: any = null;
+    let authSubscription: any = null;
 
     const cleanup = () => {
+      if (appUrlListener) {
+        appUrlListener.remove();
+        appUrlListener = null;
+      }
       if (authSubscription) {
         authSubscription.unsubscribe();
         authSubscription = null;
@@ -47,11 +52,15 @@ export const signInWithGoogleIOS = async (): Promise<{
 
       try {
         // Close browser first
-        await Browser.close().catch(() => {});
+        try {
+          await Browser.close();
+        } catch (e) {
+          // Browser may already be closed
+        }
         cleanup();
 
         // Small delay to ensure browser is fully closed
-        await new Promise(r => setTimeout(r, 100));
+        await new Promise(r => setTimeout(r, 150));
 
         // Check profile
         const { data: profile } = await supabase
@@ -97,19 +106,103 @@ export const signInWithGoogleIOS = async (): Promise<{
       }
     };
 
+    const handleDeepLink = async (url: string) => {
+      console.log('[iOS Google] Deep link received:', url);
+      
+      // Check if this is an OAuth callback
+      const isOAuthCallback = 
+        url.startsWith('driplove://auth') ||
+        url.includes('access_token=') ||
+        url.includes('auth/callback');
+        
+      if (!isOAuthCallback) {
+        console.log('[iOS Google] Not an OAuth callback, ignoring');
+        return;
+      }
+
+      if (hasProcessedAuth) {
+        console.log('[iOS Google] Already processed, ignoring duplicate');
+        return;
+      }
+
+      console.log('[iOS Google] Processing OAuth callback from deep link...');
+
+      try {
+        // Close browser immediately
+        try {
+          await Browser.close();
+        } catch (e) {
+          // Browser may already be closed
+        }
+
+        // Parse tokens from URL
+        const urlObj = new URL(url);
+        const fragment = urlObj.hash || urlObj.search;
+        
+        if (fragment.includes('access_token=')) {
+          const params = new URLSearchParams(fragment.replace('#', '').replace('?', ''));
+          const access_token = params.get('access_token');
+          const refresh_token = params.get('refresh_token');
+
+          if (access_token && refresh_token) {
+            console.log('[iOS Google] Setting session from tokens...');
+            
+            const { data, error } = await supabase.auth.setSession({
+              access_token,
+              refresh_token
+            });
+
+            if (error) {
+              cleanup();
+              reject(new Error(error.message));
+              return;
+            }
+
+            if (data.session) {
+              await processAuthSuccess(data.session);
+            } else {
+              cleanup();
+              reject(new Error('No session returned after setting tokens'));
+            }
+          } else {
+            cleanup();
+            reject(new Error('Missing tokens in callback URL'));
+          }
+        } else if (fragment.includes('error=')) {
+          const params = new URLSearchParams(fragment.replace('#', '').replace('?', ''));
+          const error = params.get('error_description') || params.get('error') || 'OAuth failed';
+          cleanup();
+          reject(new Error(error));
+        }
+      } catch (err: any) {
+        console.error('[iOS Google] Error handling deep link:', err);
+        cleanup();
+        reject(err);
+      }
+    };
+
     try {
-      // Set up auth state listener BEFORE opening browser
+      // Set up deep link listener BEFORE opening browser
+      // This is the key difference - we listen for appUrlOpen events
+      appUrlListener = await App.addListener('appUrlOpen', async (event: { url: string }) => {
+        console.log('[iOS Google] appUrlOpen event:', event.url);
+        await handleDeepLink(event.url);
+      });
+
+      // Also set up auth state listener as backup
       const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
         console.log('[iOS Google] Auth state changed:', event);
         
-        if (event === 'SIGNED_IN' && session) {
+        if (event === 'SIGNED_IN' && session && !hasProcessedAuth) {
           await processAuthSuccess(session);
         }
       });
       authSubscription = subscription;
 
-      // Generate OAuth URL
+      // Generate OAuth URL with deep link redirect
       const redirectTo = getRedirectUri('google');
+      console.log('[iOS Google] Redirect URI:', redirectTo);
+      
       const { data: oauthData, error: oauthError } = await supabase.auth.signInWithOAuth({
         provider: 'google',
         options: {
@@ -127,19 +220,19 @@ export const signInWithGoogleIOS = async (): Promise<{
         throw new Error(oauthError?.message || 'Failed to generate OAuth URL');
       }
 
-      // Handle browser finished event (user closed browser)
+      // Handle browser finished event (user closed browser manually)
       Browser.addListener('browserFinished', async () => {
         console.log('[iOS Google] Browser finished event');
         
         // Don't treat as cancelled if auth was already processed
         if (hasProcessedAuth) return;
 
-        // Give deep link a moment to process
-        await new Promise(r => setTimeout(r, 800));
+        // Give deep link handler a moment to process
+        await new Promise(r => setTimeout(r, 1000));
 
         if (hasProcessedAuth) return;
 
-        // Check one more time if we got a session
+        // Check one more time if we got a session (fallback)
         const { data: { session } } = await supabase.auth.getSession();
         if (session) {
           await processAuthSuccess(session);
@@ -151,7 +244,7 @@ export const signInWithGoogleIOS = async (): Promise<{
       });
 
       // Open Safari View Controller
-      browserOpenTime = Date.now();
+      console.log('[iOS Google] Opening Safari View Controller with URL:', oauthData.url);
       await Browser.open({
         url: oauthData.url,
         presentationStyle: 'popover',
