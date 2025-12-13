@@ -4,13 +4,16 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { useToast } from '@/hooks/use-toast';
-import { Trash2, Upload } from 'lucide-react';
+import { Trash2, Upload, Video, Image as ImageIcon, Volume2, VolumeX, Play } from 'lucide-react';
 import { Card, CardContent } from '@/components/ui/card';
 import { compressImage } from '@/utils/imageCompression';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 
 interface Ad {
   id: string;
   image_url: string;
+  video_url: string | null;
+  media_type: string;
   name: string;
   about: string;
   link: string | null;
@@ -26,6 +29,8 @@ const AdsManagement = () => {
     name: '',
     about: '',
     image_url: '',
+    video_url: '',
+    media_type: 'image',
     link: '',
     link_as: 'Click here'
   });
@@ -44,7 +49,7 @@ const AdsManagement = () => {
         .order('created_at', { ascending: false });
 
       if (error) throw error;
-      setAds(data || []);
+      setAds((data as Ad[]) || []);
     } catch (error) {
       console.error('Error fetching ads:', error);
       toast({
@@ -105,13 +110,81 @@ const AdsManagement = () => {
     }
   };
 
+  const handleVideoUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    // Check file size (max 50MB for video)
+    if (file.size > 50 * 1024 * 1024) {
+      toast({
+        title: 'Error',
+        description: 'Video must be smaller than 50MB',
+        variant: 'destructive'
+      });
+      return;
+    }
+
+    setUploading(true);
+    try {
+      const fileExt = file.name.split('.').pop() || 'mp4';
+      const fileName = `${Math.random().toString(36).slice(2)}.${fileExt}`;
+      const filePath = `ads/videos/${fileName}`;
+
+      const { error: uploadError } = await supabase.storage
+        .from('user-photos')
+        .upload(filePath, file, {
+          contentType: file.type,
+          cacheControl: '3600'
+        });
+
+      if (uploadError) throw uploadError;
+
+      const { data: { publicUrl } } = supabase.storage
+        .from('user-photos')
+        .getPublicUrl(filePath);
+
+      setFormData(prev => ({ ...prev, video_url: publicUrl }));
+      toast({
+        title: 'Success',
+        description: 'Video uploaded successfully'
+      });
+    } catch (error) {
+      console.error('Error uploading video:', error);
+      toast({
+        title: 'Error',
+        description: 'Failed to upload video',
+        variant: 'destructive'
+      });
+    } finally {
+      setUploading(false);
+    }
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
-    if (!formData.name || !formData.about || !formData.image_url) {
+    if (!formData.name || !formData.about) {
       toast({
         title: 'Error',
-        description: 'Please fill all fields and upload an image',
+        description: 'Please fill all required fields',
+        variant: 'destructive'
+      });
+      return;
+    }
+
+    if (formData.media_type === 'image' && !formData.image_url) {
+      toast({
+        title: 'Error',
+        description: 'Please upload an image',
+        variant: 'destructive'
+      });
+      return;
+    }
+
+    if (formData.media_type === 'video' && !formData.video_url) {
+      toast({
+        title: 'Error',
+        description: 'Please upload a video',
         variant: 'destructive'
       });
       return;
@@ -124,7 +197,9 @@ const AdsManagement = () => {
         .insert({
           name: formData.name,
           about: formData.about,
-          image_url: formData.image_url,
+          image_url: formData.image_url || 'https://via.placeholder.com/400x300',
+          video_url: formData.video_url || null,
+          media_type: formData.media_type,
           link: formData.link || null,
           link_as: formData.link_as || 'Click here'
         });
@@ -136,7 +211,7 @@ const AdsManagement = () => {
         description: 'Ad created successfully'
       });
 
-      setFormData({ name: '', about: '', image_url: '', link: '', link_as: 'Click here' });
+      setFormData({ name: '', about: '', image_url: '', video_url: '', media_type: 'image', link: '', link_as: 'Click here' });
       fetchAds();
     } catch (error) {
       console.error('Error creating ad:', error);
@@ -205,26 +280,74 @@ const AdsManagement = () => {
             </div>
 
             <div>
-              <label className="block text-sm font-medium mb-2">Image</label>
-              <div className="flex items-center gap-4">
-                <Input
-                  type="file"
-                  accept="image/*"
-                  onChange={handleImageUpload}
-                  disabled={uploading}
-                  className="flex-1"
-                />
-                {formData.image_url && (
-                  <img
-                    loading="lazy"
-                    decoding="async"
-                    src={formData.image_url} 
-                    alt="Preview" 
-                    className="w-20 h-20 object-cover rounded"
-                  />
-                )}
-              </div>
+              <label className="block text-sm font-medium mb-2">Media Type</label>
+              <Select 
+                value={formData.media_type} 
+                onValueChange={(value) => setFormData(prev => ({ ...prev, media_type: value }))}
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="Select media type" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="image">
+                    <div className="flex items-center gap-2">
+                      <ImageIcon className="w-4 h-4" />
+                      Image
+                    </div>
+                  </SelectItem>
+                  <SelectItem value="video">
+                    <div className="flex items-center gap-2">
+                      <Video className="w-4 h-4" />
+                      Video
+                    </div>
+                  </SelectItem>
+                </SelectContent>
+              </Select>
             </div>
+
+            {formData.media_type === 'image' && (
+              <div>
+                <label className="block text-sm font-medium mb-2">Image</label>
+                <div className="flex items-center gap-4">
+                  <Input
+                    type="file"
+                    accept="image/*"
+                    onChange={handleImageUpload}
+                    disabled={uploading}
+                    className="flex-1"
+                  />
+                  {formData.image_url && (
+                    <img
+                      loading="lazy"
+                      decoding="async"
+                      src={formData.image_url} 
+                      alt="Preview" 
+                      className="w-20 h-20 object-cover rounded"
+                    />
+                  )}
+                </div>
+              </div>
+            )}
+
+            {formData.media_type === 'video' && (
+              <div>
+                <label className="block text-sm font-medium mb-2">Video (max 50MB)</label>
+                <div className="flex items-center gap-4">
+                  <Input
+                    type="file"
+                    accept="video/*"
+                    onChange={handleVideoUpload}
+                    disabled={uploading}
+                    className="flex-1"
+                  />
+                  {formData.video_url && (
+                    <div className="w-20 h-20 bg-gray-100 rounded flex items-center justify-center">
+                      <Play className="w-8 h-8 text-gray-500" />
+                    </div>
+                  )}
+                </div>
+              </div>
+            )}
 
             <div>
               <label className="block text-sm font-medium mb-2">Link (Optional)</label>
@@ -268,16 +391,32 @@ const AdsManagement = () => {
               <Card key={ad.id}>
                 <CardContent className="pt-6">
                   <div className="flex gap-4">
-                    <img
-                      loading="lazy"
-                      decoding="async"
-                      src={ad.image_url} 
-                      alt={ad.name}
-                      className="w-24 h-24 object-cover rounded"
-                    />
+                    {ad.media_type === 'video' && ad.video_url ? (
+                      <div className="w-24 h-24 bg-gray-100 rounded flex items-center justify-center relative">
+                        <Video className="w-8 h-8 text-gray-500" />
+                        <div className="absolute bottom-1 right-1 bg-black/70 text-white text-xs px-1 rounded">
+                          Video
+                        </div>
+                      </div>
+                    ) : (
+                      <img
+                        loading="lazy"
+                        decoding="async"
+                        src={ad.image_url} 
+                        alt={ad.name}
+                        className="w-24 h-24 object-cover rounded"
+                      />
+                    )}
                     <div className="flex-1">
                       <h4 className="font-semibold">{ad.name}</h4>
                       <p className="text-sm text-gray-600 mt-1">{ad.about}</p>
+                      <div className="flex items-center gap-2 mt-1">
+                        {ad.media_type === 'video' ? (
+                          <span className="text-xs bg-blue-100 text-blue-600 px-2 py-0.5 rounded">Video</span>
+                        ) : (
+                          <span className="text-xs bg-green-100 text-green-600 px-2 py-0.5 rounded">Image</span>
+                        )}
+                      </div>
                       {ad.link && (
                         <a 
                           href={ad.link} 

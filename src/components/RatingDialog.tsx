@@ -1,6 +1,6 @@
 /**
  * Dynamic Rating Dialog Component
- * Shows platform-specific rating interface with smooth animations
+ * Shows platform-specific rating interface - triggered on second match
  */
 
 import React, { useState, useEffect } from 'react';
@@ -10,7 +10,6 @@ import { Star, X } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { 
   getRatingData, 
-  shouldShowRatingPopup, 
   markRatingShown, 
   markUserHasRated,
   incrementDismissCount 
@@ -23,17 +22,17 @@ import {
 } from '@/utils/ratingPlatform';
 
 interface RatingDialogProps {
-  /** Time in ms after login/app start before showing (default: 120000 = 2 minutes) */
-  initialDelay?: number;
-  /** Force show the dialog (for testing) */
-  forceShow?: boolean;
+  /** Force show the dialog (for testing or when triggered by match) */
+  show?: boolean;
+  /** Callback when dialog closes */
+  onClose?: () => void;
   /** Called when user completes rating */
   onRatingComplete?: (rating: number, platform: PlatformType) => void;
 }
 
 const RatingDialog: React.FC<RatingDialogProps> = ({ 
-  initialDelay = 120000, // 2 minutes
-  forceShow = false,
+  show = false,
+  onClose,
   onRatingComplete 
 }) => {
   const [isOpen, setIsOpen] = useState(false);
@@ -44,29 +43,19 @@ const RatingDialog: React.FC<RatingDialogProps> = ({
   const platform = detectPlatform();
 
   useEffect(() => {
-    // Check if we should show the rating dialog
-    const checkAndShowDialog = () => {
-      // Don't show if rating is not available
-      if (!isRatingAvailable() && !forceShow) {
-        return;
-      }
-
-      // Check storage conditions
-      if (!shouldShowRatingPopup() && !forceShow) {
-        return;
-      }
-
-      // Show after initial delay
-      const timer = setTimeout(() => {
+    if (show && isRatingAvailable()) {
+      const data = getRatingData();
+      if (!data.hasRated) {
         setIsOpen(true);
         markRatingShown();
-      }, initialDelay);
+      }
+    }
+  }, [show]);
 
-      return () => clearTimeout(timer);
-    };
-
-    checkAndShowDialog();
-  }, [initialDelay, forceShow]);
+  const handleClose = () => {
+    setIsOpen(false);
+    onClose?.();
+  };
 
   const handleStarClick = (rating: number) => {
     setSelectedRating(rating);
@@ -92,14 +81,12 @@ const RatingDialog: React.FC<RatingDialogProps> = ({
       // Mark as rated
       markUserHasRated(platform);
 
-      // Success: optionally handle silently without toast
-
       // Call callback
       if (onRatingComplete) {
         onRatingComplete(selectedRating || 5, platform);
       }
 
-      setIsOpen(false);
+      handleClose();
     } catch (error) {
       console.error('[RatingDialog] Error submitting rating:', error);
       toast({
@@ -114,27 +101,13 @@ const RatingDialog: React.FC<RatingDialogProps> = ({
 
   const handleMaybeLater = () => {
     incrementDismissCount();
-    setIsOpen(false);
+    handleClose();
   };
 
   // Don't allow closing by clicking outside - user must choose an action
   const handleOpenChange = (open: boolean) => {
     // Prevent closing unless user explicitly clicks a button
     return;
-  };
-
-  // Platform-specific messages
-  const getMessage = () => {
-    switch (platform) {
-      case 'ios':
-        return "Your feedback helps us improve DripLove for everyone";
-      case 'android':
-        return "Your feedback helps us improve DripLove for everyone";
-      case 'web':
-        return "Your feedback helps us improve DripLove for everyone";
-      default:
-        return "Your feedback helps us improve DripLove for everyone";
-    }
   };
 
   return (

@@ -1,11 +1,13 @@
-import React from 'react';
-import { ExternalLink } from 'lucide-react';
+import React, { useState, useRef, useEffect } from 'react';
+import { ExternalLink, Volume2, VolumeX } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 
 interface AdCardProps {
   ad: {
     id: string;
     image_url: string;
+    video_url?: string | null;
+    media_type?: string;
     name: string;
     about: string;
     link: string | null;
@@ -15,6 +17,19 @@ interface AdCardProps {
 }
 
 const AdCard: React.FC<AdCardProps> = ({ ad, onSwipe }) => {
+  const [isMuted, setIsMuted] = useState(true);
+  const videoRef = useRef<HTMLVideoElement>(null);
+  const isVideo = ad.media_type === 'video' && ad.video_url;
+
+  useEffect(() => {
+    // Auto-play video when card is displayed
+    if (isVideo && videoRef.current) {
+      videoRef.current.play().catch(() => {
+        // Ignore autoplay errors
+      });
+    }
+  }, [isVideo]);
+
   const handleLinkClick = (e: React.MouseEvent) => {
     e.stopPropagation();
     if (ad.link) {
@@ -22,15 +37,44 @@ const AdCard: React.FC<AdCardProps> = ({ ad, onSwipe }) => {
     }
   };
 
+  const toggleMute = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    setIsMuted(!isMuted);
+  };
+
   return (
     <div className="w-full h-full flex flex-col bg-white">
-      {/* Full-page Ad Image */}
+      {/* Full-page Ad Media */}
       <div className="flex-1 relative overflow-hidden">
-        <img loading="lazy" decoding="async"
-          src={ad.image_url}
-          alt={ad.name}
-          className="w-full h-full object-cover"
-        />
+        {isVideo ? (
+          <>
+            <video
+              ref={videoRef}
+              src={ad.video_url!}
+              muted={isMuted}
+              loop
+              playsInline
+              autoPlay
+              className="w-full h-full object-cover"
+            />
+            {/* Mute/Unmute Button */}
+            <button
+              onClick={toggleMute}
+              className="absolute top-4 right-4 bg-black/50 text-white p-2 rounded-full z-10"
+              aria-label={isMuted ? 'Unmute' : 'Mute'}
+            >
+              {isMuted ? <VolumeX className="w-5 h-5" /> : <Volume2 className="w-5 h-5" />}
+            </button>
+          </>
+        ) : (
+          <img 
+            loading="lazy" 
+            decoding="async"
+            src={ad.image_url}
+            alt={ad.name}
+            className="w-full h-full object-cover"
+          />
+        )}
         <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-transparent to-transparent" />
         
         {/* Ad Badge */}
