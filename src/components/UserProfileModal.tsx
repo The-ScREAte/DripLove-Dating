@@ -36,8 +36,12 @@ const UserProfileModal = ({ isOpen, onClose, userId, isAdmin = false }: UserProf
   const [editedGender, setEditedGender] = useState('');
   const [editedPreference, setEditedPreference] = useState('');
   const [editedCountry, setEditedCountry] = useState('');
+  const [editedCity, setEditedCity] = useState('');
   const [editedMinAge, setEditedMinAge] = useState('');
   const [editedMaxAge, setEditedMaxAge] = useState('');
+  const [editedMaxDistance, setEditedMaxDistance] = useState('');
+  const [editedRelationshipIntent, setEditedRelationshipIntent] = useState('');
+  const [editedUnlockedCountries, setEditedUnlockedCountries] = useState<string[]>([]);
   const [savingPreferences, setSavingPreferences] = useState(false);
 
   // Delete image from DB and storage
@@ -84,8 +88,12 @@ const UserProfileModal = ({ isOpen, onClose, userId, isAdmin = false }: UserProf
       setEditedGender(profile.gender || '');
       setEditedPreference(profile.preference || '');
       setEditedCountry(profile.country || '');
+      setEditedCity(profile.city || '');
       setEditedMinAge(profile.min_age?.toString() || '18');
       setEditedMaxAge(profile.max_age?.toString() || '99');
+      setEditedMaxDistance(profile.max_distance?.toString() || '250');
+      setEditedRelationshipIntent(profile.relationship_intent || '');
+      setEditedUnlockedCountries(profile.unlocked_countries || []);
     }
   }, [profile]);
 
@@ -145,8 +153,12 @@ const UserProfileModal = ({ isOpen, onClose, userId, isAdmin = false }: UserProf
           gender: editedGender || null,
           preference: editedPreference || null,
           country: editedCountry || null,
+          city: editedCity || null,
           min_age: parseInt(editedMinAge) || 18,
           max_age: parseInt(editedMaxAge) || 99,
+          max_distance: parseInt(editedMaxDistance) || 250,
+          relationship_intent: editedRelationshipIntent || null,
+          unlocked_countries: editedUnlockedCountries,
         })
         .eq('id', userId);
 
@@ -158,8 +170,12 @@ const UserProfileModal = ({ isOpen, onClose, userId, isAdmin = false }: UserProf
         gender: editedGender,
         preference: editedPreference,
         country: editedCountry,
+        city: editedCity,
         min_age: parseInt(editedMinAge) || 18,
         max_age: parseInt(editedMaxAge) || 99,
+        max_distance: parseInt(editedMaxDistance) || 250,
+        relationship_intent: editedRelationshipIntent,
+        unlocked_countries: editedUnlockedCountries,
       }));
 
       setIsEditingPreferences(false);
@@ -343,8 +359,12 @@ const UserProfileModal = ({ isOpen, onClose, userId, isAdmin = false }: UserProf
                               setEditedGender(profile?.gender || '');
                               setEditedPreference(profile?.preference || '');
                               setEditedCountry(profile?.country || '');
+                              setEditedCity(profile?.city || '');
                               setEditedMinAge(profile?.min_age?.toString() || '18');
                               setEditedMaxAge(profile?.max_age?.toString() || '99');
+                              setEditedMaxDistance(profile?.max_distance?.toString() || '250');
+                              setEditedRelationshipIntent(profile?.relationship_intent || '');
+                              setEditedUnlockedCountries(profile?.unlocked_countries || []);
                             }}
                             className="h-7 text-xs"
                           >
@@ -393,24 +413,52 @@ const UserProfileModal = ({ isOpen, onClose, userId, isAdmin = false }: UserProf
                             </Select>
                           </div>
                         </div>
-                        
+
                         <div>
-                          <label className="text-xs font-medium text-gray-600 mb-1 block">Country</label>
-                          <Select value={editedCountry} onValueChange={setEditedCountry}>
+                          <label className="text-xs font-medium text-gray-600 mb-1 block">Relationship Intent</label>
+                          <Select value={editedRelationshipIntent} onValueChange={setEditedRelationshipIntent}>
                             <SelectTrigger className="h-8 text-xs">
-                              <SelectValue placeholder="Select country" />
+                              <SelectValue placeholder="Select intent" />
                             </SelectTrigger>
-                            <SelectContent className="max-h-60">
-                              {getCountriesList().map(country => (
-                                <SelectItem key={country.code} value={country.name} className="text-xs">
-                                  {country.name}
-                                </SelectItem>
-                              ))}
+                            <SelectContent>
+                              <SelectItem value="serious" className="text-xs">Serious</SelectItem>
+                              <SelectItem value="long-term" className="text-xs">Long-term</SelectItem>
+                              <SelectItem value="casual" className="text-xs">Casual</SelectItem>
+                              <SelectItem value="open_to_anything" className="text-xs">Open to Anything</SelectItem>
+                              <SelectItem value="not-sure" className="text-xs">Not Sure</SelectItem>
                             </SelectContent>
                           </Select>
                         </div>
                         
                         <div className="grid grid-cols-2 gap-3">
+                          <div>
+                            <label className="text-xs font-medium text-gray-600 mb-1 block">Country</label>
+                            <Select value={editedCountry} onValueChange={setEditedCountry}>
+                              <SelectTrigger className="h-8 text-xs">
+                                <SelectValue placeholder="Select country" />
+                              </SelectTrigger>
+                              <SelectContent className="max-h-60">
+                                {getCountriesList().map(country => (
+                                  <SelectItem key={country.code} value={country.name} className="text-xs">
+                                    {country.name}
+                                  </SelectItem>
+                                ))}
+                              </SelectContent>
+                            </Select>
+                          </div>
+                          <div>
+                            <label className="text-xs font-medium text-gray-600 mb-1 block">City</label>
+                            <Input
+                              type="text"
+                              value={editedCity}
+                              onChange={(e) => setEditedCity(e.target.value)}
+                              placeholder="Enter city"
+                              className="h-8 text-xs"
+                            />
+                          </div>
+                        </div>
+                        
+                        <div className="grid grid-cols-3 gap-3">
                           <div>
                             <label className="text-xs font-medium text-gray-600 mb-1 block">Min Age</label>
                             <Input
@@ -433,25 +481,114 @@ const UserProfileModal = ({ isOpen, onClose, userId, isAdmin = false }: UserProf
                               className="h-8 text-xs"
                             />
                           </div>
+                          <div>
+                            <label className="text-xs font-medium text-gray-600 mb-1 block">Max Distance (km)</label>
+                            <Input
+                              type="number"
+                              value={editedMaxDistance}
+                              onChange={(e) => setEditedMaxDistance(e.target.value)}
+                              min="1"
+                              max="500"
+                              className="h-8 text-xs"
+                            />
+                          </div>
+                        </div>
+
+                        {/* Unlocked Countries */}
+                        <div>
+                          <label className="text-xs font-medium text-gray-600 mb-1 block">Unlocked Countries (Premium)</label>
+                          <div className="flex flex-wrap gap-1 mb-2">
+                            {editedUnlockedCountries.map((code: string) => {
+                              const country = getCountriesList().find(c => c.code === code);
+                              return (
+                                <Badge key={code} variant="secondary" className="text-xs flex items-center gap-1">
+                                  {country?.name || code}
+                                  <button
+                                    onClick={() => setEditedUnlockedCountries(prev => prev.filter(c => c !== code))}
+                                    className="ml-1 hover:text-red-500"
+                                  >
+                                    <X className="w-3 h-3" />
+                                  </button>
+                                </Badge>
+                              );
+                            })}
+                            {editedUnlockedCountries.length === 0 && (
+                              <span className="text-xs text-gray-400">No countries unlocked</span>
+                            )}
+                          </div>
+                          {editedUnlockedCountries.length < 3 && (
+                            <Select 
+                              value="" 
+                              onValueChange={(code) => {
+                                if (code && !editedUnlockedCountries.includes(code)) {
+                                  setEditedUnlockedCountries(prev => [...prev, code]);
+                                }
+                              }}
+                            >
+                              <SelectTrigger className="h-8 text-xs">
+                                <SelectValue placeholder="Add country..." />
+                              </SelectTrigger>
+                              <SelectContent className="max-h-60">
+                                {getCountriesList()
+                                  .filter(c => !editedUnlockedCountries.includes(c.code))
+                                  .map(country => (
+                                    <SelectItem key={country.code} value={country.code} className="text-xs">
+                                      {country.name}
+                                    </SelectItem>
+                                  ))}
+                              </SelectContent>
+                            </Select>
+                          )}
                         </div>
                       </div>
                     ) : (
-                      <div className="grid grid-cols-2 gap-3 text-sm">
-                        <div>
-                          <span className="text-gray-500 text-xs">Gender:</span>
-                          <p className="font-medium capitalize">{profile?.gender || 'Not set'}</p>
-                        </div>
-                        <div>
-                          <span className="text-gray-500 text-xs">Looking For:</span>
-                          <p className="font-medium capitalize">{profile?.preference || 'Not set'}</p>
-                        </div>
-                        <div>
-                          <span className="text-gray-500 text-xs">Country:</span>
-                          <p className="font-medium">{profile?.country || 'Not set'}</p>
-                        </div>
-                        <div>
-                          <span className="text-gray-500 text-xs">Age Range:</span>
-                          <p className="font-medium">{profile?.min_age || 18} - {profile?.max_age || 99}</p>
+                      <div className="space-y-3">
+                        <div className="grid grid-cols-2 gap-3 text-sm">
+                          <div>
+                            <span className="text-gray-500 text-xs">Gender:</span>
+                            <p className="font-medium capitalize">{profile?.gender || 'Not set'}</p>
+                          </div>
+                          <div>
+                            <span className="text-gray-500 text-xs">Looking For:</span>
+                            <p className="font-medium capitalize">{profile?.preference || 'Not set'}</p>
+                          </div>
+                          <div>
+                            <span className="text-gray-500 text-xs">Relationship Intent:</span>
+                            <p className="font-medium capitalize">{profile?.relationship_intent?.replace(/_/g, ' ') || 'Not set'}</p>
+                          </div>
+                          <div>
+                            <span className="text-gray-500 text-xs">Age Range:</span>
+                            <p className="font-medium">{profile?.min_age || 18} - {profile?.max_age || 99}</p>
+                          </div>
+                          <div>
+                            <span className="text-gray-500 text-xs">Country:</span>
+                            <p className="font-medium">{profile?.country || 'Not set'}</p>
+                          </div>
+                          <div>
+                            <span className="text-gray-500 text-xs">City:</span>
+                            <p className="font-medium">{profile?.city || 'Not set'}</p>
+                          </div>
+                          <div>
+                            <span className="text-gray-500 text-xs">Max Distance:</span>
+                            <p className="font-medium">{profile?.max_distance || 250} km</p>
+                          </div>
+                          <div>
+                            <span className="text-gray-500 text-xs">Unlocked Countries:</span>
+                            <div className="flex flex-wrap gap-1 mt-1">
+                              {profile?.unlocked_countries?.length > 0 ? (
+                                profile.unlocked_countries.map((code: string) => {
+                                  const country = getCountriesList().find(c => c.code === code);
+                                  return (
+                                    <Badge key={code} variant="outline" className="text-[10px] px-1.5 py-0">
+                                      {country?.name || code}
+                                    </Badge>
+                                  );
+                                })
+                              ) : (
+                                <span className="text-xs text-gray-400">None</span>
+                              )}
+                            </div>
+                          </div>
                         </div>
                       </div>
                     )}
