@@ -74,6 +74,45 @@ export type Database = {
         }
         Relationships: []
       }
+      app_update_config: {
+        Row: {
+          app_store_url: string | null
+          created_at: string
+          current_version: string
+          id: string
+          is_enabled: boolean
+          play_store_url: string | null
+          target_platform: string
+          universal_link: string | null
+          update_message: string | null
+          updated_at: string
+        }
+        Insert: {
+          app_store_url?: string | null
+          created_at?: string
+          current_version?: string
+          id?: string
+          is_enabled?: boolean
+          play_store_url?: string | null
+          target_platform?: string
+          universal_link?: string | null
+          update_message?: string | null
+          updated_at?: string
+        }
+        Update: {
+          app_store_url?: string | null
+          created_at?: string
+          current_version?: string
+          id?: string
+          is_enabled?: boolean
+          play_store_url?: string | null
+          target_platform?: string
+          universal_link?: string | null
+          update_message?: string | null
+          updated_at?: string
+        }
+        Relationships: []
+      }
       blocks: {
         Row: {
           blocked_id: string

@@ -18,6 +18,7 @@ import UserPoolDebugger from './admin/UserPoolDebugger';
 import CountryManagement from './admin/CountryManagement';
 import ImageModerationPanel from './admin/ImageModerationPanel';
 import FaceManagement from './admin/FaceManagement';
+import AppUpdateSettings from './admin/AppUpdateSettings';
 
 import ManualPremiumManager from './admin/ManualPremiumManager';
 import AdsManagement from './admin/AdsManagement';
@@ -1987,6 +1988,9 @@ const AdminPageComponent = ({ currentUser, onLogout }: AdminPageProps) => {
 
             {/* Settings Tab */}
             <TabsContent value="settings" className="space-y-4">
+              {/* App Update Settings */}
+              <AppUpdateSettings />
+
               {/* Payment Configuration */}
               <Card>
                 <CardHeader className="pb-3">
@@ -2000,6 +2004,7 @@ const AdminPageComponent = ({ currentUser, onLogout }: AdminPageProps) => {
                 </CardContent>
               </Card>
             </TabsContent>
+
 
             {/* Faces Tab */}
             <TabsContent value="faces" className="space-y-4">
