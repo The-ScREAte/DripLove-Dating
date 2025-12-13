@@ -102,26 +102,19 @@ export const useOAuth = () => {
             throw new Error('Native Google Sign-In is not available on this device');
           }
 
+          // signInWithGoogleNative throws on error and returns user/profile data on success
           const result = await signInWithGoogleNative();
-          
-          if (result.success && result.user) {
-            console.log('[useOAuth Android Google] ✅ Success');
-            setOauthLoading(null);
-            
-            // Check profile completeness
-            const { data: profile } = await supabase
-              .from('profiles')
-              .select('id, first_name, last_name')
-              .eq('id', result.user.id)
-              .maybeSingle();
 
-            if (!profile || !profile.first_name || !profile.last_name) {
-              navigate('/complete-profile');
-            } else {
-              navigate('/');
-            }
+          console.log('[useOAuth Android Google] ✅ Success');
+          setOauthLoading(null);
+          
+          // Check profile completeness using helper result
+          const needsProfileCompletion = result.needsProfileCompletion;
+
+          if (needsProfileCompletion) {
+            navigate('/complete-profile');
           } else {
-            throw new Error(result.error || 'Google Sign-In failed');
+            navigate('/');
           }
         } catch (err: any) {
           console.error('[useOAuth Android Google] ❌ Error:', err);
@@ -193,25 +186,17 @@ export const useOAuth = () => {
               throw new Error('Apple Sign-In is not available on this device');
             }
 
+            // signInWithAppleNativeModal throws on error and returns user/profile data on success
             const result = await signInWithAppleNativeModal();
-            
-            if (result.success && result.user) {
-              console.log('[useOAuth Apple iOS] ✅ Success');
-              setOauthLoading(null);
-              
-              const { data: profile } = await supabase
-                .from('profiles')
-                .select('id, first_name, last_name')
-                .eq('id', result.user.id)
-                .maybeSingle();
+            console.log('[useOAuth Apple iOS] ✅ Success');
+            setOauthLoading(null);
 
-              if (!profile || !profile.first_name || !profile.last_name) {
-                navigate('/complete-profile');
-              } else {
-                navigate('/');
-              }
+            const needsProfileCompletion = result.needsProfileCompletion;
+
+            if (needsProfileCompletion) {
+              navigate('/complete-profile');
             } else {
-              throw new Error(result.error || 'Apple Sign-In failed');
+              navigate('/');
             }
           } 
           // Web Apple Sign-In

@@ -36,8 +36,15 @@ export const useMobileOAuth = () => {
     const handleAppUrlOpen = async (event: { url: string }) => {
       console.log('[useMobileOAuth] 🔗 Deep link received:', event.url);
       
-      // Handle OAuth callback
-      if (event.url.startsWith('driplove://auth/callback')) {
+      // Handle OAuth callback from Supabase (Google / Apple)
+      // Supabase may redirect to either driplove://auth/callback or just driplove://
+      // We must also avoid hijacking password reset links (driplove://reset-password)
+      const isOAuthCallback = (
+        (event.url.startsWith('driplove://auth/callback') || event.url === 'driplove://') &&
+        !event.url.startsWith('driplove://reset-password')
+      );
+
+      if (isOAuthCallback) {
         console.log('[useMobileOAuth] ✅ OAuth callback detected!');
         
         // Close Safari View Controller if it's open

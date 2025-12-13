@@ -18,6 +18,8 @@ interface AuthFormProps {
   isLogin: boolean;
   onToggle: () => void;
   onBack?: () => void;
+  // Optional callback for OAuth-based flows (currently unused but kept for compatibility)
+  onOAuthSuccess?: (needsCompletion: boolean) => void;
 }
 
 const AuthForm = ({ isLogin, onToggle, onBack }: AuthFormProps) => {
