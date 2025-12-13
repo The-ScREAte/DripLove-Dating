@@ -477,92 +477,120 @@ const AuthForm = ({ isLogin, onToggle, onOAuthSuccess, onBack }: AuthFormProps) 
             // Navigate popup to OAuth URL
             popup.location.href = oauthData.url;
 
-            // Poll for session while popup is open
+            // Handle OAuth completion via both postMessage and polling
             let sessionCheckInterval: NodeJS.Timeout | null = null;
             let hasProcessedSession = false;
+
+            const cleanup = () => {
+              if (sessionCheckInterval) {
+                clearInterval(sessionCheckInterval);
+                sessionCheckInterval = null;
+              }
+              window.removeEventListener('message', handleMessage);
+              removeOverlay();
+            };
+
+            const processSession = async () => {
+              if (hasProcessedSession) return;
+              hasProcessedSession = true;
+              cleanup();
+              
+              try {
+                popup.close();
+              } catch (e) {
+                // Popup already closed
+              }
+              
+              try {
+                const { data: { session } } = await supabase.auth.getSession();
+                if (!session) {
+                  throw new Error('No session found');
+                }
+                
+                // Check if profile exists (don't create it)
+                const profile = await checkProfileExists(session.user.id);
+                
+                // Determine if profile needs completion
+                let needsProfileCompletion = false;
+                if (!profile) {
+                  needsProfileCompletion = true;
+                } else {
+                  needsProfileCompletion = !profile.first_name || 
+                    profile.first_name === 'User' ||
+                    !profile.bio || 
+                    profile.date_of_birth === '1990-01-01' ||
+                    !profile.city || 
+                    profile.city === 'Unknown' ||
+                    !profile.country;
+                }
+                
+                // Save current language to user's profile
+                await saveLanguageToProfile(session.user.id);
+                
+                setOauthLoading(null);
+                
+                if (needsProfileCompletion) {
+                  navigate('/complete-profile');
+                } else {
+                  navigate('/');
+                }
+              } catch (error) {
+                console.error('Error during post-login processing:', error);
+                setOauthLoading(null);
+                navigate('/complete-profile');
+              }
+            };
+
+            // Listen for postMessage from popup
+            const handleMessage = (event: MessageEvent) => {
+              if (event.origin !== window.location.origin) return;
+              if (event.data?.type === 'oauth_complete') {
+                console.log('[AuthForm] Received oauth_complete message:', event.data);
+                if (event.data.success) {
+                  processSession();
+                } else {
+                  hasProcessedSession = true;
+                  cleanup();
+                  toast({
+                    title: t('auth.authenticationError'),
+                    description: event.data.error || 'Authentication failed',
+                    variant: 'destructive',
+                  });
+                  setOauthLoading(null);
+                }
+              }
+            };
+            window.addEventListener('message', handleMessage);
 
             const checkForSession = async () => {
               if (hasProcessedSession) return;
               
-              // Check if popup was closed
+              // Check if popup was closed without completing
               if (popup.closed) {
-                if (sessionCheckInterval) {
-                  clearInterval(sessionCheckInterval);
-                  sessionCheckInterval = null;
+                // Wait a bit and check for session one more time
+                // (popup might have closed after setting session)
+                await new Promise(resolve => setTimeout(resolve, 500));
+                const { data: { session } } = await supabase.auth.getSession();
+                if (session) {
+                  processSession();
+                  return;
                 }
                 
-                removeOverlay();
-                
-                if (!hasProcessedSession) {
-                  toast({
-                    title: t('auth.authenticationCancelled'),
-                    description: t('auth.googleSignInCancelled'),
-                    variant: 'default',
-                  });
-                  setOauthLoading(null);
-                }
+                hasProcessedSession = true;
+                cleanup();
+                toast({
+                  title: t('auth.authenticationCancelled'),
+                  description: t('auth.googleSignInCancelled'),
+                  variant: 'default',
+                });
+                setOauthLoading(null);
                 return;
               }
               
+              // Also poll for session in case postMessage doesn't work
               const { data: { session } } = await supabase.auth.getSession();
-              
               if (session) {
-                hasProcessedSession = true;
-                
-                // Clear interval
-                if (sessionCheckInterval) {
-                  clearInterval(sessionCheckInterval);
-                  sessionCheckInterval = null;
-                }
-                
-                // Remove overlay and close popup
-                removeOverlay();
-                
-                // Close popup
-                try {
-                  popup.close();
-                } catch (e) {
-                  // Popup already closed
-                }
-                
-                try {
-                  // Check if profile exists (don't create it)
-                  const profile = await checkProfileExists(session.user.id);
-                  await new Promise(resolve => setTimeout(resolve, 300));
-                  
-                  // Determine if profile needs completion
-                  let needsProfileCompletion = false;
-                  if (!profile) {
-                    // No profile exists - user needs to complete profile
-                    needsProfileCompletion = true;
-                  } else {
-                    // Profile exists - check if it's complete
-                    needsProfileCompletion = !profile.first_name || 
-                      profile.first_name === 'User' ||
-                      !profile.bio || 
-                      profile.date_of_birth === '1990-01-01' ||
-                      !profile.city || 
-                      profile.city === 'Unknown' ||
-                      !profile.country;
-                  }
-                  
-                  // Save current language to user's profile
-                  await saveLanguageToProfile(session.user.id);
-                  
-                  await new Promise(resolve => setTimeout(resolve, 500));
-                  setOauthLoading(null);
-                  
-                  // Navigate - main page stays, no redirect
-                  if (needsProfileCompletion) {
-                    navigate('/complete-profile');
-                  } else {
-                    navigate('/');
-                  }
-                } catch (error) {
-                  console.error('Error during post-login processing:', error);
-                  setOauthLoading(null);
-                  navigate('/complete-profile');
-                }
+                processSession();
               }
             };
 

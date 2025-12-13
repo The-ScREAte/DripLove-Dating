@@ -388,81 +388,113 @@ const WelcomeScreen: React.FC<WelcomeScreenProps> = ({ onLogin, onAbout, onTerms
 
             popup.location.href = oauthData.url;
 
+            // Handle OAuth completion via both postMessage and polling
             let sessionCheckInterval: NodeJS.Timeout | null = null;
             let hasProcessedSession = false;
+
+            const cleanup = () => {
+              if (sessionCheckInterval) {
+                clearInterval(sessionCheckInterval);
+                sessionCheckInterval = null;
+              }
+              window.removeEventListener('message', handleMessage);
+              removeOverlay();
+            };
+
+            const processSession = async () => {
+              if (hasProcessedSession) return;
+              hasProcessedSession = true;
+              cleanup();
+              
+              try {
+                popup.close();
+              } catch (e) {
+                // Popup already closed
+              }
+              
+              try {
+                const { data: { session } } = await supabase.auth.getSession();
+                if (!session) {
+                  throw new Error('No session found');
+                }
+                
+                const profile = await checkProfileExists(session.user.id);
+                
+                let needsProfileCompletion = false;
+                if (!profile) {
+                  needsProfileCompletion = true;
+                } else {
+                  needsProfileCompletion = !profile.first_name || 
+                    profile.first_name === 'User' ||
+                    !profile.bio || 
+                    profile.date_of_birth === '1990-01-01' ||
+                    !profile.city || 
+                    profile.city === 'Unknown' ||
+                    !profile.country;
+                }
+                
+                await saveLanguageToProfile(session.user.id);
+                
+                setOauthLoading(null);
+                
+                if (needsProfileCompletion) {
+                  navigate('/complete-profile');
+                } else {
+                  navigate('/');
+                }
+              } catch (error) {
+                console.error('Error during post-login processing:', error);
+                setOauthLoading(null);
+                navigate('/complete-profile');
+              }
+            };
+
+            // Listen for postMessage from popup
+            const handleMessage = (event: MessageEvent) => {
+              if (event.origin !== window.location.origin) return;
+              if (event.data?.type === 'oauth_complete') {
+                console.log('[WelcomeScreen] Received oauth_complete message:', event.data);
+                if (event.data.success) {
+                  processSession();
+                } else {
+                  hasProcessedSession = true;
+                  cleanup();
+                  toast({
+                    title: t('auth.authenticationError'),
+                    description: event.data.error || 'Authentication failed',
+                    variant: 'destructive',
+                  });
+                  setOauthLoading(null);
+                }
+              }
+            };
+            window.addEventListener('message', handleMessage);
 
             const checkForSession = async () => {
               if (hasProcessedSession) return;
               
               if (popup.closed) {
-                if (sessionCheckInterval) {
-                  clearInterval(sessionCheckInterval);
-                  sessionCheckInterval = null;
+                await new Promise(resolve => setTimeout(resolve, 500));
+                const { data: { session } } = await supabase.auth.getSession();
+                if (session) {
+                  processSession();
+                  return;
                 }
                 
-                removeOverlay();
-                
-                if (!hasProcessedSession) {
-                  toast({
-                    title: t('auth.authenticationCancelled'),
-                    description: t('auth.googleSignInCancelled'),
-                    variant: 'default',
-                  });
-                  setOauthLoading(null);
-                }
+                hasProcessedSession = true;
+                cleanup();
+                toast({
+                  title: t('auth.authenticationCancelled'),
+                  description: t('auth.googleSignInCancelled'),
+                  variant: 'default',
+                });
+                setOauthLoading(null);
                 return;
               }
               
               const { data: { session } } = await supabase.auth.getSession();
-              
               if (session) {
-                hasProcessedSession = true;
-                
-                if (sessionCheckInterval) {
-                  clearInterval(sessionCheckInterval);
-                  sessionCheckInterval = null;
-                }
-                
-                removeOverlay();
-                
-                try {
-                  popup.close();
-                } catch (e) {
-                  // Popup already closed
-                }
-                
-                try {
-                  const profile = await checkProfileExists(session.user.id);
-                  await new Promise(resolve => setTimeout(resolve, 300));
-                  
-                  let needsProfileCompletion = false;
-                  if (!profile) {
-                    needsProfileCompletion = true;
-                  } else {
-                    needsProfileCompletion = !profile.first_name || 
-                      profile.first_name === 'User' ||
-                      !profile.bio || 
-                      profile.date_of_birth === '1990-01-01' ||
-                      !profile.city || 
-                      profile.city === 'Unknown' ||
-                      !profile.country;
-                  }
-                  
-                  await saveLanguageToProfile(session.user.id);
-                  
-                  await new Promise(resolve => setTimeout(resolve, 500));
-                  setOauthLoading(null);
-                  
-                  if (needsProfileCompletion) {
-                    navigate('/complete-profile');
-                  } else {
-                    navigate('/');
-                  }
-                } catch (error) {
-                  console.error('Error during post-login processing:', error);
-                  setOauthLoading(null);
-                  navigate('/complete-profile');
-                }
+                processSession();
               }
             };
 
