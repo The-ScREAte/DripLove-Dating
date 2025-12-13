@@ -154,9 +154,9 @@ const ImageManagement = ({ currentUser, profile, onProfileUpdate }: ImageManagem
     const file = event.target.files?.[0];
     if (!file) return;
 
-    // Allow upload if replacing OR if under 7 images
-    if (!replacingImageUrl && userImages.length >= 7) {
-      toast({ title: "Maximum images reached", description: "You can upload a maximum of 7 images.", variant: "destructive" });
+    // Allow upload if replacing OR if under 5 images
+    if (!replacingImageUrl && userImages.length >= 5) {
+      toast({ title: "Maximum images reached", description: "You can upload a maximum of 5 images.", variant: "destructive" });
       return;
     }
 
@@ -607,7 +607,7 @@ const ImageManagement = ({ currentUser, profile, onProfileUpdate }: ImageManagem
             </div>
           </div>
         )}
-        {userImages.length < 7 && (
+        {userImages.length < 5 && (
           <div className="mb-6">
             <Label htmlFor="image_upload" className="block mb-2">{t('profile.uploadImage')}</Label>
             

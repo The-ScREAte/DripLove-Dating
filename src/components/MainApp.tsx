@@ -1210,8 +1210,7 @@ const MainApp = ({ user, onLogout }: MainAppProps) => {
         )}
       </div>
 
-      {/* Rating Dialog - Shows after 2 minutes, then weekly */}
-      <RatingDialog initialDelay={120000} />
+      {/* Rating Dialog - Now triggered by matches instead of timer */}
 
       {/* App Update Popup - Shows on native apps when update is available */}
       <AppUpdatePopup />

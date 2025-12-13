@@ -1991,7 +1991,8 @@ const ChatPage = ({ currentUser, onUnreadChange, onDetailViewChange }: ChatPageP
       />
 
       <RatingDialog 
-        forceShow={showRatingDialog}
+        show={showRatingDialog}
+        onClose={() => setShowRatingDialog(false)}
         onRatingComplete={() => setShowRatingDialog(false)}
       />
     </div>

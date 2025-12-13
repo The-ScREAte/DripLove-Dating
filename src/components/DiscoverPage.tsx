@@ -53,6 +53,8 @@ import SwipeButtons from './discover/SwipeButtons';
 import ProfileCompletionModal from './ProfileCompletionModal';
 import SwipeCounter from './SwipeCounter';
 import AdCard from './discover/AdCard';
+import RatingDialog from './RatingDialog';
+import { incrementMatchCount } from '@/utils/ratingStorage';
 import { CurrentUser, PotentialMatch } from '@/types';
 
 // ⭐ ANDROID OPTIMIZATION: Global abort controller for canceling image loads on swipe
@@ -124,6 +126,7 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, isPremium }: DiscoverPage
   const [isOutOfSwipes, setIsOutOfSwipes] = useState(false);
   const [showMatchAnimation, setShowMatchAnimation] = useState(false);
   const [matchedUser, setMatchedUser] = useState<PotentialMatch | null>(null);
+  const [showRatingDialog, setShowRatingDialog] = useState(false);
   const [ads, setAds] = useState<AdData[]>([]);
   const [realSwipeCount, setRealSwipeCount] = useState(0); // Track actual user swipes (excluding ads)
   // New: Store images by userId for instant access
@@ -1604,6 +1607,11 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, isPremium }: DiscoverPage
               setMatchedUser(prevMatch);
               setShowMatchAnimation(true);
               
+              // Check if rating dialog should be shown (on 2nd match)
+              if (incrementMatchCount()) {
+                setTimeout(() => setShowRatingDialog(true), 2000); // Show after match animation
+              }
+              
               // Clear chat cache to force refresh when user opens ChatPage
               if (typeof window !== 'undefined' && (window as any).chatMatchesCache) {
                 (window as any).chatMatchesCache.delete(currentUser.id);
@@ -1642,6 +1650,11 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, isPremium }: DiscoverPage
           if ((rpcData as any)?.match) {
             setMatchedUser(prevMatch);
             setShowMatchAnimation(true);
+            
+            // Check if rating dialog should be shown (on 2nd match)
+            if (incrementMatchCount()) {
+              setTimeout(() => setShowRatingDialog(true), 2000); // Show after match animation
+            }
             
             // Clear chat cache to force refresh when user opens ChatPage
             if (typeof window !== 'undefined' && (window as any).chatMatchesCache) {
@@ -2566,6 +2579,13 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, isPremium }: DiscoverPage
         />
       </div>
       </div>
+      
+      {/* Rating Dialog - Shows on 2nd match, then every 3 weeks */}
+      <RatingDialog 
+        show={showRatingDialog}
+        onClose={() => setShowRatingDialog(false)}
+        onRatingComplete={() => setShowRatingDialog(false)}
+      />
     </>
   );
 }

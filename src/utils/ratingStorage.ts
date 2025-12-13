@@ -10,6 +10,7 @@ export interface RatingStorageData {
   hasRated: boolean;
   dismissCount: number;
   platform: 'ios' | 'android' | 'web' | null;
+  matchCount: number;
 }
 
 /**
@@ -30,6 +31,7 @@ export const getRatingData = (): RatingStorageData => {
     hasRated: false,
     dismissCount: 0,
     platform: null,
+    matchCount: 0,
   };
 };
 
@@ -47,7 +49,8 @@ export const saveRatingData = (data: Partial<RatingStorageData>): void => {
 };
 
 /**
- * Check if enough time has passed to show the rating pop-up
+ * Check if we should show the rating pop-up based on match count
+ * Shows on second match, then again after 3 weeks
  */
 export const shouldShowRatingPopup = (): boolean => {
   const data = getRatingData();
@@ -59,16 +62,42 @@ export const shouldShowRatingPopup = (): boolean => {
   
   const now = Date.now();
   
-  // First time - show after 2 minutes (120000ms)
+  // First time - check if we have at least 2 matches
   if (data.lastShown === null) {
-    return true; // Will be shown after 2 minutes by the component
+    return data.matchCount >= 2;
   }
   
-  // Subsequent shows - check if 7 days have passed
-  const sevenDays = 7 * 24 * 60 * 60 * 1000; // 7 days in milliseconds
+  // Subsequent shows - check if 3 weeks have passed
+  const threeWeeks = 21 * 24 * 60 * 60 * 1000; // 3 weeks in milliseconds
   const timeSinceLastShown = now - data.lastShown;
   
-  return timeSinceLastShown >= sevenDays;
+  return timeSinceLastShown >= threeWeeks;
+};
+
+/**
+ * Increment match count and check if rating should be shown
+ * Returns true if the rating popup should be triggered
+ */
+export const incrementMatchCount = (): boolean => {
+  const data = getRatingData();
+  const newCount = data.matchCount + 1;
+  saveRatingData({ matchCount: newCount });
+  
+  // Show on exactly 2nd match if never shown before
+  if (data.lastShown === null && newCount === 2 && !data.hasRated) {
+    return true;
+  }
+  
+  // Also check for recurring (3 weeks passed)
+  if (data.lastShown !== null && !data.hasRated) {
+    const threeWeeks = 21 * 24 * 60 * 60 * 1000;
+    const timeSinceLastShown = Date.now() - data.lastShown;
+    if (timeSinceLastShown >= threeWeeks) {
+      return true;
+    }
+  }
+  
+  return false;
 };
 
 /**

@@ -52,7 +52,9 @@ export type Database = {
           image_url: string
           link: string | null
           link_as: string | null
+          media_type: string
           name: string
+          video_url: string | null
         }
         Insert: {
           about: string
@@ -61,7 +63,9 @@ export type Database = {
           image_url: string
           link?: string | null
           link_as?: string | null
+          media_type?: string
           name: string
+          video_url?: string | null
         }
         Update: {
           about?: string
@@ -70,7 +74,9 @@ export type Database = {
           image_url?: string
           link?: string | null
           link_as?: string | null
+          media_type?: string
           name?: string
+          video_url?: string | null
         }
         Relationships: []
       }
