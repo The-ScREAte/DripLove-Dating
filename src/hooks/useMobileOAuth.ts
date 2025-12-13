@@ -80,12 +80,12 @@ export const useMobileOAuth = () => {
               token_type
             });
             
-            if (access_token && refresh_token) {
+            if (access_token) {
               console.log('[useMobileOAuth] Setting session with tokens...');
-              // Set the session manually
+              // Set the session manually (refresh_token may be null depending on provider)
               const { data, error } = await supabase.auth.setSession({
                 access_token,
-                refresh_token
+                refresh_token: refresh_token || undefined,
               });
               
               if (error) {
