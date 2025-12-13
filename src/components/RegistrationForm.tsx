@@ -215,10 +215,10 @@ const RegistrationForm = ({ onSubmit, onBackToLogin }: RegistrationFormProps) =>
     const files = Array.from(event.target.files || []);
     if (files.length === 0) return;
 
-    if (images.length + files.length > 7) {
+    if (images.length + files.length > 5) {
       toast({
         title: "Too many images",
-        description: "You can upload a maximum of 7 images.",
+        description: "You can upload a maximum of 5 images.",
         variant: "destructive"
       });
       return;
