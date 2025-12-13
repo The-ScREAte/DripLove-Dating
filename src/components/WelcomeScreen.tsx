@@ -162,112 +162,45 @@ const WelcomeScreen: React.FC<WelcomeScreenProps> = ({ onLogin, onAbout, onTerms
         }
       } else {
         // Google OAuth handling
-        // For Google OAuth on iOS native: use Safari View Controller (in-app browser)
+        // For Google OAuth on iOS native: use improved Safari View Controller flow
         if (provider === 'google' && isNative && platform === 'ios') {
           try {
-            // Generate the OAuth URL
-            const { data: oauthData, error: oauthError } = await supabase.auth.signInWithOAuth({
-              provider: 'google',
-              options: {
-                redirectTo,
-                queryParams: {
-                  prompt: 'select_account',
-                  access_type: 'offline',
-                },
-                skipBrowserRedirect: true,
-              }
-            });
-
-            if (oauthError || !oauthData?.url) {
-              throw new Error(oauthError?.message || 'Failed to generate OAuth URL');
+            const { signInWithGoogleIOS } = await import('@/utils/googleIOSAuth');
+            
+            const result = await signInWithGoogleIOS();
+            
+            if (result?.user?.id) {
+              await saveLanguageToProfile(result.user.id);
             }
-
-            // Open OAuth URL in Safari View Controller (in-app browser)
-            const { Browser } = await import('@capacitor/browser');
             
-            // Set up auth state listener BEFORE opening browser
-            // This handles the case where deep link fires before browser finishes
-            let authSubscription: any = null;
-            let hasProcessedAuth = false;
+            setOauthLoading(null);
             
-            const processAuthSuccess = async (session: any) => {
-              if (hasProcessedAuth) return;
-              hasProcessedAuth = true;
-              
-              try {
-                await Browser.close();
-              } catch (e) {
-                // Browser may already be closed
-              }
-              Browser.removeAllListeners();
-              authSubscription?.unsubscribe();
-              
-              // Check profile and navigate
-              const profile = await checkProfileExists(session.user.id);
-              setOauthLoading(null);
-              
-              if (!profile || !profile.first_name || !profile.last_name) {
-                navigate('/complete-profile');
-              } else {
-                navigate('/');
-              }
-            };
+            if (result.needsProfileCompletion) {
+              navigate('/complete-profile');
+            } else {
+              navigate('/');
+            }
+            return;
             
-            // Listen for auth state changes (triggered by deep link)
-            const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
-              if (event === 'SIGNED_IN' && session) {
-                console.log('[iOS OAuth] Auth state changed to SIGNED_IN');
-                await processAuthSuccess(session);
-              }
-            });
-            authSubscription = subscription;
+          } catch (err: any) {
+            console.error('❌ iOS Google Sign-In error:', err);
             
-            await Browser.open({ 
-              url: oauthData.url,
-              presentationStyle: 'popover',
-              toolbarColor: '#000000',
-            });
-
-            const handleBrowserFinish = async () => {
-              // Don't show cancelled message if auth was processed
-              if (hasProcessedAuth) return;
-              
-              // Small delay to check if auth completed
-              await new Promise(resolve => setTimeout(resolve, 500));
-              
-              if (hasProcessedAuth) return;
-              
-              // Check if we got a session anyway
-              const { data: { session } } = await supabase.auth.getSession();
-              if (session) {
-                await processAuthSuccess(session);
-                return;
-              }
-              
-              setOauthLoading(null);
-              Browser.removeAllListeners();
-              authSubscription?.unsubscribe();
-              
+            if (err.message?.includes('cancel')) {
               toast({
                 title: t('auth.authenticationCancelled'),
                 description: t('auth.googleSignInCancelled'),
                 variant: 'default',
               });
-            };
-            
-            Browser.addListener('browserFinished', handleBrowserFinish);
-            return;
-
-          } catch (err: any) {
-            console.error('❌ Safari View Controller error:', err);
-            toast({
-              title: 'Authentication Error',
-              description: err?.message || 'Failed to open Google Sign-In',
-              variant: 'destructive',
-            });
+            } else {
+              toast({
+                title: 'Authentication Error',
+                description: err?.message || 'Failed to sign in with Google.',
+                variant: 'destructive',
+              });
+            }
             setOauthLoading(null);
+            return;
           }
-          return;
         }
         
         // For Google OAuth on Android: use native Google Sign-In
