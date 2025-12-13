@@ -36,25 +36,31 @@ export const useMobileOAuth = () => {
     const handleAppUrlOpen = async (event: { url: string }) => {
       console.log('[Mobile OAuth] Deep link received:', event.url);
       
-      // Handle OAuth callback (expanded detection)
+      // Handle OAuth callback (expanded detection for all URL patterns)
       const isOAuthCallback = 
         event.url.startsWith('driplove://auth/callback') ||
+        event.url.startsWith('driplove://auth') ||
         event.url.includes('#access_token=') ||
-        event.url.includes('access_token=');
+        event.url.includes('?access_token=') ||
+        event.url.includes('access_token=') ||
+        event.url.includes('auth/callback');
         
       if (isOAuthCallback) {
-        console.log('[Mobile OAuth] OAuth callback detected');
+        console.log('[Mobile OAuth] OAuth callback detected, URL:', event.url);
         
         // Close the browser immediately when we receive the deep link callback
         try {
           if (Browser) {
             await Browser.close();
-            console.log('[Mobile OAuth] Browser closed');
+            console.log('[Mobile OAuth] Browser closed successfully');
           }
         } catch (e) {
           // Browser may already be closed, ignore error
-          console.log('[Mobile OAuth] Browser close (may already be closed):', e);
+          console.log('[Mobile OAuth] Browser close attempt:', e);
         }
+        
+        // Small delay to ensure browser is fully closed
+        await new Promise(resolve => setTimeout(resolve, 100));
         
         try {
           // Extract the fragment from the URL

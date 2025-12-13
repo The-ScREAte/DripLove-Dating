@@ -157,27 +157,32 @@ const AppWrapper = () => {
 
               // Handle deep links for OAuth callbacks
               App.addListener('appUrlOpen', async (event) => {
-                console.log('Deep link received:', event.url);
+                console.log('[Main] Deep link received:', event.url);
                 
                 // Check if this is an OAuth callback (various formats)
                 const isOAuthCallback = 
                   event.url.includes('#access_token=') || 
+                  event.url.includes('?access_token=') ||
                   event.url.includes('?code=') ||
                   event.url.includes('auth/callback') ||
+                  event.url.startsWith('driplove://auth') ||
                   event.url.includes('access_token=');
                   
                 if (isOAuthCallback) {
-                  console.log('Deep link: OAuth callback detected');
+                  console.log('[Main] Deep link: OAuth callback detected');
                   
                   // Close the browser immediately when we receive the deep link
                   try {
                     const { Browser } = await import('@capacitor/browser');
                     await Browser.close();
-                    console.log('Deep link: Browser closed');
+                    console.log('[Main] Deep link: Browser closed');
                   } catch (e) {
                     // Browser may already be closed, ignore error
-                    console.log('Deep link: Browser close (may already be closed)');
+                    console.log('[Main] Deep link: Browser close (may already be closed)');
                   }
+                  
+                  // Small delay to ensure browser is fully closed before processing
+                  await new Promise(resolve => setTimeout(resolve, 150));
                   
                   try {
                     // Use the shared OAuth handler for consistency
@@ -185,13 +190,13 @@ const AppWrapper = () => {
                     const result = await handleOAuthRedirect(event.url);
                     
                     if (result?.session && result?.user) {
-                      console.log('Deep link: OAuth session established for user:', result.user.id);
+                      console.log('[Main] Deep link: OAuth session established for user:', result.user.id);
                       
                       const profile = result.profile;
                       
                       // Check if profile completion is needed
                       if (!profile || !profile.first_name || !profile.last_name) {
-                        console.log('Deep link: Redirecting to profile completion');
+                        console.log('[Main] Deep link: Redirecting to profile completion');
                         window.location.href = '/complete-profile';
                         return;
                       }
@@ -200,7 +205,7 @@ const AppWrapper = () => {
                       if (profile.account_status === 'blocked') {
                         const { supabase } = await import('./integrations/supabase/client');
                         await supabase.auth.signOut();
-                        console.log('Deep link: Account blocked, redirecting to home');
+                        console.log('[Main] Deep link: Account blocked, redirecting to home');
                         window.location.href = '/';
                         return;
                       }
@@ -208,21 +213,21 @@ const AppWrapper = () => {
                       if (profile.account_status === 'on_hold') {
                         const { supabase } = await import('./integrations/supabase/client');
                         await supabase.auth.signOut();
-                        console.log('Deep link: Account on hold, redirecting to home');
+                        console.log('[Main] Deep link: Account on hold, redirecting to home');
                         window.location.href = '/';
                         return;
                       }
                       
                       // Store profile info and redirect to main app
                       sessionStorage.setItem('profile_id', profile.id);
-                      console.log('Deep link: Redirecting to main app');
+                      console.log('[Main] Deep link: Redirecting to main app');
                       window.location.href = '/';
                     } else {
-                      console.error('Deep link: No session established');
+                      console.error('[Main] Deep link: No session established');
                       window.location.href = '/';
                     }
                   } catch (error) {
-                    console.error('Deep link OAuth handling error:', error);
+                    console.error('[Main] Deep link OAuth handling error:', error);
                     window.location.href = '/';
                   }
                 }

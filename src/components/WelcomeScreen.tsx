@@ -184,6 +184,44 @@ const WelcomeScreen: React.FC<WelcomeScreenProps> = ({ onLogin, onAbout, onTerms
 
             // Open OAuth URL in Safari View Controller (in-app browser)
             const { Browser } = await import('@capacitor/browser');
+            
+            // Set up auth state listener BEFORE opening browser
+            // This handles the case where deep link fires before browser finishes
+            let authSubscription: any = null;
+            let hasProcessedAuth = false;
+            
+            const processAuthSuccess = async (session: any) => {
+              if (hasProcessedAuth) return;
+              hasProcessedAuth = true;
+              
+              try {
+                await Browser.close();
+              } catch (e) {
+                // Browser may already be closed
+              }
+              Browser.removeAllListeners();
+              authSubscription?.unsubscribe();
+              
+              // Check profile and navigate
+              const profile = await checkProfileExists(session.user.id);
+              setOauthLoading(null);
+              
+              if (!profile || !profile.first_name || !profile.last_name) {
+                navigate('/complete-profile');
+              } else {
+                navigate('/');
+              }
+            };
+            
+            // Listen for auth state changes (triggered by deep link)
+            const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
+              if (event === 'SIGNED_IN' && session) {
+                console.log('[iOS OAuth] Auth state changed to SIGNED_IN');
+                await processAuthSuccess(session);
+              }
+            });
+            authSubscription = subscription;
+            
             await Browser.open({ 
               url: oauthData.url,
               presentationStyle: 'popover',
@@ -191,8 +229,24 @@ const WelcomeScreen: React.FC<WelcomeScreenProps> = ({ onLogin, onAbout, onTerms
             });
 
             const handleBrowserFinish = async () => {
+              // Don't show cancelled message if auth was processed
+              if (hasProcessedAuth) return;
+              
+              // Small delay to check if auth completed
+              await new Promise(resolve => setTimeout(resolve, 500));
+              
+              if (hasProcessedAuth) return;
+              
+              // Check if we got a session anyway
+              const { data: { session } } = await supabase.auth.getSession();
+              if (session) {
+                await processAuthSuccess(session);
+                return;
+              }
+              
               setOauthLoading(null);
               Browser.removeAllListeners();
+              authSubscription?.unsubscribe();
               
               toast({
                 title: t('auth.authenticationCancelled'),
