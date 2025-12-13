@@ -40,6 +40,8 @@ export const useMobileOAuth = () => {
       const isOAuthCallback = 
         event.url.startsWith('driplove://auth/callback') ||
         event.url.startsWith('driplove://auth') ||
+        event.url.includes('?code=') ||
+        event.url.includes('#code=') ||
         event.url.includes('#access_token=') ||
         event.url.includes('?access_token=') ||
         event.url.includes('access_token=') ||
@@ -63,115 +65,61 @@ export const useMobileOAuth = () => {
         await new Promise(resolve => setTimeout(resolve, 100));
         
         try {
-          // Extract the fragment from the URL
-          const url = new URL(event.url);
-          const fragment = url.hash || url.search;
-          
-          if (fragment.includes('access_token=')) {
-            // Parse the OAuth tokens from the fragment
-            const params = new URLSearchParams(fragment.replace('#', '').replace('?', ''));
-            const access_token = params.get('access_token');
-            const refresh_token = params.get('refresh_token');
-            const expires_in = params.get('expires_in');
-            const token_type = params.get('token_type');
-            
-            if (access_token && refresh_token) {
-              // Set the session manually
-              const { data, error } = await supabase.auth.setSession({
-                access_token,
-                refresh_token
-              });
-              
-              if (error) {
-                // Silent error handling
-                toast({
-                  title: "Authentication Error",
-                  description: error.message,
-                  variant: "destructive",
-                });
-                navigate('/');
-                return;
-              }
-              
-              if (data.session?.user) {
-                // Check if user profile exists
-                const { data: profile, error: profileError } = await supabase
-                  .from('profiles')
-                  .select('id, is_admin, account_status, first_name, last_name')
-                  .eq('id', data.session.user.id)
-                  .single();
+          const { handleOAuthRedirect } = await import('@/utils/oauthCallbackHandler');
+          const result = await handleOAuthRedirect(event.url);
 
-                if (profileError || !profile) {
-                  // User doesn't have a profile - redirect to profile completion
-                  navigate('/complete-profile');
-                  return;
-                }
-
-                // Check account status
-                if (profile.account_status === 'blocked') {
-                  await supabase.auth.signOut();
-                  toast({
-                    title: "Account Blocked",
-                    description: "Your account has been blocked.",
-                    variant: "destructive",
-                  });
-                  navigate('/');
-                  return;
-                }
-
-                if (profile.account_status === 'on_hold') {
-                  await supabase.auth.signOut();
-                  toast({
-                    title: "Account On Hold",
-                    description: "Your account is on hold. Please contact support.",
-                    variant: "destructive",
-                  });
-                  navigate('/');
-                  return;
-                }
-
-                // Save profile ID to session
-                sessionStorage.setItem('profile_id', profile.id);
-
-                // Check if profile is complete
-                const isProfileComplete = profile.first_name && profile.last_name;
-
-                if (!isProfileComplete) {
-                  navigate('/complete-profile');
-                  return;
-                }
-
-                // Successful login
-                toast({
-                  title: "Welcome back!",
-                  description: "You've been successfully logged in.",
-                });
-
-                navigate('/');
-              }
-            } else {
-              // Silent error handling
-              toast({
-                title: "Authentication Error",
-                description: "Failed to get authentication tokens.",
-                variant: "destructive",
-              });
-              navigate('/');
-            }
-          } else if (fragment.includes('error=')) {
-            // Handle OAuth error
-            const params = new URLSearchParams(fragment.replace('#', '').replace('?', ''));
-            const error = params.get('error');
-            const error_description = params.get('error_description');
-            
-            // Silent error handling
+          if (!result?.session?.user) {
             toast({
-              title: "Authentication Error",
-              description: error_description || error || "OAuth failed",
-              variant: "destructive",
+              title: 'Authentication Error',
+              description: 'No session created after OAuth callback.',
+              variant: 'destructive',
             });
             navigate('/');
+            return;
           }
+
+          const profile = result.profile;
+
+          if (!profile) {
+            navigate('/complete-profile');
+            return;
+          }
+
+          if (profile.account_status === 'blocked') {
+            await supabase.auth.signOut();
+            toast({
+              title: 'Account Blocked',
+              description: 'Your account has been blocked.',
+              variant: 'destructive',
+            });
+            navigate('/');
+            return;
+          }
+
+          if (profile.account_status === 'on_hold') {
+            await supabase.auth.signOut();
+            toast({
+              title: 'Account On Hold',
+              description: 'Your account is on hold. Please contact support.',
+              variant: 'destructive',
+            });
+            navigate('/');
+            return;
+          }
+
+          sessionStorage.setItem('profile_id', profile.id);
+
+          const isProfileComplete = profile.first_name && profile.last_name;
+          if (!isProfileComplete) {
+            navigate('/complete-profile');
+            return;
+          }
+
+          toast({
+            title: 'Welcome back!',
+            description: "You've been successfully logged in.",
+          });
+          navigate('/');
         } catch (error) {
           // Silent error handling
           toast({

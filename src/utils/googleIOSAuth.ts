@@ -9,6 +9,7 @@ import { Capacitor } from '@capacitor/core';
 import { Browser } from '@capacitor/browser';
 import { App } from '@capacitor/app';
 import { getRedirectUri } from '@/config/oauth';
+import { handleOAuthRedirect } from '@/utils/oauthCallbackHandler';
 
 /**
  * Sign in with Google on iOS using Safari View Controller
@@ -112,6 +113,7 @@ export const signInWithGoogleIOS = async (): Promise<{
       // Check if this is an OAuth callback
       const isOAuthCallback = 
         url.startsWith('driplove://auth') ||
+        url.includes('?code=') ||
         url.includes('access_token=') ||
         url.includes('auth/callback');
         
@@ -135,45 +137,17 @@ export const signInWithGoogleIOS = async (): Promise<{
           // Browser may already be closed
         }
 
-        // Parse tokens from URL
-        const urlObj = new URL(url);
-        const fragment = urlObj.hash || urlObj.search;
-        
-        if (fragment.includes('access_token=')) {
-          const params = new URLSearchParams(fragment.replace('#', '').replace('?', ''));
-          const access_token = params.get('access_token');
-          const refresh_token = params.get('refresh_token');
-
-          if (access_token && refresh_token) {
-            console.log('[iOS Google] Setting session from tokens...');
-            
-            const { data, error } = await supabase.auth.setSession({
-              access_token,
-              refresh_token
-            });
-
-            if (error) {
-              cleanup();
-              reject(new Error(error.message));
-              return;
-            }
-
-            if (data.session) {
-              await processAuthSuccess(data.session);
-            } else {
-              cleanup();
-              reject(new Error('No session returned after setting tokens'));
-            }
-          } else {
-            cleanup();
-            reject(new Error('Missing tokens in callback URL'));
-          }
-        } else if (fragment.includes('error=')) {
-          const params = new URLSearchParams(fragment.replace('#', '').replace('?', ''));
-          const error = params.get('error_description') || params.get('error') || 'OAuth failed';
-          cleanup();
-          reject(new Error(error));
+        // Delegate to the shared handler so we support both:
+        // - implicit flow (#access_token=...)
+        // - PKCE code flow (?code=...)
+        const result = await handleOAuthRedirect(url);
+        if (result?.session) {
+          await processAuthSuccess(result.session);
+          return;
         }
+
+        cleanup();
+        reject(new Error('No session established from OAuth callback'));
       } catch (err: any) {
         console.error('[iOS Google] Error handling deep link:', err);
         cleanup();
