@@ -19,6 +19,7 @@ const DiscoverPage = lazy(() => import('@/components/DiscoverPage'));
 const ChatPage = lazy(() => import('@/components/ChatPage'));
 const LikedMePage = lazy(() => import('@/components/LikedMePage'));
 const ProfilePage = lazy(() => import('@/components/ProfilePage'));
+import AppUpdatePopup from '@/components/AppUpdatePopup';
 
 // Tab loading fallback
 const TabLoader = () => (
@@ -1211,6 +1212,9 @@ const MainApp = ({ user, onLogout }: MainAppProps) => {
 
       {/* Rating Dialog - Shows after 2 minutes, then weekly */}
       <RatingDialog initialDelay={120000} />
+
+      {/* App Update Popup - Shows on native apps when update is available */}
+      <AppUpdatePopup />
     </div>
   );
 };
