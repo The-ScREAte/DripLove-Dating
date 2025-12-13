@@ -45,22 +45,61 @@ const RegistrationForm = ({ onSubmit, onBackToLogin }: RegistrationFormProps) =>
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [showFaceVerification, setShowFaceVerification] = useState(false);
   const [faceVerified, setFaceVerified] = useState(false);
+  const [faceImageData, setFaceImageData] = useState<string | null>(null);
   const [isVerifying, setIsVerifying] = useState(false);
   const { toast } = useToast();
   const { t } = useTranslation();
 
-  // Handle face verification completion
+  // Restore face verification from localStorage on mount
+  React.useEffect(() => {
+    const savedFace = localStorage.getItem('pending_face_verification');
+    if (savedFace) {
+      setFaceImageData(savedFace);
+      setFaceVerified(true);
+    }
+  }, []);
+
+  // Handle face verification - validates and stores locally until form submission
   const handleFaceVerified = async (faceImageBase64: string) => {
     setIsVerifying(true);
     try {
-      // We'll store the face verification result temporarily
-      // It will be properly indexed after account creation
-      sessionStorage.setItem('pending_face_verification', faceImageBase64);
+      // First validate the face (check for duplicates) WITHOUT indexing
+      const { data, error } = await supabase.functions.invoke("face-verify", {
+        body: {
+          action: "validate_only",
+          front: faceImageBase64,
+        },
+      });
+
+      if (error) {
+        console.error('Face validation error:', error);
+        toast({
+          title: "Verification Failed",
+          description: "Could not validate your face. Please try again.",
+          variant: "destructive",
+        });
+        return;
+      }
+
+      if (!data?.success) {
+        // Face already exists in system
+        toast({
+          title: data?.code === 'DUPLICATE_FACE' ? "Face Already Registered" : "Verification Failed",
+          description: data?.error || "Could not verify your face. Please try again.",
+          variant: "destructive",
+        });
+        return;
+      }
+
+      // Store in localStorage (not DB yet)
+      localStorage.setItem('pending_face_verification', faceImageBase64);
+      setFaceImageData(faceImageBase64);
       setFaceVerified(true);
       setShowFaceVerification(false);
+      
       toast({
-        title: "Face Captured!",
-        description: "Your face verification will be completed after registration.",
+        title: "Face Verified! ✓",
+        description: "Your face will be saved when you complete registration.",
       });
     } catch (err) {
       console.error('Face verification error:', err);
@@ -74,9 +113,9 @@ const RegistrationForm = ({ onSubmit, onBackToLogin }: RegistrationFormProps) =>
     }
   };
 
-  // Restore images from sessionStorage on mount
+  // Restore images from localStorage on mount
   React.useEffect(() => {
-    const saved = sessionStorage.getItem('registration_images');
+    const saved = localStorage.getItem('registration_images');
     if (saved) {
       try {
         const parsed = JSON.parse(saved);
@@ -92,7 +131,7 @@ const RegistrationForm = ({ onSubmit, onBackToLogin }: RegistrationFormProps) =>
     }
   }, []);
 
-  // Save images to sessionStorage whenever they change
+  // Save images to localStorage whenever they change
   React.useEffect(() => {
     // Only save serializable data including hash
     const serializable = images.map(img => ({
@@ -101,7 +140,7 @@ const RegistrationForm = ({ onSubmit, onBackToLogin }: RegistrationFormProps) =>
       status: img.status,
       hash: img.hash // Save hash for duplicate detection
     }));
-    sessionStorage.setItem('registration_images', JSON.stringify(serializable));
+    localStorage.setItem('registration_images', JSON.stringify(serializable));
   }, [images]);
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
@@ -370,6 +409,16 @@ const RegistrationForm = ({ onSubmit, onBackToLogin }: RegistrationFormProps) =>
     if (!formData.dateOfBirth) firstStepErrors.dateOfBirth = 'Date of birth is required';
     // Country is now optional per Apple's guidelines
     if (!formData.city.trim()) firstStepErrors.city = 'City is required';
+    
+    // Face verification is required
+    if (!faceVerified) {
+      firstStepErrors.faceVerification = 'Face verification is required to continue';
+      toast({
+        title: "Face Verification Required",
+        description: "Please verify your face to continue registration.",
+        variant: "destructive",
+      });
+    }
     
     // Email validation
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
@@ -684,10 +733,47 @@ const RegistrationForm = ({ onSubmit, onBackToLogin }: RegistrationFormProps) =>
       }
     }
 
+    // 4. Index face in AWS Rekognition with user's name (only now, after user is created)
+    const pendingFace = localStorage.getItem('pending_face_verification');
+    if (pendingFace && userId) {
+      try {
+        const userName = `${formData.firstName} ${formData.lastName}`;
+        const { data: faceData, error: faceError } = await supabase.functions.invoke("face-verify", {
+          body: {
+            action: "index_face",
+            front: pendingFace,
+            userId: userId,
+            userName: userName, // Include user's name for admin identification
+          },
+        });
+
+        if (faceError) {
+          console.error('Face indexing error:', faceError);
+        } else if (faceData?.success) {
+          // Update profile with face descriptor
+          await supabase
+            .from('profiles')
+            .update({ 
+              face_descriptor: faceData.faceId || 'verified',
+              updated_at: new Date().toISOString()
+            })
+            .eq('id', userId);
+          
+          console.log('✅ Face indexed successfully for user:', userName);
+        }
+        
+        // Clear localStorage after successful indexing
+        localStorage.removeItem('pending_face_verification');
+      } catch (faceErr) {
+        console.error('Face indexing exception:', faceErr);
+      }
+    }
+
     setIsSubmitting(false); // Reset loading state
     
-    // Clear sessionStorage after successful registration
-    sessionStorage.removeItem('registration_images');
+    // Clear localStorage after successful registration
+    localStorage.removeItem('registration_images');
+    localStorage.removeItem('pending_face_verification');
     
     // Fetch the new user from supabase and pass to onSubmit so app state updates
     try {
@@ -771,6 +857,12 @@ const RegistrationForm = ({ onSubmit, onBackToLogin }: RegistrationFormProps) =>
             onSelectChange={handleSelectChange}
             onTogglePassword={() => setShowPassword(!showPassword)}
             onToggleConfirmPassword={() => setShowConfirmPassword(!showConfirmPassword)}
+            showFaceVerification={showFaceVerification}
+            setShowFaceVerification={setShowFaceVerification}
+            faceVerified={faceVerified}
+            isVerifying={isVerifying}
+            onFaceVerified={handleFaceVerified}
+            faceError={errors.faceVerification}
           />
 
           {/* Work & Education */}

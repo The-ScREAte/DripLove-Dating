@@ -1,12 +1,13 @@
-
 import React from 'react';
 import { Label } from '@/components/ui/label';
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { User, Mail, Lock, Calendar, MapPin, Globe, Eye, EyeOff } from 'lucide-react';
+import { Button } from '@/components/ui/button';
+import { User, Mail, Lock, Calendar, MapPin, Globe, Eye, EyeOff, Shield, CheckCircle, Camera, Loader2 } from 'lucide-react';
 import { countries } from '@/constants/formData';
 import { handleInputFocus, handleInputBlur, getInputStyles } from '@/utils/inputUtils';
 import { useTranslation } from 'react-i18next';
+import FaceVerification from '@/components/FaceVerification';
 
 interface BasicInfoSectionProps {
   formData: any;
@@ -17,6 +18,13 @@ interface BasicInfoSectionProps {
   onSelectChange: (field: string, value: string) => void;
   onTogglePassword: () => void;
   onToggleConfirmPassword: () => void;
+  // Face verification props
+  showFaceVerification?: boolean;
+  setShowFaceVerification?: (show: boolean) => void;
+  faceVerified?: boolean;
+  isVerifying?: boolean;
+  onFaceVerified?: (faceImageBase64: string) => void;
+  faceError?: string;
 }
 
 const BasicInfoSection = ({
@@ -27,7 +35,13 @@ const BasicInfoSection = ({
   onInputChange,
   onSelectChange,
   onTogglePassword,
-  onToggleConfirmPassword
+  onToggleConfirmPassword,
+  showFaceVerification = false,
+  setShowFaceVerification,
+  faceVerified = false,
+  isVerifying = false,
+  onFaceVerified,
+  faceError
 }: BasicInfoSectionProps) => {
   const { t } = useTranslation();
   
@@ -76,6 +90,84 @@ const BasicInfoSection = ({
           </div>
         </div>
       </div>
+
+      {/* Face Verification Section - Right after name fields */}
+      {setShowFaceVerification && onFaceVerified && (
+        <div className="space-y-3 mt-4">
+          <div className="flex items-center gap-2">
+            <Shield className="w-5 h-5 text-purple-600" />
+            <Label className="text-sm font-medium">{t('profileCompletion.faceVerification')} *</Label>
+          </div>
+
+          {showFaceVerification ? (
+            <div className="space-y-3 bg-gray-50 rounded-lg p-4">
+              <div className="flex items-center justify-between">
+                <p className="text-sm text-gray-600">Follow the instructions to verify your face</p>
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => setShowFaceVerification(false)}
+                >
+                  Cancel
+                </Button>
+              </div>
+              <FaceVerification 
+                onVerified={onFaceVerified}
+                disabled={isVerifying}
+              />
+            </div>
+          ) : faceVerified ? (
+            <div className="bg-green-50 border border-green-200 rounded-lg p-3">
+              <div className="flex items-center gap-3">
+                <div className="w-8 h-8 bg-green-100 rounded-full flex items-center justify-center">
+                  <CheckCircle className="w-5 h-5 text-green-600" />
+                </div>
+                <div>
+                  <p className="font-medium text-green-800 text-sm">Face Verified</p>
+                  <p className="text-xs text-green-600">
+                    Your identity will be confirmed upon registration.
+                  </p>
+                </div>
+              </div>
+            </div>
+          ) : (
+            <div className={`bg-purple-50 border rounded-lg p-3 ${faceError ? 'border-red-300' : 'border-purple-200'}`}>
+              <div className="flex items-start gap-3">
+                <div className="w-8 h-8 bg-purple-100 rounded-full flex items-center justify-center flex-shrink-0">
+                  <Camera className="w-4 h-4 text-purple-600" />
+                </div>
+                <div className="flex-1">
+                  <p className="font-medium text-purple-800 text-sm">Verify Your Identity</p>
+                  <p className="text-xs text-purple-600 mb-2">
+                    Face verification is required to continue. This helps keep our community safe.
+                  </p>
+                  <Button
+                    type="button"
+                    onClick={() => setShowFaceVerification(true)}
+                    className="bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700 text-white text-xs"
+                    size="sm"
+                    disabled={isVerifying}
+                  >
+                    {isVerifying ? (
+                      <>
+                        <Loader2 className="w-3 h-3 mr-1 animate-spin" />
+                        Verifying...
+                      </>
+                    ) : (
+                      <>
+                        <Shield className="w-3 h-3 mr-1" />
+                        Start Verification
+                      </>
+                    )}
+                  </Button>
+                </div>
+              </div>
+              {faceError && <p className="text-red-500 text-xs mt-2">{faceError}</p>}
+            </div>
+          )}
+        </div>
+      )}
       
       <div className="space-y-2">
         <Label htmlFor="email" className="text-sm font-medium">{t('auth.email')} *</Label>
