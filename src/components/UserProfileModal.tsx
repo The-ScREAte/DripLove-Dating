@@ -2,11 +2,16 @@ import React, { useState, useEffect } from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
 import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { MapPin, Heart, Briefcase, GraduationCap, User, Trash2 } from 'lucide-react';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { MapPin, Heart, Briefcase, GraduationCap, User, Trash2, X, Settings, Save, Pencil } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { Avatar, AvatarImage, AvatarFallback } from '@/components/ui/avatar';
 import ImageViewer from './ImageViewer';
 import { useTranslation } from 'react-i18next';
+import { useToast } from '@/hooks/use-toast';
+import { getCountriesList } from '@/constants/locationData';
 
 
 interface UserProfileModalProps {
@@ -18,9 +23,23 @@ interface UserProfileModalProps {
 
 const UserProfileModal = ({ isOpen, onClose, userId, isAdmin = false }: UserProfileModalProps) => {
   const { t } = useTranslation();
+  const { toast } = useToast();
   const [profile, setProfile] = useState<any>(null);
   const [userImages, setUserImages] = useState<string[]>([]);
   const [deletingImageIndex, setDeletingImageIndex] = useState<number | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [isImageViewerOpen, setIsImageViewerOpen] = useState(false);
+  const [selectedImageIndex, setSelectedImageIndex] = useState(0);
+  
+  // Admin editing state
+  const [isEditingPreferences, setIsEditingPreferences] = useState(false);
+  const [editedGender, setEditedGender] = useState('');
+  const [editedPreference, setEditedPreference] = useState('');
+  const [editedCountry, setEditedCountry] = useState('');
+  const [editedMinAge, setEditedMinAge] = useState('');
+  const [editedMaxAge, setEditedMaxAge] = useState('');
+  const [savingPreferences, setSavingPreferences] = useState(false);
+
   // Delete image from DB and storage
   const handleDeleteImage = async (imageUrl: string, index: number) => {
     if (!userId || !imageUrl) return;
@@ -47,14 +66,10 @@ const UserProfileModal = ({ isOpen, onClose, userId, isAdmin = false }: UserProf
       fetchUserImages();
     } catch (error) {
       console.error('Error deleting image:', error);
-      // Optionally show a toast here
     } finally {
       setDeletingImageIndex(null);
     }
   };
-  const [loading, setLoading] = useState(true);
-  const [isImageViewerOpen, setIsImageViewerOpen] = useState(false);
-  const [selectedImageIndex, setSelectedImageIndex] = useState(0);
 
   useEffect(() => {
     if (isOpen && userId) {
@@ -62,6 +77,17 @@ const UserProfileModal = ({ isOpen, onClose, userId, isAdmin = false }: UserProf
       fetchUserImages();
     }
   }, [isOpen, userId]);
+
+  // Reset editing state when profile changes
+  useEffect(() => {
+    if (profile) {
+      setEditedGender(profile.gender || '');
+      setEditedPreference(profile.preference || '');
+      setEditedCountry(profile.country || '');
+      setEditedMinAge(profile.min_age?.toString() || '18');
+      setEditedMaxAge(profile.max_age?.toString() || '99');
+    }
+  }, [profile]);
 
   const fetchUserProfile = async () => {
     try {
@@ -96,7 +122,6 @@ const UserProfileModal = ({ isOpen, onClose, userId, isAdmin = false }: UserProf
         .order('image_order', { ascending: true });
 
       if (error) {
-        // Only log actual errors, not missing table errors
         if (!error.message.includes('does not exist') && !error.message.includes('relation')) {
           console.error('Error fetching user images:', error);
         }
@@ -106,6 +131,51 @@ const UserProfileModal = ({ isOpen, onClose, userId, isAdmin = false }: UserProf
       setUserImages(images?.map(img => img.image_url) || []);
     } catch (error) {
       console.error('Error fetching user images:', error);
+    }
+  };
+
+  const handleSavePreferences = async () => {
+    if (!userId) return;
+    setSavingPreferences(true);
+    
+    try {
+      const { error } = await supabase
+        .from('profiles')
+        .update({
+          gender: editedGender || null,
+          preference: editedPreference || null,
+          country: editedCountry || null,
+          min_age: parseInt(editedMinAge) || 18,
+          max_age: parseInt(editedMaxAge) || 99,
+        })
+        .eq('id', userId);
+
+      if (error) throw error;
+
+      // Update local profile state
+      setProfile((prev: any) => ({
+        ...prev,
+        gender: editedGender,
+        preference: editedPreference,
+        country: editedCountry,
+        min_age: parseInt(editedMinAge) || 18,
+        max_age: parseInt(editedMaxAge) || 99,
+      }));
+
+      setIsEditingPreferences(false);
+      toast({
+        title: 'Success',
+        description: 'User preferences updated successfully',
+      });
+    } catch (error) {
+      console.error('Error updating preferences:', error);
+      toast({
+        title: 'Error',
+        description: 'Failed to update preferences',
+        variant: 'destructive',
+      });
+    } finally {
+      setSavingPreferences(false);
     }
   };
 
@@ -125,9 +195,14 @@ const UserProfileModal = ({ isOpen, onClose, userId, isAdmin = false }: UserProf
     setIsImageViewerOpen(true);
   };
 
+  const handleClose = () => {
+    setIsEditingPreferences(false);
+    onClose();
+  };
+
   if (loading) {
     return (
-      <Dialog open={isOpen} onOpenChange={onClose}>
+      <Dialog open={isOpen} onOpenChange={handleClose}>
         <DialogContent className="max-w-2xl max-h-[80vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>{t('userProfileModal.title', { name: '' })}</DialogTitle>
@@ -144,7 +219,7 @@ const UserProfileModal = ({ isOpen, onClose, userId, isAdmin = false }: UserProf
 
   if (!profile && !loading) {
     return (
-      <Dialog open={isOpen} onOpenChange={onClose}>
+      <Dialog open={isOpen} onOpenChange={handleClose}>
         <DialogContent className="max-w-2xl max-h-[80vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>{t('userProfileModal.title', { name: '' })}</DialogTitle>
@@ -164,15 +239,26 @@ const UserProfileModal = ({ isOpen, onClose, userId, isAdmin = false }: UserProf
 
   return (
     <>
-      <Dialog open={isOpen} onOpenChange={onClose}>
+      <Dialog open={isOpen} onOpenChange={handleClose}>
         <DialogContent className="max-w-2xl max-h-[80vh] overflow-y-auto">
-          <DialogHeader>
-            <DialogTitle className="text-xl text-gray-800">
-              {t('userProfileModal.title', { name: `${profile?.first_name} ${profile?.last_name}` })}
-            </DialogTitle>
-            <DialogDescription>
-              {t('userProfileModal.description')}
-            </DialogDescription>
+          <DialogHeader className="flex flex-row items-center justify-between">
+            <div>
+              <DialogTitle className="text-xl text-gray-800">
+                {t('userProfileModal.title', { name: `${profile?.first_name} ${profile?.last_name}` })}
+              </DialogTitle>
+              <DialogDescription>
+                {t('userProfileModal.description')}
+              </DialogDescription>
+            </div>
+            <Button 
+              variant="outline" 
+              size="sm" 
+              onClick={handleClose}
+              className="h-8 px-3"
+            >
+              <X className="w-4 h-4 mr-1" />
+              Cancel
+            </Button>
           </DialogHeader>
           
           <div className="space-y-6">
@@ -227,6 +313,152 @@ const UserProfileModal = ({ isOpen, onClose, userId, isAdmin = false }: UserProf
                 )}
               </div>
 
+              {/* Admin Preferences Section */}
+              {isAdmin && (
+                <Card className="border-2 border-blue-200 bg-blue-50">
+                  <CardContent className="pt-6">
+                    <div className="flex items-center justify-between mb-4">
+                      <h3 className="font-semibold flex items-center text-blue-800">
+                        <Settings className="w-4 h-4 mr-2" />
+                        User Preferences (Admin Edit)
+                      </h3>
+                      {!isEditingPreferences ? (
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          onClick={() => setIsEditingPreferences(true)}
+                          className="h-7 text-xs"
+                        >
+                          <Pencil className="w-3 h-3 mr-1" />
+                          Edit
+                        </Button>
+                      ) : (
+                        <div className="flex gap-2">
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            onClick={() => {
+                              setIsEditingPreferences(false);
+                              // Reset to original values
+                              setEditedGender(profile?.gender || '');
+                              setEditedPreference(profile?.preference || '');
+                              setEditedCountry(profile?.country || '');
+                              setEditedMinAge(profile?.min_age?.toString() || '18');
+                              setEditedMaxAge(profile?.max_age?.toString() || '99');
+                            }}
+                            className="h-7 text-xs"
+                          >
+                            Cancel
+                          </Button>
+                          <Button
+                            size="sm"
+                            onClick={handleSavePreferences}
+                            disabled={savingPreferences}
+                            className="h-7 text-xs bg-blue-600 hover:bg-blue-700"
+                          >
+                            <Save className="w-3 h-3 mr-1" />
+                            {savingPreferences ? 'Saving...' : 'Save'}
+                          </Button>
+                        </div>
+                      )}
+                    </div>
+                    
+                    {isEditingPreferences ? (
+                      <div className="space-y-3">
+                        <div className="grid grid-cols-2 gap-3">
+                          <div>
+                            <label className="text-xs font-medium text-gray-600 mb-1 block">Gender</label>
+                            <Select value={editedGender} onValueChange={setEditedGender}>
+                              <SelectTrigger className="h-8 text-xs">
+                                <SelectValue placeholder="Select gender" />
+                              </SelectTrigger>
+                              <SelectContent>
+                                <SelectItem value="male" className="text-xs">Male</SelectItem>
+                                <SelectItem value="female" className="text-xs">Female</SelectItem>
+                                <SelectItem value="other" className="text-xs">Other</SelectItem>
+                              </SelectContent>
+                            </Select>
+                          </div>
+                          <div>
+                            <label className="text-xs font-medium text-gray-600 mb-1 block">Looking For</label>
+                            <Select value={editedPreference} onValueChange={setEditedPreference}>
+                              <SelectTrigger className="h-8 text-xs">
+                                <SelectValue placeholder="Select preference" />
+                              </SelectTrigger>
+                              <SelectContent>
+                                <SelectItem value="male" className="text-xs">Male</SelectItem>
+                                <SelectItem value="female" className="text-xs">Female</SelectItem>
+                                <SelectItem value="everyone" className="text-xs">Everyone</SelectItem>
+                              </SelectContent>
+                            </Select>
+                          </div>
+                        </div>
+                        
+                        <div>
+                          <label className="text-xs font-medium text-gray-600 mb-1 block">Country</label>
+                          <Select value={editedCountry} onValueChange={setEditedCountry}>
+                            <SelectTrigger className="h-8 text-xs">
+                              <SelectValue placeholder="Select country" />
+                            </SelectTrigger>
+                            <SelectContent className="max-h-60">
+                              {getCountriesList().map(country => (
+                                <SelectItem key={country.code} value={country.name} className="text-xs">
+                                  {country.name}
+                                </SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                        </div>
+                        
+                        <div className="grid grid-cols-2 gap-3">
+                          <div>
+                            <label className="text-xs font-medium text-gray-600 mb-1 block">Min Age</label>
+                            <Input
+                              type="number"
+                              value={editedMinAge}
+                              onChange={(e) => setEditedMinAge(e.target.value)}
+                              min="18"
+                              max="99"
+                              className="h-8 text-xs"
+                            />
+                          </div>
+                          <div>
+                            <label className="text-xs font-medium text-gray-600 mb-1 block">Max Age</label>
+                            <Input
+                              type="number"
+                              value={editedMaxAge}
+                              onChange={(e) => setEditedMaxAge(e.target.value)}
+                              min="18"
+                              max="99"
+                              className="h-8 text-xs"
+                            />
+                          </div>
+                        </div>
+                      </div>
+                    ) : (
+                      <div className="grid grid-cols-2 gap-3 text-sm">
+                        <div>
+                          <span className="text-gray-500 text-xs">Gender:</span>
+                          <p className="font-medium capitalize">{profile?.gender || 'Not set'}</p>
+                        </div>
+                        <div>
+                          <span className="text-gray-500 text-xs">Looking For:</span>
+                          <p className="font-medium capitalize">{profile?.preference || 'Not set'}</p>
+                        </div>
+                        <div>
+                          <span className="text-gray-500 text-xs">Country:</span>
+                          <p className="font-medium">{profile?.country || 'Not set'}</p>
+                        </div>
+                        <div>
+                          <span className="text-gray-500 text-xs">Age Range:</span>
+                          <p className="font-medium">{profile?.min_age || 18} - {profile?.max_age || 99}</p>
+                        </div>
+                      </div>
+                    )}
+                  </CardContent>
+                </Card>
+              )}
+
               {/* Photo Gallery */}
               {userImages.length > 1 && (
                 <Card>
@@ -275,8 +507,6 @@ const UserProfileModal = ({ isOpen, onClose, userId, isAdmin = false }: UserProf
                   </CardContent>
                 </Card>
               )}
-
-              {/* Additional Images - REMOVED DUPLICATE */}
               
               {/* Basic Info */}
               <Card>

@@ -1698,7 +1698,7 @@ const AdminPageComponent = ({ currentUser, onLogout }: AdminPageProps) => {
                           <SelectItem value="all" className="text-xs">All Preferences</SelectItem>
                           <SelectItem value="male" className="text-xs">Interested in Male</SelectItem>
                           <SelectItem value="female" className="text-xs">Interested in Female</SelectItem>
-                          <SelectItem value="both" className="text-xs">Interested in Both</SelectItem>
+                          <SelectItem value="everyone" className="text-xs">Interested in Everyone</SelectItem>
                         </SelectContent>
                       </Select>
                       
@@ -1708,10 +1708,11 @@ const AdminPageComponent = ({ currentUser, onLogout }: AdminPageProps) => {
                         </SelectTrigger>
                         <SelectContent>
                           <SelectItem value="all" className="text-xs">All Intents</SelectItem>
-                          <SelectItem value="serious_relationship" className="text-xs">Serious Relationship</SelectItem>
-                          <SelectItem value="casual_dating" className="text-xs">Casual Dating</SelectItem>
-                          <SelectItem value="friendship" className="text-xs">Friendship</SelectItem>
+                          <SelectItem value="serious" className="text-xs">Serious</SelectItem>
+                          <SelectItem value="long-term" className="text-xs">Long-term</SelectItem>
+                          <SelectItem value="casual" className="text-xs">Casual</SelectItem>
                           <SelectItem value="open_to_anything" className="text-xs">Open to Anything</SelectItem>
+                          <SelectItem value="not-sure" className="text-xs">Not Sure</SelectItem>
                         </SelectContent>
                       </Select>
                       
@@ -1766,9 +1767,9 @@ const AdminPageComponent = ({ currentUser, onLogout }: AdminPageProps) => {
                                   {user.gender && ` • ${user.gender.charAt(0).toUpperCase() + user.gender.slice(1)}`}
                                 </p>
                                 <div className="flex gap-1 mt-0.5 flex-wrap">
-                                  {user.preference && (
+                                {user.preference && (
                                     <Badge variant="outline" className="text-[10px] px-1.5 py-0 h-4">
-                                      Interested: {user.preference === 'both' ? 'Both' : user.preference.charAt(0).toUpperCase() + user.preference.slice(1)}
+                                      Interested: {user.preference === 'everyone' ? 'Everyone' : user.preference.charAt(0).toUpperCase() + user.preference.slice(1)}
                                     </Badge>
                                   )}
                                   {user.relationship_intent && (
