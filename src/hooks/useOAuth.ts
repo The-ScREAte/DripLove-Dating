@@ -69,13 +69,11 @@ export const useOAuth = () => {
 
           console.log('[useOAuth iOS Google] ✅ Safari View Controller opened');
           console.log('[useOAuth iOS Google] 🔄 Delegating to useMobileOAuth');
-          
-          // ✅ STOP HERE - useMobileOAuth handles everything via deep link:
-          // 1. Receives driplove://auth/callback
-          // 2. Closes Safari View Controller
-          // 3. Sets session with tokens
-          // 4. Navigates to appropriate page
-          // ❌ NO polling, NO listeners, NO Browser.close() here
+
+          // We clear the local loading state here – the rest of the flow
+          // (deep link callback, session creation, navigation) is handled
+          // entirely inside useMobileOAuth.
+          setOauthLoading(null);
           return;
 
         } catch (err: any) {
