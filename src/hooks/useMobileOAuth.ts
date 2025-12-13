@@ -34,13 +34,22 @@ export const useMobileOAuth = () => {
     logPlatformInfo();
 
     const handleAppUrlOpen = async (event: { url: string }) => {
-      // Handle OAuth callback
-      if (event.url.startsWith('driplove://auth/callback')) {
+      console.log('[Mobile OAuth] Deep link received:', event.url);
+      
+      // Handle OAuth callback (expanded detection)
+      const isOAuthCallback = 
+        event.url.startsWith('driplove://auth/callback') ||
+        event.url.includes('#access_token=') ||
+        event.url.includes('access_token=');
+        
+      if (isOAuthCallback) {
+        console.log('[Mobile OAuth] OAuth callback detected');
         
         // Close the browser immediately when we receive the deep link callback
         try {
           if (Browser) {
             await Browser.close();
+            console.log('[Mobile OAuth] Browser closed');
           }
         } catch (e) {
           // Browser may already be closed, ignore error

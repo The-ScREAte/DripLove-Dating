@@ -14,12 +14,16 @@ const OAuthCallback = () => {
         console.log('[OAuthCallback] Starting OAuth callback processing');
         console.log('[OAuthCallback] URL:', window.location.href);
 
+        // Check if this is a popup window (opened by parent for OAuth)
+        const isPopup = window.opener && window.opener !== window;
+        console.log('[OAuthCallback] Is popup window:', isPopup);
+
         // Check if native mobile - if so, skip and let useMobileOAuth handle it
         try {
           const { Capacitor } = await import('@capacitor/core');
           if (Capacitor?.isNativePlatform?.()) {
-            console.log('[OAuthCallback] Native mobile detected - delegating to useMobileOAuth');
-            navigate('/', { replace: true });
+            console.log('[OAuthCallback] Native mobile detected - delegating to deep link handler');
+            // Don't navigate - let the deep link handler in main.tsx handle it
             return;
           }
         } catch (e) {
@@ -28,8 +32,9 @@ const OAuthCallback = () => {
 
         // Check for OAuth errors first
         const urlParams = new URLSearchParams(window.location.search);
-        const error = urlParams.get('error');
-        const errorDescription = urlParams.get('error_description');
+        const hashParams = new URLSearchParams(window.location.hash.replace('#', ''));
+        const error = urlParams.get('error') || hashParams.get('error');
+        const errorDescription = urlParams.get('error_description') || hashParams.get('error_description');
 
         if (error) {
           console.error('[OAuthCallback] OAuth error:', error, errorDescription);
@@ -49,6 +54,29 @@ const OAuthCallback = () => {
 
         const { user, profile } = result;
         console.log('[OAuthCallback] Session created successfully for user:', user.id);
+
+        // If this is a popup, notify parent window and close
+        if (isPopup && window.opener) {
+          try {
+            console.log('[OAuthCallback] Notifying parent window and closing popup');
+            // Post message to parent window
+            window.opener.postMessage({ 
+              type: 'oauth_complete', 
+              success: true,
+              userId: user.id,
+              needsProfileCompletion: !profile?.first_name || !profile?.last_name
+            }, window.location.origin);
+            
+            // Close the popup after a small delay
+            setTimeout(() => {
+              window.close();
+            }, 100);
+            return;
+          } catch (e) {
+            console.warn('[OAuthCallback] Failed to communicate with parent:', e);
+            // Fall through to regular navigation
+          }
+        }
 
         // Check account status
         if (profile?.account_status === 'blocked') {
@@ -93,6 +121,22 @@ const OAuthCallback = () => {
 
       } catch (error: any) {
         console.error('[OAuthCallback] OAuth callback error:', error);
+        
+        // If popup, notify parent of failure
+        if (window.opener && window.opener !== window) {
+          try {
+            window.opener.postMessage({ 
+              type: 'oauth_complete', 
+              success: false,
+              error: error.message
+            }, window.location.origin);
+            setTimeout(() => window.close(), 100);
+            return;
+          } catch (e) {
+            // Fall through
+          }
+        }
+        
         toast({
           title: 'Authentication Error',
           description: error.message || 'Failed to complete sign in. Please try again.',

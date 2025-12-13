@@ -10,28 +10,40 @@ import { Capacitor } from '@capacitor/core';
 
 // Track initialization state to prevent redundant initializations
 let isInitialized = false;
+let initializationPromise: Promise<void> | null = null;
 
 // Initialize Google Auth plugin
-export const initializeGoogleAuth = () => {
+export const initializeGoogleAuth = async (): Promise<void> => {
   // Skip if already initialized
   if (isInitialized) {
     return;
   }
 
+  // If initialization is in progress, wait for it
+  if (initializationPromise) {
+    return initializationPromise;
+  }
+
   // Use native config on Android (reads client ID from strings.xml)
   if (Capacitor.isNativePlatform() && Capacitor.getPlatform() === 'android') {
-    try {
-      GoogleAuth.initialize({
-        // Do not pass clientId on Android; plugin reads @string/server_client_id
-        scopes: ['profile', 'email'],
-        grantOfflineAccess: true,
-      });
-      isInitialized = true;
-      console.log('✅ Google Auth initialized');
-    } catch (err) {
-      console.warn('Google Auth initialization failed:', err);
-      // Safe no-op; initialization will be attempted on first use
-    }
+    initializationPromise = new Promise<void>((resolve) => {
+      try {
+        GoogleAuth.initialize({
+          // Do not pass clientId on Android; plugin reads @string/server_client_id
+          scopes: ['profile', 'email'],
+          grantOfflineAccess: true,
+        });
+        isInitialized = true;
+        console.log('✅ Google Auth initialized');
+        resolve();
+      } catch (err) {
+        console.warn('Google Auth initialization failed:', err);
+        // Don't set isInitialized - allow retry
+        initializationPromise = null;
+        resolve(); // Still resolve so sign-in can attempt
+      }
+    });
+    return initializationPromise;
   }
 };
 
@@ -42,23 +54,26 @@ export const initializeGoogleAuth = () => {
  */
 export const signInWithGoogleNative = async () => {
   try {
-    // Ensure Google Auth is initialized (fast if already done)
-    if (!isInitialized) {
-      initializeGoogleAuth();
-    }
+    // Ensure Google Auth is initialized
+    await initializeGoogleAuth();
+
+    console.log('📱 Starting native Google Sign-In...');
 
     // This opens Google's native picker - stays entirely in your app!
     const googleUser = await GoogleAuth.signIn({
       scopes: ['profile', 'email']
     });
     
+    console.log('📱 Google Sign-In response received');
+    
     const idToken = googleUser.authentication?.idToken;
     
     if (!idToken) {
+      console.error('❌ No ID token in response:', JSON.stringify(googleUser, null, 2));
       throw new Error('No ID token received from Google');
     }
 
-    console.log('✅ Google Sign-In successful');
+    console.log('✅ Google Sign-In successful, got ID token');
 
     // Sign in to Supabase using ONLY ID token (same as iOS Apple Sign-In)
     // DO NOT pass access_token - it causes audience validation issues
@@ -114,11 +129,19 @@ export const signInWithGoogleNative = async () => {
     console.error('❌ Native Google Sign-In error:', err);
     
     // Handle user cancellation gracefully
-    if (err.error === 'popup_closed_by_user' || err.message?.includes('cancel')) {
+    if (err.error === 'popup_closed_by_user' || 
+        err.message?.includes('cancel') || 
+        err.message?.includes('Cancel') ||
+        err.code === 'SIGN_IN_CANCELLED' ||
+        err.code === '12501') { // Google Sign-In cancelled error code
       throw new Error('Sign-in cancelled');
     }
     
-    throw err;
+    // Re-throw with more context for debugging
+    if (err.message) {
+      throw err;
+    }
+    throw new Error(`Google Sign-In failed: ${JSON.stringify(err)}`);
   }
 };
 

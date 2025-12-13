@@ -159,8 +159,16 @@ const AppWrapper = () => {
               App.addListener('appUrlOpen', async (event) => {
                 console.log('Deep link received:', event.url);
                 
-                // Check if this is an OAuth callback
-                if (event.url.includes('#access_token=') || event.url.includes('?code=')) {
+                // Check if this is an OAuth callback (various formats)
+                const isOAuthCallback = 
+                  event.url.includes('#access_token=') || 
+                  event.url.includes('?code=') ||
+                  event.url.includes('auth/callback') ||
+                  event.url.includes('access_token=');
+                  
+                if (isOAuthCallback) {
+                  console.log('Deep link: OAuth callback detected');
+                  
                   // Close the browser immediately when we receive the deep link
                   try {
                     const { Browser } = await import('@capacitor/browser');
