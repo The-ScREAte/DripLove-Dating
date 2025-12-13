@@ -149,6 +149,15 @@ body.keyboard-open .chat-messages-container {
     touch-action: manipulation;
   }
 
+  /* Android-specific: Smaller text for registration forms */
+  body.android .mobile-input-field {
+    font-size: 14px;
+  }
+  
+  body.android label {
+    font-size: 13px;
+  }
+
   /* Smooth scrolling for input areas */
   .input-scroll-container {
     scroll-behavior: smooth;

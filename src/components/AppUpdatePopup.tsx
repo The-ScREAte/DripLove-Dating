@@ -10,6 +10,8 @@ interface AppUpdateConfig {
   id: string;
   is_enabled: boolean;
   current_version: string;
+  ios_version: string;
+  android_version: string;
   target_platform: string;
   play_store_url: string;
   app_store_url: string;
@@ -104,8 +106,12 @@ const AppUpdatePopup = () => {
         return;
       }
 
-      // Compare versions
-      if (appVersion && compareVersions(appVersion, updateConfig.current_version)) {
+      // Compare versions based on platform
+      const targetVersion = currentPlatform === 'ios' 
+        ? (updateConfig.ios_version || updateConfig.current_version)
+        : (updateConfig.android_version || updateConfig.current_version);
+        
+      if (appVersion && compareVersions(appVersion, targetVersion)) {
         setShowPopup(true);
       }
     } catch (error) {
@@ -165,7 +171,11 @@ const AppUpdatePopup = () => {
             </div>
             <div className="flex justify-between mt-1">
               <span className="text-muted-foreground">Latest version:</span>
-              <span className="font-medium text-primary">{config?.current_version}</span>
+              <span className="font-medium text-primary">
+                {currentPlatform === 'ios' 
+                  ? (config?.ios_version || config?.current_version)
+                  : (config?.android_version || config?.current_version)}
+              </span>
             </div>
           </div>
 
