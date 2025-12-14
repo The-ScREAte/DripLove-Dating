@@ -1154,6 +1154,13 @@ export type Database = {
         Args: { p_user1_id: string; p_user2_id: string }
         Returns: Json
       }
+      admin_get_premium_status_for_users: {
+        Args: { target_user_ids: string[] }
+        Returns: {
+          is_premium: boolean
+          user_id: string
+        }[]
+      }
       admin_get_user_premium_status: {
         Args: { target_user_id: string }
         Returns: {
