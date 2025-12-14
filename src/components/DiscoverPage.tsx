@@ -12,6 +12,9 @@ import { preloadImageToBlob, globalImageCache, failedImages, cleanupOldBlobUrls 
 // ⭐ Import discover cache utilities from shared module
 import { discoverCache, DISCOVER_CACHE_DURATION, DISCOVER_CACHE_MAX_ENTRIES, trimDiscoverCacheIfNeeded, calculateAge, createDeterministicShuffle } from '@/utils/discoverCache';
 
+// ⭐ Import stratified sampling for fair profile distribution
+import { stratifiedSample, getStratifiedBatches } from '@/utils/stratifiedSampling';
+
 // ⭐ Import background component
 import DominantColorImageBg from './discover/DominantColorImageBg';
 
@@ -604,15 +607,17 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, isPremium }: DiscoverPage
       return match.profile_id;
     });
     
-    // Fetch full profile data with all fields
+    // ⭐ STRATIFIED SAMPLING: Fetch all profiles then apply fair distribution
+    // Common profile select fields (includes created_at for stratified sampling)
+    const PROFILE_SELECT = 'id, first_name, last_name, bio, city, country, country_code, occupation, education_level, date_of_birth, interests, gender, latitude, longitude, fun_fact, perfect_first_date, last_googled, relationship_intent, smoking, drinking, exercise_level, sleeping_schedule, introvert_extrovert, spontaneous_planner, messy_organized, adinkra_symbols, created_at';
+    
     let filteredProfiles: any[] = [];
     if (locationProfileIds.length > 0) {
       let query = supabase
         .from('profiles')
-        .select('id, first_name, last_name, bio, city, country, country_code, occupation, education_level, date_of_birth, interests, gender, latitude, longitude, fun_fact, perfect_first_date, last_googled, relationship_intent, smoking, drinking, exercise_level, sleeping_schedule, introvert_extrovert, spontaneous_planner, messy_organized, adinkra_symbols')
+        .select(PROFILE_SELECT)
         .in('id', locationProfileIds);
       
-      // ⭐ CRITICAL FIX: Use array for .not() instead of string
       if (excludedIds.length > 0) {
         query = query.not('id', 'in', `(${excludedIds.join(',')})`); 
       }
@@ -621,7 +626,7 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, isPremium }: DiscoverPage
         .in('gender', allowedGenders)
         .eq('account_status', 'active')
         .eq('is_admin', false)
-        .limit(20);
+        .limit(100); // Fetch larger pool for stratified sampling
 
       if (error) throw error;
       filteredProfiles = profiles || [];
@@ -629,9 +634,8 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, isPremium }: DiscoverPage
       // Fallback: get profiles from same country
       let query = supabase
         .from('profiles')
-        .select('id, first_name, last_name, bio, city, country, country_code, occupation, education_level, date_of_birth, interests, gender, latitude, longitude, fun_fact, perfect_first_date, last_googled, relationship_intent, smoking, drinking, exercise_level, sleeping_schedule, introvert_extrovert, spontaneous_planner, messy_organized, adinkra_symbols');
+        .select(PROFILE_SELECT);
       
-      // ⭐ CRITICAL FIX: Use array for .not() instead of string
       if (excludedIds.length > 0) {
         query = query.not('id', 'in', `(${excludedIds.join(',')})`);
       }
@@ -641,7 +645,7 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, isPremium }: DiscoverPage
         .eq('account_status', 'active')
         .eq('is_admin', false)
         .eq('country', currentUserData?.country || 'Ghana')
-        .limit(15);
+        .limit(100); // Fetch larger pool for stratified sampling
 
       if (error) throw error;
       filteredProfiles = profiles || [];
@@ -654,7 +658,7 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, isPremium }: DiscoverPage
       
       let unlockedQuery = supabase
         .from('profiles')
-        .select('id, first_name, last_name, bio, city, country, country_code, occupation, education_level, date_of_birth, interests, gender, latitude, longitude, fun_fact, perfect_first_date, last_googled, relationship_intent, smoking, drinking, exercise_level, sleeping_schedule, introvert_extrovert, spontaneous_planner, messy_organized, adinkra_symbols')
+        .select(PROFILE_SELECT)
         .in('country_code', unlockedCountries);
       
       if (allExcludedIds.length > 0) {
@@ -665,7 +669,7 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, isPremium }: DiscoverPage
         .in('gender', allowedGenders)
         .eq('account_status', 'active')
         .eq('is_admin', false)
-        .limit(20); // Optimized: smaller initial batch, auto-reload will fetch more as needed
+        .limit(50); // Larger batch for stratified sampling
 
       if (!unlockedError && unlockedProfiles && unlockedProfiles.length > 0) {
         // ⭐ OPTIMIZED: Add distance info inline while spreading (10ms saved)
@@ -698,11 +702,12 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, isPremium }: DiscoverPage
       new Map(profilesWithImages.map(p => [p.id, p])).values()
     );
 
-    // Deterministic shuffle function to ensure consistent profile order
-    // Create seed using user ID and today's date to maintain consistent order per day
-    const today = new Date().toISOString().split('T')[0]; // e.g., "2025-10-08"
-    const profileHash = uniqueProfiles.map(p => p.id).sort().join('');
-    const shuffleSeed = `${userId}_${today}_${profileHash.slice(0, 10)}`;
+    // ⭐ STRATIFIED SAMPLING: Fair distribution by account age
+    // Bucket A (≤7 days): 3/15 (20%), Bucket B (8-30 days): 4/15 (27%)
+    // Bucket C (1-6 months): 4/15 (27%), Bucket D (>6 months): 4/15 (26%)
+    // This ensures new users get visibility (47%) while established users stay visible (53%)
+    const today = new Date().toISOString().split('T')[0];
+    const shuffleSeed = `${userId}_${today}`;
     
     // ⭐ Check if we have a saved profile order for today
     const savedOrderKey = `driplove_profile_order_${userId}_${today}`;
@@ -721,18 +726,24 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, isPremium }: DiscoverPage
           .map(id => orderMap.get(id))
           .filter((p): p is typeof uniqueProfiles[0] => p !== undefined);
         
-        // Add any new profiles that weren't in saved order
+        // Add any new profiles that weren't in saved order (use stratified sampling for them)
         const orderedIds = new Set(orderIds);
         const newProfiles = uniqueProfiles.filter(p => !orderedIds.has(p.id));
         
-        shuffled = [...orderedProfiles, ...newProfiles];
+        // Apply stratified sampling to new profiles
+        const stratifiedNewProfiles = newProfiles.length > 0 
+          ? getStratifiedBatches(newProfiles, 15, 4, shuffleSeed + '_new')
+          : [];
+        
+        shuffled = [...orderedProfiles, ...stratifiedNewProfiles];
       } catch (error) {
-        // If parse fails, shuffle normally
-        shuffled = createDeterministicShuffle(uniqueProfiles, shuffleSeed);
+        // If parse fails, apply stratified sampling
+        shuffled = getStratifiedBatches(uniqueProfiles, 15, 4, shuffleSeed);
       }
     } else {
-      // First time today - shuffle and save order
-      shuffled = createDeterministicShuffle(uniqueProfiles, shuffleSeed);
+      // First time today - apply stratified sampling for fair distribution
+      // Get 4 batches of 15 profiles each (60 total) with fair distribution
+      shuffled = getStratifiedBatches(uniqueProfiles, 15, 4, shuffleSeed);
       
       // Save profile order to localStorage
       try {
@@ -1321,11 +1332,13 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, isPremium }: DiscoverPage
       const hiddenPassedIds = recentPasses?.map(p => p.passed_id) || [];
       excludedIds.push(...likedUserIds, ...blockedUserIds, ...hiddenPassedIds);
       
+      // ⭐ STRATIFIED REFILL: Include created_at for stratified sampling
+      const PROFILE_SELECT = 'id, first_name, last_name, bio, city, country, country_code, occupation, education_level, date_of_birth, interests, gender, latitude, longitude, fun_fact, perfect_first_date, last_googled, relationship_intent, smoking, drinking, exercise_level, sleeping_schedule, introvert_extrovert, spontaneous_planner, messy_organized, adinkra_symbols, created_at';
+      
       let query = supabase
         .from('profiles')
-        .select('id, first_name, last_name, bio, city, country, country_code, occupation, education_level, date_of_birth, interests, gender, latitude, longitude, fun_fact, perfect_first_date, last_googled, relationship_intent, smoking, drinking, exercise_level, sleeping_schedule, introvert_extrovert, spontaneous_planner, messy_organized, adinkra_symbols');
+        .select(PROFILE_SELECT);
       
-      // ⭐ CRITICAL FIX: Use array for .not() instead of string
       if (excludedIds.length > 0) {
         query = query.not('id', 'in', `(${excludedIds.join(',')})`);
       }
@@ -1334,7 +1347,7 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, isPremium }: DiscoverPage
         .in('gender', allowedGenders)
         .eq('account_status', 'active')
         .eq('is_admin', false)
-        .limit(15); // Load 15 profiles at a time (reduced from 25 for better performance)
+        .limit(100); // Larger pool for stratified sampling
 
       if (error) throw error;
       
@@ -1374,7 +1387,7 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, isPremium }: DiscoverPage
         
         let unlockedQuery = supabase
           .from('profiles')
-          .select('id, first_name, last_name, bio, city, country, country_code, occupation, education_level, date_of_birth, interests, gender, latitude, longitude, fun_fact, perfect_first_date, last_googled, relationship_intent, smoking, drinking, exercise_level, sleeping_schedule, introvert_extrovert, spontaneous_planner, messy_organized, adinkra_symbols')
+          .select(PROFILE_SELECT)
           .in('country_code', currentUser.unlocked_countries);
         
         if (allExcludedIds.length > 0) {
@@ -1385,7 +1398,7 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, isPremium }: DiscoverPage
           .in('gender', allowedGenders)
           .eq('account_status', 'active')
           .eq('is_admin', false)
-          .limit(30); // Fetch additional profiles from unlocked countries
+          .limit(50); // Larger pool for stratified sampling
 
         if (!unlockedError && unlockedProfiles && unlockedProfiles.length > 0) {
           // ⭐ OPTIMIZED: Add distance inline (5ms saved)
@@ -1409,13 +1422,14 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, isPremium }: DiscoverPage
         distance: distanceMap[profile.id]
       }));
 
-      // ⭐ CRITICAL FIX: DO NOT shuffle after refill - just append to end
-      // Shuffling reorders the deck and can bring swiped profiles back to the front
-      // New profiles are already randomly ordered from the database query
+      // ⭐ STRATIFIED SAMPLING: Apply fair distribution to refilled profiles
+      const today = new Date().toISOString().split('T')[0];
+      const refillSeed = `${currentUser.id}_refill_${today}_${Date.now()}`;
+      const stratifiedProfiles = stratifiedSample(profilesWithImages, 15, refillSeed);
       
       // ⭐ DEDUPLICATION: Filter out profiles that are already in potentialMatches
       const existingProfileIds = new Set(potentialMatches.map(p => !isAd(p) ? p.id : null).filter(Boolean));
-      const uniqueProfiles = profilesWithImages.filter(profile => !existingProfileIds.has(profile.id));
+      const uniqueProfiles = stratifiedProfiles.filter(profile => !existingProfileIds.has(profile.id));
       
       // Add new UNIQUE profiles to the END of the array (with ads injected)
       const newProfilesWithAds = injectAds(uniqueProfiles);
