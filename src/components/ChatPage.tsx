@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useLayoutEffect, useRef } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import { usePushNotifications } from '@/hooks/usePushNotifications';
@@ -79,6 +79,12 @@ const ChatPage = ({ currentUser, onUnreadChange, onDetailViewChange }: ChatPageP
     estimateSize: () => 80,
     overscan: 5,
   });
+
+  // Ensure virtual row heights are up-to-date for variable-height messages (e.g. replies).
+  // Some WebViews can be inconsistent with ResizeObserver timing; forcing a measure here prevents overlap.
+  useLayoutEffect(() => {
+    rowVirtualizer.measure();
+  }, [rowVirtualizer, messages.length]);
   const backgroundFetchingRef = useRef(false);
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [pullDistance, setPullDistance] = useState(0);
@@ -97,8 +103,21 @@ const ChatPage = ({ currentUser, onUnreadChange, onDetailViewChange }: ChatPageP
   // Reply state
   const [replyingTo, setReplyingTo] = useState<ChatMessage | null>(null);
 
+  // Highlighted message state (for scroll-to-message)
+  const [highlightedMessageId, setHighlightedMessageId] = useState<string | null>(null);
+  const highlightTimeoutRef = useRef<number | null>(null);
+
   // Keyboard handling for chat input
   useChatKeyboardFix();
+
+  // Cleanup highlight timeout on unmount
+  useEffect(() => {
+    return () => {
+      if (highlightTimeoutRef.current) {
+        window.clearTimeout(highlightTimeoutRef.current);
+      }
+    };
+  }, []);
 
   useEffect(() => {
     if (!currentUser || !currentUser.id) return;
@@ -1396,6 +1415,30 @@ const ChatPage = ({ currentUser, onUnreadChange, onDetailViewChange }: ChatPageP
     } catch (error) {}
   };
 
+  const handleScrollToMessage = (messageId: string) => {
+    const messageIndex = messages.findIndex((m) => m.id === messageId);
+    if (messageIndex === -1) return;
+
+    // Scroll to the message using the virtualizer
+    rowVirtualizer.scrollToIndex(messageIndex, {
+      align: 'center',
+      behavior: 'smooth',
+    });
+
+    // Highlight the message briefly
+    setHighlightedMessageId(messageId);
+
+    // Clear previous timeout if any
+    if (highlightTimeoutRef.current) {
+      window.clearTimeout(highlightTimeoutRef.current);
+    }
+
+    // Auto-remove highlight after 2 seconds
+    highlightTimeoutRef.current = window.setTimeout(() => {
+      setHighlightedMessageId(null);
+    }, 2000);
+  };
+
   const handleDormancyResponse = async (response: boolean) => {
     if (!selectedMatch) return;
 
@@ -1914,6 +1957,9 @@ const ChatPage = ({ currentUser, onUnreadChange, onDetailViewChange }: ChatPageP
                 return (
                   <div
                     key={message.id}
+                    ref={rowVirtualizer.measureElement}
+                    data-index={virtualRow.index}
+                    className="pt-0.5 pb-0"
                     style={{
                       position: 'absolute',
                       top: 0,
@@ -1931,6 +1977,8 @@ const ChatPage = ({ currentUser, onUnreadChange, onDetailViewChange }: ChatPageP
                       onDormancyResponse={handleDormancyResponse}
                       onReply={setReplyingTo}
                       repliedMessage={repliedMessage}
+                      onReplyClick={handleScrollToMessage}
+                      isHighlighted={message.id === highlightedMessageId}
                     />
                   </div>
                 );

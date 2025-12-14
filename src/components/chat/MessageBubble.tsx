@@ -1,7 +1,8 @@
-import React, { useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { ChatMessage, CurrentUser } from '@/types';
-import MessageOptionsMenu from './MessageOptionsMenu';
 import DeleteConfirmDialog from './DeleteConfirmDialog';
+import { Reply, Trash2 } from 'lucide-react';
+import { useTranslation } from 'react-i18next';
 
 interface MessageBubbleProps {
   message: ChatMessage;
@@ -12,6 +13,8 @@ interface MessageBubbleProps {
   onDormancyResponse?: (response: boolean) => void;
   onReply?: (message: ChatMessage) => void;
   repliedMessage?: ChatMessage | null;
+  onReplyClick?: (messageId: string) => void;
+  isHighlighted?: boolean;
 }
 
 const MessageBubble: React.FC<MessageBubbleProps> = ({
@@ -22,31 +25,99 @@ const MessageBubble: React.FC<MessageBubbleProps> = ({
   onDeleteForEveryone,
   onDormancyResponse,
   onReply,
-  repliedMessage
+  repliedMessage,
+  onReplyClick,
+  isHighlighted = false,
 }) => {
+  const { t } = useTranslation();
   const isOwnMessage = message.sender_id === currentUser.id;
   const isSystemMessage = message.sender_id === '00000000-0000-0000-0000-000000000000';
+
   const [showConfirm, setShowConfirm] = useState(false);
   const [deleteType, setDeleteType] = useState<'me' | 'everyone'>('me');
   const [hasResponded, setHasResponded] = useState(false);
-  
-  // Swipe gesture state
+
   const [touchStart, setTouchStart] = useState({ x: 0, y: 0 });
   const [swipeOffset, setSwipeOffset] = useState(0);
   const [isSwiping, setIsSwiping] = useState(false);
   const [isMouseDown, setIsMouseDown] = useState(false);
-  
-  // Check if message is deleted for current user
-  const isDeletedForMe = message.deleted_for && message.deleted_for.includes(currentUser.id);
-  
+
+  const [isOptionsOpen, setIsOptionsOpen] = useState(false);
+  const [showOptionsBelow, setShowOptionsBelow] = useState(false);
+  const optionsMenuRef = useRef<HTMLDivElement>(null);
+  const bubbleRef = useRef<HTMLDivElement>(null);
+  const longPressTimerRef = useRef<number | null>(null);
+  const longPressTriggeredRef = useRef(false);
+
+  const isDeletedForMe = !!(message.deleted_for && message.deleted_for.includes(currentUser.id));
+
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent | TouchEvent) => {
+      if (!isOptionsOpen) return;
+      const target = event.target as Node;
+      if (optionsMenuRef.current && optionsMenuRef.current.contains(target)) return;
+      if (bubbleRef.current && bubbleRef.current.contains(target)) return;
+      setIsOptionsOpen(false);
+    };
+
+    if (isOptionsOpen) {
+      document.addEventListener('mousedown', handleClickOutside);
+      document.addEventListener('touchstart', handleClickOutside);
+    }
+
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+      document.removeEventListener('touchstart', handleClickOutside);
+    };
+  }, [isOptionsOpen]);
+
+  const openOptionsMenu = () => {
+    if (isSystemMessage) return;
+
+    if (bubbleRef.current) {
+      const rect = bubbleRef.current.getBoundingClientRect();
+
+      const safeAreaTop = parseInt(
+        getComputedStyle(document.documentElement).getPropertyValue('--safe-area-inset-top') || '0',
+        10
+      );
+      const safeAreaBottom = parseInt(
+        getComputedStyle(document.documentElement).getPropertyValue('--safe-area-inset-bottom') || '0',
+        10
+      );
+
+      const spaceAbove = rect.top - safeAreaTop;
+      const spaceBelow = window.innerHeight - rect.bottom - safeAreaBottom;
+
+      // If there's not enough space above (accounting for headers), show below.
+      setShowOptionsBelow(spaceAbove < 180);
+    }
+
+    setIsOptionsOpen(true);
+  };
+
+  const clearLongPressTimer = () => {
+    if (longPressTimerRef.current) {
+      window.clearTimeout(longPressTimerRef.current);
+      longPressTimerRef.current = null;
+    }
+  };
+
   const handleDeleteForMe = () => {
     setDeleteType('me');
     setShowConfirm(true);
+    setIsOptionsOpen(false);
   };
 
   const handleDeleteForEveryone = () => {
     setDeleteType('everyone');
     setShowConfirm(true);
+    setIsOptionsOpen(false);
+  };
+
+  const handleReply = () => {
+    if (onReply) onReply(message);
+    setIsOptionsOpen(false);
   };
 
   const handleConfirmDelete = () => {
@@ -69,6 +140,16 @@ const MessageBubble: React.FC<MessageBubbleProps> = ({
     e.stopPropagation();
     setTouchStart({ x: e.touches[0].clientX, y: e.touches[0].clientY });
     setIsSwiping(true);
+
+    longPressTriggeredRef.current = false;
+    clearLongPressTimer();
+    // iMessage-style long press to show options
+    longPressTimerRef.current = window.setTimeout(() => {
+      longPressTriggeredRef.current = true;
+      setSwipeOffset(0);
+      setIsSwiping(false);
+      openOptionsMenu();
+    }, 450);
   };
   
   const handleTouchMove = (e: React.TouchEvent) => {
@@ -78,6 +159,11 @@ const MessageBubble: React.FC<MessageBubbleProps> = ({
     const touchY = e.touches[0].clientY;
     const deltaX = touchX - touchStart.x;
     const deltaY = touchY - touchStart.y;
+
+    // If the finger moves, cancel long-press.
+    if (Math.abs(deltaX) > 10 || Math.abs(deltaY) > 10) {
+      clearLongPressTimer();
+    }
     
     // Only trigger swipe if horizontal movement is dominant
     if (Math.abs(deltaX) > Math.abs(deltaY)) {
@@ -94,6 +180,13 @@ const MessageBubble: React.FC<MessageBubbleProps> = ({
   };
   
   const handleTouchEnd = () => {
+    clearLongPressTimer();
+    if (longPressTriggeredRef.current) {
+      longPressTriggeredRef.current = false;
+      setSwipeOffset(0);
+      setIsSwiping(false);
+      return;
+    }
     const threshold = window.innerWidth * 0.3; // 30% of screen width
     if (swipeOffset > threshold && onReply) {
       onReply(message);
@@ -180,7 +273,7 @@ const MessageBubble: React.FC<MessageBubbleProps> = ({
   return (
     <>
       <div 
-        className={`flex ${isOwnMessage ? 'justify-end' : 'justify-start'} ${repliedMessage ? 'mt-5' : 'mt-3'}`}
+        className={`flex ${isOwnMessage ? 'justify-end' : 'justify-start'} items-start`}
         onTouchStart={handleTouchStart}
         onTouchMove={handleTouchMove}
         onTouchEnd={handleTouchEnd}
@@ -188,6 +281,10 @@ const MessageBubble: React.FC<MessageBubbleProps> = ({
         onMouseMove={handleMouseMove}
         onMouseUp={handleMouseUp}
         onMouseLeave={handleMouseLeave}
+        onContextMenu={(e) => {
+          e.preventDefault();
+          openOptionsMenu();
+        }}
         style={{
           transform: swipeOffset > 0 ? `translateX(${isOwnMessage ? -swipeOffset * 0.3 : swipeOffset * 0.3}px)` : 'none',
           transition: isSwiping ? 'none' : 'transform 0.2s ease-out',
@@ -196,19 +293,37 @@ const MessageBubble: React.FC<MessageBubbleProps> = ({
         }}
       >
         <div
-          className={`relative max-w-[75%] lg:max-w-md px-4 py-3 rounded-2xl shadow-md ${
+          ref={bubbleRef}
+          className={`relative max-w-[75%] lg:max-w-md px-2 py-1 rounded-2xl shadow-md transition-all duration-300 ${
             isOwnMessage
               ? 'bg-gradient-to-br from-rose-500 to-pink-600 text-white'
               : 'bg-white text-slate-800 border border-slate-200'
+          } ${
+            isHighlighted
+              ? 'ring-4 ring-yellow-400 shadow-2xl shadow-yellow-400/50 scale-105 animate-pulse'
+              : ''
           }`}
+          style={{
+            backgroundColor: isHighlighted 
+              ? (isOwnMessage ? 'rgba(251, 191, 36, 0.3)' : 'rgba(251, 191, 36, 0.2)')
+              : undefined,
+          }}
         >
           {/* Reply thread indicator */}
           {repliedMessage && (
-            <div className={`mb-2 px-3 py-2 rounded-lg ${
-              isOwnMessage 
-                ? 'bg-white/20 border-l-4 border-white/60' 
-                : 'bg-rose-50 border-l-4 border-rose-400'
-            }`}>
+            <div
+              className={`mb-2 px-3 py-2 rounded-lg cursor-pointer transition-all hover:opacity-80 active:scale-[0.98] ${
+                isOwnMessage 
+                  ? 'bg-white/20 border-l-4 border-white/60' 
+                  : 'bg-rose-50 border-l-4 border-rose-400'
+              }`}
+              onClick={(e) => {
+                e.stopPropagation();
+                if (onReplyClick && repliedMessage.id) {
+                  onReplyClick(repliedMessage.id);
+                }
+              }}
+            >
               <p className={`text-xs font-semibold mb-0.5 ${
                 isOwnMessage ? 'text-white' : 'text-rose-600'
               }`}>
@@ -222,22 +337,48 @@ const MessageBubble: React.FC<MessageBubbleProps> = ({
             </div>
           )}
           
-          {/* Three-dot menu in top corner inside bubble */}
-          {!isSystemMessage && (
-            <div className={`absolute -top-1 ${isOwnMessage ? 'right-1' : 'left-1'}`}>
-              <MessageOptionsMenu
-                isOwnMessage={isOwnMessage}
-                onDeleteForMe={handleDeleteForMe}
-                onDeleteForEveryone={handleDeleteForEveryone}
-                onReply={onReply ? () => onReply(message) : undefined}
-              />
+          {/* Options menu (shown on long-press / right-click) */}
+          {isOptionsOpen && !isSystemMessage && (
+            <div
+              ref={optionsMenuRef}
+              className={`absolute ${showOptionsBelow ? 'top-full mt-1' : 'bottom-full mb-1'} ${
+                isOwnMessage ? 'right-0' : 'left-0'
+              } bg-white rounded-lg shadow-lg border border-gray-200 py-0.5 z-50 w-32 text-sm`}
+            >
+              {onReply && (
+                <button
+                  onClick={handleReply}
+                  className="w-full px-2.5 py-1.5 text-left text-gray-700 hover:bg-gray-50 flex items-center gap-1.5 transition-colors text-xs"
+                >
+                  <Reply className="w-3 h-3" />
+                  {t('chat.reply')}
+                </button>
+              )}
+
+              <button
+                onClick={handleDeleteForMe}
+                className="w-full px-2.5 py-1.5 text-left text-gray-700 hover:bg-gray-50 flex items-center gap-1.5 transition-colors text-xs"
+              >
+                <Trash2 className="w-3 h-3" />
+                {t('chat.deleteForMe')}
+              </button>
+
+              {isOwnMessage && (
+                <button
+                  onClick={handleDeleteForEveryone}
+                  className="w-full px-2.5 py-1.5 text-left text-red-600 hover:bg-red-50 flex items-center gap-1.5 transition-colors text-xs"
+                >
+                  <Trash2 className="w-3 h-3" />
+                  {t('chat.deleteForEveryone')}
+                </button>
+              )}
             </div>
           )}
 
-          <p className={`text-sm break-words pr-5 ${isDeletedForMe ? 'italic opacity-70' : ''}`}>
+          <p className={`text-sm break-words pr-5 mt-1 ${isDeletedForMe ? 'italic opacity-70' : ''}`}>
             {isDeletedForMe ? 'deleted' : message.message}
           </p>
-          <div className={`flex items-center gap-1.5 text-xs mt-2 ${
+          <div className={`flex items-center gap-0 text-[9px] leading-none mt-0 ${
             isOwnMessage ? 'text-white/70' : 'text-slate-400'
           }`}>
             <span>
@@ -247,7 +388,7 @@ const MessageBubble: React.FC<MessageBubbleProps> = ({
               })}
             </span>
             {isOwnMessage && (
-              <span className="text-sm font-medium text-white/90">
+              <span className="text-[9px] font-medium text-white/90 leading-none">
                 {message.is_read ? '✓✓' : '✓'}
               </span>
             )}
@@ -271,6 +412,8 @@ export default React.memo(MessageBubble, (prevProps, nextProps) => {
     prevProps.message.id === nextProps.message.id &&
     prevProps.message.is_read === nextProps.message.is_read &&
     prevProps.message.deleted_for === nextProps.message.deleted_for &&
-    prevProps.isConsecutive === nextProps.isConsecutive
+    prevProps.isConsecutive === nextProps.isConsecutive &&
+    prevProps.isHighlighted === nextProps.isHighlighted &&
+    prevProps.repliedMessage?.id === nextProps.repliedMessage?.id
   );
 });
