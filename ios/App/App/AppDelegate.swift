@@ -38,6 +38,7 @@ class AppDelegate: UIResponder, UIApplicationDelegate {
     func application(_ app: UIApplication,
                      open url: URL,
                      options: [UIApplication.OpenURLOptionsKey : Any] = [:]) -> Bool {
+        print("[AppDelegate] open url: \(url.absoluteString)")
         return ApplicationDelegateProxy.shared.application(app, open: url, options: options)
     }
 

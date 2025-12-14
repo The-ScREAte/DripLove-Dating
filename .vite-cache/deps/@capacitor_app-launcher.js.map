@@ -1,0 +1,7 @@
+{
+  "version": 3,
+  "sources": ["../../node_modules/@capacitor/app-launcher/src/index.ts"],
+  "sourcesContent": ["import { registerPlugin } from '@capacitor/core';\n\nimport type { AppLauncherPlugin } from './definitions';\n\nconst AppLauncher = registerPlugin<AppLauncherPlugin>('AppLauncher', {\n  web: () => import('./web').then((m) => new m.AppLauncherWeb()),\n});\n\nexport * from './definitions';\nexport { AppLauncher };\n"],
+  "mappings": ";;;AAAA,SAAS,sBAAsB;AAI/B,IAAM,cAAc,eAAkC,eAAe;EACnE,KAAK,MAAM,OAAO,mBAAO,EAAE,KAAK,CAAC,MAAM,IAAI,EAAE,eAAc,CAAE;CAC9D;",
+  "names": []
+}

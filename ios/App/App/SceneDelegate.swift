@@ -31,6 +31,38 @@ class SceneDelegate: UIResponder, UIWindowSceneDelegate {
         }
         
         self.window?.makeKeyAndVisible()
+
+        // Handle deep links on cold start
+        if let urlContext = connectionOptions.urlContexts.first {
+            print("[SceneDelegate] Cold start openURL: \(urlContext.url.absoluteString)")
+            _ = ApplicationDelegateProxy.shared.application(UIApplication.shared,
+                                                           open: urlContext.url,
+                                                           options: [:])
+        }
+
+        // Handle universal links on cold start
+        if let userActivity = connectionOptions.userActivities.first {
+            _ = ApplicationDelegateProxy.shared.application(UIApplication.shared,
+                                                           continue: userActivity,
+                                                           restorationHandler: { _ in })
+        }
+    }
+
+    // Handle deep links while app is running / in background
+    func scene(_ scene: UIScene, openURLContexts URLContexts: Set<UIOpenURLContext>) {
+        for context in URLContexts {
+            print("[SceneDelegate] openURLContexts: \(context.url.absoluteString)")
+            _ = ApplicationDelegateProxy.shared.application(UIApplication.shared,
+                                                           open: context.url,
+                                                           options: [:])
+        }
+    }
+
+    // Handle universal links while app is running / in background
+    func scene(_ scene: UIScene, continue userActivity: NSUserActivity) {
+        _ = ApplicationDelegateProxy.shared.application(UIApplication.shared,
+                                                       continue: userActivity,
+                                                       restorationHandler: { _ in })
     }
 
     func sceneDidDisconnect(_ scene: UIScene) {

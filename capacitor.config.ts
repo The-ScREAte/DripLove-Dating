@@ -20,7 +20,6 @@ const config: CapacitorConfig = {
     ]
   },
   ios: {
-    scheme: 'driplove',
     scrollEnabled: true,
     // Performance optimizations for iOS
     preferredContentMode: 'mobile',
