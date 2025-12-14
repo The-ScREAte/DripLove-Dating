@@ -180,7 +180,7 @@ const MessageBubble: React.FC<MessageBubbleProps> = ({
   return (
     <>
       <div 
-        className={`flex ${isOwnMessage ? 'justify-end' : 'justify-start'} ${isConsecutive ? 'mt-1' : 'mt-4'}`}
+        className={`flex ${isOwnMessage ? 'justify-end' : 'justify-start'} mb-3`}
         onTouchStart={handleTouchStart}
         onTouchMove={handleTouchMove}
         onTouchEnd={handleTouchEnd}
@@ -192,30 +192,33 @@ const MessageBubble: React.FC<MessageBubbleProps> = ({
           transform: swipeOffset > 0 ? `translateX(${isOwnMessage ? -swipeOffset * 0.3 : swipeOffset * 0.3}px)` : 'none',
           transition: isSwiping ? 'none' : 'transform 0.2s ease-out',
           cursor: isMouseDown ? 'grabbing' : 'grab',
-          touchAction: 'pan-y' // Allow vertical scroll, prevent horizontal swipe-back
+          touchAction: 'pan-y'
         }}
       >
         <div
-          className={`relative max-w-xs lg:max-w-md px-4 py-2 rounded-lg ${
+          className={`relative max-w-[75%] lg:max-w-md px-4 py-3 rounded-2xl shadow-md ${
             isOwnMessage
-              ? 'bg-primary text-primary-foreground'
-              : 'bg-gray-200 text-gray-900'
-          } ${isConsecutive ? '' : 'shadow-sm'}`}
+              ? 'bg-gradient-to-br from-rose-500 to-pink-600 text-white'
+              : 'bg-white text-slate-800 border border-slate-200'
+          }`}
         >
           {/* Reply thread indicator */}
           {repliedMessage && (
-            <div className={`mb-2 pb-2 border-b ${isOwnMessage ? 'border-primary-foreground/20' : 'border-gray-400/20'}`}>
-              <div className="flex items-start space-x-1">
-                <div className={`w-1 h-full rounded-full ${isOwnMessage ? 'bg-primary-foreground/40' : 'bg-primary/40'}`}></div>
-                <div className="flex-1 min-w-0">
-                  <p className={`text-xs font-semibold ${isOwnMessage ? 'text-primary-foreground/80' : 'text-gray-600'}`}>
-                    {repliedMessage.sender_id === currentUser.id ? 'You' : repliedMessage.sender?.first_name}
-                  </p>
-                  <p className={`text-xs truncate ${isOwnMessage ? 'text-primary-foreground/70' : 'text-gray-500'}`}>
-                    {repliedMessage.message}
-                  </p>
-                </div>
-              </div>
+            <div className={`mb-2 px-3 py-2 rounded-lg ${
+              isOwnMessage 
+                ? 'bg-white/20 border-l-4 border-white/60' 
+                : 'bg-rose-50 border-l-4 border-rose-400'
+            }`}>
+              <p className={`text-xs font-semibold mb-0.5 ${
+                isOwnMessage ? 'text-white' : 'text-rose-600'
+              }`}>
+                {repliedMessage.sender_id === currentUser.id ? 'You' : repliedMessage.sender?.first_name}
+              </p>
+              <p className={`text-xs ${
+                isOwnMessage ? 'text-white/80' : 'text-slate-600'
+              }`}>
+                {repliedMessage.message}
+              </p>
             </div>
           )}
           
@@ -231,10 +234,12 @@ const MessageBubble: React.FC<MessageBubbleProps> = ({
             </div>
           )}
 
-          <p className={`text-sm break-words pr-6 ${isDeletedForMe ? 'italic opacity-70' : ''}`}>
+          <p className={`text-sm break-words pr-5 ${isDeletedForMe ? 'italic opacity-70' : ''}`}>
             {isDeletedForMe ? 'deleted' : message.message}
           </p>
-          <div className={`flex items-center gap-1 text-xs mt-1 ${isOwnMessage ? 'text-primary-foreground/70' : 'text-gray-500'}`}>
+          <div className={`flex items-center gap-1.5 text-xs mt-2 ${
+            isOwnMessage ? 'text-white/70' : 'text-slate-400'
+          }`}>
             <span>
               {new Date(message.sent_at || message.created_at || '').toLocaleTimeString([], {
                 hour: '2-digit',
@@ -242,7 +247,7 @@ const MessageBubble: React.FC<MessageBubbleProps> = ({
               })}
             </span>
             {isOwnMessage && (
-              <span className={`text-sm font-semibold text-primary-foreground/90`}>
+              <span className="text-sm font-medium text-white/90">
                 {message.is_read ? '✓✓' : '✓'}
               </span>
             )}
