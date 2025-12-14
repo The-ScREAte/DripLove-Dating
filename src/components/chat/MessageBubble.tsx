@@ -180,7 +180,7 @@ const MessageBubble: React.FC<MessageBubbleProps> = ({
   return (
     <>
       <div 
-        className={`flex ${isOwnMessage ? 'justify-end' : 'justify-start'} mb-3`}
+        className={`flex ${isOwnMessage ? 'justify-end' : 'justify-start'} ${repliedMessage ? 'mt-5' : 'mt-3'}`}
         onTouchStart={handleTouchStart}
         onTouchMove={handleTouchMove}
         onTouchEnd={handleTouchEnd}
