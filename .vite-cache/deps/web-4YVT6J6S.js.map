@@ -1,7 +1,0 @@
-{
-  "version": 3,
-  "sources": ["../../node_modules/@capacitor/app-launcher/src/web.ts"],
-  "sourcesContent": ["import { WebPlugin } from '@capacitor/core';\n\nimport type {\n  AppLauncherPlugin,\n  CanOpenURLOptions,\n  CanOpenURLResult,\n  OpenURLOptions,\n  OpenURLResult,\n} from './definitions';\n\nexport class AppLauncherWeb extends WebPlugin implements AppLauncherPlugin {\n  async canOpenUrl(_options: CanOpenURLOptions): Promise<CanOpenURLResult> {\n    return { value: true };\n  }\n\n  async openUrl(options: OpenURLOptions): Promise<OpenURLResult> {\n    window.open(options.url, '_blank');\n    return { completed: true };\n  }\n}\n"],
-  "mappings": ";;;AAAA,SAAS,iBAAiB;AAUpB,IAAO,iBAAP,cAA8B,UAAS;EAC3C,MAAM,WAAW,UAA2B;AAC1C,WAAO,EAAE,OAAO,KAAI;EACtB;EAEA,MAAM,QAAQ,SAAuB;AACnC,WAAO,KAAK,QAAQ,KAAK,QAAQ;AACjC,WAAO,EAAE,WAAW,KAAI;EAC1B;;",
-  "names": []
-}
