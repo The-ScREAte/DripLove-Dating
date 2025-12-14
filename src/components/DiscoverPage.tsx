@@ -604,101 +604,47 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, isPremium }: DiscoverPage
       return match.profile_id;
     });
     
-    // ⭐ BALANCED DISTRIBUTION: Fetch mix of new, established, active, and random users
-    // This ensures fair visibility - everyone gets seen, not just new or old users
+    // Fetch full profile data with all fields
     let filteredProfiles: any[] = [];
     if (locationProfileIds.length > 0) {
-      const baseQuery = () => supabase
+      let query = supabase
         .from('profiles')
-        .select('id, first_name, last_name, bio, city, country, country_code, occupation, education_level, date_of_birth, interests, gender, latitude, longitude, fun_fact, perfect_first_date, last_googled, relationship_intent, smoking, drinking, exercise_level, sleeping_schedule, introvert_extrovert, spontaneous_planner, messy_organized, adinkra_symbols, created_at, last_active')
-        .in('id', locationProfileIds)
-        .in('gender', allowedGenders)
-        .eq('account_status', 'active')
-        .eq('is_admin', false);
+        .select('id, first_name, last_name, bio, city, country, country_code, occupation, education_level, date_of_birth, interests, gender, latitude, longitude, fun_fact, perfect_first_date, last_googled, relationship_intent, smoking, drinking, exercise_level, sleeping_schedule, introvert_extrovert, spontaneous_planner, messy_organized, adinkra_symbols')
+        .in('id', locationProfileIds);
       
-      // Fetch 4 balanced segments (5 each = 20 total)
-      const [newUsers, establishedUsers, activeUsers, randomUsers] = await Promise.all([
-        // 1. New users (joined recently) - ensure new signups get visibility
-        baseQuery()
-          .not('id', 'in', excludedIds.length > 0 ? `(${excludedIds.join(',')})` : '()')
-          .order('created_at', { ascending: false })
-          .limit(5),
-        
-        // 2. Established users (been around longer) - ensure loyal users stay visible
-        baseQuery()
-          .not('id', 'in', excludedIds.length > 0 ? `(${excludedIds.join(',')})` : '()')
-          .order('created_at', { ascending: true })
-          .limit(5),
-        
-        // 3. Recently active users - prioritize engagement
-        baseQuery()
-          .not('id', 'in', excludedIds.length > 0 ? `(${excludedIds.join(',')})` : '()')
-          .not('last_active', 'is', null)
-          .order('last_active', { ascending: false })
-          .limit(5),
-        
-        // 4. Random mix - pure variety
-        baseQuery()
-          .not('id', 'in', excludedIds.length > 0 ? `(${excludedIds.join(',')})` : '()')
-          .limit(5)
-      ]);
-
-      // Combine all segments, removing duplicates
-      const allProfiles = [
-        ...(newUsers.data || []),
-        ...(establishedUsers.data || []),
-        ...(activeUsers.data || []),
-        ...(randomUsers.data || [])
-      ];
+      // ⭐ CRITICAL FIX: Use array for .not() instead of string
+      if (excludedIds.length > 0) {
+        query = query.not('id', 'in', `(${excludedIds.join(',')})`); 
+      }
       
-      // Deduplicate by ID
-      const seen = new Set<string>();
-      filteredProfiles = allProfiles.filter(p => {
-        if (seen.has(p.id)) return false;
-        seen.add(p.id);
-        return true;
-      });
-    } else {
-      // Fallback: get profiles from same country with balanced distribution
-      const baseQuery = () => supabase
-        .from('profiles')
-        .select('id, first_name, last_name, bio, city, country, country_code, occupation, education_level, date_of_birth, interests, gender, latitude, longitude, fun_fact, perfect_first_date, last_googled, relationship_intent, smoking, drinking, exercise_level, sleeping_schedule, introvert_extrovert, spontaneous_planner, messy_organized, adinkra_symbols, created_at, last_active')
+      const { data: profiles, error } = await query
         .in('gender', allowedGenders)
         .eq('account_status', 'active')
         .eq('is_admin', false)
-        .eq('country', currentUserData?.country || 'Ghana');
-      
-      // Fetch balanced segments
-      const [newUsers, establishedUsers, activeUsers] = await Promise.all([
-        baseQuery()
-          .not('id', 'in', excludedIds.length > 0 ? `(${excludedIds.join(',')})` : '()')
-          .order('created_at', { ascending: false })
-          .limit(5),
-        
-        baseQuery()
-          .not('id', 'in', excludedIds.length > 0 ? `(${excludedIds.join(',')})` : '()')
-          .order('created_at', { ascending: true })
-          .limit(5),
-        
-        baseQuery()
-          .not('id', 'in', excludedIds.length > 0 ? `(${excludedIds.join(',')})` : '()')
-          .not('last_active', 'is', null)
-          .order('last_active', { ascending: false })
-          .limit(5)
-      ]);
+        .limit(20);
 
-      const allProfiles = [
-        ...(newUsers.data || []),
-        ...(establishedUsers.data || []),
-        ...(activeUsers.data || [])
-      ];
+      if (error) throw error;
+      filteredProfiles = profiles || [];
+    } else {
+      // Fallback: get profiles from same country
+      let query = supabase
+        .from('profiles')
+        .select('id, first_name, last_name, bio, city, country, country_code, occupation, education_level, date_of_birth, interests, gender, latitude, longitude, fun_fact, perfect_first_date, last_googled, relationship_intent, smoking, drinking, exercise_level, sleeping_schedule, introvert_extrovert, spontaneous_planner, messy_organized, adinkra_symbols');
       
-      const seen = new Set<string>();
-      filteredProfiles = allProfiles.filter(p => {
-        if (seen.has(p.id)) return false;
-        seen.add(p.id);
-        return true;
-      });
+      // ⭐ CRITICAL FIX: Use array for .not() instead of string
+      if (excludedIds.length > 0) {
+        query = query.not('id', 'in', `(${excludedIds.join(',')})`);
+      }
+      
+      const { data: profiles, error } = await query
+        .in('gender', allowedGenders)
+        .eq('account_status', 'active')
+        .eq('is_admin', false)
+        .eq('country', currentUserData?.country || 'Ghana')
+        .limit(15);
+
+      if (error) throw error;
+      filteredProfiles = profiles || [];
     }
 
     // ⭐ PREMIUM FEATURE: Fetch profiles from unlocked countries and mix with local profiles
@@ -1375,48 +1321,20 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, isPremium }: DiscoverPage
       const hiddenPassedIds = recentPasses?.map(p => p.passed_id) || [];
       excludedIds.push(...likedUserIds, ...blockedUserIds, ...hiddenPassedIds);
       
-      // ⭐ BALANCED REFILL: Load mix of new, established, active users
-      const baseQuery = () => supabase
+      let query = supabase
         .from('profiles')
-        .select('id, first_name, last_name, bio, city, country, country_code, occupation, education_level, date_of_birth, interests, gender, latitude, longitude, fun_fact, perfect_first_date, last_googled, relationship_intent, smoking, drinking, exercise_level, sleeping_schedule, introvert_extrovert, spontaneous_planner, messy_organized, adinkra_symbols, created_at, last_active')
+        .select('id, first_name, last_name, bio, city, country, country_code, occupation, education_level, date_of_birth, interests, gender, latitude, longitude, fun_fact, perfect_first_date, last_googled, relationship_intent, smoking, drinking, exercise_level, sleeping_schedule, introvert_extrovert, spontaneous_planner, messy_organized, adinkra_symbols');
+      
+      // ⭐ CRITICAL FIX: Use array for .not() instead of string
+      if (excludedIds.length > 0) {
+        query = query.not('id', 'in', `(${excludedIds.join(',')})`);
+      }
+      
+      const { data: newProfiles, error } = await query
         .in('gender', allowedGenders)
         .eq('account_status', 'active')
-        .eq('is_admin', false);
-      
-      // Fetch balanced segments (5 each = 15 total)
-      const [newUsers, establishedUsers, activeUsers] = await Promise.all([
-        baseQuery()
-          .not('id', 'in', excludedIds.length > 0 ? `(${excludedIds.join(',')})` : '()')
-          .order('created_at', { ascending: false })
-          .limit(5),
-        
-        baseQuery()
-          .not('id', 'in', excludedIds.length > 0 ? `(${excludedIds.join(',')})` : '()')
-          .order('created_at', { ascending: true })
-          .limit(5),
-        
-        baseQuery()
-          .not('id', 'in', excludedIds.length > 0 ? `(${excludedIds.join(',')})` : '()')
-          .not('last_active', 'is', null)
-          .order('last_active', { ascending: false })
-          .limit(5)
-      ]);
-
-      const allNewProfiles = [
-        ...(newUsers.data || []),
-        ...(establishedUsers.data || []),
-        ...(activeUsers.data || [])
-      ];
-      
-      // Deduplicate
-      const seen = new Set<string>();
-      const newProfiles = allNewProfiles.filter(p => {
-        if (seen.has(p.id)) return false;
-        seen.add(p.id);
-        return true;
-      });
-      
-      const error = newUsers.error || establishedUsers.error || activeUsers.error;
+        .eq('is_admin', false)
+        .limit(15); // Load 15 profiles at a time (reduced from 25 for better performance)
 
       if (error) throw error;
       
@@ -1454,47 +1372,20 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, isPremium }: DiscoverPage
         const existingIds = new Set(filteredProfiles.map(p => p.id));
         const allExcludedIds = [...excludedIds, ...Array.from(existingIds)];
         
-        // Balanced unlocked countries fetch
-        const unlockedBaseQuery = () => supabase
+        let unlockedQuery = supabase
           .from('profiles')
-          .select('id, first_name, last_name, bio, city, country, country_code, occupation, education_level, date_of_birth, interests, gender, latitude, longitude, fun_fact, perfect_first_date, last_googled, relationship_intent, smoking, drinking, exercise_level, sleeping_schedule, introvert_extrovert, spontaneous_planner, messy_organized, adinkra_symbols, created_at, last_active')
-          .in('country_code', currentUser.unlocked_countries)
+          .select('id, first_name, last_name, bio, city, country, country_code, occupation, education_level, date_of_birth, interests, gender, latitude, longitude, fun_fact, perfect_first_date, last_googled, relationship_intent, smoking, drinking, exercise_level, sleeping_schedule, introvert_extrovert, spontaneous_planner, messy_organized, adinkra_symbols')
+          .in('country_code', currentUser.unlocked_countries);
+        
+        if (allExcludedIds.length > 0) {
+          unlockedQuery = unlockedQuery.not('id', 'in', `(${allExcludedIds.join(',')})`);
+        }
+        
+        const { data: unlockedProfiles, error: unlockedError } = await unlockedQuery
           .in('gender', allowedGenders)
           .eq('account_status', 'active')
-          .eq('is_admin', false);
-        
-        const [unlockedNew, unlockedEstablished, unlockedActive] = await Promise.all([
-          unlockedBaseQuery()
-            .not('id', 'in', allExcludedIds.length > 0 ? `(${allExcludedIds.join(',')})` : '()')
-            .order('created_at', { ascending: false })
-            .limit(10),
-          
-          unlockedBaseQuery()
-            .not('id', 'in', allExcludedIds.length > 0 ? `(${allExcludedIds.join(',')})` : '()')
-            .order('created_at', { ascending: true })
-            .limit(10),
-          
-          unlockedBaseQuery()
-            .not('id', 'in', allExcludedIds.length > 0 ? `(${allExcludedIds.join(',')})` : '()')
-            .not('last_active', 'is', null)
-            .order('last_active', { ascending: false })
-            .limit(10)
-        ]);
-
-        const allUnlockedProfiles = [
-          ...(unlockedNew.data || []),
-          ...(unlockedEstablished.data || []),
-          ...(unlockedActive.data || [])
-        ];
-        
-        const unlockedSeen = new Set<string>();
-        const unlockedProfiles = allUnlockedProfiles.filter(p => {
-          if (unlockedSeen.has(p.id)) return false;
-          unlockedSeen.add(p.id);
-          return true;
-        });
-        
-        const unlockedError = unlockedNew.error || unlockedEstablished.error || unlockedActive.error;
+          .eq('is_admin', false)
+          .limit(30); // Fetch additional profiles from unlocked countries
 
         if (!unlockedError && unlockedProfiles && unlockedProfiles.length > 0) {
           // ⭐ OPTIMIZED: Add distance inline (5ms saved)
