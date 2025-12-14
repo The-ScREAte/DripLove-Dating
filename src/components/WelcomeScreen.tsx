@@ -21,7 +21,7 @@ const WelcomeScreen: React.FC<WelcomeScreenProps> = ({ onLogin, onAbout, onTerms
   const [videoSrc, setVideoSrc] = React.useState('/welcome-video.mp4');
   
   // ✅ SINGLE SOURCE OF TRUTH for OAuth - centralized hook
-  const { startOAuth, oauthLoading } = useOAuth();
+  const { startOAuth, oauthLoading, setOauthLoading } = useOAuth();
 
   // Check if running on native platform and get platform
   const isNative = Capacitor.isNativePlatform();
@@ -47,6 +47,32 @@ const WelcomeScreen: React.FC<WelcomeScreenProps> = ({ onLogin, onAbout, onTerms
       }).catch(() => {});
     }
   }, [isNative, platform]); 
+
+  // Reset any stuck OAuth loading state when app comes back to foreground on iOS
+  React.useEffect(() => {
+    if (!isNative || !isIOS) return;
+
+    let removeListener: (() => void) | undefined;
+
+    (async () => {
+      try {
+        const { App } = await import('@capacitor/app');
+        const listener = await App.addListener('appStateChange', (state: { isActive: boolean }) => {
+          if (state.isActive) {
+            console.log('[WelcomeScreen] App became active, clearing oauthLoading state');
+            setOauthLoading(null);
+          }
+        });
+        removeListener = () => listener.remove();
+      } catch (err) {
+        console.log('[WelcomeScreen] Failed to add appStateChange listener', err);
+      }
+    })();
+
+    return () => {
+      if (removeListener) removeListener();
+    };
+  }, [isNative, isIOS, setOauthLoading]);
 
   // ✅ Browser cleanup is handled by useMobileOAuth - removed duplicate cleanup
 
