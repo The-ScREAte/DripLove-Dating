@@ -922,11 +922,7 @@ const AdminPageComponent = ({ currentUser, onLogout }: AdminPageProps) => {
           preference, 
           relationship_intent,
           last_login_at,
-          login_count,
-          user_subscriptions!left(
-            status,
-            expires_at
-          )
+          login_count
         `)
         .eq('is_admin', false)
         .order('created_at', { ascending: false });
@@ -955,23 +951,43 @@ const AdminPageComponent = ({ currentUser, onLogout }: AdminPageProps) => {
 
       if (error) throw error;
 
-      const usersWithAge = data?.map(user => {
-        // Check if user has active premium subscription
-        // Premium if status is 'active' AND (expires_at is null OR expires_at is in the future)
-        const hasPremium = Array.isArray(user.user_subscriptions) && 
-          user.user_subscriptions.some((sub: any) => 
-            sub.status === 'active' && 
-            (sub.expires_at === null || new Date(sub.expires_at) > new Date())
-          );
-        
-        return {
-          ...user,
-          age: calculateAge(user.date_of_birth),
-          is_premium: hasPremium,
-          last_login_at: (user as any).last_login_at,
-          login_count: (user as any).login_count
-        };
-      }) || [];
+      // Determine premium via admin RPC (bypasses RLS on user_subscriptions)
+      const userIds = (data || []).map(u => u.id).filter(Boolean);
+      const premiumMap = new Map<string, boolean>();
+
+      if (userIds.length > 0) {
+        const { data: premiumRowsRaw, error: premiumError } = await (supabase as any).rpc(
+          'admin_get_premium_status_for_users',
+          { target_user_ids: userIds }
+        );
+        if (premiumError) {
+          console.error('Premium status RPC failed:', premiumError);
+          throw premiumError;
+        }
+
+        const premiumRows: any[] = Array.isArray(premiumRowsRaw) ? premiumRowsRaw : [];
+        premiumRows.forEach((row: any) => {
+          if (row?.user_id) premiumMap.set(row.user_id, !!row.is_premium);
+        });
+      }
+
+      // Map users and attach premium flag
+      const usersWithAge = (data || []).map(user => ({
+        ...user,
+        age: calculateAge(user.date_of_birth),
+        is_premium: premiumMap.get(user.id) ?? false,
+        last_login_at: user.last_login_at,
+        login_count: user.login_count
+      }));
+
+      // Apply premium filter BEFORE caching (critical fix)
+      let filteredByPremium = usersWithAge;
+      
+      if (premiumFilter === 'premium') {
+        filteredByPremium = usersWithAge.filter(u => u.is_premium);
+      } else if (premiumFilter === 'free') {
+        filteredByPremium = usersWithAge.filter(u => !u.is_premium);
+      }
 
       // Fetch admin users separately
       const { data: adminData } = await supabase
@@ -985,16 +1001,30 @@ const AdminPageComponent = ({ currentUser, onLogout }: AdminPageProps) => {
         age: calculateAge(user.date_of_birth)
       })) || [];
 
-      setUsers(usersWithAge);
+      setUsers(filteredByPremium);
       setAdminUsers(adminsWithAge);
       
-      // Cache the users data for 3 minutes
-      userDataCache.set(cacheKey, { regularUsers: usersWithAge, admins: adminsWithAge });
+      // Cache the FILTERED users data for 3 minutes
+      userDataCache.set(cacheKey, { regularUsers: filteredByPremium, admins: adminsWithAge });
     } catch (error) {
-      console.error('Error fetching users:', error);
+      const errAny = error as any;
+      const status = errAny?.status;
+      const message: string = errAny?.message || '';
+      const details: string = errAny?.details || '';
+
+      console.error('Error fetching users:', errAny);
+
+      const rpcName = 'admin_get_premium_status_for_users';
+      const missingRpc =
+        status === 404 ||
+        message.toLowerCase().includes(rpcName) && message.toLowerCase().includes('could not find') ||
+        message.toLowerCase().includes('function') && message.toLowerCase().includes(rpcName) && message.toLowerCase().includes('not found');
+
       toast({
         title: 'Error',
-        description: 'Failed to load users',
+        description: missingRpc
+          ? 'Premium lookup RPC is missing on the database. Apply the latest Supabase migration (admin_get_premium_status_for_users) and refresh.'
+          : (details || message || 'Failed to load users'),
         variant: 'destructive'
       });
     } finally {
@@ -1024,6 +1054,14 @@ const AdminPageComponent = ({ currentUser, onLogout }: AdminPageProps) => {
       fetchReportedChats();
     }
   }, [isAdmin, fetchAppStats, fetchUsers, fetchPendingImages]);
+
+  // Clear cache when premium filter changes to prevent stale cached data
+  useEffect(() => {
+    userDataCache.clear();
+    if (isAdmin) {
+      fetchUsers();
+    }
+  }, [premiumFilter]);
 
   const updateUserStatus = async (userId: string, newStatus: string) => {
     try {
