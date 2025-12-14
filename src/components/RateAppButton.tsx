@@ -51,12 +51,6 @@ const RateAppButton: React.FC<RateAppButtonProps> = ({ className, onRatingComple
           description: "The rating dialog should appear now. If it doesn't, you may have already rated us recently (Google limits how often we can ask). You can always rate us directly in the Play Store!",
           duration: 6000,
         });
-      } else {
-        // iOS shows dialog immediately
-        toast({
-          title: "Thank you! ❤️",
-          description: "Your feedback helps us improve DripLove",
-        });
       }
     } catch (error) {
       console.error('[RateAppButton] Error opening rating:', error);

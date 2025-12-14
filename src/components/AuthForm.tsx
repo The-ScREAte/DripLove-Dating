@@ -154,11 +154,6 @@ const AuthForm = ({ isLogin, onToggle, onBack }: AuthFormProps) => {
         }
       }
 
-      toast({
-        title: "Password Reset Email Sent",
-        description: "Please check your email for password reset instructions.",
-      });
-
       setShowForgotPassword(false);
       setLoading(false);
     } catch (error: any) {

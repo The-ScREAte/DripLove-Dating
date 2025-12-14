@@ -112,11 +112,6 @@ const EmailConfirmPage = () => {
               
               setStatus('success');
               setMessage('Your email has been confirmed and your profile has been created! Welcome to DripLove!');
-              
-              toast({
-                title: "Welcome to DripLove!",
-                description: "Your account is now complete. Redirecting to the app...",
-              });
 
               // Redirect to the app after 3 seconds
               setTimeout(() => {
@@ -134,11 +129,6 @@ const EmailConfirmPage = () => {
           } else {
             setStatus('success');
             setMessage('Your email has been successfully confirmed! You can now log in to your account.');
-            
-            toast({
-              title: "Email Confirmed!",
-              description: "Your email has been verified. You can now log in.",
-            });
 
             // Redirect to login after 3 seconds
             setTimeout(() => {

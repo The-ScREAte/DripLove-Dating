@@ -506,7 +506,6 @@ const ImageManagement = ({ currentUser, profile, onProfileUpdate }: ImageManagem
       }
 
       await fetchUserImages();
-      toast({ title: "Image deleted", description: "Your image has been deleted successfully." });
     } catch (error) {
   // ...removed log...
       toast({ title: "Error", description: "Failed to delete image. Please try again.", variant: "destructive" });

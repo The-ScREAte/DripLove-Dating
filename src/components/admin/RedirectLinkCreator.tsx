@@ -186,11 +186,6 @@ const RedirectLinkCreator = () => {
 
       if (error) throw error;
 
-      toast({
-        title: 'Deleted',
-        description: 'Redirect link deleted successfully',
-      });
-
       fetchRedirectLinks();
     } catch (error) {
       console.error('Error deleting redirect:', error);

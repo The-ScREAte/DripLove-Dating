@@ -1482,6 +1482,8 @@ const LikedMePage = ({ currentUser, isPremium = false }: LikedMePageProps) => {
     style={{
       marginTop: platform === 'ios' 
         ? 'clamp(20px, calc(env(safe-area-inset-top, 10px) + 23px), 50px)'
+        : platform === 'android'
+        ? '20px'
         : '0'
     }}
   >
