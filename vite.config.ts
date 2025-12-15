@@ -6,8 +6,9 @@ import { visualizer } from 'rollup-plugin-visualizer';
 
 // https://vitejs.dev/config/
 export default defineConfig(({ mode }) => ({
-  // Use relative paths for Capacitor (mobile), absolute for web
-  base: mode === 'production' ? './' : '/',
+  // Web must use absolute base so routes like /r/:id can load assets.
+  // Capacitor builds need relative base so assets resolve under file://.
+  base: mode === 'capacitor' ? './' : '/',
   server: {
     host: "::",
     port: 8080,
