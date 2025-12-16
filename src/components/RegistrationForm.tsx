@@ -12,6 +12,7 @@ import { Heart, MapPin, Briefcase, GraduationCap, Upload, Shield, CheckCircle, A
 import BasicInfoSection from '@/components/forms/BasicInfoSection';
 import LocationInput from '@/components/forms/LocationInput';
 import AdinkraSymbolSelector from '@/components/forms/AdinkraSymbolSelector';
+import PromoCodeInput from '@/components/forms/PromoCodeInput';
 import { validateRegistrationForm, transformFormDataForSubmission } from '@/utils/formValidation';
 import { initialFormData } from '@/constants/formData';
 import { occupationOptions, industryOptions } from '@/constants/professionOptions';
@@ -658,6 +659,21 @@ const RegistrationForm = ({ onSubmit, onBackToLogin }: RegistrationFormProps) =>
           }
         }
       }
+
+      // Save referral if promo code was used
+      if (formData.promoCodeId) {
+        try {
+          await supabase
+            .from('referrals')
+            .insert({
+              user_id: userId,
+              promo_code_id: formData.promoCodeId
+            });
+        } catch (refErr) {
+          console.error('Error saving referral:', refErr);
+          // Don't block registration if referral save fails
+        }
+      }
       
     } catch (err) {
       setIsSubmitting(false); // Reset loading state
@@ -932,6 +948,20 @@ const RegistrationForm = ({ onSubmit, onBackToLogin }: RegistrationFormProps) =>
               }}
               required={false}
               autoDetect={true}
+            />
+          </div>
+
+          {/* Promo Code Section */}
+          <div className="animate-scale-in">
+            <PromoCodeInput
+              value={formData.promoCode}
+              onChange={(value, promoCodeId) => {
+                setFormData(prev => ({
+                  ...prev,
+                  promoCode: value,
+                  promoCodeId: promoCodeId
+                }));
+              }}
             />
           </div>
           </div>
