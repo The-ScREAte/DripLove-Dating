@@ -341,6 +341,64 @@ export type Database = {
         }
         Relationships: []
       }
+      influencer_commissions: {
+        Row: {
+          commission_amount: number
+          commission_percentage: number
+          created_at: string | null
+          deduction_number: number
+          id: string
+          payment_amount: number
+          payment_id: string
+          promo_code_id: string
+          user_id: string
+        }
+        Insert: {
+          commission_amount: number
+          commission_percentage: number
+          created_at?: string | null
+          deduction_number?: number
+          id?: string
+          payment_amount: number
+          payment_id: string
+          promo_code_id: string
+          user_id: string
+        }
+        Update: {
+          commission_amount?: number
+          commission_percentage?: number
+          created_at?: string | null
+          deduction_number?: number
+          id?: string
+          payment_amount?: number
+          payment_id?: string
+          promo_code_id?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "influencer_commissions_payment_id_fkey"
+            columns: ["payment_id"]
+            isOneToOne: false
+            referencedRelation: "subscription_payments"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "influencer_commissions_promo_code_id_fkey"
+            columns: ["promo_code_id"]
+            isOneToOne: false
+            referencedRelation: "promo_codes"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "influencer_commissions_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       likes: {
         Row: {
           created_at: string
@@ -563,6 +621,50 @@ export type Database = {
         }
         Relationships: []
       }
+      payout_requests: {
+        Row: {
+          admin_notes: string | null
+          amount: number
+          created_at: string | null
+          id: string
+          processed_at: string | null
+          processed_by: string | null
+          promo_code_id: string
+          status: string | null
+          updated_at: string | null
+        }
+        Insert: {
+          admin_notes?: string | null
+          amount: number
+          created_at?: string | null
+          id?: string
+          processed_at?: string | null
+          processed_by?: string | null
+          promo_code_id: string
+          status?: string | null
+          updated_at?: string | null
+        }
+        Update: {
+          admin_notes?: string | null
+          amount?: number
+          created_at?: string | null
+          id?: string
+          processed_at?: string | null
+          processed_by?: string | null
+          promo_code_id?: string
+          status?: string | null
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "payout_requests_promo_code_id_fkey"
+            columns: ["promo_code_id"]
+            isOneToOne: false
+            referencedRelation: "promo_codes"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       profiles: {
         Row: {
           account_status: string | null
@@ -719,29 +821,53 @@ export type Database = {
       promo_codes: {
         Row: {
           code: string
+          commission_duration: number | null
           created_at: string
+          created_by: string | null
+          deleted_at: string | null
           id: string
           is_active: boolean
           owner_name: string
+          password_hash: string | null
           percentage_cut: number
+          status: string | null
+          total_commission_earned: number | null
+          total_paid_subscribers: number | null
+          total_signups: number | null
           updated_at: string
         }
         Insert: {
           code: string
+          commission_duration?: number | null
           created_at?: string
+          created_by?: string | null
+          deleted_at?: string | null
           id?: string
           is_active?: boolean
           owner_name: string
+          password_hash?: string | null
           percentage_cut?: number
+          status?: string | null
+          total_commission_earned?: number | null
+          total_paid_subscribers?: number | null
+          total_signups?: number | null
           updated_at?: string
         }
         Update: {
           code?: string
+          commission_duration?: number | null
           created_at?: string
+          created_by?: string | null
+          deleted_at?: string | null
           id?: string
           is_active?: boolean
           owner_name?: string
+          password_hash?: string | null
           percentage_cut?: number
+          status?: string | null
+          total_commission_earned?: number | null
+          total_paid_subscribers?: number | null
+          total_signups?: number | null
           updated_at?: string
         }
         Relationships: []
@@ -816,6 +942,42 @@ export type Database = {
           web_url?: string
         }
         Relationships: []
+      }
+      referrals: {
+        Row: {
+          created_at: string | null
+          id: string
+          promo_code_id: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string | null
+          id?: string
+          promo_code_id: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string | null
+          id?: string
+          promo_code_id?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "referrals_promo_code_id_fkey"
+            columns: ["promo_code_id"]
+            isOneToOne: false
+            referencedRelation: "promo_codes"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "referrals_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: true
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       reported_chats: {
         Row: {
@@ -926,6 +1088,64 @@ export type Database = {
         }
         Relationships: []
       }
+      subscription_payments: {
+        Row: {
+          amount: number
+          created_at: string | null
+          currency: string | null
+          id: string
+          payment_method: string | null
+          promo_code_id: string | null
+          subscription_id: string | null
+          transaction_id: string | null
+          user_id: string
+        }
+        Insert: {
+          amount: number
+          created_at?: string | null
+          currency?: string | null
+          id?: string
+          payment_method?: string | null
+          promo_code_id?: string | null
+          subscription_id?: string | null
+          transaction_id?: string | null
+          user_id: string
+        }
+        Update: {
+          amount?: number
+          created_at?: string | null
+          currency?: string | null
+          id?: string
+          payment_method?: string | null
+          promo_code_id?: string | null
+          subscription_id?: string | null
+          transaction_id?: string | null
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "subscription_payments_promo_code_id_fkey"
+            columns: ["promo_code_id"]
+            isOneToOne: false
+            referencedRelation: "promo_codes"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "subscription_payments_subscription_id_fkey"
+            columns: ["subscription_id"]
+            isOneToOne: false
+            referencedRelation: "user_subscriptions"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "subscription_payments_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       subscription_plans: {
         Row: {
           created_at: string
@@ -1006,6 +1226,48 @@ export type Database = {
           },
           {
             foreignKeyName: "user_images_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      user_referral_deductions: {
+        Row: {
+          created_at: string | null
+          deductions_used: number | null
+          id: string
+          promo_code_id: string
+          updated_at: string | null
+          user_id: string
+        }
+        Insert: {
+          created_at?: string | null
+          deductions_used?: number | null
+          id?: string
+          promo_code_id: string
+          updated_at?: string | null
+          user_id: string
+        }
+        Update: {
+          created_at?: string | null
+          deductions_used?: number | null
+          id?: string
+          promo_code_id?: string
+          updated_at?: string | null
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "user_referral_deductions_promo_code_id_fkey"
+            columns: ["promo_code_id"]
+            isOneToOne: false
+            referencedRelation: "promo_codes"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "user_referral_deductions_user_id_fkey"
             columns: ["user_id"]
             isOneToOne: false
             referencedRelation: "profiles"
@@ -1272,6 +1534,10 @@ export type Database = {
         Args: { field_name: string; match_id_input: string }
         Returns: undefined
       }
+      influencer_login: {
+        Args: { code_input: string; password_input: string }
+        Returns: Json
+      }
       like_and_usage_batched: {
         Args: {
           liked_id_param: string
@@ -1288,9 +1554,21 @@ export type Database = {
         }
         Returns: Json
       }
+      process_referral_commission: {
+        Args: {
+          p_payment_amount: number
+          p_payment_id: string
+          p_user_id: string
+        }
+        Returns: Json
+      }
       reject_image: {
         Args: { admin_notes?: string; image_id: string }
         Returns: boolean
+      }
+      request_influencer_payout: {
+        Args: { p_amount: number; p_promo_code_id: string }
+        Returns: Json
       }
       test_subscription_info: { Args: { user_id_param: string }; Returns: Json }
       update_user_usage: {
@@ -1301,6 +1579,7 @@ export type Database = {
         }
         Returns: Json
       }
+      validate_promo_code: { Args: { code_input: string }; Returns: Json }
     }
     Enums: {
       [_ in never]: never

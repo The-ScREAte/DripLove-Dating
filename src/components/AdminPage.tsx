@@ -24,6 +24,7 @@ import ManualPremiumManager from './admin/ManualPremiumManager';
 import AdsManagement from './admin/AdsManagement';
 import RedirectLinkCreator from './admin/RedirectLinkCreator';
 import BroadcastNotifications from './admin/BroadcastNotifications';
+import InfluencerManagement from './admin/InfluencerManagement';
 import { debounce, userDataCache, createPagination } from '@/utils/performanceOptimizer';
 import { useSupabaseSubscription, useMemoryMonitor } from '@/hooks/usePerformance';
 import { CurrentUser, AdminStats } from '@/types';
@@ -1449,6 +1450,10 @@ const AdminPageComponent = ({ currentUser, onLogout }: AdminPageProps) => {
                     <Search className="w-4 h-4" />
                     <span>Debugger</span>
                   </TabsTrigger>
+                  <TabsTrigger value="influencers" className="text-xs flex flex-col gap-1 py-2">
+                    <Crown className="w-4 h-4" />
+                    <span>Influencers</span>
+                  </TabsTrigger>
                   <TabsTrigger value="settings" className="text-xs flex flex-col gap-1 py-2">
                     <Settings className="w-4 h-4" />
                     <span>Settings</span>
@@ -2022,6 +2027,11 @@ const AdminPageComponent = ({ currentUser, onLogout }: AdminPageProps) => {
             {/* Redirects Tab */}
             <TabsContent value="redirects" className="space-y-4">
               <RedirectLinkCreator />
+            </TabsContent>
+
+            {/* Influencers Tab */}
+            <TabsContent value="influencers" className="space-y-4">
+              <InfluencerManagement />
             </TabsContent>
 
             {/* Settings Tab */}
