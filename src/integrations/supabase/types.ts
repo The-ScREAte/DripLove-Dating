@@ -825,6 +825,7 @@ export type Database = {
           created_at: string
           created_by: string | null
           deleted_at: string | null
+          email: string | null
           id: string
           is_active: boolean
           owner_name: string
@@ -842,6 +843,7 @@ export type Database = {
           created_at?: string
           created_by?: string | null
           deleted_at?: string | null
+          email?: string | null
           id?: string
           is_active?: boolean
           owner_name: string
@@ -859,6 +861,7 @@ export type Database = {
           created_at?: string
           created_by?: string | null
           deleted_at?: string | null
+          email?: string | null
           id?: string
           is_active?: boolean
           owner_name?: string

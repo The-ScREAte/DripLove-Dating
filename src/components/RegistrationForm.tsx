@@ -864,6 +864,20 @@ const RegistrationForm = ({ onSubmit, onBackToLogin }: RegistrationFormProps) =>
         <form onSubmit={handleSubmit} className="space-y-8">
           {currentStep === 1 && (
             <div className="space-y-6 animate-fade-in">
+          {/* Promo Code Section - At the top */}
+          <div className="animate-scale-in">
+            <PromoCodeInput
+              value={formData.promoCode}
+              onChange={(value, promoCodeId) => {
+                setFormData(prev => ({
+                  ...prev,
+                  promoCode: value,
+                  promoCodeId: promoCodeId
+                }));
+              }}
+            />
+          </div>
+
           <BasicInfoSection
             formData={formData}
             errors={errors}
@@ -951,19 +965,6 @@ const RegistrationForm = ({ onSubmit, onBackToLogin }: RegistrationFormProps) =>
             />
           </div>
 
-          {/* Promo Code Section */}
-          <div className="animate-scale-in">
-            <PromoCodeInput
-              value={formData.promoCode}
-              onChange={(value, promoCodeId) => {
-                setFormData(prev => ({
-                  ...prev,
-                  promoCode: value,
-                  promoCodeId: promoCodeId
-                }));
-              }}
-            />
-          </div>
           </div>
           )}
 

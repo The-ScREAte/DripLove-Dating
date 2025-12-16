@@ -64,6 +64,7 @@ const InfluencerManagement = () => {
   const [formData, setFormData] = useState({
     code: '',
     ownerName: '',
+    email: '',
     password: '',
     percentageCut: '20',
     commissionDuration: '1'
@@ -183,6 +184,7 @@ const InfluencerManagement = () => {
         .insert({
           code: formData.code.trim().toUpperCase(),
           owner_name: formData.ownerName.trim(),
+          email: formData.email.trim() || null,
           password_hash: formData.password, // Plain text for now - login function handles comparison
           percentage_cut: parseFloat(formData.percentageCut),
           commission_duration: parseInt(formData.commissionDuration),
@@ -194,7 +196,7 @@ const InfluencerManagement = () => {
 
       toast({ title: 'Success', description: 'Promo code created successfully' });
       setShowCreateModal(false);
-      setFormData({ code: '', ownerName: '', password: '', percentageCut: '20', commissionDuration: '1' });
+      setFormData({ code: '', ownerName: '', email: '', password: '', percentageCut: '20', commissionDuration: '1' });
       fetchPromoCodes();
     } catch (error) {
       console.error('Error creating promo code:', error);
@@ -208,6 +210,7 @@ const InfluencerManagement = () => {
     try {
       const updateData: any = {
         owner_name: formData.ownerName.trim(),
+        email: formData.email.trim() || null,
         percentage_cut: parseFloat(formData.percentageCut),
         commission_duration: parseInt(formData.commissionDuration)
       };
@@ -349,6 +352,7 @@ const InfluencerManagement = () => {
     setFormData({
       code: promoCode.code,
       ownerName: promoCode.owner_name,
+      email: (promoCode as any).email || '',
       password: '',
       percentageCut: promoCode.percentage_cut.toString(),
       commissionDuration: promoCode.commission_duration.toString()
@@ -523,6 +527,15 @@ const InfluencerManagement = () => {
               />
             </div>
             <div>
+              <Label>Email (Optional)</Label>
+              <Input 
+                type="email"
+                value={formData.email} 
+                onChange={(e) => setFormData(prev => ({ ...prev, email: e.target.value }))}
+                placeholder="influencer@email.com"
+              />
+            </div>
+            <div>
               <Label>Login Password *</Label>
               <Input 
                 type="password"
@@ -581,6 +594,15 @@ const InfluencerManagement = () => {
               <Input 
                 value={formData.ownerName} 
                 onChange={(e) => setFormData(prev => ({ ...prev, ownerName: e.target.value }))}
+              />
+            </div>
+            <div>
+              <Label>Email (Optional)</Label>
+              <Input 
+                type="email"
+                value={formData.email} 
+                onChange={(e) => setFormData(prev => ({ ...prev, email: e.target.value }))}
+                placeholder="influencer@email.com"
               />
             </div>
             <div>
