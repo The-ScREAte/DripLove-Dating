@@ -13,6 +13,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { occupationOptions, industryOptions } from '@/constants/professionOptions';
 import LocationInput from '@/components/forms/LocationInput';
 import AdinkraSymbolSelector from '@/components/forms/AdinkraSymbolSelector';
+import PromoCodeInput from '@/components/forms/PromoCodeInput';
 import { moderateImage, ModerationResult } from '@/utils/photoModeration';
 import { compressImage } from '@/utils/imageCompression';
 import TermsAcceptance from './TermsAcceptance';
@@ -613,6 +614,21 @@ const ProfileCompletionPage = () => {
         throw error;
       }
 
+      // Save referral if promo code was used
+      if (formData.promoCodeId) {
+        try {
+          await supabase
+            .from('referrals')
+            .insert({
+              user_id: user.id,
+              promo_code_id: formData.promoCodeId
+            });
+        } catch (refErr) {
+          console.error('Error saving referral:', refErr);
+          // Don't block profile completion if referral save fails
+        }
+      }
+
       // Upload approved images to storage and DB for the existing user
       const approvedImages = images.filter(img => img.status === 'approved' || img.status === 'pending');
       let imageOrder = 1;
@@ -811,6 +827,18 @@ const ProfileCompletionPage = () => {
                 </div>
                 <form onSubmit={handleSubmit} className="space-y-4">
                   <div className="space-y-4">
+                    {/* Promo Code Section - At the top */}
+                    <PromoCodeInput
+                      value={formData.promoCode}
+                      onChange={(value, promoCodeId) => {
+                        setFormData(prev => ({
+                          ...prev,
+                          promoCode: value,
+                          promoCodeId: promoCodeId
+                        }));
+                      }}
+                    />
+
                     <h3 className="text-lg font-semibold text-gray-800">{t('profileCompletion.basicInformation')}</h3>
                     
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">

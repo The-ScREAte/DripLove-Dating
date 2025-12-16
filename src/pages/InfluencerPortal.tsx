@@ -26,6 +26,7 @@ interface InfluencerSession {
   promo_code_id: string;
   code: string;
   owner_name: string;
+  email?: string;
   percentage_cut: number;
   commission_duration: number;
   status: string;
@@ -80,6 +81,7 @@ const InfluencerPortal = () => {
           promo_code_id: result.promo_code_id,
           code: result.code,
           owner_name: result.owner_name,
+          email: result.email,
           percentage_cut: result.percentage_cut,
           commission_duration: result.commission_duration,
           status: result.status,
@@ -131,6 +133,7 @@ const InfluencerPortal = () => {
           promo_code_id: result.promo_code_id,
           code: result.code,
           owner_name: result.owner_name,
+          email: result.email,
           percentage_cut: result.percentage_cut,
           commission_duration: result.commission_duration,
           status: result.status,
@@ -312,6 +315,9 @@ const InfluencerPortal = () => {
               <div>
                 <p className="text-sm text-gray-500">Welcome back,</p>
                 <h1 className="text-xl font-bold">{session.owner_name}</h1>
+                {session.email && (
+                  <p className="text-xs text-gray-500">{session.email}</p>
+                )}
                 <Badge className="mt-1 bg-pink-100 text-pink-800">
                   Code: {session.code}
                 </Badge>
