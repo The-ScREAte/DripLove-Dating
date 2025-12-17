@@ -51,13 +51,14 @@ const Index = () => {
   // Save view to sessionStorage when it changes
   React.useEffect(() => {
     try {
-      if (currentView === 'register' || currentView === 'profile-completion') {
+      // Save views that need to be restored/checked
+      if (currentView === 'register' || currentView === 'profile-completion' || currentView === 'terms-acceptance') {
         sessionStorage.setItem('driplove_current_view', currentView);
       } else {
         sessionStorage.removeItem('driplove_current_view');
       }
-      // Persist authenticated state
-      if (currentView === 'app' || currentView === 'admin') {
+      // Persist authenticated state - includes terms-acceptance since user is logged in
+      if (currentView === 'app' || currentView === 'admin' || currentView === 'terms-acceptance') {
         sessionStorage.setItem('driplove_user_session', 'authenticated');
       } else if (currentView === 'welcome' || currentView === 'login') {
         sessionStorage.removeItem('driplove_user_session');
@@ -150,8 +151,18 @@ const Index = () => {
           })();
         }
         
-        // Auth state changed for user ID: session.user.id
+        // Set user immediately
         setUser(session.user);
+        
+        // Skip redirect if already on terms-acceptance or app view (user is in flow)
+        // This prevents interrupting registration/terms flow
+        const currentViewNow = sessionStorage.getItem('driplove_current_view');
+        if (currentViewNow === 'terms-acceptance' || 
+            sessionStorage.getItem('driplove_user_session') === 'authenticated') {
+          setLoading(false);
+          return;
+        }
+        
         checkUserTypeAndRedirect(session.user.id);
       } else if (_event === 'SIGNED_OUT') {
         // Only clear on explicit sign out, not on every state change
@@ -330,10 +341,15 @@ const Index = () => {
 
   // Shortest possible registration: essentials only
   const handleRegister = async (formData: any) => {
-    // Registration is now fully handled in RegistrationForm, just update user and view if needed
-    // If RegistrationForm returns a user, set it and show terms
-    if (formData && formData.email) {
-      // Try to fetch the user from Supabase after registration
+    // Registration passes user directly - use it immediately
+    if (formData?.user) {
+      setUser(formData.user);
+      setCurrentView('terms-acceptance');
+      return;
+    }
+    
+    // Fallback: get user from auth if not passed
+    if (formData?.email) {
       const { data: { user } } = await supabase.auth.getUser();
       if (user) {
         setUser(user);

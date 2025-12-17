@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -10,6 +10,7 @@ import { useToast } from '@/hooks/use-toast';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import TermsOfService from './TermsOfService';
 import PrivacyPolicy from './PrivacyPolicy';
+import { preloadPricingConfig } from '@/hooks/usePricingConfig';
 
 interface TermsAcceptanceProps {
   user: any;
@@ -24,6 +25,27 @@ const TermsAcceptance = ({ user, onAccept }: TermsAcceptanceProps) => {
   const [showPrivacy, setShowPrivacy] = useState(false);
   const { toast } = useToast();
 
+  // Preload app data in background while user views terms
+  useEffect(() => {
+    if (!user?.id) return;
+    
+    // Mark user as authenticated for instant app load
+    try {
+      sessionStorage.setItem('driplove_user_session', 'authenticated');
+    } catch {}
+    
+    // Preload pricing config in background
+    preloadPricingConfig(user.id);
+    
+    // Preload user profile data
+    supabase
+      .from('profiles')
+      .select('*')
+      .eq('id', user.id)
+      .single()
+      .then(() => {});
+  }, [user?.id]);
+
   const handleAccept = async () => {
     if (!termsAccepted) {
       toast({
@@ -35,8 +57,9 @@ const TermsAcceptance = ({ user, onAccept }: TermsAcceptanceProps) => {
     }
 
     setLoading(true);
+    
+    // Update DB and navigate immediately - don't wait for toast
     try {
-      // Update user profile to mark terms as accepted
       const { error } = await supabase
         .from('profiles')
         .update({
@@ -45,25 +68,24 @@ const TermsAcceptance = ({ user, onAccept }: TermsAcceptanceProps) => {
         })
         .eq('id', user.id);
 
-      if (error) {
-        throw error;
-      }
+      if (error) throw error;
 
+      // Navigate immediately - toast shows in background
+      onAccept();
+      
+      // Show toast after navigation started
       toast({
         title: t('termsAcceptance.termsAccepted'),
         description: t('termsAcceptance.thankYou'),
       });
-
-      onAccept();
     } catch (error: any) {
       console.error('Terms acceptance error:', error);
+      setLoading(false);
       toast({
         title: t('termsAcceptance.error'),
         description: t('termsAcceptance.failedToSave'),
         variant: "destructive",
       });
-    } finally {
-      setLoading(false);
     }
   };
 
