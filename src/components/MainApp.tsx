@@ -287,6 +287,12 @@ const MainApp = ({ user, onLogout }: MainAppProps) => {
                             currentUserData?.preference === 'everyone' || currentUserData?.preference === 'both' ? ['male', 'female', 'other'] :
                             ['male', 'female', 'other']; // Default to all if preference is not set
 
+      // Skip query if user country is not set
+      if (!currentUserData?.country) {
+        console.log('[MainApp] Skipping preload - user country not set');
+        return;
+      }
+
       // Get location-based matches (simplified for preloading)
       const { data: profiles, error } = await supabase
         .from('profiles')
@@ -295,7 +301,7 @@ const MainApp = ({ user, onLogout }: MainAppProps) => {
         .in('gender', allowedGenders)
         .eq('account_status', 'active')
         .eq('is_admin', false)
-        .eq('country', currentUserData?.country || 'Ghana')
+        .eq('country', currentUserData.country)
         .limit(25);
 
       if (error) throw error;
@@ -482,6 +488,12 @@ const MainApp = ({ user, onLogout }: MainAppProps) => {
                               currentUserData?.preference === 'everyone' || currentUserData?.preference === 'both' ? ['male', 'female', 'other'] :
                               ['male', 'female', 'other']; // Default to all if preference is not set
 
+        // Skip if user country is not set
+        if (!currentUserData?.country) {
+          console.log('[MainApp] Skipping refill - user country not set');
+          return;
+        }
+
         // Fetch new profiles
         const { data: newProfiles } = await supabase
           .from('profiles')
@@ -490,8 +502,8 @@ const MainApp = ({ user, onLogout }: MainAppProps) => {
           .in('gender', allowedGenders)
           .eq('account_status', 'active')
           .eq('is_admin', false)
-          .eq('country', currentUserData?.country || 'Ghana')
-          .limit(15); // Load 15 new profiles
+          .eq('country', currentUserData.country)
+          .limit(15);
 
         if (newProfiles?.length) {
           // Age filtering
