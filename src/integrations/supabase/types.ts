@@ -1091,6 +1091,95 @@ export type Database = {
         }
         Relationships: []
       }
+      scheduled_broadcast_history: {
+        Row: {
+          error_message: string | null
+          failed_sends: number | null
+          id: string
+          scheduled_broadcast_id: string
+          sent_at: string | null
+          successful_sends: number | null
+          total_recipients: number | null
+        }
+        Insert: {
+          error_message?: string | null
+          failed_sends?: number | null
+          id?: string
+          scheduled_broadcast_id: string
+          sent_at?: string | null
+          successful_sends?: number | null
+          total_recipients?: number | null
+        }
+        Update: {
+          error_message?: string | null
+          failed_sends?: number | null
+          id?: string
+          scheduled_broadcast_id?: string
+          sent_at?: string | null
+          successful_sends?: number | null
+          total_recipients?: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "scheduled_broadcast_history_scheduled_broadcast_id_fkey"
+            columns: ["scheduled_broadcast_id"]
+            isOneToOne: false
+            referencedRelation: "scheduled_broadcasts"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      scheduled_broadcasts: {
+        Row: {
+          admin_id: string
+          created_at: string | null
+          id: string
+          is_active: boolean | null
+          last_sent_at: string | null
+          message: string
+          next_send_at: string | null
+          repeat_type: string
+          specific_day: string | null
+          target_countries: string[] | null
+          time_to_send: string
+          title: string
+          total_sends: number | null
+          updated_at: string | null
+        }
+        Insert: {
+          admin_id: string
+          created_at?: string | null
+          id?: string
+          is_active?: boolean | null
+          last_sent_at?: string | null
+          message: string
+          next_send_at?: string | null
+          repeat_type: string
+          specific_day?: string | null
+          target_countries?: string[] | null
+          time_to_send: string
+          title: string
+          total_sends?: number | null
+          updated_at?: string | null
+        }
+        Update: {
+          admin_id?: string
+          created_at?: string | null
+          id?: string
+          is_active?: boolean | null
+          last_sent_at?: string | null
+          message?: string
+          next_send_at?: string | null
+          repeat_type?: string
+          specific_day?: string | null
+          target_countries?: string[] | null
+          time_to_send?: string
+          title?: string
+          total_sends?: number | null
+          updated_at?: string | null
+        }
+        Relationships: []
+      }
       subscription_payments: {
         Row: {
           amount: number

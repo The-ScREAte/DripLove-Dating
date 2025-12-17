@@ -67,13 +67,26 @@ const TermsAcceptance = ({ user, onAccept }: TermsAcceptanceProps) => {
       console.log('🔄 Preloading discover profiles in background...');
 
       // Fetch user preferences first
-      const { data: currentUserData } = await supabase
-        .from('profiles')
-        .select('max_distance, distance_preference, country, country_code, min_age, max_age, preference, unlocked_countries, is_premium')
-        .eq('id', userId)
-        .single();
+      const [{ data: currentUserData }, { data: subscriptionData }] = await Promise.all([
+        supabase
+          .from('profiles')
+          .select('max_distance, distance_preference, country, country_code, min_age, max_age, preference, unlocked_countries')
+          .eq('id', userId)
+          .single(),
+        supabase
+          .from('user_subscriptions')
+          .select('plan_name, status, expires_at')
+          .eq('user_id', userId)
+          .eq('status', 'active')
+          .single()
+      ]);
 
       if (!currentUserData) return;
+
+      // Check premium status from subscription
+      const isPremium = subscriptionData?.plan_name === 'premium' && 
+        subscriptionData?.status === 'active' &&
+        (!subscriptionData?.expires_at || new Date(subscriptionData.expires_at) > new Date());
 
       // Get exclusion lists
       const [
@@ -97,7 +110,6 @@ const TermsAcceptance = ({ user, onAccept }: TermsAcceptanceProps) => {
                             ['male', 'female', 'other'];
 
       const baseCountryCode = (currentUserData?.country_code || '').trim();
-      const isPremium = currentUserData?.is_premium || false;
       const unlockedCountries = Array.isArray(currentUserData?.unlocked_countries) ? currentUserData.unlocked_countries : [];
       
       const allowedCountryCodes = Array.from(
