@@ -270,7 +270,7 @@ const MainApp = ({ user, onLogout }: MainAppProps) => {
           .gte('passed_at', new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString()),
         supabase
           .from('profiles')
-          .select('max_distance, distance_preference, country, min_age, max_age, preference')
+          .select('max_distance, distance_preference, country, country_code, min_age, max_age, preference')
           .eq('id', userId)
           .limit(1)
       ]);
@@ -287,19 +287,20 @@ const MainApp = ({ user, onLogout }: MainAppProps) => {
       const blockedUserIds = blockedUsers?.flatMap(block => [block.blocked_id, block.blocker_id]) || [];
       const hiddenPassedIds = recentPasses?.map(p => p.passed_id) || [];
       const excludedIds = [...likedUserIds, ...blockedUserIds, ...hiddenPassedIds, userId];
-      
+
+      // CRITICAL: Non-premium preloads must stay in the user's country.
+      const baseCountryCode = (currentUserData?.country_code || '').trim();
+      if (!baseCountryCode) {
+        console.log('[MainApp] Skipping preload - user country_code not set');
+        return;
+      }
+
       const userMaxDistance = currentUserData?.max_distance || currentUserData?.distance_preference || 50;
       // Fix: Match the correct values stored in database ('male', 'female', 'everyone')
       const allowedGenders = currentUserData?.preference === 'male' ? ['male'] : 
                             currentUserData?.preference === 'female' ? ['female'] : 
                             currentUserData?.preference === 'everyone' || currentUserData?.preference === 'both' ? ['male', 'female', 'other'] :
                             ['male', 'female', 'other']; // Default to all if preference is not set
-
-      // Skip query if user country is not set
-      if (!currentUserData?.country) {
-        console.log('[MainApp] Skipping preload - user country not set');
-        return;
-      }
 
       // Get location-based matches (simplified for preloading)
       const { data: profiles, error } = await supabase
@@ -309,7 +310,7 @@ const MainApp = ({ user, onLogout }: MainAppProps) => {
         .in('gender', allowedGenders)
         .eq('account_status', 'active')
         .eq('is_admin', false)
-        .eq('country', currentUserData.country)
+        .eq('country_code', baseCountryCode)
         .limit(25);
 
       if (error) throw error;

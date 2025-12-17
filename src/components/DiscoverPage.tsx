@@ -592,36 +592,54 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, isPremium }: DiscoverPage
                           currentUserData?.preference === 'everyone' || currentUserData?.preference === 'both' ? ['male', 'female', 'other'] :
                           ['male', 'female', 'other']; // Default to all if preference is not set
 
+    const baseCountryCode = (currentUserData?.country_code || '').trim();
+
     // Get unlocked countries for premium users
     const unlockedCountries: string[] = Array.isArray(currentUserData?.unlocked_countries) 
       ? currentUserData.unlocked_countries 
       : [];
 
-    // Get location-based matches
+    // IMPORTANT: Non-premium users ONLY see profiles in their own country.
+    // Premium users can additionally see profiles from unlocked countries.
+    const allowedCountryCodes = Array.from(
+      new Set([
+        ...(baseCountryCode ? [baseCountryCode] : []),
+        ...(isPremium ? unlockedCountries.filter(Boolean) : []),
+      ])
+    );
+
+    // Get location-based matches (distance filter)
     const locationMatches = await locationService.getLocationBasedMatches(userId, userMaxDistance);
-    
+
     // ⭐ OPTIMIZED: Single pass to build both distanceMap and locationProfileIds (50ms saved)
     const distanceMap: { [key: string]: number } = {};
-    const locationProfileIds = locationMatches.map(match => {
-      distanceMap[match.profile_id] = match.distance_km;
-      return match.profile_id;
-    });
-    
+    const locationProfileIds = locationMatches
+      .filter((m) => !allowedCountryCodes.length || allowedCountryCodes.includes(m.country_code))
+      .map((match) => {
+        distanceMap[match.profile_id] = match.distance_km;
+        return match.profile_id;
+      });
+
     // ⭐ STRATIFIED SAMPLING: Fetch all profiles then apply fair distribution
     // Common profile select fields (includes created_at for stratified sampling)
     const PROFILE_SELECT = 'id, first_name, last_name, bio, city, country, country_code, occupation, education_level, date_of_birth, interests, gender, latitude, longitude, fun_fact, perfect_first_date, last_googled, relationship_intent, smoking, drinking, exercise_level, sleeping_schedule, introvert_extrovert, spontaneous_planner, messy_organized, adinkra_symbols, created_at';
-    
+
     let filteredProfiles: any[] = [];
     if (locationProfileIds.length > 0) {
       let query = supabase
         .from('profiles')
         .select(PROFILE_SELECT)
         .in('id', locationProfileIds);
-      
-      if (excludedIds.length > 0) {
-        query = query.not('id', 'in', `(${excludedIds.join(',')})`); 
+
+      // Enforce country rules at DB level too
+      if (allowedCountryCodes.length > 0) {
+        query = query.in('country_code', allowedCountryCodes);
       }
-      
+
+      if (excludedIds.length > 0) {
+        query = query.not('id', 'in', `(${excludedIds.join(',')})`);
+      }
+
       const { data: profiles, error } = await query
         .in('gender', allowedGenders)
         .eq('account_status', 'active')
@@ -630,21 +648,19 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, isPremium }: DiscoverPage
 
       if (error) throw error;
       filteredProfiles = profiles || [];
-    } else if (currentUserData?.country) {
-      // Fallback: get profiles from same country (only if country is set)
-      let query = supabase
-        .from('profiles')
-        .select(PROFILE_SELECT);
-      
+    } else if (baseCountryCode) {
+      // Fallback: same-country only
+      let query = supabase.from('profiles').select(PROFILE_SELECT);
+
       if (excludedIds.length > 0) {
         query = query.not('id', 'in', `(${excludedIds.join(',')})`);
       }
-      
+
       const { data: profiles, error } = await query
         .in('gender', allowedGenders)
         .eq('account_status', 'active')
         .eq('is_admin', false)
-        .eq('country', currentUserData.country)
+        .eq('country_code', baseCountryCode)
         .limit(100);
 
       if (error) throw error;
@@ -1334,15 +1350,28 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, isPremium }: DiscoverPage
       
       // ⭐ STRATIFIED REFILL: Include created_at for stratified sampling
       const PROFILE_SELECT = 'id, first_name, last_name, bio, city, country, country_code, occupation, education_level, date_of_birth, interests, gender, latitude, longitude, fun_fact, perfect_first_date, last_googled, relationship_intent, smoking, drinking, exercise_level, sleeping_schedule, introvert_extrovert, spontaneous_planner, messy_organized, adinkra_symbols, created_at';
-      
-      let query = supabase
-        .from('profiles')
-        .select(PROFILE_SELECT);
-      
+
+      // Enforce country rules early for speed + correctness
+      const baseCountryCode = (currentUser.country_code || '').trim();
+      const allowedCountryCodes = Array.from(
+        new Set([
+          ...(baseCountryCode ? [baseCountryCode] : []),
+          ...(isPremium && Array.isArray(currentUser.unlocked_countries)
+            ? currentUser.unlocked_countries.filter(Boolean)
+            : []),
+        ])
+      );
+
+      let query = supabase.from('profiles').select(PROFILE_SELECT);
+
       if (excludedIds.length > 0) {
         query = query.not('id', 'in', `(${excludedIds.join(',')})`);
       }
-      
+
+      if (allowedCountryCodes.length > 0) {
+        query = query.in('country_code', allowedCountryCodes);
+      }
+
       const { data: newProfiles, error } = await query
         .in('gender', allowedGenders)
         .eq('account_status', 'active')
@@ -1360,25 +1389,31 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, isPremium }: DiscoverPage
       // Apply same filtering logic as original fetch using location service
       let filteredProfiles = newProfiles;
       const userMaxDistance = currentUser.max_distance || currentUser.distance_preference || 50;
-      
+
+
       // Get location-based matches for distance filtering
       const locationMatches = await locationService.getLocationBasedMatches(currentUser.id, userMaxDistance * 2);
       // ⭐ OPTIMIZED: Single pass for distanceMap and locationProfileIds (30ms saved)
       const distanceMap: { [key: string]: number } = {};
-      const locationProfileIds = locationMatches.map(match => {
-        distanceMap[match.profile_id] = match.distance_km;
-        return match.profile_id;
-      });
-      
-      // Filter profiles to only those within distance range
-      if (currentUser.latitude && currentUser.longitude) {
-        filteredProfiles = filteredProfiles.filter(profile => {
-          if (!profile.latitude || !profile.longitude) {
-            return profile.country === currentUser.country;
-          }
-          return locationProfileIds.includes(profile.id);
+      const locationProfileIds = locationMatches
+        .filter((m) => !allowedCountryCodes.length || allowedCountryCodes.includes(m.country_code))
+        .map((match) => {
+          distanceMap[match.profile_id] = match.distance_km;
+          return match.profile_id;
         });
-      }
+
+      // Filter profiles to only those within distance range AND allowed countries
+      filteredProfiles = filteredProfiles.filter((profile) => {
+        if (allowedCountryCodes.length && !allowedCountryCodes.includes(profile.country_code)) {
+          return false;
+        }
+
+        if (!profile.latitude || !profile.longitude) {
+          return profile.country_code === baseCountryCode;
+        }
+
+        return locationProfileIds.includes(profile.id);
+      });
 
       // ⭐ PREMIUM FEATURE: Also fetch profiles from unlocked countries for premium users
       if (isPremium && currentUser.unlocked_countries && Array.isArray(currentUser.unlocked_countries) && currentUser.unlocked_countries.length > 0) {
