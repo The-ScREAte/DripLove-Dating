@@ -253,7 +253,7 @@ const MainApp = ({ user, onLogout }: MainAppProps) => {
         { data: likedUsers },
         { data: blockedUsers },
         { data: recentPasses },
-        { data: currentUserData }
+        { data: currentUserRows }
       ] = await Promise.all([
         supabase
           .from('likes')
@@ -272,8 +272,16 @@ const MainApp = ({ user, onLogout }: MainAppProps) => {
           .from('profiles')
           .select('max_distance, distance_preference, country, min_age, max_age, preference')
           .eq('id', userId)
-          .single()
+          .limit(1)
       ]);
+
+      const currentUserData = currentUserRows?.[0] ?? null;
+
+      // If profile row doesn't exist (or isn't readable due to RLS), don't spam further queries.
+      if (!currentUserData) {
+        console.log('[MainApp] Skipping preload - profile not found');
+        return;
+      }
 
       const likedUserIds = likedUsers?.map(like => like.liked_id) || [];
       const blockedUserIds = blockedUsers?.flatMap(block => [block.blocked_id, block.blocker_id]) || [];
@@ -469,13 +477,21 @@ const MainApp = ({ user, onLogout }: MainAppProps) => {
           { data: likedUsers },
           { data: blockedUsers },
           { data: recentPasses },
-          { data: currentUserData }
+          { data: currentUserRows }
         ] = await Promise.all([
           supabase.from('likes').select('liked_id').eq('liker_id', userId),
           supabase.from('blocks').select('blocked_id, blocker_id').or(`blocker_id.eq.${userId},blocked_id.eq.${userId}`),
           supabase.from('passes').select('passed_id, passed_at').match({ passer_id: userId }).gte('passed_at', new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString()),
-          supabase.from('profiles').select('max_distance, distance_preference, country, min_age, max_age, preference').eq('id', userId).single()
+          supabase.from('profiles').select('max_distance, distance_preference, country, min_age, max_age, preference').eq('id', userId).limit(1)
         ]);
+
+        const currentUserData = currentUserRows?.[0] ?? null;
+
+        // If profile row doesn't exist (or isn't readable due to RLS), avoid repeated refill attempts.
+        if (!currentUserData) {
+          console.log('[MainApp] Skipping refill - profile not found');
+          return;
+        }
 
         const likedUserIds = likedUsers?.map(like => like.liked_id) || [];
         const blockedUserIds = blockedUsers?.flatMap(block => [block.blocked_id, block.blocker_id]) || [];

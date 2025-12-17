@@ -49,8 +49,7 @@ const TermsAcceptance = ({ user, onAccept }: TermsAcceptanceProps) => {
   const handleAccept = async () => {
     if (!termsAccepted) {
       toast({
-        title: t('termsAcceptance.mustAccept'),
-        description: t('termsAcceptance.subtitle'),
+        title: "Please accept terms",
         variant: "destructive",
       });
       return;
@@ -70,20 +69,13 @@ const TermsAcceptance = ({ user, onAccept }: TermsAcceptanceProps) => {
 
       if (error) throw error;
 
-      // Navigate immediately - toast shows in background
+      // Navigate immediately - no toast needed
       onAccept();
-      
-      // Show toast after navigation started
-      toast({
-        title: t('termsAcceptance.termsAccepted'),
-        description: t('termsAcceptance.thankYou'),
-      });
     } catch (error: any) {
       console.error('Terms acceptance error:', error);
       setLoading(false);
       toast({
-        title: t('termsAcceptance.error'),
-        description: t('termsAcceptance.failedToSave'),
+        title: "Error",
         variant: "destructive",
       });
     }

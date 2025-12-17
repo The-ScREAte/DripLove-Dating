@@ -139,6 +139,32 @@ function dispatch(action: Action) {
 
 type Toast = Omit<ToasterToast, "id">
 
+const getText = (node: React.ReactNode): string => {
+  if (typeof node === "string") return node
+  if (typeof node === "number") return String(node)
+  return ""
+}
+
+const shouldShowToast = (props: Toast): boolean => {
+  // Always allow explicit destructive variant (errors)
+  if (props.variant === "destructive") return true
+
+  const title = getText(props.title).toLowerCase()
+  const description = getText(props.description).toLowerCase()
+  const text = `${title} ${description}`.trim()
+
+  // Allow payment success messaging
+  if (/(payment|premium|subscription|purchase|iap|in[-\s]?app|upgrade)/i.test(text)) return true
+
+  // Allow warnings and errors even if variant wasn't set
+  if (/(warning|warn|error|failed|failure|unable|cannot|can't|invalid|missing|denied|expired|timeout|not found)/i.test(text)) {
+    return true
+  }
+
+  // Suppress all other success/info toasts
+  return false
+}
+
 function toast({ ...props }: Toast) {
   const id = genId()
 
@@ -148,6 +174,14 @@ function toast({ ...props }: Toast) {
       toast: { ...props, id },
     })
   const dismiss = () => dispatch({ type: "DISMISS_TOAST", toastId: id })
+
+  if (!shouldShowToast(props)) {
+    return {
+      id: id,
+      dismiss,
+      update,
+    }
+  }
 
   dispatch({
     type: "ADD_TOAST",

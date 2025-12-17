@@ -90,18 +90,21 @@ export async function searchCitiesForCountry(
   url.searchParams.set('q', normalizedQuery);
   // Don't set featuretype - it may exclude results in countries with less data
 
-  const res = await fetch(url.toString(), {
-    signal: options?.signal,
-    headers: {
-      Accept: 'application/json'
+  try {
+    const res = await fetch(url.toString(), {
+      signal: options?.signal,
+      headers: {
+        'Accept': 'application/json',
+        'User-Agent': 'DripLove Dating App'
+      }
+    });
+
+    if (!res.ok) {
+      console.warn(`City search API error: ${res.status}`);
+      return [];
     }
-  });
 
-  if (!res.ok) {
-    throw new Error(`City search failed (${res.status})`);
-  }
-
-  const raw: any[] = await res.json();
+    const raw: any[] = await res.json();
 
   const mapped = raw
     .filter((item) => {
@@ -164,8 +167,12 @@ export async function searchCitiesForCountry(
     .map(item => item?.city)
     .filter(Boolean) as CityData[];
 
-  const results = dedupeCities(mapped).slice(0, limit);
+    const results = dedupeCities(mapped).slice(0, limit);
 
-  cache.set(cacheKey, { expiresAt: Date.now() + CACHE_TTL_MS, data: results });
-  return results;
+    cache.set(cacheKey, { expiresAt: Date.now() + CACHE_TTL_MS, data: results });
+    return results;
+  } catch (error) {
+    console.warn('City search error:', error);
+    return [];
+  }
 }

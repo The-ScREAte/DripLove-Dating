@@ -75,11 +75,7 @@ const ImageManagement = ({ currentUser, profile, onProfileUpdate }: ImageManagem
           })
           .eq('id', currentUser?.id);
 
-        toast({
-          title: "Face Verified! ✓",
-          description: "Your identity has been confirmed.",
-        });
-
+        // Face verified - no toast needed, verified badge shows on profile
         setShowFaceVerification(false);
         onProfileUpdate?.();
       } else {

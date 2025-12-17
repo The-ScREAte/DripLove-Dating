@@ -724,17 +724,12 @@ const ProfileCompletionPage = () => {
         }
       }
 
-      toast({
-        title: t('profileCompletion.profileCompleted'),
-        description: t('profileCompletion.profileCompletedSuccess'),
-      });
-
+      // Profile completed - navigate to terms
       handleProfileComplete();
     } catch (error: any) {
       console.error('Profile completion error:', error);
       toast({
-        title: t('profileCompletion.profileCompletionError'),
-        description: error.message || t('profileCompletion.failedToComplete'),
+        title: "Error",
         variant: "destructive",
       });
     } finally {
@@ -742,15 +737,6 @@ const ProfileCompletionPage = () => {
       setIsSubmitting(false);
     }
   };
-
-  if (loading) {
-    return (
-      <div className="min-h-screen bg-gradient-to-br from-pink-400 via-purple-500 to-indigo-600 flex flex-col items-center justify-center">
-        <img src="/driplove-logo.png" alt="DripLove Logo" className="w-32 h-32 mb-8 animate-bounce" />
-        <p className="text-white text-lg font-semibold tracking-wide">{t('profileCompletion.loadingDripLove')}</p>
-      </div>
-    );
-  }
 
   if (!user) {
     return null; // Will redirect in useEffect
@@ -775,67 +761,34 @@ const ProfileCompletionPage = () => {
           paddingBottom: "calc(env(safe-area-inset-bottom, 0px) + 8px)"
         }}
       >
-      {/* Video Background - always rendered, loads async */}
-      <div className="absolute inset-0 overflow-hidden">
-        <video
-          autoPlay
-          loop
-          muted
-          playsInline
-          webkit-playsinline="true"
-          x5-playsinline="true"
-          preload="auto"
-          src={videoPreloader.getVideoUrl()}
-          className="absolute top-0 left-0 w-full h-full object-cover opacity-25"
-          onTimeUpdate={(e) => {
-            const video = e.currentTarget;
-            if (video.duration && video.currentTime >= video.duration - 0.1) {
-              video.currentTime = 0;
-            }
-          }}
-          onEnded={(e) => {
-            e.currentTarget.currentTime = 0;
-            e.currentTarget.play().catch(() => {});
-          }}
-          onLoadedData={(e) => {
-            e.currentTarget.playbackRate = 1.2;
-            e.currentTarget.play().catch(() => {});
-          }}
-        />
-        <div className="absolute inset-0 bg-gradient-to-b from-transparent via-pink-500/10 via-pink-500/20 to-pink-500/30"></div>
-      </div>
-      
-      {/* Header - stays visible */}
-      <div className="text-center py-4 px-4 relative z-10">
-        <h1 className="text-3xl font-bold text-white mb-2">
-          {t('profileCompletion.title')}
-        </h1>
-      </div>
-
       {/* Scrollable form container */}
       <div 
-        className="px-4 pb-4 overflow-y-auto relative z-10"
+        className="px-4 pb-4 pt-4 overflow-y-auto relative z-10"
         style={{
-          maxHeight: "calc(100vh - env(safe-area-inset-top) - env(safe-area-inset-bottom) - 120px)"
+          maxHeight: "calc(100vh - env(safe-area-inset-top) - env(safe-area-inset-bottom) - 16px)"
         }}
       >
         <div className="max-w-2xl mx-auto">
-          <div className="bg-white/25 rounded-2xl shadow-2xl backdrop-blur-lg border border-white/30 overflow-hidden">
-            <Card className="w-full backdrop-blur-sm bg-white/25 shadow-2xl border-0 relative">
-              <CardContent className="p-6 pb-8">
-                <div className="flex items-center justify-between mb-6">
-                  <Button
-                    type="button"
-                    variant="ghost"
-                    size="sm"
-                    onClick={handleCancel}
-                    className="flex items-center text-gray-600 hover:text-gray-800"
-                  >
-                    <ArrowLeft className="w-4 h-4 mr-1" />
-                    {t('profileCompletion.back')}
-                  </Button>
-                  <div className="w-16"></div> {/* Spacer for alignment */}
-                </div>
+          <Card className="w-full bg-white rounded-2xl shadow-2xl border-0 relative">
+            <CardContent className="p-6 pb-8">
+              {/* Title inside white card */}
+              <h1 className="text-3xl font-bold text-gray-900 mb-6 text-center">
+                {t('profileCompletion.title')}
+              </h1>
+              
+              <div className="flex items-center justify-between mb-6">
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="sm"
+                  onClick={handleCancel}
+                  className="flex items-center text-gray-600 hover:text-gray-800"
+                >
+                  <ArrowLeft className="w-4 h-4 mr-1" />
+                  {t('profileCompletion.back')}
+                </Button>
+                <div className="w-16"></div> {/* Spacer for alignment */}
+              </div>
                 <form onSubmit={handleSubmit} className="space-y-4">
                   <div className="space-y-4">
                     <h3 className="text-lg font-semibold text-gray-800">{t('profileCompletion.basicInformation')}</h3>
@@ -1124,10 +1077,8 @@ const ProfileCompletionPage = () => {
                     }}
                   />
 
-                  {/* Note: Face verification is now shown under name fields above */}
-
                   <div className="flex flex-col gap-3">
-                      <Button
+                    <Button
                         type="submit"
                         disabled={isSubmitting}
                         className="w-full bg-gradient-to-r from-pink-500 to-purple-600 hover:from-pink-600 hover:to-purple-700 text-white font-semibold py-3 rounded-lg transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed"
@@ -1148,10 +1099,9 @@ const ProfileCompletionPage = () => {
                 </form>
               </CardContent>
             </Card>
-          </div>
         </div>
       </div>
-    </div>
+      </div>
     </div>
   );
 };

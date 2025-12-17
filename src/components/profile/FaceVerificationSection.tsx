@@ -63,11 +63,7 @@ const FaceVerificationSection = ({
           console.error('Profile update error:', updateError);
         }
 
-        toast({
-          title: "Face Verified! ✓",
-          description: "Your identity has been confirmed. You'll now see a verified badge on your profile.",
-        });
-
+        // Face verified - no toast needed, verified badge shows on profile
         setShowVerification(false);
         onProfileUpdate();
       } else {
