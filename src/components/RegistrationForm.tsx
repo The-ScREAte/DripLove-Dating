@@ -761,37 +761,40 @@ const RegistrationForm = ({ onSubmit, onBackToLogin }: RegistrationFormProps) =>
       }
     }
 
-    // 4. Index face in AWS Rekognition in background (non-blocking)
+    // 4. Index face in AWS Rekognition with user's name (only now, after user is created)
     const pendingFace = localStorage.getItem('pending_face_verification');
     if (pendingFace && userId) {
-      const userName = `${formData.firstName} ${formData.lastName}`;
-      // Don't await - let it run in background
-      supabase.functions.invoke("face-verify", {
-        body: {
-          action: "index_face",
-          front: pendingFace,
-          userId: userId,
-          userName: userName,
-        },
-      }).then(({ data: faceData, error: faceError }) => {
+      try {
+        const userName = `${formData.firstName} ${formData.lastName}`;
+        const { data: faceData, error: faceError } = await supabase.functions.invoke("face-verify", {
+          body: {
+            action: "index_face",
+            front: pendingFace,
+            userId: userId,
+            userName: userName, // Include user's name for admin identification
+          },
+        });
+
         if (faceError) {
           console.error('Face indexing error:', faceError);
         } else if (faceData?.success) {
-          supabase
+          // Update profile with face descriptor
+          await supabase
             .from('profiles')
             .update({ 
               face_descriptor: faceData.faceId || 'verified',
               updated_at: new Date().toISOString()
             })
-            .eq('id', userId)
-            .then(() => console.log('✅ Face indexed successfully for user:', userName))
-            .catch(err => console.error('Error updating face descriptor:', err));
+            .eq('id', userId);
+          
+          console.log('✅ Face indexed successfully for user:', userName);
         }
+        
+        // Clear localStorage after successful indexing
         localStorage.removeItem('pending_face_verification');
-      }).catch(faceErr => {
+      } catch (faceErr) {
         console.error('Face indexing exception:', faceErr);
-        localStorage.removeItem('pending_face_verification');
-      });
+      }
     }
 
     setIsSubmitting(false); // Reset loading state
@@ -808,8 +811,15 @@ const RegistrationForm = ({ onSubmit, onBackToLogin }: RegistrationFormProps) =>
       }
       
       if (user) {
-        // Call onSubmit to update app state - parent will handle navigation
+        // Try to force a reload/redirect if onSubmit does not update the app state
         onSubmit({ ...formData, images: approvedImages, user });
+        
+        // If the parent does not update view, do it here as a fallback
+        if (typeof window !== 'undefined') {
+          setTimeout(() => {
+            window.location.reload();
+          }, 1000); // Increased timeout to give parent more time to handle
+        }
       } else {
         onSubmit({ ...formData, images: approvedImages });
       }

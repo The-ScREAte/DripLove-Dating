@@ -464,18 +464,21 @@ const ProfileCompletionPage = () => {
       description: "Your profile has been completed and terms accepted. Welcome to the community!",
     });
     
-    // Send welcome push notification in background (non-blocking)
-    import('@/services/pushNotifications').then(({ sendPushNotification }) => {
-      sendPushNotification({
+    // Send welcome push notification
+    try {
+      const { sendPushNotification } = await import('@/services/pushNotifications');
+      await sendPushNotification({
         title: "Welcome to DripLove! 💕",
         body: t('profileCompletion.profileSetup'),
         userId: user.id,
         type: 'system',
         data: { action: 'open_discover' }
-      }).catch(error => console.error('Failed to send welcome notification:', error));
-    }).catch(error => console.error('Failed to load push notifications:', error));
+      });
+    } catch (error) {
+      console.error('Failed to send welcome notification:', error);
+      // Don't block user flow if notification fails
+    }
     
-    // Navigate immediately without waiting
     navigate('/discover');
   };
 
@@ -685,39 +688,40 @@ const ProfileCompletionPage = () => {
         }
       }
 
-      // Index face in AWS Rekognition in background (non-blocking)
+      // Index face in AWS Rekognition with user's name (only now, after profile is saved)
       const pendingFace = localStorage.getItem('pending_face_verification_profile');
       if (pendingFace && user.id) {
-        const userName = `${formData.firstName} ${formData.lastName}`;
-        // Don't await - let it run in background
-        supabase.functions.invoke("face-verify", {
-          body: {
-            action: "index_face",
-            front: pendingFace,
-            userId: user.id,
-            userName: userName,
-          },
-        }).then(({ data: faceData, error: faceError }) => {
+        try {
+          const userName = `${formData.firstName} ${formData.lastName}`;
+          const { data: faceData, error: faceError } = await supabase.functions.invoke("face-verify", {
+            body: {
+              action: "index_face",
+              front: pendingFace,
+              userId: user.id,
+              userName: userName, // Include user's name for admin identification
+            },
+          });
+
           if (faceError) {
             console.error('Face indexing error:', faceError);
           } else if (faceData?.success) {
             // Update profile with face descriptor
-            supabase
+            await supabase
               .from('profiles')
               .update({ 
                 face_descriptor: faceData.faceId || 'verified',
                 updated_at: new Date().toISOString()
               })
-              .eq('id', user.id)
-              .then(() => console.log('✅ Face indexed successfully for user:', userName))
-              .catch(err => console.error('Error updating face descriptor:', err));
+              .eq('id', user.id);
+            
+            console.log('✅ Face indexed successfully for user:', userName);
           }
-          // Clear localStorage after indexing attempt
+          
+          // Clear localStorage after successful indexing
           localStorage.removeItem('pending_face_verification_profile');
-        }).catch(faceErr => {
+        } catch (faceErr) {
           console.error('Face indexing exception:', faceErr);
-          localStorage.removeItem('pending_face_verification_profile');
-        });
+        }
       }
 
       toast({
