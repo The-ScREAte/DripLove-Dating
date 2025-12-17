@@ -65,7 +65,7 @@ const OAuthCallback = () => {
           throw new Error('No session created after OAuth callback');
         }
 
-        const { user, profile } = result;
+        const { user, profile, needsProfileCompletion } = result;
         console.log('[OAuthCallback] Session created successfully for user:', user.id);
 
         // If this is a popup, notify parent window and close
@@ -77,7 +77,7 @@ const OAuthCallback = () => {
               type: 'oauth_complete', 
               success: true,
               userId: user.id,
-              needsProfileCompletion: !profile?.first_name || !profile?.last_name
+              needsProfileCompletion
             }, window.location.origin);
             
             // Close the popup after a small delay
@@ -91,7 +91,7 @@ const OAuthCallback = () => {
           }
         }
 
-        // Check account status
+        // Check account status (only if profile exists)
         if (profile?.account_status === 'blocked') {
           await supabase.auth.signOut();
           toast({ 
@@ -114,16 +114,14 @@ const OAuthCallback = () => {
           return;
         }
 
-        // Store profile ID
+        // Store profile ID if exists
         if (profile?.id) {
           sessionStorage.setItem('profile_id', profile.id);
         }
 
-        // Check if profile is complete
-        const isProfileComplete = profile?.first_name && profile?.last_name;
-        
-        if (!isProfileComplete) {
-          console.log('[OAuthCallback] Profile incomplete - redirecting to profile completion');
+        // Use needsProfileCompletion flag - same logic as Apple/Android native
+        if (needsProfileCompletion) {
+          console.log('[OAuthCallback] Profile needs completion - redirecting');
           navigate('/complete-profile', { replace: true });
           return;
         }

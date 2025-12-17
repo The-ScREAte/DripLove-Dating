@@ -50,73 +50,45 @@ export async function handleOAuthRedirect(url?: string) {
 
     const user = sessionData.session.user;
 
-    // Step C: Fetch or create profile asynchronously (don't block redirect)
-    // We'll do a quick check and create if needed, but won't wait for all retries
-    const profilePromise = (async () => {
-      try {
-        let { data: profile, error: profileError } = await supabase
-          .from('profiles')
-          .select('id, is_admin, account_status, first_name, last_name, preferred_language')
-          .eq('id', user.id)
-          .maybeSingle();
+    // Step C: Check if profile exists - same pattern as Apple/Android native
+    let profile = null;
+    let needsProfileCompletion = true;
+    
+    try {
+      const { data, error: profileError } = await supabase
+        .from('profiles')
+        .select('id, is_admin, account_status, first_name, last_name, preferred_language')
+        .eq('id', user.id)
+        .maybeSingle();
 
-        if (profileError) {
-          console.warn('[OAuthHandler] Profile fetch error:', profileError);
-          return null;
-        }
-
-        // Create profile if it doesn't exist
-        if (!profile) {
-          const fullName = user.user_metadata?.full_name || user.user_metadata?.name || '';
-          const firstName = fullName.split(' ')[0] || '';
-          const lastName = fullName.split(' ').slice(1).join(' ') || '';
-
-          const { data: inserted } = await supabase
-            .from('profiles')
-            .insert({
-              id: user.id,
-              email: user.email,
-              first_name: firstName || null,
-              last_name: lastName || null,
-              date_of_birth: '1990-01-01',
-              country: null,
-              city: null,
-              gender: null,
-              preference: 'both',
-              relationship_intent: 'not-sure',
-              account_status: 'active',
-              is_admin: false,
-              terms_accepted: false
-            })
-            .select()
-            .maybeSingle();
-
-          profile = inserted;
-          console.log('[OAuthHandler] Created profile for OAuth user:', user.id);
-        }
-
+      if (profileError) {
+        console.warn('[OAuthHandler] Profile fetch error:', profileError);
+      } else if (data) {
+        profile = data;
+        console.log('[OAuthHandler] Existing profile found for user:', user.id);
+        
         // Cache profile in sessionStorage
-        if (typeof window !== 'undefined' && profile) {
+        if (typeof window !== 'undefined') {
           sessionStorage.setItem('oauth_profile', JSON.stringify(profile));
+          sessionStorage.setItem('profile_id', profile.id);
         }
-
-        return profile;
-      } catch (e) {
-        console.error('[OAuthHandler] Profile operation failed:', e);
-        return null;
+        
+        // Check if profile needs completion (same logic as native flows)
+        needsProfileCompletion = !profile.first_name || !profile.last_name;
+      } else {
+        console.log('[OAuthHandler] No profile found - user needs to complete profile creation');
+        needsProfileCompletion = true;
       }
-    })();
-
-    // Wait for profile but with a timeout to prevent blocking
-    const profile = await Promise.race([
-      profilePromise,
-      new Promise<null>((resolve) => setTimeout(() => resolve(null), 1000))
-    ]);
+    } catch (e) {
+      console.error('[OAuthHandler] Profile fetch failed:', e);
+      needsProfileCompletion = true;
+    }
 
     return {
       session: sessionData.session,
       user,
       profile: profile || null,
+      needsProfileCompletion
     };
   } catch (err) {
     console.error('[OAuthHandler] Error handling OAuth redirect:', err);

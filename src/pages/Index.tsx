@@ -197,31 +197,10 @@ const Index = () => {
       }
       
       if (error || !profile) {
-        console.error('Profile not found for user:', userId, 'Error:', error);
-        // For OAuth users, profile might not be ready yet, wait and retry once
-        await new Promise(resolve => setTimeout(resolve, 500));
-        
-        const retryResult = await supabase
-          .from('profiles')
-          .select('is_admin, account_status, first_name, last_name, date_of_birth, country, city, gender, preference, relationship_intent, occupation, industry, education_level, terms_accepted')
-          .eq('id', userId)
-          .single();
-          
-        if (retryResult.error || !retryResult.data) {
-          console.error('Profile still not found after retry, signing out user');
-          // Sign out user since no profile exists - they need to register
-          await supabase.auth.signOut();
-          toast({
-            title: "Account Not Found",
-            description: "This account doesn't exist in our system. Please register first.",
-            variant: "destructive",
-          });
-          setLoading(false);
-          setCurrentView('welcome');
-          return;
-        }
-        
-        profile = retryResult.data;
+        console.log('Profile not found for user:', userId, '- redirecting to profile completion');
+        // User has auth but no profile - redirect to complete profile (common for OAuth)
+        navigate('/complete-profile', { replace: true });
+        return;
       }
 
       // Check account status
