@@ -9,8 +9,9 @@ import { useToast } from '@/hooks/use-toast';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { ScrollArea } from '@/components/ui/scroll-area';
-import { Loader2, Send, Users, Globe, CheckCircle2, AlertCircle, Trash2, RotateCw, Eye, History, Copy, Mail } from 'lucide-react';
+import { Loader2, Send, Users, Globe, CheckCircle2, AlertCircle, Trash2, RotateCw, Eye, History, Copy, Mail, Calendar } from 'lucide-react';
 import EmailExport from './EmailExport';
+import ScheduledBroadcasts from './ScheduledBroadcasts';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import {
@@ -142,7 +143,8 @@ export default function BroadcastNotifications() {
         .from('profiles')
         .select('country, id')
         .not('country', 'is', null)
-        .eq('account_status', 'active');
+        .eq('account_status', 'active')
+        .eq('is_admin', false);
 
       if (error) throw error;
 
@@ -183,6 +185,7 @@ export default function BroadcastNotifications() {
         .select('id, first_name, last_name, country, city')
         .in('country', countryArray)
         .eq('account_status', 'active')
+        .eq('is_admin', false)
         .order('first_name');
 
       if (profileError) throw profileError;
@@ -629,8 +632,12 @@ export default function BroadcastNotifications() {
       </div>
 
       <Tabs value={activeTab} onValueChange={setActiveTab}>
-        <TabsList className="grid w-full grid-cols-3">
+        <TabsList className="grid w-full grid-cols-4">
           <TabsTrigger value="new">New Broadcast</TabsTrigger>
+          <TabsTrigger value="scheduled">
+            <Calendar className="w-4 h-4 mr-2" />
+            Scheduled
+          </TabsTrigger>
           <TabsTrigger value="history">
             <History className="w-4 h-4 mr-2" />
             History
@@ -886,6 +893,10 @@ export default function BroadcastNotifications() {
               </CardContent>
             </Card>
           )}
+        </TabsContent>
+
+        <TabsContent value="scheduled">
+          <ScheduledBroadcasts />
         </TabsContent>
 
         <TabsContent value="history" className="space-y-4">

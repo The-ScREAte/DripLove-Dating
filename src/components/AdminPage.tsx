@@ -1047,19 +1047,34 @@ const AdminPageComponent = ({ currentUser, onLogout }: AdminPageProps) => {
   };
 
   // Second useEffect for fetching data after admin status is confirmed
+  // OPTIMIZED: Only fetch stats immediately, lazy load other data when tabs are accessed
   useEffect(() => {
     if (isAdmin) {
       fetchAppStats();
-      fetchUsers();
-      fetchPendingImages();
-      fetchReportedChats();
+      // Don't fetch all data on mount - let tabs load their own data when accessed
+      // This makes initial admin page load much faster
     }
-  }, [isAdmin, fetchAppStats, fetchUsers, fetchPendingImages]);
+  }, [isAdmin, fetchAppStats]);
+
+  // Lazy load users when users tab is accessed
+  useEffect(() => {
+    if (isAdmin && activeTab === 'users' && users.length === 0) {
+      fetchUsers();
+    }
+  }, [isAdmin, activeTab]);
+
+  // Lazy load content when content tab is accessed
+  useEffect(() => {
+    if (isAdmin && activeTab === 'content') {
+      if (pendingImages.length === 0) fetchPendingImages();
+      if (reportedChats.length === 0) fetchReportedChats();
+    }
+  }, [isAdmin, activeTab]);
 
   // Clear cache when premium filter changes to prevent stale cached data
   useEffect(() => {
     userDataCache.clear();
-    if (isAdmin) {
+    if (isAdmin && activeTab === 'users') {
       fetchUsers();
     }
   }, [premiumFilter]);
@@ -1456,7 +1471,7 @@ const AdminPageComponent = ({ currentUser, onLogout }: AdminPageProps) => {
                 </TabsList>
 
                 {/* Second Row - Additional Tabs */}
-                <TabsList className="grid w-full grid-cols-5 h-auto">
+                <TabsList className="grid w-full grid-cols-4 h-auto">
                   <TabsTrigger value="ads" className="text-xs flex flex-col gap-1 py-2">
                     <Megaphone className="w-4 h-4" />
                     <span>Ads</span>
@@ -1473,6 +1488,8 @@ const AdminPageComponent = ({ currentUser, onLogout }: AdminPageProps) => {
                     <Search className="w-4 h-4" />
                     <span>Debugger</span>
                   </TabsTrigger>
+                </TabsList>
+                <TabsList className="grid w-full grid-cols-4 h-auto">
                   <TabsTrigger value="influencers" className="text-xs flex flex-col gap-1 py-2">
                     <Crown className="w-4 h-4" />
                     <span>Influencers</span>
@@ -1963,7 +1980,7 @@ const AdminPageComponent = ({ currentUser, onLogout }: AdminPageProps) => {
 
             {/* Content Tab - Image Moderation */}
             <TabsContent value="content" className="space-y-4">
-              <ImageModerationPanel />
+              <ImageModerationPanel onViewProfile={handleViewProfile} />
 
               {/* Reported Chats Section */}
               <div className="bg-white border rounded-lg p-3">

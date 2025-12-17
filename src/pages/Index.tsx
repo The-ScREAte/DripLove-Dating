@@ -383,7 +383,22 @@ const Index = () => {
   };
 
   const handleTermsAccept = () => {
+    // ANDROID FIX: Ensure session storage is updated before state change
+    sessionStorage.setItem('driplove_user_session', 'authenticated');
+    sessionStorage.removeItem('driplove_current_view');
+    
+    // Update view
     setCurrentView('app');
+    
+    // ANDROID FIX: Force a hard reload after brief delay if view doesn't update
+    // This ensures Android properly transitions to the main app
+    setTimeout(() => {
+      // Only reload if we're somehow stuck on terms-acceptance view
+      const currentSessionView = sessionStorage.getItem('driplove_current_view');
+      if (currentSessionView === 'terms-acceptance') {
+        window.location.reload();
+      }
+    }, 500);
   };
 
   

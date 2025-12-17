@@ -47,7 +47,11 @@ interface ReportedImage {
   };
 }
 
-const ImageModerationPanel = () => {
+interface ImageModerationPanelProps {
+  onViewProfile?: (userId: string) => void;
+}
+
+const ImageModerationPanel = ({ onViewProfile }: ImageModerationPanelProps) => {
   const [pendingImages, setPendingImages] = useState<PendingImage[]>([]);
   const [reportedImages, setReportedImages] = useState<ReportedImage[]>([]);
   const [loadingPending, setLoadingPending] = useState(false);
@@ -521,6 +525,17 @@ const ImageModerationPanel = () => {
                         </div>
 
                         <div className="flex flex-col gap-1">
+                          {onViewProfile && (
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              className="w-full text-blue-600 hover:text-blue-700 text-[10px] h-6"
+                              onClick={() => onViewProfile(image.user_id)}
+                            >
+                              <Eye className="w-2.5 h-2.5 mr-1" />
+                              View User
+                            </Button>
+                          )}
                           <Button
                             size="sm"
                             className="w-full bg-green-600 hover:bg-green-700 text-[10px] h-6"
@@ -618,27 +633,40 @@ const ImageModerationPanel = () => {
                         </div>
 
                         {report.status === 'pending' && (
-                          <div className="flex gap-2">
-                            <Button
-                              size="sm"
-                              variant="outline"
-                              className="flex-1 text-xs h-8"
-                              onClick={() => handleIgnoreReport(report.id)}
-                              disabled={processingReports[report.id]}
-                            >
-                              <XCircle className="w-3 h-3 mr-1" />
-                              {processingReports[report.id] ? 'Ignoring...' : 'Ignore'}
-                            </Button>
-                            <Button
-                              size="sm"
-                              variant="destructive"
-                              className="flex-1 text-xs h-8"
-                              onClick={() => handleDeleteReportedImage(report.id, report.image_url, report.reported_user_id)}
-                              disabled={processingReports[report.id]}
-                            >
-                              <Trash2 className="w-3 h-3 mr-1" />
-                              {processingReports[report.id] ? 'Deleting...' : 'Delete'}
-                            </Button>
+                          <div className="flex flex-col gap-2">
+                            {onViewProfile && (
+                              <Button
+                                size="sm"
+                                variant="outline"
+                                className="w-full text-blue-600 hover:text-blue-700 text-xs h-7"
+                                onClick={() => onViewProfile(report.reported_user_id)}
+                              >
+                                <Eye className="w-3 h-3 mr-1" />
+                                View User
+                              </Button>
+                            )}
+                            <div className="flex gap-2">
+                              <Button
+                                size="sm"
+                                variant="outline"
+                                className="flex-1 text-xs h-8"
+                                onClick={() => handleIgnoreReport(report.id)}
+                                disabled={processingReports[report.id]}
+                              >
+                                <XCircle className="w-3 h-3 mr-1" />
+                                {processingReports[report.id] ? 'Ignoring...' : 'Ignore'}
+                              </Button>
+                              <Button
+                                size="sm"
+                                variant="destructive"
+                                className="flex-1 text-xs h-8"
+                                onClick={() => handleDeleteReportedImage(report.id, report.image_url, report.reported_user_id)}
+                                disabled={processingReports[report.id]}
+                              >
+                                <Trash2 className="w-3 h-3 mr-1" />
+                                {processingReports[report.id] ? 'Deleting...' : 'Delete'}
+                              </Button>
+                            </div>
                           </div>
                         )}
                       </CardContent>

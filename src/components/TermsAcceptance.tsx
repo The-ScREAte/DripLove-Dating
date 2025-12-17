@@ -11,6 +11,9 @@ import { ScrollArea } from '@/components/ui/scroll-area';
 import TermsOfService from './TermsOfService';
 import PrivacyPolicy from './PrivacyPolicy';
 import { preloadPricingConfig } from '@/hooks/usePricingConfig';
+import { discoverCache, calculateAge, createDeterministicShuffle } from '@/utils/discoverCache';
+import { getStratifiedBatches } from '@/utils/stratifiedSampling';
+import { locationService } from '@/services/locationService';
 
 interface TermsAcceptanceProps {
   user: any;
@@ -25,7 +28,7 @@ const TermsAcceptance = ({ user, onAccept }: TermsAcceptanceProps) => {
   const [showPrivacy, setShowPrivacy] = useState(false);
   const { toast } = useToast();
 
-  // Preload app data in background while user views terms
+  // Preload app data AND profiles in background while user views terms
   useEffect(() => {
     if (!user?.id) return;
     
@@ -44,7 +47,165 @@ const TermsAcceptance = ({ user, onAccept }: TermsAcceptanceProps) => {
       .eq('id', user.id)
       .single()
       .then(() => {});
+    
+    // CRITICAL: Preload discover profiles in background for instant app load
+    preloadDiscoverProfiles(user.id);
   }, [user?.id]);
+
+  // Background profile preloading - runs while user reads terms
+  const preloadDiscoverProfiles = async (userId: string) => {
+    try {
+      // Check if already cached
+      const today = new Date().toISOString().split('T')[0];
+      const cacheKey = `${userId}_${today}`;
+      
+      if (discoverCache.has(cacheKey)) {
+        console.log('✅ Profiles already cached, skipping preload');
+        return;
+      }
+
+      console.log('🔄 Preloading discover profiles in background...');
+
+      // Fetch user preferences first
+      const { data: currentUserData } = await supabase
+        .from('profiles')
+        .select('max_distance, distance_preference, country, country_code, min_age, max_age, preference, unlocked_countries, is_premium')
+        .eq('id', userId)
+        .single();
+
+      if (!currentUserData) return;
+
+      // Get exclusion lists
+      const [
+        { data: likedUsers },
+        { data: blockedUsers },
+        { data: recentPasses }
+      ] = await Promise.all([
+        supabase.from('likes').select('liked_id').eq('liker_id', userId),
+        supabase.from('blocks').select('blocked_id, blocker_id').or(`blocker_id.eq.${userId},blocked_id.eq.${userId}`),
+        supabase.from('passes').select('passed_id').match({ passer_id: userId }).gte('passed_at', new Date(Date.now() - 192 * 60 * 60 * 1000).toISOString())
+      ]);
+
+      const likedUserIds = likedUsers?.map(like => like.liked_id) || [];
+      const blockedUserIds = blockedUsers?.flatMap(block => [block.blocked_id, block.blocker_id]) || [];
+      const passedUserIds = recentPasses?.map(p => p.passed_id) || [];
+      const excludedIds = [...likedUserIds, ...blockedUserIds, ...passedUserIds, userId];
+
+      const userMaxDistance = currentUserData?.max_distance || currentUserData?.distance_preference || 50;
+      const allowedGenders = currentUserData?.preference === 'male' ? ['male'] : 
+                            currentUserData?.preference === 'female' ? ['female'] : 
+                            ['male', 'female', 'other'];
+
+      const baseCountryCode = (currentUserData?.country_code || '').trim();
+      const isPremium = currentUserData?.is_premium || false;
+      const unlockedCountries = Array.isArray(currentUserData?.unlocked_countries) ? currentUserData.unlocked_countries : [];
+      
+      const allowedCountryCodes = Array.from(
+        new Set([
+          ...(baseCountryCode ? [baseCountryCode] : []),
+          ...(isPremium ? unlockedCountries.filter(Boolean) : []),
+        ])
+      );
+
+      // Get location-based matches
+      const locationMatches = await locationService.getLocationBasedMatches(userId, userMaxDistance);
+      
+      const distanceMap: { [key: string]: number } = {};
+      const locationProfileIds = locationMatches
+        .filter((m) => !allowedCountryCodes.length || allowedCountryCodes.includes(m.country_code))
+        .map((match) => {
+          distanceMap[match.profile_id] = match.distance_km;
+          return match.profile_id;
+        });
+
+      // Fetch profiles
+      let filteredProfiles: any[] = [];
+      if (locationProfileIds.length > 0) {
+        const { data: profiles } = await supabase
+          .from('profiles')
+          .select('id, first_name, last_name, bio, city, country, country_code, occupation, education_level, date_of_birth, interests, gender, latitude, longitude, fun_fact, perfect_first_date, last_googled, relationship_intent, smoking, drinking, exercise_level, sleeping_schedule, introvert_extrovert, spontaneous_planner, messy_organized, adinkra_symbols, created_at')
+          .in('id', locationProfileIds)
+          .in('country_code', allowedCountryCodes)
+          .not('id', 'in', `(${excludedIds.join(',')})`)
+          .in('gender', allowedGenders)
+          .eq('account_status', 'active')
+          .eq('is_admin', false)
+          .limit(100);
+
+        filteredProfiles = profiles || [];
+      }
+
+      // Apply age filtering
+      const userMinAge = currentUserData?.min_age || 18;
+      const userMaxAge = currentUserData?.max_age || 99;
+      
+      filteredProfiles = filteredProfiles.filter(profile => {
+        if (!profile.date_of_birth) return false;
+        const age = calculateAge(profile.date_of_birth);
+        return age >= userMinAge && age <= userMaxAge;
+      });
+
+      // Add distance to profiles
+      const profilesWithImages = filteredProfiles.map(profile => ({
+        ...profile,
+        images: [],
+        distance: distanceMap[profile.id]
+      }));
+
+      // Apply stratified sampling for fair distribution
+      const shuffleSeed = `${userId}_${today}`;
+      const shuffled = getStratifiedBatches(profilesWithImages, 15, 4, shuffleSeed);
+
+      // Preload first 6 profile images
+      const firstSix = shuffled.slice(0, 6);
+      const firstSixIds = firstSix.map(p => p.id);
+      
+      const imageMap: { [key: string]: string[] } = {};
+      
+      if (firstSixIds.length > 0) {
+        const { data: imageRows } = await supabase
+          .from('user_images')
+          .select('user_id, image_url, image_order')
+          .in('user_id', firstSixIds)
+          .eq('is_approved', true)
+          .order('user_id', { ascending: true })
+          .order('image_order', { ascending: true });
+
+        if (imageRows) {
+          const byUser: Record<string, string[]> = {};
+          for (const row of imageRows) {
+            if (!byUser[row.user_id]) byUser[row.user_id] = [];
+            byUser[row.user_id].push(row.image_url);
+          }
+
+          firstSix.forEach((profile, index) => {
+            const imgs = byUser[profile.id] || [];
+            if (imgs.length === 0) return;
+
+            let maxCount = 1;
+            if (index === 0) maxCount = 3;
+            else if (index === 1) maxCount = 2;
+
+            imageMap[profile.id] = imgs.slice(0, maxCount);
+          });
+        }
+      }
+
+      // Cache the results
+      discoverCache.set(cacheKey, {
+        potentialMatches: shuffled,
+        userImages: imageMap,
+        userDistances: distanceMap,
+        currentIndex: 0,
+        timestamp: Date.now()
+      });
+
+      console.log(`✅ Preloaded ${shuffled.length} profiles with ${Object.keys(imageMap).length} image sets`);
+    } catch (error) {
+      console.error('❌ Profile preload error:', error);
+      // Don't block the flow if preloading fails
+    }
+  };
 
   const handleAccept = async () => {
     if (!termsAccepted) {
@@ -69,8 +230,23 @@ const TermsAcceptance = ({ user, onAccept }: TermsAcceptanceProps) => {
 
       if (error) throw error;
 
-      // Navigate immediately - no toast needed
+      // ANDROID FIX: Force session update to trigger proper state refresh
+      sessionStorage.setItem('driplove_user_session', 'authenticated');
+      sessionStorage.removeItem('driplove_current_view');
+      
+      // Call onAccept to update parent state
       onAccept();
+      
+      // ANDROID FIX: Force a hard navigation after brief delay to ensure state propagates
+      // This fixes the issue where Android doesn't reload after terms acceptance
+      setTimeout(() => {
+        // Double-check if we're still on terms page (not already navigated)
+        const currentPath = window.location.pathname;
+        if (currentPath === '/' || currentPath.includes('terms')) {
+          // Force reload to main app - this ensures Android properly loads the app
+          window.location.reload();
+        }
+      }, 300);
     } catch (error: any) {
       console.error('Terms acceptance error:', error);
       setLoading(false);

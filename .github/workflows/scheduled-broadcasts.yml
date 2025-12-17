@@ -1,0 +1,16 @@
+name: Process Scheduled Broadcasts
+
+on:
+  schedule:
+    - cron: '*/15 * * * *' # Every 15 minutes
+
+jobs:
+  process:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Call Edge Function
+        run: |
+          curl -X POST \
+            '${{ secrets.SUPABASE_URL }}/functions/v1/process-scheduled-broadcasts' \
+            -H 'Authorization: Bearer ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}' \
+            -H 'Content-Type: application/json'

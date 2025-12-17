@@ -13,6 +13,7 @@ import { getPasswordResetRedirectUri, getEmailConfirmRedirectUri } from '@/confi
 import { Capacitor } from '@capacitor/core';
 import { useTranslation } from 'react-i18next';
 import { saveLanguageToProfile } from '@/utils/languageSync';
+import HoppingLogo from '@/components/HoppingLogo';
 
 interface AuthFormProps {
   isLogin: boolean;
@@ -668,9 +669,9 @@ const AuthForm = ({ isLogin, onToggle, onBack }: AuthFormProps) => {
                   className="w-64 bg-gradient-to-r from-pink-500 to-purple-600 hover:from-pink-600 hover:to-purple-700 text-white font-medium py-3 rounded-full transition-all duration-200 shadow-md hover:shadow-lg"
                 >
                   {loading ? (
-                    <div className="flex items-center">
-                      <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin mr-2"></div>
-                      {t('auth.processing')}
+                    <div className="flex items-center justify-center gap-2">
+                      <HoppingLogo size={20} opacity={1} />
+                      <span>{t('auth.processing')}</span>
                     </div>
                   ) : isLogin ? t('auth.signIn') : t('auth.createAccount')}
                 </Button>

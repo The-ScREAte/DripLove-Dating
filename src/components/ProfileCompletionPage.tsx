@@ -20,6 +20,7 @@ import TermsAcceptance from './TermsAcceptance';
 import { getLanguageForCountry } from '@/i18n/config';
 import { videoPreloader } from '@/utils/videoPreloader';
 import FaceVerification from '@/components/FaceVerification';
+import HoppingLogo from '@/components/HoppingLogo';
 
 interface ImageUpload {
   file: File;
@@ -479,7 +480,17 @@ const ProfileCompletionPage = () => {
       // Don't block user flow if notification fails
     }
     
-    navigate('/discover');
+    // ANDROID FIX: Update session storage before navigation
+    sessionStorage.setItem('driplove_user_session', 'authenticated');
+    sessionStorage.removeItem('driplove_current_view');
+    
+    // Navigate to home which will load the main app
+    navigate('/');
+    
+    // ANDROID FIX: Force reload after navigation to ensure proper app loading
+    setTimeout(() => {
+      window.location.reload();
+    }, 300);
   };
 
   const handleCancel = async () => {
@@ -738,8 +749,12 @@ const ProfileCompletionPage = () => {
     }
   };
 
-  if (!user) {
-    return null; // Will redirect in useEffect
+  if (loading || !user) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-purple-500 to-pink-500 flex items-center justify-center">
+        <HoppingLogo size={64} opacity={0.7} />
+      </div>
+    );
   }
 
   // Show terms acceptance after profile completion
@@ -1083,7 +1098,12 @@ const ProfileCompletionPage = () => {
                         disabled={isSubmitting}
                         className="w-full bg-gradient-to-r from-pink-500 to-purple-600 hover:from-pink-600 hover:to-purple-700 text-white font-semibold py-3 rounded-lg transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed"
                       >
-                        {isSubmitting ? t('profileCompletion.completingProfile') : t('profileCompletion.completeProfile')}
+                        {isSubmitting ? (
+                          <div className="flex items-center justify-center gap-2">
+                            <HoppingLogo size={20} opacity={1} />
+                            <span>{t('profileCompletion.completingProfile')}</span>
+                          </div>
+                        ) : t('profileCompletion.completeProfile')}
                       </Button>
                       
                       <Button
