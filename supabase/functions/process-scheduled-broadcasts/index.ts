@@ -13,7 +13,7 @@ serve(async (req) => {
 
   try {
     const supabase = createClient(
-      Denv.get('SUPABASE_URL') ?? '',
+      Deno.env.get('SUPABASE_URL') ?? '',
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
     )
 
@@ -152,12 +152,12 @@ serve(async (req) => {
         })
 
         console.log(`Completed broadcast: ${broadcast.title} - ${successful} sent, ${failed} failed`)
-      } catch (error) {
+      } catch (error: unknown) {
         console.error(`Error processing broadcast ${broadcast.id}:`, error)
         results.push({
           id: broadcast.id,
           title: broadcast.title,
-          error: error.message,
+          error: error instanceof Error ? error.message : 'Unknown error',
         })
       }
     }
@@ -166,10 +166,10 @@ serve(async (req) => {
       JSON.stringify({ message: 'Processing complete', results }),
       { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     )
-  } catch (error) {
+  } catch (error: unknown) {
     console.error('Error:', error)
     return new Response(
-      JSON.stringify({ error: error.message }),
+      JSON.stringify({ error: error instanceof Error ? error.message : 'Unknown error' }),
       { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 500 }
     )
   }

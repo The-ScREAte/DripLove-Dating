@@ -118,13 +118,13 @@ export default function ScheduledBroadcasts() {
     setIsLoading(true);
     try {
       const { data, error } = await supabase
-        .from('scheduled_broadcasts')
+        .from('scheduled_broadcasts' as any)
         .select('*')
         .order('created_at', { ascending: false });
 
       if (error) throw error;
 
-      setScheduledBroadcasts(data || []);
+      setScheduledBroadcasts((data || []) as unknown as ScheduledBroadcast[]);
     } catch (error) {
       console.error('Error loading scheduled broadcasts:', error);
       toast({
@@ -241,7 +241,7 @@ export default function ScheduledBroadcasts() {
     try {
       if (editingBroadcast) {
         const { error } = await supabase
-          .from('scheduled_broadcasts')
+          .from('scheduled_broadcasts' as any)
           .update(broadcastData)
           .eq('id', editingBroadcast.id);
 
@@ -253,7 +253,7 @@ export default function ScheduledBroadcasts() {
         });
       } else {
         const { error } = await supabase
-          .from('scheduled_broadcasts')
+          .from('scheduled_broadcasts' as any)
           .insert(broadcastData);
 
         if (error) throw error;
@@ -279,7 +279,7 @@ export default function ScheduledBroadcasts() {
   const toggleActive = async (broadcast: ScheduledBroadcast) => {
     try {
       const { error } = await supabase
-        .from('scheduled_broadcasts')
+        .from('scheduled_broadcasts' as any)
         .update({ is_active: !broadcast.is_active })
         .eq('id', broadcast.id);
 
@@ -306,7 +306,7 @@ export default function ScheduledBroadcasts() {
 
     try {
       const { error } = await supabase
-        .from('scheduled_broadcasts')
+        .from('scheduled_broadcasts' as any)
         .delete()
         .eq('id', id);
 
