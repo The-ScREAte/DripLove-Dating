@@ -47,8 +47,9 @@ const AuthForm = ({ isLogin, onToggle, onBack }: AuthFormProps) => {
   const validateForm = () => {
     const newErrors: {[key: string]: string} = {};
     
-    // Email validation
-    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    // Email validation - accepts any valid email with a domain (e.g., user@gmail.com, user@company.co.uk)
+    // Domain must have at least 2 characters after the last dot
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[a-zA-Z]{2,}$/;
     if (!formData.email) {
       newErrors.email = t('auth.errors.emailRequired');
     } else if (!emailRegex.test(formData.email)) {
@@ -105,7 +106,7 @@ const AuthForm = ({ isLogin, onToggle, onBack }: AuthFormProps) => {
       return;
     }
 
-    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[a-zA-Z]{2,}$/;
     if (!emailRegex.test(formData.email)) {
       setErrors({ email: 'Please enter a valid email address' });
       return;
