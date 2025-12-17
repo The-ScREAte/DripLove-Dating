@@ -12,6 +12,7 @@ import { Heart, MapPin, Briefcase, GraduationCap, Upload, Shield, CheckCircle, A
 import BasicInfoSection from '@/components/forms/BasicInfoSection';
 import LocationInput from '@/components/forms/LocationInput';
 import AdinkraSymbolSelector from '@/components/forms/AdinkraSymbolSelector';
+import PromoCodeInput from '@/components/forms/PromoCodeInput';
 import { validateRegistrationForm, transformFormDataForSubmission } from '@/utils/formValidation';
 import { initialFormData } from '@/constants/formData';
 import { occupationOptions, industryOptions } from '@/constants/professionOptions';
@@ -420,10 +421,11 @@ const RegistrationForm = ({ onSubmit, onBackToLogin }: RegistrationFormProps) =>
       });
     }
     
-    // Email validation
-    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    // Email validation - accepts any valid email with a domain (e.g., user@gmail.com, user@company.co.uk)
+    // Domain must have at least 2 characters after the last dot
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[a-zA-Z]{2,}$/;
     if (formData.email && !emailRegex.test(formData.email)) {
-      firstStepErrors.email = 'Please enter a valid email address';
+      firstStepErrors.email = 'Please enter a valid email address (e.g., name@domain.com)';
     }
     
     // Password validation
@@ -658,6 +660,21 @@ const RegistrationForm = ({ onSubmit, onBackToLogin }: RegistrationFormProps) =>
           }
         }
       }
+
+      // Save referral if promo code was used
+      if (formData.promoCodeId) {
+        try {
+          await supabase
+            .from('referrals')
+            .insert({
+              user_id: userId,
+              promo_code_id: formData.promoCodeId
+            });
+        } catch (refErr) {
+          console.error('Error saving referral:', refErr);
+          // Don't block registration if referral save fails
+        }
+      }
       
     } catch (err) {
       setIsSubmitting(false); // Reset loading state
@@ -848,6 +865,20 @@ const RegistrationForm = ({ onSubmit, onBackToLogin }: RegistrationFormProps) =>
         <form onSubmit={handleSubmit} className="space-y-8">
           {currentStep === 1 && (
             <div className="space-y-6 animate-fade-in">
+          {/* Promo Code Section - At the top */}
+          <div className="animate-scale-in">
+            <PromoCodeInput
+              value={formData.promoCode}
+              onChange={(value, promoCodeId) => {
+                setFormData(prev => ({
+                  ...prev,
+                  promoCode: value,
+                  promoCodeId: promoCodeId
+                }));
+              }}
+            />
+          </div>
+
           <BasicInfoSection
             formData={formData}
             errors={errors}
@@ -934,6 +965,7 @@ const RegistrationForm = ({ onSubmit, onBackToLogin }: RegistrationFormProps) =>
               autoDetect={true}
             />
           </div>
+
           </div>
           )}
 
