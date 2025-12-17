@@ -64,7 +64,7 @@ const ProfileCompletionPage = () => {
           .from('profiles')
           .select('face_descriptor')
           .eq('id', user.id)
-          .single();
+          .maybeSingle();
         
         if (profile?.face_descriptor) {
           setFaceVerified(true);
@@ -196,7 +196,7 @@ const ProfileCompletionPage = () => {
           .from('profiles')
           .select('first_name, last_name')
           .eq('id', user.id)
-          .single();
+          .maybeSingle();
         
         // Extract name from user metadata (supports both Google and Apple OAuth)
         const fullName = user.user_metadata?.full_name || user.user_metadata?.name || '';
@@ -226,9 +226,20 @@ const ProfileCompletionPage = () => {
   };
 
   const handleSelectChange = (field: string, value: string) => {
+    const updates: any = { [field]: value };
+    
+    // Auto-select opposite gender for preference, but allow manual override
+    if (field === 'gender' && !formData.preference) {
+      if (value === 'male') {
+        updates.preference = 'female';
+      } else if (value === 'female') {
+        updates.preference = 'male';
+      }
+    }
+    
     setFormData({
       ...formData,
-      [field]: value
+      ...updates
     });
     if (errors[field]) {
       setErrors(prev => ({ ...prev, [field]: '' }));
@@ -453,22 +464,19 @@ const ProfileCompletionPage = () => {
       description: "Your profile has been completed and terms accepted. Welcome to the community!",
     });
     
-    // Send welcome push notification
-    try {
-      const { sendPushNotification } = await import('@/services/pushNotifications');
-      await sendPushNotification({
+    // Send welcome push notification in background (non-blocking)
+    import('@/services/pushNotifications').then(({ sendPushNotification }) => {
+      sendPushNotification({
         title: "Welcome to DripLove! 💕",
         body: t('profileCompletion.profileSetup'),
         userId: user.id,
         type: 'system',
         data: { action: 'open_discover' }
-      });
-    } catch (error) {
-      console.error('Failed to send welcome notification:', error);
-      // Don't block user flow if notification fails
-    }
+      }).catch(error => console.error('Failed to send welcome notification:', error));
+    }).catch(error => console.error('Failed to load push notifications:', error));
     
-    navigate('/');
+    // Navigate immediately without waiting
+    navigate('/discover');
   };
 
   const handleCancel = async () => {
@@ -510,7 +518,7 @@ const ProfileCompletionPage = () => {
       .from('profiles')
       .select('face_descriptor')
       .eq('id', user.id)
-      .single();
+      .maybeSingle();
     
     if (!faceVerified && !existingProfile?.face_descriptor) {
       validationErrors.faceVerification = 'Face verification is required to continue';
@@ -677,40 +685,39 @@ const ProfileCompletionPage = () => {
         }
       }
 
-      // Index face in AWS Rekognition with user's name (only now, after profile is saved)
+      // Index face in AWS Rekognition in background (non-blocking)
       const pendingFace = localStorage.getItem('pending_face_verification_profile');
       if (pendingFace && user.id) {
-        try {
-          const userName = `${formData.firstName} ${formData.lastName}`;
-          const { data: faceData, error: faceError } = await supabase.functions.invoke("face-verify", {
-            body: {
-              action: "index_face",
-              front: pendingFace,
-              userId: user.id,
-              userName: userName, // Include user's name for admin identification
-            },
-          });
-
+        const userName = `${formData.firstName} ${formData.lastName}`;
+        // Don't await - let it run in background
+        supabase.functions.invoke("face-verify", {
+          body: {
+            action: "index_face",
+            front: pendingFace,
+            userId: user.id,
+            userName: userName,
+          },
+        }).then(({ data: faceData, error: faceError }) => {
           if (faceError) {
             console.error('Face indexing error:', faceError);
           } else if (faceData?.success) {
             // Update profile with face descriptor
-            await supabase
+            supabase
               .from('profiles')
               .update({ 
                 face_descriptor: faceData.faceId || 'verified',
                 updated_at: new Date().toISOString()
               })
-              .eq('id', user.id);
-            
-            console.log('✅ Face indexed successfully for user:', userName);
+              .eq('id', user.id)
+              .then(() => console.log('✅ Face indexed successfully for user:', userName))
+              .catch(err => console.error('Error updating face descriptor:', err));
           }
-          
-          // Clear localStorage after successful indexing
+          // Clear localStorage after indexing attempt
           localStorage.removeItem('pending_face_verification_profile');
-        } catch (faceErr) {
+        }).catch(faceErr => {
           console.error('Face indexing exception:', faceErr);
-        }
+          localStorage.removeItem('pending_face_verification_profile');
+        });
       }
 
       toast({
@@ -827,18 +834,6 @@ const ProfileCompletionPage = () => {
                 </div>
                 <form onSubmit={handleSubmit} className="space-y-4">
                   <div className="space-y-4">
-                    {/* Promo Code Section - At the top */}
-                    <PromoCodeInput
-                      value={formData.promoCode}
-                      onChange={(value, promoCodeId) => {
-                        setFormData(prev => ({
-                          ...prev,
-                          promoCode: value,
-                          promoCodeId: promoCodeId
-                        }));
-                      }}
-                    />
-
                     <h3 className="text-lg font-semibold text-gray-800">{t('profileCompletion.basicInformation')}</h3>
                     
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -1113,6 +1108,17 @@ const ProfileCompletionPage = () => {
                     
                     {errors.images && <p className="text-sm text-red-500">{errors.images}</p>}
                   </div>
+
+                  <PromoCodeInput
+                    value={formData.promoCode}
+                    onChange={(value, promoCodeId) => {
+                      setFormData(prev => ({
+                        ...prev,
+                        promoCode: value,
+                        promoCodeId: promoCodeId
+                      }));
+                    }}
+                  />
 
                   {/* Note: Face verification is now shown under name fields above */}
 

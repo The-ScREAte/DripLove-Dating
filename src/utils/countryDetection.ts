@@ -2,6 +2,30 @@
  * Auto-detect user's country using GPS and IP geolocation
  */
 
+async function isNativePlatform(): Promise<boolean> {
+  try {
+    const { Capacitor } = await import('@capacitor/core');
+    return !!Capacitor?.isNativePlatform?.();
+  } catch {
+    return false;
+  }
+}
+
+function withTimeout<T>(promise: Promise<T>, ms: number, label: string): Promise<T> {
+  return new Promise<T>((resolve, reject) => {
+    const timeoutId = setTimeout(() => reject(new Error(`Timeout: ${label}`)), ms);
+    promise
+      .then((value) => {
+        clearTimeout(timeoutId);
+        resolve(value);
+      })
+      .catch((err) => {
+        clearTimeout(timeoutId);
+        reject(err);
+      });
+  });
+}
+
 interface GeolocationResult {
   countryCode: string;
   countryName: string;
@@ -88,14 +112,18 @@ const countryCodeMap: Record<string, string> = {
 async function reverseGeocode(latitude: number, longitude: number): Promise<string | null> {
   try {
     // Using OpenStreetMap Nominatim (free, no API key needed)
+    // NOTE: Browsers/WKWebView forbid setting some headers (like User-Agent),
+    // so keep headers minimal to avoid failures on iOS/Android WebView.
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 7000);
     const response = await fetch(
       `https://nominatim.openstreetmap.org/reverse?format=json&lat=${latitude}&lon=${longitude}&zoom=3&addressdetails=1`,
       {
-        headers: {
-          'User-Agent': 'DripLove Dating App'
-        }
+        signal: controller.signal,
+        headers: { 'Accept': 'application/json' }
       }
     );
+    clearTimeout(timeoutId);
     
     if (!response.ok) return null;
     
@@ -171,26 +199,33 @@ async function getCountryFromIP(): Promise<string | null> {
  * Auto-detect user's country using GPS first, then IP as fallback
  */
 export async function autoDetectCountry(): Promise<GeolocationResult> {
-  // Try GPS first (most accurate)
-  if ('geolocation' in navigator) {
+  const native = await isNativePlatform();
+
+  // On iOS/Android WebViews, navigator.geolocation can hang without rejecting.
+  // Prefer IP detection on native to avoid infinite spinners; use GPS only when safe.
+  if (!native && 'geolocation' in navigator) {
     try {
-      const position = await new Promise<GeolocationPosition>((resolve, reject) => {
-        navigator.geolocation.getCurrentPosition(resolve, reject, {
-          timeout: 10000,
-          enableHighAccuracy: true
-        });
-      });
+      const position = await withTimeout(
+        new Promise<GeolocationPosition>((resolve, reject) => {
+          navigator.geolocation.getCurrentPosition(resolve, reject, {
+            timeout: 10000,
+            enableHighAccuracy: true,
+          });
+        }),
+        11000,
+        'navigator.geolocation.getCurrentPosition'
+      );
 
       const { latitude, longitude } = position.coords;
-      const countryCode = await reverseGeocode(latitude, longitude);
-      
+      const countryCode = await withTimeout(reverseGeocode(latitude, longitude), 8000, 'reverseGeocode');
+
       if (countryCode && countryCodeMap[countryCode]) {
         return {
           countryCode,
           countryName: countryCodeMap[countryCode],
           latitude,
           longitude,
-          method: 'gps'
+          method: 'gps',
         };
       }
     } catch (error) {
@@ -198,8 +233,8 @@ export async function autoDetectCountry(): Promise<GeolocationResult> {
     }
   }
 
-  // Fallback to IP geolocation
-  const countryCode = await getCountryFromIP();
+  // IP geolocation (primary for native; fallback for web)
+  const countryCode = await withTimeout(getCountryFromIP(), 15000, 'getCountryFromIP');
   if (countryCode && countryCodeMap[countryCode]) {
     return {
       countryCode,

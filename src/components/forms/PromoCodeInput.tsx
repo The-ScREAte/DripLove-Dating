@@ -78,7 +78,7 @@ const PromoCodeInput = ({ value, onChange, disabled, className }: PromoCodeInput
     <div className={`space-y-2 ${className}`}>
       <Label htmlFor="promoCode" className="text-sm font-medium flex items-center gap-2">
         <Gift className="w-4 h-4 text-pink-500" />
-        Promo Code (Optional)
+        Promo Code
       </Label>
       <div className="flex gap-2">
         <div className="relative flex-1">
@@ -142,9 +142,6 @@ const PromoCodeInput = ({ value, onChange, disabled, className }: PromoCodeInput
             : validationResult.error}
         </p>
       )}
-      <p className="text-xs text-gray-500">
-        Have a promo code from an influencer? Enter it here for special benefits.
-      </p>
     </div>
   );
 };

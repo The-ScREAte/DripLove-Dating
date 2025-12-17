@@ -167,19 +167,9 @@ export const useOAuth = () => {
           };
           window.addEventListener('message', handleMessage);
 
-          // Also set a timeout to clear loading state if popup is closed without completing
-          const checkPopupClosed = setInterval(() => {
-            if (popup.closed) {
-              console.log('[useOAuth Web Google] Popup closed, clearing loading state');
-              clearInterval(checkPopupClosed);
-              setOauthLoading(null);
-              window.removeEventListener('message', handleMessage);
-            }
-          }, 500);
-
-          // Clear interval after 5 minutes max
+          // COOP can block checking popup.closed; instead rely on postMessage and a max timeout.
+          // Max timeout (5 minutes) ensures loading doesn't get stuck if user closes popup.
           setTimeout(() => {
-            clearInterval(checkPopupClosed);
             window.removeEventListener('message', handleMessage);
             setOauthLoading(null);
           }, 5 * 60 * 1000);

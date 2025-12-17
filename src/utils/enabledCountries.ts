@@ -17,9 +17,13 @@ export async function getEnabledCountries() {
   }
 
   try {
-    // Fetch enabled countries from database
-    const { data, error } = await supabase
-      .rpc('get_enabled_countries');
+    // Fetch enabled countries from database (with timeout so mobile doesn't hang forever)
+    const rpcPromise = supabase.rpc('get_enabled_countries');
+    const timeoutPromise = new Promise<{ data: any; error: any }>((resolve) =>
+      setTimeout(() => resolve({ data: null, error: new Error('Timeout fetching enabled countries') }), 8000)
+    );
+
+    const { data, error } = await Promise.race([rpcPromise, timeoutPromise]);
 
     if (error) {
       console.error('Error fetching enabled countries:', error);

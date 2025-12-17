@@ -305,19 +305,15 @@ const AuthForm = ({ isLogin, onToggle, onBack }: AuthFormProps) => {
           .from('profiles')
           .select('id, is_admin, account_status')
           .eq('id', authData.user.id)
-          .single();
+          .maybeSingle();
 
         if (profileError || !profile) {
           // Sign out the user since they don't have a profile
           await supabase.auth.signOut();
-          
-          // Show error toast - stay on the same page, no redirect
-          toast({
-            title: "Account Not Found",
-            description: "This account doesn't exist in our system. Please register first.",
-            variant: "destructive",
-          });
-          
+
+          // Don't flash an error toast; instead guide them into registration.
+          // (A missing profile means signup wasn't completed.)
+          onToggle();
           setLoading(false);
           return;
         }

@@ -15,6 +15,7 @@ import {
 } from '@/constants/locationData';
 import { getEnabledCountries } from '@/utils/enabledCountries';
 import { autoDetectCountry, checkIfUserIsOutsideCountry, getCountryName as getCountryNameFromCode } from '@/utils/countryDetection';
+import { searchCitiesForCountry } from '@/utils/citySearch';
 
 interface LocationInputProps {
   country: string;
@@ -55,6 +56,8 @@ const LocationInput = ({
   isPremium = false,
   disabled = false
 }: LocationInputProps) => {
+  const isRemoteCitySearchCountry = (code: string) => ['US', 'CA', 'GB'].includes(code);
+
   const [selectedCountryCode, setSelectedCountryCode] = useState<string>('');
   const [cityInput, setCityInput] = useState<string>(city);
   const [showCitySuggestions, setShowCitySuggestions] = useState(false);
@@ -270,10 +273,37 @@ const LocationInput = ({
 
   // Update suggested cities when country changes OR when searching without a country
   useEffect(() => {
-    if (selectedCountryCode) {
-      const cities = getCitiesForCountry(selectedCountryCode);
-      setSuggestedCities(cities);
-    } else if (cityInput.length >= 2) {
+    let isDisposed = false;
+    const abortController = new AbortController();
+
+    const loadCities = async () => {
+      if (selectedCountryCode) {
+        // For US/CA/GB, use live lookup when user is typing to support ALL towns/cities.
+        if (isRemoteCitySearchCountry(selectedCountryCode) && cityInput.trim().length >= 2) {
+          try {
+            const results = await searchCitiesForCountry(selectedCountryCode, cityInput, {
+              limit: 10,
+              signal: abortController.signal
+            });
+            if (!isDisposed) setSuggestedCities(results);
+          } catch (e) {
+            // If lookup fails (offline/rate limited), fall back to bundled major cities.
+            if (!isDisposed) {
+              const fallback = getCitiesForCountry(selectedCountryCode)
+                .filter(c => c.name.toLowerCase().includes(cityInput.toLowerCase()))
+                .slice(0, 10);
+              setSuggestedCities(fallback);
+            }
+          }
+          return;
+        }
+
+        const cities = getCitiesForCountry(selectedCountryCode);
+        if (!isDisposed) setSuggestedCities(cities);
+        return;
+      }
+
+      if (cityInput.length >= 2) {
       // If no country is selected but user is typing, search across all countries
       const allCities: CityData[] = [];
       const countryCodes = getCountriesList();
@@ -295,11 +325,26 @@ const LocationInput = ({
     } else {
       setSuggestedCities([]);
     }
+
+    };
+
+    // Debounce the live search a bit to avoid hammering the endpoint.
+    const shouldDebounce = selectedCountryCode && isRemoteCitySearchCountry(selectedCountryCode) && cityInput.trim().length >= 2;
+    const timer = window.setTimeout(() => {
+      void loadCities();
+    }, shouldDebounce ? 300 : 0);
+
+    return () => {
+      isDisposed = true;
+      abortController.abort();
+      window.clearTimeout(timer);
+    };
   }, [selectedCountryCode, cityInput]);
 
   // Update coordinates when city changes
   useEffect(() => {
-    if (selectedCountryCode && cityInput) {
+    // For US/CA/GB we use live city search, so bundled coordinate lookup may be incomplete.
+    if (selectedCountryCode && cityInput && !isRemoteCitySearchCountry(selectedCountryCode)) {
       const cityData = getCityCoordinates(selectedCountryCode, cityInput);
       if (cityData) {
         setCoordinates({ lat: cityData.latitude, lng: cityData.longitude });
@@ -383,7 +428,9 @@ const LocationInput = ({
     setShowCitySuggestions(value.length >= 2 || selectedCountryCode !== '');
 
     // Check if it matches a major city
-    const cityData = selectedCountryCode ? getCityCoordinates(selectedCountryCode, value) : null;
+    const cityData = selectedCountryCode && !isRemoteCitySearchCountry(selectedCountryCode)
+      ? getCityCoordinates(selectedCountryCode, value)
+      : null;
     const selectedCountry = countries.find(c => c.code === selectedCountryCode);
     
     onLocationChange({

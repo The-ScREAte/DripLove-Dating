@@ -156,9 +156,20 @@ const RegistrationForm = ({ onSubmit, onBackToLogin }: RegistrationFormProps) =>
   };
 
   const handleSelectChange = (field: string, value: string) => {
+    const updates: any = { [field]: value };
+    
+    // Auto-select opposite gender for preference, but allow manual override
+    if (field === 'gender' && !formData.preference) {
+      if (value === 'male') {
+        updates.preference = 'female';
+      } else if (value === 'female') {
+        updates.preference = 'male';
+      }
+    }
+    
     setFormData({
       ...formData,
-      [field]: value
+      ...updates
     });
     if (errors[field]) {
       setErrors(prev => ({ ...prev, [field]: '' }));
@@ -750,40 +761,37 @@ const RegistrationForm = ({ onSubmit, onBackToLogin }: RegistrationFormProps) =>
       }
     }
 
-    // 4. Index face in AWS Rekognition with user's name (only now, after user is created)
+    // 4. Index face in AWS Rekognition in background (non-blocking)
     const pendingFace = localStorage.getItem('pending_face_verification');
     if (pendingFace && userId) {
-      try {
-        const userName = `${formData.firstName} ${formData.lastName}`;
-        const { data: faceData, error: faceError } = await supabase.functions.invoke("face-verify", {
-          body: {
-            action: "index_face",
-            front: pendingFace,
-            userId: userId,
-            userName: userName, // Include user's name for admin identification
-          },
-        });
-
+      const userName = `${formData.firstName} ${formData.lastName}`;
+      // Don't await - let it run in background
+      supabase.functions.invoke("face-verify", {
+        body: {
+          action: "index_face",
+          front: pendingFace,
+          userId: userId,
+          userName: userName,
+        },
+      }).then(({ data: faceData, error: faceError }) => {
         if (faceError) {
           console.error('Face indexing error:', faceError);
         } else if (faceData?.success) {
-          // Update profile with face descriptor
-          await supabase
+          supabase
             .from('profiles')
             .update({ 
               face_descriptor: faceData.faceId || 'verified',
               updated_at: new Date().toISOString()
             })
-            .eq('id', userId);
-          
-          console.log('✅ Face indexed successfully for user:', userName);
+            .eq('id', userId)
+            .then(() => console.log('✅ Face indexed successfully for user:', userName))
+            .catch(err => console.error('Error updating face descriptor:', err));
         }
-        
-        // Clear localStorage after successful indexing
         localStorage.removeItem('pending_face_verification');
-      } catch (faceErr) {
+      }).catch(faceErr => {
         console.error('Face indexing exception:', faceErr);
-      }
+        localStorage.removeItem('pending_face_verification');
+      });
     }
 
     setIsSubmitting(false); // Reset loading state
@@ -800,15 +808,8 @@ const RegistrationForm = ({ onSubmit, onBackToLogin }: RegistrationFormProps) =>
       }
       
       if (user) {
-        // Try to force a reload/redirect if onSubmit does not update the app state
+        // Call onSubmit to update app state - parent will handle navigation
         onSubmit({ ...formData, images: approvedImages, user });
-        
-        // If the parent does not update view, do it here as a fallback
-        if (typeof window !== 'undefined') {
-          setTimeout(() => {
-            window.location.reload();
-          }, 1000); // Increased timeout to give parent more time to handle
-        }
       } else {
         onSubmit({ ...formData, images: approvedImages });
       }
@@ -865,20 +866,6 @@ const RegistrationForm = ({ onSubmit, onBackToLogin }: RegistrationFormProps) =>
         <form onSubmit={handleSubmit} className="space-y-8">
           {currentStep === 1 && (
             <div className="space-y-6 animate-fade-in">
-          {/* Promo Code Section - At the top */}
-          <div className="animate-scale-in">
-            <PromoCodeInput
-              value={formData.promoCode}
-              onChange={(value, promoCodeId) => {
-                setFormData(prev => ({
-                  ...prev,
-                  promoCode: value,
-                  promoCodeId: promoCodeId
-                }));
-              }}
-            />
-          </div>
-
           <BasicInfoSection
             formData={formData}
             errors={errors}
@@ -1077,6 +1064,19 @@ const RegistrationForm = ({ onSubmit, onBackToLogin }: RegistrationFormProps) =>
                     ))}
                   </div>
                 )}
+
+                <div className="animate-scale-in">
+                  <PromoCodeInput
+                    value={formData.promoCode}
+                    onChange={(value, promoCodeId) => {
+                      setFormData(prev => ({
+                        ...prev,
+                        promoCode: value,
+                        promoCodeId: promoCodeId
+                      }));
+                    }}
+                  />
+                </div>
 
                 <div className="bg-blue-50 p-4 rounded-lg">
                   <h4 className="font-medium text-blue-900 mb-2">{t('registration.photoGuidelines')}</h4>

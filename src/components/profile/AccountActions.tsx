@@ -82,7 +82,29 @@ const AccountActions = ({ currentUser, onLogout, onShowTerms, onShowPrivacy, hid
         return;
       }
 
-      // If password is correct, proceed with account deletion
+      // If password is correct, first delete face from AWS Rekognition
+      try {
+        const { data: profile } = await supabase
+          .from('profiles')
+          .select('face_descriptor')
+          .eq('id', currentUser.id)
+          .single();
+
+        if (profile?.face_descriptor) {
+          await supabase.functions.invoke('face-verify', {
+            body: {
+              action: 'delete_face',
+              userId: currentUser.id,
+              faceId: profile.face_descriptor
+            }
+          });
+        }
+      } catch (faceError) {
+        console.error('Error deleting face from Rekognition:', faceError);
+        // Continue with account deletion even if face deletion fails
+      }
+
+      // Proceed with account deletion
       const { error } = await supabase.rpc('delete_user_and_data', {
         user_id_to_delete: currentUser.id
       });

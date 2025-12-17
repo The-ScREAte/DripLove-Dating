@@ -133,7 +133,7 @@ const Index = () => {
                 .from('profiles')
                 .select('login_count')
                 .eq('id', session.user.id)
-                .single();
+                .maybeSingle();
               
               if (profileData) {
                 const currentCount = profileData.login_count || 0;
@@ -191,13 +191,14 @@ const Index = () => {
           .from('profiles')
           .select('is_admin, account_status, first_name, last_name, date_of_birth, country, city, gender, preference, relationship_intent, occupation, industry, education_level, terms_accepted')
           .eq('id', userId)
-          .single();
+          .maybeSingle();
         profile = result.data;
         error = result.error;
       }
       
       if (error || !profile) {
-        console.error('Profile not found for user:', userId, 'Error:', error);
+        // Profile row may not exist yet (common immediately after OAuth).
+        // Avoid noisy logs/toasts here; we'll route based on provider after one retry.
         // For OAuth users, profile might not be ready yet, wait and retry once
         await new Promise(resolve => setTimeout(resolve, 500));
         
@@ -205,7 +206,7 @@ const Index = () => {
           .from('profiles')
           .select('is_admin, account_status, first_name, last_name, date_of_birth, country, city, gender, preference, relationship_intent, occupation, industry, education_level, terms_accepted')
           .eq('id', userId)
-          .single();
+          .maybeSingle();
           
         if (retryResult.error || !retryResult.data) {
           console.log('Profile not found after retry - checking if OAuth user for profile completion');
@@ -216,22 +217,15 @@ const Index = () => {
           const isOAuthUser = provider === 'google' || provider === 'apple';
           
           if (isOAuthUser) {
-            console.log('OAuth user without profile - redirecting to profile completion');
             setLoading(false);
             setCurrentView('profile-completion');
             return;
           }
           
           // For non-OAuth users (email/password), they need to register first
-          console.error('Non-OAuth user without profile - signing out');
           await supabase.auth.signOut();
-          toast({
-            title: "Account Not Found",
-            description: "This account doesn't exist in our system. Please register first.",
-            variant: "destructive",
-          });
           setLoading(false);
-          setCurrentView('welcome');
+          setCurrentView('register');
           return;
         }
         

@@ -411,7 +411,7 @@ export default function FaceVerification({ onVerified, disabled }: FaceVerificat
                   playsInline
                   muted
                   className="w-full h-full object-cover rounded-full"
-                  style={{ transform: 'scaleX(-1)' }}
+
                 />
               </div>
             )}
@@ -474,7 +474,7 @@ export default function FaceVerification({ onVerified, disabled }: FaceVerificat
             <div className="flex flex-col items-center">
               <div className={`w-24 h-24 rounded-full border-4 overflow-hidden shadow-lg ${verificationResult === 'error' || verificationResult === 'duplicate' ? 'border-red-400' : 'border-purple-200'}`}>
                 {capturedImages.front && (
-                  <img src={capturedImages.front} alt="Front" className="w-full h-full object-cover" style={{ transform: 'scaleX(-1)' }} />
+                  <img src={capturedImages.front} alt="Front" className="w-full h-full object-cover" />
                 )}
               </div>
               <span className="text-xs text-gray-500 mt-2">Front</span>
@@ -482,7 +482,7 @@ export default function FaceVerification({ onVerified, disabled }: FaceVerificat
             <div className="flex flex-col items-center">
               <div className={`w-24 h-24 rounded-full border-4 overflow-hidden shadow-lg ${verificationResult === 'error' || verificationResult === 'duplicate' ? 'border-red-400' : 'border-purple-200'}`}>
                 {capturedImages.side && (
-                  <img src={capturedImages.side} alt="Side" className="w-full h-full object-cover" style={{ transform: 'scaleX(-1)' }} />
+                  <img src={capturedImages.side} alt="Side" className="w-full h-full object-cover" />
                 )}
               </div>
               <span className="text-xs text-gray-500 mt-2">Side</span>
