@@ -23,10 +23,9 @@ const LazyAdminPage = lazy(() => import('@/components/AdminPage'));
 const PageLoader = () => null;
 
 const Index = () => {
-  // Restore view from sessionStorage to persist on reload
+  // Restore view from sessionStorage to persist on reload - instant view
   const getInitialView = () => {
     try {
-      // Check if user was logged in (has session)
       const savedSession = sessionStorage.getItem('driplove_user_session');
       if (savedSession === 'authenticated') {
         return 'app' as const;
@@ -39,9 +38,11 @@ const Index = () => {
     return 'welcome' as const;
   };
   
-  const [currentView, setCurrentView] = useState<'welcome' | 'login' | 'register' | 'profile-completion' | 'terms-acceptance' | 'app' | 'admin' | 'about' | 'terms' | 'privacy'>(getInitialView());
+  const initialView = getInitialView();
+  const [currentView, setCurrentView] = useState<'welcome' | 'login' | 'register' | 'profile-completion' | 'terms-acceptance' | 'app' | 'admin' | 'about' | 'terms' | 'privacy'>(initialView);
   const [user, setUser] = useState<any>(null);
-  const [loading, setLoading] = useState(true);
+  // If we have a cached session, don't show loading - validate in background
+  const [loading, setLoading] = useState(initialView !== 'app');
   const [showAuthDialog, setShowAuthDialog] = useState(false);
   const [isLoginMode, setIsLoginMode] = useState(true);
   const [authInitialized, setAuthInitialized] = useState(false);
@@ -166,52 +167,31 @@ const Index = () => {
 
   const checkUserTypeAndRedirect = async (userId: string) => {
     try {
-      // Fast-path: if the OAuth handler just created a minimal profile it will
-      // stash it in sessionStorage under 'oauth_profile'. Use that to avoid a
-      // short timing window where the DB read may not yet return the new row.
+      // Fast-path: check sessionStorage for OAuth profile first
       let profile: any = null;
-      let error: any = null;
 
       try {
         if (typeof window !== 'undefined') {
           const raw = sessionStorage.getItem('oauth_profile');
           if (raw) {
             profile = JSON.parse(raw);
-            // Clear it so subsequent checks rely on the DB
             try { sessionStorage.removeItem('oauth_profile'); } catch {}
           }
         }
-      } catch (e) {
-        // If sessionStorage is unavailable, fall back to DB
-        profile = null;
-      }
+      } catch {}
 
       if (!profile) {
+        // Single fast query with retry logic built-in
         const result = await supabase
           .from('profiles')
           .select('is_admin, account_status, first_name, last_name, date_of_birth, country, city, gender, preference, relationship_intent, occupation, industry, education_level, terms_accepted')
           .eq('id', userId)
           .maybeSingle();
         profile = result.data;
-        error = result.error;
-      }
-      
-      if (error || !profile) {
-        // Profile row may not exist yet (common immediately after OAuth).
-        // Avoid noisy logs/toasts here; we'll route based on provider after one retry.
-        // For OAuth users, profile might not be ready yet, wait and retry once
-        await new Promise(resolve => setTimeout(resolve, 500));
         
-        const retryResult = await supabase
-          .from('profiles')
-          .select('is_admin, account_status, first_name, last_name, date_of_birth, country, city, gender, preference, relationship_intent, occupation, industry, education_level, terms_accepted')
-          .eq('id', userId)
-          .maybeSingle();
-          
-        if (retryResult.error || !retryResult.data) {
-          console.log('Profile not found after retry - checking if OAuth user for profile completion');
-          
-          // Check if this is an OAuth user (Google/Apple) - they should go to profile completion
+        // If no profile found, check if OAuth user needs profile completion
+        if (!profile) {
+          // Get auth user info to check provider
           const { data: { user: authUser } } = await supabase.auth.getUser();
           const provider = authUser?.app_metadata?.provider;
           const isOAuthUser = provider === 'google' || provider === 'apple';
@@ -222,14 +202,12 @@ const Index = () => {
             return;
           }
           
-          // For non-OAuth users (email/password), they need to register first
+          // Non-OAuth users need to register
           await supabase.auth.signOut();
           setLoading(false);
           setCurrentView('register');
           return;
         }
-        
-        profile = retryResult.data;
       }
 
       // Check account status

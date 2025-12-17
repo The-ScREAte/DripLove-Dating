@@ -630,8 +630,8 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, isPremium }: DiscoverPage
 
       if (error) throw error;
       filteredProfiles = profiles || [];
-    } else {
-      // Fallback: get profiles from same country
+    } else if (currentUserData?.country) {
+      // Fallback: get profiles from same country (only if country is set)
       let query = supabase
         .from('profiles')
         .select(PROFILE_SELECT);
@@ -644,8 +644,8 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, isPremium }: DiscoverPage
         .in('gender', allowedGenders)
         .eq('account_status', 'active')
         .eq('is_admin', false)
-        .eq('country', currentUserData?.country || 'Ghana')
-        .limit(100); // Fetch larger pool for stratified sampling
+        .eq('country', currentUserData.country)
+        .limit(100);
 
       if (error) throw error;
       filteredProfiles = profiles || [];
