@@ -811,15 +811,8 @@ const RegistrationForm = ({ onSubmit, onBackToLogin }: RegistrationFormProps) =>
       }
       
       if (user) {
-        // Try to force a reload/redirect if onSubmit does not update the app state
+        // Pass user directly to onSubmit - NO reload needed
         onSubmit({ ...formData, images: approvedImages, user });
-        
-        // If the parent does not update view, do it here as a fallback
-        if (typeof window !== 'undefined') {
-          setTimeout(() => {
-            window.location.reload();
-          }, 1000); // Increased timeout to give parent more time to handle
-        }
       } else {
         onSubmit({ ...formData, images: approvedImages });
       }
