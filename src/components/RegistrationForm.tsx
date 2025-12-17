@@ -421,10 +421,11 @@ const RegistrationForm = ({ onSubmit, onBackToLogin }: RegistrationFormProps) =>
       });
     }
     
-    // Email validation
-    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    // Email validation - accepts any valid email with a domain (e.g., user@gmail.com, user@company.co.uk)
+    // Domain must have at least 2 characters after the last dot
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[a-zA-Z]{2,}$/;
     if (formData.email && !emailRegex.test(formData.email)) {
-      firstStepErrors.email = 'Please enter a valid email address';
+      firstStepErrors.email = 'Please enter a valid email address (e.g., name@domain.com)';
     }
     
     // Password validation

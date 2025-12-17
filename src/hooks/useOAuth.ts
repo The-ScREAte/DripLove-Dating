@@ -156,8 +156,33 @@ export const useOAuth = () => {
             throw new Error('Popup blocked. Please allow popups for this site.');
           }
 
-          // Popup flow is handled by OAuthCallback component via postMessage
-          // No further action needed here - loading state will be cleared by callback
+          // Set up message listener to clear loading state when OAuth completes
+          const handleMessage = (event: MessageEvent) => {
+            if (event.origin !== window.location.origin) return;
+            if (event.data?.type === 'oauth_complete') {
+              console.log('[useOAuth Web Google] Received oauth_complete message');
+              setOauthLoading(null);
+              window.removeEventListener('message', handleMessage);
+            }
+          };
+          window.addEventListener('message', handleMessage);
+
+          // Also set a timeout to clear loading state if popup is closed without completing
+          const checkPopupClosed = setInterval(() => {
+            if (popup.closed) {
+              console.log('[useOAuth Web Google] Popup closed, clearing loading state');
+              clearInterval(checkPopupClosed);
+              setOauthLoading(null);
+              window.removeEventListener('message', handleMessage);
+            }
+          }, 500);
+
+          // Clear interval after 5 minutes max
+          setTimeout(() => {
+            clearInterval(checkPopupClosed);
+            window.removeEventListener('message', handleMessage);
+            setOauthLoading(null);
+          }, 5 * 60 * 1000);
           
         } catch (err: any) {
           console.error('[useOAuth Web Google] ❌ Error:', err);

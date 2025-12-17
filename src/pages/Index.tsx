@@ -208,8 +208,22 @@ const Index = () => {
           .single();
           
         if (retryResult.error || !retryResult.data) {
-          console.error('Profile still not found after retry, signing out user');
-          // Sign out user since no profile exists - they need to register
+          console.log('Profile not found after retry - checking if OAuth user for profile completion');
+          
+          // Check if this is an OAuth user (Google/Apple) - they should go to profile completion
+          const { data: { user: authUser } } = await supabase.auth.getUser();
+          const provider = authUser?.app_metadata?.provider;
+          const isOAuthUser = provider === 'google' || provider === 'apple';
+          
+          if (isOAuthUser) {
+            console.log('OAuth user without profile - redirecting to profile completion');
+            setLoading(false);
+            setCurrentView('profile-completion');
+            return;
+          }
+          
+          // For non-OAuth users (email/password), they need to register first
+          console.error('Non-OAuth user without profile - signing out');
           await supabase.auth.signOut();
           toast({
             title: "Account Not Found",
