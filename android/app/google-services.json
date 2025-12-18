@@ -30,6 +30,14 @@
           }
         },
         {
+          "client_id": "361835962012-onhu3om7tqoc94j66mpo2ch4gnec9rn2.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.driplove.dating",
+            "certificate_hash": "04bbc4ab9c39092a6efb50f9cfcff1bedfacfda4"
+          }
+        },
+        {
           "client_id": "361835962012-i85negkabf06fei55t34jh2gav0t56g6.apps.googleusercontent.com",
           "client_type": 3
         }

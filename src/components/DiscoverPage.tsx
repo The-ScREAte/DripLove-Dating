@@ -945,10 +945,10 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, isPremium }: DiscoverPage
   }, [currentUser, allowedGenders, toast]);
 
   // ⭐ PARALLEL IMAGE PRELOADING - Load images in background without blocking
-  // ⭐ ANDROID OPTIMIZATION: Reduced batch size for Android (4 vs 10 for iOS)
+  // ⭐ ANDROID OPTIMIZATION: Reduced batch size for Android (2 vs 10 for iOS)
   const preloadProfileImages = useCallback((profiles: PotentialMatch[], startIndex: number = 0) => {
-    // Android: Load 4 profiles ahead, iOS: Load 10 profiles ahead
-    const batchSize = isAndroidPlatform() ? 4 : 10;
+    // Android: Load only 2 profiles ahead, iOS: Load 6 profiles ahead
+    const batchSize = isAndroidPlatform() ? 2 : 6;
     const profilesToLoad = profiles.slice(startIndex, startIndex + batchSize);
     
     profilesToLoad.forEach((user, profileIndex) => {
