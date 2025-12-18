@@ -19,7 +19,22 @@ interface Ad {
   link: string | null;
   link_as: string | null;
   created_at: string;
+  target_countries: string[];
 }
+
+// Country options
+const COUNTRY_OPTIONS = [
+  { code: 'GH', name: 'Ghana' },
+  { code: 'NG', name: 'Nigeria' },
+  { code: 'US', name: 'United States' },
+  { code: 'GB', name: 'United Kingdom' },
+  { code: 'CA', name: 'Canada' },
+  { code: 'KE', name: 'Kenya' },
+  { code: 'ZA', name: 'South Africa' },
+  { code: 'UG', name: 'Uganda' },
+  { code: 'TZ', name: 'Tanzania' },
+  { code: 'RW', name: 'Rwanda' },
+];
 
 const AdsManagement = () => {
   const [ads, setAds] = useState<Ad[]>([]);
@@ -32,7 +47,8 @@ const AdsManagement = () => {
     video_url: '',
     media_type: 'image',
     link: '',
-    link_as: 'Click here'
+    link_as: 'Click here',
+    target_countries: [] as string[]
   });
   const { toast } = useToast();
 
@@ -201,8 +217,9 @@ const AdsManagement = () => {
           video_url: formData.video_url || null,
           media_type: formData.media_type,
           link: formData.link || null,
-          link_as: formData.link_as || 'Click here'
-        });
+          link_as: formData.link_as || 'Click here',
+          target_countries: formData.target_countries
+        } as any);
 
       if (error) throw error;
 
@@ -211,7 +228,7 @@ const AdsManagement = () => {
         description: 'Ad created successfully'
       });
 
-      setFormData({ name: '', about: '', image_url: '', video_url: '', media_type: 'image', link: '', link_as: 'Click here' });
+      setFormData({ name: '', about: '', image_url: '', video_url: '', media_type: 'image', link: '', link_as: 'Click here', target_countries: [] });
       fetchAds();
     } catch (error) {
       console.error('Error creating ad:', error);
@@ -368,6 +385,34 @@ const AdsManagement = () => {
               />
             </div>
 
+            <div>
+              <label className="block text-sm font-medium mb-2">Target Countries (leave empty for all)</label>
+              <div className="grid grid-cols-2 gap-2 max-h-40 overflow-y-auto p-2 border rounded-md">
+                {COUNTRY_OPTIONS.map((country) => (
+                  <label key={country.code} className="flex items-center gap-2 cursor-pointer text-sm">
+                    <input
+                      type="checkbox"
+                      checked={formData.target_countries.includes(country.code)}
+                      onChange={(e) => {
+                        if (e.target.checked) {
+                          setFormData(prev => ({ ...prev, target_countries: [...prev.target_countries, country.code] }));
+                        } else {
+                          setFormData(prev => ({ ...prev, target_countries: prev.target_countries.filter(c => c !== country.code) }));
+                        }
+                      }}
+                      className="rounded"
+                    />
+                    {country.name}
+                  </label>
+                ))}
+              </div>
+              {formData.target_countries.length > 0 && (
+                <p className="text-xs text-gray-500 mt-1">
+                  Selected: {formData.target_countries.map(c => COUNTRY_OPTIONS.find(o => o.code === c)?.name).join(', ')}
+                </p>
+              )}
+            </div>
+
             <Button 
               type="submit" 
               disabled={loading || uploading}
@@ -410,11 +455,20 @@ const AdsManagement = () => {
                     <div className="flex-1">
                       <h4 className="font-semibold">{ad.name}</h4>
                       <p className="text-sm text-gray-600 mt-1">{ad.about}</p>
-                      <div className="flex items-center gap-2 mt-1">
+                      <div className="flex items-center gap-2 mt-1 flex-wrap">
                         {ad.media_type === 'video' ? (
                           <span className="text-xs bg-blue-100 text-blue-600 px-2 py-0.5 rounded">Video</span>
                         ) : (
                           <span className="text-xs bg-green-100 text-green-600 px-2 py-0.5 rounded">Image</span>
+                        )}
+                        {ad.target_countries && ad.target_countries.length > 0 ? (
+                          <span className="text-xs bg-purple-100 text-purple-600 px-2 py-0.5 rounded">
+                            {ad.target_countries.length === 1 
+                              ? COUNTRY_OPTIONS.find(c => c.code === ad.target_countries[0])?.name || ad.target_countries[0]
+                              : `${ad.target_countries.length} countries`}
+                          </span>
+                        ) : (
+                          <span className="text-xs bg-gray-100 text-gray-600 px-2 py-0.5 rounded">All countries</span>
                         )}
                       </div>
                       {ad.link && (

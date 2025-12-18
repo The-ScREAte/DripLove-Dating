@@ -328,7 +328,7 @@ export default function BroadcastNotifications() {
     }
   };
 
-  const sendNotifications = async (retryFailed = false, existingCampaignId?: string) => {
+  const sendNotifications = async (retryFailed = false, existingCampaignId?: string, runInBackground = false) => {
     let recipientsToSend = Array.from(selectedUsers);
     
     if (!retryFailed && selectedUsers.size === 0) {
@@ -349,7 +349,28 @@ export default function BroadcastNotifications() {
       return;
     }
 
-    setIsSending(true);
+    // Store notification data before resetting form (for background processing)
+    const notificationTitleToSend = notificationTitle;
+    const notificationMessageToSend = notificationMessage;
+    const selectedCountriesArray = Array.from(selectedCountries);
+
+    // If running in background, show toast and reset form immediately
+    if (runInBackground) {
+      toast({
+        title: 'Broadcast Started',
+        description: `Sending notifications to ${recipientsToSend.length} users in the background. You can leave this page.`,
+        duration: 5000,
+      });
+      
+      // Reset form immediately so user can leave
+      setNotificationTitle('');
+      setNotificationMessage('');
+      setSelectedUsers(new Set());
+      setIsSending(false);
+    } else {
+      setIsSending(true);
+    }
+    
     setSendProgress({ sent: 0, total: recipientsToSend.length, failed: 0 });
 
     try {
@@ -363,10 +384,10 @@ export default function BroadcastNotifications() {
           .from('broadcast_campaigns')
           .insert({
             admin_id: user?.id,
-            title: notificationTitle,
-            message: notificationMessage,
+            title: notificationTitleToSend,
+            message: notificationMessageToSend,
             notification_type: 'system',
-            target_countries: Array.from(selectedCountries),
+            target_countries: selectedCountriesArray,
             total_recipients: recipientsToSend.length,
             successful_sends: 0,
             failed_sends: 0,
@@ -376,7 +397,9 @@ export default function BroadcastNotifications() {
 
         if (campaignError) throw campaignError;
         campaignId = campaign.id;
-        setCurrentCampaignId(campaignId);
+        if (!runInBackground) {
+          setCurrentCampaignId(campaignId);
+        }
 
         // Create recipient records
         const recipients = recipientsToSend.map(userId => ({
@@ -405,8 +428,8 @@ export default function BroadcastNotifications() {
             try {
               const { data, error } = await supabase.functions.invoke('send-push-notification', {
                 body: {
-                  title: notificationTitle,
-                  body: notificationMessage,
+                  title: notificationTitleToSend,
+                  body: notificationMessageToSend,
                   userId: userId,
                   type: 'system',
                   data: { action: 'open_discover' }
@@ -476,18 +499,20 @@ export default function BroadcastNotifications() {
         })
         .eq('id', campaignId);
 
-      setIsSending(false);
+      if (!runInBackground) {
+        setIsSending(false);
 
-      toast({
-        title: 'Notifications Sent',
-        description: `Successfully sent ${successCount} notifications. ${failureCount > 0 ? `${failureCount} failed.` : ''}`,
-        variant: successCount > 0 ? 'default' : 'destructive',
-      });
+        toast({
+          title: 'Notifications Sent',
+          description: `Successfully sent ${successCount} notifications. ${failureCount > 0 ? `${failureCount} failed.` : ''}`,
+          variant: successCount > 0 ? 'default' : 'destructive',
+        });
 
-      if (successCount > 0) {
-        setNotificationTitle('');
-        setNotificationMessage('');
-        setSelectedUsers(new Set());
+        if (successCount > 0) {
+          setNotificationTitle('');
+          setNotificationMessage('');
+          setSelectedUsers(new Set());
+        }
       }
       
       if (activeTab === 'history') {
@@ -495,12 +520,14 @@ export default function BroadcastNotifications() {
       }
     } catch (error) {
       console.error('Error sending notifications:', error);
-      toast({
-        title: 'Error',
-        description: 'Failed to process notification campaign',
-        variant: 'destructive',
-      });
-      setIsSending(false);
+      if (!runInBackground) {
+        toast({
+          title: 'Error',
+          description: 'Failed to process notification campaign',
+          variant: 'destructive',
+        });
+        setIsSending(false);
+      }
     }
   };
 
@@ -849,7 +876,7 @@ export default function BroadcastNotifications() {
                   </AlertDescription>
                 </Alert>
 
-                <div className="flex items-center justify-between pt-4 border-t">
+                <div className="flex items-center justify-between pt-4 border-t gap-2">
                   <div>
                     <p className="text-xs font-medium">
                       Sending to {selectedUsers.size} user{selectedUsers.size !== 1 ? 's' : ''}
@@ -858,23 +885,35 @@ export default function BroadcastNotifications() {
                       {selectedUsersWithTokens} will receive push notification
                     </p>
                   </div>
-                  <Button
-                    onClick={() => sendNotifications()}
-                    disabled={isSending || !notificationTitle.trim() || !notificationMessage.trim()}
-                    className="min-w-[140px] h-8 text-xs"
-                  >
-                    {isSending ? (
-                      <>
-                        <Loader2 className="w-3 h-3 mr-2 animate-spin" />
-                        Sending... {sendProgress.sent}/{sendProgress.total}
-                      </>
-                    ) : (
-                      <>
-                        <Send className="w-3 h-3 mr-2" />
-                        Send Notifications
-                      </>
-                    )}
-                  </Button>
+                  <div className="flex gap-2">
+                    <Button
+                      variant="outline"
+                      onClick={() => sendNotifications(false, undefined, true)}
+                      disabled={isSending || !notificationTitle.trim() || !notificationMessage.trim() || selectedUsers.size === 0}
+                      className="h-8 text-xs"
+                      title="Send in background - you can leave this page"
+                    >
+                      <Send className="w-3 h-3 mr-1" />
+                      Send & Leave
+                    </Button>
+                    <Button
+                      onClick={() => sendNotifications()}
+                      disabled={isSending || !notificationTitle.trim() || !notificationMessage.trim() || selectedUsers.size === 0}
+                      className="min-w-[140px] h-8 text-xs"
+                    >
+                      {isSending ? (
+                        <>
+                          <Loader2 className="w-3 h-3 mr-2 animate-spin" />
+                          Sending... {sendProgress.sent}/{sendProgress.total}
+                        </>
+                      ) : (
+                        <>
+                          <Send className="w-3 h-3 mr-2" />
+                          Send & Wait
+                        </>
+                      )}
+                    </Button>
+                  </div>
                 </div>
 
                 {isSending && (

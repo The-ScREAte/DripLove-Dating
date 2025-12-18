@@ -1,12 +1,13 @@
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
+import { Capacitor } from '@capacitor/core';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
-import { LogOut, AlertTriangle, Mail } from 'lucide-react';
+import { LogOut, AlertTriangle, Mail, Loader2 } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import RateAppButton from '@/components/RateAppButton';
@@ -25,15 +26,44 @@ interface AccountActionsProps {
   onLanguageChange?: (language: string) => void;
 }
 
+type AuthProvider = 'email' | 'google' | 'apple' | 'unknown';
+
 const AccountActions = ({ currentUser, onLogout, onShowTerms, onShowPrivacy, hideLogoutTermsPrivacy, preferredLanguage, onLanguageChange }: AccountActionsProps) => {
   const { t } = useTranslation();
   const [deletingAccount, setDeletingAccount] = useState(false);
   const [showPasswordDialog, setShowPasswordDialog] = useState(false);
   const [password, setPassword] = useState('');
   const [passwordError, setPasswordError] = useState('');
+  const [authProvider, setAuthProvider] = useState<AuthProvider>('unknown');
+  const [isReauthenticating, setIsReauthenticating] = useState(false);
   const { toast } = useToast();
   const { isPremium, subscriptionStatus, loading } = useEnhancedSubscription();
   const navigate = useNavigate();
+  
+  const isNativePlatform = Capacitor.isNativePlatform();
+
+  // Determine auth provider on mount
+  useEffect(() => {
+    const checkAuthProvider = async () => {
+      try {
+        const { data: { user } } = await supabase.auth.getUser();
+        if (user) {
+          const provider = user.app_metadata?.provider || 'email';
+          if (provider === 'google') {
+            setAuthProvider('google');
+          } else if (provider === 'apple') {
+            setAuthProvider('apple');
+          } else {
+            setAuthProvider('email');
+          }
+        }
+      } catch (error) {
+        console.error('Error checking auth provider:', error);
+        setAuthProvider('email'); // Default to email
+      }
+    };
+    checkAuthProvider();
+  }, []);
 
   const handleLogout = async () => {
     try {
@@ -60,29 +90,115 @@ const AccountActions = ({ currentUser, onLogout, onShowTerms, onShowPrivacy, hid
     setPasswordError('');
   };
 
+  // Handle OAuth re-authentication for native platforms
+  const handleOAuthReauth = async (): Promise<boolean> => {
+    setIsReauthenticating(true);
+    setPasswordError('');
+    
+    try {
+      if (authProvider === 'google' && isNativePlatform) {
+        // Use native Google Sign-In for re-authentication
+        const { signInWithGoogleNative, signOutGoogleNative } = await import('@/utils/googleNativeAuth');
+        
+        try {
+          await signOutGoogleNative();
+        } catch (e) {
+          // Ignore signout errors
+        }
+        
+        const result = await signInWithGoogleNative();
+        
+        if (!result?.user) {
+          setPasswordError('Google authentication failed. Please try again.');
+          return false;
+        }
+        
+        // Verify it's the same user
+        if (result.user.email !== currentUser.email) {
+          setPasswordError('Please sign in with the same Google account you used to create this account.');
+          await supabase.auth.signOut();
+          return false;
+        }
+        
+        return true;
+      } else if (authProvider === 'apple' && isNativePlatform) {
+        // Use native Apple Sign-In for re-authentication
+        const { SignInWithApple } = await import('@capacitor-community/apple-sign-in');
+        
+        const result = await SignInWithApple.authorize({
+          clientId: 'com.driplove.dating',
+          redirectURI: 'https://tgjsyyihabsovironesw.supabase.co/auth/v1/callback',
+          scopes: 'email name',
+        });
+        
+        if (!result?.response?.identityToken) {
+          setPasswordError('Apple authentication failed. Please try again.');
+          return false;
+        }
+        
+        // Re-authenticate with Supabase using the Apple token
+        const { error } = await supabase.auth.signInWithIdToken({
+          provider: 'apple',
+          token: result.response.identityToken,
+        });
+        
+        if (error) {
+          setPasswordError('Re-authentication failed. Please try again.');
+          return false;
+        }
+        
+        return true;
+      }
+      
+      return false;
+    } catch (error: any) {
+      console.error('OAuth re-auth error:', error);
+      setPasswordError(error.message || 'Authentication failed. Please try again.');
+      return false;
+    } finally {
+      setIsReauthenticating(false);
+    }
+  };
+
   const handleDeleteAccount = async () => {
-    if (!password.trim()) {
-      setPasswordError('Password is required');
-      return;
+    // For email users, require password
+    if (authProvider === 'email') {
+      if (!password.trim()) {
+        setPasswordError('Password is required');
+        return;
+      }
     }
 
     setDeletingAccount(true);
     setPasswordError('');
     
     try {
-      // First verify the password by attempting to reauthenticate
-      const { error: authError } = await supabase.auth.signInWithPassword({
-        email: currentUser.email,
-        password: password,
-      });
+      // Re-authenticate based on provider
+      if (authProvider === 'email') {
+        // Email/password re-authentication
+        const { error: authError } = await supabase.auth.signInWithPassword({
+          email: currentUser.email,
+          password: password,
+        });
 
-      if (authError) {
-        setPasswordError('Incorrect password');
-        setDeletingAccount(false);
-        return;
+        if (authError) {
+          setPasswordError('Incorrect password');
+          setDeletingAccount(false);
+          return;
+        }
+      } else if (isNativePlatform && (authProvider === 'google' || authProvider === 'apple')) {
+        // Native OAuth re-authentication
+        const success = await handleOAuthReauth();
+        if (!success) {
+          setDeletingAccount(false);
+          return;
+        }
+      } else {
+        // Web OAuth users - just proceed (Supabase session should still be valid)
+        // For web, we trust the existing session
       }
 
-      // If password is correct, first delete face from AWS Rekognition
+      // If re-auth is successful, delete face from AWS Rekognition
       try {
         const { data: profile } = await supabase
           .from('profiles')
@@ -125,7 +241,7 @@ const AccountActions = ({ currentUser, onLogout, onShowTerms, onShowPrivacy, hid
       await supabase.auth.signOut();
       onLogout();
     } catch (error: any) {
-  // ...removed log...
+      console.error('Delete account error:', error);
       toast({
         title: "Error",
         description: "Failed to delete account. Please try again.",
@@ -276,31 +392,50 @@ const AccountActions = ({ currentUser, onLogout, onShowTerms, onShowPrivacy, hid
           </AlertDialog>
         </div>
 
-        {/* Password Confirmation Dialog */}
+        {/* Password/OAuth Confirmation Dialog */}
         <Dialog open={showPasswordDialog} onOpenChange={setShowPasswordDialog}>
           <DialogContent className="sm:max-w-md">
             <DialogHeader>
               <DialogTitle>Confirm Account Deletion</DialogTitle>
               <DialogDescription>
-                Please enter your password to confirm you want to delete your account permanently.
+                {authProvider === 'email' 
+                  ? 'Please enter your password to confirm you want to delete your account permanently.'
+                  : authProvider === 'google'
+                  ? 'Please sign in with Google to confirm you want to delete your account permanently.'
+                  : authProvider === 'apple'
+                  ? 'Please sign in with Apple to confirm you want to delete your account permanently.'
+                  : 'Please confirm you want to delete your account permanently.'}
               </DialogDescription>
             </DialogHeader>
             <div className="space-y-4">
-              <div>
-                <Input
-                  type="password"
-                  placeholder="Enter your password"
-                  value={password}
-                  onChange={(e) => {
-                    setPassword(e.target.value);
-                    setPasswordError('');
-                  }}
-                  className={passwordError ? 'border-red-500' : ''}
-                />
-                {passwordError && (
-                  <p className="text-red-500 text-sm mt-1">{passwordError}</p>
-                )}
-              </div>
+              {authProvider === 'email' ? (
+                <div>
+                  <Input
+                    type="password"
+                    placeholder="Enter your password"
+                    value={password}
+                    onChange={(e) => {
+                      setPassword(e.target.value);
+                      setPasswordError('');
+                    }}
+                    className={passwordError ? 'border-red-500' : ''}
+                  />
+                  {passwordError && (
+                    <p className="text-red-500 text-sm mt-1">{passwordError}</p>
+                  )}
+                </div>
+              ) : (
+                <div className="text-center py-4">
+                  <p className="text-sm text-gray-600 mb-2">
+                    {isNativePlatform 
+                      ? `Tap "Delete Account" to sign in with ${authProvider === 'google' ? 'Google' : 'Apple'} and confirm deletion.`
+                      : 'Click "Delete Account" to confirm deletion.'}
+                  </p>
+                  {passwordError && (
+                    <p className="text-red-500 text-sm mt-1">{passwordError}</p>
+                  )}
+                </div>
+              )}
             </div>
             <DialogFooter>
               <Button 
@@ -310,16 +445,21 @@ const AccountActions = ({ currentUser, onLogout, onShowTerms, onShowPrivacy, hid
                   setPassword('');
                   setPasswordError('');
                 }}
-                disabled={deletingAccount}
+                disabled={deletingAccount || isReauthenticating}
               >
                 Cancel
               </Button>
               <Button 
                 variant="destructive" 
                 onClick={handleDeleteAccount}
-                disabled={deletingAccount || !password.trim()}
+                disabled={deletingAccount || isReauthenticating || (authProvider === 'email' && !password.trim())}
               >
-                {deletingAccount ? 'Deleting...' : 'Delete Account'}
+                {deletingAccount || isReauthenticating ? (
+                  <>
+                    <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                    {isReauthenticating ? 'Verifying...' : 'Deleting...'}
+                  </>
+                ) : 'Delete Account'}
               </Button>
             </DialogFooter>
           </DialogContent>

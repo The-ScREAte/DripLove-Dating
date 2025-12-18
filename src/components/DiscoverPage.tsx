@@ -70,6 +70,7 @@ interface AdData {
   about: string;
   link: string | null;
   link_as: string | null;
+  target_countries?: string[];
   isAd: true; // Mark this as an ad
 }
 
@@ -199,6 +200,11 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, isPremium }: DiscoverPage
   // Fetch ads from database - load them BEFORE fetching profiles
   const [adsLoaded, setAdsLoaded] = useState(false);
   
+  // Get user's country code for filtering ads
+  const userCountryCode = useMemo(() => {
+    return currentUser?.country_code || '';
+  }, [currentUser?.country_code]);
+  
   useEffect(() => {
     const fetchAds = async () => {
       try {
@@ -209,8 +215,17 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, isPremium }: DiscoverPage
 
         if (error) throw error;
 
+        // Filter ads by user's country - show ad if target_countries is empty OR includes user's country
+        const filteredAds = (data || []).filter((ad: any) => {
+          const targetCountries = ad.target_countries || [];
+          // If no target countries specified, show to everyone
+          if (targetCountries.length === 0) return true;
+          // Otherwise, only show if user's country is in the list
+          return userCountryCode && targetCountries.includes(userCountryCode);
+        });
+
         // Mark ads with isAd property
-        const adsWithMarker: AdData[] = (data || []).map(ad => ({
+        const adsWithMarker: AdData[] = filteredAds.map((ad: any) => ({
           ...ad,
           isAd: true as const
         }));
@@ -224,7 +239,7 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, isPremium }: DiscoverPage
     };
 
     fetchAds();
-  }, []);
+  }, [userCountryCode]);
 
   // Ensure currentIndex stays valid when potentialMatches array changes
   useEffect(() => {
