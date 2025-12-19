@@ -448,16 +448,23 @@ const AccountActions = ({ currentUser, onLogout, onShowTerms, onShowPrivacy, hid
             <AlertDialogContent className="sm:max-w-lg">
               <AlertDialogHeader>
                 <AlertDialogTitle>Delete Account</AlertDialogTitle>
-                <AlertDialogDescription>
-                  Are you sure you want to permanently delete your account? This action will:
-                  <ul className="list-disc ml-6 mt-2 space-y-1">
-                    <li>Delete your profile and all personal information</li>
-                    <li>Remove all your photos</li>
-                    <li>Delete all your matches and conversations</li>
-                    <li>Remove all likes given and received</li>
-                  </ul>
-                  <br />
-                  <strong>This action cannot be undone and your profile won't exist anymore.</strong>
+                <AlertDialogDescription asChild>
+                  <div>
+                    <p>
+                      Are you sure you want to permanently delete your account? This action will:
+                    </p>
+                    <ul className="list-disc ml-6 mt-2 space-y-1">
+                      <li>Delete your profile and all personal information</li>
+                      <li>Remove all your photos</li>
+                      <li>Delete all your matches and conversations</li>
+                      <li>Remove all likes given and received</li>
+                    </ul>
+                    <p className="mt-2">
+                      <strong>
+                        This action cannot be undone and your profile won't exist anymore.
+                      </strong>
+                    </p>
+                  </div>
                 </AlertDialogDescription>
               </AlertDialogHeader>
               <AlertDialogFooter>

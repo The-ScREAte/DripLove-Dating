@@ -99,20 +99,19 @@ export function initGoogleIAP() {
             }
           })
           .approved(async (t: any) => {
-            console.log('[Google IAP] Transaction approved:', t.productId);
-            
-            if (window.googleIapPurchaseInitiated) {
-              if (t.verify && typeof t.verify === 'function') {
-                t.verify();
-              }
-            } else {
-              if (t.finish && typeof t.finish === 'function') {
-                t.finish();
-              }
+            console.log('[Google IAP] Transaction approved:', t?.productId);
+
+            // On many Android configurations, `.verified()` is not reliably emitted
+            // (e.g., when no validator is configured). If we only activate premium
+            // in `.verified()`, the user never gets premium.
+            //
+            // To match the working Apple/Paystack behavior (DB updated -> UI sees premium),
+            // activate premium here for user-initiated purchases.
+            if (!window.googleIapPurchaseInitiated) {
+              if (t?.finish && typeof t.finish === 'function') t.finish();
+              return;
             }
-          })
-          .verified(async (r: any) => {
-            console.log('[Google IAP] Purchase verified:', r.productId);
+
             window.googleIapPurchaseInitiated = false;
 
             try {
@@ -121,37 +120,47 @@ export function initGoogleIAP() {
 
               if (user) {
                 const expiryDate = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000);
-                // Store purchaseToken for webhook matching - this is critical!
-                const purchaseToken = r.purchaseToken || r.transactionId || r.productId || null;
-                
-                const subscriptionData = {
-                  user_id: user.id,
-                  plan_name: 'premium',
-                  status: 'active',
-                  flutterwave_transaction_id: purchaseToken, // Store purchaseToken for webhook
-                  starts_at: new Date().toISOString(),
-                  expires_at: expiryDate.toISOString(),
-                  next_billing_date: expiryDate.toISOString(),
-                  auto_renew: true,
-                  payment_method: 'google',
-                  payment_attempts: 0,
-                  updated_at: new Date().toISOString(),
-                };
+
+                const purchaseToken =
+                  t?.purchaseToken ||
+                  t?.transactionId ||
+                  t?.id ||
+                  t?.nativePurchase?.purchaseToken ||
+                  t?.productId ||
+                  null;
 
                 await supabase
                   .from('user_subscriptions')
-                  .upsert(subscriptionData, { onConflict: 'user_id' });
+                  .upsert({
+                    user_id: user.id,
+                    plan_name: 'premium',
+                    status: 'active',
+                    flutterwave_transaction_id: purchaseToken,
+                    starts_at: new Date().toISOString(),
+                    expires_at: expiryDate.toISOString(),
+                    next_billing_date: expiryDate.toISOString(),
+                    auto_renew: true,
+                    payment_method: 'google',
+                    payment_attempts: 0,
+                    updated_at: new Date().toISOString(),
+                  }, { onConflict: 'user_id' });
 
                 console.log('[Google IAP] Premium activated for user:', user.id);
-                console.log('[Google IAP] Stored purchase token:', purchaseToken?.substring(0, 20) + '...');
                 window.location.href = '/payment-success?status=successful&payment_type=iap';
               }
             } catch (error) {
-              console.error('[Google IAP] Error processing verified receipt:', error);
+              console.error('[Google IAP] Error activating premium on approved:', error);
               alert('Payment processing failed. Please try again or contact support.');
+            } finally {
+              if (t?.finish && typeof t.finish === 'function') t.finish();
             }
+          })
+          .verified(async (r: any) => {
+            // Keep handler for completeness; some environments may still emit verified.
+            // We do not rely on it for entitlement activation.
+            console.log('[Google IAP] Purchase verified:', r?.productId);
 
-            if (r.finish && typeof r.finish === 'function') {
+            if (r?.finish && typeof r.finish === 'function') {
               r.finish();
             }
           })
