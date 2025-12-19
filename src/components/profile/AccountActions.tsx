@@ -46,6 +46,7 @@ const AccountActions = ({ currentUser, onLogout, onShowTerms, onShowPrivacy, hid
   const navigate = useNavigate();
   
   const isNativePlatform = Capacitor.isNativePlatform();
+  const isAndroidNative = isNativePlatform && Capacitor.getPlatform() === 'android';
 
   // Determine auth provider on mount
   useEffect(() => {
@@ -323,10 +324,10 @@ const AccountActions = ({ currentUser, onLogout, onShowTerms, onShowPrivacy, hid
 
   return (
     <Card>
-      <CardHeader>
-        <CardTitle>{t('profile.accountActions')}</CardTitle>
+      <CardHeader className={isAndroidNative ? 'p-4' : undefined}>
+        <CardTitle className={isAndroidNative ? 'text-xl' : undefined}>{t('profile.accountActions')}</CardTitle>
       </CardHeader>
-      <CardContent className="space-y-4">
+      <CardContent className={isAndroidNative ? 'p-4 pt-0 space-y-3' : 'space-y-4'}>
         {/* Language Selector */}
         {preferredLanguage && onLanguageChange && (
           <div className="bg-gray-50 p-4 rounded-lg border">
@@ -343,7 +344,7 @@ const AccountActions = ({ currentUser, onLogout, onShowTerms, onShowPrivacy, hid
         <div className="bg-yellow-50 p-4 rounded-lg border border-yellow-200">
           <div className="flex flex-col space-y-3">
             <span className="font-medium text-gray-900">{t('settings.enjoyingDripLove')}</span>
-            <p className="text-sm text-gray-600">
+            <p className={isAndroidNative ? 'text-xs text-gray-600' : 'text-sm text-gray-600'}>
               {t('settings.rateExperience')}
             </p>
             <RateAppButton className="w-full sm:w-auto" />
@@ -360,13 +361,14 @@ const AccountActions = ({ currentUser, onLogout, onShowTerms, onShowPrivacy, hid
           {/* Live Chat Button */}
           <Button
             onClick={() => setShowLiveChat(true)}
-            className="w-full mb-3 bg-gradient-to-r from-pink-500 to-purple-600 hover:from-pink-600 hover:to-purple-700 text-white font-medium"
+            size={isAndroidNative ? 'sm' : 'default'}
+            className={`w-full mb-3 bg-gradient-to-r from-pink-500 to-purple-600 hover:from-pink-600 hover:to-purple-700 text-white font-medium ${isAndroidNative ? 'text-xs' : ''}`}
           >
             <MessageCircle className="w-4 h-4 mr-2" />
-            💬 Live Chat - Get Instant Help!
+            Live Chat
           </Button>
           
-          <p className="text-sm text-gray-600 mb-2">
+          <p className={isAndroidNative ? 'text-xs text-gray-600 mb-2' : 'text-sm text-gray-600 mb-2'}>
             {t('settings.contactSupport')}
           </p>
           <a 
@@ -385,7 +387,7 @@ const AccountActions = ({ currentUser, onLogout, onShowTerms, onShowPrivacy, hid
           <>
             {(onShowTerms || onShowPrivacy) && (
               <div className="bg-gray-50 p-4 rounded-lg border">
-                <div className="flex flex-wrap justify-center gap-4 text-sm">
+                <div className={isAndroidNative ? 'flex flex-wrap justify-center gap-3 text-xs' : 'flex flex-wrap justify-center gap-4 text-sm'}>
                   {onShowTerms && (
                     <button 
                       onClick={onShowTerms}
@@ -412,7 +414,8 @@ const AccountActions = ({ currentUser, onLogout, onShowTerms, onShowPrivacy, hid
               <Button 
                 onClick={handleLogout}
                 variant="outline"
-                className="flex items-center justify-center space-x-2 border-gray-300 text-gray-700 hover:bg-gray-50 w-full sm:w-auto"
+                size={isAndroidNative ? 'sm' : 'default'}
+                className={`flex items-center justify-center space-x-2 border-gray-300 text-gray-700 hover:bg-gray-50 w-full sm:w-auto ${isAndroidNative ? 'text-xs' : ''}`}
               >
                 <LogOut className="w-4 h-4" />
                 <span>{t('common.logout')}</span>
@@ -426,7 +429,8 @@ const AccountActions = ({ currentUser, onLogout, onShowTerms, onShowPrivacy, hid
           <div className="flex flex-col sm:flex-row gap-4 mt-4">
             <Button
               variant="outline"
-              className="flex items-center justify-center space-x-2 w-full sm:w-auto border-red-400 text-red-600 hover:bg-red-50"
+              size={isAndroidNative ? 'sm' : 'default'}
+              className={`flex items-center justify-center space-x-2 w-full sm:w-auto border-red-400 text-red-600 hover:bg-red-50 ${isAndroidNative ? 'text-xs' : ''}`}
               onClick={() => navigate('/unsubscribe')}
             >
               {t('settings.cancelSubscription')}
@@ -439,7 +443,8 @@ const AccountActions = ({ currentUser, onLogout, onShowTerms, onShowPrivacy, hid
             <AlertDialogTrigger asChild>
               <Button 
                 variant="destructive"
-                className="flex items-center justify-center space-x-2 w-full sm:w-auto"
+                size={isAndroidNative ? 'sm' : 'default'}
+                className={`flex items-center justify-center space-x-2 w-full sm:w-auto ${isAndroidNative ? 'text-xs' : ''}`}
               >
                 <AlertTriangle className="w-4 h-4" />
                 <span>Delete Account</span>
