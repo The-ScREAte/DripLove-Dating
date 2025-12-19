@@ -27,22 +27,44 @@ export const useSubscription = (userId: string | undefined) => {
   const { toast } = useToast();
 
   const fetchSubscription = async () => {
-    if (!userId) return;
+    if (!userId) {
+      setLoading(false);
+      return;
+    }
 
     try {
+      // Check if user is authenticated first
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) {
+        setLoading(false);
+        return;
+      }
+
       // Use real-time subscription status checker
       const { data, error } = await supabase.rpc('get_current_subscription_status', {
         p_user_id: userId
       });
 
       if (error) {
-        console.error('Error fetching real-time subscription status:', error);
-        // Fallback to old method
+        // Fallback to old method silently
         const { data: fallbackData, error: fallbackError } = await supabase.rpc('get_user_subscription', {
           user_id_param: userId
         });
         
-        if (fallbackError) throw fallbackError;
+        if (fallbackError) {
+          // Set default free subscription
+          setSubscription({
+            plan_name: 'free',
+            status: 'active',
+            expires_at: null,
+            features: {
+              daily_swipes: 20,
+              reverse_dislikes: 1,
+              liked_me_visible: 1
+            }
+          });
+          return;
+        }
         
         const subscriptionData = fallbackData as unknown as SubscriptionInfo;
         setSubscription(subscriptionData);

@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Capacitor } from '@capacitor/core';
@@ -7,11 +6,12 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
-import { LogOut, AlertTriangle, Mail, Loader2 } from 'lucide-react';
+import { LogOut, AlertTriangle, Loader2 } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import RateAppButton from '@/components/RateAppButton';
 import LanguageSelector from '@/components/LanguageSelector';
+import LiveChatFAQ from '@/components/profile/LiveChatFAQ';
 
 import { useEnhancedSubscription } from '@/hooks/useEnhancedSubscription';
 import { useNavigate } from 'react-router-dom';
@@ -282,22 +282,8 @@ const AccountActions = ({ currentUser, onLogout, onShowTerms, onShowPrivacy, hid
           </div>
         </div>
 
-        {/* Support Email */}
-        <div className="bg-gray-50 p-4 rounded-lg border">
-          <div className="flex items-center space-x-2 mb-2">
-            <Mail className="w-4 h-4 text-pink-600" />
-            <span className="font-medium text-gray-700">{t('settings.needHelp')}</span>
-          </div>
-          <p className="text-sm text-gray-600 mb-2">
-            {t('settings.contactSupport')}
-          </p>
-          <a 
-            href="mailto:driploveinfo@gmail.com" 
-            className="text-blue-600 hover:text-blue-800 underline"
-          >
-            driploveinfo@gmail.com
-          </a>
-        </div>
+        {/* Live Chat FAQ */}
+        <LiveChatFAQ />
 
         {/* Legal Links and Logout only if not hidden by prop */}
         {!hideLogoutTermsPrivacy && (
