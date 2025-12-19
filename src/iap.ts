@@ -1,4 +1,9 @@
 import 'cordova-plugin-purchase';
+import { Capacitor } from '@capacitor/core';
+
+// Detect platform
+const isAndroid = () => Capacitor.isNativePlatform() && Capacitor.getPlatform() === 'android';
+const isIOS = () => Capacitor.isNativePlatform() && Capacitor.getPlatform() === 'ios';
 
 export function initIAP() {
   return new Promise<void>((resolve, reject) => {
@@ -46,11 +51,15 @@ export function initIAP() {
       'com.driplove.dating.premium.monthlysub2'   // older one (fallback)
     ];
 
-    // 2️⃣ Register all of them with the store
+    // Determine platform for registration
+    const currentPlatform = isAndroid() ? Platform.GOOGLE_PLAY : Platform.APPLE_APPSTORE;
+    console.log('[IAP] Registering products for platform:', isAndroid() ? 'GOOGLE_PLAY' : 'APPLE_APPSTORE');
+
+    // 2️⃣ Register all of them with the store for the correct platform
     if (store.register && typeof store.register === 'function') {
       store.register(PRODUCT_IDS.map(id => ({
         id,
-        platform: Platform.APPLE_APPSTORE,
+        platform: currentPlatform,
         type: ProductType.PAID_SUBSCRIPTION
       })));
     } else {
@@ -111,6 +120,9 @@ export function initIAP() {
             const { supabase } = await import('@/integrations/supabase/client');
             const { data: { user } } = await supabase.auth.getUser();
             
+            // Determine payment method based on platform
+            const paymentMethod = isAndroid() ? 'google' : 'apple';
+            
             if (user) {
               // Get receipt data from the transaction
               const receiptData = r.receipt || r.payload || r.transactionReceipt;
@@ -121,12 +133,17 @@ export function initIAP() {
                   setTimeout(() => reject(new Error('Receipt validation timeout')), 25000);
                 });
                 
+                // Choose the correct validator based on platform
+                const validatorFunction = isAndroid() ? 'google-iap-validator' : 'iap-receipt-validator';
+                
                 // Race between validation and timeout
-                const validationPromise = supabase.functions.invoke('iap-receipt-validator', {
+                const validationPromise = supabase.functions.invoke(validatorFunction, {
                   body: {
                     receiptData: receiptData,
                     productId: r.productId,
-                    userId: user.id
+                    userId: user.id,
+                    purchaseToken: r.purchaseToken || r.transactionId, // Google uses purchaseToken
+                    transactionId: r.transactionId
                   }
                 });
 
@@ -149,12 +166,12 @@ export function initIAP() {
                     user_id: user.id,
                     plan_name: 'premium',
                     status: 'active',
-                    flutterwave_transaction_id: r.productId || null,
+                    flutterwave_transaction_id: r.transactionId || r.productId || null,
                     starts_at: new Date().toISOString(),
                     expires_at: expiryDate.toISOString(),
                     next_billing_date: expiryDate.toISOString(),
                     auto_renew: true,
-                    payment_method: 'apple',
+                    payment_method: paymentMethod,
                     payment_attempts: 0,
                     updated_at: new Date().toISOString(),
                   };
@@ -185,18 +202,19 @@ export function initIAP() {
                 }
               } else {
                 // Fallback: Direct database update if no receipt data available
+                console.log('[IAP] No receipt data, using direct database update');
                 
                 const expiryDate = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000);
                 const subscriptionData = {
                   user_id: user.id,
                   plan_name: 'premium',
                   status: 'active',
-                  flutterwave_transaction_id: r.productId || null,
+                  flutterwave_transaction_id: r.transactionId || r.productId || null,
                   starts_at: new Date().toISOString(),
                   expires_at: expiryDate.toISOString(),
                   next_billing_date: expiryDate.toISOString(),
                   auto_renew: true,
-                  payment_method: 'apple',
+                  payment_method: paymentMethod,
                   payment_attempts: 0, // Reset payment attempts
                   updated_at: new Date().toISOString(),
                 };
@@ -258,10 +276,16 @@ export function initIAP() {
         });
     }
 
-    // 4) Initialize AFTER register, then refresh
+    // 4) Initialize AFTER register, then refresh - use correct platform
     if (store.initialize && typeof store.initialize === 'function') {
       try {
-        store.initialize([{ platform: Platform.APPLE_APPSTORE, options: { needAppReceipt: true } }]);
+        // Initialize for the correct platform
+        const initPlatform = isAndroid() ? Platform.GOOGLE_PLAY : Platform.APPLE_APPSTORE;
+        const initOptions = isAndroid() 
+          ? { platform: initPlatform }
+          : { platform: initPlatform, options: { needAppReceipt: true } };
+        
+        store.initialize([initOptions]);
         
         // Add a ready state handler to clear timeout and resolve promise
         if (store.ready && typeof store.ready === 'function') {

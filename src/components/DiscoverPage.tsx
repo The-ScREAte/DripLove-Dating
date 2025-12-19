@@ -562,7 +562,8 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, isPremium }: DiscoverPage
       { data: currentUserData },
       { data: likedUsers },
       { data: blockedUsers },
-      { data: recentPasses }
+      { data: recentPasses },
+      { data: usersWhoLikedMe } // ⭐ NEW: Fetch users who have liked the current user
     ] = await Promise.all([
       supabase
         .from('profiles')
@@ -581,12 +582,25 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, isPremium }: DiscoverPage
         .from('passes')
         .select('passed_id, passed_at')
         .match({ passer_id: userId })
-        .gte('passed_at', new Date(Date.now() - 192 * 60 * 60 * 1000).toISOString()) // 8 days
+        .gte('passed_at', new Date(Date.now() - 192 * 60 * 60 * 1000).toISOString()), // 8 days
+      // ⭐ Fetch users who liked the current user (for priority placement)
+      supabase
+        .from('likes')
+        .select('liker_id, created_at')
+        .eq('liked_id', userId)
+        .order('created_at', { ascending: false })
+        .limit(50) // Get up to 50 recent likers
     ]);
 
     const likedUserIds = likedUsers?.map(like => like.liked_id) || [];
     const blockedUserIds = blockedUsers?.flatMap(block => [block.blocked_id, block.blocker_id]) || [];
     const passedUserIds = recentPasses?.map(p => p.passed_id) || [];
+    
+    // ⭐ NEW: Get IDs of users who liked me (excluding those I've already interacted with)
+    const usersWhoLikedMeIds = (usersWhoLikedMe || [])
+      .map(like => like.liker_id)
+      .filter(id => !likedUserIds.includes(id) && !blockedUserIds.includes(id) && !passedUserIds.includes(id));
+    
     // ⭐ CRITICAL: Exclude locally swiped IDs, filtering out passed profiles older than 8 days
     const now = Date.now();
     const eightDaysMs = 8 * 24 * 60 * 60 * 1000;
@@ -599,6 +613,9 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, isPremium }: DiscoverPage
       })
       .map(([id, _]) => id);
     const excludedIds = [...likedUserIds, ...blockedUserIds, ...passedUserIds, ...locallySwipedIds, userId];
+    
+    // ⭐ Filter priority likers to only those not already swiped on locally
+    const priorityLikerIds = usersWhoLikedMeIds.filter(id => !locallySwipedIds.includes(id));
     
     const userMaxDistance = currentUserData?.max_distance || currentUserData?.distance_preference || 50;
     // Fix: Match the correct values stored in database ('male', 'female', 'everyone')
@@ -783,6 +800,42 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, isPremium }: DiscoverPage
       } catch (error) {
         // Ignore localStorage errors
       }
+    }
+
+    // ⭐ PRIORITY LIKERS: Inject users who liked the current user at strategic positions
+    // Show 2 priority likers per every 20 profiles (positions ~5 and ~15 in each batch of 20)
+    if (priorityLikerIds.length > 0) {
+      // Get profile data for priority likers that are in our shuffled list
+      const priorityProfiles = shuffled.filter(p => priorityLikerIds.includes(p.id));
+      
+      // Remove priority profiles from their current positions
+      const nonPriorityProfiles = shuffled.filter(p => !priorityLikerIds.includes(p.id));
+      
+      // Inject priority likers at strategic positions: 2 per every 20 profiles
+      // Position them at ~5 and ~15 within each batch of 20 for natural discovery
+      const finalProfiles: typeof shuffled = [];
+      let priorityIndex = 0;
+      
+      for (let i = 0; i < nonPriorityProfiles.length; i++) {
+        // Calculate position within a batch of 20
+        const positionInBatch = i % 20;
+        
+        // Insert a priority liker at positions 5 and 15 in each batch (if available)
+        if ((positionInBatch === 5 || positionInBatch === 15) && priorityIndex < priorityProfiles.length) {
+          finalProfiles.push(priorityProfiles[priorityIndex]);
+          priorityIndex++;
+        }
+        
+        finalProfiles.push(nonPriorityProfiles[i]);
+      }
+      
+      // Add any remaining priority profiles at the end if we didn't place them all
+      while (priorityIndex < priorityProfiles.length) {
+        finalProfiles.push(priorityProfiles[priorityIndex]);
+        priorityIndex++;
+      }
+      
+      shuffled = finalProfiles;
     }
 
     // Load last profile ID and time from localStorage
