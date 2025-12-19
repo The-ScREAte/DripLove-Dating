@@ -6,12 +6,12 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
-import { LogOut, AlertTriangle, Loader2 } from 'lucide-react';
+import { LogOut, AlertTriangle, Mail, Loader2, MessageCircle } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import RateAppButton from '@/components/RateAppButton';
 import LanguageSelector from '@/components/LanguageSelector';
-import LiveChatFAQ from '@/components/profile/LiveChatFAQ';
+import LiveChat from '@/components/LiveChat';
 
 import { useEnhancedSubscription } from '@/hooks/useEnhancedSubscription';
 import { useNavigate } from 'react-router-dom';
@@ -36,6 +36,11 @@ const AccountActions = ({ currentUser, onLogout, onShowTerms, onShowPrivacy, hid
   const [passwordError, setPasswordError] = useState('');
   const [authProvider, setAuthProvider] = useState<AuthProvider>('unknown');
   const [isReauthenticating, setIsReauthenticating] = useState(false);
+  const [verificationCode, setVerificationCode] = useState('');
+  const [emailForVerification, setEmailForVerification] = useState('');
+  const [codeSent, setCodeSent] = useState(false);
+  const [sendingCode, setSendingCode] = useState(false);
+  const [showLiveChat, setShowLiveChat] = useState(false);
   const { toast } = useToast();
   const { isPremium, subscriptionStatus, loading } = useEnhancedSubscription();
   const navigate = useNavigate();
@@ -88,6 +93,47 @@ const AccountActions = ({ currentUser, onLogout, onShowTerms, onShowPrivacy, hid
     setShowPasswordDialog(true);
     setPassword('');
     setPasswordError('');
+    setVerificationCode('');
+    setEmailForVerification('');
+    setCodeSent(false);
+  };
+
+  // Send verification code to email for web OAuth users
+  const handleSendVerificationCode = async () => {
+    if (!emailForVerification.trim()) {
+      setPasswordError('Please enter your email address');
+      return;
+    }
+
+    if (emailForVerification.toLowerCase() !== currentUser.email.toLowerCase()) {
+      setPasswordError('Email does not match your account');
+      return;
+    }
+
+    setSendingCode(true);
+    setPasswordError('');
+
+    try {
+      const { error } = await supabase.auth.signInWithOtp({
+        email: emailForVerification,
+        options: {
+          shouldCreateUser: false,
+        },
+      });
+
+      if (error) throw error;
+
+      setCodeSent(true);
+      toast({
+        title: 'Verification code sent',
+        description: 'Please check your email for the verification code.',
+      });
+    } catch (error: any) {
+      console.error('Error sending verification code:', error);
+      setPasswordError('Failed to send verification code. Please try again.');
+    } finally {
+      setSendingCode(false);
+    }
   };
 
   // Handle OAuth re-authentication for native platforms
@@ -169,6 +215,18 @@ const AccountActions = ({ currentUser, onLogout, onShowTerms, onShowPrivacy, hid
       }
     }
 
+    // For web OAuth users (Google/Apple), require verification code
+    if (!isNativePlatform && (authProvider === 'google' || authProvider === 'apple')) {
+      if (!codeSent) {
+        setPasswordError('Please send and enter the verification code first');
+        return;
+      }
+      if (!verificationCode.trim()) {
+        setPasswordError('Verification code is required');
+        return;
+      }
+    }
+
     setDeletingAccount(true);
     setPasswordError('');
     
@@ -193,9 +251,19 @@ const AccountActions = ({ currentUser, onLogout, onShowTerms, onShowPrivacy, hid
           setDeletingAccount(false);
           return;
         }
-      } else {
-        // Web OAuth users - just proceed (Supabase session should still be valid)
-        // For web, we trust the existing session
+      } else if (!isNativePlatform && (authProvider === 'google' || authProvider === 'apple')) {
+        // Web OAuth users - verify OTP code
+        const { error: verifyError } = await supabase.auth.verifyOtp({
+          email: emailForVerification,
+          token: verificationCode,
+          type: 'email',
+        });
+
+        if (verifyError) {
+          setPasswordError('Invalid verification code. Please try again.');
+          setDeletingAccount(false);
+          return;
+        }
       }
 
       // If re-auth is successful, delete face from AWS Rekognition
@@ -282,8 +350,35 @@ const AccountActions = ({ currentUser, onLogout, onShowTerms, onShowPrivacy, hid
           </div>
         </div>
 
-        {/* Live Chat FAQ */}
-        <LiveChatFAQ />
+        {/* Support Email & Live Chat */}
+        <div className="bg-gray-50 p-4 rounded-lg border">
+          <div className="flex items-center space-x-2 mb-3">
+            <Mail className="w-4 h-4 text-pink-600" />
+            <span className="font-medium text-gray-700">{t('settings.needHelp')}</span>
+          </div>
+          
+          {/* Live Chat Button */}
+          <Button
+            onClick={() => setShowLiveChat(true)}
+            className="w-full mb-3 bg-gradient-to-r from-pink-500 to-purple-600 hover:from-pink-600 hover:to-purple-700 text-white font-medium"
+          >
+            <MessageCircle className="w-4 h-4 mr-2" />
+            💬 Live Chat - Get Instant Help!
+          </Button>
+          
+          <p className="text-sm text-gray-600 mb-2">
+            {t('settings.contactSupport')}
+          </p>
+          <a 
+            href="mailto:driploveinfo@gmail.com" 
+            className="text-blue-600 hover:text-blue-800 underline"
+          >
+            driploveinfo@gmail.com
+          </a>
+        </div>
+        
+        {/* Live Chat Dialog */}
+        <LiveChat open={showLiveChat} onOpenChange={setShowLiveChat} />
 
         {/* Legal Links and Logout only if not hidden by prop */}
         {!hideLogoutTermsPrivacy && (
@@ -386,11 +481,9 @@ const AccountActions = ({ currentUser, onLogout, onShowTerms, onShowPrivacy, hid
               <DialogDescription>
                 {authProvider === 'email' 
                   ? 'Please enter your password to confirm you want to delete your account permanently.'
-                  : authProvider === 'google'
-                  ? 'Please sign in with Google to confirm you want to delete your account permanently.'
-                  : authProvider === 'apple'
-                  ? 'Please sign in with Apple to confirm you want to delete your account permanently.'
-                  : 'Please confirm you want to delete your account permanently.'}
+                  : isNativePlatform
+                  ? `Please sign in with ${authProvider === 'google' ? 'Google' : 'Apple'} to confirm you want to delete your account permanently.`
+                  : 'For security, please verify your email address to confirm account deletion.'}
               </DialogDescription>
             </DialogHeader>
             <div className="space-y-4">
@@ -410,15 +503,76 @@ const AccountActions = ({ currentUser, onLogout, onShowTerms, onShowPrivacy, hid
                     <p className="text-red-500 text-sm mt-1">{passwordError}</p>
                   )}
                 </div>
-              ) : (
+              ) : isNativePlatform ? (
                 <div className="text-center py-4">
                   <p className="text-sm text-gray-600 mb-2">
-                    {isNativePlatform 
-                      ? `Tap "Delete Account" to sign in with ${authProvider === 'google' ? 'Google' : 'Apple'} and confirm deletion.`
-                      : 'Click "Delete Account" to confirm deletion.'}
+                    Tap "Delete Account" to sign in with {authProvider === 'google' ? 'Google' : 'Apple'} and confirm deletion.
                   </p>
                   {passwordError && (
                     <p className="text-red-500 text-sm mt-1">{passwordError}</p>
+                  )}
+                </div>
+              ) : (
+                <div className="space-y-3">
+                  <div>
+                    <label className="text-sm font-medium text-gray-700 mb-1 block">
+                      Email Address
+                    </label>
+                    <Input
+                      type="email"
+                      placeholder="Enter your email"
+                      value={emailForVerification}
+                      onChange={(e) => {
+                        setEmailForVerification(e.target.value);
+                        setPasswordError('');
+                      }}
+                      disabled={codeSent}
+                      className={passwordError && !codeSent ? 'border-red-500' : ''}
+                    />
+                  </div>
+                  {!codeSent && (
+                    <Button
+                      onClick={handleSendVerificationCode}
+                      disabled={sendingCode || !emailForVerification.trim()}
+                      className="w-full"
+                      variant="outline"
+                    >
+                      {sendingCode ? (
+                        <>
+                          <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                          Sending Code...
+                        </>
+                      ) : (
+                        <>
+                          <Mail className="w-4 h-4 mr-2" />
+                          Send Verification Code
+                        </>
+                      )}
+                    </Button>
+                  )}
+                  {codeSent && (
+                    <div>
+                      <label className="text-sm font-medium text-gray-700 mb-1 block">
+                        Verification Code
+                      </label>
+                      <Input
+                        type="text"
+                        placeholder="Enter 6-digit code"
+                        value={verificationCode}
+                        onChange={(e) => {
+                          setVerificationCode(e.target.value);
+                          setPasswordError('');
+                        }}
+                        className={passwordError ? 'border-red-500' : ''}
+                        maxLength={6}
+                      />
+                      <p className="text-xs text-gray-500 mt-1">
+                        Check your email for the verification code
+                      </p>
+                    </div>
+                  )}
+                  {passwordError && (
+                    <p className="text-red-500 text-sm">{passwordError}</p>
                   )}
                 </div>
               )}
@@ -430,15 +584,24 @@ const AccountActions = ({ currentUser, onLogout, onShowTerms, onShowPrivacy, hid
                   setShowPasswordDialog(false);
                   setPassword('');
                   setPasswordError('');
+                  setVerificationCode('');
+                  setEmailForVerification('');
+                  setCodeSent(false);
                 }}
-                disabled={deletingAccount || isReauthenticating}
+                disabled={deletingAccount || isReauthenticating || sendingCode}
               >
                 Cancel
               </Button>
               <Button 
                 variant="destructive" 
                 onClick={handleDeleteAccount}
-                disabled={deletingAccount || isReauthenticating || (authProvider === 'email' && !password.trim())}
+                disabled={
+                  deletingAccount || 
+                  isReauthenticating || 
+                  sendingCode ||
+                  (authProvider === 'email' && !password.trim()) ||
+                  (!isNativePlatform && (authProvider === 'google' || authProvider === 'apple') && (!codeSent || !verificationCode.trim()))
+                }
               >
                 {deletingAccount || isReauthenticating ? (
                   <>

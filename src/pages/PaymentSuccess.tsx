@@ -70,70 +70,12 @@ const PaymentSuccess: React.FC = () => {
     const txnId = transaction_id || reference || null;
     const payment_type = params.get('payment_type') || 'subscription'; // Default to subscription for backward compatibility
 
-    // If Apple IAP, treat as successful and update DB
+    // If IAP (Apple or Google), just show success - the validator/verified handler already updated the DB
     if (payment_type === 'iap' && status === 'successful') {
-      setUpgrading(true);
-      supabase.auth.getSession().then(async ({ data: { session } }) => {
-        const user = session?.user;
-        if (!user) {
-          setError('User session expired. Please log in again.');
-          setUpgrading(false);
-          setTimeout(() => navigate('/auth'), 3000);
-          return;
-        }
-        try {
-          // Set premium in DB (same as Paystack, but payment_method = 'apple')
-          const expiryDate = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000);
-          const subscriptionData = {
-            user_id: user.id,
-            plan_name: 'premium',
-            status: 'active',
-            flutterwave_transaction_id: null,
-            starts_at: new Date().toISOString(),
-            expires_at: expiryDate.toISOString(),
-            next_billing_date: expiryDate.toISOString(),
-            auto_renew: true,
-            payment_method: 'apple',
-            updated_at: new Date().toISOString(),
-          };
-          // Check if user already has a subscription
-          const { data: existingSubscription } = await supabase
-            .from('user_subscriptions')
-            .select('*')
-            .eq('user_id', user.id)
-            .single();
-          let subscriptionResult;
-          let subscriptionError;
-          if (existingSubscription) {
-            const { data, error } = await supabase
-              .from('user_subscriptions')
-              .update({
-                ...subscriptionData,
-                updated_at: new Date().toISOString(),
-              })
-              .eq('user_id', user.id)
-              .select();
-            subscriptionResult = data;
-            subscriptionError = error;
-          } else {
-            const { data, error } = await supabase
-              .from('user_subscriptions')
-              .insert([subscriptionData])
-              .select();
-            subscriptionResult = data;
-            subscriptionError = error;
-          }
-          if (subscriptionError) {
-            setError(`Could not activate premium: ${subscriptionError.message || subscriptionError.details || 'Unknown database error'}. Please contact support.`);
-          } else {
-            setUpgradeSuccess(true);
-            // Removed: Premium Activated toast
-          }
-        } catch (err) {
-          setError('An unexpected error occurred. Please contact support.');
-        }
-        setUpgrading(false);
-      });
+      // Database was already updated by the IAP validator (Apple or Google)
+      // Just show the success message
+      setUpgradeSuccess(true);
+      setUpgrading(false);
       return;
     }
     

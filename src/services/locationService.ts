@@ -27,15 +27,19 @@ class LocationService {
     userId: string, 
     maxDistance?: number
   ): Promise<LocationMatch[]> {
+    if (!userId) return [];
+
     try {
   // ...removed log...
-      
+
+      const maxDistanceKm = typeof maxDistance === 'number' ? maxDistance : Number(maxDistance);
+      const args: { user_id: string; max_distance_km?: number } = { user_id: userId };
+      if (Number.isFinite(maxDistanceKm) && maxDistanceKm > 0) {
+        args.max_distance_km = maxDistanceKm;
+      }
+
       // First try to use the database function
-      const { data: dbMatches, error: dbError } = await supabase
-        .rpc('find_matches_by_location', {
-          user_id: userId,
-          max_distance_km: maxDistance
-        });
+      const { data: dbMatches, error: dbError } = await supabase.rpc('find_matches_by_location', args);
 
   // ...removed log...
 
@@ -60,6 +64,8 @@ class LocationService {
     userId: string, 
     maxDistance: number = 50
   ): Promise<LocationMatch[]> {
+    if (!userId) return [];
+
     try {
       // Get current user's location
       const { data: currentUser, error: userError } = await supabase

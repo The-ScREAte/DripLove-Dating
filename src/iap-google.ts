@@ -121,11 +121,14 @@ export function initGoogleIAP() {
 
               if (user) {
                 const expiryDate = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000);
+                // Store purchaseToken for webhook matching - this is critical!
+                const purchaseToken = r.purchaseToken || r.transactionId || r.productId || null;
+                
                 const subscriptionData = {
                   user_id: user.id,
                   plan_name: 'premium',
                   status: 'active',
-                  flutterwave_transaction_id: r.productId || r.transactionId || null,
+                  flutterwave_transaction_id: purchaseToken, // Store purchaseToken for webhook
                   starts_at: new Date().toISOString(),
                   expires_at: expiryDate.toISOString(),
                   next_billing_date: expiryDate.toISOString(),
@@ -140,7 +143,8 @@ export function initGoogleIAP() {
                   .upsert(subscriptionData, { onConflict: 'user_id' });
 
                 console.log('[Google IAP] Premium activated for user:', user.id);
-                window.location.href = '/payment-success?status=successful&payment_type=google_iap';
+                console.log('[Google IAP] Stored purchase token:', purchaseToken?.substring(0, 20) + '...');
+                window.location.href = '/payment-success?status=successful&payment_type=iap';
               }
             } catch (error) {
               console.error('[Google IAP] Error processing verified receipt:', error);

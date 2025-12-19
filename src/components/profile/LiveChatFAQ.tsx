@@ -17,14 +17,14 @@ const faqItems: FAQItem[] = [
   {
     id: 'edit-profile',
     question: 'How do I edit my profile?',
-    answer: 'Tap the Edit button at the top right of your profile page. You can update your photos, bio, interests, and preferences. Remember to save your changes when done.',
+    answer: 'Edit your profile with accurate information so others know who they\'re chatting with.\n\nGo to Profile → Tap Edit at the top → Scroll down and open each tab (Photos, Bio, Interests, Preferences, Personal Info) → Make your changes → Save.\n\nIf changes don\'t appear immediately, close the app completely and reopen it.',
     icon: <User className="w-4 h-4" />,
     category: 'profile',
   },
   {
     id: 'change-photos',
     question: 'How do I change my photos?',
-    answer: 'Go to your profile and tap the Edit button. Tap on any photo slot to add, replace, or remove photos. Your first photo is your main profile picture.',
+    answer: 'Go to your profile and tap Edit. Tap on any photo slot to add, replace, or remove photos. Your first photo is your main profile picture. Use clear, recent photos that accurately represent you.',
     icon: <User className="w-4 h-4" />,
     category: 'profile',
   },
@@ -42,8 +42,15 @@ const faqItems: FAQItem[] = [
   {
     id: 'premium-features',
     question: 'What does Premium include?',
-    answer: 'Premium includes: Unlimited daily swipes, See everyone who liked you, Unlimited reverse dislikes (undo passes), Priority in discover feed, and Access to explore all countries.',
+    answer: 'Premium includes: Unlimited daily swipes, See everyone who liked you, Unlimited reverse dislikes (undo passes), Priority in discover feed, Access to explore all countries, Ad-free experience, and Priority support. After subscribing, close the app completely and reopen it if changes don\'t appear immediately.',
     icon: <Crown className="w-4 h-4" />,
+    category: 'subscription',
+  },
+  {
+    id: 'payment-error',
+    question: 'I have a payment error. What should I do?',
+    answer: 'Contact us at driploveinfo@gmail.com. Include your registered email, a screenshot of the error, payment method used, and transaction details if available. We respond within 24 hours and guarantee your issue will be resolved.',
+    icon: <CreditCard className="w-4 h-4" />,
     category: 'subscription',
   },
   {
@@ -59,17 +66,17 @@ const faqItems: FAQItem[] = [
     id: 'more-countries',
     question: 'How do I explore more countries?',
     answer: (pricing, isPremium) => isPremium
-      ? 'As a Premium member, go to Settings → Discovery Preferences → Location. You can select any available country to explore matches worldwide.'
+      ? 'As a Premium member, go to Profile → Preference → Edit. You can select up to 3 additional countries in addition to your own country (4 total).'
       : `Upgrade to Premium (${pricing.displayPrice}) to unlock access to all countries. Free users can only match within their registered country.`,
     icon: <Globe className="w-4 h-4" />,
     category: 'features',
   },
   {
     id: 'see-likes',
-    question: 'How do I see who liked me?',
+    question: 'Who liked me?',
     answer: (pricing, isPremium) => isPremium
-      ? 'Go to the Likes tab from the bottom navigation. You can see all users who have liked your profile and match with them instantly.'
-      : `With the free plan, you can see limited likes. Upgrade to Premium (${pricing.displayPrice}) to see everyone who likes you.`,
+      ? 'Access the Likes tab from the bottom navigation to see all users who have liked your profile with full details.'
+      : `Free users can see the location of people who liked you, but full profile access requires Premium membership (${pricing.displayPrice}). Upgrade to unlock complete visibility of everyone who likes you.`,
     icon: <Heart className="w-4 h-4" />,
     category: 'features',
   },
@@ -80,6 +87,13 @@ const faqItems: FAQItem[] = [
       ? 'As a Premium member, you have unlimited swipes every day!'
       : `Free users get 20 swipes per day that reset at midnight. Upgrade to Premium (${pricing.displayPrice}) for unlimited swipes.`,
     icon: <Heart className="w-4 h-4" />,
+    category: 'features',
+  },
+  {
+    id: 'report-user',
+    question: 'How do I report someone?',
+    answer: 'If you encounter inconvenient or unsafe behavior, go to their profile and tap the Report button. You can also block users directly and report chats. We investigate all reports and will remove users from DripLove if necessary. DripLove has a large pool of people - you will always find new matches.',
+    icon: <Shield className="w-4 h-4" />,
     category: 'features',
   },
   
@@ -99,9 +113,16 @@ const faqItems: FAQItem[] = [
     category: 'account',
   },
   {
+    id: 'advertising',
+    question: 'How can I advertise on DripLove?',
+    answer: 'We provide advertising opportunities for companies and individuals with location-based targeting. Contact us at driploveinfo@gmail.com for detailed information about advertising packages and pricing.',
+    icon: <MessageCircle className="w-4 h-4" />,
+    category: 'account',
+  },
+  {
     id: 'contact-support',
     question: 'How do I contact support?',
-    answer: 'Email us at driploveinfo@gmail.com. We typically respond within 24 hours. Include your registered email for faster assistance.',
+    answer: 'Email us at driploveinfo@gmail.com. We respond within 24 hours and guarantee your issue will be resolved. Include your registered email for faster assistance.',
     icon: <MessageCircle className="w-4 h-4" />,
     category: 'account',
   },

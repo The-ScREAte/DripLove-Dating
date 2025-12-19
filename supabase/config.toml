@@ -1,5 +1,18 @@
 project_id = "tgjsyyihabsovironesw"
 
+[auth]
+# Enable OTP for email verification
+enable_signup = true
+email_confirm = true
+# OTP expiry time (in seconds) - 1 hour
+otp_expiry = 3600
+# Length of OTP token
+otp_length = 6
+
+[auth.email]
+# Enable email OTP instead of magic links for certain flows
+enable_confirmations = true
+
 [functions.paystack-init]
 verify_jwt = false
 
@@ -17,6 +30,12 @@ verify_jwt = false
 
 [functions.iap-receipt-validator]
 verify_jwt = true
+
+[functions.google-iap-validator]
+verify_jwt = true
+
+[functions.google-play-webhook]
+verify_jwt = false
 
 [functions.send-push-notification]
 verify_jwt = false

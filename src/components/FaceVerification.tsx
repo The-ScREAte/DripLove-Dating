@@ -387,7 +387,6 @@ export default function FaceVerification({ onVerified, disabled }: FaceVerificat
                     src={nativeLiveFrame}
                     alt="Camera preview"
                     className="w-full h-full object-cover rounded-full"
-                    style={{ transform: 'scaleX(-1)' }}
                   />
                 ) : (
                   <div className="w-full h-full flex items-center justify-center">
@@ -434,7 +433,7 @@ export default function FaceVerification({ onVerified, disabled }: FaceVerificat
             <div className="flex flex-col items-center">
               <div className={`w-14 h-14 rounded-full border-2 overflow-hidden ${capturedImages.front ? 'border-green-400' : 'border-gray-300'} bg-gray-100`}>
                 {capturedImages.front ? (
-                  <img src={capturedImages.front} alt="Front" className="w-full h-full object-cover" style={{ transform: 'scaleX(-1)' }} />
+                  <img src={capturedImages.front} alt="Front" className="w-full h-full object-cover" />
                 ) : (
                   <div className="w-full h-full flex items-center justify-center text-gray-400 text-xs">Front</div>
                 )}
@@ -444,7 +443,7 @@ export default function FaceVerification({ onVerified, disabled }: FaceVerificat
             <div className="flex flex-col items-center">
               <div className={`w-14 h-14 rounded-full border-2 overflow-hidden ${capturedImages.side ? 'border-green-400' : 'border-gray-300'} bg-gray-100`}>
                 {capturedImages.side ? (
-                  <img src={capturedImages.side} alt="Side" className="w-full h-full object-cover" style={{ transform: 'scaleX(-1)' }} />
+                  <img src={capturedImages.side} alt="Side" className="w-full h-full object-cover" />
                 ) : (
                   <div className="w-full h-full flex items-center justify-center text-gray-400 text-xs">Side</div>
                 )}

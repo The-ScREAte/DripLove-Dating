@@ -60,6 +60,10 @@ import RatingDialog from './RatingDialog';
 import { incrementMatchCount } from '@/utils/ratingStorage';
 import { CurrentUser, PotentialMatch } from '@/types';
 
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+const isUuid = (value: unknown): value is string => typeof value === 'string' && UUID_RE.test(value);
+const uniqUuids = (values: unknown[]): string[] => Array.from(new Set(values.filter(isUuid)));
+
 // ⭐ ANDROID OPTIMIZATION: Global abort controller for canceling image loads on swipe
 let currentImageAbortController: AbortController | null = null;
 
@@ -133,6 +137,8 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, isPremium }: DiscoverPage
   const [showRatingDialog, setShowRatingDialog] = useState(false);
   const [ads, setAds] = useState<AdData[]>([]);
   const [realSwipeCount, setRealSwipeCount] = useState(0); // Track actual user swipes (excluding ads)
+  // Store users who liked the current user (for "they liked you" notification)
+  const [usersWhoLikedMeIds, setUsersWhoLikedMeIds] = useState<string[]>([]);
   // New: Store images by userId for instant access
   const [userImages, setUserImages] = useState<{ [key: string]: string[] }>({});
   // We avoid storing HTMLImageElement objects in state to prevent GC pressure
@@ -592,32 +598,37 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, isPremium }: DiscoverPage
         .limit(50) // Get up to 50 recent likers
     ]);
 
-    const likedUserIds = likedUsers?.map(like => like.liked_id) || [];
-    const blockedUserIds = blockedUsers?.flatMap(block => [block.blocked_id, block.blocker_id]) || [];
-    const passedUserIds = recentPasses?.map(p => p.passed_id) || [];
+    const likedUserIds = uniqUuids(likedUsers?.map(like => like.liked_id) || []);
+    const blockedUserIds = uniqUuids(blockedUsers?.flatMap(block => [block.blocked_id, block.blocker_id]) || []);
+    const passedUserIds = uniqUuids(recentPasses?.map(p => p.passed_id) || []);
     
     // ⭐ NEW: Get IDs of users who liked me (excluding those I've already interacted with)
-    const usersWhoLikedMeIds = (usersWhoLikedMe || [])
+    const usersWhoLikedMeIds = uniqUuids((usersWhoLikedMe || [])
       .map(like => like.liker_id)
-      .filter(id => !likedUserIds.includes(id) && !blockedUserIds.includes(id) && !passedUserIds.includes(id));
+      .filter(id => !likedUserIds.includes(id) && !blockedUserIds.includes(id) && !passedUserIds.includes(id)));
+    
+    // Store in state for "they liked you" popup feature
+    setUsersWhoLikedMeIds(usersWhoLikedMeIds);
     
     // ⭐ CRITICAL: Exclude locally swiped IDs, filtering out passed profiles older than 8 days
     const now = Date.now();
     const eightDaysMs = 8 * 24 * 60 * 60 * 1000;
-    const locallySwipedIds = Array.from(locallySwipedProfileIds.current.entries())
+    const locallySwipedIds = uniqUuids(Array.from(locallySwipedProfileIds.current.entries())
       .filter(([_, data]) => {
         // Always exclude liked profiles
         if (data.action === 'like') return true;
         // Only exclude passed profiles if less than 8 days old
         return (now - data.timestamp) < eightDaysMs;
       })
-      .map(([id, _]) => id);
-    const excludedIds = [...likedUserIds, ...blockedUserIds, ...passedUserIds, ...locallySwipedIds, userId];
+      .map(([id, _]) => id));
+    const excludedIds = uniqUuids([...likedUserIds, ...blockedUserIds, ...passedUserIds, ...locallySwipedIds, userId]);
     
     // ⭐ Filter priority likers to only those not already swiped on locally
     const priorityLikerIds = usersWhoLikedMeIds.filter(id => !locallySwipedIds.includes(id));
     
-    const userMaxDistance = currentUserData?.max_distance || currentUserData?.distance_preference || 50;
+    const userMaxDistanceRaw = currentUserData?.max_distance ?? currentUserData?.distance_preference ?? 50;
+    const userMaxDistance = Number(userMaxDistanceRaw);
+    const safeUserMaxDistance = Number.isFinite(userMaxDistance) && userMaxDistance > 0 ? userMaxDistance : 50;
     // Fix: Match the correct values stored in database ('male', 'female', 'everyone')
     const allowedGenders = currentUserData?.preference === 'male' ? ['male'] : 
                           currentUserData?.preference === 'female' ? ['female'] : 
@@ -627,8 +638,10 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, isPremium }: DiscoverPage
     const baseCountryCode = (currentUserData?.country_code || '').trim();
 
     // Get unlocked countries for premium users
-    const unlockedCountries: string[] = Array.isArray(currentUserData?.unlocked_countries) 
-      ? currentUserData.unlocked_countries 
+    const unlockedCountries: string[] = Array.isArray(currentUserData?.unlocked_countries)
+      ? currentUserData.unlocked_countries
+          .filter((c): c is string => typeof c === 'string' && c.trim().length > 0)
+          .map(c => c.trim())
       : [];
 
     // IMPORTANT: Non-premium users ONLY see profiles in their own country.
@@ -641,16 +654,16 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, isPremium }: DiscoverPage
     );
 
     // Get location-based matches (distance filter)
-    const locationMatches = await locationService.getLocationBasedMatches(userId, userMaxDistance);
+    const locationMatches = await locationService.getLocationBasedMatches(userId, safeUserMaxDistance);
 
     // ⭐ OPTIMIZED: Single pass to build both distanceMap and locationProfileIds (50ms saved)
     const distanceMap: { [key: string]: number } = {};
-    const locationProfileIds = locationMatches
+    const locationProfileIds = uniqUuids(locationMatches
       .filter((m) => !allowedCountryCodes.length || allowedCountryCodes.includes(m.country_code))
       .map((match) => {
         distanceMap[match.profile_id] = match.distance_km;
         return match.profile_id;
-      });
+      }));
 
     // ⭐ STRATIFIED SAMPLING: Fetch all profiles then apply fair distribution
     // Common profile select fields (includes created_at for stratified sampling)
@@ -802,8 +815,8 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, isPremium }: DiscoverPage
       }
     }
 
-    // ⭐ PRIORITY LIKERS: Inject users who liked the current user at strategic positions
-    // Show 2 priority likers per every 20 profiles (positions ~5 and ~15 in each batch of 20)
+    // ⭐ PRIORITY LIKERS: Inject users who liked the current user at natural, sparse positions
+    // Uses variable intervals (25-40 profiles) with random positioning for organic discovery
     if (priorityLikerIds.length > 0) {
       // Get profile data for priority likers that are in our shuffled list
       const priorityProfiles = shuffled.filter(p => priorityLikerIds.includes(p.id));
@@ -811,28 +824,65 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, isPremium }: DiscoverPage
       // Remove priority profiles from their current positions
       const nonPriorityProfiles = shuffled.filter(p => !priorityLikerIds.includes(p.id));
       
-      // Inject priority likers at strategic positions: 2 per every 20 profiles
-      // Position them at ~5 and ~15 within each batch of 20 for natural discovery
+      // Cap priority likers at 15% of total feed to keep it natural
+      const maxPriorityCount = Math.min(
+        priorityProfiles.length,
+        Math.ceil(nonPriorityProfiles.length * 0.15)
+      );
+      const limitedPriorityProfiles = priorityProfiles.slice(0, maxPriorityCount);
+      
+      // Create deterministic but seemingly random injection points
+      const userId = currentUser?.id || '';
+      const dateSeed = new Date().toISOString().split('T')[0];
+      const injectionSeed = `${userId}_priority_${dateSeed}`;
+      
+      // Simple hash function for deterministic "randomness"
+      const simpleHash = (str: string, index: number) => {
+        let hash = 0;
+        const combined = str + index;
+        for (let i = 0; i < combined.length; i++) {
+          hash = ((hash << 5) - hash) + combined.charCodeAt(i);
+          hash = hash & hash;
+        }
+        return Math.abs(hash);
+      };
+      
+      // Calculate injection positions with variable intervals
+      const injectionPositions: number[] = [];
+      let currentPos = 0;
+      let injectionIndex = 0;
+      
+      while (injectionIndex < limitedPriorityProfiles.length && currentPos < nonPriorityProfiles.length) {
+        // Variable interval: 25-40 profiles for most injections
+        // First injection happens earlier (8-15 profiles) for early engagement
+        let minInterval = injectionIndex === 0 ? 8 : 25;
+        let maxInterval = injectionIndex === 0 ? 15 : 40;
+        
+        // Use deterministic hash to pick interval and offset
+        const intervalRange = maxInterval - minInterval;
+        const interval = minInterval + (simpleHash(injectionSeed, injectionIndex) % intervalRange);
+        const offset = simpleHash(injectionSeed, injectionIndex + 1000) % Math.min(8, interval);
+        
+        currentPos += interval + offset;
+        
+        if (currentPos < nonPriorityProfiles.length) {
+          injectionPositions.push(currentPos);
+          injectionIndex++;
+        }
+      }
+      
+      // Build final array with injections at calculated positions
       const finalProfiles: typeof shuffled = [];
-      let priorityIndex = 0;
+      let priorityIdx = 0;
       
       for (let i = 0; i < nonPriorityProfiles.length; i++) {
-        // Calculate position within a batch of 20
-        const positionInBatch = i % 20;
-        
-        // Insert a priority liker at positions 5 and 15 in each batch (if available)
-        if ((positionInBatch === 5 || positionInBatch === 15) && priorityIndex < priorityProfiles.length) {
-          finalProfiles.push(priorityProfiles[priorityIndex]);
-          priorityIndex++;
+        // Check if we should inject at this position
+        if (injectionPositions.includes(i) && priorityIdx < limitedPriorityProfiles.length) {
+          finalProfiles.push(limitedPriorityProfiles[priorityIdx]);
+          priorityIdx++;
         }
         
         finalProfiles.push(nonPriorityProfiles[i]);
-      }
-      
-      // Add any remaining priority profiles at the end if we didn't place them all
-      while (priorityIndex < priorityProfiles.length) {
-        finalProfiles.push(priorityProfiles[priorityIndex]);
-        priorityIndex++;
       }
       
       shuffled = finalProfiles;
@@ -1382,13 +1432,13 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, isPremium }: DiscoverPage
       // CRITICAL: Include locally swiped profiles, filtering out passed profiles older than 8 days
       const now = Date.now();
       const eightDaysMs = 8 * 24 * 60 * 60 * 1000;
-      const locallySwipedIds = Array.from(locallySwipedProfileIds.current.entries())
+      const locallySwipedIds = uniqUuids(Array.from(locallySwipedProfileIds.current.entries())
         .filter(([_, data]) => {
           if (data.action === 'like') return true;
           return (now - data.timestamp) < eightDaysMs;
         })
-        .map(([id, _]) => id);
-      const excludedIds = [...currentIds, ...locallySwipedIds, currentUser.id];
+        .map(([id, _]) => id));
+      const excludedIds = uniqUuids([...currentIds, ...locallySwipedIds, currentUser.id]);
       
       // Get recently interacted users to exclude (likes, blocks, passes)
       const [
@@ -1411,10 +1461,10 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, isPremium }: DiscoverPage
           .gte('passed_at', new Date(Date.now() - 192 * 60 * 60 * 1000).toISOString()) // 8 days - same as main fetch
       ]);
 
-      const likedUserIds = likedUsers?.map(like => like.liked_id) || [];
-      const blockedUserIds = blockedUsers?.flatMap(block => [block.blocked_id, block.blocker_id]) || [];
-      const hiddenPassedIds = recentPasses?.map(p => p.passed_id) || [];
-      excludedIds.push(...likedUserIds, ...blockedUserIds, ...hiddenPassedIds);
+      const likedUserIds = uniqUuids(likedUsers?.map(like => like.liked_id) || []);
+      const blockedUserIds = uniqUuids(blockedUsers?.flatMap(block => [block.blocked_id, block.blocker_id]) || []);
+      const hiddenPassedIds = uniqUuids(recentPasses?.map(p => p.passed_id) || []);
+      const allExcludedIds = uniqUuids([...excludedIds, ...likedUserIds, ...blockedUserIds, ...hiddenPassedIds]);
       
       // ⭐ STRATIFIED REFILL: Include created_at for stratified sampling
       const PROFILE_SELECT = 'id, first_name, last_name, bio, city, country, country_code, occupation, education_level, date_of_birth, interests, gender, latitude, longitude, fun_fact, perfect_first_date, last_googled, relationship_intent, smoking, drinking, exercise_level, sleeping_schedule, introvert_extrovert, spontaneous_planner, messy_organized, adinkra_symbols, created_at';
@@ -1432,8 +1482,8 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, isPremium }: DiscoverPage
 
       let query = supabase.from('profiles').select(PROFILE_SELECT);
 
-      if (excludedIds.length > 0) {
-        query = query.not('id', 'in', `(${excludedIds.join(',')})`);
+      if (allExcludedIds.length > 0) {
+        query = query.not('id', 'in', `(${allExcludedIds.join(',')})`);
       }
 
       if (allowedCountryCodes.length > 0) {
@@ -1456,19 +1506,21 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, isPremium }: DiscoverPage
 
       // Apply same filtering logic as original fetch using location service
       let filteredProfiles = newProfiles;
-      const userMaxDistance = currentUser.max_distance || currentUser.distance_preference || 50;
+      const userMaxDistanceRaw = (currentUser as any).max_distance ?? (currentUser as any).distance_preference ?? 50;
+      const userMaxDistance = Number(userMaxDistanceRaw);
+      const safeUserMaxDistance = Number.isFinite(userMaxDistance) && userMaxDistance > 0 ? userMaxDistance : 50;
 
 
       // Get location-based matches for distance filtering
-      const locationMatches = await locationService.getLocationBasedMatches(currentUser.id, userMaxDistance * 2);
+      const locationMatches = await locationService.getLocationBasedMatches(currentUser.id, safeUserMaxDistance * 2);
       // ⭐ OPTIMIZED: Single pass for distanceMap and locationProfileIds (30ms saved)
       const distanceMap: { [key: string]: number } = {};
-      const locationProfileIds = locationMatches
+      const locationProfileIds = uniqUuids(locationMatches
         .filter((m) => !allowedCountryCodes.length || allowedCountryCodes.includes(m.country_code))
         .map((match) => {
           distanceMap[match.profile_id] = match.distance_km;
           return match.profile_id;
-        });
+        }));
 
       // Filter profiles to only those within distance range AND allowed countries
       filteredProfiles = filteredProfiles.filter((profile) => {
@@ -1486,27 +1538,34 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, isPremium }: DiscoverPage
       // ⭐ PREMIUM FEATURE: Also fetch profiles from unlocked countries for premium users
       if (isPremium && currentUser.unlocked_countries && Array.isArray(currentUser.unlocked_countries) && currentUser.unlocked_countries.length > 0) {
         const existingIds = new Set(filteredProfiles.map(p => p.id));
-        const allExcludedIds = [...excludedIds, ...Array.from(existingIds)];
+        const premiumExcludedIds = uniqUuids([...allExcludedIds, ...Array.from(existingIds)]);
+        const unlockedCountryCodes = (currentUser.unlocked_countries || [])
+          .filter((c): c is string => typeof c === 'string' && c.trim().length > 0)
+          .map(c => c.trim());
         
-        let unlockedQuery = supabase
-          .from('profiles')
-          .select(PROFILE_SELECT)
-          .in('country_code', currentUser.unlocked_countries);
+        if (unlockedCountryCodes.length === 0) {
+          // Nothing valid to query
+        } else {
+          let unlockedQuery = supabase
+            .from('profiles')
+            .select(PROFILE_SELECT)
+            .in('country_code', unlockedCountryCodes);
         
-        if (allExcludedIds.length > 0) {
-          unlockedQuery = unlockedQuery.not('id', 'in', `(${allExcludedIds.join(',')})`);
-        }
+          if (premiumExcludedIds.length > 0) {
+            unlockedQuery = unlockedQuery.not('id', 'in', `(${premiumExcludedIds.join(',')})`);
+          }
         
-        const { data: unlockedProfiles, error: unlockedError } = await unlockedQuery
-          .in('gender', allowedGenders)
-          .eq('account_status', 'active')
-          .eq('is_admin', false)
-          .limit(50); // Larger pool for stratified sampling
+          const { data: unlockedProfiles, error: unlockedError } = await unlockedQuery
+            .in('gender', allowedGenders)
+            .eq('account_status', 'active')
+            .eq('is_admin', false)
+            .limit(50); // Larger pool for stratified sampling
 
-        if (!unlockedError && unlockedProfiles && unlockedProfiles.length > 0) {
-          // ⭐ OPTIMIZED: Add distance inline (5ms saved)
-          unlockedProfiles.forEach(p => distanceMap[p.id] = 999);
-          filteredProfiles = [...filteredProfiles, ...unlockedProfiles];
+          if (!unlockedError && unlockedProfiles && unlockedProfiles.length > 0) {
+            // ⭐ OPTIMIZED: Add distance inline (5ms saved)
+            unlockedProfiles.forEach(p => distanceMap[p.id] = 999);
+            filteredProfiles = [...filteredProfiles, ...unlockedProfiles];
+          }
         }
       }
 
@@ -1824,16 +1883,8 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, isPremium }: DiscoverPage
   };
 
   // Optimistic UI: move to next card instantly, then process pass in background
-  const handlePass = async () => {
-    const currentMatch = potentialMatches[currentIndex];
-    if (!currentMatch) return;
-
-    // Skip passes on ads - just move to next
-    if (isAd(currentMatch)) {
-      moveToNext();
-      return;
-    }
-
+  // Function to execute pass after user confirms (used when "they liked you" popup is shown)
+  const executePassLogic = async (matchToPass: PotentialMatch) => {
     // Check profile completion restriction (70% after 8 swipes) - MUST be checked BEFORE swipe
     if (profileCompletion < 70 && todaySwipeCount >= 8) {
       toast({
@@ -1953,6 +2004,29 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, isPremium }: DiscoverPage
         pendingSwipesRef.current = Math.max(0, pendingSwipesRef.current - 1);
       }
     });
+  };
+
+  const handlePass = async () => {
+    const currentMatch = potentialMatches[currentIndex];
+    if (!currentMatch) return;
+
+    // Skip passes on ads - just move to next
+    if (isAd(currentMatch)) {
+      moveToNext();
+      return;
+    }
+
+    // ⭐ NEW: Show notification if this user already liked you (but still allow the pass)
+    if (usersWhoLikedMeIds.includes(currentMatch.id)) {
+      toast({
+        title: `💕 ${currentMatch.first_name} likes you!`,
+        description: "They've already liked your profile",
+        duration: 3000,
+      });
+    }
+
+    // Execute pass normally
+    await executePassLogic(currentMatch);
   };
 
   const handleReverse = async () => {

@@ -660,7 +660,7 @@ export default function BroadcastNotifications() {
 
       <Tabs value={activeTab} onValueChange={setActiveTab}>
         <TabsList className="grid w-full grid-cols-4">
-          <TabsTrigger value="new">New Broadcast</TabsTrigger>
+          <TabsTrigger value="new">New</TabsTrigger>
           <TabsTrigger value="scheduled">
             <Calendar className="w-4 h-4 mr-2" />
             Scheduled

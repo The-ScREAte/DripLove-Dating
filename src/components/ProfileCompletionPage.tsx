@@ -1100,7 +1100,7 @@ const ProfileCompletionPage = () => {
                       >
                         {isSubmitting ? (
                           <div className="flex items-center justify-center gap-2">
-                            <HoppingLogo size={20} opacity={1} />
+                            <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
                             <span>{t('profileCompletion.completingProfile')}</span>
                           </div>
                         ) : t('profileCompletion.completeProfile')}

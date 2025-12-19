@@ -37,6 +37,7 @@ const ManualPremiumManager: React.FC<ManualPremiumManagerProps> = ({ users, onRe
   const [months, setMonths] = useState('1');
   const [loading, setLoading] = useState(false);
   const [premiumStatuses, setPremiumStatuses] = useState<Record<string, PremiumStatus>>({});
+  const [searchTerm, setSearchTerm] = useState('');
   const { toast } = useToast();
 
   const fetchUserPremiumStatus = async (userId: string) => {
@@ -67,6 +68,20 @@ const ManualPremiumManager: React.FC<ManualPremiumManagerProps> = ({ users, onRe
       await fetchUserPremiumStatus(userId);
     }
   };
+
+  // Filter users based on search term
+  const filteredUsers = React.useMemo(() => {
+    if (!searchTerm.trim()) {
+      return users;
+    }
+    
+    const searchLower = searchTerm.toLowerCase().trim();
+    return users.filter(user => {
+      const fullName = `${user.first_name} ${user.last_name}`.toLowerCase();
+      const email = user.email.toLowerCase();
+      return fullName.includes(searchLower) || email.includes(searchLower);
+    });
+  }, [users, searchTerm]);
 
   const setPremium = async () => {
     if (!selectedUser || !months) {
@@ -169,22 +184,45 @@ const ManualPremiumManager: React.FC<ManualPremiumManagerProps> = ({ users, onRe
   return (
     <div className="space-y-4">
       <div className="grid grid-cols-1 gap-3">
-        {/* User Selection */}
+        {/* User Selection with search inside dropdown */}
         <div>
-          <label className="block text-sm font-medium mb-2">Select User</label>
+          <label className="block text-sm font-medium mb-2">Select User to Manage Premium</label>
           <Select value={selectedUser} onValueChange={handleUserSelection}>
             <SelectTrigger className="text-sm">
               <SelectValue placeholder="Choose a user to manage premium" />
             </SelectTrigger>
-            <SelectContent>
-              {users.map((user) => (
-                <SelectItem key={user.id} value={user.id}>
-                  <div className="flex items-center gap-2">
-                    <span>{user.first_name} {user.last_name}</span>
-                    <span className="text-xs text-gray-500">({user.email})</span>
+            <SelectContent className="max-h-[400px]">
+              <div className="sticky top-0 bg-white z-10 p-2 border-b">
+                <Input
+                  type="text"
+                  placeholder="Filter by name or email..."
+                  value={searchTerm}
+                  onChange={(e) => setSearchTerm(e.target.value)}
+                  className="text-sm"
+                  onClick={(e) => e.stopPropagation()}
+                />
+                {searchTerm && (
+                  <p className="text-xs text-gray-600 mt-1">
+                    {filteredUsers.length} user(s) {filteredUsers.length === users.length ? 'shown' : 'matched'}
+                  </p>
+                )}
+              </div>
+              <div className="overflow-y-auto max-h-[280px]">
+                {filteredUsers.length === 0 ? (
+                  <div className="p-3 text-sm text-gray-500 text-center">
+                    No users match your filter
                   </div>
-                </SelectItem>
-              ))}
+                ) : (
+                  filteredUsers.map((user) => (
+                    <SelectItem key={user.id} value={user.id}>
+                      <div className="flex items-center gap-2">
+                        <span>{user.first_name} {user.last_name}</span>
+                        <span className="text-xs text-gray-500">({user.email})</span>
+                      </div>
+                    </SelectItem>
+                  ))
+                )}
+              </div>
             </SelectContent>
           </Select>
         </div>

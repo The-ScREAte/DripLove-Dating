@@ -1,5 +1,4 @@
 import React from 'react';
-import { Heart } from 'lucide-react';
 
 interface HoppingLogoProps {
   size?: number;
@@ -28,10 +27,16 @@ const HoppingLogo: React.FC<HoppingLogoProps> = ({ size = 48, opacity = 0.6 }) =
           animation: hop 1.2s ease-in-out infinite;
         }
       `}</style>
-      <Heart 
-        className="hopping-logo fill-pink-500 text-pink-500" 
-        size={size}
-        style={{ opacity }}
+      <img 
+        src="/driplove-logo.webp" 
+        alt="DripLove Logo"
+        className="hopping-logo" 
+        style={{ 
+          width: size,
+          height: size,
+          opacity,
+          objectFit: 'contain'
+        }}
       />
     </div>
   );
