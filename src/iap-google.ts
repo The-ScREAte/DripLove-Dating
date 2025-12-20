@@ -368,7 +368,7 @@ export function restoreGooglePurchases(): Promise<{ restored: boolean; message: 
 
     if (!store) {
       console.error('[Google IAP] Cannot restore purchases - store not available');
-      reject(new Error('Store not available'));
+      resolve({ restored: false, message: 'Store not available. Please ensure you are using the app on Android.' });
       return;
     }
 
@@ -388,14 +388,6 @@ export function restoreGooglePurchases(): Promise<{ restored: boolean; message: 
         resolve(result);
       }
     };
-    
-    const rejectOnce = (error: any) => {
-      if (!hasResolved) {
-        hasResolved = true;
-        window.iapPurchaseInitiated = false;
-        reject(error);
-      }
-    };
 
     const activateSubscription = async (productId: string, transactionId?: string, receiptData?: string) => {
       try {
@@ -408,12 +400,13 @@ export function restoreGooglePurchases(): Promise<{ restored: boolean; message: 
         }
         
         let expiryDate = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000);
+        let isActiveSubscription = false;
         
         // Try server validation if we have receipt data
         if (receiptData) {
-          console.log('[Google IAP] Validating restored receipt...');
+          console.log('[Google IAP] Validating restored receipt with server...');
           try {
-            const { data: validation } = await supabase.functions.invoke('google-iap-validator', {
+            const { data: validation, error: valError } = await supabase.functions.invoke('google-iap-validator', {
               body: {
                 receiptData: receiptData,
                 productId: productId,
@@ -423,13 +416,38 @@ export function restoreGooglePurchases(): Promise<{ restored: boolean; message: 
               }
             });
             
-            if (validation?.active && validation?.expiresDate) {
-              expiryDate = new Date(validation.expiresDate);
-              console.log('[Google IAP] Server validated expiry:', expiryDate);
+            if (valError) {
+              console.warn('[Google IAP] Validation error:', valError);
+            } else if (validation?.active && validation?.expiresDate) {
+              const serverExpiry = new Date(validation.expiresDate);
+              // Check if subscription is actually still active
+              if (serverExpiry > new Date()) {
+                expiryDate = serverExpiry;
+                isActiveSubscription = true;
+                console.log('[Google IAP] Server confirmed active subscription, expires:', expiryDate);
+              } else {
+                console.log('[Google IAP] Server validation shows subscription has expired:', serverExpiry);
+                return false;
+              }
+            } else if (validation && !validation.active) {
+              console.log('[Google IAP] Server validation: subscription is not active');
+              return false;
             }
           } catch (valError) {
-            console.warn('[Google IAP] Validation failed, using default expiry:', valError);
+            console.warn('[Google IAP] Validation failed, checking product ownership:', valError);
           }
+        }
+        
+        // Only proceed if we confirmed an active subscription
+        if (!isActiveSubscription && !receiptData) {
+          // No receipt data and no validation - trust the product.owned flag
+          console.log('[Google IAP] No receipt data, trusting product ownership');
+          isActiveSubscription = true;
+        }
+        
+        if (!isActiveSubscription) {
+          console.log('[Google IAP] Cannot confirm active subscription');
+          return false;
         }
         
         const subscriptionData = {
@@ -486,10 +504,12 @@ export function restoreGooglePurchases(): Promise<{ restored: boolean; message: 
     
     // Check existing products first
     const checkExistingProducts = async () => {
+      let foundOwned = false;
       for (const id of GOOGLE_PRODUCT_IDS) {
         try {
           const product = store.get?.(id);
           if (product && product.owned) {
+            foundOwned = true;
             console.log('[Google IAP] Found already-owned product:', id);
             
             const transaction = product.transaction || product.latestTransaction;
@@ -507,6 +527,10 @@ export function restoreGooglePurchases(): Promise<{ restored: boolean; message: 
         } catch (err) {
           console.warn('[Google IAP] Error checking product:', id, err);
         }
+      }
+      
+      if (!foundOwned) {
+        console.log('[Google IAP] No owned products found in initial check');
       }
       return false;
     };
@@ -531,21 +555,22 @@ export function restoreGooglePurchases(): Promise<{ restored: boolean; message: 
       console.log('[Google IAP] Calling store.refresh()...');
       store.refresh();
     } else {
-      rejectOnce(new Error('Restore method not available'));
+      resolveOnce({ restored: false, message: 'Restore not available on this device' });
       return;
     }
     
-    // Wait for processing to complete (reduced timeout)
+    // Wait for processing to complete
     setTimeout(() => {
       if (!hasResolved) {
         if (restoreError) {
-          rejectOnce(restoreError);
+          resolveOnce({ restored: false, message: restoreError.message || 'Restore failed' });
         } else if (hasRestoredPurchase) {
           resolveOnce({ restored: true, message: 'Subscription restored successfully' });
         } else {
-          resolveOnce({ restored: false, message: 'No active subscription found' });
+          // No subscription found
+          resolveOnce({ restored: false, message: 'No active subscription found. If you previously purchased, it may have expired.' });
         }
       }
-    }, 5000);
+    }, 8000);
   });
 }
