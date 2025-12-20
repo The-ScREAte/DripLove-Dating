@@ -4,11 +4,16 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/components/ui/use-toast';
-import { RefreshCw, Users, MapPin, Heart, X, Clock } from 'lucide-react';
+import { 
+  RefreshCw, Users, MapPin, Heart, X, Clock, 
+  Database, Server, Wifi, AlertCircle, CheckCircle,
+  Bell, Mail, CreditCard, Archive
+} from 'lucide-react';
 
 interface UserPoolStats {
   totalUsers: number;
   activeUsers: number;
+  archivedUsers: number;
   usersInAgeRange: number;
   usersInDistance: number;
   usersWithPreferenceMatch: number;
@@ -16,6 +21,15 @@ interface UserPoolStats {
   blockedUsers: number;
   recentPasses: number;
   finalEligibleUsers: number;
+}
+
+interface SystemStats {
+  pushTokens: number;
+  activeSubscriptions: number;
+  scheduledBroadcasts: number;
+  pendingPayouts: number;
+  recentMatches: number;
+  recentLikes: number;
 }
 
 interface Props {
@@ -32,7 +46,9 @@ interface Props {
 
 const UserPoolDebugger: React.FC<Props> = ({ currentUserId, userPreferences }) => {
   const [stats, setStats] = useState<UserPoolStats | null>(null);
+  const [systemStats, setSystemStats] = useState<SystemStats | null>(null);
   const [isLoading, setIsLoading] = useState(false);
+  const [activeTab, setActiveTab] = useState<'userPool' | 'system'>('userPool');
   const { toast } = useToast();
 
   const calculateAge = (dateOfBirth: string) => {
@@ -49,7 +65,7 @@ const UserPoolDebugger: React.FC<Props> = ({ currentUserId, userPreferences }) =
   };
 
   const calculateDistance = (lat1: number, lon1: number, lat2: number, lon2: number) => {
-    const R = 6371; // Earth's radius in kilometers
+    const R = 6371;
     const dLat = (lat2 - lat1) * Math.PI / 180;
     const dLon = (lon2 - lon1) * Math.PI / 180;
     const a = Math.sin(dLat/2) * Math.sin(dLat/2) +
@@ -75,7 +91,6 @@ const UserPoolDebugger: React.FC<Props> = ({ currentUserId, userPreferences }) =
     
     setIsLoading(true);
     try {
-      // Get current user's exclusions
       const [
         { data: allUsers },
         { data: likedUsers },
@@ -84,7 +99,7 @@ const UserPoolDebugger: React.FC<Props> = ({ currentUserId, userPreferences }) =
       ] = await Promise.all([
         supabase
           .from('profiles')
-          .select('id, gender, date_of_birth, latitude, longitude, account_status, is_admin')
+          .select('id, gender, date_of_birth, latitude, longitude, account_status, is_admin, is_archived')
           .neq('id', currentUserId),
         supabase
           .from('likes')
@@ -115,11 +130,12 @@ const UserPoolDebugger: React.FC<Props> = ({ currentUserId, userPreferences }) =
       const blockedUserIds = blockedUsers?.flatMap(block => [block.blocked_id, block.blocker_id]) || [];
       const recentPassIds = recentPasses?.map(pass => pass.passed_id) || [];
 
-      let currentStep = allUsers;
+      // Count archived users
+      const archivedUsers = allUsers.filter(user => user.is_archived === true).length;
 
-      // Step 1: Active users only
-      const activeUsers = currentStep.filter(user => 
-        user.account_status === 'active' && !user.is_admin
+      // Step 1: Active & not archived users only
+      const activeUsers = allUsers.filter(user => 
+        user.account_status === 'active' && !user.is_admin && !user.is_archived
       );
 
       // Step 2: Gender preference filtering
@@ -134,12 +150,12 @@ const UserPoolDebugger: React.FC<Props> = ({ currentUserId, userPreferences }) =
         return age >= minAge && age <= maxAge;
       });
 
-      // Step 4: Distance filtering (if coordinates available)
+      // Step 4: Distance filtering
       let distanceFilteredUsers = ageFilteredUsers;
       if (preferences.latitude && preferences.longitude) {
         distanceFilteredUsers = ageFilteredUsers.filter(user => {
           if (!user.latitude || !user.longitude) {
-            return true; // Include users without coordinates
+            return true;
           }
           const distance = calculateDistance(
             preferences.latitude!,
@@ -161,6 +177,7 @@ const UserPoolDebugger: React.FC<Props> = ({ currentUserId, userPreferences }) =
       const stats: UserPoolStats = {
         totalUsers: allUsers.length,
         activeUsers: activeUsers.length,
+        archivedUsers,
         usersWithPreferenceMatch: genderFilteredUsers.length,
         usersInAgeRange: ageFilteredUsers.length,
         usersInDistance: distanceFilteredUsers.length,
@@ -189,110 +206,285 @@ const UserPoolDebugger: React.FC<Props> = ({ currentUserId, userPreferences }) =
     }
   };
 
+  const analyzeSystem = async () => {
+    setIsLoading(true);
+    try {
+      const [
+        { count: pushTokenCount },
+        { count: activeSubCount },
+        { count: scheduledBroadcastCount },
+        { count: pendingPayoutCount },
+        { count: recentMatchCount },
+        { count: recentLikeCount }
+      ] = await Promise.all([
+        supabase.from('push_tokens').select('*', { count: 'exact', head: true }),
+        supabase.from('user_subscriptions').select('*', { count: 'exact', head: true }).eq('status', 'active'),
+        supabase.from('scheduled_broadcasts').select('*', { count: 'exact', head: true }).eq('is_active', true),
+        supabase.from('payout_requests').select('*', { count: 'exact', head: true }).eq('status', 'pending'),
+        supabase.from('matches').select('*', { count: 'exact', head: true }).gte('created_at', new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString()),
+        supabase.from('likes').select('*', { count: 'exact', head: true }).gte('created_at', new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString())
+      ]);
+
+      setSystemStats({
+        pushTokens: pushTokenCount || 0,
+        activeSubscriptions: activeSubCount || 0,
+        scheduledBroadcasts: scheduledBroadcastCount || 0,
+        pendingPayouts: pendingPayoutCount || 0,
+        recentMatches: recentMatchCount || 0,
+        recentLikes: recentLikeCount || 0
+      });
+
+      toast({
+        title: "System Analysis Complete",
+        description: "All system stats fetched successfully.",
+      });
+
+    } catch (error) {
+      console.error('Error analyzing system:', error);
+      toast({
+        title: "Error",
+        description: "Failed to analyze system",
+        variant: "destructive"
+      });
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
   return (
     <Card className="w-full">
-      <CardHeader>
-        <CardTitle className="flex items-center gap-2">
-          <Users className="w-5 h-5" />
-          User Pool Debugger
+      <CardHeader className="pb-2">
+        <CardTitle className="flex items-center gap-2 text-base">
+          <Database className="w-4 h-4" />
+          System Debugger
         </CardTitle>
       </CardHeader>
-      <CardContent className="space-y-4">
-        <Button 
-          onClick={analyzeUserPool} 
-          disabled={isLoading}
-          className="w-full"
-        >
-          {isLoading ? (
-            <>
-              <RefreshCw className="w-4 h-4 mr-2 animate-spin" />
-              Analyzing...
-            </>
-          ) : (
-            <>
-              <RefreshCw className="w-4 h-4 mr-2" />
-              Analyze User Pool
-            </>
-          )}
-        </Button>
+      <CardContent className="space-y-3">
+        {/* Tab buttons */}
+        <div className="flex gap-2">
+          <Button 
+            variant={activeTab === 'userPool' ? 'default' : 'outline'}
+            size="sm"
+            onClick={() => setActiveTab('userPool')}
+            className="flex-1 text-xs"
+          >
+            <Users className="w-3 h-3 mr-1" />
+            User Pool
+          </Button>
+          <Button 
+            variant={activeTab === 'system' ? 'default' : 'outline'}
+            size="sm"
+            onClick={() => setActiveTab('system')}
+            className="flex-1 text-xs"
+          >
+            <Server className="w-3 h-3 mr-1" />
+            System
+          </Button>
+        </div>
 
-        {stats && (
-          <div className="space-y-3">
-            <div className="grid grid-cols-2 gap-3 text-sm">
-              <div className="flex justify-between">
-                <span>Total Users:</span>
-                <Badge variant="secondary">{stats.totalUsers}</Badge>
-              </div>
-              
-              <div className="flex justify-between">
-                <span>Active Users:</span>
-                <Badge variant="secondary">{stats.activeUsers}</Badge>
-              </div>
-              
-              <div className="flex justify-between">
-                <span>Gender Match:</span>
-                <Badge variant="secondary">{stats.usersWithPreferenceMatch}</Badge>
-              </div>
-              
-              <div className="flex justify-between">
-                <span>Age Range:</span>
-                <Badge variant="secondary">{stats.usersInAgeRange}</Badge>
-              </div>
-              
-              <div className="flex justify-between">
-                <span className="flex items-center gap-1">
-                  <MapPin className="w-3 h-3" />
-                  Distance:
-                </span>
-                <Badge variant="secondary">{stats.usersInDistance}</Badge>
-              </div>
-              
-              <div className="flex justify-between">
-                <span className="flex items-center gap-1 text-red-600">
-                  <Heart className="w-3 h-3" />
-                  Liked:
-                </span>
-                <Badge variant="destructive">{stats.likedUsers}</Badge>
-              </div>
-              
-              <div className="flex justify-between">
-                <span className="flex items-center gap-1 text-red-600">
-                  <X className="w-3 h-3" />
-                  Blocked:
-                </span>
-                <Badge variant="destructive">{stats.blockedUsers}</Badge>
-              </div>
-              
-              <div className="flex justify-between">
-                <span className="flex items-center gap-1 text-yellow-600">
-                  <Clock className="w-3 h-3" />
-                  Recent Passes:
-                </span>
-                <Badge variant="secondary">{stats.recentPasses}</Badge>
-              </div>
-            </div>
-            
-            <div className="border-t pt-3">
-              <div className="flex justify-between items-center">
-                <span className="font-semibold">Final Eligible Users:</span>
-                <Badge 
-                  variant={stats.finalEligibleUsers > 10 ? "default" : "destructive"}
-                  className="text-lg px-3 py-1"
-                >
-                  {stats.finalEligibleUsers}
-                </Badge>
-              </div>
-            </div>
+        {activeTab === 'userPool' && (
+          <>
+            <Button 
+              onClick={analyzeUserPool} 
+              disabled={isLoading}
+              className="w-full"
+              size="sm"
+            >
+              {isLoading ? (
+                <>
+                  <RefreshCw className="w-3 h-3 mr-1 animate-spin" />
+                  Analyzing...
+                </>
+              ) : (
+                <>
+                  <RefreshCw className="w-3 h-3 mr-1" />
+                  Analyze User Pool
+                </>
+              )}
+            </Button>
 
-            {stats.finalEligibleUsers < 10 && (
-              <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-3 text-sm">
-                <p className="font-medium text-yellow-800">Low User Pool Detected</p>
-                <p className="text-yellow-700 mt-1">
-                  Consider adjusting your preferences (age range, distance, gender) or the app may need more users in your area.
-                </p>
+            {stats && (
+              <div className="space-y-2">
+                <div className="grid grid-cols-2 gap-2 text-xs">
+                  <div className="flex justify-between p-2 bg-gray-50 rounded">
+                    <span>Total Users:</span>
+                    <Badge variant="secondary" className="text-xs">{stats.totalUsers}</Badge>
+                  </div>
+                  
+                  <div className="flex justify-between p-2 bg-gray-50 rounded">
+                    <span>Active:</span>
+                    <Badge variant="secondary" className="text-xs">{stats.activeUsers}</Badge>
+                  </div>
+                  
+                  <div className="flex justify-between p-2 bg-orange-50 rounded">
+                    <span className="flex items-center gap-1">
+                      <Archive className="w-3 h-3" />
+                      Archived:
+                    </span>
+                    <Badge variant="outline" className="text-xs">{stats.archivedUsers}</Badge>
+                  </div>
+                  
+                  <div className="flex justify-between p-2 bg-gray-50 rounded">
+                    <span>Gender Match:</span>
+                    <Badge variant="secondary" className="text-xs">{stats.usersWithPreferenceMatch}</Badge>
+                  </div>
+                  
+                  <div className="flex justify-between p-2 bg-gray-50 rounded">
+                    <span>Age Range:</span>
+                    <Badge variant="secondary" className="text-xs">{stats.usersInAgeRange}</Badge>
+                  </div>
+                  
+                  <div className="flex justify-between p-2 bg-gray-50 rounded">
+                    <span className="flex items-center gap-1">
+                      <MapPin className="w-3 h-3" />
+                      Distance:
+                    </span>
+                    <Badge variant="secondary" className="text-xs">{stats.usersInDistance}</Badge>
+                  </div>
+                  
+                  <div className="flex justify-between p-2 bg-red-50 rounded">
+                    <span className="flex items-center gap-1 text-red-600">
+                      <Heart className="w-3 h-3" />
+                      Liked:
+                    </span>
+                    <Badge variant="destructive" className="text-xs">{stats.likedUsers}</Badge>
+                  </div>
+                  
+                  <div className="flex justify-between p-2 bg-red-50 rounded">
+                    <span className="flex items-center gap-1 text-red-600">
+                      <X className="w-3 h-3" />
+                      Blocked:
+                    </span>
+                    <Badge variant="destructive" className="text-xs">{stats.blockedUsers}</Badge>
+                  </div>
+                  
+                  <div className="flex justify-between p-2 bg-yellow-50 rounded col-span-2">
+                    <span className="flex items-center gap-1 text-yellow-600">
+                      <Clock className="w-3 h-3" />
+                      Recent Passes (24h):
+                    </span>
+                    <Badge variant="secondary" className="text-xs">{stats.recentPasses}</Badge>
+                  </div>
+                </div>
+                
+                <div className="border-t pt-2">
+                  <div className="flex justify-between items-center p-2 bg-green-50 rounded">
+                    <span className="font-semibold text-sm flex items-center gap-1">
+                      <CheckCircle className="w-4 h-4 text-green-600" />
+                      Eligible Users:
+                    </span>
+                    <Badge 
+                      variant={stats.finalEligibleUsers > 10 ? "default" : "destructive"}
+                      className="text-sm px-2"
+                    >
+                      {stats.finalEligibleUsers}
+                    </Badge>
+                  </div>
+                </div>
+
+                {stats.finalEligibleUsers < 10 && (
+                  <div className="bg-yellow-50 border border-yellow-200 rounded p-2 text-xs">
+                    <p className="font-medium text-yellow-800 flex items-center gap-1">
+                      <AlertCircle className="w-3 h-3" />
+                      Low User Pool
+                    </p>
+                    <p className="text-yellow-700 mt-1">
+                      Consider adjusting preferences or the app needs more users.
+                    </p>
+                  </div>
+                )}
               </div>
             )}
-          </div>
+          </>
+        )}
+
+        {activeTab === 'system' && (
+          <>
+            <Button 
+              onClick={analyzeSystem} 
+              disabled={isLoading}
+              className="w-full"
+              size="sm"
+            >
+              {isLoading ? (
+                <>
+                  <RefreshCw className="w-3 h-3 mr-1 animate-spin" />
+                  Analyzing...
+                </>
+              ) : (
+                <>
+                  <Server className="w-3 h-3 mr-1" />
+                  Analyze System
+                </>
+              )}
+            </Button>
+
+            {systemStats && (
+              <div className="space-y-2">
+                <div className="grid grid-cols-2 gap-2 text-xs">
+                  <div className="flex justify-between p-2 bg-blue-50 rounded">
+                    <span className="flex items-center gap-1">
+                      <Bell className="w-3 h-3" />
+                      Push Tokens:
+                    </span>
+                    <Badge className="bg-blue-100 text-blue-700 text-xs">{systemStats.pushTokens}</Badge>
+                  </div>
+                  
+                  <div className="flex justify-between p-2 bg-green-50 rounded">
+                    <span className="flex items-center gap-1">
+                      <CreditCard className="w-3 h-3" />
+                      Active Subs:
+                    </span>
+                    <Badge className="bg-green-100 text-green-700 text-xs">{systemStats.activeSubscriptions}</Badge>
+                  </div>
+                  
+                  <div className="flex justify-between p-2 bg-purple-50 rounded">
+                    <span className="flex items-center gap-1">
+                      <Mail className="w-3 h-3" />
+                      Scheduled:
+                    </span>
+                    <Badge className="bg-purple-100 text-purple-700 text-xs">{systemStats.scheduledBroadcasts}</Badge>
+                  </div>
+                  
+                  <div className="flex justify-between p-2 bg-orange-50 rounded">
+                    <span className="flex items-center gap-1">
+                      <AlertCircle className="w-3 h-3" />
+                      Pending Payouts:
+                    </span>
+                    <Badge className="bg-orange-100 text-orange-700 text-xs">{systemStats.pendingPayouts}</Badge>
+                  </div>
+                  
+                  <div className="flex justify-between p-2 bg-pink-50 rounded">
+                    <span className="flex items-center gap-1">
+                      <Heart className="w-3 h-3" />
+                      Matches (7d):
+                    </span>
+                    <Badge className="bg-pink-100 text-pink-700 text-xs">{systemStats.recentMatches}</Badge>
+                  </div>
+                  
+                  <div className="flex justify-between p-2 bg-red-50 rounded">
+                    <span className="flex items-center gap-1">
+                      <Heart className="w-3 h-3" />
+                      Likes (24h):
+                    </span>
+                    <Badge className="bg-red-100 text-red-700 text-xs">{systemStats.recentLikes}</Badge>
+                  </div>
+                </div>
+
+                {systemStats.pendingPayouts > 0 && (
+                  <div className="bg-orange-50 border border-orange-200 rounded p-2 text-xs">
+                    <p className="font-medium text-orange-800 flex items-center gap-1">
+                      <AlertCircle className="w-3 h-3" />
+                      {systemStats.pendingPayouts} Pending Payout(s)
+                    </p>
+                    <p className="text-orange-700 mt-1">
+                      Review payouts in the Influencer Management section.
+                    </p>
+                  </div>
+                )}
+              </div>
+            )}
+          </>
         )}
       </CardContent>
     </Card>
