@@ -411,11 +411,15 @@ export default function ScheduledBroadcasts() {
                         <span>{broadcast.time_to_send}</span>
                       </div>
                       {broadcast.target_countries && broadcast.target_countries.length > 0 ? (
-                        <Badge variant="outline" className="text-xs">
-                          {broadcast.target_countries.length} {broadcast.target_countries.length === 1 ? 'country' : 'countries'}
-                        </Badge>
+                        <div className="flex flex-wrap gap-1">
+                          {broadcast.target_countries.map((code) => (
+                            <Badge key={code} variant="outline" className="text-xs">
+                              {getCountryName(code)}
+                            </Badge>
+                          ))}
+                        </div>
                       ) : (
-                        <Badge variant="outline" className="text-xs">All countries</Badge>
+                        <Badge variant="outline" className="text-xs bg-green-50">All countries</Badge>
                       )}
                       <Badge variant="outline" className="text-xs">
                         {broadcast.total_sends} sends

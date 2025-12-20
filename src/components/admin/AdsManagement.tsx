@@ -462,11 +462,13 @@ const AdsManagement = () => {
                           <span className="text-xs bg-green-100 text-green-600 px-2 py-0.5 rounded">Image</span>
                         )}
                         {ad.target_countries && ad.target_countries.length > 0 ? (
-                          <span className="text-xs bg-purple-100 text-purple-600 px-2 py-0.5 rounded">
-                            {ad.target_countries.length === 1 
-                              ? COUNTRY_OPTIONS.find(c => c.code === ad.target_countries[0])?.name || ad.target_countries[0]
-                              : `${ad.target_countries.length} countries`}
-                          </span>
+                          <div className="flex flex-wrap gap-1">
+                            {ad.target_countries.map((code) => (
+                              <span key={code} className="text-xs bg-purple-100 text-purple-600 px-2 py-0.5 rounded">
+                                {COUNTRY_OPTIONS.find(c => c.code === code)?.name || code}
+                              </span>
+                            ))}
+                          </div>
                         ) : (
                           <span className="text-xs bg-gray-100 text-gray-600 px-2 py-0.5 rounded">All countries</span>
                         )}

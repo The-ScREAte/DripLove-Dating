@@ -67,8 +67,9 @@ const PaymentSuccess: React.FC = () => {
     const tx_ref = params.get('tx_ref');
     const transaction_id = params.get('transaction_id');
     const reference = params.get('reference') || params.get('trxref') || params.get('txref') || params.get('tx_ref');
+    // Use transaction_id first, then reference - Paystack redirect uses reference
     const txnId = transaction_id || reference || null;
-    const payment_type = params.get('payment_type') || 'subscription'; // Default to subscription for backward compatibility
+    const payment_type = params.get('payment_type') || 'subscription';
 
     // If IAP (Apple or Google), just show success - the validator/verified handler already updated the DB
     if (payment_type === 'iap' && status === 'successful') {
