@@ -513,17 +513,23 @@ export function restorePurchases(): Promise<{ restored: boolean; message: string
     
     let hasRestoredPurchase = false;
     let restoreError: any = null;
+    let hasResolved = false;
     
-    // Set a timeout for the restore operation
-    const timeoutId = setTimeout(() => {
-      window.iapPurchaseInitiated = false;
-      if (hasRestoredPurchase) {
-        resolve({ restored: true, message: 'Subscription restored successfully' });
-      } else {
-        console.log('[IAP] Restore timeout - no active subscription found');
-        resolve({ restored: false, message: 'No active subscription found' });
+    const resolveOnce = (result: { restored: boolean; message: string }) => {
+      if (!hasResolved) {
+        hasResolved = true;
+        window.iapPurchaseInitiated = false;
+        resolve(result);
       }
-    }, 8000);
+    };
+    
+    const rejectOnce = (error: any) => {
+      if (!hasResolved) {
+        hasResolved = true;
+        window.iapPurchaseInitiated = false;
+        reject(error);
+      }
+    };
     
     // Set up temporary listener for owned products during restore
     const PRODUCT_IDS = [
@@ -531,166 +537,118 @@ export function restorePurchases(): Promise<{ restored: boolean; message: string
       'com.driplove.dating.premium.monthlysub2'
     ];
     
-    const onProductUpdated = async (product: any) => {
-      // Check if this is one of our products and it's owned
-      if (product && PRODUCT_IDS.includes(product.id) && product.owned && product.canPurchase === false) {
-        console.log('[IAP] Found owned product during restore:', product.id);
-        hasRestoredPurchase = true;
+    const activateSubscription = async (productId: string, transactionId?: string, receiptData?: string) => {
+      try {
+        const { supabase } = await import('@/integrations/supabase/client');
+        const { data: { user } } = await supabase.auth.getUser();
         
-        // Try to get the latest transaction for this product
-        const transaction = product.transaction || product.latestTransaction;
-        if (transaction) {
-          console.log('[IAP] Processing restored transaction...');
-          
+        if (!user) {
+          console.error('[IAP] No user found during restore');
+          return false;
+        }
+        
+        let expiryDate = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000);
+        
+        // Try server validation if we have receipt data
+        if (receiptData) {
+          console.log('[IAP] Validating restored receipt...');
           try {
-            // Import supabase client
-            const { supabase } = await import('@/integrations/supabase/client');
-            const { data: { user } } = await supabase.auth.getUser();
-            
-            if (user) {
-              // Get receipt data
-              const receiptData = transaction.appStoreReceipt || transaction.receipt || transaction.transactionReceipt;
-              
-              if (receiptData) {
-                console.log('[IAP] Validating restored receipt...');
-                
-                // Validate with server
-                const { data: validation, error } = await supabase.functions.invoke('iap-receipt-validator', {
-                  body: {
-                    receiptData: receiptData,
-                    productId: product.id,
-                    userId: user.id,
-                    transactionId: transaction.transactionId || transaction.id
-                  }
-                });
-                
-                console.log('[IAP] Validation result:', { validation, error });
-                
-                // If validation succeeds OR fails (fallback to direct update)
-                const isActive = validation?.active || !error;
-                
-                if (isActive) {
-                  console.log('[IAP] Restoring subscription...');
-                  
-                  // Calculate expiry date from validation or use 30 days
-                  const expiryDate = validation?.expiresDate 
-                    ? new Date(validation.expiresDate)
-                    : new Date(Date.now() + 30 * 24 * 60 * 60 * 1000);
-                  
-                  const subscriptionData = {
-                    user_id: user.id,
-                    plan_name: 'premium',
-                    status: 'active',
-                    flutterwave_transaction_id: transaction.transactionId || transaction.id,
-                    starts_at: validation?.purchaseDate ? new Date(validation.purchaseDate).toISOString() : new Date().toISOString(),
-                    expires_at: expiryDate.toISOString(),
-                    next_billing_date: expiryDate.toISOString(),
-                    auto_renew: true,
-                    payment_method: 'apple',
-                    payment_attempts: 0,
-                    updated_at: new Date().toISOString(),
-                  };
-                  
-                  console.log('[IAP] Updating subscription with data:', subscriptionData);
-                  
-                  const { error: upsertError } = await supabase
-                    .from('user_subscriptions')
-                    .upsert(subscriptionData, { onConflict: 'user_id' });
-                  
-                  if (upsertError) {
-                    console.error('[IAP] Database update error:', upsertError);
-                    hasRestoredPurchase = false;
-                    restoreError = upsertError;
-                  } else {
-                    console.log('[IAP] ✅ Subscription restored successfully!');
-                    hasRestoredPurchase = true;
-                  }
-                } else {
-                  console.log('[IAP] Restored subscription is not active or validation failed');
-                  hasRestoredPurchase = false;
-                }
-              } else {
-                // No receipt data - use direct update as fallback
-                console.log('[IAP] No receipt data for restore, using direct update');
-                
-                const expiryDate = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000);
-                const subscriptionData = {
-                  user_id: user.id,
-                  plan_name: 'premium',
-                  status: 'active',
-                  flutterwave_transaction_id: transaction.transactionId || transaction.id || product.id,
-                  starts_at: new Date().toISOString(),
-                  expires_at: expiryDate.toISOString(),
-                  next_billing_date: expiryDate.toISOString(),
-                  auto_renew: true,
-                  payment_method: 'apple',
-                  payment_attempts: 0,
-                  updated_at: new Date().toISOString(),
-                };
-                
-                const { error: upsertError } = await supabase
-                  .from('user_subscriptions')
-                  .upsert(subscriptionData, { onConflict: 'user_id' });
-                
-                if (upsertError) {
-                  console.error('[IAP] Database update error:', upsertError);
-                  hasRestoredPurchase = false;
-                  restoreError = upsertError;
-                } else {
-                  console.log('[IAP] ✅ Subscription restored via fallback!');
-                  hasRestoredPurchase = true;
-                }
+            const { data: validation } = await supabase.functions.invoke('iap-receipt-validator', {
+              body: {
+                receiptData: receiptData,
+                productId: productId,
+                userId: user.id,
+                transactionId: transactionId
               }
-            }
-          } catch (error) {
-            console.error('[IAP] Error processing restored purchase:', error);
-            restoreError = error;
-            hasRestoredPurchase = false;
-          }
-        } else {
-          // No transaction data - still mark as owned and update directly
-          console.log('[IAP] No transaction data, updating based on ownership');
-          
-          try {
-            const { supabase } = await import('@/integrations/supabase/client');
-            const { data: { user } } = await supabase.auth.getUser();
+            });
             
-            if (user) {
-              const expiryDate = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000);
-              const subscriptionData = {
-                user_id: user.id,
-                plan_name: 'premium',
-                status: 'active',
-                flutterwave_transaction_id: product.id,
-                starts_at: new Date().toISOString(),
-                expires_at: expiryDate.toISOString(),
-                next_billing_date: expiryDate.toISOString(),
-                auto_renew: true,
-                payment_method: 'apple',
-                payment_attempts: 0,
-                updated_at: new Date().toISOString(),
-              };
-              
-              const { error: upsertError } = await supabase
-                .from('user_subscriptions')
-                .upsert(subscriptionData, { onConflict: 'user_id' });
-              
-              if (upsertError) {
-                console.error('[IAP] Database update error:', upsertError);
-                hasRestoredPurchase = false;
-                restoreError = upsertError;
-              } else {
-                console.log('[IAP] ✅ Subscription restored based on ownership!');
-                hasRestoredPurchase = true;
-              }
+            if (validation?.active && validation?.expiresDate) {
+              expiryDate = new Date(validation.expiresDate);
+              console.log('[IAP] Server validated expiry:', expiryDate);
             }
-          } catch (error) {
-            console.error('[IAP] Error updating subscription:', error);
-            restoreError = error;
-            hasRestoredPurchase = false;
+          } catch (valError) {
+            console.warn('[IAP] Validation failed, using default expiry:', valError);
           }
         }
+        
+        const subscriptionData = {
+          user_id: user.id,
+          plan_name: 'premium',
+          status: 'active',
+          flutterwave_transaction_id: transactionId || productId,
+          starts_at: new Date().toISOString(),
+          expires_at: expiryDate.toISOString(),
+          next_billing_date: expiryDate.toISOString(),
+          auto_renew: true,
+          payment_method: 'apple',
+          payment_attempts: 0,
+          updated_at: new Date().toISOString(),
+        };
+        
+        console.log('[IAP] Updating subscription...');
+        
+        const { error: upsertError } = await supabase
+          .from('user_subscriptions')
+          .upsert(subscriptionData, { onConflict: 'user_id' });
+        
+        if (upsertError) {
+          console.error('[IAP] Database update error:', upsertError);
+          return false;
+        }
+        
+        console.log('[IAP] ✅ Subscription restored successfully!');
+        return true;
+      } catch (error) {
+        console.error('[IAP] Error activating subscription:', error);
+        return false;
       }
+    };
+    
+    const onProductUpdated = async (product: any) => {
+      if (hasResolved) return;
+      
+      // Check if this is one of our products and it's owned
+      if (product && PRODUCT_IDS.includes(product.id) && product.owned) {
+        console.log('[IAP] Found owned product during restore:', product.id);
+        
+        const transaction = product.transaction || product.latestTransaction;
+        const receiptData = transaction?.appStoreReceipt || transaction?.receipt || transaction?.transactionReceipt;
+        const transactionId = transaction?.transactionId || transaction?.id;
+        
+        const success = await activateSubscription(product.id, transactionId, receiptData);
+        
+        if (success) {
+          hasRestoredPurchase = true;
+          resolveOnce({ restored: true, message: 'Subscription restored successfully' });
+        }
+      }
+    };
+    
+    // Also check existing products immediately
+    const checkExistingProducts = async () => {
+      for (const id of PRODUCT_IDS) {
+        try {
+          const product = store.get?.(id);
+          if (product && product.owned) {
+            console.log('[IAP] Found already-owned product:', id);
+            
+            const transaction = product.transaction || product.latestTransaction;
+            const receiptData = transaction?.appStoreReceipt || transaction?.receipt || transaction?.transactionReceipt;
+            const transactionId = transaction?.transactionId || transaction?.id;
+            
+            const success = await activateSubscription(id, transactionId, receiptData);
+            
+            if (success) {
+              hasRestoredPurchase = true;
+              resolveOnce({ restored: true, message: 'Subscription restored successfully' });
+              return true;
+            }
+          }
+        } catch (err) {
+          console.warn('[IAP] Error checking product:', id, err);
+        }
+      }
+      return false;
     };
     
     // Set up listener
@@ -702,6 +660,10 @@ export function restorePurchases(): Promise<{ restored: boolean; message: string
       }
     }
     
+    // Check existing products first
+    const foundExisting = await checkExistingProducts();
+    if (foundExisting) return;
+    
     // Trigger the restore/refresh
     if (store.restorePurchases && typeof store.restorePurchases === 'function') {
       console.log('[IAP] Calling store.restorePurchases()...');
@@ -710,26 +672,23 @@ export function restorePurchases(): Promise<{ restored: boolean; message: string
       console.log('[IAP] Calling store.refresh()...');
       store.refresh();
     } else {
-      clearTimeout(timeoutId);
-      window.iapPurchaseInitiated = false;
       console.error('[IAP] No restore or refresh method available');
-      reject(new Error('Restore method not available'));
+      rejectOnce(new Error('Restore method not available'));
       return;
     }
     
-    // Wait for processing to complete
+    // Wait for processing to complete (reduced timeout)
     setTimeout(() => {
-      clearTimeout(timeoutId);
-      window.iapPurchaseInitiated = false;
-      
-      if (restoreError) {
-        reject(restoreError);
-      } else if (hasRestoredPurchase) {
-        resolve({ restored: true, message: 'Subscription restored successfully' });
-      } else {
-        resolve({ restored: false, message: 'No active subscription found' });
+      if (!hasResolved) {
+        if (restoreError) {
+          rejectOnce(restoreError);
+        } else if (hasRestoredPurchase) {
+          resolveOnce({ restored: true, message: 'Subscription restored successfully' });
+        } else {
+          resolveOnce({ restored: false, message: 'No active subscription found' });
+        }
       }
-    }, 6000);
+    }, 5000);
   });
 }
 
