@@ -12,7 +12,8 @@ import {
   Crown,
   Pause,
   Activity,
-  History
+  History,
+  Archive
 } from 'lucide-react';
 import { AdminStats } from '@/types';
 
@@ -96,6 +97,12 @@ const StatsCard: React.FC<StatsCardProps> = ({ stats }) => {
             <History className="w-8 h-8 text-slate-600 mb-2" />
             <span className="text-2xl font-bold text-slate-600">{stats.total_users_ever || stats.total_users}</span>
             <span className="text-sm text-gray-600 text-center">Total Users Ever</span>
+          </div>
+          
+          <div className="flex flex-col items-center p-4 bg-amber-50 rounded-lg">
+            <Archive className="w-8 h-8 text-amber-600 mb-2" />
+            <span className="text-2xl font-bold text-amber-600">{stats.archived_users || 0}</span>
+            <span className="text-sm text-gray-600 text-center">Archived Users</span>
           </div>
         </div>
       </CardContent>

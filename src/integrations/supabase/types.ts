@@ -692,6 +692,7 @@ export type Database = {
           interests: string[] | null
           introvert_extrovert: number | null
           is_admin: boolean | null
+          is_archived: boolean | null
           is_custom_city: boolean | null
           last_googled: string | null
           last_login_at: string | null
@@ -742,6 +743,7 @@ export type Database = {
           interests?: string[] | null
           introvert_extrovert?: number | null
           is_admin?: boolean | null
+          is_archived?: boolean | null
           is_custom_city?: boolean | null
           last_googled?: string | null
           last_login_at?: string | null
@@ -792,6 +794,7 @@ export type Database = {
           interests?: string[] | null
           introvert_extrovert?: number | null
           is_admin?: boolean | null
+          is_archived?: boolean | null
           is_custom_city?: boolean | null
           last_googled?: string | null
           last_login_at?: string | null
@@ -1560,6 +1563,7 @@ export type Database = {
         Args: { admin_notes?: string; image_id: string }
         Returns: boolean
       }
+      auto_archive_inactive_users: { Args: never; Returns: undefined }
       calculate_distance: {
         Args: { lat1: number; lat2: number; lon1: number; lon2: number }
         Returns: number
