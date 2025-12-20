@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useMemo } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -11,8 +11,10 @@ interface UserModerationPanelProps {
   users: AdminUser[];
   searchTerm: string;
   statusFilter: string;
+  lastLoginFilter: string;
   onSearchChange: (term: string) => void;
   onStatusFilterChange: (status: string) => void;
+  onLastLoginFilterChange: (filter: string) => void;
   onViewProfile: (userId: string) => void;
   onBlockUser: (userId: string, block: boolean) => void;
   onHoldUser: (userId: string, hold: boolean) => void;
@@ -26,8 +28,10 @@ const UserModerationPanel: React.FC<UserModerationPanelProps> = ({
   users,
   searchTerm,
   statusFilter,
+  lastLoginFilter,
   onSearchChange,
   onStatusFilterChange,
+  onLastLoginFilterChange,
   onViewProfile,
   onBlockUser,
   onHoldUser,
@@ -36,15 +40,47 @@ const UserModerationPanel: React.FC<UserModerationPanelProps> = ({
   holdingUsers,
   deletingUsers
 }) => {
-  const filteredUsers = users.filter(user => {
-    const matchesSearch = user.first_name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      user.last_name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      user.email.toLowerCase().includes(searchTerm.toLowerCase());
-    
-    const matchesStatus = statusFilter === 'all' || user.account_status === statusFilter;
-    
-    return matchesSearch && matchesStatus;
-  });
+  const getLastLoginFilterDate = (filter: string): Date | null => {
+    const now = new Date();
+    switch (filter) {
+      case 'today':
+        return new Date(now.getFullYear(), now.getMonth(), now.getDate());
+      case '3_days':
+        return new Date(now.getTime() - 3 * 24 * 60 * 60 * 1000);
+      case '1_week':
+        return new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
+      case '2_weeks':
+        return new Date(now.getTime() - 14 * 24 * 60 * 60 * 1000);
+      case '1_month':
+        return new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
+      case '3_months':
+        return new Date(now.getTime() - 90 * 24 * 60 * 60 * 1000);
+      default:
+        return null;
+    }
+  };
+
+  const filteredUsers = useMemo(() => {
+    return users.filter(user => {
+      const matchesSearch = user.first_name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        user.last_name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        user.email.toLowerCase().includes(searchTerm.toLowerCase());
+      
+      const matchesStatus = statusFilter === 'all' || user.account_status === statusFilter;
+      
+      // Last login filter
+      let matchesLastLogin = true;
+      if (lastLoginFilter !== 'all') {
+        const filterDate = getLastLoginFilterDate(lastLoginFilter);
+        if (filterDate) {
+          const lastLoginDate = user.last_login_at ? new Date(user.last_login_at) : null;
+          matchesLastLogin = lastLoginDate ? lastLoginDate >= filterDate : false;
+        }
+      }
+      
+      return matchesSearch && matchesStatus && matchesLastLogin;
+    });
+  }, [users, searchTerm, statusFilter, lastLoginFilter]);
 
   const getStatusBadge = (status: string) => {
     switch (status) {
@@ -57,6 +93,25 @@ const UserModerationPanel: React.FC<UserModerationPanelProps> = ({
       default:
         return <Badge variant="outline">{status}</Badge>;
     }
+  };
+
+  const formatLastLogin = (lastLoginAt: string | null, createdAt: string) => {
+    // If no last_login_at, use created_at since account creation logs them in
+    const dateToUse = lastLoginAt || createdAt;
+    const date = new Date(dateToUse);
+    const now = new Date();
+    const diffMs = now.getTime() - date.getTime();
+    const diffDays = Math.floor(diffMs / (24 * 60 * 60 * 1000));
+    const diffHours = Math.floor(diffMs / (60 * 60 * 1000));
+    const diffMins = Math.floor(diffMs / (60 * 1000));
+
+    if (diffMins < 5) return 'Just now';
+    if (diffMins < 60) return `${diffMins}m ago`;
+    if (diffHours < 24) return `${diffHours}h ago`;
+    if (diffDays === 1) return 'Yesterday';
+    if (diffDays < 7) return `${diffDays}d ago`;
+    if (diffDays < 30) return `${Math.floor(diffDays / 7)}w ago`;
+    return date.toLocaleDateString();
   };
 
   return (
@@ -77,7 +132,7 @@ const UserModerationPanel: React.FC<UserModerationPanelProps> = ({
             />
           </div>
           <Select value={statusFilter} onValueChange={onStatusFilterChange}>
-            <SelectTrigger className="w-full sm:w-48">
+            <SelectTrigger className="w-full sm:w-40">
               <SelectValue placeholder="Filter by status" />
             </SelectTrigger>
             <SelectContent>
@@ -85,6 +140,20 @@ const UserModerationPanel: React.FC<UserModerationPanelProps> = ({
               <SelectItem value="active">Active</SelectItem>
               <SelectItem value="blocked">Blocked</SelectItem>
               <SelectItem value="on_hold">On Hold</SelectItem>
+            </SelectContent>
+          </Select>
+          <Select value={lastLoginFilter} onValueChange={onLastLoginFilterChange}>
+            <SelectTrigger className="w-full sm:w-44">
+              <SelectValue placeholder="Last active" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">All Time</SelectItem>
+              <SelectItem value="today">Today</SelectItem>
+              <SelectItem value="3_days">Last 3 Days</SelectItem>
+              <SelectItem value="1_week">Last Week</SelectItem>
+              <SelectItem value="2_weeks">Last 2 Weeks</SelectItem>
+              <SelectItem value="1_month">Last Month</SelectItem>
+              <SelectItem value="3_months">Last 3 Months</SelectItem>
             </SelectContent>
           </Select>
         </div>
@@ -100,6 +169,7 @@ const UserModerationPanel: React.FC<UserModerationPanelProps> = ({
                 <th className="text-left p-2">Location</th>
                 <th className="text-left p-2">Premium</th>
                 <th className="text-left p-2">Joined</th>
+                <th className="text-left p-2">Last Active</th>
                 <th className="text-left p-2">Actions</th>
               </tr>
             </thead>
@@ -126,6 +196,11 @@ const UserModerationPanel: React.FC<UserModerationPanelProps> = ({
                   </td>
                   <td className="p-2 text-sm">
                     {new Date(user.created_at).toLocaleDateString()}
+                  </td>
+                  <td className="p-2 text-sm">
+                    <span className="text-gray-600">
+                      {formatLastLogin(user.last_login_at, user.created_at)}
+                    </span>
                   </td>
                   <td className="p-2">
                     <div className="flex space-x-1">
