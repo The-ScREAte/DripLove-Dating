@@ -72,7 +72,11 @@
     {
       "id" : "D6764023",
       "localizations" : [
-
+        {
+          "description" : "Get unlimited access to premium features",
+          "displayName" : "Premium",
+          "locale" : "en_US"
+        }
       ],
       "name" : "DripLove Premium Subscription",
       "subscriptions" : [
@@ -83,15 +87,15 @@
           "codeOffers" : [
 
           ],
-          "displayPrice" : "1.99",
+          "displayPrice" : "1.90",
           "familyShareable" : false,
           "groupNumber" : 1,
           "internalID" : "0387B296",
           "introductoryOffer" : null,
           "localizations" : [
             {
-              "description" : "",
-              "displayName" : "",
+              "description" : "Premium monthly subscription",
+              "displayName" : "DripLove Premium",
               "locale" : "en_US"
             }
           ],
@@ -111,15 +115,15 @@
           "codeOffers" : [
 
           ],
-          "displayPrice" : "1.99",
+          "displayPrice" : "1.90",
           "familyShareable" : false,
           "groupNumber" : 1,
           "internalID" : "0387B297",
           "introductoryOffer" : null,
           "localizations" : [
             {
-              "description" : "",
-              "displayName" : "",
+              "description" : "Premium monthly subscription v3",
+              "displayName" : "DripLove Premium",
               "locale" : "en_US"
             }
           ],

@@ -31,6 +31,8 @@ export function initIAP() {
         // Use ERROR level in production, DEBUG only in development
         const isDevelopment = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
         log.setLevel(isDevelopment ? LogLevel.DEBUG : LogLevel.ERROR);
+        console.log('[IAP] Log level set to:', isDevelopment ? 'DEBUG' : 'ERROR');
+        console.log('[IAP] Environment:', isDevelopment ? 'DEVELOPMENT (StoreKit Testing)' : 'PRODUCTION');
       }
 
       // Disable automatic error popups from the plugin
@@ -54,14 +56,18 @@ export function initIAP() {
     // Determine platform for registration
     const currentPlatform = isAndroid() ? Platform.GOOGLE_PLAY : Platform.APPLE_APPSTORE;
     console.log('[IAP] Registering products for platform:', isAndroid() ? 'GOOGLE_PLAY' : 'APPLE_APPSTORE');
+    console.log('[IAP] Product IDs to register:', PRODUCT_IDS);
 
     // 2️⃣ Register all of them with the store for the correct platform
     if (store.register && typeof store.register === 'function') {
-      store.register(PRODUCT_IDS.map(id => ({
+      const productsToRegister = PRODUCT_IDS.map(id => ({
         id,
         platform: currentPlatform,
         type: ProductType.PAID_SUBSCRIPTION
-      })));
+      }));
+      console.log('[IAP] Registering products:', JSON.stringify(productsToRegister, null, 2));
+      store.register(productsToRegister);
+      console.log('[IAP] Products registered, waiting for productUpdated events...');
     } else {
       console.error('[IAP] store.register not available');
       clearTimeout(initializationTimeout);
@@ -74,13 +80,23 @@ export function initIAP() {
       store.error(e => {
         // Only log to console, don't show user-facing errors here
         // User-facing errors will be handled in the UI layer
-        console.warn('[IAP] Store error:', e?.code, e?.message);
+        console.warn('[IAP] Store error:', {
+          code: e?.code,
+          message: e?.message,
+          isSetupError: e?.code === 'SETUP',
+          isCommunicationError: e?.code === 'COMMUNICATION'
+        });
         
         // Reset loading state on error
         window.iapPurchaseInitiated = false;
         
         // Set flag to indicate connection failed (for UI to handle)
         if (e?.code === 'SETUP' || e?.code === 'COMMUNICATION') {
+          console.error('[IAP] Connection to App Store failed. Make sure:', 
+            '\n  1. You are running from Xcode (not standalone)',
+            '\n  2. StoreKit Configuration is enabled in scheme',
+            '\n  3. You are signed out of production App Store'
+          );
           window.iapInitializationFailed = true;
         }
       });
@@ -88,14 +104,27 @@ export function initIAP() {
     
     // 3) Core lifecycle - using the correct API structure
     if (store.when && typeof store.when === 'function') {
+      console.log('[IAP] Setting up store.when() event handlers...');
       store.when()
         .productUpdated(p => {
           // Product updated successfully - clear initialization timeout
+          console.log('[IAP] productUpdated event received for:', p?.id);
+          
           // Check if it's one of our registered products
           const isOurProduct = PRODUCT_IDS.includes(p?.id);
           if (p && isOurProduct) {
+            console.log('[IAP] ✅ Product loaded successfully:', p.id, 'Price:', p.pricing?.price);
+            console.log('[IAP] Product details:', {
+              id: p.id,
+              title: p.title,
+              canPurchase: p.canPurchase,
+              owned: p.owned,
+              state: p.state
+            });
             clearTimeout(initializationTimeout);
             window.iapInitializationFailed = false;
+          } else if (p) {
+            console.log('[IAP] Ignoring product (not in our list):', p.id);
           }
         })
         .approved(t => {
@@ -176,28 +205,60 @@ export function initIAP() {
                     updated_at: new Date().toISOString(),
                   };
 
-                  await supabase
+                  console.log('[IAP] Updating subscription (fallback):', subscriptionData);
+                  const { data: upsertData, error: upsertError } = await supabase
                     .from('user_subscriptions')
                     .upsert(subscriptionData, { onConflict: 'user_id' });
 
+                  if (upsertError) {
+                    console.error('[IAP] ❌ Database update failed:', upsertError);
+                    alert('Failed to activate subscription. Please contact support.');
+                    return;
+                  }
+                  
+                  console.log('[IAP] ✅ Subscription activated via fallback!', upsertData);
                   window.location.href = '/payment-success?status=successful&payment_type=iap';
                   return;
                 }
 
                 if (validation.active) {
+                  console.log('[IAP] Validation successful, updating subscription...');
                   
-                  // Reset payment attempts on successful validation
-                  await supabase
+                  // Calculate expiry date from validation or use 30 days
+                  const expiryDate = validation.expiresDate 
+                    ? new Date(validation.expiresDate)
+                    : new Date(Date.now() + 30 * 24 * 60 * 60 * 1000);
+                  
+                  const subscriptionData = {
+                    user_id: user.id,
+                    plan_name: 'premium',
+                    status: 'active',
+                    flutterwave_transaction_id: r.transactionId || r.productId || null,
+                    starts_at: validation.purchaseDate ? new Date(validation.purchaseDate).toISOString() : new Date().toISOString(),
+                    expires_at: expiryDate.toISOString(),
+                    next_billing_date: expiryDate.toISOString(),
+                    auto_renew: true,
+                    payment_method: paymentMethod,
+                    payment_attempts: 0,
+                    updated_at: new Date().toISOString(),
+                  };
+                  
+                  console.log('[IAP] Subscription data:', subscriptionData);
+                  const { data: upsertData, error: upsertError } = await supabase
                     .from('user_subscriptions')
-                    .update({ 
-                      payment_attempts: 0,
-                      updated_at: new Date().toISOString()
-                    })
-                    .eq('user_id', user.id);
+                    .upsert(subscriptionData, { onConflict: 'user_id' });
                   
+                  if (upsertError) {
+                    console.error('[IAP] ❌ Database update failed:', upsertError);
+                    alert('Failed to activate subscription. Please contact support.');
+                    return;
+                  }
+                  
+                  console.log('[IAP] ✅ Subscription activated successfully!', upsertData);
                   // Redirect to success page
                   window.location.href = '/payment-success?status=successful&payment_type=iap';
                 } else {
+                  console.warn('[IAP] Subscription not active according to validation');
                   alert('Your subscription has expired. Please renew your subscription.');
                 }
               } else {
@@ -215,15 +276,23 @@ export function initIAP() {
                   next_billing_date: expiryDate.toISOString(),
                   auto_renew: true,
                   payment_method: paymentMethod,
-                  payment_attempts: 0, // Reset payment attempts
+                  payment_attempts: 0,
                   updated_at: new Date().toISOString(),
                 };
 
+                console.log('[IAP] Updating subscription:', subscriptionData);
                 // Upsert subscription
-                await supabase
+                const { data: upsertData, error: upsertError } = await supabase
                   .from('user_subscriptions')
                   .upsert(subscriptionData, { onConflict: 'user_id' });
 
+                if (upsertError) {
+                  console.error('[IAP] ❌ Database update failed:', upsertError);
+                  alert('Failed to activate subscription. Please contact support.');
+                  return;
+                }
+                
+                console.log('[IAP] ✅ Subscription activated!', upsertData);
                 window.location.href = '/payment-success?status=successful&payment_type=iap';
               }
             }
@@ -285,16 +354,22 @@ export function initIAP() {
           ? { platform: initPlatform }
           : { platform: initPlatform, options: { needAppReceipt: true } };
         
+        console.log('[IAP] Calling store.initialize with platform:', initPlatform);
         store.initialize([initOptions]);
+        console.log('[IAP] store.initialize called successfully');
         
         // Add a ready state handler to clear timeout and resolve promise
         if (store.ready && typeof store.ready === 'function') {
+          console.log('[IAP] Setting up store.ready() handler...');
           store.ready(() => {
+            console.log('[IAP] ✅ Store is READY! Products should be loaded now.');
+            console.log('[IAP] Available products:', store.products?.map(p => ({ id: p.id, title: p.title, price: p.pricing?.price })));
             clearTimeout(initializationTimeout);
             window.iapInitializationFailed = false;
             resolve(); // Resolve when store is ready
           });
         } else {
+          console.warn('[IAP] store.ready() not available, using timeout fallback');
           // If no ready handler, resolve after a short delay
           setTimeout(() => {
             clearTimeout(initializationTimeout);
@@ -369,8 +444,16 @@ export const buyMonthly = async () => {
   for (const id of PRODUCT_IDS) {
     try {
       const p = store.get ? store.get(id) : null;
+      console.log(`[IAP] Checking product ${id}:`, { 
+        exists: !!p, 
+        canPurchase: p?.canPurchase, 
+        owned: p?.owned,
+        title: p?.title,
+        price: p?.pricing?.price
+      });
       if (p && p.canPurchase) {
         product = p;
+        console.log(`[IAP] ✅ Selected product: ${id}`);
         break;
       }
     } catch (err) {
@@ -380,6 +463,7 @@ export const buyMonthly = async () => {
 
   if (!product) {
     console.error('[IAP] No valid product found among:', PRODUCT_IDS);
+    console.log('[IAP] Available products:', store.products?.map(p => ({ id: p.id, canPurchase: p.canPurchase, title: p.title })));
     window.iapPurchaseInitiated = false;
     throw new Error('No valid subscription product available');
   }
@@ -388,9 +472,10 @@ export const buyMonthly = async () => {
   try {
     const offer = product.getOffer?.();
     if (offer && typeof offer.order === 'function') {
+      console.log('[IAP] Ordering product:', product.id);
       await offer.order();
     } else {
-      console.error('[IAP] No valid offer found');
+      console.error('[IAP] No valid offer found for product:', product.id);
       window.iapPurchaseInitiated = false;
       throw new Error('No valid offer available');
     }
@@ -401,9 +486,9 @@ export const buyMonthly = async () => {
   }
 };
 
-// Call to restore purchases - returns a Promise
-export function restorePurchases(): Promise<void> {
-  return new Promise((resolve, reject) => {
+// Call to restore purchases - returns a Promise with restoration result
+export function restorePurchases(): Promise<{ restored: boolean; message: string }> {
+  return new Promise(async (resolve, reject) => {
     // @ts-ignore
     const store = window.CdvPurchase?.store;
     
@@ -413,16 +498,190 @@ export function restorePurchases(): Promise<void> {
       return;
     }
     
+    console.log('[IAP] Starting restore purchases...');
+    
+    // Mark that we're restoring (similar to purchase initiation)
+    window.iapPurchaseInitiated = true;
+    
+    let hasRestoredPurchase = false;
+    let restoreError: any = null;
+    
     // Set a timeout for the restore operation
     const timeoutId = setTimeout(() => {
-      resolve();
-    }, 5000);
+      window.iapPurchaseInitiated = false;
+      if (hasRestoredPurchase) {
+        resolve({ restored: true, message: 'Subscription restored successfully' });
+      } else {
+        console.log('[IAP] Restore timeout - no active subscription found');
+        resolve({ restored: false, message: 'No active subscription found' });
+      }
+    }, 8000);
     
-    // Listen for product updates during restore
-    let restoredCount = 0;
-    const onProductUpdated = (product: any) => {
-      if (product && product.owned) {
-        restoredCount++;
+    // Set up temporary listener for owned products during restore
+    const PRODUCT_IDS = [
+      'com.driplove.dating.premium.monthlysub3',
+      'com.driplove.dating.premium.monthlysub2'
+    ];
+    
+    const onProductUpdated = async (product: any) => {
+      // Check if this is one of our products and it's owned
+      if (product && PRODUCT_IDS.includes(product.id) && product.owned && product.canPurchase === false) {
+        console.log('[IAP] Found owned product during restore:', product.id);
+        hasRestoredPurchase = true;
+        
+        // Try to get the latest transaction for this product
+        const transaction = product.transaction || product.latestTransaction;
+        if (transaction) {
+          console.log('[IAP] Processing restored transaction...');
+          
+          try {
+            // Import supabase client
+            const { supabase } = await import('@/integrations/supabase/client');
+            const { data: { user } } = await supabase.auth.getUser();
+            
+            if (user) {
+              // Get receipt data
+              const receiptData = transaction.appStoreReceipt || transaction.receipt || transaction.transactionReceipt;
+              
+              if (receiptData) {
+                console.log('[IAP] Validating restored receipt...');
+                
+                // Validate with server
+                const { data: validation, error } = await supabase.functions.invoke('iap-receipt-validator', {
+                  body: {
+                    receiptData: receiptData,
+                    productId: product.id,
+                    userId: user.id,
+                    transactionId: transaction.transactionId || transaction.id
+                  }
+                });
+                
+                console.log('[IAP] Validation result:', { validation, error });
+                
+                // If validation succeeds OR fails (fallback to direct update)
+                const isActive = validation?.active || !error;
+                
+                if (isActive) {
+                  console.log('[IAP] Restoring subscription...');
+                  
+                  // Calculate expiry date from validation or use 30 days
+                  const expiryDate = validation?.expiresDate 
+                    ? new Date(validation.expiresDate)
+                    : new Date(Date.now() + 30 * 24 * 60 * 60 * 1000);
+                  
+                  const subscriptionData = {
+                    user_id: user.id,
+                    plan_name: 'premium',
+                    status: 'active',
+                    flutterwave_transaction_id: transaction.transactionId || transaction.id,
+                    starts_at: validation?.purchaseDate ? new Date(validation.purchaseDate).toISOString() : new Date().toISOString(),
+                    expires_at: expiryDate.toISOString(),
+                    next_billing_date: expiryDate.toISOString(),
+                    auto_renew: true,
+                    payment_method: 'apple',
+                    payment_attempts: 0,
+                    updated_at: new Date().toISOString(),
+                  };
+                  
+                  console.log('[IAP] Updating subscription with data:', subscriptionData);
+                  
+                  const { error: upsertError } = await supabase
+                    .from('user_subscriptions')
+                    .upsert(subscriptionData, { onConflict: 'user_id' });
+                  
+                  if (upsertError) {
+                    console.error('[IAP] Database update error:', upsertError);
+                    hasRestoredPurchase = false;
+                    restoreError = upsertError;
+                  } else {
+                    console.log('[IAP] ✅ Subscription restored successfully!');
+                    hasRestoredPurchase = true;
+                  }
+                } else {
+                  console.log('[IAP] Restored subscription is not active or validation failed');
+                  hasRestoredPurchase = false;
+                }
+              } else {
+                // No receipt data - use direct update as fallback
+                console.log('[IAP] No receipt data for restore, using direct update');
+                
+                const expiryDate = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000);
+                const subscriptionData = {
+                  user_id: user.id,
+                  plan_name: 'premium',
+                  status: 'active',
+                  flutterwave_transaction_id: transaction.transactionId || transaction.id || product.id,
+                  starts_at: new Date().toISOString(),
+                  expires_at: expiryDate.toISOString(),
+                  next_billing_date: expiryDate.toISOString(),
+                  auto_renew: true,
+                  payment_method: 'apple',
+                  payment_attempts: 0,
+                  updated_at: new Date().toISOString(),
+                };
+                
+                const { error: upsertError } = await supabase
+                  .from('user_subscriptions')
+                  .upsert(subscriptionData, { onConflict: 'user_id' });
+                
+                if (upsertError) {
+                  console.error('[IAP] Database update error:', upsertError);
+                  hasRestoredPurchase = false;
+                  restoreError = upsertError;
+                } else {
+                  console.log('[IAP] ✅ Subscription restored via fallback!');
+                  hasRestoredPurchase = true;
+                }
+              }
+            }
+          } catch (error) {
+            console.error('[IAP] Error processing restored purchase:', error);
+            restoreError = error;
+            hasRestoredPurchase = false;
+          }
+        } else {
+          // No transaction data - still mark as owned and update directly
+          console.log('[IAP] No transaction data, updating based on ownership');
+          
+          try {
+            const { supabase } = await import('@/integrations/supabase/client');
+            const { data: { user } } = await supabase.auth.getUser();
+            
+            if (user) {
+              const expiryDate = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000);
+              const subscriptionData = {
+                user_id: user.id,
+                plan_name: 'premium',
+                status: 'active',
+                flutterwave_transaction_id: product.id,
+                starts_at: new Date().toISOString(),
+                expires_at: expiryDate.toISOString(),
+                next_billing_date: expiryDate.toISOString(),
+                auto_renew: true,
+                payment_method: 'apple',
+                payment_attempts: 0,
+                updated_at: new Date().toISOString(),
+              };
+              
+              const { error: upsertError } = await supabase
+                .from('user_subscriptions')
+                .upsert(subscriptionData, { onConflict: 'user_id' });
+              
+              if (upsertError) {
+                console.error('[IAP] Database update error:', upsertError);
+                hasRestoredPurchase = false;
+                restoreError = upsertError;
+              } else {
+                console.log('[IAP] ✅ Subscription restored based on ownership!');
+                hasRestoredPurchase = true;
+              }
+            }
+          } catch (error) {
+            console.error('[IAP] Error updating subscription:', error);
+            restoreError = error;
+            hasRestoredPurchase = false;
+          }
+        }
       }
     };
     
@@ -435,28 +694,34 @@ export function restorePurchases(): Promise<void> {
       }
     }
     
-    // Trigger the refresh
+    // Trigger the restore/refresh
     if (store.restorePurchases && typeof store.restorePurchases === 'function') {
+      console.log('[IAP] Calling store.restorePurchases()...');
       store.restorePurchases();
-      
-      // Wait a bit for restoration to complete
-      setTimeout(() => {
-        clearTimeout(timeoutId);
-        resolve();
-      }, 3000);
     } else if (store.refresh && typeof store.refresh === 'function') {
+      console.log('[IAP] Calling store.refresh()...');
       store.refresh();
-      
-      // Wait a bit for refresh to complete
-      setTimeout(() => {
-        clearTimeout(timeoutId);
-        resolve();
-      }, 3000);
     } else {
       clearTimeout(timeoutId);
+      window.iapPurchaseInitiated = false;
       console.error('[IAP] No restore or refresh method available');
       reject(new Error('Restore method not available'));
+      return;
     }
+    
+    // Wait for processing to complete
+    setTimeout(() => {
+      clearTimeout(timeoutId);
+      window.iapPurchaseInitiated = false;
+      
+      if (restoreError) {
+        reject(restoreError);
+      } else if (hasRestoredPurchase) {
+        resolve({ restored: true, message: 'Subscription restored successfully' });
+      } else {
+        resolve({ restored: false, message: 'No active subscription found' });
+      }
+    }, 6000);
   });
 }
 

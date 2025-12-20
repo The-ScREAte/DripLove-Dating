@@ -306,10 +306,9 @@ const PremiumUpgrade = ({ currentUser, onClose, preselectedPlan }: PremiumUpgrad
       }
       setGoogleIapLoading(true);
       const timeoutId = setTimeout(() => {
-        setGoogleIapLoading(false);
         toast({
-          title: 'Request timeout',
-          description: 'The payment request is taking longer than expected. Please try again.',
+          title: 'Still waiting for Google Play',
+          description: 'If you are still on the Google Play payment screen, please finish the purchase. Do not retry unless Google Play shows an error.',
         });
       }, 30000);
       try {
@@ -355,27 +354,56 @@ const PremiumUpgrade = ({ currentUser, onClose, preselectedPlan }: PremiumUpgrad
     try {
       console.log('[PremiumUpgrade] Starting restore purchases...');
       
+      // Get current subscription status before restore
+      const beforeSubscription = data?.status === 'active';
+      
       // Call the appropriate restore function based on platform
+      let restoreResult;
       if (isAndroidNative) {
-        await restoreGooglePurchases();
+        restoreResult = await restoreGooglePurchases();
       } else {
-        await restorePurchases();
+        restoreResult = await restorePurchases();
       }
       
-      // Give it an additional moment to process any receipt validations
-      await new Promise(resolve => setTimeout(resolve, 2000));
+      // Give it an additional moment to process
+      await new Promise(resolve => setTimeout(resolve, 1500));
       
       console.log('[PremiumUpgrade] Restore completed, refreshing subscription status...');
       
       // Refetch subscription status
-      await refetchSubscription();
+      const { data: newSubscription } = await refetchSubscription();
       
       console.log('[PremiumUpgrade] Subscription status refreshed');
       
-      toast({
-        title: 'Restore Complete',
-        description: 'If you had an active subscription, it has been restored.',
-      });
+      // Check if subscription was actually restored
+      const afterSubscription = newSubscription?.status === 'active';
+      
+      if (restoreResult.restored && !beforeSubscription && afterSubscription) {
+        // Successfully restored a subscription that wasn't active before
+        toast({
+          title: '✅ Subscription Restored!',
+          description: 'Your premium subscription has been successfully restored and is now active.',
+        });
+      } else if (afterSubscription && beforeSubscription) {
+        // Already had active subscription
+        toast({
+          title: '✓ Already Active',
+          description: 'Your subscription is already active. No restoration needed.',
+        });
+      } else if (!restoreResult.restored) {
+        // No subscription found to restore
+        toast({
+          title: 'No Purchase Found',
+          description: 'No active subscription found to restore. Please purchase a subscription to get premium access.',
+          variant: 'destructive',
+        });
+      } else {
+        // Some other case - general message
+        toast({
+          title: 'Restore Complete',
+          description: restoreResult.message || 'Restore process completed.',
+        });
+      }
     } catch (error) {
       console.error('[PremiumUpgrade] Restore error:', error);
       toast({
