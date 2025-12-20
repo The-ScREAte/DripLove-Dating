@@ -754,12 +754,18 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, isPremium }: DiscoverPage
             .eq('country_code', baseCountryCode);
         }
       } else if (baseCountryCode) {
-        // Fallback: no location matches, use country-based search
-        query = query.eq('country_code', baseCountryCode);
+        // Fallback: no location matches.
+        // Free users: only their country.
+        // Premium users: their country + unlocked countries.
+        if (isPremium && allowedCountryCodes.length > 0) {
+          query = query.in('country_code', allowedCountryCodes);
+        } else {
+          query = query.eq('country_code', baseCountryCode);
+        }
       }
       
       // Execute query if we didn't handle it above
-      if (query && typeof query.not === 'function') {
+      if (query) {
         if (excludedIds.length > 0) {
           query = query.not('id', 'in', `(${excludedIds.join(',')})`);
         }
@@ -773,6 +779,15 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, isPremium }: DiscoverPage
 
         if (error) throw error;
         filteredProfiles = profiles || [];
+
+        // For premium: treat unlocked-country profiles as "far" so they can still be mixed in.
+        if (isPremium && baseCountryCode) {
+          filteredProfiles.forEach((p) => {
+            if (p?.id && p.country_code && p.country_code !== baseCountryCode && distanceMap[p.id] === undefined) {
+              distanceMap[p.id] = 999;
+            }
+          });
+        }
       }
     }
  
@@ -1087,7 +1102,7 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, isPremium }: DiscoverPage
         // No need for extra calls here - keeps logic simple and centralized
       }
     } catch (error) {
-  // ...removed log...
+      console.error('[Discover] Failed to load potential matches:', error);
       toast({
         title: t('common.error'),
         description: t('discover.errors.loadFailed'),
