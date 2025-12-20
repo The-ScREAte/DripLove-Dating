@@ -42,14 +42,38 @@ export function useEnhancedSubscription() {
       setLoading(false)
 
       if (quickCheck && quickCheck.plan_name === 'premium' && quickCheck.status === 'active') {
-        // Quick check shows active premium, set it immediately
-        const isActive = !quickCheck.expires_at || new Date(quickCheck.expires_at) > new Date()
-        setSubscriptionStatus({
-          plan_name: quickCheck.plan_name,
-          status: quickCheck.status,
-          expires_at: quickCheck.expires_at,
-          is_active: isActive
-        })
+        // Check if subscription has actually expired
+        const isExpired = quickCheck.expires_at && new Date(quickCheck.expires_at) <= new Date()
+        
+        if (isExpired) {
+          // Subscription has expired - update the database and set to free
+          console.log('[Subscription] Premium subscription has expired, updating status...')
+          
+          // Update the subscription status in the database
+          await supabase
+            .from('user_subscriptions')
+            .update({
+              status: 'expired',
+              plan_name: 'free',
+              updated_at: new Date().toISOString()
+            })
+            .eq('user_id', user.id)
+          
+          setSubscriptionStatus({
+            plan_name: 'free',
+            status: 'expired',
+            expires_at: quickCheck.expires_at,
+            is_active: false
+          })
+        } else {
+          // Active premium subscription
+          setSubscriptionStatus({
+            plan_name: quickCheck.plan_name,
+            status: quickCheck.status,
+            expires_at: quickCheck.expires_at,
+            is_active: true
+          })
+        }
       } else {
         // Set to free immediately if no active premium found
         setSubscriptionStatus({
@@ -72,22 +96,10 @@ export function useEnhancedSubscription() {
         const status = data[0]
         // Update with the comprehensive result
         setSubscriptionStatus(status)
-        
-        // Disabled: Flash notification removed - subscription status is already visible on profile page
-        // if (!hasShownExpiredNotification && (status.status === 'payment_failed' || status.status === 'expired')) {
-        //   setHasShownExpiredNotification(true)
-        //   toast({
-        //     title: 'Subscription Status',
-        //     description: status.status === 'payment_failed' 
-        //       ? 'Your subscription payment failed. Please update your payment method to continue enjoying premium features.'
-        //       : 'Your subscription has expired. Renew now to continue enjoying premium features.',
-        //     variant: 'destructive',
-        //   })
-        // }
       } else {
         // Comprehensive check found no subscription, confirm free status
         // (but don't change if quick check already set premium - avoid flicker)
-        if (subscriptionStatus?.plan_name !== 'premium') {
+        if (subscriptionStatus?.plan_name !== 'premium' || !subscriptionStatus?.is_active) {
           setSubscriptionStatus({
             plan_name: 'free',
             status: 'active',

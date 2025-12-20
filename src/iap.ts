@@ -502,7 +502,7 @@ export function restorePurchases(): Promise<{ restored: boolean; message: string
     
     if (!store) {
       console.error('[IAP] Cannot restore purchases - store not available');
-      reject(new Error('Store not available'));
+      resolve({ restored: false, message: 'Store not available. Please ensure you are using the app on iOS.' });
       return;
     }
     
@@ -548,12 +548,13 @@ export function restorePurchases(): Promise<{ restored: boolean; message: string
         }
         
         let expiryDate = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000);
+        let isActiveSubscription = false;
         
         // Try server validation if we have receipt data
         if (receiptData) {
-          console.log('[IAP] Validating restored receipt...');
+          console.log('[IAP] Validating restored receipt with server...');
           try {
-            const { data: validation } = await supabase.functions.invoke('iap-receipt-validator', {
+            const { data: validation, error: valError } = await supabase.functions.invoke('iap-receipt-validator', {
               body: {
                 receiptData: receiptData,
                 productId: productId,
@@ -562,13 +563,38 @@ export function restorePurchases(): Promise<{ restored: boolean; message: string
               }
             });
             
-            if (validation?.active && validation?.expiresDate) {
-              expiryDate = new Date(validation.expiresDate);
-              console.log('[IAP] Server validated expiry:', expiryDate);
+            if (valError) {
+              console.warn('[IAP] Validation error:', valError);
+            } else if (validation?.active && validation?.expiresDate) {
+              const serverExpiry = new Date(validation.expiresDate);
+              // Check if subscription is actually still active
+              if (serverExpiry > new Date()) {
+                expiryDate = serverExpiry;
+                isActiveSubscription = true;
+                console.log('[IAP] Server confirmed active subscription, expires:', expiryDate);
+              } else {
+                console.log('[IAP] Server validation shows subscription has expired:', serverExpiry);
+                return false;
+              }
+            } else if (validation && !validation.active) {
+              console.log('[IAP] Server validation: subscription is not active');
+              return false;
             }
           } catch (valError) {
-            console.warn('[IAP] Validation failed, using default expiry:', valError);
+            console.warn('[IAP] Validation failed, checking product ownership:', valError);
           }
+        }
+        
+        // Only proceed if we confirmed an active subscription
+        if (!isActiveSubscription && !receiptData) {
+          // No receipt data and no validation - trust the product.owned flag
+          console.log('[IAP] No receipt data, trusting product ownership');
+          isActiveSubscription = true;
+        }
+        
+        if (!isActiveSubscription) {
+          console.log('[IAP] Cannot confirm active subscription');
+          return false;
         }
         
         const subscriptionData = {
@@ -626,10 +652,12 @@ export function restorePurchases(): Promise<{ restored: boolean; message: string
     
     // Also check existing products immediately
     const checkExistingProducts = async () => {
+      let foundOwned = false;
       for (const id of PRODUCT_IDS) {
         try {
           const product = store.get?.(id);
           if (product && product.owned) {
+            foundOwned = true;
             console.log('[IAP] Found already-owned product:', id);
             
             const transaction = product.transaction || product.latestTransaction;
@@ -647,6 +675,10 @@ export function restorePurchases(): Promise<{ restored: boolean; message: string
         } catch (err) {
           console.warn('[IAP] Error checking product:', id, err);
         }
+      }
+      
+      if (!foundOwned) {
+        console.log('[IAP] No owned products found in initial check');
       }
       return false;
     };
@@ -673,22 +705,23 @@ export function restorePurchases(): Promise<{ restored: boolean; message: string
       store.refresh();
     } else {
       console.error('[IAP] No restore or refresh method available');
-      rejectOnce(new Error('Restore method not available'));
+      resolveOnce({ restored: false, message: 'Restore not available on this device' });
       return;
     }
     
-    // Wait for processing to complete (reduced timeout)
+    // Wait for processing to complete
     setTimeout(() => {
       if (!hasResolved) {
         if (restoreError) {
-          rejectOnce(restoreError);
+          resolveOnce({ restored: false, message: restoreError.message || 'Restore failed' });
         } else if (hasRestoredPurchase) {
           resolveOnce({ restored: true, message: 'Subscription restored successfully' });
         } else {
-          resolveOnce({ restored: false, message: 'No active subscription found' });
+          // No subscription found
+          resolveOnce({ restored: false, message: 'No active subscription found. If you previously purchased, it may have expired.' });
         }
       }
-    }, 5000);
+    }, 8000);
   });
 }
 

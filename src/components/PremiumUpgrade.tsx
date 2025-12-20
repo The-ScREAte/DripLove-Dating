@@ -408,10 +408,10 @@ const PremiumUpgrade = ({ currentUser, onClose, preselectedPlan }: PremiumUpgrad
         }, 1000);
         return; // Don't set loading to false since we're redirecting
       } else {
-        // No subscription found to restore
+        // No subscription found to restore - show the message from restore result
         toast({
           title: 'No Purchase Found',
-          description: 'No active subscription found to restore. Please purchase a subscription to get premium access.',
+          description: restoreResult.message || 'No active subscription found. If you previously purchased, it may have expired.',
           variant: 'destructive',
         });
       }
