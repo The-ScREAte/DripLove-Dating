@@ -1370,6 +1370,27 @@ export type Database = {
           },
         ]
       }
+      user_stats_history: {
+        Row: {
+          id: string
+          stat_type: string
+          stat_value: number
+          updated_at: string
+        }
+        Insert: {
+          id?: string
+          stat_type: string
+          stat_value?: number
+          updated_at?: string
+        }
+        Update: {
+          id?: string
+          stat_type?: string
+          stat_value?: number
+          updated_at?: string
+        }
+        Relationships: []
+      }
       user_subscriptions: {
         Row: {
           auto_renew: boolean | null

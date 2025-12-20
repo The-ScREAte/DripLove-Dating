@@ -84,6 +84,8 @@ export interface ChatMessage {
 
 export interface AdminStats {
   total_users: number;
+  total_users_ever: number;
+  active_users_30_days: number;
   total_matches: number;
   total_likes: number;
   total_blocks: number;
