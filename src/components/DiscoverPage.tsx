@@ -658,8 +658,9 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, isPremium }: DiscoverPage
 
     // ⭐ OPTIMIZED: Single pass to build both distanceMap and locationProfileIds (50ms saved)
     const distanceMap: { [key: string]: number } = {};
+    // ⭐ FIX: For premium users, don't filter location matches by country here
+    // since we'll fetch unlocked country profiles separately without distance filtering
     const locationProfileIds = uniqUuids(locationMatches
-      .filter((m) => !allowedCountryCodes.length || allowedCountryCodes.includes(m.country_code))
       .map((match) => {
         distanceMap[match.profile_id] = match.distance_km;
         return match.profile_id;
@@ -671,29 +672,36 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, isPremium }: DiscoverPage
 
     let filteredProfiles: any[] = [];
     if (locationProfileIds.length > 0) {
-      let query = supabase
-        .from('profiles')
-        .select(PROFILE_SELECT)
-        .in('id', locationProfileIds);
+      // ⭐ FIX: Only filter by base country for non-premium users
+      // Premium users will get all nearby profiles regardless of country
+      if (!isPremium && !baseCountryCode) {
+        // Non-premium without base country - no results
+        filteredProfiles = [];
+      } else {
+        let query = supabase
+          .from('profiles')
+          .select(PROFILE_SELECT)
+          .in('id', locationProfileIds);
 
-      // Enforce country rules at DB level too
-      if (allowedCountryCodes.length > 0) {
-        query = query.in('country_code', allowedCountryCodes);
+        // Apply country filter only for non-premium users
+        if (!isPremium && baseCountryCode) {
+          query = query.eq('country_code', baseCountryCode);
+        }
+
+        if (excludedIds.length > 0) {
+          query = query.not('id', 'in', `(${excludedIds.join(',')})`);
+        }
+
+        const { data: profiles, error } = await query
+          .in('gender', allowedGenders)
+          .eq('account_status', 'active')
+          .eq('is_admin', false)
+          .eq('is_archived', false)
+          .limit(100); // Fetch larger pool for stratified sampling
+
+        if (error) throw error;
+        filteredProfiles = profiles || [];
       }
-
-      if (excludedIds.length > 0) {
-        query = query.not('id', 'in', `(${excludedIds.join(',')})`);
-      }
-
-      const { data: profiles, error } = await query
-        .in('gender', allowedGenders)
-        .eq('account_status', 'active')
-        .eq('is_admin', false)
-        .eq('is_archived', false)
-        .limit(100); // Fetch larger pool for stratified sampling
-
-      if (error) throw error;
-      filteredProfiles = profiles || [];
     } else if (baseCountryCode) {
       // Fallback: same-country only
       let query = supabase.from('profiles').select(PROFILE_SELECT);
