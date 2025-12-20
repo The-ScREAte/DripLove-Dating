@@ -12,6 +12,7 @@ import { supabase, SUPABASE_URL } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import { usePushNotifications } from '@/hooks/usePushNotifications';
 import { loadUserLanguage } from '@/utils/languageSync';
+import { useActivityTracker } from '@/hooks/useActivityTracker';
 
 // Lazy load tab components - reduces initial bundle by ~700KB
 // Each component only loads when user navigates to that tab
@@ -71,6 +72,9 @@ const MainApp = ({ user, onLogout }: MainAppProps) => {
   const [isPremium, setIsPremium] = useState(false);
   const [unreadCount, setUnreadCount] = useState(0);
   const { toast } = useToast();
+  
+  // Track user activity for accurate "Active Users" stats
+  useActivityTracker(user?.id);
 
   // Safety check - if no user data, show error (AFTER all hooks)
   if (!user || !user.id) {
