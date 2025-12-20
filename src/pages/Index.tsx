@@ -38,11 +38,21 @@ const Index = () => {
     return 'welcome' as const;
   };
   
+  // Check if we have a cached authenticated session - if so, don't show anything until validated
+  const hasCachedSession = () => {
+    try {
+      return sessionStorage.getItem('driplove_user_session') === 'authenticated';
+    } catch {
+      return false;
+    }
+  };
+  
   const initialView = getInitialView();
+  const cachedAuth = hasCachedSession();
   const [currentView, setCurrentView] = useState<'welcome' | 'login' | 'register' | 'profile-completion' | 'terms-acceptance' | 'app' | 'admin' | 'about' | 'terms' | 'privacy'>(initialView);
   const [user, setUser] = useState<any>(null);
-  // If we have a cached session, don't show loading - validate in background
-  const [loading, setLoading] = useState(initialView !== 'app');
+  // CRITICAL FIX: If we have a cached session, show nothing until auth is validated (prevents welcome flash)
+  const [loading, setLoading] = useState(cachedAuth);
   const [showAuthDialog, setShowAuthDialog] = useState(false);
   const [isLoginMode, setIsLoginMode] = useState(true);
   const [authInitialized, setAuthInitialized] = useState(false);
@@ -401,7 +411,14 @@ const Index = () => {
     }, 500);
   };
 
-  
+  // CRITICAL FIX: Show nothing while validating cached session (prevents welcome screen flash)
+  if (loading && cachedAuth) {
+    return (
+      <div className="w-full h-screen flex items-center justify-center bg-gradient-to-br from-purple-500 to-pink-500">
+        <div className="w-12 h-12 border-4 border-white border-t-transparent rounded-full animate-spin" />
+      </div>
+    );
+  }
   
   return (
     <div className="w-full h-fill flex justify-center bg-transparent" style={{ margin: 0, padding: 0 }}>
