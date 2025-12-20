@@ -131,10 +131,14 @@ serve(async (req) => {
       ...(appleResponse.latest_receipt_info || []),
     ]
 
-    // Accept both possible product IDs
+    // Accept all possible product IDs (Apple and Google formats)
     const VALID_PRODUCT_IDS = [
+      // Apple product IDs
       'com.driplove.dating.premium.monthlysub2',
-      'com.driplove.dating.premium.monthlysub3'
+      'com.driplove.dating.premium.monthlysub3',
+      // Google Play product IDs
+      'premium_monthly',
+      'com.driplove.dating.premium.monthly',
     ]
 
     const relevantTxs = allTransactions.filter(
