@@ -355,7 +355,7 @@ const PremiumUpgrade = ({ currentUser, onClose, preselectedPlan }: PremiumUpgrad
       console.log('[PremiumUpgrade] Starting restore purchases...');
       
       // Get current subscription status before restore
-      const beforeSubscription = data?.status === 'active';
+      const beforeSubscription = subscriptionStatus?.status === 'active';
       
       // Call the appropriate restore function based on platform
       let restoreResult;
@@ -371,12 +371,12 @@ const PremiumUpgrade = ({ currentUser, onClose, preselectedPlan }: PremiumUpgrad
       console.log('[PremiumUpgrade] Restore completed, refreshing subscription status...');
       
       // Refetch subscription status
-      const { data: newSubscription } = await refetchSubscription();
+      await refetchSubscription();
       
       console.log('[PremiumUpgrade] Subscription status refreshed');
       
-      // Check if subscription was actually restored
-      const afterSubscription = newSubscription?.status === 'active';
+      // Check if subscription was actually restored by re-checking isPremium
+      const afterSubscription = isPremium;
       
       if (restoreResult.restored && !beforeSubscription && afterSubscription) {
         // Successfully restored a subscription that wasn't active before
