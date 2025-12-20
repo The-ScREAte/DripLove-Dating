@@ -354,61 +354,93 @@ const PremiumUpgrade = ({ currentUser, onClose, preselectedPlan }: PremiumUpgrad
     try {
       console.log('[PremiumUpgrade] Starting restore purchases...');
       
-      // Get current subscription status before restore
-      const beforeSubscription = subscriptionStatus?.status === 'active';
+      // Call the appropriate restore function based on platform with timeout protection
+      let restoreResult: { restored: boolean; message: string };
       
-      // Call the appropriate restore function based on platform
-      let restoreResult;
-      if (isAndroidNative) {
-        restoreResult = await restoreGooglePurchases();
-      } else {
-        restoreResult = await restorePurchases();
+      const restorePromise = isAndroidNative 
+        ? restoreGooglePurchases() 
+        : restorePurchases();
+      
+      // Add timeout protection for the restore operation (15 seconds max)
+      const timeoutPromise = new Promise<{ restored: boolean; message: string }>((_, reject) => {
+        setTimeout(() => reject(new Error('Restore timeout')), 15000);
+      });
+      
+      try {
+        restoreResult = await Promise.race([restorePromise, timeoutPromise]);
+      } catch (timeoutError) {
+        console.log('[PremiumUpgrade] Restore timed out, checking subscription status directly...');
+        // On timeout, check the database directly
+        await refetchSubscription();
+        // Small delay for refetch to complete
+        await new Promise(resolve => setTimeout(resolve, 500));
+        
+        // Check if subscription is now active
+        const { data: subData } = await supabase
+          .from('user_subscriptions')
+          .select('status, expires_at')
+          .eq('user_id', currentUser?.id)
+          .maybeSingle();
+        
+        if (subData?.status === 'active' && new Date(subData.expires_at) > new Date()) {
+          restoreResult = { restored: true, message: 'Subscription restored successfully' };
+        } else {
+          restoreResult = { restored: false, message: 'No active subscription found' };
+        }
       }
       
-      // Give it an additional moment to process
-      await new Promise(resolve => setTimeout(resolve, 1500));
-      
-      console.log('[PremiumUpgrade] Restore completed, refreshing subscription status...');
+      console.log('[PremiumUpgrade] Restore result:', restoreResult);
       
       // Refetch subscription status
       await refetchSubscription();
       
-      console.log('[PremiumUpgrade] Subscription status refreshed');
-      
-      // Check if subscription was actually restored by re-checking isPremium
-      const afterSubscription = isPremium;
-      
-      if (restoreResult.restored && !beforeSubscription && afterSubscription) {
-        // Successfully restored a subscription that wasn't active before
+      if (restoreResult.restored) {
+        // Successfully restored - redirect to success page
         toast({
           title: '✅ Subscription Restored!',
-          description: 'Your premium subscription has been successfully restored and is now active.',
+          description: 'Redirecting to your premium account...',
         });
-      } else if (afterSubscription && beforeSubscription) {
-        // Already had active subscription
-        toast({
-          title: '✓ Already Active',
-          description: 'Your subscription is already active. No restoration needed.',
-        });
-      } else if (!restoreResult.restored) {
+        // Small delay for toast to show
+        setTimeout(() => {
+          window.location.href = '/payment-success?status=successful&payment_type=restore';
+        }, 1000);
+        return; // Don't set loading to false since we're redirecting
+      } else {
         // No subscription found to restore
         toast({
           title: 'No Purchase Found',
           description: 'No active subscription found to restore. Please purchase a subscription to get premium access.',
           variant: 'destructive',
         });
-      } else {
-        // Some other case - general message
-        toast({
-          title: 'Restore Complete',
-          description: restoreResult.message || 'Restore process completed.',
-        });
       }
-    } catch (error) {
+    } catch (error: any) {
       console.error('[PremiumUpgrade] Restore error:', error);
+      
+      // Even on error, check if subscription is actually active
+      try {
+        const { data: subData } = await supabase
+          .from('user_subscriptions')
+          .select('status, expires_at')
+          .eq('user_id', currentUser?.id)
+          .maybeSingle();
+        
+        if (subData?.status === 'active' && new Date(subData.expires_at) > new Date()) {
+          toast({
+            title: '✅ Subscription Active!',
+            description: 'Your subscription is active. Redirecting...',
+          });
+          setTimeout(() => {
+            window.location.href = '/payment-success?status=successful&payment_type=restore';
+          }, 1000);
+          return;
+        }
+      } catch (dbError) {
+        console.error('[PremiumUpgrade] Error checking subscription:', dbError);
+      }
+      
       toast({
         title: 'Restore Failed',
-        description: 'Unable to restore purchases. Please ensure you have an active subscription and try again.',
+        description: 'Unable to restore purchases. Please try again.',
         variant: 'destructive',
       });
     } finally {

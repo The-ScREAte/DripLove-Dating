@@ -379,84 +379,136 @@ export function restoreGooglePurchases(): Promise<{ restored: boolean; message: 
     
     let hasRestoredPurchase = false;
     let restoreError: any = null;
+    let hasResolved = false;
     
-    const timeoutId = setTimeout(() => {
-      window.iapPurchaseInitiated = false;
-      if (hasRestoredPurchase) {
-        resolve({ restored: true, message: 'Subscription restored successfully' });
-      } else {
-        console.log('[Google IAP] Restore timeout - no active subscription found');
-        resolve({ restored: false, message: 'No active subscription found' });
+    const resolveOnce = (result: { restored: boolean; message: string }) => {
+      if (!hasResolved) {
+        hasResolved = true;
+        window.iapPurchaseInitiated = false;
+        resolve(result);
       }
-    }, 8000);
+    };
+    
+    const rejectOnce = (error: any) => {
+      if (!hasResolved) {
+        hasResolved = true;
+        window.iapPurchaseInitiated = false;
+        reject(error);
+      }
+    };
 
-    // Set up temporary listener for owned products
-    const onProductUpdated = async (product: any) => {
-      if (product && product.owned && product.canPurchase === false) {
-        console.log('[Google IAP] Found owned product during restore:', product.id);
-        hasRestoredPurchase = true;
+    const activateSubscription = async (productId: string, transactionId?: string, receiptData?: string) => {
+      try {
+        const { supabase } = await import('@/integrations/supabase/client');
+        const { data: { user } } = await supabase.auth.getUser();
         
-        const transaction = product.transaction || product.latestTransaction;
-        if (transaction) {
-          console.log('[Google IAP] Processing restored transaction...');
-          
+        if (!user) {
+          console.error('[Google IAP] No user found during restore');
+          return false;
+        }
+        
+        let expiryDate = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000);
+        
+        // Try server validation if we have receipt data
+        if (receiptData) {
+          console.log('[Google IAP] Validating restored receipt...');
           try {
-            const { supabase } = await import('@/integrations/supabase/client');
-            const { data: { user } } = await supabase.auth.getUser();
-            
-            if (user) {
-              const receiptData = transaction.receipt || transaction.purchaseToken;
-              
-              if (receiptData) {
-                console.log('[Google IAP] Validating restored receipt...');
-                
-                const { data: validation, error } = await supabase.functions.invoke('google-iap-validator', {
-                  body: {
-                    receiptData: receiptData,
-                    productId: product.id,
-                    userId: user.id,
-                    purchaseToken: transaction.purchaseToken,
-                    transactionId: transaction.transactionId || transaction.id
-                  }
-                });
-                
-                if (!error && validation?.active) {
-                  console.log('[Google IAP] Restored subscription is active!');
-                  
-                  const expiryDate = new Date(validation.expiresDate || Date.now() + 30 * 24 * 60 * 60 * 1000);
-                  const subscriptionData = {
-                    user_id: user.id,
-                    plan_name: 'premium',
-                    status: 'active',
-                    flutterwave_transaction_id: transaction.transactionId || transaction.id,
-                    starts_at: new Date(validation.purchaseDate || Date.now()).toISOString(),
-                    expires_at: expiryDate.toISOString(),
-                    next_billing_date: expiryDate.toISOString(),
-                    auto_renew: true,
-                    payment_method: 'google',
-                    payment_attempts: 0,
-                    updated_at: new Date().toISOString(),
-                  };
-                  
-                  await supabase
-                    .from('user_subscriptions')
-                    .upsert(subscriptionData, { onConflict: 'user_id' });
-                  
-                  console.log('[Google IAP] Subscription restored successfully!');
-                  hasRestoredPurchase = true;
-                } else {
-                  console.log('[Google IAP] Restored subscription is not active or validation failed');
-                  hasRestoredPurchase = false;
-                }
+            const { data: validation } = await supabase.functions.invoke('google-iap-validator', {
+              body: {
+                receiptData: receiptData,
+                productId: productId,
+                userId: user.id,
+                purchaseToken: receiptData,
+                transactionId: transactionId
               }
+            });
+            
+            if (validation?.active && validation?.expiresDate) {
+              expiryDate = new Date(validation.expiresDate);
+              console.log('[Google IAP] Server validated expiry:', expiryDate);
             }
-          } catch (error) {
-            console.error('[Google IAP] Error processing restored purchase:', error);
-            restoreError = error;
-            hasRestoredPurchase = false;
+          } catch (valError) {
+            console.warn('[Google IAP] Validation failed, using default expiry:', valError);
           }
         }
+        
+        const subscriptionData = {
+          user_id: user.id,
+          plan_name: 'premium',
+          status: 'active',
+          flutterwave_transaction_id: transactionId || productId,
+          starts_at: new Date().toISOString(),
+          expires_at: expiryDate.toISOString(),
+          next_billing_date: expiryDate.toISOString(),
+          auto_renew: true,
+          payment_method: 'google',
+          payment_attempts: 0,
+          updated_at: new Date().toISOString(),
+        };
+        
+        console.log('[Google IAP] Updating subscription...');
+        
+        const { error: upsertError } = await supabase
+          .from('user_subscriptions')
+          .upsert(subscriptionData, { onConflict: 'user_id' });
+        
+        if (upsertError) {
+          console.error('[Google IAP] Database update error:', upsertError);
+          return false;
+        }
+        
+        console.log('[Google IAP] ✅ Subscription restored successfully!');
+        return true;
+      } catch (error) {
+        console.error('[Google IAP] Error activating subscription:', error);
+        return false;
       }
+    };
+
+    const onProductUpdated = async (product: any) => {
+      if (hasResolved) return;
+      
+      if (product && product.owned) {
+        console.log('[Google IAP] Found owned product during restore:', product.id);
+        
+        const transaction = product.transaction || product.latestTransaction;
+        const receiptData = transaction?.receipt || transaction?.purchaseToken;
+        const transactionId = transaction?.transactionId || transaction?.id;
+        
+        const success = await activateSubscription(product.id, transactionId, receiptData);
+        
+        if (success) {
+          hasRestoredPurchase = true;
+          resolveOnce({ restored: true, message: 'Subscription restored successfully' });
+        }
+      }
+    };
+    
+    // Check existing products first
+    const checkExistingProducts = async () => {
+      for (const id of GOOGLE_PRODUCT_IDS) {
+        try {
+          const product = store.get?.(id);
+          if (product && product.owned) {
+            console.log('[Google IAP] Found already-owned product:', id);
+            
+            const transaction = product.transaction || product.latestTransaction;
+            const receiptData = transaction?.receipt || transaction?.purchaseToken;
+            const transactionId = transaction?.transactionId || transaction?.id;
+            
+            const success = await activateSubscription(id, transactionId, receiptData);
+            
+            if (success) {
+              hasRestoredPurchase = true;
+              resolveOnce({ restored: true, message: 'Subscription restored successfully' });
+              return true;
+            }
+          }
+        } catch (err) {
+          console.warn('[Google IAP] Error checking product:', id, err);
+        }
+      }
+      return false;
     };
     
     // Set up listener
@@ -468,6 +520,10 @@ export function restoreGooglePurchases(): Promise<{ restored: boolean; message: 
       }
     }
 
+    // Check existing products first
+    const foundExisting = await checkExistingProducts();
+    if (foundExisting) return;
+
     if (store.restorePurchases && typeof store.restorePurchases === 'function') {
       console.log('[Google IAP] Calling store.restorePurchases()...');
       store.restorePurchases();
@@ -475,23 +531,21 @@ export function restoreGooglePurchases(): Promise<{ restored: boolean; message: 
       console.log('[Google IAP] Calling store.refresh()...');
       store.refresh();
     } else {
-      clearTimeout(timeoutId);
-      window.iapPurchaseInitiated = false;
-      reject(new Error('Restore method not available'));
+      rejectOnce(new Error('Restore method not available'));
       return;
     }
     
+    // Wait for processing to complete (reduced timeout)
     setTimeout(() => {
-      clearTimeout(timeoutId);
-      window.iapPurchaseInitiated = false;
-      
-      if (restoreError) {
-        reject(restoreError);
-      } else if (hasRestoredPurchase) {
-        resolve({ restored: true, message: 'Subscription restored successfully' });
-      } else {
-        resolve({ restored: false, message: 'No active subscription found' });
+      if (!hasResolved) {
+        if (restoreError) {
+          rejectOnce(restoreError);
+        } else if (hasRestoredPurchase) {
+          resolveOnce({ restored: true, message: 'Subscription restored successfully' });
+        } else {
+          resolveOnce({ restored: false, message: 'No active subscription found' });
+        }
       }
-    }, 6000);
+    }, 5000);
   });
 }
