@@ -1336,30 +1336,40 @@ const AdminPageComponent = ({ currentUser, onLogout }: AdminPageProps) => {
       (premiumFilter === 'premium' && user.is_premium) || 
       (premiumFilter === 'free' && !user.is_premium);
     
-    // Activity filter logic
+    // Activity filter logic - use last_login_at or created_at (account creation = first login)
     let matchesActivity = true;
     if (activityFilter !== 'all') {
       const now = new Date();
+      const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+      const threeDaysAgo = new Date(now.getTime() - 3 * 24 * 60 * 60 * 1000);
       const oneWeekAgo = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
+      const twoWeeksAgo = new Date(now.getTime() - 14 * 24 * 60 * 60 * 1000);
       const oneMonthAgo = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
-      const lastLogin = user.last_login_at ? new Date(user.last_login_at) : null;
-      const loginCount = user.login_count || 0;
+      const threeMonthsAgo = new Date(now.getTime() - 90 * 24 * 60 * 60 * 1000);
+      // Use last_login_at if available, otherwise use created_at (account creation = first login)
+      const lastActive = user.last_login_at ? new Date(user.last_login_at) : new Date(user.created_at);
       
       switch (activityFilter) {
-        case 'active_week':
-          matchesActivity = lastLogin !== null && lastLogin >= oneWeekAgo;
+        case 'today':
+          matchesActivity = lastActive >= today;
           break;
-        case 'active_month':
-          matchesActivity = lastLogin !== null && lastLogin >= oneMonthAgo;
+        case '3_days':
+          matchesActivity = lastActive >= threeDaysAgo;
           break;
-        case 'logged_once':
-          matchesActivity = loginCount === 1;
+        case '1_week':
+          matchesActivity = lastActive >= oneWeekAgo;
           break;
-        case 'never_active':
-          matchesActivity = lastLogin === null || loginCount === 0;
+        case '2_weeks':
+          matchesActivity = lastActive >= twoWeeksAgo;
+          break;
+        case '1_month':
+          matchesActivity = lastActive >= oneMonthAgo;
+          break;
+        case '3_months':
+          matchesActivity = lastActive >= threeMonthsAgo;
           break;
         case 'inactive_month':
-          matchesActivity = lastLogin === null || lastLogin < oneMonthAgo;
+          matchesActivity = lastActive < oneMonthAgo;
           break;
       }
     }
@@ -1580,6 +1590,21 @@ const AdminPageComponent = ({ currentUser, onLogout }: AdminPageProps) => {
                           <p className="text-[10px] text-orange-600 opacity-75">Active subscriptions</p>
                         </div>
                         <Crown className="w-5 h-5 text-orange-500" />
+                      </div>
+                      <div className="flex items-center justify-between p-2 bg-gradient-to-r from-teal-50 to-teal-100 rounded-lg border border-teal-200">
+                        <div>
+                          <p className="text-[11px] text-teal-700 font-medium">Active (30 Days)</p>
+                          <p className="text-base font-bold text-teal-900">{stats.active_users_30_days || 0}</p>
+                        </div>
+                        <Calendar className="w-5 h-5 text-teal-500" />
+                      </div>
+                      <div className="flex items-center justify-between p-2 bg-gradient-to-r from-slate-50 to-slate-100 rounded-lg border border-slate-200">
+                        <div>
+                          <p className="text-[11px] text-slate-700 font-medium">Total Users Ever</p>
+                          <p className="text-base font-bold text-slate-900">{stats.total_users_ever || stats.total_users}</p>
+                          <p className="text-[10px] text-slate-600 opacity-75">Including deleted</p>
+                        </div>
+                        <Users className="w-5 h-5 text-slate-500" />
                       </div>
                     </div>
                   </CardContent>
@@ -1816,15 +1841,17 @@ const AdminPageComponent = ({ currentUser, onLogout }: AdminPageProps) => {
                       
                       <Select value={activityFilter} onValueChange={setActivityFilter}>
                         <SelectTrigger className="text-xs h-8">
-                          <SelectValue placeholder="All Activity" />
+                          <SelectValue placeholder="Last Active" />
                         </SelectTrigger>
                         <SelectContent>
                           <SelectItem value="all" className="text-xs">All Activity</SelectItem>
-                          <SelectItem value="active_week" className="text-xs">Active Last Week</SelectItem>
-                          <SelectItem value="active_month" className="text-xs">Active Last Month</SelectItem>
-                          <SelectItem value="logged_once" className="text-xs">Logged In Once</SelectItem>
+                          <SelectItem value="today" className="text-xs">Active Today</SelectItem>
+                          <SelectItem value="3_days" className="text-xs">Last 3 Days</SelectItem>
+                          <SelectItem value="1_week" className="text-xs">Last Week</SelectItem>
+                          <SelectItem value="2_weeks" className="text-xs">Last 2 Weeks</SelectItem>
+                          <SelectItem value="1_month" className="text-xs">Last Month</SelectItem>
+                          <SelectItem value="3_months" className="text-xs">Last 3 Months</SelectItem>
                           <SelectItem value="inactive_month" className="text-xs">Inactive 30+ Days</SelectItem>
-                          <SelectItem value="never_active" className="text-xs">Never Logged In</SelectItem>
                         </SelectContent>
                       </Select>
                     </div>
@@ -1869,12 +1896,24 @@ const AdminPageComponent = ({ currentUser, onLogout }: AdminPageProps) => {
                                 </div>
                                 <p className="text-[11px] text-gray-500 mt-0.5">
                                   Joined: {new Date(user.created_at).toLocaleDateString()}
-                                  {user.last_login_at && (
-                                    <> • Last active: {new Date(user.last_login_at).toLocaleDateString()}</>
-                                  )}
-                                  {!user.last_login_at && (
-                                    <> • <span className="text-orange-600">Never logged in</span></>
-                                  )}
+                                  {' • Last active: '}
+                                  {(() => {
+                                    const dateToUse = user.last_login_at || user.created_at;
+                                    const date = new Date(dateToUse);
+                                    const now = new Date();
+                                    const diffMs = now.getTime() - date.getTime();
+                                    const diffDays = Math.floor(diffMs / (24 * 60 * 60 * 1000));
+                                    const diffHours = Math.floor(diffMs / (60 * 60 * 1000));
+                                    const diffMins = Math.floor(diffMs / (60 * 1000));
+
+                                    if (diffMins < 5) return 'Just now';
+                                    if (diffMins < 60) return `${diffMins}m ago`;
+                                    if (diffHours < 24) return `${diffHours}h ago`;
+                                    if (diffDays === 1) return 'Yesterday';
+                                    if (diffDays < 7) return `${diffDays}d ago`;
+                                    if (diffDays < 30) return `${Math.floor(diffDays / 7)}w ago`;
+                                    return date.toLocaleDateString();
+                                  })()}
                                   {user.login_count !== null && user.login_count !== undefined && (
                                     <> • Logins: {user.login_count}</>
                                   )}

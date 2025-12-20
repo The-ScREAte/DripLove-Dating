@@ -109,6 +109,7 @@ export interface AdminUser {
   city: string;
   country: string;
   created_at: string;
+  last_login_at: string | null;
   is_premium: boolean;
   is_admin: boolean;
 }

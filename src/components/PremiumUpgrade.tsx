@@ -273,13 +273,14 @@ const PremiumUpgrade = ({ currentUser, onClose, preselectedPlan }: PremiumUpgrad
         return;
       }
       setIapLoading(true);
+      // Increased timeout to 3 minutes for slower connections/payment processing
       const timeoutId = setTimeout(() => {
         setIapLoading(false);
         toast({
           title: 'Request timeout',
           description: 'The payment request is taking longer than expected. Please try again.',
         });
-      }, 30000);
+      }, 180000);
       try {
         await buyMonthly();
         clearTimeout(timeoutId);
@@ -305,12 +306,13 @@ const PremiumUpgrade = ({ currentUser, onClose, preselectedPlan }: PremiumUpgrad
         return;
       }
       setGoogleIapLoading(true);
+      // Increased timeout to 3 minutes for slower connections/payment processing
       const timeoutId = setTimeout(() => {
         toast({
           title: 'Still waiting for Google Play',
           description: 'If you are still on the Google Play payment screen, please finish the purchase. Do not retry unless Google Play shows an error.',
         });
-      }, 30000);
+      }, 180000);
       try {
         await buyGoogleMonthly();
         clearTimeout(timeoutId);
@@ -633,7 +635,12 @@ const PremiumUpgrade = ({ currentUser, onClose, preselectedPlan }: PremiumUpgrad
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 px-2 sm:px-4">
           <div className="bg-white rounded-lg shadow-lg p-3 sm:p-5 w-full max-w-md relative">
             <button 
-              onClick={() => setShowPaymentOptions(false)} 
+              onClick={() => {
+                setShowPaymentOptions(false);
+                // Reset loading states when modal is closed
+                setIapLoading(false);
+                setGoogleIapLoading(false);
+              }} 
               className="absolute top-2 right-2 text-gray-400 hover:text-gray-600"
             >
               ✕
