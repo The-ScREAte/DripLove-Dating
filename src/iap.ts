@@ -152,151 +152,159 @@ export function initIAP() {
             // Determine payment method based on platform
             const paymentMethod = isAndroid() ? 'google' : 'apple';
             
-            if (user) {
-              // Get receipt data from the transaction
-              const receiptData = r.receipt || r.payload || r.transactionReceipt;
+            if (!user) {
+              console.error('[IAP] No authenticated user found');
+              alert('Please log in to complete your purchase.');
+              return;
+            }
+            
+            console.log('[IAP] Processing verified receipt for user:', user.id);
+            console.log('[IAP] Receipt object:', {
+              productId: r.productId,
+              transactionId: r.transactionId,
+              hasReceipt: !!r.receipt,
+              hasPayload: !!r.payload,
+              platform: paymentMethod
+            });
+            
+            // Helper function to activate subscription in database
+            const activateSubscription = async (transactionId: string | null, expiryDate?: Date) => {
+              const expiry = expiryDate || new Date(Date.now() + 30 * 24 * 60 * 60 * 1000);
               
-              if (receiptData) {
-                // Add timeout protection for receipt validation (25 seconds)
-                const validationTimeout = new Promise((_, reject) => {
-                  setTimeout(() => reject(new Error('Receipt validation timeout')), 25000);
-                });
-                
-                // Choose the correct validator based on platform
-                const validatorFunction = isAndroid() ? 'google-iap-validator' : 'iap-receipt-validator';
-                
-                // Race between validation and timeout
-                const validationPromise = supabase.functions.invoke(validatorFunction, {
-                  body: {
-                    receiptData: receiptData,
-                    productId: r.productId,
-                    userId: user.id,
-                    purchaseToken: r.purchaseToken || r.transactionId, // Google uses purchaseToken
-                    transactionId: r.transactionId
-                  }
-                });
+              // First, check if subscription exists
+              const { data: existingSub, error: fetchError } = await supabase
+                .from('user_subscriptions')
+                .select('id')
+                .eq('user_id', user.id)
+                .maybeSingle();
+              
+              if (fetchError) {
+                console.error('[IAP] Error fetching existing subscription:', fetchError);
+              }
+              
+              const subscriptionData = {
+                user_id: user.id,
+                plan_name: 'premium',
+                status: 'active',
+                flutterwave_transaction_id: transactionId,
+                starts_at: new Date().toISOString(),
+                expires_at: expiry.toISOString(),
+                next_billing_date: expiry.toISOString(),
+                auto_renew: true,
+                payment_method: paymentMethod,
+                payment_attempts: 0,
+                updated_at: new Date().toISOString(),
+              };
+              
+              let result;
+              if (existingSub?.id) {
+                // Update existing subscription
+                console.log('[IAP] Updating existing subscription:', existingSub.id);
+                result = await supabase
+                  .from('user_subscriptions')
+                  .update(subscriptionData)
+                  .eq('user_id', user.id);
+              } else {
+                // Insert new subscription
+                console.log('[IAP] Creating new subscription for user:', user.id);
+                result = await supabase
+                  .from('user_subscriptions')
+                  .insert(subscriptionData);
+              }
+              
+              if (result.error) {
+                console.error('[IAP] ❌ Database operation failed:', result.error);
+                throw new Error(`Database update failed: ${result.error.message}`);
+              }
+              
+              console.log('[IAP] ✅ Subscription activated successfully!');
+              return true;
+            };
+            
+            // Get receipt data from the transaction
+            const receiptData = r.receipt || r.payload || r.transactionReceipt;
+            const transactionId = r.transactionId || r.productId || `iap_${Date.now()}`;
+            
+            if (receiptData) {
+              console.log('[IAP] Receipt data found, attempting server validation...');
+              
+              // Add timeout protection for receipt validation (25 seconds)
+              const validationTimeout = new Promise((_, reject) => {
+                setTimeout(() => reject(new Error('Receipt validation timeout')), 25000);
+              });
+              
+              // Choose the correct validator based on platform
+              const validatorFunction = isAndroid() ? 'google-iap-validator' : 'iap-receipt-validator';
+              console.log('[IAP] Using validator function:', validatorFunction);
+              
+              // Race between validation and timeout
+              const validationPromise = supabase.functions.invoke(validatorFunction, {
+                body: {
+                  receiptData: receiptData,
+                  productId: r.productId,
+                  userId: user.id,
+                  purchaseToken: r.purchaseToken || r.transactionId,
+                  transactionId: transactionId
+                }
+              });
 
-                let validation, validationError;
+              let validation, validationError;
+              try {
+                const result: any = await Promise.race([validationPromise, validationTimeout]);
+                validation = result.data;
+                validationError = result.error;
+                console.log('[IAP] Validation response:', { validation, validationError });
+              } catch (timeoutError) {
+                console.error('[IAP] Receipt validation timeout, using fallback method');
+                validationError = timeoutError;
+              }
+
+              // If validation fails or times out, use fallback
+              if (validationError || !validation?.valid) {
+                console.warn('[IAP] Server validation failed, activating via fallback:', validationError?.message || validation);
+                
                 try {
-                  const result: any = await Promise.race([validationPromise, validationTimeout]);
-                  validation = result.data;
-                  validationError = result.error;
-                } catch (timeoutError) {
-                  console.error('[IAP] Receipt validation timeout, using fallback method');
-                  validationError = timeoutError;
-                }
-
-                if (validationError || !validation?.valid) {
-                  console.error('[IAP] Receipt validation failed, using fallback:', validationError || validation);
-                  
-                  // Fallback: Direct database update if validation fails/times out
-                  const expiryDate = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000);
-                  const subscriptionData = {
-                    user_id: user.id,
-                    plan_name: 'premium',
-                    status: 'active',
-                    flutterwave_transaction_id: r.transactionId || r.productId || null,
-                    starts_at: new Date().toISOString(),
-                    expires_at: expiryDate.toISOString(),
-                    next_billing_date: expiryDate.toISOString(),
-                    auto_renew: true,
-                    payment_method: paymentMethod,
-                    payment_attempts: 0,
-                    updated_at: new Date().toISOString(),
-                  };
-
-                  console.log('[IAP] Updating subscription (fallback):', subscriptionData);
-                  const { data: upsertData, error: upsertError } = await supabase
-                    .from('user_subscriptions')
-                    .upsert(subscriptionData, { onConflict: 'user_id' });
-
-                  if (upsertError) {
-                    console.error('[IAP] ❌ Database update failed:', upsertError);
-                    alert('Failed to activate subscription. Please contact support.');
-                    return;
-                  }
-                  
-                  console.log('[IAP] ✅ Subscription activated via fallback!', upsertData);
+                  await activateSubscription(transactionId);
                   window.location.href = '/payment-success?status=successful&payment_type=iap';
-                  return;
+                } catch (dbError) {
+                  console.error('[IAP] Fallback activation failed:', dbError);
+                  alert('Failed to activate subscription. Please contact support.');
                 }
+                return;
+              }
 
-                if (validation.active) {
-                  console.log('[IAP] Validation successful, updating subscription...');
-                  
-                  // Calculate expiry date from validation or use 30 days
-                  const expiryDate = validation.expiresDate 
-                    ? new Date(validation.expiresDate)
-                    : new Date(Date.now() + 30 * 24 * 60 * 60 * 1000);
-                  
-                  const subscriptionData = {
-                    user_id: user.id,
-                    plan_name: 'premium',
-                    status: 'active',
-                    flutterwave_transaction_id: r.transactionId || r.productId || null,
-                    starts_at: validation.purchaseDate ? new Date(validation.purchaseDate).toISOString() : new Date().toISOString(),
-                    expires_at: expiryDate.toISOString(),
-                    next_billing_date: expiryDate.toISOString(),
-                    auto_renew: true,
-                    payment_method: paymentMethod,
-                    payment_attempts: 0,
-                    updated_at: new Date().toISOString(),
-                  };
-                  
-                  console.log('[IAP] Subscription data:', subscriptionData);
-                  const { data: upsertData, error: upsertError } = await supabase
-                    .from('user_subscriptions')
-                    .upsert(subscriptionData, { onConflict: 'user_id' });
-                  
-                  if (upsertError) {
-                    console.error('[IAP] ❌ Database update failed:', upsertError);
-                    alert('Failed to activate subscription. Please contact support.');
-                    return;
-                  }
-                  
-                  console.log('[IAP] ✅ Subscription activated successfully!', upsertData);
-                  // Redirect to success page
+              // Server validation successful
+              if (validation.active) {
+                console.log('[IAP] Server validation successful, subscription is active');
+                
+                const expiryDate = validation.expiresDate 
+                  ? new Date(validation.expiresDate)
+                  : new Date(Date.now() + 30 * 24 * 60 * 60 * 1000);
+                
+                try {
+                  await activateSubscription(validation.transaction_id || transactionId, expiryDate);
                   window.location.href = '/payment-success?status=successful&payment_type=iap';
-                } else {
-                  console.warn('[IAP] Subscription not active according to validation');
-                  alert('Your subscription has expired. Please renew your subscription.');
+                } catch (dbError) {
+                  console.error('[IAP] Server-validated activation failed:', dbError);
+                  alert('Failed to activate subscription. Please contact support.');
                 }
               } else {
-                // Fallback: Direct database update if no receipt data available
-                console.log('[IAP] No receipt data, using direct database update');
-                
-                const expiryDate = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000);
-                const subscriptionData = {
-                  user_id: user.id,
-                  plan_name: 'premium',
-                  status: 'active',
-                  flutterwave_transaction_id: r.transactionId || r.productId || null,
-                  starts_at: new Date().toISOString(),
-                  expires_at: expiryDate.toISOString(),
-                  next_billing_date: expiryDate.toISOString(),
-                  auto_renew: true,
-                  payment_method: paymentMethod,
-                  payment_attempts: 0,
-                  updated_at: new Date().toISOString(),
-                };
-
-                console.log('[IAP] Updating subscription:', subscriptionData);
-                // Upsert subscription
-                const { data: upsertData, error: upsertError } = await supabase
-                  .from('user_subscriptions')
-                  .upsert(subscriptionData, { onConflict: 'user_id' });
-
-                if (upsertError) {
-                  console.error('[IAP] ❌ Database update failed:', upsertError);
-                  alert('Failed to activate subscription. Please contact support.');
-                  return;
-                }
-                
-                console.log('[IAP] ✅ Subscription activated!', upsertData);
+                console.warn('[IAP] Subscription not active according to server validation');
+                alert('Your subscription has expired. Please renew your subscription.');
+              }
+            } else {
+              // No receipt data - use direct activation
+              console.log('[IAP] No receipt data available, using direct activation');
+              
+              try {
+                await activateSubscription(transactionId);
                 window.location.href = '/payment-success?status=successful&payment_type=iap';
+              } catch (dbError) {
+                console.error('[IAP] Direct activation failed:', dbError);
+                alert('Failed to activate subscription. Please contact support.');
               }
             }
-          } catch (error) {
+          } catch (error: any) {
             console.error('[IAP] Error processing verified receipt:', error);
             // Handle error - ensure user doesn't get premium access on failure
             try {
