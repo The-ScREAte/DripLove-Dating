@@ -116,6 +116,7 @@ const AdminPageComponent = ({ currentUser, onLogout }: AdminPageProps) => {
   const [relationshipIntentFilter, setRelationshipIntentFilter] = useState('all');
   const [premiumFilter, setPremiumFilter] = useState('all');
   const [activityFilter, setActivityFilter] = useState('all');
+  const [archiveFilter, setArchiveFilter] = useState('all');
   const [loading, setLoading] = useState(true);
   const [currentPage, setCurrentPage] = useState(1);
   const [matchUser1, setMatchUser1] = useState('');
@@ -1374,7 +1375,15 @@ const AdminPageComponent = ({ currentUser, onLogout }: AdminPageProps) => {
       }
     }
     
-    return matchesSearch && matchesStatus && matchesGender && matchesInterestedIn && matchesCountry && matchesRelationshipIntent && matchesPremium && matchesActivity;
+    // Archive filter logic
+    let matchesArchive = true;
+    if (archiveFilter === 'archived') {
+      matchesArchive = (user as any).is_archived === true;
+    } else if (archiveFilter === 'active') {
+      matchesArchive = (user as any).is_archived !== true;
+    }
+    
+    return matchesSearch && matchesStatus && matchesGender && matchesInterestedIn && matchesCountry && matchesRelationshipIntent && matchesPremium && matchesActivity && matchesArchive;
   });
 
   // Pagination
@@ -1728,7 +1737,7 @@ const AdminPageComponent = ({ currentUser, onLogout }: AdminPageProps) => {
                       User Management ({filteredUsers.length})
                     </CardTitle>
                     {(statusFilter !== 'all' || genderFilter !== 'all' || interestedInFilter !== 'all' || 
-                      countryFilter !== 'all' || relationshipIntentFilter !== 'all' || premiumFilter !== 'all' || activityFilter !== 'all') && (
+                      countryFilter !== 'all' || relationshipIntentFilter !== 'all' || premiumFilter !== 'all' || activityFilter !== 'all' || archiveFilter !== 'all') && (
                       <Button
                         variant="outline"
                         size="sm"
@@ -1740,6 +1749,7 @@ const AdminPageComponent = ({ currentUser, onLogout }: AdminPageProps) => {
                           setRelationshipIntentFilter('all');
                           setPremiumFilter('all');
                           setActivityFilter('all');
+                          setArchiveFilter('all');
                         }}
                         className="text-xs h-7"
                       >
@@ -1852,6 +1862,17 @@ const AdminPageComponent = ({ currentUser, onLogout }: AdminPageProps) => {
                           <SelectItem value="1_month" className="text-xs">Last Month</SelectItem>
                           <SelectItem value="3_months" className="text-xs">Last 3 Months</SelectItem>
                           <SelectItem value="inactive_month" className="text-xs">Inactive 30+ Days</SelectItem>
+                        </SelectContent>
+                      </Select>
+                      
+                      <Select value={archiveFilter} onValueChange={setArchiveFilter}>
+                        <SelectTrigger className="text-xs h-8">
+                          <SelectValue placeholder="Archive Status" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="all" className="text-xs">All Users</SelectItem>
+                          <SelectItem value="active" className="text-xs">Not Archived</SelectItem>
+                          <SelectItem value="archived" className="text-xs">Archived Only</SelectItem>
                         </SelectContent>
                       </Select>
                     </div>

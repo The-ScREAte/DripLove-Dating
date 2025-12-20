@@ -86,6 +86,7 @@ export interface AdminStats {
   total_users: number;
   total_users_ever: number;
   active_users_30_days: number;
+  archived_users: number;
   total_matches: number;
   total_likes: number;
   total_blocks: number;
@@ -112,6 +113,7 @@ export interface AdminUser {
   last_login_at: string | null;
   is_premium: boolean;
   is_admin: boolean;
+  is_archived?: boolean;
 }
 
 export interface PendingImage {

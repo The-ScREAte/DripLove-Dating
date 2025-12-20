@@ -12,9 +12,11 @@ interface UserModerationPanelProps {
   searchTerm: string;
   statusFilter: string;
   lastLoginFilter: string;
+  archiveFilter: string;
   onSearchChange: (term: string) => void;
   onStatusFilterChange: (status: string) => void;
   onLastLoginFilterChange: (filter: string) => void;
+  onArchiveFilterChange: (filter: string) => void;
   onViewProfile: (userId: string) => void;
   onBlockUser: (userId: string, block: boolean) => void;
   onHoldUser: (userId: string, hold: boolean) => void;
@@ -29,9 +31,11 @@ const UserModerationPanel: React.FC<UserModerationPanelProps> = ({
   searchTerm,
   statusFilter,
   lastLoginFilter,
+  archiveFilter,
   onSearchChange,
   onStatusFilterChange,
   onLastLoginFilterChange,
+  onArchiveFilterChange,
   onViewProfile,
   onBlockUser,
   onHoldUser,
@@ -78,9 +82,17 @@ const UserModerationPanel: React.FC<UserModerationPanelProps> = ({
         }
       }
       
-      return matchesSearch && matchesStatus && matchesLastLogin;
+      // Archive filter
+      let matchesArchive = true;
+      if (archiveFilter === 'archived') {
+        matchesArchive = user.is_archived === true;
+      } else if (archiveFilter === 'active') {
+        matchesArchive = user.is_archived !== true;
+      }
+      
+      return matchesSearch && matchesStatus && matchesLastLogin && matchesArchive;
     });
-  }, [users, searchTerm, statusFilter, lastLoginFilter]);
+  }, [users, searchTerm, statusFilter, lastLoginFilter, archiveFilter]);
 
   const getStatusBadge = (status: string) => {
     switch (status) {
@@ -154,6 +166,16 @@ const UserModerationPanel: React.FC<UserModerationPanelProps> = ({
               <SelectItem value="2_weeks">Last 2 Weeks</SelectItem>
               <SelectItem value="1_month">Last Month</SelectItem>
               <SelectItem value="3_months">Last 3 Months</SelectItem>
+            </SelectContent>
+          </Select>
+          <Select value={archiveFilter} onValueChange={onArchiveFilterChange}>
+            <SelectTrigger className="w-full sm:w-36">
+              <SelectValue placeholder="Archive status" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">All Users</SelectItem>
+              <SelectItem value="active">Not Archived</SelectItem>
+              <SelectItem value="archived">Archived</SelectItem>
             </SelectContent>
           </Select>
         </div>

@@ -662,6 +662,11 @@ const ChatPage = ({ currentUser, onUnreadChange, onDetailViewChange }: ChatPageP
     const matchesWithPartner = (matches?.map(match => {
       const partner = match.user1_id === currentUser.id ? match.user2 : match.user1;
       
+      // ⭐ Skip matches where partner is archived
+      if (partner?.is_archived === true) {
+        return null;
+      }
+      
       // ⭐ Cache partner name globally for instant render
       if (partner?.id && partner.first_name && partner.last_name) {
         cacheUserName(partner.id, partner.first_name, partner.last_name);
@@ -685,9 +690,9 @@ const ChatPage = ({ currentUser, onUnreadChange, onDetailViewChange }: ChatPageP
         last_message: lastMessage?.message || '',
         last_message_time: lastMessage?.created_at || match.created_at
       };
-    }) || [])
+    }).filter(Boolean) || [])
       // Sort by most recent message time (desc)
-      .sort((a, b) => {
+      .sort((a: any, b: any) => {
         const aTime = new Date(a.last_message_time || a.created_at).getTime();
         const bTime = new Date(b.last_message_time || b.created_at).getTime();
         return bTime - aTime;
@@ -741,8 +746,8 @@ const ChatPage = ({ currentUser, onUnreadChange, onDetailViewChange }: ChatPageP
         .from('matches')
         .select(`
           *,
-          user1:profiles!matches_user1_id_fkey(id, first_name, last_name, is_admin),
-          user2:profiles!matches_user2_id_fkey(id, first_name, last_name, is_admin),
+          user1:profiles!matches_user1_id_fkey(id, first_name, last_name, is_admin, is_archived),
+          user2:profiles!matches_user2_id_fkey(id, first_name, last_name, is_admin, is_archived),
           chats(id, message, created_at, sender_id)
         `)
         .or(`user1_id.eq.${currentUser.id},user2_id.eq.${currentUser.id}`)
@@ -785,8 +790,8 @@ const ChatPage = ({ currentUser, onUnreadChange, onDetailViewChange }: ChatPageP
         .from('matches')
         .select(`
           *,
-          user1:profiles!matches_user1_id_fkey(id, first_name, last_name, is_admin),
-          user2:profiles!matches_user2_id_fkey(id, first_name, last_name, is_admin),
+          user1:profiles!matches_user1_id_fkey(id, first_name, last_name, is_admin, is_archived),
+          user2:profiles!matches_user2_id_fkey(id, first_name, last_name, is_admin, is_archived),
           chats(id, message, created_at, sender_id)
         `)
         .or(`user1_id.eq.${currentUser.id},user2_id.eq.${currentUser.id}`)

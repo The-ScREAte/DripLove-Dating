@@ -689,6 +689,7 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, isPremium }: DiscoverPage
         .in('gender', allowedGenders)
         .eq('account_status', 'active')
         .eq('is_admin', false)
+        .eq('is_archived', false)
         .limit(100); // Fetch larger pool for stratified sampling
 
       if (error) throw error;
@@ -705,6 +706,7 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, isPremium }: DiscoverPage
         .in('gender', allowedGenders)
         .eq('account_status', 'active')
         .eq('is_admin', false)
+        .eq('is_archived', false)
         .eq('country_code', baseCountryCode)
         .limit(100);
 
@@ -730,6 +732,7 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, isPremium }: DiscoverPage
         .in('gender', allowedGenders)
         .eq('account_status', 'active')
         .eq('is_admin', false)
+        .eq('is_archived', false)
         .limit(50); // Larger batch for stratified sampling
 
       if (!unlockedError && unlockedProfiles && unlockedProfiles.length > 0) {
@@ -1494,6 +1497,7 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, isPremium }: DiscoverPage
         .in('gender', allowedGenders)
         .eq('account_status', 'active')
         .eq('is_admin', false)
+        .eq('is_archived', false)
         .limit(100); // Larger pool for stratified sampling
 
       if (error) throw error;
@@ -1559,6 +1563,7 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, isPremium }: DiscoverPage
             .in('gender', allowedGenders)
             .eq('account_status', 'active')
             .eq('is_admin', false)
+            .eq('is_archived', false)
             .limit(50); // Larger pool for stratified sampling
 
           if (!unlockedError && unlockedProfiles && unlockedProfiles.length > 0) {
