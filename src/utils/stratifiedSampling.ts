@@ -78,6 +78,65 @@ export function categorizeProfilesIntoBuckets<T extends { created_at?: string | 
 }
 
 /**
+ * Shuffle profiles from multiple countries together fairly
+ * Ensures profiles from all countries are interleaved rather than grouped
+ */
+export function shuffleCountriesTogether<T extends { country_code?: string | null; id: string }>(
+  profiles: T[],
+  seed: string = ''
+): T[] {
+  if (profiles.length === 0) return [];
+  
+  // Group profiles by country
+  const byCountry: Map<string, T[]> = new Map();
+  for (const profile of profiles) {
+    const country = profile.country_code || 'unknown';
+    if (!byCountry.has(country)) {
+      byCountry.set(country, []);
+    }
+    byCountry.get(country)!.push(profile);
+  }
+  
+  // If only one country, just return shuffled
+  if (byCountry.size <= 1) {
+    const random = seededRandom(hashString(seed + '_single'));
+    return sampleFromArray(profiles, profiles.length, random);
+  }
+  
+  // Shuffle each country's profiles
+  const random = seededRandom(hashString(seed + '_countries'));
+  const shuffledByCountry: Map<string, T[]> = new Map();
+  for (const [country, countryProfiles] of byCountry) {
+    shuffledByCountry.set(country, sampleFromArray(countryProfiles, countryProfiles.length, random));
+  }
+  
+  // Interleave profiles from all countries fairly (round-robin with randomization)
+  const result: T[] = [];
+  const countries = Array.from(shuffledByCountry.keys());
+  const indices: Map<string, number> = new Map(countries.map(c => [c, 0]));
+  
+  // Keep pulling from countries in a randomized round-robin fashion
+  while (result.length < profiles.length) {
+    // Shuffle the order of countries for this round
+    for (let i = countries.length - 1; i > 0; i--) {
+      const j = Math.floor(random() * (i + 1));
+      [countries[i], countries[j]] = [countries[j], countries[i]];
+    }
+    
+    for (const country of countries) {
+      const countryProfiles = shuffledByCountry.get(country)!;
+      const idx = indices.get(country)!;
+      if (idx < countryProfiles.length) {
+        result.push(countryProfiles[idx]);
+        indices.set(country, idx + 1);
+      }
+    }
+  }
+  
+  return result;
+}
+
+/**
  * Seeded random number generator for deterministic sampling
  */
 function seededRandom(seed: number): () => number {
@@ -225,8 +284,9 @@ export function stratifiedSample<T extends { created_at?: string | null }>(
 /**
  * Get multiple stratified batches from a large pool of profiles
  * Each batch will have fair distribution from the remaining pool
+ * Also interleaves profiles from different countries for fair exposure
  */
-export function getStratifiedBatches<T extends { created_at?: string | null; id: string }>(
+export function getStratifiedBatches<T extends { created_at?: string | null; id: string; country_code?: string | null }>(
   profiles: T[],
   batchSize: number = 15,
   numBatches: number = 4,
@@ -234,8 +294,11 @@ export function getStratifiedBatches<T extends { created_at?: string | null; id:
 ): T[] {
   if (profiles.length === 0) return [];
   
+  // First, interleave profiles from different countries
+  const countryInterleaved = shuffleCountriesTogether(profiles, seed + '_country');
+  
   const result: T[] = [];
-  let remainingProfiles = [...profiles];
+  let remainingProfiles = [...countryInterleaved];
   const usedIds = new Set<string>();
   
   for (let i = 0; i < numBatches && remainingProfiles.length > 0; i++) {
@@ -254,5 +317,6 @@ export function getStratifiedBatches<T extends { created_at?: string | null; id:
     remainingProfiles = remainingProfiles.filter(p => !usedIds.has(p.id));
   }
   
-  return result;
+  // Final country interleave to ensure countries are mixed throughout
+  return shuffleCountriesTogether(result, seed + '_final_mix');
 }
