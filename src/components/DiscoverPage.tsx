@@ -156,6 +156,7 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, isPremium }: DiscoverPage
   const [userProfileImages, setUserProfileImages] = useState<any[]>([]);
   const [showProfileCompletionModal, setShowProfileCompletionModal] = useState(false);
   const [todaySwipeCount, setTodaySwipeCount] = useState(0);
+  const [localProfilesExhausted, setLocalProfilesExhausted] = useState(false);
   
   // Dynamic content height management
   const contentRef = useRef<HTMLDivElement>(null);
@@ -561,6 +562,45 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, isPremium }: DiscoverPage
     }
   }, [currentUser?.id]);
 
+  // ⭐ HELPER: Fetch unlocked country profiles (consolidated to avoid duplication)
+  const fetchUnlockedCountryProfiles = useCallback(async ({
+    unlockedCountries,
+    excludedIds,
+    allowedGenders,
+    distanceMap,
+    limit = 100
+  }: {
+    unlockedCountries: string[],
+    excludedIds: string[],
+    allowedGenders: string[],
+    distanceMap: { [key: string]: number },
+    limit?: number
+  }) => {
+    const PROFILE_SELECT = 'id, first_name, last_name, bio, city, country, country_code, occupation, education_level, date_of_birth, interests, gender, latitude, longitude, fun_fact, perfect_first_date, last_googled, relationship_intent, smoking, drinking, exercise_level, sleeping_schedule, introvert_extrovert, spontaneous_planner, messy_organized, adinkra_symbols, created_at';
+    
+    let query = supabase
+      .from('profiles')
+      .select(PROFILE_SELECT)
+      .in('country_code', unlockedCountries);
+
+    if (excludedIds.length > 0) {
+      query = query.not('id', 'in', `(${excludedIds.join(',')})`);
+    }
+
+    const { data, error } = await query
+      .in('gender', allowedGenders)
+      .eq('account_status', 'active')
+      .eq('is_admin', false)
+      .eq('is_archived', false)
+      .limit(limit);
+
+    if (error) return [];
+
+    // Mark all unlocked country profiles with distance = 999
+    (data || []).forEach(p => distanceMap[p.id] = 999);
+    return data || [];
+  }, []);
+
   // Shared data fetching logic - optimized for speed
   const fetchPotentialMatchesData = useCallback(async (userId: string) => {
     // Parallel queries for better performance - fetch user data first for early filtering
@@ -669,7 +709,18 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, isPremium }: DiscoverPage
     // Common profile select fields (includes created_at for stratified sampling)
     const PROFILE_SELECT = 'id, first_name, last_name, bio, city, country, country_code, occupation, education_level, date_of_birth, interests, gender, latitude, longitude, fun_fact, perfect_first_date, last_googled, relationship_intent, smoking, drinking, exercise_level, sleeping_schedule, introvert_extrovert, spontaneous_planner, messy_organized, adinkra_symbols, created_at';
 
+    // ⭐ PREMIUM FIX: Detect if premium user has unlocked countries
+    const hasUnlockedCountries = isPremium && unlockedCountries.length > 0;
+    const localProfilesEmpty = locationProfileIds.length === 0;
+    
+    // ⭐ RESET BANNER: If local profiles exist again, reset the exhausted banner
+    if (locationProfileIds.length > 0 && localProfilesExhausted) {
+      setLocalProfilesExhausted(false);
+    }
+
     let filteredProfiles: any[] = [];
+    
+    // 1️⃣ Normal local flow
     if (locationProfileIds.length > 0) {
       let query = supabase
         .from('profiles')
@@ -694,8 +745,26 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, isPremium }: DiscoverPage
 
       if (error) throw error;
       filteredProfiles = profiles || [];
-    } else if (baseCountryCode) {
-      // Fallback: same-country only
+    }
+    // 2️⃣ PREMIUM FALLBACK — unlocked countries ONLY when local is empty
+    else if (hasUnlockedCountries) {
+      const unlockedProfiles = await fetchUnlockedCountryProfiles({
+        unlockedCountries,
+        excludedIds,
+        allowedGenders,
+        distanceMap,
+        limit: 100
+      });
+      
+      filteredProfiles = unlockedProfiles;
+
+      // 🚨 FLAG for UI MESSAGE - local profiles exhausted
+      if (filteredProfiles.length > 0) {
+        setLocalProfilesExhausted(true);
+      }
+    }
+    // 3️⃣ Free-user fallback (same country only)
+    else if (baseCountryCode) {
       let query = supabase.from('profiles').select(PROFILE_SELECT);
 
       if (excludedIds.length > 0) {
@@ -714,30 +783,21 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, isPremium }: DiscoverPage
       filteredProfiles = profiles || [];
     }
 
-    // ⭐ PREMIUM FEATURE: Fetch profiles from unlocked countries and mix with local profiles
-    if (unlockedCountries.length > 0 && isPremium) {
+    // ⭐ PREMIUM FEATURE: Mix unlocked countries with local profiles ONLY if local profiles exist
+    // If local is empty, unlocked countries are already fetched in premium fallback above
+    if (unlockedCountries.length > 0 && isPremium && locationProfileIds.length > 0) {
       const existingIds = new Set(filteredProfiles.map(p => p.id));
       const allExcludedIds = [...excludedIds, ...Array.from(existingIds)];
       
-      let unlockedQuery = supabase
-        .from('profiles')
-        .select(PROFILE_SELECT)
-        .in('country_code', unlockedCountries);
-      
-      if (allExcludedIds.length > 0) {
-        unlockedQuery = unlockedQuery.not('id', 'in', `(${allExcludedIds.join(',')})`);
-      }
-      
-      const { data: unlockedProfiles, error: unlockedError } = await unlockedQuery
-        .in('gender', allowedGenders)
-        .eq('account_status', 'active')
-        .eq('is_admin', false)
-        .eq('is_archived', false)
-        .limit(50); // Larger batch for stratified sampling
+      const unlockedProfiles = await fetchUnlockedCountryProfiles({
+        unlockedCountries,
+        excludedIds: allExcludedIds,
+        allowedGenders,
+        distanceMap,
+        limit: 50
+      });
 
-      if (!unlockedError && unlockedProfiles && unlockedProfiles.length > 0) {
-        // ⭐ OPTIMIZED: Add distance info inline while spreading (10ms saved)
-        unlockedProfiles.forEach(p => distanceMap[p.id] = 999);
+      if (unlockedProfiles.length > 0) {
         filteredProfiles = [...filteredProfiles, ...unlockedProfiles];
       }
     }
@@ -964,7 +1024,7 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, isPremium }: DiscoverPage
       distances: distanceMap,
       index: startIndex
     };
-  }, [loadAllImagesForProfile, isPremium]);
+  }, [loadAllImagesForProfile, isPremium, fetchUnlockedCountryProfiles]);
 
   // ⭐ BATCH LANGUAGE FETCHING - Load all languages at once to avoid per-card DB calls
   const batchFetchLanguages = useCallback(async (profileIds: string[]) => {
@@ -1489,6 +1549,9 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, isPremium }: DiscoverPage
         ])
       );
 
+      // ⭐ PREMIUM FIX: Check if we have unlocked countries
+      const hasUnlockedCountries = isPremium && unlockedCountries.length > 0;
+
       let query = supabase.from('profiles').select(PROFILE_SELECT);
 
       if (allExcludedIds.length > 0) {
@@ -1508,8 +1571,75 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, isPremium }: DiscoverPage
 
       if (error) throw error;
       
-      // If no new profiles found, we've exhausted the pool
-      if (!newProfiles || newProfiles.length === 0) {
+      // ⭐ Initialize distanceMap early for premium fallback
+      const distanceMap: { [key: string]: number } = {};
+      
+      // If no new profiles found, try premium fallback before giving up
+      if ((!newProfiles || newProfiles.length === 0) && hasUnlockedCountries) {
+        // Try unlocked countries only as fallback
+        const fallbackProfiles = await fetchUnlockedCountryProfiles({
+          unlockedCountries,
+          excludedIds: allExcludedIds,
+          allowedGenders,
+          distanceMap,
+          limit: 100
+        });
+        
+        if (fallbackProfiles.length > 0) {
+          // Show banner if not already shown
+          if (!localProfilesExhausted) {
+            setLocalProfilesExhausted(true);
+          }
+          
+          // Continue with fallback profiles
+          const profilesWithImages = fallbackProfiles.map(profile => ({
+            ...profile,
+            images: [],
+            distance: distanceMap[profile.id]
+          }));
+
+          // Apply age filtering
+          const userMinAge = currentUser.min_age || 18;
+          const userMaxAge = currentUser.max_age || 99;
+          const ageFiltered = profilesWithImages.filter(profile => {
+            if (!profile.date_of_birth) return false;
+            const age = calculateAge(profile.date_of_birth);
+            return age >= userMinAge && age <= userMaxAge;
+          });
+
+          // Apply stratified sampling
+          const today = new Date().toISOString().split('T')[0];
+          const refillSeed = `${currentUser.id}_refill_${today}_${Date.now()}`;
+          const stratifiedProfiles = stratifiedSample(ageFiltered, 15, refillSeed);
+          
+          // Remove duplicates
+          const existingProfileIds = new Set(potentialMatches.map(p => !isAd(p) ? p.id : null).filter(Boolean));
+          const uniqueProfiles = stratifiedProfiles.filter(profile => !existingProfileIds.has(profile.id));
+          
+          if (uniqueProfiles.length > 0) {
+            const newProfilesWithAds = injectAds(uniqueProfiles);
+            setPotentialMatches(prev => [...prev, ...newProfilesWithAds]);
+            
+            // Preload images
+            preloadNextProfileImages(uniqueProfiles, userImages, 0);
+            
+            // Batch fetch languages
+            const newProfileIds = uniqueProfiles.map(p => p.id).filter(Boolean);
+            if (newProfileIds.length > 0) {
+              batchFetchLanguages(newProfileIds);
+            }
+            
+            return; // Success - exit early
+          }
+        }
+      }
+      
+      // If no new profiles found even after premium fallback, we've exhausted the pool
+      // BUT: Only mark exhausted if premium fallback isn't available
+      if (
+        (!newProfiles || newProfiles.length === 0) &&
+        !hasUnlockedCountries
+      ) {
         setNoMoreProfiles(true); // Mark that we've exhausted all available profiles
         return;
       }
@@ -1524,7 +1654,6 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, isPremium }: DiscoverPage
       // Get location-based matches for distance filtering
       const locationMatches = await locationService.getLocationBasedMatches(currentUser.id, safeUserMaxDistance * 2);
       // ⭐ OPTIMIZED: Single pass for distanceMap and locationProfileIds (30ms saved)
-      const distanceMap: { [key: string]: number } = {};
       const locationProfileIds = uniqUuids(locationMatches
         .filter((m) => !allowedCountryCodes.length || allowedCountryCodes.includes(m.country_code))
         .map((match) => {
@@ -1545,40 +1674,7 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, isPremium }: DiscoverPage
         return locationProfileIds.includes(profile.id);
       });
 
-      // ⭐ PREMIUM FEATURE: Also fetch profiles from unlocked countries for premium users
-      if (isPremium && currentUser.unlocked_countries && Array.isArray(currentUser.unlocked_countries) && currentUser.unlocked_countries.length > 0) {
-        const existingIds = new Set(filteredProfiles.map(p => p.id));
-        const premiumExcludedIds = uniqUuids([...allExcludedIds, ...Array.from(existingIds)]);
-        const unlockedCountryCodes = (currentUser.unlocked_countries || [])
-          .filter((c): c is string => typeof c === 'string' && c.trim().length > 0)
-          .map(c => c.trim());
-        
-        if (unlockedCountryCodes.length === 0) {
-          // Nothing valid to query
-        } else {
-          let unlockedQuery = supabase
-            .from('profiles')
-            .select(PROFILE_SELECT)
-            .in('country_code', unlockedCountryCodes);
-        
-          if (premiumExcludedIds.length > 0) {
-            unlockedQuery = unlockedQuery.not('id', 'in', `(${premiumExcludedIds.join(',')})`);
-          }
-        
-          const { data: unlockedProfiles, error: unlockedError } = await unlockedQuery
-            .in('gender', allowedGenders)
-            .eq('account_status', 'active')
-            .eq('is_admin', false)
-            .eq('is_archived', false)
-            .limit(50); // Larger pool for stratified sampling
-
-          if (!unlockedError && unlockedProfiles && unlockedProfiles.length > 0) {
-            // ⭐ OPTIMIZED: Add distance inline (5ms saved)
-            unlockedProfiles.forEach(p => distanceMap[p.id] = 999);
-            filteredProfiles = [...filteredProfiles, ...unlockedProfiles];
-          }
-        }
-      }
+      // ⭐ PREMIUM FEATURE: Also fetch profiles from unlocked countries for premium users\n      if (isPremium && currentUser.unlocked_countries && Array.isArray(currentUser.unlocked_countries) && currentUser.unlocked_countries.length > 0) {\n        const existingIds = new Set(filteredProfiles.map(p => p.id));\n        const premiumExcludedIds = uniqUuids([...allExcludedIds, ...Array.from(existingIds)]);\n        const unlockedCountryCodes = (currentUser.unlocked_countries || [])\n          .filter((c): c is string => typeof c === 'string' && c.trim().length > 0)\n          .map(c => c.trim());\n        \n        if (unlockedCountryCodes.length > 0) {\n          const unlockedProfiles = await fetchUnlockedCountryProfiles({\n            unlockedCountries: unlockedCountryCodes,\n            excludedIds: premiumExcludedIds,\n            allowedGenders,\n            distanceMap,\n            limit: 50\n          });\n\n          if (unlockedProfiles.length > 0) {\n            filteredProfiles = [...filteredProfiles, ...unlockedProfiles];\n          }\n        }\n      }
 
       // Apply age filtering
       const userMinAge = currentUser.min_age || 18;
@@ -1623,7 +1719,7 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, isPremium }: DiscoverPage
     } finally {
       setIsLoadingMore(false);
     }
-  }, [currentUser, allowedGenders, potentialMatches, calculateAge, isLoadingMore, userImages, preloadNextProfileImages, injectAds]);
+  }, [currentUser, allowedGenders, potentialMatches, calculateAge, isLoadingMore, userImages, preloadNextProfileImages, injectAds, fetchUnlockedCountryProfiles, batchFetchLanguages, isPremium]);
 
   // ⭐ AUTO-REFILL ON SWIPE - Load more profiles as user swipes
   // Triggers when 15 REAL profiles remaining (excludes ads) - SINGLE SOURCE OF TRUTH for reloads
@@ -2366,7 +2462,14 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, isPremium }: DiscoverPage
   }
 
   // Show no profiles if we've exhausted all available profiles OR if initial fetch found none
-  if ((noMoreProfiles && potentialMatches.length === 0) || (potentialMatches.length === 0 && hasCompletedInitialFetch && !isLoading)) {
+  // BUT: Premium users with unlocked countries should never see this unless truly exhausted
+  const hasUnlockedCountries = isPremium && currentUser?.unlocked_countries && 
+    Array.isArray(currentUser.unlocked_countries) && currentUser.unlocked_countries.length > 0;
+  
+  if (
+    (noMoreProfiles && potentialMatches.length === 0 && !hasUnlockedCountries) || 
+    (potentialMatches.length === 0 && hasCompletedInitialFetch && !isLoading && !hasUnlockedCountries)
+  ) {
     return (
       <div className="min-h-screen w-full flex items-center justify-center" style={{ minHeight: 'calc(100vh - 152px)' }}>
         <Card className="max-w-md w-full mx-4">
@@ -2532,6 +2635,45 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, isPremium }: DiscoverPage
           </div>
         </div>
       )}
+      
+      {/* 🌍 Premium: Local Profiles Exhausted Banner */}
+      {localProfilesExhausted && isPremium && (
+        <div className="absolute top-4 left-0 right-0 z-[9998] px-4 animate-fade-in">
+          <div className="bg-gradient-to-r from-indigo-600 via-purple-600 to-pink-600 text-white text-sm rounded-2xl px-5 py-4 shadow-2xl border border-white/20 backdrop-blur-sm"
+               style={{
+                 animation: 'slideDown 0.5s ease-out, fadeOut 0.5s ease-in 7.5s forwards',
+                 boxShadow: '0 10px 40px -10px rgba(99, 102, 241, 0.5)'
+               }}>
+            <style>{`
+              @keyframes slideDown {
+                from { transform: translateY(-100%); opacity: 0; }
+                to { transform: translateY(0); opacity: 1; }
+              }
+              @keyframes fadeOut {
+                from { opacity: 1; }
+                to { opacity: 0; pointer-events: none; }
+              }
+            `}</style>
+            <div className="flex items-start gap-3">
+              <div className="text-2xl" role="img" aria-label="globe">🌍</div>
+              <div className="flex-1">
+                <div className="font-bold text-base mb-1">Local profiles are currently exhausted</div>
+                <div className="text-sm opacity-95 leading-relaxed">
+                  Extend your distance to see more nearby matches — or enjoy discovering people from the countries you unlocked!
+                </div>
+              </div>
+              <button 
+                onClick={() => setLocalProfilesExhausted(false)}
+                className="text-white/80 hover:text-white transition-colors ml-2 -mt-1"
+                aria-label="Close banner"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+      
       {/* Main Image Area - Card stack */}
   <div className="flex-1 relative overflow-hidden" style={{ 
     height: '100%', 
