@@ -314,6 +314,7 @@ const ProfilePage = ({ currentUser, profile, onProfileUpdate, onLogout, onShowTe
         latitude: editedProfile.latitude || null,
         longitude: editedProfile.longitude || null,
         is_custom_city: editedProfile.is_custom_city || false,
+        unlocked_countries: Array.isArray(editedProfile.unlocked_countries) ? editedProfile.unlocked_countries : [],
         introvert_extrovert:
           typeof editedProfile.introvert_extrovert === 'number' &&
           editedProfile.introvert_extrovert >= 0 &&
