@@ -100,7 +100,7 @@ serve(async (req) => {
     // This catches any that weren't properly processed by the RPC
     const { data: stuckSubscriptions, error: stuckError } = await supabase
       .from('user_subscriptions')
-      .select('id, user_id, status, plan_name, expires_at, payment_method')
+      .select('id, user_id, status, plan_name, expires_at, payment_method, auto_renew')
       .eq('status', 'active')
       .eq('plan_name', 'premium')
       .not('expires_at', 'is', null)
