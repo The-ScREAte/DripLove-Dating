@@ -157,6 +157,7 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, isPremium }: DiscoverPage
   const [showProfileCompletionModal, setShowProfileCompletionModal] = useState(false);
   const [todaySwipeCount, setTodaySwipeCount] = useState(0);
   const [localProfilesExhausted, setLocalProfilesExhausted] = useState(false);
+  const [isArchivedFallback, setIsArchivedFallback] = useState(false); // Two-phase: true when showing archived profiles
   
   // Dynamic content height management
   const contentRef = useRef<HTMLDivElement>(null);
@@ -719,8 +720,13 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, isPremium }: DiscoverPage
     }
 
     let filteredProfiles: any[] = [];
+    let usingArchivedFallback = false; // Track if we're showing archived profiles
     
-    // 1️⃣ Normal local flow
+    // =====================================================
+    // PHASE 1: ACTIVE USERS ONLY (is_archived = false)
+    // =====================================================
+    
+    // 1️⃣ Normal local flow - ACTIVE users only
     if (locationProfileIds.length > 0) {
       let query = supabase
         .from('profiles')
@@ -740,8 +746,8 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, isPremium }: DiscoverPage
         .in('gender', allowedGenders)
         .eq('account_status', 'active')
         .eq('is_admin', false)
-        .eq('is_archived', false)
-        .limit(100); // Fetch larger pool for stratified sampling
+        .eq('is_archived', false) // PHASE 1: Active users only
+        .limit(100);
 
       if (error) throw error;
       filteredProfiles = profiles || [];
@@ -763,7 +769,7 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, isPremium }: DiscoverPage
         setLocalProfilesExhausted(true);
       }
     }
-    // 3️⃣ Free-user fallback (same country only)
+    // 3️⃣ Free-user fallback (same country only) - ACTIVE users only
     else if (baseCountryCode) {
       let query = supabase.from('profiles').select(PROFILE_SELECT);
 
@@ -775,7 +781,7 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, isPremium }: DiscoverPage
         .in('gender', allowedGenders)
         .eq('account_status', 'active')
         .eq('is_admin', false)
-        .eq('is_archived', false)
+        .eq('is_archived', false) // PHASE 1: Active users only
         .eq('country_code', baseCountryCode)
         .limit(100);
 
@@ -785,7 +791,7 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, isPremium }: DiscoverPage
 
     // ⭐ PREMIUM FEATURE: Mix unlocked countries with local profiles ONLY if local profiles exist
     // If local is empty, unlocked countries are already fetched in premium fallback above
-    if (unlockedCountries.length > 0 && isPremium && locationProfileIds.length > 0) {
+    if (unlockedCountries.length > 0 && isPremium && locationProfileIds.length > 0 && filteredProfiles.length > 0) {
       const existingIds = new Set(filteredProfiles.map(p => p.id));
       const allExcludedIds = [...excludedIds, ...Array.from(existingIds)];
       
@@ -801,6 +807,42 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, isPremium }: DiscoverPage
         filteredProfiles = [...filteredProfiles, ...unlockedProfiles];
       }
     }
+
+    // =====================================================
+    // PHASE 2: ARCHIVED FALLBACK (only if Phase 1 returns 0)
+    // =====================================================
+    if (filteredProfiles.length === 0) {
+      console.log('[Discover] Phase 1 returned 0 active profiles, trying archived fallback...');
+      
+      let archivedQuery = supabase.from('profiles').select(PROFILE_SELECT);
+      
+      if (excludedIds.length > 0) {
+        archivedQuery = archivedQuery.not('id', 'in', `(${excludedIds.join(',')})`);
+      }
+      
+      // Build country filter based on user type
+      if (isPremium && allowedCountryCodes.length > 0) {
+        archivedQuery = archivedQuery.in('country_code', allowedCountryCodes);
+      } else if (baseCountryCode) {
+        archivedQuery = archivedQuery.eq('country_code', baseCountryCode);
+      }
+
+      const { data: archivedProfiles, error: archivedError } = await archivedQuery
+        .eq('is_archived', true) // PHASE 2: Archived users
+        .eq('account_status', 'active') // Still respect account status
+        .eq('is_admin', false)
+        .in('gender', allowedGenders)
+        .limit(50);
+
+      if (!archivedError && archivedProfiles && archivedProfiles.length > 0) {
+        console.log(`[Discover] Phase 2: Found ${archivedProfiles.length} archived profiles`);
+        filteredProfiles = archivedProfiles;
+        usingArchivedFallback = true;
+      }
+    }
+    
+    // Update the fallback state
+    setIsArchivedFallback(usingArchivedFallback);
  
     // Apply age filtering
     const userMinAge = currentUserData?.min_age || 18;
@@ -2674,7 +2716,40 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, isPremium }: DiscoverPage
         </div>
       )}
       
-      {/* Main Image Area - Card stack */}
+      {/* 🕐 Archived Fallback Banner - Two-phase discover */}
+      {isArchivedFallback && (
+        <div className="absolute top-4 left-0 right-0 z-[9998] px-4 animate-fade-in">
+          <div className="bg-gradient-to-r from-slate-700 to-slate-900 text-white text-xs rounded-xl px-4 py-3 shadow-lg"
+               style={{
+                 animation: 'slideDown 0.5s ease-out, fadeOut 0.5s ease-in 5.5s forwards',
+               }}>
+            <style>{`
+              @keyframes slideDown {
+                from { transform: translateY(-100%); opacity: 0; }
+                to { transform: translateY(0); opacity: 1; }
+              }
+              @keyframes fadeOut {
+                from { opacity: 1; }
+                to { opacity: 0; pointer-events: none; }
+              }
+            `}</style>
+            <div className="flex items-center gap-2">
+              <div className="text-base" role="img" aria-label="clock">🕐</div>
+              <div className="flex-1">
+                {t('discover.archivedFallback', "You've seen all recently active profiles. Showing more profiles to keep things going.")}
+              </div>
+              <button 
+                onClick={() => setIsArchivedFallback(false)}
+                className="text-white/80 hover:text-white transition-colors ml-2"
+                aria-label="Close banner"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+      
   <div className="flex-1 relative overflow-hidden" style={{ 
     height: '100%', 
     minHeight: 'calc(100vh - 100px)', 
