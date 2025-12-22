@@ -112,13 +112,14 @@ const StatsCard: React.FC<StatsCardProps> = ({ stats }) => {
   const displayActiveToday = isToday ? stats.active_users_today : selectedDateCount ?? 0;
 
   return (
-    <Card>
-      <CardHeader>
-        <CardTitle className="flex items-center">
+    <Card className="w-full">
+      <CardHeader className="pb-3">
+        <CardTitle className="flex items-center text-base">
           <TrendingUp className="w-5 h-5 mr-2" />
           Platform Statistics
         </CardTitle>
       </CardHeader>
+
 
       <CardContent>
         <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
