@@ -271,7 +271,6 @@ const ProfilePage = ({ currentUser, profile, onProfileUpdate, onLogout, onShowTe
           variant: "destructive",
         });
       } else {
-        console.log('Language saved successfully:', language);
         toast({
           title: "Language Updated! 🌍",
           description: "Your language preference has been saved.",
@@ -371,7 +370,6 @@ const ProfilePage = ({ currentUser, profile, onProfileUpdate, onLogout, onShowTe
   
   // Clear discover cache to force refresh with new settings
   if (typeof window !== 'undefined' && (window as any).discoverCache && currentUser?.id) {
-    console.log('🔄 Clearing discover cache due to profile update');
     (window as any).discoverCache.delete(currentUser.id);
     
     // Show toast notification

@@ -48,6 +48,7 @@ interface Campaign {
   failed_sends: number;
   created_at: string;
   admin_id: string;
+  status: 'queued' | 'processing' | 'completed' | 'failed';
 }
 
 // Collapsible countries badge component
@@ -518,9 +519,7 @@ export default function BroadcastNotifications() {
           });
           loadCampaigns();
         } else if (campaign.successful_sends + campaign.failed_sends > 0) {
-          // Show progress update
-          const progress = campaign.successful_sends + campaign.failed_sends;
-          console.log(`Progress: ${progress}/${campaign.total_recipients}`);
+          // Progress update happening silently
         }
       } catch (error) {
         console.error('Error polling progress:', error);

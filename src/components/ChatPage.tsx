@@ -426,7 +426,7 @@ const ChatPage = ({ currentUser, onUnreadChange, onDetailViewChange }: ChatPageP
             }));
           }
         } catch (e) {
-          console.log('[ChatPage] Error polling read status:', e);
+          // Silently handle polling errors
         }
       }, 2000);
       
@@ -1068,7 +1068,7 @@ const ChatPage = ({ currentUser, onUnreadChange, onDetailViewChange }: ChatPageP
           ));
         }
       } catch (chatError) {
-        console.log('[ChatPage] Error marking messages as read:', chatError);
+        // Silently handle read status errors
       }
 
       onUnreadChange?.();

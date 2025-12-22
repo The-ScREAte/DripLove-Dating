@@ -696,7 +696,6 @@ const AdminPageComponent = ({ currentUser, onLogout }: AdminPageProps) => {
           'Your account has been blocked due to community guideline violations. Please contact support if you believe this is an error.',
           reportedUserId
         );
-        console.log('📤 Account block notification sent to:', reportedUserId);
       } catch (notifError) {
         console.error('📤 Failed to send block notification:', notifError);
         // Don't fail the block action if notification fails
@@ -1110,7 +1109,6 @@ const AdminPageComponent = ({ currentUser, onLogout }: AdminPageProps) => {
         const notification = notificationMessages[newStatus as keyof typeof notificationMessages];
         if (notification) {
           await sendAdminNotification(notification.title, notification.body, userId);
-          console.log('📤 Account status notification sent to:', userId, '- Status:', newStatus);
         }
       } catch (notifError) {
         console.error('📤 Failed to send status notification:', notifError);
@@ -1205,17 +1203,9 @@ const AdminPageComponent = ({ currentUser, onLogout }: AdminPageProps) => {
   };
 
   const createManualMatch = async () => {
-    console.log('=== CREATE MATCH CALLED ===');
-    console.log('matchUser1 state:', matchUser1);
-    console.log('matchUser2 state:', matchUser2);
-    console.log('matchUser1Ref:', matchUser1Ref.current);
-    console.log('matchUser2Ref:', matchUser2Ref.current);
-    
     // Use refs instead of state to avoid closure issues
     const user1Id = matchUser1Ref.current || matchUser1;
     const user2Id = matchUser2Ref.current || matchUser2;
-    
-    console.log('Using values:', { user1Id, user2Id });
     
     if (!user1Id || !user2Id) {
       toast({
@@ -1227,7 +1217,6 @@ const AdminPageComponent = ({ currentUser, onLogout }: AdminPageProps) => {
     }
 
     if (user1Id === user2Id) {
-      console.log('ERROR: Both users have same ID!');
       toast({
         title: 'Error',
         description: 'Cannot match a user with themselves',
@@ -1236,18 +1225,6 @@ const AdminPageComponent = ({ currentUser, onLogout }: AdminPageProps) => {
       return;
     }
 
-    // Debug logging
-    const user1Data = users.find(u => u.id === user1Id);
-    const user2Data = users.find(u => u.id === user2Id);
-    
-    console.log('Creating match with:', {
-      user1_id: user1Id,
-      user2_id: user2Id,
-      user1_data: user1Data,
-      user2_data: user2Data,
-      are_equal: user1Id === user2Id
-    });
-
     try {
       const { data, error } = await supabase.rpc('admin_create_match', {
         p_user1_id: user1Id,
@@ -1255,11 +1232,8 @@ const AdminPageComponent = ({ currentUser, onLogout }: AdminPageProps) => {
       });
 
       if (error) {
-        console.error('RPC Error:', error);
         throw error;
       }
-
-      console.log('Match creation response:', data);
 
       // Check the response from the function
       if (data && typeof data === 'object') {
@@ -1533,7 +1507,6 @@ const AdminPageComponent = ({ currentUser, onLogout }: AdminPageProps) => {
                 <CardContent className="space-y-3">
                   <div className="grid grid-cols-2 gap-2">
                     <Select value={matchUser1} onValueChange={(value) => {
-                      console.log('User 1 selected:', value, users.find(u => u.id === value));
                       matchUser1Ref.current = value;
                       setMatchUser1(value);
                     }}>
@@ -1549,7 +1522,6 @@ const AdminPageComponent = ({ currentUser, onLogout }: AdminPageProps) => {
                       </SelectContent>
                     </Select>
                     <Select value={matchUser2} onValueChange={(value) => {
-                      console.log('User 2 selected:', value, users.find(u => u.id === value));
                       matchUser2Ref.current = value;
                       setMatchUser2(value);
                     }}>

@@ -786,8 +786,6 @@ const RegistrationForm = ({ onSubmit, onBackToLogin }: RegistrationFormProps) =>
               updated_at: new Date().toISOString()
             })
             .eq('id', userId);
-          
-          console.log('✅ Face indexed successfully for user:', userName);
         }
         
         // Clear localStorage after successful indexing

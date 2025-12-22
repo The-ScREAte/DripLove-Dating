@@ -50,8 +50,6 @@ const GlobalLanguageSelector: React.FC<GlobalLanguageSelectorProps> = ({
           .from('profiles')
           .update({ preferred_language: languageCode })
           .eq('id', userId);
-        
-        console.log('Language preference saved to database:', languageCode);
       }
     } catch (error) {
       console.error('Error changing language:', error);

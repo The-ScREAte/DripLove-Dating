@@ -48,7 +48,7 @@ const ChatUserList: React.FC<ChatUserListProps> = ({
       />
       
       {/* Scrollable conversations list */}
-      <div className="flex-1 overflow-y-auto">
+      <div className="flex-1 overflow-y-auto pb-24">
         {matches.length === 0 ? (
           <div className="p-4 text-center text-muted-foreground">
             No conversations yet

@@ -12,7 +12,6 @@ const AppleOAuthTest = () => {
   const handleTestAppleOAuth = async () => {
     setTesting(true);
     try {
-      console.log('🧪 Testing Custom Apple OAuth...');
       await startCustomAppleOAuth();
     } catch (error) {
       console.error('🧪 Test failed:', error);
