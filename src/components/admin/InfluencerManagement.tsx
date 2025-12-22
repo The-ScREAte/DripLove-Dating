@@ -160,8 +160,8 @@ const InfluencerManagement = () => {
   }, [fetchPromoCodes, fetchPayoutRequests]);
 
   const handleCreatePromoCode = async () => {
-    if (!formData.code.trim() || !formData.ownerName.trim() || !formData.password.trim()) {
-      toast({ title: 'Error', description: 'Please fill all required fields', variant: 'destructive' });
+    if (!formData.code.trim() || !formData.ownerName.trim() || !formData.email.trim()) {
+      toast({ title: 'Error', description: 'Please fill all required fields (code, name, email)', variant: 'destructive' });
       return;
     }
 
@@ -178,23 +178,51 @@ const InfluencerManagement = () => {
         return;
       }
 
-      // Store password (will be compared in login function)
-      const { error } = await supabase
+      // Generate a unique token for password setup
+      const token = crypto.randomUUID();
+
+      // Create promo code with token as temporary password_hash
+      const { data: newPromoCode, error } = await supabase
         .from('promo_codes')
         .insert({
           code: formData.code.trim().toUpperCase(),
           owner_name: formData.ownerName.trim(),
-          email: formData.email.trim() || null,
-          password_hash: formData.password, // Plain text for now - login function handles comparison
+          email: formData.email.trim(),
+          password_hash: token, // Token will be replaced when user sets password
           percentage_cut: parseFloat(formData.percentageCut),
           commission_duration: parseInt(formData.commissionDuration),
           status: 'active',
           is_active: true
-        });
+        })
+        .select('id')
+        .single();
 
       if (error) throw error;
 
-      toast({ title: 'Success', description: 'Promo code created successfully' });
+      // Send email with password setup link
+      const appUrl = window.location.origin;
+      const { error: emailError } = await supabase.functions.invoke('send-influencer-password-email', {
+        body: {
+          email: formData.email.trim(),
+          ownerName: formData.ownerName.trim(),
+          promoCode: formData.code.trim().toUpperCase(),
+          promoCodeId: newPromoCode.id,
+          token: token,
+          appUrl: appUrl
+        }
+      });
+
+      if (emailError) {
+        console.error('Email send error:', emailError);
+        toast({ 
+          title: 'Created but email failed', 
+          description: 'Promo code created but email failed to send. The influencer can request a new link later.', 
+          variant: 'destructive' 
+        });
+      } else {
+        toast({ title: 'Success', description: 'Promo code created! Email sent to influencer to set their password.' });
+      }
+
       setShowCreateModal(false);
       setFormData({ code: '', ownerName: '', email: '', password: '', percentageCut: '20', commissionDuration: '1' });
       fetchPromoCodes();
@@ -527,22 +555,16 @@ const InfluencerManagement = () => {
               />
             </div>
             <div>
-              <Label>Email (Optional)</Label>
+              <Label>Email * (Password setup link will be sent here)</Label>
               <Input 
                 type="email"
                 value={formData.email} 
                 onChange={(e) => setFormData(prev => ({ ...prev, email: e.target.value }))}
                 placeholder="influencer@email.com"
               />
-            </div>
-            <div>
-              <Label>Login Password *</Label>
-              <Input 
-                type="password"
-                value={formData.password} 
-                onChange={(e) => setFormData(prev => ({ ...prev, password: e.target.value }))}
-                placeholder="Secure password for influencer login"
-              />
+              <p className="text-xs text-gray-500 mt-1">
+                An email will be sent to the influencer to set their own password.
+              </p>
             </div>
             <div className="grid grid-cols-2 gap-4">
               <div>
