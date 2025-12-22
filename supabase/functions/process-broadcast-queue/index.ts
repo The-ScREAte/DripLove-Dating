@@ -143,7 +143,7 @@ serve(async (req) => {
 
         // Process recipients in parallel
         const sendResults = await Promise.allSettled(
-          recipients.map(async (recipient) => {
+          recipients.map(async (recipient: { id: string; user_id: string; retry_count?: number }) => {
             try {
               // Call send-push-notification function
               const { data, error } = await supabase.functions.invoke('send-push-notification', {
