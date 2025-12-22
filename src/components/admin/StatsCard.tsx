@@ -121,7 +121,7 @@ const StatsCard: React.FC<StatsCardProps> = ({ stats }) => {
         <CardDescription>Real-time metrics including premium subscriptions</CardDescription>
       </CardHeader>
       <CardContent>
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
           <div className="flex flex-col items-center p-4 bg-blue-50 rounded-lg">
             <Users className="w-8 h-8 text-blue-600 mb-2" />
             <span className="text-2xl font-bold text-blue-600">{stats.total_users}</span>
@@ -140,15 +140,15 @@ const StatsCard: React.FC<StatsCardProps> = ({ stats }) => {
             <span className="text-sm text-gray-600">Messages Sent</span>
           </div>
           
-          {/* Active Now - users active in last 15 minutes */}
-          <div className="flex flex-col items-center p-4 bg-emerald-50 rounded-lg border-2 border-emerald-200">
+          {/* Active Now - users active in last 15 minutes - PROMINENT */}
+          <div className="flex flex-col items-center p-4 bg-gradient-to-br from-emerald-50 to-green-100 rounded-lg border-2 border-emerald-300 shadow-sm">
             <div className="relative">
               <Radio className="w-8 h-8 text-emerald-600 mb-2" />
               <span className="absolute -top-1 -right-1 w-3 h-3 bg-emerald-500 rounded-full animate-pulse" />
             </div>
-            <span className="text-2xl font-bold text-emerald-600">{stats.active_now || 0}</span>
-            <span className="text-sm text-gray-600 text-center font-medium">Active Now</span>
-            <span className="text-xs text-gray-400">(last 15 min)</span>
+            <span className="text-2xl font-bold text-emerald-600">{stats.active_now ?? 0}</span>
+            <span className="text-sm text-emerald-700 text-center font-semibold">🟢 Active Now</span>
+            <span className="text-xs text-emerald-500">(last 15 min)</span>
           </div>
           
           {/* Active Today with date dropdown */}
@@ -160,30 +160,31 @@ const StatsCard: React.FC<StatsCardProps> = ({ stats }) => {
                 <Button 
                   variant="ghost" 
                   size="sm" 
-                  className="text-sm text-gray-600 hover:bg-purple-100 px-2 py-1 h-auto"
+                  className="text-sm text-gray-600 hover:bg-purple-100 px-2 py-1 h-auto flex items-center"
                 >
                   {isToday ? (
                     <>
-                      Active Today
+                      📅 Active Today
                       <ChevronDown className="w-3 h-3 ml-1" />
                     </>
                   ) : (
                     <>
-                      {format(selectedDate, 'MMM d')}
+                      📅 {format(selectedDate, 'MMM d')}
                       <ChevronDown className="w-3 h-3 ml-1" />
                     </>
                   )}
                 </Button>
               </DropdownMenuTrigger>
-              <DropdownMenuContent className="max-h-64 overflow-y-auto">
+              <DropdownMenuContent className="max-h-64 overflow-y-auto z-50">
                 {dateOptions.map((option, index) => (
                   <DropdownMenuItem
                     key={index}
                     onClick={() => handleSelectDate(option.date)}
                     className={format(selectedDate, 'yyyy-MM-dd') === format(option.date, 'yyyy-MM-dd') 
-                      ? 'bg-purple-100' 
+                      ? 'bg-purple-100 font-semibold' 
                       : ''}
                   >
+                    <History className="w-3 h-3 mr-2" />
                     {option.label}
                   </DropdownMenuItem>
                 ))}
