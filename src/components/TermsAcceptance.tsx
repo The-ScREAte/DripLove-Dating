@@ -60,11 +60,11 @@ const TermsAcceptance = ({ user, onAccept }: TermsAcceptanceProps) => {
       const cacheKey = `${userId}_${today}`;
       
       if (discoverCache.has(cacheKey)) {
-        console.log('✅ Profiles already cached, skipping preload');
+        // Profiles already cached, skipping preload
         return;
       }
 
-      console.log('🔄 Preloading discover profiles in background...');
+      // Preloading discover profiles in background
 
       // Fetch user preferences first
       const [{ data: currentUserData }, { data: subscriptionData }] = await Promise.all([
@@ -212,7 +212,7 @@ const TermsAcceptance = ({ user, onAccept }: TermsAcceptanceProps) => {
         timestamp: Date.now()
       });
 
-      console.log(`✅ Preloaded ${shuffled.length} profiles with ${Object.keys(imageMap).length} image sets`);
+      // Preloaded profiles successfully
     } catch (error) {
       console.error('❌ Profile preload error:', error);
       // Don't block the flow if preloading fails

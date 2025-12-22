@@ -74,26 +74,49 @@ const RatingDialog: React.FC<RatingDialogProps> = ({
     setIsSubmitting(true);
 
     try {
-      // For web, pass the selected rating; for iOS/Android, no rating needed
-      const ratingToPass = platform === 'web' ? selectedRating : undefined;
-      await openRatingInterface(ratingToPass);
-
-      // Mark as rated
-      markUserHasRated(platform);
-
-      // Call callback
-      if (onRatingComplete) {
-        onRatingComplete(selectedRating || 5, platform);
+      // For native platforms (iOS/Android), close dialog first then request review
+      // This ensures the native review modal can appear on top
+      if (platform !== 'web') {
+        // Mark as rated first
+        markUserHasRated(platform);
+        
+        // Close our dialog
+        setIsOpen(false);
+        onClose?.();
+        
+        // Small delay to ensure our dialog is fully closed before native modal appears
+        await new Promise(resolve => setTimeout(resolve, 300));
+        
+        // Now request the native review - this will show Apple/Google's native modal
+        await openRatingInterface();
+        
+        // Call callback
+        if (onRatingComplete) {
+          onRatingComplete(5, platform);
+        }
+      } else {
+        // Web flow - submit rating directly
+        await openRatingInterface(selectedRating);
+        
+        // Mark as rated
+        markUserHasRated(platform);
+        
+        // Call callback
+        if (onRatingComplete) {
+          onRatingComplete(selectedRating, platform);
+        }
+        
+        handleClose();
       }
-
-      handleClose();
     } catch (error) {
-      console.error('[RatingDialog] Error submitting rating:', error);
-      toast({
-        title: "Something went wrong",
-        description: "Please try again later",
-        variant: "destructive",
-      });
+      // Don't show error for native platforms - the modal might not show due to rate limits
+      if (platform === 'web') {
+        toast({
+          title: "Something went wrong",
+          description: "Please try again later",
+          variant: "destructive",
+        });
+      }
     } finally {
       setIsSubmitting(false);
     }

@@ -175,6 +175,7 @@ export type Database = {
           id: string
           message: string
           notification_type: string | null
+          status: string | null
           successful_sends: number | null
           target_countries: string[] | null
           title: string
@@ -188,6 +189,7 @@ export type Database = {
           id?: string
           message: string
           notification_type?: string | null
+          status?: string | null
           successful_sends?: number | null
           target_countries?: string[] | null
           title: string
@@ -201,6 +203,7 @@ export type Database = {
           id?: string
           message?: string
           notification_type?: string | null
+          status?: string | null
           successful_sends?: number | null
           target_countries?: string[] | null
           title?: string
@@ -223,6 +226,8 @@ export type Database = {
           created_at: string | null
           error_message: string | null
           id: string
+          processing_started_at: string | null
+          retry_count: number | null
           sent_at: string | null
           status: string | null
           user_id: string | null
@@ -232,6 +237,8 @@ export type Database = {
           created_at?: string | null
           error_message?: string | null
           id?: string
+          processing_started_at?: string | null
+          retry_count?: number | null
           sent_at?: string | null
           status?: string | null
           user_id?: string | null
@@ -241,6 +248,8 @@ export type Database = {
           created_at?: string | null
           error_message?: string | null
           id?: string
+          processing_started_at?: string | null
+          retry_count?: number | null
           sent_at?: string | null
           status?: string | null
           user_id?: string | null
@@ -1600,6 +1609,18 @@ export type Database = {
           notified_count: number
         }[]
       }
+      claim_broadcast_recipients: {
+        Args: {
+          p_batch_size: number
+          p_campaign_id: string
+          p_max_retries: number
+        }
+        Returns: {
+          id: string
+          retry_count: number
+          user_id: string
+        }[]
+      }
       cleanup_incomplete_users: { Args: never; Returns: undefined }
       create_admin_user: {
         Args: {
@@ -1618,15 +1639,25 @@ export type Database = {
         Args: { user_id_to_delete: string }
         Returns: undefined
       }
-      find_matches_by_location: {
-        Args: { max_distance_km?: number; user_id: string }
-        Returns: {
-          city: string
-          country_code: string
-          distance_km: number
-          profile_id: string
-        }[]
-      }
+      find_matches_by_location:
+        | {
+            Args: { max_distance_km?: number; user_id: string }
+            Returns: {
+              city: string
+              country_code: string
+              distance_km: number
+              profile_id: string
+            }[]
+          }
+        | {
+            Args: { max_distance_km?: number; user_id: string }
+            Returns: {
+              city: string
+              country_code: string
+              distance_km: number
+              profile_id: string
+            }[]
+          }
       get_active_users_for_date: {
         Args: { target_date: string }
         Returns: number
@@ -1714,6 +1745,10 @@ export type Database = {
       reject_image: {
         Args: { admin_notes?: string; image_id: string }
         Returns: boolean
+      }
+      release_stale_broadcast_recipients: {
+        Args: { p_stale_after: unknown }
+        Returns: number
       }
       request_influencer_payout: {
         Args: { p_amount: number; p_promo_code_id: string }

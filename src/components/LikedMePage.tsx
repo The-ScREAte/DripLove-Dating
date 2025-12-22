@@ -817,8 +817,6 @@ const LikedMePage = ({ currentUser, isPremium = false }: LikedMePageProps) => {
   };
 
   const handlePass = async (profileId: string) => {
-    console.log('handlePass called - passing on profileId:', profileId);
-    
     // Optimistic update - remove profile immediately
     const profileToRemove = likers.find(liker => liker.id === profileId);
     setLikers(prev => prev.filter(liker => liker.id !== profileId));
@@ -883,7 +881,6 @@ const LikedMePage = ({ currentUser, isPremium = false }: LikedMePageProps) => {
       if (currentUser?.id) {
         likedMeCache.delete(currentUser.id);
         sessionStorage.removeItem(getStorageKey(currentUser.id));
-        console.log('Cache cleared for user:', currentUser.id);
       }
       
       // Set lockout period for free users
@@ -891,8 +888,6 @@ const LikedMePage = ({ currentUser, isPremium = false }: LikedMePageProps) => {
         await setLockoutPeriod();
         setHasInteractedToday(true);
       }
-
-      console.log('Pass completed - user will be filtered out on next refresh');
     } catch (error) {
       console.error('Error in handlePass:', error);
       // Revert optimistic update on error

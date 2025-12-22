@@ -72,20 +72,16 @@ export async function fetchIAPProducts(productIds: string[]): Promise<any[]> {
       'com.driplove.dating.premium.monthlysub3'
     ];
     const ids = productIds && productIds.length > 0 ? productIds : defaultIds;
-    console.log('[IAP] Fetching products:', ids);
     
     return new Promise((resolve, reject) => {
       window.store.verbosity = window.store.DEBUG;
       const products = ids.map(id => ({ id, type: window.store.PAID_SUBSCRIPTION }));
-      console.log('[IAP] Registering products:', products);
       
       window.store.register(products);
       
       window.store.ready(() => {
-        console.log('[IAP] Store ready, fetching products...');
         const fetchedProducts = ids.map(id => {
           const product = window.store.get(id);
-          console.log(`[IAP] Product ${id}:`, product);
           return product;
         });
         resolve(fetchedProducts);
@@ -135,7 +131,6 @@ export async function buyIAPProduct(productId: string): Promise<any> {
           if (p && p.canPurchase) {
             product = p;
             selectedId = id;
-            console.log('[IAP] Using available product:', id);
             break;
           }
         }

@@ -724,8 +724,6 @@ const ProfileCompletionPage = () => {
                 updated_at: new Date().toISOString()
               })
               .eq('id', user.id);
-            
-            console.log('✅ Face indexed successfully for user:', userName);
           }
           
           // Clear localStorage after successful indexing

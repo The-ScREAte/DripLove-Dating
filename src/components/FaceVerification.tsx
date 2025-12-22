@@ -227,16 +227,11 @@ export default function FaceVerification({ onVerified, disabled }: FaceVerificat
         },
       });
 
-      console.log("Face verify response - data:", data, "error:", error);
-
       // If error is FunctionsHttpError, it contains the response body
       if (error) {
-        console.log("Error type:", error.constructor.name);
-        
         if (error instanceof FunctionsHttpError) {
           // Get the error response body
           const errorBody = await error.context.json();
-          console.log("Error body from FunctionsHttpError:", errorBody);
           
           if (errorBody) {
             handleErrorResponse(errorBody);
@@ -290,8 +285,6 @@ export default function FaceVerification({ onVerified, disabled }: FaceVerificat
   }
 
   function handleErrorResponse(responseData: any) {
-    console.log("Handling error response:", responseData);
-    
     const code = responseData?.code;
     const errorMsg = responseData?.error;
 

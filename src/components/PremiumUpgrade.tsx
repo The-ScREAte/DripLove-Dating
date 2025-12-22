@@ -354,8 +354,7 @@ const PremiumUpgrade = ({ currentUser, onClose, preselectedPlan }: PremiumUpgrad
   const handleRestorePurchases = async () => {
     setRestoreLoading(true);
     try {
-      console.log('[PremiumUpgrade] Starting restore purchases...');
-      
+      // Start restore purchases
       // Call the appropriate restore function based on platform with timeout protection
       let restoreResult: { restored: boolean; message: string };
       
@@ -371,7 +370,6 @@ const PremiumUpgrade = ({ currentUser, onClose, preselectedPlan }: PremiumUpgrad
       try {
         restoreResult = await Promise.race([restorePromise, timeoutPromise]);
       } catch (timeoutError) {
-        console.log('[PremiumUpgrade] Restore timed out, checking subscription status directly...');
         // On timeout, check the database directly
         await refetchSubscription();
         // Small delay for refetch to complete
@@ -390,8 +388,6 @@ const PremiumUpgrade = ({ currentUser, onClose, preselectedPlan }: PremiumUpgrad
           restoreResult = { restored: false, message: 'No active subscription found' };
         }
       }
-      
-      console.log('[PremiumUpgrade] Restore result:', restoreResult);
       
       // Refetch subscription status
       await refetchSubscription();

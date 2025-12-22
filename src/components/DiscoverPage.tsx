@@ -817,8 +817,7 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, isPremium }: DiscoverPage
     // PHASE 2: ARCHIVED FALLBACK (only if Phase 1 returns 0)
     // =====================================================
     if (filteredProfiles.length === 0) {
-      console.log('[Discover] Phase 1 returned 0 active profiles, trying archived fallback...');
-      
+      // Phase 1 returned 0 active profiles, trying archived fallback
       let archivedQuery = supabase.from('profiles').select(PROFILE_SELECT);
       
       if (excludedIds.length > 0) {
@@ -840,7 +839,6 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, isPremium }: DiscoverPage
         .limit(50);
 
       if (!archivedError && archivedProfiles && archivedProfiles.length > 0) {
-        console.log(`[Discover] Phase 2: Found ${archivedProfiles.length} archived profiles`);
         filteredProfiles = archivedProfiles;
         usingArchivedFallback = true;
       }
@@ -1629,8 +1627,7 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, isPremium }: DiscoverPage
       let usingArchivedFallback = false;
       
       if (activeProfiles.length === 0) {
-        console.log('[LoadMore] Phase 1 returned 0 active profiles, trying archived fallback...');
-        
+        // Phase 1 returned 0 active profiles, trying archived fallback
         let archivedQuery = supabase.from('profiles').select(PROFILE_SELECT);
         
         if (allExcludedIds.length > 0) {
@@ -1652,7 +1649,6 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, isPremium }: DiscoverPage
           .limit(50);
 
         if (!archivedError && archivedProfiles && archivedProfiles.length > 0) {
-          console.log(`[LoadMore] Phase 2: Found ${archivedProfiles.length} archived profiles`);
           activeProfiles = archivedProfiles;
           usingArchivedFallback = true;
           
