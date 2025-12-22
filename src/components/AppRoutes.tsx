@@ -24,6 +24,7 @@ const RedirectHandler = lazy(() => import('./RedirectHandler'));
 const TermsOfService = lazy(() => import('./TermsOfService'));
 const PrivacyPolicy = lazy(() => import('./PrivacyPolicy'));
 const InfluencerPortal = lazy(() => import('../pages/InfluencerPortal'));
+const InfluencerSetPassword = lazy(() => import('../pages/InfluencerSetPassword'));
 
 // Minimal fallback - just blank screen
 const PageLoader = () => null;
@@ -50,6 +51,7 @@ const AppRoutes = () => {
       <Route path="/terms-of-service" element={<TermsOfService onBack={() => navigate(-1)} />} />
       <Route path="/privacy-policy" element={<PrivacyPolicy onBack={() => navigate(-1)} />} />
       <Route path="/influencer" element={<InfluencerPortal />} />
+      <Route path="/influencer/set-password" element={<InfluencerSetPassword />} />
       <Route path="/r/:id" element={<RedirectHandler />} />
       {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
       <Route path="*" element={<NotFound />} />
