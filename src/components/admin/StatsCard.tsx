@@ -1,10 +1,10 @@
 import React, { useState, useEffect } from 'react';
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
-import { 
-  Users, 
-  Heart, 
-  MessageSquare, 
-  UserX, 
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import {
+  Users,
+  Heart,
+  MessageSquare,
+  UserX,
   TrendingUp,
   Calendar,
   Shield,
@@ -15,7 +15,7 @@ import {
   History,
   Archive,
   ChevronDown,
-  Radio
+  Radio,
 } from 'lucide-react';
 import { AdminStats } from '@/types';
 import { supabase } from '@/integrations/supabase/client';
@@ -24,7 +24,7 @@ import {
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
+} from '@/components/ui/dropdown-menu';
 import { Button } from '@/components/ui/button';
 import { format, subDays } from 'date-fns';
 
@@ -118,8 +118,8 @@ const StatsCard: React.FC<StatsCardProps> = ({ stats }) => {
           <TrendingUp className="w-5 h-5 mr-2" />
           Platform Statistics
         </CardTitle>
-        <CardDescription>Real-time metrics including premium subscriptions</CardDescription>
       </CardHeader>
+
       <CardContent>
         <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
           <div className="flex flex-col items-center p-4 bg-blue-50 rounded-lg">
