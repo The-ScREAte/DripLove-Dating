@@ -138,7 +138,7 @@ const ImageManagement = ({ currentUser, profile, onProfileUpdate }: ImageManagem
         })));
       }
     } catch (error) {
-  // ...removed log...
+      console.error('Error fetching user images:', error);
     }
   }, [currentUser?.id]);
 
@@ -247,7 +247,7 @@ const ImageManagement = ({ currentUser, profile, onProfileUpdate }: ImageManagem
       }
 
     } catch (error) {
-  // ...removed log...
+      console.error('Moderation error:', error);
       // STRICT: If moderation fails, require manual review
       moderationResult = {
         isApproved: false, // Changed to false - no auto-approval on error
@@ -374,7 +374,7 @@ const ImageManagement = ({ currentUser, profile, onProfileUpdate }: ImageManagem
           .order('image_order', { ascending: true });
 
         if (orderError) {
-    // ...removed log...
+          console.error('Error fetching image order:', orderError);
           throw orderError;
         }
 
@@ -412,7 +412,7 @@ const ImageManagement = ({ currentUser, profile, onProfileUpdate }: ImageManagem
           .insert(insertData);
 
         if (dbError) {
-    // ...removed log...
+          console.error('Error inserting image:', dbError);
           throw dbError;
         }
           
@@ -435,7 +435,7 @@ const ImageManagement = ({ currentUser, profile, onProfileUpdate }: ImageManagem
       // Refresh the image list
       await fetchUserImages();
     } catch (error) {
-  // ...removed log...
+      console.error('Error uploading image:', error);
       
       // Provide more specific error messages
       let errorMessage = "Failed to upload image.";
@@ -503,7 +503,7 @@ const ImageManagement = ({ currentUser, profile, onProfileUpdate }: ImageManagem
 
       await fetchUserImages();
     } catch (error) {
-  // ...removed log...
+      console.error('Error deleting image:', error);
       toast({ title: "Error", description: "Failed to delete image. Please try again.", variant: "destructive" });
     } finally {
       setDeleting(false);

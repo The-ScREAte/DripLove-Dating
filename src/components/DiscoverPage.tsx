@@ -345,7 +345,7 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, isPremium }: DiscoverPage
           .single();
 
         if (profileError) {
-      // ...removed log...
+          console.error('Error fetching profile:', profileError);
           return;
         }
 
@@ -356,7 +356,7 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, isPremium }: DiscoverPage
           .eq('user_id', currentUser.id);
 
         if (imagesError) {
-      // ...removed log...
+          console.error('Error fetching images:', imagesError);
         }
 
         const userImages = images || [];
@@ -385,7 +385,7 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, isPremium }: DiscoverPage
           }
         }
       } catch (error) {
-  // ...removed log...
+        console.error('Error in fetchUserProfileCompletion:', error);
       }
     };
 
@@ -404,13 +404,13 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, isPremium }: DiscoverPage
         .maybeSingle();
 
       if (error && error.code !== 'PGRST116') {
-  // ...removed log...
+        console.error('Error fetching reverse usage:', error);
         return;
       }
 
       setReverseUsageToday(data?.reverse_dislikes_used || 0);
     } catch (error) {
-  // ...removed log...
+      console.error('Error in fetchReverseUsage:', error);
     }
   }, [currentUser?.id]);
   const [lastShuffleTime, setLastShuffleTime] = useState<number>(0);
@@ -1158,7 +1158,7 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, isPremium }: DiscoverPage
         // No need for extra calls here - keeps logic simple and centralized
       }
     } catch (error) {
-  // ...removed log...
+      console.error('Failed to load potential matches:', error);
       toast({
         title: t('common.error'),
         description: t('discover.errors.loadFailed'),
@@ -2256,7 +2256,7 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, isPremium }: DiscoverPage
         });
 
       if (deleteError) {
-  // ...removed log...
+        console.error('Error reversing dislike:', deleteError);
         toast({
           title: t('common.error'),
           description: t('discover.errors.reverseFailed'),
@@ -2304,7 +2304,7 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, isPremium }: DiscoverPage
       }
 
     } catch (error) {
-  // ...removed log...
+      console.error('Error in handleReverseDislike:', error);
       toast({
         title: t('common.error'),
         description: t('discover.errors.reverseFailed'),

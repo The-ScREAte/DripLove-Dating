@@ -60,7 +60,7 @@ const ChatUserAvatar = ({ userId, firstName = '', lastName = '', onClick, size =
         if (error) {
           // Only log actual errors, not missing table errors
           if (!error.message.includes('does not exist') && !error.message.includes('relation')) {
-            // ...removed log...
+            console.error('Error loading avatar:', error);
           }
           return;
         }
@@ -77,7 +77,7 @@ const ChatUserAvatar = ({ userId, firstName = '', lastName = '', onClick, size =
           }
         }
       } catch (error) {
-        // ...removed log...
+        // Silent fail for image loading
       }
     };
 

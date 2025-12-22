@@ -122,7 +122,7 @@ const AuthForm = ({ isLogin, onToggle, onBack }: AuthFormProps) => {
       
       // Double-check the URI before sending
       if (window.location.hostname === 'localhost' && !redirectUri.includes('localhost')) {
-  // ...removed log...
+        // Localhost redirect mismatch detected
         const correctedUri = `${window.location.origin}/reset-password`;
         
         const { error } = await supabase.auth.resetPasswordForEmail(formData.email, {
@@ -130,7 +130,7 @@ const AuthForm = ({ isLogin, onToggle, onBack }: AuthFormProps) => {
         });
         
         if (error) {
-          // ...removed log...
+          console.error('Password reset error:', error);
           toast({
             title: "Password Reset Failed",
             description: error.message,
@@ -145,7 +145,7 @@ const AuthForm = ({ isLogin, onToggle, onBack }: AuthFormProps) => {
         });
 
         if (error) {
-          // ...removed log...
+          console.error('Password reset error:', error);
           toast({
             title: "Password Reset Failed",
             description: error.message,

@@ -86,7 +86,7 @@ const AccountActions = ({ currentUser, onLogout, onShowTerms, onShowPrivacy, hid
         description: "See you again soon!",
       });
     } catch (error) {
-  // ...removed log...
+      console.error('Error during logout:', error);
     }
   };
 
