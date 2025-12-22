@@ -48,3 +48,12 @@ verify_jwt = false
 
 [functions.face-verify]
 verify_jwt = false
+
+[functions.process-scheduled-broadcasts]
+verify_jwt = false
+
+[functions.send-broadcast-campaign]
+verify_jwt = true
+
+[functions.process-broadcast-queue]
+verify_jwt = false
