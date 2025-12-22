@@ -80,6 +80,7 @@ export function categorizeProfilesIntoBuckets<T extends { created_at?: string | 
 /**
  * Shuffle profiles from multiple countries together fairly
  * Ensures profiles from all countries are interleaved rather than grouped
+ * Uses deterministic round-robin with small batches per country
  */
 export function shuffleCountriesTogether<T extends { country_code?: string | null; id: string }>(
   profiles: T[],
@@ -103,32 +104,44 @@ export function shuffleCountriesTogether<T extends { country_code?: string | nul
     return sampleFromArray(profiles, profiles.length, random);
   }
   
-  // Shuffle each country's profiles
+  // Shuffle each country's profiles internally for randomness
   const random = seededRandom(hashString(seed + '_countries'));
   const shuffledByCountry: Map<string, T[]> = new Map();
   for (const [country, countryProfiles] of byCountry) {
     shuffledByCountry.set(country, sampleFromArray(countryProfiles, countryProfiles.length, random));
   }
   
-  // Interleave profiles from all countries fairly (round-robin with randomization)
+  // Deterministic round-robin: take 2 from each country in rotation
   const result: T[] = [];
   const countries = Array.from(shuffledByCountry.keys());
-  const indices: Map<string, number> = new Map(countries.map(c => [c, 0]));
+  // Shuffle country order once for variety
+  for (let i = countries.length - 1; i > 0; i--) {
+    const j = Math.floor(random() * (i + 1));
+    [countries[i], countries[j]] = [countries[j], countries[i]];
+  }
   
-  // Keep pulling from countries in a randomized round-robin fashion
-  while (result.length < profiles.length) {
-    // Shuffle the order of countries for this round
-    for (let i = countries.length - 1; i > 0; i--) {
-      const j = Math.floor(random() * (i + 1));
-      [countries[i], countries[j]] = [countries[j], countries[i]];
-    }
-    
+  const indices: Map<string, number> = new Map(countries.map(c => [c, 0]));
+  const batchSize = 2; // Take 2 profiles per country per round
+  
+  let hasMore = true;
+  while (hasMore) {
+    hasMore = false;
     for (const country of countries) {
       const countryProfiles = shuffledByCountry.get(country)!;
-      const idx = indices.get(country)!;
-      if (idx < countryProfiles.length) {
-        result.push(countryProfiles[idx]);
-        indices.set(country, idx + 1);
+      const startIdx = indices.get(country)!;
+      
+      // Take up to batchSize profiles from this country
+      for (let i = 0; i < batchSize; i++) {
+        const idx = startIdx + i;
+        if (idx < countryProfiles.length) {
+          result.push(countryProfiles[idx]);
+        }
+      }
+      
+      const newIdx = startIdx + batchSize;
+      indices.set(country, newIdx);
+      if (newIdx < countryProfiles.length) {
+        hasMore = true;
       }
     }
   }

@@ -727,6 +727,7 @@ export type Database = {
           is_admin: boolean | null
           is_archived: boolean | null
           is_custom_city: boolean | null
+          is_verified: boolean
           last_googled: string | null
           last_login_at: string | null
           last_name: string
@@ -742,6 +743,7 @@ export type Database = {
           perfect_first_date: string | null
           preference: string
           preferred_language: string | null
+          profile_completion: number
           promo_code_used: string | null
           relationship_intent: string | null
           sleeping_schedule: string | null
@@ -778,6 +780,7 @@ export type Database = {
           is_admin?: boolean | null
           is_archived?: boolean | null
           is_custom_city?: boolean | null
+          is_verified?: boolean
           last_googled?: string | null
           last_login_at?: string | null
           last_name: string
@@ -793,6 +796,7 @@ export type Database = {
           perfect_first_date?: string | null
           preference: string
           preferred_language?: string | null
+          profile_completion?: number
           promo_code_used?: string | null
           relationship_intent?: string | null
           sleeping_schedule?: string | null
@@ -829,6 +833,7 @@ export type Database = {
           is_admin?: boolean | null
           is_archived?: boolean | null
           is_custom_city?: boolean | null
+          is_verified?: boolean
           last_googled?: string | null
           last_login_at?: string | null
           last_name?: string
@@ -844,6 +849,7 @@ export type Database = {
           perfect_first_date?: string | null
           preference?: string
           preferred_language?: string | null
+          profile_completion?: number
           promo_code_used?: string | null
           relationship_intent?: string | null
           sleeping_schedule?: string | null
