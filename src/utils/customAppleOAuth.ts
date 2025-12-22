@@ -11,6 +11,8 @@
 
 import { supabase } from '@/integrations/supabase/client';
 
+const noopLog = (..._args: unknown[]) => {};
+
 // Apple JS SDK types
 declare global {
   interface Window {
@@ -30,7 +32,7 @@ async function loadAppleJSSDK(): Promise<void> {
   return new Promise((resolve, reject) => {
     // Check if already loaded and properly initialized
     if (window.AppleID?.auth?.init) {
-      console.log('🍎 Apple JS SDK already loaded');
+      noopLog('🍎 Apple JS SDK already loaded');
       resolve();
       return;
     }
@@ -42,7 +44,7 @@ async function loadAppleJSSDK(): Promise<void> {
     script.defer = true;
     
     script.onload = () => {
-      console.log('🍎 Apple JS SDK script loaded, waiting for initialization...');
+      noopLog('🍎 Apple JS SDK script loaded, waiting for initialization...');
       
       // Wait a bit for the SDK to fully initialize
       let attempts = 0;
@@ -51,10 +53,10 @@ async function loadAppleJSSDK(): Promise<void> {
       const checkInit = () => {
         attempts++;
         if (window.AppleID?.auth?.init) {
-          console.log('🍎 Apple JS SDK fully initialized');
+          noopLog('🍎 Apple JS SDK fully initialized');
           resolve();
         } else if (attempts < maxAttempts) {
-          console.log(`🍎 Waiting for Apple SDK initialization... (${attempts}/${maxAttempts})`);
+          noopLog(`🍎 Waiting for Apple SDK initialization... (${attempts}/${maxAttempts})`);
           setTimeout(checkInit, 100);
         } else {
           console.error('🍎 Apple JS SDK failed to initialize properly');
@@ -118,7 +120,7 @@ function generateState(): string {
  * FINAL SOLUTION: Simple Apple OAuth redirect (no SDK needed)
  */
 export async function startCustomAppleOAuth(): Promise<never> {
-  console.log('🍎 Starting simple Apple OAuth redirect');
+  noopLog('🍎 Starting simple Apple OAuth redirect');
   
   const servicesId = (import.meta.env?.VITE_APPLE_SERVICES_ID as string) || 'com.driplove.dating.signin';
   const origin = window.location.origin;
@@ -141,7 +143,7 @@ export async function startCustomAppleOAuth(): Promise<never> {
     `response_mode=query&` +
     `state=${encodeURIComponent(state)}`;
   
-  console.log('🍎 Redirecting to Apple with URL:', {
+  noopLog('🍎 Redirecting to Apple with URL:', {
     servicesId,
     redirectUri,
     state: state.substring(0, 8) + '...',
@@ -159,7 +161,7 @@ export async function startCustomAppleOAuth(): Promise<never> {
  * Fallback: Simple Apple OAuth redirect flow
  */
 async function startAppleRedirectFlow(): Promise<never> {
-  console.log('🍎 Starting Apple redirect flow fallback');
+  noopLog('🍎 Starting Apple redirect flow fallback');
   
   const servicesId = (import.meta.env?.VITE_APPLE_SERVICES_ID as string) || 'com.driplove.dating.signin';
   const origin = window.location.origin;
@@ -183,7 +185,7 @@ async function startAppleRedirectFlow(): Promise<never> {
   
   const authUrl = `https://appleid.apple.com/auth/authorize?${params.toString()}`;
   
-  console.log('🍎 Redirecting to Apple OAuth:', {
+  noopLog('🍎 Redirecting to Apple OAuth:', {
     clientId: servicesId,
     redirectUri: `${origin}/auth/apple-callback`,
     authUrl: authUrl.substring(0, 100) + '...'
@@ -204,7 +206,7 @@ async function processAppleSignInResponse(response: any): Promise<{
   profile: any;
   needsProfileCompletion: boolean;
 }> {
-  console.log('🍎 Processing Apple Sign-In response');
+  noopLog('🍎 Processing Apple Sign-In response');
   
   if (!response || !response.authorization || !response.authorization.id_token) {
     throw new Error('Invalid Apple Sign-In response - no ID token');
@@ -213,7 +215,7 @@ async function processAppleSignInResponse(response: any): Promise<{
   const idToken = response.authorization.id_token;
   
   // Exchange Apple ID token for Supabase session
-  console.log('🍎 Exchanging Apple ID token for Supabase session');
+  noopLog('🍎 Exchanging Apple ID token for Supabase session');
   
   const { data, error: supabaseError } = await supabase.auth.signInWithIdToken({
     provider: 'apple',
@@ -229,7 +231,7 @@ async function processAppleSignInResponse(response: any): Promise<{
     throw new Error('No user returned from Supabase after Apple sign-in');
   }
   
-  console.log('🍎 Successfully authenticated with Supabase:', data.user.id);
+  noopLog('🍎 Successfully authenticated with Supabase:', data.user.id);
   
   // Check if user profile exists
   let { data: profile, error: profileError } = await supabase
@@ -262,10 +264,10 @@ async function processAppleSignInResponse(response: any): Promise<{
           last_name: lastName,
         }
       });
-      console.log('🍎 Saved Apple name to user_metadata:', { firstName, lastName });
+      noopLog('🍎 Saved Apple name to user_metadata:', { firstName, lastName });
     }
     
-    console.log('🍎 No profile found - user needs to complete profile with moderation');
+    noopLog('🍎 No profile found - user needs to complete profile with moderation');
     return {
       user: { ...data.user, user_metadata: { ...data.user.user_metadata, first_name: firstName, last_name: lastName } },
       profile: null,
@@ -305,7 +307,7 @@ export async function handleCustomAppleCallback(): Promise<{
   profile: any;
   needsProfileCompletion: boolean;
 }> {
-  console.log('🍎 Handling Apple OAuth Callback (query parameters)');
+  noopLog('🍎 Handling Apple OAuth Callback (query parameters)');
   
   try {
     // Parse URL parameters
@@ -314,7 +316,7 @@ export async function handleCustomAppleCallback(): Promise<{
     const state = urlParams.get('state');
     const error = urlParams.get('error');
     
-    console.log('🍎 Callback parameters:', {
+    noopLog('🍎 Callback parameters:', {
       hasCode: !!code,
       hasState: !!state,
       error: error,
@@ -332,7 +334,7 @@ export async function handleCustomAppleCallback(): Promise<{
     
     // Verify state (with lenient validation for Apple OAuth redirects)
     const storedState = sessionStorage.getItem('apple_oauth_state');
-    console.log('🍎 State validation:', { 
+    noopLog('🍎 State validation:', { 
       receivedState: state, 
       storedState, 
       matches: state === storedState 
@@ -350,17 +352,17 @@ export async function handleCustomAppleCallback(): Promise<{
     sessionStorage.removeItem('apple_oauth_state');
     
     // Use Supabase to handle the authorization code
-    console.log('🍎 Processing authorization code with Supabase...');
+    noopLog('🍎 Processing authorization code with Supabase...');
     
     // Process the authorization code directly - no need to redirect
     // We're now handling Apple OAuth properly on our domain
-    console.log('🍎 Processing Apple authorization code on domain:', window.location.origin);
+    noopLog('🍎 Processing Apple authorization code on domain:', window.location.origin);
     
     // Process normally with Supabase callback
     const supabaseCallbackUrl = `${window.location.origin}/auth/callback?code=${code}&state=${state}`;
     
     // Redirect to the regular Supabase callback handler
-    console.log('🍎 Redirecting to Supabase callback handler:', supabaseCallbackUrl);
+    noopLog('🍎 Redirecting to Supabase callback handler:', supabaseCallbackUrl);
     window.location.href = supabaseCallbackUrl;
     
     // This never executes since we redirect

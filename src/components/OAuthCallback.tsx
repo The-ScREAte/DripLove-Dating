@@ -22,8 +22,6 @@ const OAuthCallback = () => {
       }
 
       if (isNativePlatform) {
-        console.log('[OAuthCallback] ❌ Native mobile detected - HARD STOP');
-        console.log('[OAuthCallback] ✅ useMobileOAuth owns all mobile OAuth');
         setLoading(false);
         // Do NOT import handleOAuthRedirect
         // Do NOT call setSession
@@ -36,12 +34,8 @@ const OAuthCallback = () => {
       // ═══════════════════════════════════════════════════════════
       
       try {
-        console.log('[OAuthCallback] Starting OAuth callback processing (WEB ONLY)');
-        console.log('[OAuthCallback] URL:', window.location.href);
-
         // WEB ONLY: Check if this is a popup window (opened by parent for OAuth)
         const isPopup = window.opener && window.opener !== window;
-        console.log('[OAuthCallback] Is popup window:', isPopup);
 
         // Check for OAuth errors first
         const urlParams = new URLSearchParams(window.location.search);
@@ -58,7 +52,6 @@ const OAuthCallback = () => {
         const { handleOAuthRedirect } = await import('@/utils/oauthCallbackHandler');
         
         // Process the OAuth callback with the current URL
-        console.log('[OAuthCallback] Processing OAuth redirect...');
         const result = await handleOAuthRedirect(window.location.href);
 
         if (!result?.session) {
@@ -66,12 +59,10 @@ const OAuthCallback = () => {
         }
 
         const { user, profile, needsProfileCompletion } = result;
-        console.log('[OAuthCallback] Session created successfully for user:', user.id);
 
         // If this is a popup, notify parent window and close
         if (isPopup && window.opener) {
           try {
-            console.log('[OAuthCallback] Notifying parent window and closing popup');
             // Post message to parent window
             window.opener.postMessage({ 
               type: 'oauth_complete', 
@@ -121,13 +112,11 @@ const OAuthCallback = () => {
 
         // Use needsProfileCompletion flag - same logic as Apple/Android native
         if (needsProfileCompletion) {
-          console.log('[OAuthCallback] Profile needs completion - redirecting');
           navigate('/complete-profile', { replace: true });
           return;
         }
 
         // Success - redirect to home
-        console.log('[OAuthCallback] OAuth callback successful - redirecting to home');
         navigate('/', { replace: true });
 
       } catch (error: any) {

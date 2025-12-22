@@ -39,7 +39,6 @@ const WelcomeScreen: React.FC<WelcomeScreenProps> = ({ onLogin, onAbout, onTerms
         setTimeout(() => {
           try {
             initializeGoogleAuth();
-            console.log('✅ Google Auth preloaded');
           } catch (err) {
             console.warn('Google Auth preload failed (non-critical):', err);
           }
@@ -59,13 +58,12 @@ const WelcomeScreen: React.FC<WelcomeScreenProps> = ({ onLogin, onAbout, onTerms
         const { App } = await import('@capacitor/app');
         const listener = await App.addListener('appStateChange', (state: { isActive: boolean }) => {
           if (state.isActive) {
-            console.log('[WelcomeScreen] App became active, clearing oauthLoading state');
             setOauthLoading(null);
           }
         });
         removeListener = () => listener.remove();
       } catch (err) {
-        console.log('[WelcomeScreen] Failed to add appStateChange listener', err);
+        // Ignore listener failures
       }
     })();
 
@@ -98,11 +96,10 @@ const WelcomeScreen: React.FC<WelcomeScreenProps> = ({ onLogin, onAbout, onTerms
             // Video started playing
           })
           .catch((error) => {
-            console.log('Autoplay prevented:', error);
             // On iOS, sometimes we need to try again after a short delay
             if (isIOS) {
               setTimeout(() => {
-                video.play().catch(e => console.log('Retry play failed:', e));
+                video.play().catch(() => undefined);
               }, 100);
             }
           });

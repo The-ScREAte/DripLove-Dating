@@ -19,11 +19,8 @@ export async function bulkApproveExistingImages(): Promise<void> {
     }
 
     if (!unapprovedImages || unapprovedImages.length === 0) {
-      console.log('No images need bulk approval');
       return;
     }
-
-    console.log(`Found ${unapprovedImages.length} images to bulk approve`);
 
     // Update all unapproved images to approved
     const { error: updateError } = await supabase
@@ -39,8 +36,6 @@ export async function bulkApproveExistingImages(): Promise<void> {
       console.error('Error bulk approving images:', updateError);
       return;
     }
-
-    console.log(`Successfully bulk approved ${unapprovedImages.length} images`);
   } catch (error) {
     console.error('Bulk approval failed:', error);
   }

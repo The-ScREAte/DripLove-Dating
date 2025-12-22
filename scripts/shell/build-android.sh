@@ -37,7 +37,7 @@ case $choice in
     2)
         echo -e "${BLUE}Building Release APK...${NC}"
         if [ ! -f "android/app/release-key.keystore" ]; then
-            echo -e "${RED}❌ Keystore not found! Run setup-android-release.sh first${NC}"
+            echo -e "${RED}❌ Keystore not found! Run ./scripts/shell/setup-android-release.sh first${NC}"
             exit 1
         fi
         cd android
@@ -52,7 +52,7 @@ case $choice in
     3)
         echo -e "${BLUE}Building Release AAB for Google Play...${NC}"
         if [ ! -f "android/app/release-key.keystore" ]; then
-            echo -e "${RED}❌ Keystore not found! Run setup-android-release.sh first${NC}"
+            echo -e "${RED}❌ Keystore not found! Run ./scripts/shell/setup-android-release.sh first${NC}"
             exit 1
         fi
         cd android

@@ -1438,7 +1438,7 @@ const AdminPageComponent = ({ currentUser, onLogout }: AdminPageProps) => {
   
   return (
     <div className="admin-page-container w-full min-h-screen bg-gray-100 overflow-y-auto">
-      <div className="w-full max-w-[390px] mx-auto bg-white min-h-screen">
+      <div className="w-full max-w-[390px] sm:max-w-3xl lg:max-w-6xl mx-auto bg-white min-h-screen">
         {/* Fixed Header with Safe Area */}
         <div className="sticky top-0 z-50 bg-white border-b border-gray-200">
           <div className="p-4">
@@ -1469,52 +1469,46 @@ const AdminPageComponent = ({ currentUser, onLogout }: AdminPageProps) => {
           {/* Tabbed Interface with Error Boundaries for 1000+ users */}
           <AdminErrorBoundary>
             <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-              <div className="space-y-2 mb-3">
-                {/* First Row - Main Tabs */}
-                <TabsList className="grid w-full grid-cols-4 h-auto">
-                  <TabsTrigger value="dashboard" className="text-xs flex flex-col gap-1 py-2">
+              <div className="mb-3">
+                {/* Tabs in 2 rows on desktop */}
+                <TabsList className="grid w-full grid-cols-5 h-auto gap-1">
+                  <TabsTrigger value="dashboard" className="w-full text-xs flex flex-col gap-1 py-2">
                     <BarChart3 className="w-4 h-4" />
                     <span>Dashboard</span>
                   </TabsTrigger>
-                  <TabsTrigger value="users" className="text-xs flex flex-col gap-1 py-2">
+                  <TabsTrigger value="users" className="w-full text-xs flex flex-col gap-1 py-2">
                     <Users className="w-4 h-4" />
                     <span>Users</span>
                   </TabsTrigger>
-                  <TabsTrigger value="content" className="text-xs flex flex-col gap-1 py-2">
+                  <TabsTrigger value="content" className="w-full text-xs flex flex-col gap-1 py-2">
                     <Image className="w-4 h-4" />
                     <span>Content</span>
                   </TabsTrigger>
-                  <TabsTrigger value="broadcast" className="text-xs flex flex-col gap-1 py-2">
+                  <TabsTrigger value="broadcast" className="w-full text-xs flex flex-col gap-1 py-2">
                     <Megaphone className="w-4 h-4" />
                     <span>Broadcast</span>
                   </TabsTrigger>
-                </TabsList>
-
-                {/* Second Row - Additional Tabs */}
-                <TabsList className="grid w-full grid-cols-4 h-auto">
-                  <TabsTrigger value="ads" className="text-xs flex flex-col gap-1 py-2">
+                  <TabsTrigger value="ads" className="w-full text-xs flex flex-col gap-1 py-2">
                     <Megaphone className="w-4 h-4" />
                     <span>Ads</span>
                   </TabsTrigger>
-                  <TabsTrigger value="redirects" className="text-xs flex flex-col gap-1 py-2">
+                  <TabsTrigger value="redirects" className="w-full text-xs flex flex-col gap-1 py-2">
                     <Link2 className="w-4 h-4" />
                     <span>Links</span>
                   </TabsTrigger>
-                  <TabsTrigger value="faces" className="text-xs flex flex-col gap-1 py-2">
+                  <TabsTrigger value="faces" className="w-full text-xs flex flex-col gap-1 py-2">
                     <Scan className="w-4 h-4" />
                     <span>Faces</span>
                   </TabsTrigger>
-                  <TabsTrigger value="debugger" className="text-xs flex flex-col gap-1 py-2">
+                  <TabsTrigger value="debugger" className="w-full text-xs flex flex-col gap-1 py-2">
                     <Search className="w-4 h-4" />
                     <span>Debugger</span>
                   </TabsTrigger>
-                </TabsList>
-                <TabsList className="grid w-full grid-cols-4 h-auto">
-                  <TabsTrigger value="influencers" className="text-xs flex flex-col gap-1 py-2">
+                  <TabsTrigger value="influencers" className="w-full text-xs flex flex-col gap-1 py-2">
                     <Crown className="w-4 h-4" />
                     <span>Influencers</span>
                   </TabsTrigger>
-                  <TabsTrigger value="settings" className="text-xs flex flex-col gap-1 py-2">
+                  <TabsTrigger value="settings" className="w-full text-xs flex flex-col gap-1 py-2">
                     <Settings className="w-4 h-4" />
                     <span>Settings</span>
                   </TabsTrigger>

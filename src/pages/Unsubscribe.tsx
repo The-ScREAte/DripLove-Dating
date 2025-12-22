@@ -66,14 +66,9 @@ const Unsubscribe: React.FC = () => {
         throw new Error('No active subscription found');
       }
 
-      console.log('[Unsubscribe] Current subscription:', subscription);
-      console.log('[Unsubscribe] Payment method:', subscription.payment_method, 'Native App:', isNativeApp());
-
       // For Apple IAP subscriptions, we MUST redirect to Apple's subscription management
       // Apps cannot programmatically cancel Apple subscriptions
       if (isNativeApp() && subscription.payment_method === 'apple') {
-        console.log('[Unsubscribe] Taking Apple IAP path - redirecting to Settings');
-        
         // Mark as pending cancellation in database
         const { error: updateError } = await supabase
           .from('user_subscriptions')
@@ -100,7 +95,6 @@ const Unsubscribe: React.FC = () => {
       }
 
       // For non-Apple subscriptions (Paystack, web subscriptions, etc.)
-      console.log('[Unsubscribe] Taking direct cancellation path for payment method:', subscription.payment_method);
 
       // For non-Apple subscriptions (Paystack, etc.), update status to cancelled
       const { error: updateError } = await supabase
@@ -126,7 +120,6 @@ const Unsubscribe: React.FC = () => {
       // For Paystack subscriptions, we should also call their API to cancel
       // This ensures the subscription is cancelled on the provider's side too
       if (subscription.payment_method === 'paystack' && subscription.flutterwave_transaction_id) {
-        console.log('[Paystack] Subscription cancelled in database. Provider-side cancellation handled by webhook.');
       }
 
       navigate('/');

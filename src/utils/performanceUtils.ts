@@ -120,8 +120,6 @@ export async function measurePerformance<T>(
     
     if (duration > 1000) {
       console.warn(`⚠️ Slow operation: ${name} took ${duration.toFixed(2)}ms`);
-    } else if (duration > 100) {
-      console.log(`⏱️ ${name} took ${duration.toFixed(2)}ms`);
     }
     
     return result;

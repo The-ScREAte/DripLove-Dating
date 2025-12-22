@@ -1,6 +1,8 @@
 import 'cordova-plugin-purchase';
 import { Capacitor } from '@capacitor/core';
 
+const noopLog = (..._args: unknown[]) => {};
+
 // Detect platform
 const isAndroid = () => Capacitor.isNativePlatform() && Capacitor.getPlatform() === 'android';
 const isIOS = () => Capacitor.isNativePlatform() && Capacitor.getPlatform() === 'ios';
@@ -31,8 +33,8 @@ export function initIAP() {
         // Use ERROR level in production, DEBUG only in development
         const isDevelopment = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
         log.setLevel(isDevelopment ? LogLevel.DEBUG : LogLevel.ERROR);
-        console.log('[IAP] Log level set to:', isDevelopment ? 'DEBUG' : 'ERROR');
-        console.log('[IAP] Environment:', isDevelopment ? 'DEVELOPMENT (StoreKit Testing)' : 'PRODUCTION');
+        noopLog('[IAP] Log level set to:', isDevelopment ? 'DEBUG' : 'ERROR');
+        noopLog('[IAP] Environment:', isDevelopment ? 'DEVELOPMENT (StoreKit Testing)' : 'PRODUCTION');
       }
 
       // Disable automatic error popups from the plugin
@@ -55,8 +57,8 @@ export function initIAP() {
 
     // Determine platform for registration
     const currentPlatform = isAndroid() ? Platform.GOOGLE_PLAY : Platform.APPLE_APPSTORE;
-    console.log('[IAP] Registering products for platform:', isAndroid() ? 'GOOGLE_PLAY' : 'APPLE_APPSTORE');
-    console.log('[IAP] Product IDs to register:', PRODUCT_IDS);
+    noopLog('[IAP] Registering products for platform:', isAndroid() ? 'GOOGLE_PLAY' : 'APPLE_APPSTORE');
+    noopLog('[IAP] Product IDs to register:', PRODUCT_IDS);
 
     // 2️⃣ Register all of them with the store for the correct platform
     if (store.register && typeof store.register === 'function') {
@@ -65,9 +67,9 @@ export function initIAP() {
         platform: currentPlatform,
         type: ProductType.PAID_SUBSCRIPTION
       }));
-      console.log('[IAP] Registering products:', JSON.stringify(productsToRegister, null, 2));
+      noopLog('[IAP] Registering products:', JSON.stringify(productsToRegister, null, 2));
       store.register(productsToRegister);
-      console.log('[IAP] Products registered, waiting for productUpdated events...');
+      noopLog('[IAP] Products registered, waiting for productUpdated events...');
     } else {
       console.error('[IAP] store.register not available');
       clearTimeout(initializationTimeout);
@@ -104,17 +106,17 @@ export function initIAP() {
     
     // 3) Core lifecycle - using the correct API structure
     if (store.when && typeof store.when === 'function') {
-      console.log('[IAP] Setting up store.when() event handlers...');
+      noopLog('[IAP] Setting up store.when() event handlers...');
       store.when()
         .productUpdated(p => {
           // Product updated successfully - clear initialization timeout
-          console.log('[IAP] productUpdated event received for:', p?.id);
+          noopLog('[IAP] productUpdated event received for:', p?.id);
           
           // Check if it's one of our registered products
           const isOurProduct = PRODUCT_IDS.includes(p?.id);
           if (p && isOurProduct) {
-            console.log('[IAP] ✅ Product loaded successfully:', p.id, 'Price:', p.pricing?.price);
-            console.log('[IAP] Product details:', {
+            noopLog('[IAP] ✅ Product loaded successfully:', p.id, 'Price:', p.pricing?.price);
+            noopLog('[IAP] Product details:', {
               id: p.id,
               title: p.title,
               canPurchase: p.canPurchase,
@@ -124,7 +126,7 @@ export function initIAP() {
             clearTimeout(initializationTimeout);
             window.iapInitializationFailed = false;
           } else if (p) {
-            console.log('[IAP] Ignoring product (not in our list):', p.id);
+            noopLog('[IAP] Ignoring product (not in our list):', p.id);
           }
         })
         .approved(t => {
@@ -158,8 +160,8 @@ export function initIAP() {
               return;
             }
             
-            console.log('[IAP] Processing verified receipt for user:', user.id);
-            console.log('[IAP] Receipt object:', {
+            noopLog('[IAP] Processing verified receipt for user:', user.id);
+            noopLog('[IAP] Receipt object:', {
               productId: r.productId,
               transactionId: r.transactionId,
               hasReceipt: !!r.receipt,
@@ -199,14 +201,14 @@ export function initIAP() {
               let result;
               if (existingSub?.id) {
                 // Update existing subscription
-                console.log('[IAP] Updating existing subscription:', existingSub.id);
+                noopLog('[IAP] Updating existing subscription:', existingSub.id);
                 result = await supabase
                   .from('user_subscriptions')
                   .update(subscriptionData)
                   .eq('user_id', user.id);
               } else {
                 // Insert new subscription
-                console.log('[IAP] Creating new subscription for user:', user.id);
+                noopLog('[IAP] Creating new subscription for user:', user.id);
                 result = await supabase
                   .from('user_subscriptions')
                   .insert(subscriptionData);
@@ -217,7 +219,7 @@ export function initIAP() {
                 throw new Error(`Database update failed: ${result.error.message}`);
               }
               
-              console.log('[IAP] ✅ Subscription activated successfully!');
+              noopLog('[IAP] ✅ Subscription activated successfully!');
               return true;
             };
             
@@ -226,7 +228,7 @@ export function initIAP() {
             const transactionId = r.transactionId || r.productId || `iap_${Date.now()}`;
             
             if (receiptData) {
-              console.log('[IAP] Receipt data found, attempting server validation...');
+              noopLog('[IAP] Receipt data found, attempting server validation...');
               
               // Add timeout protection for receipt validation (25 seconds)
               const validationTimeout = new Promise((_, reject) => {
@@ -235,7 +237,7 @@ export function initIAP() {
               
               // Choose the correct validator based on platform
               const validatorFunction = isAndroid() ? 'google-iap-validator' : 'iap-receipt-validator';
-              console.log('[IAP] Using validator function:', validatorFunction);
+              noopLog('[IAP] Using validator function:', validatorFunction);
               
               // Race between validation and timeout
               const validationPromise = supabase.functions.invoke(validatorFunction, {
@@ -253,7 +255,7 @@ export function initIAP() {
                 const result: any = await Promise.race([validationPromise, validationTimeout]);
                 validation = result.data;
                 validationError = result.error;
-                console.log('[IAP] Validation response:', { validation, validationError });
+                noopLog('[IAP] Validation response:', { validation, validationError });
               } catch (timeoutError) {
                 console.error('[IAP] Receipt validation timeout, using fallback method');
                 validationError = timeoutError;
@@ -275,7 +277,7 @@ export function initIAP() {
 
               // Server validation successful
               if (validation.active) {
-                console.log('[IAP] Server validation successful, subscription is active');
+                noopLog('[IAP] Server validation successful, subscription is active');
                 
                 const expiryDate = validation.expiresDate 
                   ? new Date(validation.expiresDate)
@@ -294,7 +296,7 @@ export function initIAP() {
               }
             } else {
               // No receipt data - use direct activation
-              console.log('[IAP] No receipt data available, using direct activation');
+              noopLog('[IAP] No receipt data available, using direct activation');
               
               try {
                 await activateSubscription(transactionId);
@@ -362,16 +364,16 @@ export function initIAP() {
           ? { platform: initPlatform }
           : { platform: initPlatform, options: { needAppReceipt: true } };
         
-        console.log('[IAP] Calling store.initialize with platform:', initPlatform);
+        noopLog('[IAP] Calling store.initialize with platform:', initPlatform);
         store.initialize([initOptions]);
-        console.log('[IAP] store.initialize called successfully');
+        noopLog('[IAP] store.initialize called successfully');
         
         // Add a ready state handler to clear timeout and resolve promise
         if (store.ready && typeof store.ready === 'function') {
-          console.log('[IAP] Setting up store.ready() handler...');
+          noopLog('[IAP] Setting up store.ready() handler...');
           store.ready(() => {
-            console.log('[IAP] ✅ Store is READY! Products should be loaded now.');
-            console.log('[IAP] Available products:', store.products?.map(p => ({ id: p.id, title: p.title, price: p.pricing?.price })));
+            noopLog('[IAP] ✅ Store is READY! Products should be loaded now.');
+            noopLog('[IAP] Available products:', store.products?.map(p => ({ id: p.id, title: p.title, price: p.pricing?.price })));
             clearTimeout(initializationTimeout);
             window.iapInitializationFailed = false;
             resolve(); // Resolve when store is ready
@@ -452,7 +454,7 @@ export const buyMonthly = async () => {
   for (const id of PRODUCT_IDS) {
     try {
       const p = store.get ? store.get(id) : null;
-      console.log(`[IAP] Checking product ${id}:`, { 
+      noopLog(`[IAP] Checking product ${id}:`, { 
         exists: !!p, 
         canPurchase: p?.canPurchase, 
         owned: p?.owned,
@@ -461,7 +463,7 @@ export const buyMonthly = async () => {
       });
       if (p && p.canPurchase) {
         product = p;
-        console.log(`[IAP] ✅ Selected product: ${id}`);
+        noopLog(`[IAP] ✅ Selected product: ${id}`);
         break;
       }
     } catch (err) {
@@ -471,7 +473,7 @@ export const buyMonthly = async () => {
 
   if (!product) {
     console.error('[IAP] No valid product found among:', PRODUCT_IDS);
-    console.log('[IAP] Available products:', store.products?.map(p => ({ id: p.id, canPurchase: p.canPurchase, title: p.title })));
+    noopLog('[IAP] Available products:', store.products?.map(p => ({ id: p.id, canPurchase: p.canPurchase, title: p.title })));
     window.iapPurchaseInitiated = false;
     throw new Error('No valid subscription product available');
   }
@@ -480,7 +482,7 @@ export const buyMonthly = async () => {
   try {
     const offer = product.getOffer?.();
     if (offer && typeof offer.order === 'function') {
-      console.log('[IAP] Ordering product:', product.id);
+      noopLog('[IAP] Ordering product:', product.id);
       await offer.order();
     } else {
       console.error('[IAP] No valid offer found for product:', product.id);
@@ -506,7 +508,7 @@ export function restorePurchases(): Promise<{ restored: boolean; message: string
       return;
     }
     
-    console.log('[IAP] Starting restore purchases...');
+    noopLog('[IAP] Starting restore purchases...');
     
     // Mark that we're restoring (similar to purchase initiation)
     window.iapPurchaseInitiated = true;
@@ -552,7 +554,7 @@ export function restorePurchases(): Promise<{ restored: boolean; message: string
         
         // Try server validation if we have receipt data
         if (receiptData) {
-          console.log('[IAP] Validating restored receipt with server...');
+          noopLog('[IAP] Validating restored receipt with server...');
           try {
             const { data: validation, error: valError } = await supabase.functions.invoke('iap-receipt-validator', {
               body: {
@@ -571,13 +573,13 @@ export function restorePurchases(): Promise<{ restored: boolean; message: string
               if (serverExpiry > new Date()) {
                 expiryDate = serverExpiry;
                 isActiveSubscription = true;
-                console.log('[IAP] Server confirmed active subscription, expires:', expiryDate);
+                noopLog('[IAP] Server confirmed active subscription, expires:', expiryDate);
               } else {
-                console.log('[IAP] Server validation shows subscription has expired:', serverExpiry);
+                noopLog('[IAP] Server validation shows subscription has expired:', serverExpiry);
                 return false;
               }
             } else if (validation && !validation.active) {
-              console.log('[IAP] Server validation: subscription is not active');
+              noopLog('[IAP] Server validation: subscription is not active');
               return false;
             }
           } catch (valError) {
@@ -588,12 +590,12 @@ export function restorePurchases(): Promise<{ restored: boolean; message: string
         // Only proceed if we confirmed an active subscription
         if (!isActiveSubscription && !receiptData) {
           // No receipt data and no validation - trust the product.owned flag
-          console.log('[IAP] No receipt data, trusting product ownership');
+          noopLog('[IAP] No receipt data, trusting product ownership');
           isActiveSubscription = true;
         }
         
         if (!isActiveSubscription) {
-          console.log('[IAP] Cannot confirm active subscription');
+          noopLog('[IAP] Cannot confirm active subscription');
           return false;
         }
         
@@ -611,7 +613,7 @@ export function restorePurchases(): Promise<{ restored: boolean; message: string
           updated_at: new Date().toISOString(),
         };
         
-        console.log('[IAP] Updating subscription...');
+        noopLog('[IAP] Updating subscription...');
         
         const { error: upsertError } = await supabase
           .from('user_subscriptions')
@@ -622,7 +624,7 @@ export function restorePurchases(): Promise<{ restored: boolean; message: string
           return false;
         }
         
-        console.log('[IAP] ✅ Subscription restored successfully!');
+        noopLog('[IAP] ✅ Subscription restored successfully!');
         return true;
       } catch (error) {
         console.error('[IAP] Error activating subscription:', error);
@@ -635,7 +637,7 @@ export function restorePurchases(): Promise<{ restored: boolean; message: string
       
       // Check if this is one of our products and it's owned
       if (product && PRODUCT_IDS.includes(product.id) && product.owned) {
-        console.log('[IAP] Found owned product during restore:', product.id);
+        noopLog('[IAP] Found owned product during restore:', product.id);
         
         const transaction = product.transaction || product.latestTransaction;
         const receiptData = transaction?.appStoreReceipt || transaction?.receipt || transaction?.transactionReceipt;
@@ -658,7 +660,7 @@ export function restorePurchases(): Promise<{ restored: boolean; message: string
           const product = store.get?.(id);
           if (product && product.owned) {
             foundOwned = true;
-            console.log('[IAP] Found already-owned product:', id);
+            noopLog('[IAP] Found already-owned product:', id);
             
             const transaction = product.transaction || product.latestTransaction;
             const receiptData = transaction?.appStoreReceipt || transaction?.receipt || transaction?.transactionReceipt;
@@ -678,7 +680,7 @@ export function restorePurchases(): Promise<{ restored: boolean; message: string
       }
       
       if (!foundOwned) {
-        console.log('[IAP] No owned products found in initial check');
+        noopLog('[IAP] No owned products found in initial check');
       }
       return false;
     };
@@ -698,10 +700,10 @@ export function restorePurchases(): Promise<{ restored: boolean; message: string
     
     // Trigger the restore/refresh
     if (store.restorePurchases && typeof store.restorePurchases === 'function') {
-      console.log('[IAP] Calling store.restorePurchases()...');
+      noopLog('[IAP] Calling store.restorePurchases()...');
       store.restorePurchases();
     } else if (store.refresh && typeof store.refresh === 'function') {
-      console.log('[IAP] Calling store.refresh()...');
+      noopLog('[IAP] Calling store.refresh()...');
       store.refresh();
     } else {
       console.error('[IAP] No restore or refresh method available');

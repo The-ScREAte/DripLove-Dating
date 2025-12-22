@@ -69,12 +69,10 @@ export function useChatKeyboardFix() {
       try {
         // iOS: keyboardWillShow/WillHide fire and are reliable
         showListener = await Keyboard.addListener("keyboardWillShow", (info) => {
-          console.log("[Keyboard] Will show, height:", info.keyboardHeight);
           applyKeyboardOffset(info.keyboardHeight);
         });
 
         hideListener = await Keyboard.addListener("keyboardWillHide", () => {
-          console.log("[Keyboard] Will hide");
           applyKeyboardOffset(0);
         });
 
@@ -82,18 +80,16 @@ export function useChatKeyboardFix() {
         await Keyboard.addListener("keyboardDidShow", (info) => {
           // iOS: update if height changed (emoji/text, etc.)
           if (Math.abs(keyboardHeightRef.current - info.keyboardHeight) > 20) {
-            console.log("[Keyboard] Did show with different height:", info.keyboardHeight);
             applyKeyboardOffset(info.keyboardHeight);
           }
         });
 
         await Keyboard.addListener("keyboardDidHide", () => {
-          console.log("[Keyboard] Did hide");
           applyKeyboardOffset(0);
         });
 
       } catch (error) {
-        console.log("[Keyboard] Plugin not available, using web fallback:", error);
+        // Silent fallback to web handling
       }
     };
 

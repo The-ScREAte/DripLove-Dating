@@ -94,17 +94,13 @@ class SupabasePushNotificationService {
 
   private async initializeNativePushNotifications(userId: string): Promise<void> {
     try {
-      console.log('🔔 Initializing native push notifications for Android...');
-      
       // Ensure we're on a native platform and push notifications are available
       if (!Capacitor.isNativePlatform() || typeof PushNotifications === 'undefined') {
-        console.log('❌ Not on native platform or PushNotifications unavailable');
         return;
       }
 
       // Check if we should request permission (respects 3-day delay)
       if (!this.shouldRequestPermission()) {
-        console.log('⏳ Too soon since last permission denial, skipping request');
         // Too soon since last denial, skip request
         return;
       }
@@ -113,27 +109,21 @@ class SupabasePushNotificationService {
       const delay = Capacitor.getPlatform() === 'ios' ? 2000 : 1000;
       await new Promise(resolve => setTimeout(resolve, delay));
 
-      console.log('📋 Requesting push notification permissions...');
       // Request permission for push notifications
       const permissionStatus = await PushNotifications.requestPermissions();
-      console.log('✅ Permission status:', permissionStatus);
       
       if (permissionStatus.receive === 'granted') {
-        console.log('✅ Push notification permission granted!');
         // Permission granted! Clear any denial record
         this.clearPermissionDenial();
 
         // Add delay to ensure Firebase is fully initialized on Android
         if (Capacitor.getPlatform() === 'android') {
-          console.log('⏳ Waiting for Firebase initialization on Android...');
           await new Promise(resolve => setTimeout(resolve, 2000));
         }
         
         // Register for push notifications with error handling
         try {
-          console.log('📝 Registering for push notifications...');
           await PushNotifications.register();
-          console.log('✅ Successfully registered for push notifications');
         } catch (registerError) {
           console.error('❌ Failed to register for push notifications:', registerError);
           // Continue without push notifications rather than failing completely
@@ -142,12 +132,10 @@ class SupabasePushNotificationService {
         
         // Set up event listeners
         PushNotifications.addListener('registration', async (token: Token) => {
-          console.log('🎫 Got push notification token!');
           // For iOS, get FCM token from Firebase Messaging plugin
           if (Capacitor.getPlatform() === 'ios') {
             try {
               const { token: fcmToken } = await FirebaseMessaging.getToken();
-              console.log('📱 Got FCM token for iOS:', fcmToken.substring(0, 20) + '...');
               this.deviceToken = fcmToken;
               await this.saveTokenToDatabase(userId, fcmToken, 'ios');
             } catch (error) {
@@ -158,7 +146,6 @@ class SupabasePushNotificationService {
             }
           } else {
             // Android uses token.value directly (it's already an FCM token)
-            console.log('📱 Got FCM token for Android:', token.value.substring(0, 20) + '...');
             this.deviceToken = token.value;
             await this.saveTokenToDatabase(userId, token.value, Capacitor.getPlatform());
           }
@@ -170,20 +157,15 @@ class SupabasePushNotificationService {
         });
 
         PushNotifications.addListener('pushNotificationReceived', (notification: PushNotificationSchema) => {
-          console.log('📬 Received push notification in foreground:', notification);
           this.handleForegroundNotification(notification);
         });
 
         PushNotifications.addListener('pushNotificationActionPerformed', (notification: ActionPerformed) => {
-          console.log('👆 User tapped notification:', notification);
           this.handleNotificationAction(notification);
         });
       } else if (permissionStatus.receive === 'denied') {
-        console.log('🚫 Push notification permission denied by user');
         // Permission denied, record timestamp for 3-day retry
         this.recordPermissionDenial();
-      } else {
-        console.log('⚠️ Push notification permission status:', permissionStatus.receive);
       }
       // If permission is 'prompt', don't record as denied
     } catch (error) {
@@ -262,18 +244,15 @@ class SupabasePushNotificationService {
   private handleNotificationAction(notification: ActionPerformed): void {
     // Handle notification tap/action
     const data = notification.notification.data;
-    console.log('🔔 Notification tapped, data:', data);
     
     // Check for specific action first
     if (data?.action === 'open_discover') {
-      console.log('🎯 Opening discover page from broadcast notification');
       window.location.href = '/';
       return;
     }
     
     if (data?.type === 'message' && data?.chatId) {
       // Navigate to specific chat conversation
-      console.log('💬 Opening chat with matchId:', data.chatId);
       // Navigate to chat page with the matchId query parameter
       window.location.href = `/?tab=chat&matchId=${data.chatId}`;
       return;
@@ -281,27 +260,23 @@ class SupabasePushNotificationService {
     
     if (data?.type === 'match') {
       // Navigate to chat page (matches tab) 
-      console.log('🎉 Opening matches/chat page');
       window.location.href = '/?tab=chat';
       return;
     }
     
     if (data?.type === 'like') {
       // Navigate to liked me page
-      console.log('💖 Opening likes page');
       window.location.href = '/?tab=liked';
       return;
     }
     
     if (data?.type === 'system' || data?.type === 'admin') {
       // System/admin notifications go to discover page
-      console.log('📢 Opening discover page from system notification');
       window.location.href = '/';
       return;
     }
     
     // Default: go to chat page
-    console.log('📱 Opening default chat page');
     window.location.href = '/?tab=chat';
   }
 
@@ -539,8 +514,6 @@ class SupabasePushNotificationService {
       if (error) {
         // Silently handle errors - user is logging out anyway
         console.debug('Push token removal skipped:', error.message);
-      } else {
-        console.log('✅ Push token removed for user:', userId, 'platform:', platform);
       }
       
       // Clear the stored device token

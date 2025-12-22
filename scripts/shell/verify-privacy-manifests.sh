@@ -7,7 +7,8 @@ echo "🔍 Verifying Privacy Manifests for App Store Submission"
 echo "=================================================="
 echo ""
 
-cd "$(dirname "$0")/ios/App"
+PROJECT_ROOT="$(cd "$(dirname "$0")/../.." && pwd)"
+cd "$PROJECT_ROOT/ios/App"
 
 MISSING=0
 

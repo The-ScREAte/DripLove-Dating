@@ -35,18 +35,15 @@ export const openRatingInterface = async (rating?: number): Promise<void> => {
       // iOS - Use Apple's SKStoreReviewController (in-app modal)
       // Limited to 3 prompts per user per 365 days
       await RateApp.requestReview();
-      console.log('[Rating] iOS in-app rating dialog requested');
     } else if (platform === 'android') {
       // Android - Use Google Play In-App Review API (in-app modal)
       // Note: Google enforces time-bound quotas - may not show if user was recently prompted
       // If quota exceeded, dialog won't appear (this is expected behavior)
       await RateApp.requestReview();
-      console.log('[Rating] Android in-app review requested (subject to Google Play quota)');
     } else {
       // Web - Handle internally (rating is required for web)
       if (rating !== undefined) {
         await saveWebRating(rating);
-        console.log('[Rating] Web rating saved:', rating);
       } else {
         console.error('[Rating] Web platform requires a rating value');
       }
@@ -82,8 +79,6 @@ export const saveWebRating = async (ratingValue: number): Promise<void> => {
     if (error) {
       throw error;
     }
-    
-    console.log('[Rating] Web rating saved successfully');
   } catch (error) {
     console.error('[Rating] Error saving web rating:', error);
     throw error;

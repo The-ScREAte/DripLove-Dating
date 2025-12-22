@@ -21,8 +21,6 @@ export const useMobileOAuth = () => {
     logPlatformInfo();
 
     const handleAppUrlOpen = async (event: { url: string }) => {
-      console.log('[useMobileOAuth] 🔗 Deep link received:', event.url);
-
       try {
         // Persist for post-mortem debugging (iOS external Safari handoff can be flaky)
         localStorage.setItem('debug:last_deeplink_url', event.url);
@@ -116,17 +114,14 @@ export const useMobileOAuth = () => {
       // ✅ Handle OAuth callback (Accept BOTH patterns)
       //    driplove://auth/callback (preferred/explicit)
       //    driplove:// (fallback - iOS strips path sometimes)
-      console.log('[useMobileOAuth] ✅ OAuth callback detected!');
       
       // Close Safari View Controller if it's open
         try {
           if (Browser) {
-            console.log('[useMobileOAuth] Closing Safari View Controller...');
             await Browser.close();
-            console.log('[useMobileOAuth] Safari View Controller closed');
           }
         } catch (e) {
-          console.log('[useMobileOAuth] Browser may already be closed:', e);
+          // ignore
         }
         
         try {
@@ -140,7 +135,6 @@ export const useMobileOAuth = () => {
 
           const url = new URL(callbackUrl);
           const raw = url.hash || url.search || '';
-          console.log('[useMobileOAuth] Raw callback params:', raw);
 
           const params = new URLSearchParams(raw.replace(/^#|\?/, ''));
 
@@ -154,16 +148,6 @@ export const useMobileOAuth = () => {
           const token_type = params.get('token_type');
 
           if (access_token) {
-            console.log('[useMobileOAuth] Found access_token in callback');
-            
-            console.log('[useMobileOAuth] Parsed tokens:', {
-              has_access_token: !!access_token,
-              has_refresh_token: !!refresh_token,
-              expires_in,
-              token_type
-            });
-            
-            console.log('[useMobileOAuth] Setting session with tokens...');
             // Set the session manually (refresh_token may be null depending on provider)
             const { data, error } = await supabase.auth.setSession({
               access_token,
@@ -182,10 +166,7 @@ export const useMobileOAuth = () => {
                 return;
               }
               
-              console.log('[useMobileOAuth] ✅ Session set successfully');
-              
               if (data.session?.user) {
-                console.log('[useMobileOAuth] User session created:', data.session.user.id);
                 // Check if user profile exists
                 const { data: profile, error: profileError } = await supabase
                   .from('profiles')
@@ -193,10 +174,7 @@ export const useMobileOAuth = () => {
                   .eq('id', data.session.user.id)
                   .single();
 
-                console.log('[useMobileOAuth] Profile lookup result:', { profile, profileError });
-
                 if (profileError || !profile) {
-                  console.log('[useMobileOAuth] No profile found, redirecting to profile completion');
                   // User doesn't have a profile - redirect to profile completion
                   navigate('/complete-profile');
                   return;
@@ -204,7 +182,6 @@ export const useMobileOAuth = () => {
 
                 // Check account status
                 if (profile.account_status === 'blocked') {
-                  console.log('[useMobileOAuth] Account blocked, signing out');
                   await supabase.auth.signOut();
                   toast({
                     title: "Account Blocked",
@@ -216,7 +193,6 @@ export const useMobileOAuth = () => {
                 }
 
                 if (profile.account_status === 'on_hold') {
-                  console.log('[useMobileOAuth] Account on hold, signing out');
                   await supabase.auth.signOut();
                   toast({
                     title: "Account On Hold",
@@ -229,19 +205,16 @@ export const useMobileOAuth = () => {
 
                 // Save profile ID to session
                 sessionStorage.setItem('profile_id', profile.id);
-                console.log('[useMobileOAuth] Profile ID saved to session');
 
                 // Check if profile is complete
                 const isProfileComplete = profile.first_name && profile.last_name;
 
                 if (!isProfileComplete) {
-                  console.log('[useMobileOAuth] Profile incomplete, redirecting to completion');
                   navigate('/complete-profile');
                   return;
                 }
 
                 // Successful login
-                console.log('[useMobileOAuth] ✅ Login successful, redirecting to home');
                 toast({
                   title: "Welcome back!",
                   description: "You've been successfully logged in.",
@@ -255,7 +228,6 @@ export const useMobileOAuth = () => {
           }
 
           if (code) {
-            console.log('[useMobileOAuth] Found code in callback, exchanging for session...');
             const { data, error } = await supabase.auth.exchangeCodeForSession(code);
             if (error) {
               console.error('[useMobileOAuth] ❌ Code exchange error:', error);
@@ -279,7 +251,6 @@ export const useMobileOAuth = () => {
               return;
             }
 
-            console.log('[useMobileOAuth] ✅ Session created via code exchange:', data.session.user.id);
 
             // Continue with existing profile logic
             const { data: profile, error: profileError } = await supabase
@@ -288,7 +259,6 @@ export const useMobileOAuth = () => {
               .eq('id', data.session.user.id)
               .single();
 
-            console.log('[useMobileOAuth] Profile lookup result:', { profile, profileError });
 
             if (profileError || !profile) {
               navigate('/complete-profile');
@@ -336,8 +306,6 @@ export const useMobileOAuth = () => {
           const oauthErrorDescription = params.get('error_description');
 
           if (oauthError || oauthErrorDescription) {
-            console.log('[useMobileOAuth] Error in callback params');
-            
             console.error('[useMobileOAuth] OAuth error:', oauthError, oauthErrorDescription);
             toast({
               title: "Authentication Error",
@@ -346,7 +314,6 @@ export const useMobileOAuth = () => {
             });
             navigate('/');
           } else {
-            console.log('[useMobileOAuth] ⚠️ No access_token/code/error in callback');
           }
         } catch (error) {
           console.error('[useMobileOAuth] ❌ Exception processing callback:', error);
@@ -368,12 +335,10 @@ export const useMobileOAuth = () => {
         if (typeof App.getLaunchUrl === 'function') {
           const launch = await App.getLaunchUrl();
           if (launch?.url) {
-            console.log('[useMobileOAuth] 🚀 Launch URL detected:', launch.url);
             await handleAppUrlOpen({ url: launch.url });
           }
         }
       } catch (e) {
-        console.log('[useMobileOAuth] getLaunchUrl not available or failed:', e);
       }
     })();
 

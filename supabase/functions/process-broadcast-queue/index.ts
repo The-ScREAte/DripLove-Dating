@@ -9,6 +9,7 @@ const corsHeaders = {
 const BATCH_SIZE = 25; // Process 25 recipients per execution
 const MAX_RETRIES = 3; // Maximum retry attempts per recipient
 const STALE_PROCESSING_MINUTES = 10; // Self-heal processing recipients stuck longer than this
+const MAX_CHAIN_DEPTH = 20; // Safety to prevent infinite self-invocation
 
 serve(async (req) => {
   if (req.method === 'OPTIONS') {
@@ -19,6 +20,24 @@ serve(async (req) => {
     const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
     const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
     const supabase = createClient(supabaseUrl, supabaseServiceKey);
+
+    // Optional body to target a specific campaign and/or allow self-chaining.
+    let requestedCampaignId: string | null = null;
+    let chainDepth = 0;
+    try {
+      const body = await req.json();
+      if (body && typeof body === 'object') {
+        const anyBody = body as Record<string, unknown>;
+        if (typeof anyBody.campaignId === 'string' && anyBody.campaignId.trim()) {
+          requestedCampaignId = anyBody.campaignId.trim(); 
+        }
+        if (typeof anyBody.depth === 'number' && Number.isFinite(anyBody.depth)) {
+          chainDepth = Math.max(0, Math.floor(anyBody.depth));
+        }
+      }
+    } catch {
+      // Ignore missing/invalid body
+    }
 
     console.log('Starting broadcast queue processing...');
 
@@ -39,12 +58,19 @@ serve(async (req) => {
     }
 
     // Find campaigns that need processing (queued or processing)
-    const { data: campaigns, error: campaignError } = await supabase
+    let campaignsQuery = supabase
       .from('broadcast_campaigns')
       .select('id, title, message, notification_type')
       .in('status', ['queued', 'processing'])
-      .order('created_at', { ascending: true })
-      .limit(5); // Process up to 5 campaigns per run
+      .order('created_at', { ascending: true });
+
+    if (requestedCampaignId) {
+      campaignsQuery = campaignsQuery.eq('id', requestedCampaignId);
+    } else {
+      campaignsQuery = campaignsQuery.limit(5); // Process up to 5 campaigns per run
+    }
+
+    const { data: campaigns, error: campaignError } = await campaignsQuery;
 
     if (campaignError) {
       console.error('Error fetching campaigns:', campaignError);
@@ -95,7 +121,7 @@ serve(async (req) => {
         }
 
         if (!recipients || recipients.length === 0) {
-          // No claimable work; only complete when no pending/processing remain
+          // No claimable work this run. Sync stats and complete if finished.
           const { count: remainingCount, error: remainingError } = await supabase
             .from('broadcast_recipients')
             .select('*', { count: 'exact', head: true })
@@ -107,32 +133,31 @@ serve(async (req) => {
             continue;
           }
 
+          const { count: sentCount, error: sentCountError } = await supabase
+            .from('broadcast_recipients')
+            .select('*', { count: 'exact', head: true })
+            .eq('campaign_id', campaign.id)
+            .eq('status', 'sent');
+
+          const { count: failedCount, error: failedCountError } = await supabase
+            .from('broadcast_recipients')
+            .select('*', { count: 'exact', head: true })
+            .eq('campaign_id', campaign.id)
+            .eq('status', 'failed');
+
+          if (sentCountError) console.warn('Failed counting sent:', sentCountError);
+          if (failedCountError) console.warn('Failed counting failed:', failedCountError);
+
+          await supabase
+            .from('broadcast_campaigns')
+            .update({
+              successful_sends: sentCount || 0,
+              failed_sends: failedCount || 0,
+              status: !remainingCount || remainingCount === 0 ? 'completed' : currentCampaign?.status ?? 'processing',
+            })
+            .eq('id', campaign.id);
+
           if (!remainingCount || remainingCount === 0) {
-            await supabase
-              .from('broadcast_campaigns')
-              .update({ status: 'completed' })
-              .eq('id', campaign.id);
-
-            const { count: sentCount } = await supabase
-              .from('broadcast_recipients')
-              .select('*', { count: 'exact', head: true })
-              .eq('campaign_id', campaign.id)
-              .eq('status', 'sent');
-
-            const { count: failedCount } = await supabase
-              .from('broadcast_recipients')
-              .select('*', { count: 'exact', head: true })
-              .eq('campaign_id', campaign.id)
-              .eq('status', 'failed');
-
-            await supabase
-              .from('broadcast_campaigns')
-              .update({
-                successful_sends: sentCount || 0,
-                failed_sends: failedCount || 0,
-              })
-              .eq('id', campaign.id);
-
             console.log(`Campaign ${campaign.id} completed`);
           }
 
@@ -218,6 +243,47 @@ serve(async (req) => {
           r => r.status === 'fulfilled' && r.value.success
         ).length;
 
+        // Sync campaign stats after each batch so UI progress updates immediately.
+        const { count: sentCount, error: sentCountError } = await supabase
+          .from('broadcast_recipients')
+          .select('*', { count: 'exact', head: true })
+          .eq('campaign_id', campaign.id)
+          .eq('status', 'sent');
+
+        const { count: failedCount, error: failedCountError } = await supabase
+          .from('broadcast_recipients')
+          .select('*', { count: 'exact', head: true })
+          .eq('campaign_id', campaign.id)
+          .eq('status', 'failed');
+
+        if (sentCountError) console.warn('Failed counting sent:', sentCountError);
+        if (failedCountError) console.warn('Failed counting failed:', failedCountError);
+
+        await supabase
+          .from('broadcast_campaigns')
+          .update({
+            successful_sends: sentCount || 0,
+            failed_sends: failedCount || 0,
+          })
+          .eq('id', campaign.id);
+
+        // Complete campaign in the same run if there is no remaining work.
+        const { count: remainingCount, error: remainingError } = await supabase
+          .from('broadcast_recipients')
+          .select('*', { count: 'exact', head: true })
+          .eq('campaign_id', campaign.id)
+          .in('status', ['pending', 'processing']);
+
+        if (remainingError) {
+          console.warn('Error checking remaining recipients after batch:', remainingError);
+        } else if (!remainingCount || remainingCount === 0) {
+          await supabase
+            .from('broadcast_campaigns')
+            .update({ status: 'completed' })
+            .eq('id', campaign.id);
+          console.log(`Campaign ${campaign.id} completed`);
+        }
+
         results.push({
           campaignId: campaign.id,
           title: campaign.title,
@@ -238,6 +304,32 @@ serve(async (req) => {
           error: error instanceof Error ? error.message : 'Unknown error',
         });
       }
+    }
+
+    // If there is still work, self-invoke so processing continues even if the admin page is closed.
+    if (chainDepth < MAX_CHAIN_DEPTH) {
+      try {
+        const { count: remainingCampaigns } = await supabase
+          .from('broadcast_campaigns')
+          .select('*', { count: 'exact', head: true })
+          .in('status', ['queued', 'processing']);
+
+        if (remainingCampaigns && remainingCampaigns > 0) {
+          console.log(`Remaining campaigns detected (${remainingCampaigns}). Chaining next run (depth ${chainDepth + 1}).`);
+          supabase.functions
+            .invoke('process-broadcast-queue', {
+              body: {
+                campaignId: requestedCampaignId ?? undefined,
+                depth: chainDepth + 1,
+              },
+            })
+            .catch((err) => console.warn('Failed to chain worker invocation:', err));
+        }
+      } catch (error) {
+        console.warn('Chaining check failed (continuing):', error);
+      }
+    } else {
+      console.warn(`Max chain depth reached (${MAX_CHAIN_DEPTH}). Another trigger may be needed for remaining work.`);
     }
 
     return new Response(

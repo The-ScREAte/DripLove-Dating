@@ -122,7 +122,7 @@ const StatsCard: React.FC<StatsCardProps> = ({ stats }) => {
 
 
       <CardContent className="pt-0">
-        <div className="grid grid-cols-4 md:grid-cols-6 lg:grid-cols-8 gap-1.5">
+        <div className="grid grid-cols-4 md:grid-cols-6 lg:grid-cols-8 xl:grid-cols-12 gap-1.5 md:gap-2">
           <div className="flex flex-col items-center p-1.5 bg-blue-50 rounded">
             <Users className="w-3 h-3 text-blue-600 mb-0.5" />
             <span className="text-sm font-bold text-blue-600">{stats.total_users}</span>

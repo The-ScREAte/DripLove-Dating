@@ -1,6 +1,8 @@
 import 'cordova-plugin-purchase';
 import { Capacitor } from '@capacitor/core';
 
+const noopLog = (..._args: unknown[]) => {};
+
 // TypeScript declaration for window.store
 declare global {
   interface Window {
@@ -65,7 +67,7 @@ export function initGoogleIAP() {
           platform: Platform.GOOGLE_PLAY,
           type: ProductType.PAID_SUBSCRIPTION
         })));
-        console.log('[Google IAP] Products registered:', GOOGLE_PRODUCT_IDS);
+        noopLog('[Google IAP] Products registered:', GOOGLE_PRODUCT_IDS);
       } else {
         console.error('[Google IAP] store.register not available');
         clearTimeout(initializationTimeout);
@@ -92,14 +94,14 @@ export function initGoogleIAP() {
           .productUpdated((p: any) => {
             const isOurProduct = GOOGLE_PRODUCT_IDS.includes(p?.id);
             if (p && isOurProduct) {
-              console.log('[Google IAP] Product updated:', p.id, 'canPurchase:', p.canPurchase);
+              noopLog('[Google IAP] Product updated:', p.id, 'canPurchase:', p.canPurchase);
               clearTimeout(initializationTimeout);
               window.googleIapInitializationFailed = false;
               window.googleIapInitialized = true;
             }
           })
           .approved(async (t: any) => {
-            console.log('[Google IAP] Transaction approved:', t?.productId);
+            noopLog('[Google IAP] Transaction approved:', t?.productId);
 
             // On many Android configurations, `.verified()` is not reliably emitted
             // (e.g., when no validator is configured). If we only activate premium
@@ -145,7 +147,7 @@ export function initGoogleIAP() {
                     updated_at: new Date().toISOString(),
                   }, { onConflict: 'user_id' });
 
-                console.log('[Google IAP] Premium activated for user:', user.id);
+                noopLog('[Google IAP] Premium activated for user:', user.id);
                 window.location.href = '/payment-success?status=successful&payment_type=iap';
               }
             } catch (error) {
@@ -158,7 +160,7 @@ export function initGoogleIAP() {
           .verified(async (r: any) => {
             // Keep handler for completeness; some environments may still emit verified.
             // We do not rely on it for entitlement activation.
-            console.log('[Google IAP] Purchase verified:', r?.productId);
+            noopLog('[Google IAP] Purchase verified:', r?.productId);
 
             if (r?.finish && typeof r.finish === 'function') {
               r.finish();
@@ -177,7 +179,7 @@ export function initGoogleIAP() {
 
           if (store.ready && typeof store.ready === 'function') {
             store.ready(() => {
-              console.log('[Google IAP] Store ready');
+              noopLog('[Google IAP] Store ready');
               clearTimeout(initializationTimeout);
               window.googleIapInitializationFailed = false;
               window.googleIapInitialized = true;
@@ -302,7 +304,7 @@ export const buyGoogleMonthly = async () => {
   for (const id of GOOGLE_PRODUCT_IDS) {
     try {
       const p = store.get ? store.get(id) : null;
-      console.log(`[Google IAP] Checking product ${id}:`, p ? {
+      noopLog(`[Google IAP] Checking product ${id}:`, p ? {
         id: p.id,
         canPurchase: p.canPurchase,
         hasOffer: !!p.getOffer?.()
@@ -313,12 +315,12 @@ export const buyGoogleMonthly = async () => {
         if (o && typeof o.order === 'function') {
           product = p;
           offer = o;
-          console.log('[Google IAP] Found valid product with offer:', id);
+          noopLog('[Google IAP] Found valid product with offer:', id);
           break;
         } else if (p.canPurchase) {
           // Fallback: product is purchasable but getOffer might work differently
           product = p;
-          console.log('[Google IAP] Found purchasable product:', id);
+          noopLog('[Google IAP] Found purchasable product:', id);
         }
       }
     } catch (err) {
@@ -335,19 +337,19 @@ export const buyGoogleMonthly = async () => {
 
   try {
     if (offer && typeof offer.order === 'function') {
-      console.log('[Google IAP] Ordering via offer:', product.id);
+      noopLog('[Google IAP] Ordering via offer:', product.id);
       await offer.order();
     } else if (product.getOffer && typeof product.getOffer === 'function') {
       const productOffer = product.getOffer();
       if (productOffer && typeof productOffer.order === 'function') {
-        console.log('[Google IAP] Ordering via product.getOffer():', product.id);
+        noopLog('[Google IAP] Ordering via product.getOffer():', product.id);
         await productOffer.order();
       } else {
         throw new Error('Product offer not available');
       }
     } else if (store.order && typeof store.order === 'function') {
       // Fallback to store.order
-      console.log('[Google IAP] Ordering via store.order:', product.id);
+      noopLog('[Google IAP] Ordering via store.order:', product.id);
       await store.order(product);
     } else {
       console.error('[Google IAP] No valid purchase method found');
@@ -372,7 +374,7 @@ export function restoreGooglePurchases(): Promise<{ restored: boolean; message: 
       return;
     }
 
-    console.log('[Google IAP] Starting restore purchases...');
+    noopLog('[Google IAP] Starting restore purchases...');
     
     // Mark that we're restoring
     window.iapPurchaseInitiated = true;
@@ -404,7 +406,7 @@ export function restoreGooglePurchases(): Promise<{ restored: boolean; message: 
         
         // Try server validation if we have receipt data
         if (receiptData) {
-          console.log('[Google IAP] Validating restored receipt with server...');
+          noopLog('[Google IAP] Validating restored receipt with server...');
           try {
             const { data: validation, error: valError } = await supabase.functions.invoke('google-iap-validator', {
               body: {
@@ -424,13 +426,13 @@ export function restoreGooglePurchases(): Promise<{ restored: boolean; message: 
               if (serverExpiry > new Date()) {
                 expiryDate = serverExpiry;
                 isActiveSubscription = true;
-                console.log('[Google IAP] Server confirmed active subscription, expires:', expiryDate);
+                noopLog('[Google IAP] Server confirmed active subscription, expires:', expiryDate);
               } else {
-                console.log('[Google IAP] Server validation shows subscription has expired:', serverExpiry);
+                noopLog('[Google IAP] Server validation shows subscription has expired:', serverExpiry);
                 return false;
               }
             } else if (validation && !validation.active) {
-              console.log('[Google IAP] Server validation: subscription is not active');
+              noopLog('[Google IAP] Server validation: subscription is not active');
               return false;
             }
           } catch (valError) {
@@ -441,12 +443,12 @@ export function restoreGooglePurchases(): Promise<{ restored: boolean; message: 
         // Only proceed if we confirmed an active subscription
         if (!isActiveSubscription && !receiptData) {
           // No receipt data and no validation - trust the product.owned flag
-          console.log('[Google IAP] No receipt data, trusting product ownership');
+          noopLog('[Google IAP] No receipt data, trusting product ownership');
           isActiveSubscription = true;
         }
         
         if (!isActiveSubscription) {
-          console.log('[Google IAP] Cannot confirm active subscription');
+          noopLog('[Google IAP] Cannot confirm active subscription');
           return false;
         }
         
@@ -464,7 +466,7 @@ export function restoreGooglePurchases(): Promise<{ restored: boolean; message: 
           updated_at: new Date().toISOString(),
         };
         
-        console.log('[Google IAP] Updating subscription...');
+        noopLog('[Google IAP] Updating subscription...');
         
         const { error: upsertError } = await supabase
           .from('user_subscriptions')
@@ -475,7 +477,7 @@ export function restoreGooglePurchases(): Promise<{ restored: boolean; message: 
           return false;
         }
         
-        console.log('[Google IAP] ✅ Subscription restored successfully!');
+        noopLog('[Google IAP] ✅ Subscription restored successfully!');
         return true;
       } catch (error) {
         console.error('[Google IAP] Error activating subscription:', error);
@@ -487,7 +489,7 @@ export function restoreGooglePurchases(): Promise<{ restored: boolean; message: 
       if (hasResolved) return;
       
       if (product && product.owned) {
-        console.log('[Google IAP] Found owned product during restore:', product.id);
+        noopLog('[Google IAP] Found owned product during restore:', product.id);
         
         const transaction = product.transaction || product.latestTransaction;
         const receiptData = transaction?.receipt || transaction?.purchaseToken;
@@ -510,7 +512,7 @@ export function restoreGooglePurchases(): Promise<{ restored: boolean; message: 
           const product = store.get?.(id);
           if (product && product.owned) {
             foundOwned = true;
-            console.log('[Google IAP] Found already-owned product:', id);
+            noopLog('[Google IAP] Found already-owned product:', id);
             
             const transaction = product.transaction || product.latestTransaction;
             const receiptData = transaction?.receipt || transaction?.purchaseToken;
@@ -530,7 +532,7 @@ export function restoreGooglePurchases(): Promise<{ restored: boolean; message: 
       }
       
       if (!foundOwned) {
-        console.log('[Google IAP] No owned products found in initial check');
+        noopLog('[Google IAP] No owned products found in initial check');
       }
       return false;
     };
@@ -549,10 +551,10 @@ export function restoreGooglePurchases(): Promise<{ restored: boolean; message: 
     if (foundExisting) return;
 
     if (store.restorePurchases && typeof store.restorePurchases === 'function') {
-      console.log('[Google IAP] Calling store.restorePurchases()...');
+      noopLog('[Google IAP] Calling store.restorePurchases()...');
       store.restorePurchases();
     } else if (store.refresh && typeof store.refresh === 'function') {
-      console.log('[Google IAP] Calling store.refresh()...');
+      noopLog('[Google IAP] Calling store.refresh()...');
       store.refresh();
     } else {
       resolveOnce({ restored: false, message: 'Restore not available on this device' });

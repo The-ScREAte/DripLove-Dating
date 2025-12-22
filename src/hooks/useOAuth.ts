@@ -30,15 +30,11 @@ export const useOAuth = () => {
       setOauthLoading(provider);
       const redirectTo = getRedirectUri();
 
-      console.log(`[useOAuth] Starting ${provider} OAuth for platform: ${platform}`);
-      console.log(`[useOAuth] Redirect URI: ${redirectTo}`);
-
       // ═══════════════════════════════════════════════════════════
       // iOS GOOGLE OAUTH - Safari View Controller + Deep Link
       // ═══════════════════════════════════════════════════════════
       if (provider === 'google' && isNative && platform === 'ios') {
         try {
-          console.log('[useOAuth iOS Google] Generating OAuth URL...');
           
           const { data: oauthData, error: oauthError } = await supabase.auth.signInWithOAuth({
             provider: 'google',
@@ -57,18 +53,12 @@ export const useOAuth = () => {
             throw new Error(oauthError?.message || 'Failed to generate OAuth URL');
           }
 
-          console.log('[useOAuth iOS Google] ✅ OAuth URL generated');
-          console.log('[useOAuth iOS Google] 📱 Opening Safari View Controller...');
-
           const { Browser } = await import('@capacitor/browser');
           await Browser.open({ 
             url: oauthData.url,
             presentationStyle: 'popover',
             toolbarColor: '#000000',
           });
-
-          console.log('[useOAuth iOS Google] ✅ Safari View Controller opened');
-          console.log('[useOAuth iOS Google] 🔄 Delegating to useMobileOAuth');
 
           // We clear the local loading state here – the rest of the flow
           // (deep link callback, session creation, navigation) is handled
@@ -102,8 +92,6 @@ export const useOAuth = () => {
 
           // signInWithGoogleNative throws on error and returns user/profile data on success
           const result = await signInWithGoogleNative();
-
-          console.log('[useOAuth Android Google] ✅ Success');
           setOauthLoading(null);
           
           // Check profile completeness using helper result
@@ -131,7 +119,6 @@ export const useOAuth = () => {
       // ═══════════════════════════════════════════════════════════
       if (provider === 'google' && !isNative) {
         try {
-          console.log('[useOAuth Web Google] Opening popup...');
           
           const { data: oauthData, error: oauthError } = await supabase.auth.signInWithOAuth({
             provider: 'google',
@@ -160,7 +147,6 @@ export const useOAuth = () => {
           const handleMessage = (event: MessageEvent) => {
             if (event.origin !== window.location.origin) return;
             if (event.data?.type === 'oauth_complete') {
-              console.log('[useOAuth Web Google] Received oauth_complete message');
               setOauthLoading(null);
               window.removeEventListener('message', handleMessage);
             }
@@ -201,7 +187,6 @@ export const useOAuth = () => {
 
             // signInWithAppleNativeModal throws on error and returns user/profile data on success
             const result = await signInWithAppleNativeModal();
-            console.log('[useOAuth Apple iOS] ✅ Success');
             setOauthLoading(null);
 
             const needsProfileCompletion = result.needsProfileCompletion;

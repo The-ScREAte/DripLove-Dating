@@ -6,15 +6,41 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
 
+type PushTokenRow = {
+  user_id: string | null;
+};
+
+const chunkArray = <T,>(arr: T[], chunkSize: number): T[][] => {
+  const chunks: T[][] = [];
+  for (let i = 0; i < arr.length; i += chunkSize) {
+    chunks.push(arr.slice(i, i + chunkSize));
+  }
+  return chunks;
+};
+
 interface BroadcastRequest {
   title: string;
   message: string;
   targetCountries: string[];
-  userIds: string[];
+  userIds: string[]; 
   notificationType: string;
 }
+ 
+const getErrorMessage = (error: unknown): string => {
+  if (error instanceof Error) return error.message;
+  if (error && typeof error === 'object') {
+    const anyErr = error as Record<string, unknown>;
+    const message = anyErr['message'];
+    const details = anyErr['details'];
+    if (typeof message === 'string' && typeof details === 'string' && details.trim()) {
+      return `${message} (${details})`;
+    }
+    if (typeof message === 'string') return message;
+  }
+  return 'Unknown error';
+};
 
-serve(async (req) => {
+serve(async (req: Request) => {
   // Handle CORS preflight
   if (req.method === 'OPTIONS') {
     return new Response('ok', { headers: corsHeaders });
@@ -64,7 +90,35 @@ serve(async (req) => {
       throw new Error('Missing required fields: title, message, or userIds');
     }
 
-    console.log(`Queueing broadcast campaign for ${userIds.length} users`);
+    console.log(`Queueing broadcast campaign for ${userIds.length} selected users`);
+
+    // Only enqueue users who currently have push tokens.
+    // IMPORTANT: don't use a single massive `.in(...)` with hundreds/thousands of UUIDs;
+    // it can exceed URL limits and return 400 from PostgREST.
+    const tokenUserIdSet = new Set<string>();
+    const TOKEN_LOOKUP_CHUNK_SIZE = 100;
+    for (const chunk of chunkArray(userIds, TOKEN_LOOKUP_CHUNK_SIZE)) {
+      if (chunk.length === 0) continue;
+      const { data: tokenRows, error: tokenError } = await supabase
+        .from('push_tokens')
+        .select('user_id')
+        .in('user_id', chunk);
+
+      if (tokenError) {
+        console.error('Push token lookup error:', tokenError);
+        throw tokenError;
+      }
+
+      ((tokenRows as PushTokenRow[] | null) || []).forEach((r) => {
+        if (r.user_id) tokenUserIdSet.add(r.user_id);
+      });
+    }
+
+    const deliverableUserIds = Array.from(tokenUserIdSet);
+
+    if (deliverableUserIds.length === 0) {
+      throw new Error('No selected users have push notifications enabled (no push tokens found).');
+    }
 
     // Create campaign with 'queued' status
     const { data: campaign, error: campaignError } = await supabase
@@ -75,7 +129,7 @@ serve(async (req) => {
         message,
         notification_type: notificationType,
         target_countries: targetCountries,
-        total_recipients: userIds.length,
+        total_recipients: deliverableUserIds.length,
         successful_sends: 0,
         failed_sends: 0,
         status: 'queued', // Will be processed by background worker
@@ -90,8 +144,8 @@ serve(async (req) => {
 
     console.log(`Created campaign ${campaign.id} with status: queued`);
 
-    // Create recipient records (all pending)
-    const recipients = userIds.map(userId => ({
+    // Create recipient records - they will be processed by the background worker
+    const recipientsToInsert = deliverableUserIds.map(userId => ({
       campaign_id: campaign.id,
       user_id: userId,
       status: 'pending',
@@ -100,21 +154,21 @@ serve(async (req) => {
 
     const { error: recipientsError } = await supabase
       .from('broadcast_recipients')
-      .insert(recipients);
+      .insert(recipientsToInsert);
 
     if (recipientsError) {
       console.error('Recipients creation error:', recipientsError);
       throw recipientsError;
     }
 
-    console.log(`Queued ${userIds.length} recipients for background processing`);
+    console.log(`Queued ${deliverableUserIds.length} recipients for background processing`);
 
     // Return immediately - background worker will process
     return new Response(
       JSON.stringify({
         success: true,
         campaignId: campaign.id,
-        totalRecipients: userIds.length,
+        totalRecipients: deliverableUserIds.length,
         message: 'Broadcast queued successfully. Processing will continue in background.',
       }),
       {
@@ -127,7 +181,7 @@ serve(async (req) => {
     return new Response(
       JSON.stringify({
         success: false,
-        error: error instanceof Error ? error.message : 'Unknown error',
+        error: getErrorMessage(error),
       }),
       {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },

@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -93,6 +93,34 @@ interface Recipient {
   };
 }
 
+const getEdgeFunctionErrorMessage = (err: unknown): string => {
+  if (err && typeof err === 'object') {
+    const anyErr = err as any;
+
+    // Supabase FunctionsHttpError often includes a JSON string body in context
+    const body = anyErr?.context?.body;
+    if (body) {
+      if (typeof body === 'string' && body.trim().length > 0) {
+        try {
+          const parsed = JSON.parse(body);
+          const msg = parsed?.error || parsed?.message;
+          if (typeof msg === 'string' && msg.trim().length > 0) return msg;
+        } catch {
+          // ignore JSON parse errors
+        }
+      } else if (typeof body === 'object') {
+        const msg = (body as any)?.error || (body as any)?.message;
+        if (typeof msg === 'string' && msg.trim().length > 0) return msg;
+      }
+    }
+
+    const message = anyErr?.message;
+    if (typeof message === 'string' && message.trim().length > 0) return message;
+  }
+
+  return 'Failed to start broadcast campaign';
+};
+
 export default function BroadcastNotifications() {
   const [countries, setCountries] = useState<Country[]>([]);
   const [selectedCountries, setSelectedCountries] = useState<Set<string>>(new Set());
@@ -115,6 +143,10 @@ export default function BroadcastNotifications() {
   const [isLoadingRecipients, setIsLoadingRecipients] = useState(false);
   const [showCampaignDetails, setShowCampaignDetails] = useState(false);
 
+  const lastCampaignsSignatureRef = useRef<string>('');
+  const historyPollIntervalRef = useRef<number | null>(null);
+  const campaignsRef = useRef<Campaign[]>([]);
+
   useEffect(() => {
     loadCountries();
   }, []);
@@ -129,9 +161,32 @@ export default function BroadcastNotifications() {
   }, [selectedCountries]);
 
   useEffect(() => {
-    if (activeTab === 'history') {
-      loadCampaigns();
+    if (activeTab !== 'history') {
+      if (historyPollIntervalRef.current) {
+        window.clearInterval(historyPollIntervalRef.current);
+        historyPollIntervalRef.current = null;
+      }
+      return;
     }
+
+    // Initial load can show the spinner.
+    loadCampaigns({ silent: false });
+
+    // Poll silently while there are active campaigns.
+    historyPollIntervalRef.current = window.setInterval(() => {
+      const hasActive = campaignsRef.current.some(
+        (c) => c.status === 'queued' || c.status === 'processing'
+      );
+      if (!hasActive) return;
+      void loadCampaigns({ silent: true });
+    }, 4000);
+
+    return () => {
+      if (historyPollIntervalRef.current) {
+        window.clearInterval(historyPollIntervalRef.current);
+        historyPollIntervalRef.current = null;
+      }
+    };
   }, [activeTab]);
 
   const loadCountries = async () => {
@@ -177,33 +232,60 @@ export default function BroadcastNotifications() {
     setIsLoadingUsers(true);
     try {
       const countryArray = Array.from(selectedCountries);
-      
-      const { data: profiles, error: profileError } = await supabase
-        .from('profiles')
-        .select('id, first_name, last_name, country, city')
-        .in('country', countryArray)
-        .eq('account_status', 'active')
-        .eq('is_admin', false)
-        .order('first_name');
 
-      if (profileError) throw profileError;
+      // Supabase/PostgREST commonly applies a default max rows per request.
+      // Page through results so large countries (>1000 users) are fully included.
+      const PAGE_SIZE = 1000;
+      const profiles: Array<{ id: string; first_name: string | null; last_name: string | null; country: string | null; city: string | null }> = [];
+      for (let page = 0; ; page++) {
+        const from = page * PAGE_SIZE;
+        const to = from + PAGE_SIZE - 1;
 
-      const userIds = profiles?.map(p => p.id) || [];
-      const { data: tokens } = await supabase
-        .from('push_tokens')
-        .select('user_id')
-        .in('user_id', userIds);
+        const { data: pageRows, error: profileError } = await supabase
+          .from('profiles')
+          .select('id, first_name, last_name, country, city')
+          .in('country', countryArray)
+          .eq('account_status', 'active')
+          .eq('is_admin', false)
+          .order('id')
+          .range(from, to);
 
-      const usersWithTokens = new Set(tokens?.map(t => t.user_id) || []);
+        if (profileError) throw profileError;
+        if (!pageRows || pageRows.length === 0) break;
 
-      const userList: User[] = profiles?.map(p => ({
+        profiles.push(...pageRows);
+        if (pageRows.length < PAGE_SIZE) break;
+      }
+
+      const userIds = profiles.map((p) => p.id);
+      const usersWithTokens = new Set<string>();
+
+      // Avoid huge `.in(...)` queries that can exceed URL limits and return 400.
+      // Batch token lookups in smaller chunks.
+      const CHUNK_SIZE = 100;
+      for (let i = 0; i < userIds.length; i += CHUNK_SIZE) {
+        const chunk = userIds.slice(i, i + CHUNK_SIZE);
+        if (chunk.length === 0) continue;
+
+        const { data: tokensChunk, error: tokenError } = await supabase
+          .from('push_tokens')
+          .select('user_id')
+          .in('user_id', chunk);
+
+        if (tokenError) throw tokenError;
+        (tokensChunk || []).forEach((t) => {
+          if (t.user_id) usersWithTokens.add(t.user_id);
+        });
+      }
+
+      const userList: User[] = profiles.map(p => ({
         id: p.id,
         first_name: p.first_name || '',
         last_name: p.last_name || '',
         country: p.country || '',
         city: p.city || '',
         has_push_token: usersWithTokens.has(p.id),
-      })) || [];
+      }));
 
       setUsers(userList);
     } catch (error) {
@@ -218,8 +300,9 @@ export default function BroadcastNotifications() {
     }
   };
 
-  const loadCampaigns = async () => {
-    setIsLoadingCampaigns(true);
+  const loadCampaigns = async (opts?: { silent?: boolean }) => {
+    const silent = opts?.silent === true;
+    if (!silent) setIsLoadingCampaigns(true);
     try {
       const { data, error } = await supabase
         .from('broadcast_campaigns')
@@ -229,16 +312,33 @@ export default function BroadcastNotifications() {
 
       if (error) throw error;
 
-      setCampaigns(data || []);
+      const next = (data || []) as Campaign[];
+
+      // Prevent re-renders (and scroll jumps) when nothing meaningful changed.
+      const signature = next
+        .map((c) => `${c.id}:${c.status}:${c.successful_sends}:${c.failed_sends}:${c.total_recipients}`)
+        .join('|');
+
+      if (signature !== lastCampaignsSignatureRef.current) {
+        lastCampaignsSignatureRef.current = signature;
+        campaignsRef.current = next;
+        setCampaigns(next);
+      } else {
+        // Still keep ref current in case other code reads it.
+        campaignsRef.current = next;
+      }
     } catch (error) {
       console.error('Error loading campaigns:', error);
-      toast({
-        title: 'Error',
-        description: 'Failed to load campaign history',
-        variant: 'destructive',
-      });
+      // Avoid spamming toast on silent refresh.
+      if (!silent) {
+        toast({
+          title: 'Error',
+          description: 'Failed to load campaign history',
+          variant: 'destructive',
+        });
+      }
     } finally {
-      setIsLoadingCampaigns(false);
+      if (!silent) setIsLoadingCampaigns(false);
     }
   };
 
@@ -348,7 +448,7 @@ export default function BroadcastNotifications() {
     setIsSending(true);
 
     try {
-      // Call edge function to handle broadcast server-side
+      // Call edge function to queue the broadcast
       const { data, error } = await supabase.functions.invoke('send-broadcast-campaign', {
         body: {
           title: notificationTitle,
@@ -361,9 +461,20 @@ export default function BroadcastNotifications() {
 
       if (error) throw error;
 
+      const campaignId = (data as any)?.campaignId;
+      const totalRecipients = (data as any)?.totalRecipients || selectedUsers.size;
+
+      // Trigger the background worker to start processing immediately
+      supabase.functions.invoke('process-broadcast-queue', {
+        body: { campaignId }
+      }).catch(err => {
+        console.error('Failed to trigger worker:', err);
+        // Don't show error to user - worker will pick it up anyway
+      });
+
       toast({
         title: 'Broadcast Queued',
-        description: `Sending to ${selectedUsers.size} users. Processing continues in background. You can leave this page.`,
+        description: `Sending to ${totalRecipients} users. Processing in background. Check History tab for progress.`,
         duration: 5000,
       });
 
@@ -372,20 +483,53 @@ export default function BroadcastNotifications() {
       setNotificationMessage('');
       setSelectedUsers(new Set());
       
-      // Refresh campaign history
-      if (activeTab === 'history') {
-        loadCampaigns();
-      }
+      // Switch to history tab to show progress
+      setActiveTab('history');
     } catch (error) {
       console.error('Error starting broadcast:', error);
       toast({
         title: 'Error',
-        description: error instanceof Error ? error.message : 'Failed to start broadcast campaign',
+        description: getEdgeFunctionErrorMessage(error),
         variant: 'destructive',
       });
     } finally {
       setIsSending(false);
     }
+  };
+
+  // Poll for broadcast progress
+  const startProgressPolling = (campaignId: string) => {
+    const pollInterval = setInterval(async () => {
+      try {
+        const { data: campaign, error } = await supabase
+          .from('broadcast_campaigns')
+          .select('status, successful_sends, failed_sends, total_recipients')
+          .eq('id', campaignId)
+          .single();
+
+        if (error) throw error;
+
+        if (campaign.status === 'completed') {
+          clearInterval(pollInterval);
+          toast({
+            title: 'Broadcast Complete',
+            description: `Sent: ${campaign.successful_sends}, Failed: ${campaign.failed_sends} out of ${campaign.total_recipients} total`,
+            duration: 5000,
+          });
+          loadCampaigns();
+        } else if (campaign.successful_sends + campaign.failed_sends > 0) {
+          // Show progress update
+          const progress = campaign.successful_sends + campaign.failed_sends;
+          console.log(`Progress: ${progress}/${campaign.total_recipients}`);
+        }
+      } catch (error) {
+        console.error('Error polling progress:', error);
+        clearInterval(pollInterval);
+      }
+    }, 3000); // Poll every 3 seconds
+
+    // Stop polling after 5 minutes
+    setTimeout(() => clearInterval(pollInterval), 300000);
   };
 
   const deleteCampaign = async (campaignId: string) => {
@@ -813,8 +957,31 @@ export default function BroadcastNotifications() {
                               {campaign.failed_sends} failed
                             </Badge>
                           )}
+                          {(campaign.status === 'queued' || campaign.status === 'processing') && (
+                            <Badge variant="outline" className="text-blue-600 border-blue-600 text-[10px] h-4">
+                              <Loader2 className="w-2.5 h-2.5 mr-0.5 animate-spin" />
+                              Processing...
+                            </Badge>
+                          )}
                           <CountriesBadge countries={campaign.target_countries} />
                         </div>
+
+                        {/* Progress bar for active campaigns */}
+                        {(campaign.status === 'queued' || campaign.status === 'processing') && campaign.total_recipients > 0 && (
+                          <div className="mb-2">
+                            <div className="w-full bg-gray-200 rounded-full h-2 overflow-hidden">
+                              <div 
+                                className="bg-purple-600 h-2 transition-all duration-300"
+                                style={{ 
+                                  width: `${Math.min(100, ((campaign.successful_sends + campaign.failed_sends) / campaign.total_recipients) * 100)}%` 
+                                }}
+                              />
+                            </div>
+                            <p className="text-[9px] text-gray-500 mt-0.5">
+                              {campaign.successful_sends + campaign.failed_sends} / {campaign.total_recipients} processed
+                            </p>
+                          </div>
+                        )}
 
                         <div className="space-y-2">
                           <div className="text-[10px] text-gray-500">

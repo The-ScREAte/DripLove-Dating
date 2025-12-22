@@ -171,7 +171,6 @@ export const useSubscription = (userId: string | undefined) => {
             filter: `user_id=eq.${userId}`
           },
           (payload) => {
-            console.log('Subscription changed:', payload);
             // Refetch subscription when it changes
             fetchSubscription();
           }

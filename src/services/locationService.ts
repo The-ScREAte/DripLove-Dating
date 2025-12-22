@@ -30,26 +30,6 @@ class LocationService {
     if (!userId) return [];
 
     try {
-  // ...removed log...
-
-      const maxDistanceKm = typeof maxDistance === 'number' ? maxDistance : Number(maxDistance);
-      const args: { user_id: string; max_distance_km?: number } = { user_id: userId };
-      if (Number.isFinite(maxDistanceKm) && maxDistanceKm > 0) {
-        args.max_distance_km = maxDistanceKm;
-      }
-
-      // First try to use the database function
-      const { data: dbMatches, error: dbError } = await supabase.rpc('find_matches_by_location', args);
-
-  // ...removed log...
-
-      if (!dbError && dbMatches && dbMatches.length > 0) {
-  // ...removed log...
-        return dbMatches;
-      }
-
-  // ...removed log...
-      // Fallback to manual location matching
       return await this.getFallbackLocationMatches(userId, maxDistance);
       
     } catch (error) {

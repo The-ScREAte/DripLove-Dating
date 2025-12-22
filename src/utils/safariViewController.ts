@@ -35,7 +35,7 @@ export function cleanupSafariViewController() {
         // ignore
       });
   } catch (err) {
-    console.log('cleanupSafariViewController error:', err);
+    console.error('cleanupSafariViewController error:', err);
   }
 }
 

@@ -1,6 +1,8 @@
 import { SignInWithApple } from '@capacitor-community/apple-sign-in';
 import { supabase } from '@/integrations/supabase/client';
 import { Capacitor } from '@capacitor/core';
+
+const noopLog = (..._args: unknown[]) => {};
 import { getAppleClientId } from '@/config/oauth';
 
 /**
@@ -26,7 +28,7 @@ export async function signInWithAppleNativeModal() {
       throw new Error('Native Apple Sign-In modal is only available on iOS');
     }
 
-    console.log('[Apple Native Modal] Starting native Apple Sign-In modal...');
+    noopLog('[Apple Native Modal] Starting native Apple Sign-In modal...');
 
     // Show native Apple modal - plugin will use App ID (com.driplove.dating) as audience
     // Remove nonce to avoid nonce mismatch issues with Supabase
@@ -38,7 +40,7 @@ export async function signInWithAppleNativeModal() {
       // nonce: generateNonce() // Remove this - causes nonce mismatch with Supabase
     });
 
-    console.log('[Apple Native Modal] Apple authorization result:', result);
+    noopLog('[Apple Native Modal] Apple authorization result:', result);
 
     if (!result.response || !result.response.identityToken) {
       throw new Error('No identity token received from Apple');
@@ -61,7 +63,7 @@ export async function signInWithAppleNativeModal() {
       throw new Error('No user returned from Supabase after Apple sign-in');
     }
 
-    console.log('[Apple Native Modal] Successfully authenticated with Supabase:', data.user.id);
+    noopLog('[Apple Native Modal] Successfully authenticated with Supabase:', data.user.id);
 
     // Extract name from Apple response if available (only on first sign up)
     let firstName = '';
@@ -69,7 +71,7 @@ export async function signInWithAppleNativeModal() {
     if (result.response.givenName || result.response.familyName) {
       firstName = result.response.givenName || '';
       lastName = result.response.familyName || '';
-      console.log('[Apple Native Modal] Extracted name from Apple:', { firstName, lastName });
+      noopLog('[Apple Native Modal] Extracted name from Apple:', { firstName, lastName });
     }
 
     // Check if user profile exists (same as Google OAuth flow)
@@ -82,7 +84,7 @@ export async function signInWithAppleNativeModal() {
     if (profileError || !profile) {
       // User doesn't have a profile - save name to user_metadata and let them complete profile
       // DO NOT create profile here - user needs to go through full profile completion with moderation
-      console.log('[Apple Native Modal] No profile found - needs completion');
+      noopLog('[Apple Native Modal] No profile found - needs completion');
       
       // Save name to user_metadata so it can be pre-filled in profile completion form
       if (firstName || lastName) {
@@ -92,7 +94,7 @@ export async function signInWithAppleNativeModal() {
             last_name: lastName,
           }
         });
-        console.log('[Apple Native Modal] Saved Apple name to user_metadata');
+        noopLog('[Apple Native Modal] Saved Apple name to user_metadata');
       }
       
       return { 
@@ -149,7 +151,7 @@ export function isAppleSignInAvailable(): boolean {
  * Fallback for non-iOS platforms - use custom Apple OAuth with Services ID
  */
 export async function signInWithAppleFallback(): Promise<never> {
-  console.log('🍎 Starting Custom Apple OAuth for Web (Services ID)');
+  noopLog('🍎 Starting Custom Apple OAuth for Web (Services ID)');
   
   // Use our custom Apple OAuth flow that uses the Services ID
   const { startCustomAppleOAuth } = await import('@/utils/customAppleOAuth');

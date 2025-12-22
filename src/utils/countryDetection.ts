@@ -181,12 +181,11 @@ async function getCountryFromIP(): Promise<string | null> {
         const data = await response.json();
         const countryCode = service.getCountry(data);
         if (countryCode) {
-          console.log(`IP geolocation success from ${service.url}:`, countryCode);
           return countryCode;
         }
       }
     } catch (error) {
-      console.log(`IP service ${service.url} failed:`, error);
+      console.warn(`IP service ${service.url} failed:`, error);
       // Continue to next service
     }
   }
@@ -229,7 +228,7 @@ export async function autoDetectCountry(): Promise<GeolocationResult> {
         };
       }
     } catch (error) {
-      console.log('GPS detection failed, falling back to IP:', error);
+      console.warn('GPS detection failed, falling back to IP:', error);
     }
   }
 

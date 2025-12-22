@@ -34,7 +34,6 @@ export const initializeGoogleAuth = async (): Promise<void> => {
           grantOfflineAccess: true,
         });
         isInitialized = true;
-        console.log('✅ Google Auth initialized');
         resolve();
       } catch (err) {
         console.warn('Google Auth initialization failed:', err);
@@ -57,14 +56,10 @@ export const signInWithGoogleNative = async () => {
     // Ensure Google Auth is initialized
     await initializeGoogleAuth();
 
-    console.log('📱 Starting native Google Sign-In...');
-
     // This opens Google's native picker - stays entirely in your app!
     const googleUser = await GoogleAuth.signIn({
       scopes: ['profile', 'email']
     });
-    
-    console.log('📱 Google Sign-In response received');
     
     const idToken = googleUser.authentication?.idToken;
     
@@ -72,8 +67,6 @@ export const signInWithGoogleNative = async () => {
       console.error('❌ No ID token in response:', JSON.stringify(googleUser, null, 2));
       throw new Error('No ID token received from Google');
     }
-
-    console.log('✅ Google Sign-In successful, got ID token');
 
     // Sign in to Supabase using ONLY ID token (same as iOS Apple Sign-In)
     // DO NOT pass access_token - it causes audience validation issues
@@ -86,8 +79,6 @@ export const signInWithGoogleNative = async () => {
       console.error('❌ Supabase sign-in error:', error);
       throw error;
     }
-    
-    console.log('✅ Supabase authentication successful');
     
     // Fast path: Check if user has a profile with minimal fields
     // This dramatically improves Android performance by reducing query complexity
@@ -159,7 +150,6 @@ export const isNativeGoogleAuthAvailable = () => {
 export const signOutGoogleNative = async () => {
   try {
     await GoogleAuth.signOut();
-    console.log('✅ Signed out from Google');
   } catch (err) {
     console.error('❌ Google sign-out error:', err);
   }

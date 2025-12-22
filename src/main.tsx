@@ -26,8 +26,7 @@ if (import.meta.env.PROD) {
     }
     originalError.apply(console, args);
   };
-  
-  console.log = () => {};
+
   console.debug = () => {};
   console.info = () => {};
   console.warn = () => {};
@@ -184,7 +183,7 @@ const AppWrapper = () => {
               document.documentElement.style.setProperty('--safe-area-inset-right', 'env(safe-area-inset-right, 0px)');
               
             } catch (error) {
-              console.log('Capacitor plugin initialization failed:', error);
+              // Ignore plugin initialization failures
             }
           }
 
@@ -196,7 +195,7 @@ const AppWrapper = () => {
               // Silent session handling
             }
           } catch (error) {
-            console.log('Auth check error:', error);
+            // Ignore auth check failures
           }
 
           // Background initialization complete

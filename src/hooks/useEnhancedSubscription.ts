@@ -44,11 +44,9 @@ export function useEnhancedSubscription() {
       
       // Only verify if this subscription was purchased via this platform
       if (dbSubscription?.payment_method !== paymentMethod) {
-        console.log('[Subscription] DB subscription is from different platform, skipping store verification');
         return true;
       }
-      
-      console.log('[Subscription] Verifying with native store...');
+
       hasVerifiedWithStore.current = true;
       
       // Check for owned products
@@ -65,7 +63,6 @@ export function useEnhancedSubscription() {
         try {
           const product = store.get?.(productId);
           if (product && product.owned) {
-            console.log('[Subscription] Found owned product:', productId);
             hasActiveStoreSubscription = true;
             break;
           }
@@ -76,12 +73,8 @@ export function useEnhancedSubscription() {
       
       // If DB says premium but store says not owned - subscription may have expired/been cancelled
       if (dbSubscription?.plan_name === 'premium' && dbSubscription?.status === 'active' && !hasActiveStoreSubscription) {
-        console.log('[Subscription] DB shows premium but store shows not owned - may be expired');
-        
         // Check expiry date as final confirmation
         if (dbSubscription.expires_at && new Date(dbSubscription.expires_at) <= new Date()) {
-          console.log('[Subscription] Subscription expired, updating to free...');
-          
           await supabase
             .from('user_subscriptions')
             .update({
@@ -134,8 +127,6 @@ export function useEnhancedSubscription() {
         
         if (isExpired) {
           // Subscription has expired - update the database and set to free
-          console.log('[Subscription] Premium subscription has expired, updating status...')
-          
           // Update the subscription status in the database
           await supabase
             .from('user_subscriptions')

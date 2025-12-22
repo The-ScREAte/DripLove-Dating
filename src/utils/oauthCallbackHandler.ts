@@ -20,7 +20,6 @@ export async function handleOAuthRedirect(url?: string) {
       const refresh_token = params.get('refresh_token');
 
       if (access_token) {
-        console.log('[OAuthHandler] Setting session from URL tokens');
         const { data, error } = await supabase.auth.setSession({ 
           access_token, 
           refresh_token: refresh_token || '' 
@@ -30,7 +29,6 @@ export async function handleOAuthRedirect(url?: string) {
           console.warn('[OAuthHandler] setSession error:', error);
         } else if (data?.session) {
           sessionData = data;
-          console.log('[OAuthHandler] Session set successfully');
         }
       }
     }
@@ -65,7 +63,6 @@ export async function handleOAuthRedirect(url?: string) {
         console.warn('[OAuthHandler] Profile fetch error:', profileError);
       } else if (data) {
         profile = data;
-        console.log('[OAuthHandler] Existing profile found for user:', user.id);
         
         // Cache profile in sessionStorage
         if (typeof window !== 'undefined') {
@@ -76,7 +73,6 @@ export async function handleOAuthRedirect(url?: string) {
         // Check if profile needs completion (same logic as native flows)
         needsProfileCompletion = !profile.first_name || !profile.last_name;
       } else {
-        console.log('[OAuthHandler] No profile found - user needs to complete profile creation');
         needsProfileCompletion = true;
       }
     } catch (e) {

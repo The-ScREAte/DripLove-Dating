@@ -18,7 +18,6 @@ const AppleOAuthCallback = () => {
       try {
         const { Capacitor } = await import('@capacitor/core');
         if (Capacitor && Capacitor.isNativePlatform && Capacitor.isNativePlatform()) {
-          console.log('AppleOAuthCallback: Native mobile detected, skipping web callback');
           setIsNativeMobile(true);
           // Immediately navigate to Index - useMobileOAuth will handle auth
           navigate('/', { replace: true });
