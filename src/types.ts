@@ -91,6 +91,7 @@ export interface AdminStats {
   total_likes: number;
   total_blocks: number;
   total_messages: number;
+  active_now: number;
   active_users_today: number;
   new_users_this_week: number;
   matches_this_week: number;

@@ -317,6 +317,30 @@ export type Database = {
           },
         ]
       }
+      daily_active_stats: {
+        Row: {
+          active_count: number
+          created_at: string | null
+          id: string
+          stat_date: string
+          updated_at: string | null
+        }
+        Insert: {
+          active_count?: number
+          created_at?: string | null
+          id?: string
+          stat_date: string
+          updated_at?: string | null
+        }
+        Update: {
+          active_count?: number
+          created_at?: string | null
+          id?: string
+          stat_date?: string
+          updated_at?: string | null
+        }
+        Relationships: []
+      }
       enabled_countries: {
         Row: {
           country_code: string
@@ -1603,6 +1627,10 @@ export type Database = {
           profile_id: string
         }[]
       }
+      get_active_users_for_date: {
+        Args: { target_date: string }
+        Returns: number
+      }
       get_admin_stats: { Args: never; Returns: Json }
       get_app_stats: { Args: never; Returns: Json }
       get_current_subscription_status: {
@@ -1682,6 +1710,7 @@ export type Database = {
         }
         Returns: Json
       }
+      record_daily_active_count: { Args: never; Returns: undefined }
       reject_image: {
         Args: { admin_notes?: string; image_id: string }
         Returns: boolean
