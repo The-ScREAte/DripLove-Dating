@@ -85,7 +85,8 @@ const seededRandomFromString = (seedStr: string) => {
 
 const buildFeedSignature = (baseCountryCode: string, unlockedCountries: string[], isPremium: boolean, maxDistance: number) => {
   const unlockedSignature = isPremium ? [...unlockedCountries].sort().join(',') : '';
-  return `v4_${hashStringToInt(`${baseCountryCode}|${unlockedSignature}|${maxDistance}|${isPremium ? 'premium' : 'free'}`).toString(36)}`;
+  // Bump version when feed ordering logic changes so old saved orders don't lock users into bad mixing
+  return `v5_${hashStringToInt(`${baseCountryCode}|${unlockedSignature}|${maxDistance}|${isPremium ? 'premium' : 'free'}`).toString(36)}`;
 };
 
 const buildSavedOrderKey = (userId: string, feedSignature: string) =>
