@@ -252,7 +252,7 @@ const LikedMePage = ({ currentUser, isPremium = false }: LikedMePageProps) => {
         .maybeSingle();
 
       if (error) {
-  // ...removed log...
+        console.error('Error fetching cooldown:', error);
         return;
       }
 
@@ -263,7 +263,7 @@ const LikedMePage = ({ currentUser, isPremium = false }: LikedMePageProps) => {
         }
       }
     } catch (error) {
-  // ...removed log...
+      console.error('Error in fetchCooldown:', error);
     }
   }, [currentUser?.id, isPremium]);
 
@@ -511,7 +511,7 @@ const LikedMePage = ({ currentUser, isPremium = false }: LikedMePageProps) => {
         }
       }
     } catch (error) {
-  // ...removed log...
+      console.error('Error fetching likers:', error);
       if (showLoading) {
         toast({
           title: t('matches.error'),
@@ -584,7 +584,7 @@ const LikedMePage = ({ currentUser, isPremium = false }: LikedMePageProps) => {
         }
       }
     } catch (error) {
-  // ...removed log...
+      // Silent fail for image loading - don't log for aborted requests
     }
   }, [userImages]); // Removed platform dependency - it's stable via useMemo
 
@@ -727,7 +727,7 @@ const LikedMePage = ({ currentUser, isPremium = false }: LikedMePageProps) => {
 
       setLockoutEndDate(lockoutDate);
     } catch (error) {
-  // ...removed log...
+      console.error('Error setting cooldown:', error);
     }
   };
 

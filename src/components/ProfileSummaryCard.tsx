@@ -61,7 +61,7 @@ const ProfileSummaryCard = ({ currentUser }: ProfileSummaryCardProps) => {
         totalLikes: likes?.length || 0
       });
     } catch (error) {
-  // ...removed log...
+      console.error('Error fetching stats:', error);
     }
   };
 
