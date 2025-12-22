@@ -21,7 +21,9 @@ import {
   XCircle,
   Clock,
   Gift,
-  Percent
+  Percent,
+  Copy,
+  Link
 } from 'lucide-react';
 
 interface PromoCode {
@@ -59,6 +61,7 @@ const InfluencerManagement = () => {
   const [showDetailModal, setShowDetailModal] = useState(false);
   const [selectedPromoCode, setSelectedPromoCode] = useState<PromoCode | null>(null);
   const [detailStats, setDetailStats] = useState<any>(null);
+  const [passwordSetupLink, setPasswordSetupLink] = useState<string | null>(null);
   
   // Form state
   const [formData, setFormData] = useState({
@@ -191,7 +194,7 @@ const InfluencerManagement = () => {
           password_hash: token, // Token will be replaced when user sets password
           percentage_cut: parseFloat(formData.percentageCut),
           commission_duration: parseInt(formData.commissionDuration),
-          status: 'active',
+          status: 'pending_password',
           is_active: true
         })
         .select('id')
@@ -199,37 +202,30 @@ const InfluencerManagement = () => {
 
       if (error) throw error;
 
-      // Send email with password setup link
+      // Generate the password setup link for the admin to share
       const appUrl = window.location.origin;
-      const { error: emailError } = await supabase.functions.invoke('send-influencer-password-email', {
-        body: {
-          email: formData.email.trim(),
-          ownerName: formData.ownerName.trim(),
-          promoCode: formData.code.trim().toUpperCase(),
-          promoCodeId: newPromoCode.id,
-          token: token,
-          appUrl: appUrl
-        }
-      });
+      const setupLink = `${appUrl}/influencer/set-password?id=${newPromoCode.id}&token=${encodeURIComponent(token)}`;
+      setPasswordSetupLink(setupLink);
 
-      if (emailError) {
-        console.error('Email send error:', emailError);
-        toast({ 
-          title: 'Created but email failed', 
-          description: 'Promo code created but email failed to send. The influencer can request a new link later.', 
-          variant: 'destructive' 
-        });
-      } else {
-        toast({ title: 'Success', description: 'Promo code created! Email sent to influencer to set their password.' });
-      }
-
-      setShowCreateModal(false);
+      toast({ title: 'Success', description: 'Influencer created! Share the password setup link with them.' });
       setFormData({ code: '', ownerName: '', email: '', password: '', percentageCut: '20', commissionDuration: '1' });
       fetchPromoCodes();
     } catch (error) {
       console.error('Error creating promo code:', error);
       toast({ title: 'Error', description: 'Failed to create promo code', variant: 'destructive' });
     }
+  };
+
+  const copySetupLink = () => {
+    if (passwordSetupLink) {
+      navigator.clipboard.writeText(passwordSetupLink);
+      toast({ title: 'Copied!', description: 'Link copied to clipboard. Share it with the influencer.' });
+    }
+  };
+
+  const closeSetupLinkDialog = () => {
+    setPasswordSetupLink(null);
+    setShowCreateModal(false);
   };
 
   const handleUpdatePromoCode = async () => {
@@ -555,16 +551,13 @@ const InfluencerManagement = () => {
               />
             </div>
             <div>
-              <Label>Email * (Password setup link will be sent here)</Label>
+              <Label>Email *</Label>
               <Input 
                 type="email"
                 value={formData.email} 
                 onChange={(e) => setFormData(prev => ({ ...prev, email: e.target.value }))}
                 placeholder="influencer@email.com"
               />
-              <p className="text-xs text-gray-500 mt-1">
-                An email will be sent to the influencer to set their own password.
-              </p>
             </div>
             <div className="grid grid-cols-2 gap-4">
               <div>
@@ -764,6 +757,35 @@ const InfluencerManagement = () => {
               </div>
             </div>
           )}
+        </DialogContent>
+      </Dialog>
+
+      {/* Password Setup Link Dialog */}
+      <Dialog open={!!passwordSetupLink} onOpenChange={() => setPasswordSetupLink(null)}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Link className="w-5 h-5 text-pink-500" />
+              Password Setup Link
+            </DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4">
+            <p className="text-sm text-gray-600">
+              Share this link with the influencer. They will use it to set their password and access their portal.
+            </p>
+            <div className="p-3 bg-gray-100 rounded-lg">
+              <p className="text-xs text-gray-500 mb-1">Setup Link</p>
+              <p className="text-sm font-mono break-all select-all">{passwordSetupLink}</p>
+            </div>
+            <div className="flex gap-2">
+              <Button onClick={copySetupLink} className="flex-1 bg-pink-500 hover:bg-pink-600">
+                <Copy className="w-4 h-4 mr-2" /> Copy Link
+              </Button>
+              <Button variant="outline" onClick={closeSetupLinkDialog}>
+                Done
+              </Button>
+            </div>
+          </div>
         </DialogContent>
       </Dialog>
     </div>
