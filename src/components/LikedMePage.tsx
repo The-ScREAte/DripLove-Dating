@@ -70,12 +70,9 @@ const likedMePollIntervals = new Map<string, ReturnType<typeof setInterval>>();
 
 const hasListChanged = (previous: any[], next: any[]) => {
   if (previous.length !== next.length) return true;
-  for (let i = 0; i < previous.length; i++) {
-    const prev = previous[i];
-    const curr = next[i];
-    if (!curr || prev.id !== curr.id || prev.updated_at !== curr.updated_at) {
-      return true;
-    }
+  const prevMap = new Map(previous.map(p => [p.id, p.updated_at]));
+  for (const n of next) {
+    if (prevMap.get(n.id) !== n.updated_at) return true;
   }
   return false;
 };
@@ -119,7 +116,8 @@ const LikedMePage = ({ currentUser, isPremium = false }: LikedMePageProps) => {
   // ------------------
   const backgroundFetchingRef = useRef(false);
   const scrollContainerRef = useRef<HTMLDivElement>(null);
-  const imageAbortController = useRef<AbortController | null>(null);
+  const preloadAbortRef = useRef<AbortController | null>(null);
+  const fullImageAbortRef = useRef<AbortController | null>(null);
 
   // ------------------
   // MEMOIZED PLATFORM
@@ -130,19 +128,16 @@ const LikedMePage = ({ currentUser, isPremium = false }: LikedMePageProps) => {
   // SAFE IMAGE RESOLVER (stable, never creates hooks)
   // ------------------
   const getSafeImageSrc = useCallback(
-    (urlOrBlob?: string) => {
-      if (!urlOrBlob) return "";
+    (urlOrBlob?: string): string | undefined => {
+      if (!urlOrBlob) return undefined;
 
       // Blob URLs always safe
       if (urlOrBlob.startsWith("blob:")) return urlOrBlob;
 
-      // Android NEVER loads remote images directly → must use blob cache
-      if (platform === "android") return "";
-
-      // iOS/Web use direct URL
+      // Android: allow remote URL fallback (blob is an optimization)
       return urlOrBlob;
     },
-    [platform]
+    []
   );
 
 
@@ -153,7 +148,7 @@ const LikedMePage = ({ currentUser, isPremium = false }: LikedMePageProps) => {
     if (width >= 768) return 3;
     return 2;
   });
-  
+   
   useEffect(() => {
     let rafId: number | null = null;
     
@@ -218,7 +213,11 @@ const LikedMePage = ({ currentUser, isPremium = false }: LikedMePageProps) => {
 
   // ⭐ CRITICAL FIX: Create stable callbacks OUTSIDE useVirtualizer (hooks can't be nested)
   const getScrollElement = useCallback(() => scrollContainerRef.current, []);
-  const getEstimateSize = useCallback(() => estimatedRowHeight, [estimatedRowHeight]);
+  // Include vertical gap in the virtualizer size so we don't have to manually offset `top` or container height.
+  const getEstimateSize = useCallback(
+    () => estimatedRowHeight + rowVerticalGap,
+    [estimatedRowHeight, rowVerticalGap]
+  );
 
   // ⭐ Always create virtualizer - don't conditionally enable/disable based on state
   const rowVirtualizer = useVirtualizer({
@@ -240,6 +239,16 @@ const LikedMePage = ({ currentUser, isPremium = false }: LikedMePageProps) => {
 
     return age;
   }, []);
+
+  const ageByLikerId = useMemo(() => {
+    const map: Record<string, number> = {};
+    for (const liker of likers) {
+      if (liker?.id && liker?.date_of_birth) {
+        map[liker.id] = calculateAge(liker.date_of_birth);
+      }
+    }
+    return map;
+  }, [likers, calculateAge]);
 
   const checkLockoutStatus = useCallback(async () => {
     if (!currentUser?.id || isPremium) return;
@@ -398,7 +407,7 @@ const LikedMePage = ({ currentUser, isPremium = false }: LikedMePageProps) => {
       }
     }
 
-    // ⭐ FIX #3: TINDER-STYLE - Load ONLY first image for first 3 profiles (not all 200+)
+    // Map exactly one (first) image URL per liker (cheap), then selectively blob-preload only the first few.
     const imageMap: { [key: string]: string[] } = {};
     if (imagesData) {
       // Group images by user_id
@@ -409,12 +418,12 @@ const LikedMePage = ({ currentUser, isPremium = false }: LikedMePageProps) => {
         }
         imagesByUser[img.user_id].push(img);
       }
-      
-      // ⭐ Only load first image for first 3 users (priority loading)
-      const priorityUserIds = likerIds.slice(0, 3);
-      for (const userId of priorityUserIds) {
-        if (imagesByUser[userId]?.[0]) {
-          imageMap[userId] = [imagesByUser[userId][0].image_url];
+
+      // Always assign a first image URL for every liker, so cards don't fall back to initials.
+      for (const likerId of likerIds) {
+        const firstImageUrl = imagesByUser[likerId]?.[0]?.image_url;
+        if (firstImageUrl) {
+          imageMap[likerId] = [firstImageUrl];
         }
       }
     }
@@ -428,12 +437,13 @@ const LikedMePage = ({ currentUser, isPremium = false }: LikedMePageProps) => {
     imageUrls: { [key: string]: string[] }
   ) => {
     // ⭐ FIX #4: Cancel previous loads
-    if (imageAbortController.current) {
-      imageAbortController.current.abort();
+    if (preloadAbortRef.current) {
+      preloadAbortRef.current.abort();
+      preloadAbortRef.current = null;
     }
     
     const controller = new AbortController();
-    imageAbortController.current = controller;
+    preloadAbortRef.current = controller;
 
     // ⭐ ANDROID FIX: Only preload first 2 profiles (reduced from 3)
     const profilesToPreload = profiles.slice(0, 2);
@@ -470,6 +480,9 @@ const LikedMePage = ({ currentUser, isPremium = false }: LikedMePageProps) => {
       } catch {
         // Silent fail for individual images
       }
+    }
+    if (preloadAbortRef.current === controller) {
+      preloadAbortRef.current = null;
     }
   }, [platform]); // Add platform dependency
 
@@ -534,12 +547,13 @@ const LikedMePage = ({ currentUser, isPremium = false }: LikedMePageProps) => {
     if (userImages[profileId]?.length > 1) return; // Already loaded
 
     // ⭐ FIX #4: Cancel previous image loads
-    if (imageAbortController.current) {
-      imageAbortController.current.abort();
+    if (fullImageAbortRef.current) {
+      fullImageAbortRef.current.abort();
+      fullImageAbortRef.current = null;
     }
 
     const controller = new AbortController();
-    imageAbortController.current = controller;
+    fullImageAbortRef.current = controller;
 
     try {
       // Try to fetch approved images first
@@ -585,6 +599,10 @@ const LikedMePage = ({ currentUser, isPremium = false }: LikedMePageProps) => {
       }
     } catch (error) {
       // Silent fail for image loading - don't log for aborted requests
+    } finally {
+      if (fullImageAbortRef.current === controller) {
+        fullImageAbortRef.current = null;
+      }
     }
   }, [userImages]); // Removed platform dependency - it's stable via useMemo
 
@@ -1218,7 +1236,7 @@ const LikedMePage = ({ currentUser, isPremium = false }: LikedMePageProps) => {
                   <div className="flex items-center space-x-3 text-xs">
                     <div className="flex items-center">
                       <Calendar className="w-3 h-3 mr-1" />
-                      <span>{calculateAge(selectedProfile.date_of_birth)} {t('matches.yearsOld')}</span>
+                      <span>{ageByLikerId[selectedProfile.id] ?? calculateAge(selectedProfile.date_of_birth)} {t('matches.yearsOld')}</span>
                     </div>
                     <div className="flex items-center">
                       <MapPin className="w-3 h-3 mr-1" />
@@ -1525,7 +1543,8 @@ const LikedMePage = ({ currentUser, isPremium = false }: LikedMePageProps) => {
           <div
             style={{
               position: 'relative',
-              height: `${rowVirtualizer.getTotalSize() + virtualizerCount * rowVerticalGap}px`
+              // Subtract the final gap so we don't end with extra whitespace after the last row.
+              height: `${Math.max(0, rowVirtualizer.getTotalSize() - rowVerticalGap)}px`
             }}
           >
             {rowVirtualizer.getVirtualItems().map(row => {
@@ -1538,12 +1557,12 @@ const LikedMePage = ({ currentUser, isPremium = false }: LikedMePageProps) => {
                   key={row.index}
                   style={{
                     position: 'absolute',
-                    top: `${row.start + row.index * rowVerticalGap}px`,
+                    top: `${row.start}px`,
                     left: '50%',
                     transform: 'translateX(-50%)',
                     maxWidth: '1400px',
                     width: '100%',
-                    height: `${row.size}px`,
+                    height: `${Math.max(0, row.size - rowVerticalGap)}px`,
                     paddingLeft: `${rowPaddingHorizontal}px`,
                     paddingRight: `${rowPaddingHorizontal}px`,
                     columnGap: `${rowColumnGap}px`,
@@ -1601,7 +1620,7 @@ const LikedMePage = ({ currentUser, isPremium = false }: LikedMePageProps) => {
                       </div>
                       <CardContent className="p-3 flex-1">
                         <h3 className={`font-semibold text-gray-800 truncate text-sm ${isLocked ? 'blur-sm' : ''}`}>
-                          {liker.first_name}, {calculateAge(liker.date_of_birth)}
+                          {liker.first_name}, {ageByLikerId[liker.id] ?? calculateAge(liker.date_of_birth)}
                         </h3>
                         <p className="text-xs text-gray-600 truncate">
                           {liker.country}, {liker.city}

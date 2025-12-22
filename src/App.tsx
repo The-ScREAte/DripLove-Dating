@@ -11,7 +11,13 @@ import i18n from "@/i18n/config";
 
 const queryClient = new QueryClient();
  
-const App = () => {
+const App = ({
+  user,
+  isAuthenticated,
+}: {
+  user: any | null;
+  isAuthenticated: boolean;
+}) => {
   // Add error boundary to prevent crashes
   const [hasError, setHasError] = React.useState(false);
   
@@ -68,7 +74,7 @@ const App = () => {
                  WebkitTouchCallout: 'none'
                }}>
             <BrowserRouter>
-              <AppRoutes />
+              <AppRoutes user={user} isAuthenticated={isAuthenticated} />
             </BrowserRouter>
           </div>
         </TooltipProvider>

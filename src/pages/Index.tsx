@@ -22,169 +22,43 @@ const LazyAdminPage = lazy(() => import('@/components/AdminPage'));
 // Loading component for lazy-loaded pages - minimal spinner
 const PageLoader = () => null;
 
-const Index = () => {
-  // Restore view from sessionStorage to persist on reload - instant view
-  const getInitialView = () => {
-    try {
-      const savedSession = sessionStorage.getItem('driplove_user_session');
-      if (savedSession === 'authenticated') {
-        return 'app' as const;
-      }
-      const savedView = sessionStorage.getItem('driplove_current_view');
-      if (savedView === 'register' || savedView === 'profile-completion') {
-        return savedView as 'register' | 'profile-completion';
-      }
-    } catch {}
-    return 'welcome' as const;
-  };
-  
-  // Check if we have a cached authenticated session - if so, don't show anything until validated
-  const hasCachedSession = () => {
-    try {
-      return sessionStorage.getItem('driplove_user_session') === 'authenticated';
-    } catch {
-      return false;
-    }
-  };
-  
-  const initialView = getInitialView();
-  const cachedAuth = hasCachedSession();
-  const [currentView, setCurrentView] = useState<'welcome' | 'login' | 'register' | 'profile-completion' | 'terms-acceptance' | 'app' | 'admin' | 'about' | 'terms' | 'privacy'>(initialView);
-  const [user, setUser] = useState<any>(null);
-  // CRITICAL FIX: If we have a cached session, show nothing until auth is validated (prevents welcome flash)
-  const [loading, setLoading] = useState(cachedAuth);
+const Index = ({
+  user,
+  isAuthenticated,
+}: {
+  user: any | null;
+  isAuthenticated: boolean;
+}) => {
+  const [currentView, setCurrentView] = useState<'welcome' | 'login' | 'register' | 'profile-completion' | 'terms-acceptance' | 'app' | 'admin' | 'about' | 'terms' | 'privacy'>(
+    isAuthenticated ? 'app' : 'welcome'
+  );
+  const [loading, setLoading] = useState(false);
   const [showAuthDialog, setShowAuthDialog] = useState(false);
   const [isLoginMode, setIsLoginMode] = useState(true);
-  const [authInitialized, setAuthInitialized] = useState(false);
   const { toast } = useToast();
+  const didRouteRef = React.useRef(false);
 
-  // Save view to sessionStorage when it changes
-  React.useEffect(() => {
-    try {
-      // Save views that need to be restored/checked
-      if (currentView === 'register' || currentView === 'profile-completion' || currentView === 'terms-acceptance') {
-        sessionStorage.setItem('driplove_current_view', currentView);
-      } else {
-        sessionStorage.removeItem('driplove_current_view');
-      }
-      // Persist authenticated state - includes terms-acceptance since user is logged in
-      if (currentView === 'app' || currentView === 'admin' || currentView === 'terms-acceptance') {
-        sessionStorage.setItem('driplove_user_session', 'authenticated');
-      } else if (currentView === 'welcome' || currentView === 'login') {
-        sessionStorage.removeItem('driplove_user_session');
-      }
-    } catch {}
-  }, [currentView]);
+  const setViewIfChanged = (nextView: typeof currentView) => {
+    setCurrentView((prev) => (prev === nextView ? prev : nextView));
+  };
 
+  // React to global auth state (single source of truth lives in AppWrapper)
   useEffect(() => {
-    // Prevent re-initialization
-    if (authInitialized) return;
-    
-    // Check for existing session
-    supabase.auth.getSession().then(({ data: { session }, error }) => {
-      if (error) {
-        // Session error - clear session storage and show welcome
-        sessionStorage.removeItem('driplove_user_session');
-        setLoading(false);
-        setCurrentView('welcome');
-        setAuthInitialized(true);
-        return;
-      }
-      
-      if (session?.user) {
-        // Check if email is confirmed before proceeding
-        if (!session.user.email_confirmed_at) {
-          setLoading(false);
-          setCurrentView('welcome');
-          setAuthInitialized(true);
-          return;
-        }
-        
-        setUser(session.user);
-        checkUserTypeAndRedirect(session.user.id);
-        setAuthInitialized(true);
-      } else {
-        // No session - clear any saved session state and show welcome
-        sessionStorage.removeItem('driplove_user_session');
-        setCurrentView('welcome');
-        setLoading(false);
-        setAuthInitialized(true);
-      }
-    }).catch(() => {
-      // Handle any errors by showing welcome screen
-      sessionStorage.removeItem('driplove_user_session');
+    if (!isAuthenticated || !user) {
       setLoading(false);
-      setCurrentView('welcome');
-      setAuthInitialized(true);
-    });
+      setViewIfChanged('welcome');
+      didRouteRef.current = false;
+      return;
+    }
 
-    // Listen for auth changes (but only respond to actual sign in/out events)
-    const {
-      data: { subscription },
-    } = supabase.auth.onAuthStateChange(async (_event, session) => {
-      // Skip initial session event - we handle that above
-      if (_event === 'INITIAL_SESSION') return;
-      
-      if (session?.user) {
-        // Check if email is confirmed before proceeding
-        if (!session.user.email_confirmed_at) {
-          setUser(null);
-          setCurrentView('login');
-          setLoading(false);
-          return;
-        }
-        
-        // Track last login - update profile with login timestamp (non-blocking)
-        if (_event === 'SIGNED_IN') {
-          // Preload pricing config in background
-          preloadPricingConfig(session.user.id);
-          
-          (async () => {
-            try {
-              const { data: profileData } = await supabase
-                .from('profiles')
-                .select('login_count')
-                .eq('id', session.user.id)
-                .maybeSingle();
-              
-              if (profileData) {
-                const currentCount = profileData.login_count || 0;
-                await supabase
-                  .from('profiles')
-                  .update({ 
-                    last_login_at: new Date().toISOString(),
-                    login_count: currentCount + 1
-                  })
-                  .eq('id', session.user.id);
-              }
-            } catch {}
-          })();
-        }
-        
-        // Set user immediately
-        setUser(session.user);
-        
-        // Skip redirect if already on terms-acceptance or app view (user is in flow)
-        // This prevents interrupting registration/terms flow
-        const currentViewNow = sessionStorage.getItem('driplove_current_view');
-        if (currentViewNow === 'terms-acceptance' || 
-            sessionStorage.getItem('driplove_user_session') === 'authenticated') {
-          setLoading(false);
-          return;
-        }
-        
-        checkUserTypeAndRedirect(session.user.id);
-      } else if (_event === 'SIGNED_OUT') {
-        // Only clear on explicit sign out, not on every state change
-        setUser(null);
-        sessionStorage.removeItem('driplove_user_session');
-        setCurrentView('welcome');
-        setLoading(false);
-      }
-    });
-    
-    return () => subscription.unsubscribe();
-  }, []);
+    if (didRouteRef.current) return;
+    didRouteRef.current = true;
+
+    // If user is authenticated, run app-specific profile routing
+    setLoading(true);
+    preloadPricingConfig(user.id);
+    checkUserTypeAndRedirect(user.id);
+  }, [isAuthenticated, user?.id]);
 
   const checkUserTypeAndRedirect = async (userId: string) => {
     try {
@@ -212,21 +86,19 @@ const Index = () => {
         
         // If no profile found, check if OAuth user needs profile completion
         if (!profile) {
-          // Get auth user info to check provider
-          const { data: { user: authUser } } = await supabase.auth.getUser();
-          const provider = authUser?.app_metadata?.provider;
+          const provider = user?.app_metadata?.provider;
           const isOAuthUser = provider === 'google' || provider === 'apple';
           
           if (isOAuthUser) {
             setLoading(false);
-            setCurrentView('profile-completion');
+            setViewIfChanged('profile-completion');
             return;
           }
           
           // Non-OAuth users need to register
           await supabase.auth.signOut();
           setLoading(false);
-          setCurrentView('register');
+          setViewIfChanged('register');
           return;
         }
       }
@@ -239,7 +111,7 @@ const Index = () => {
           description: "Your account has been blocked. Please contact support.",
           variant: "destructive",
         });
-        setCurrentView('welcome');
+        setViewIfChanged('welcome');
         setLoading(false);
         return;
       }
@@ -251,7 +123,7 @@ const Index = () => {
           description: "Your account is currently on hold. Please contact support.",
           variant: "destructive",
         });
-        setCurrentView('welcome');
+        setViewIfChanged('welcome');
         setLoading(false);
         return;
       }
@@ -263,36 +135,39 @@ const Index = () => {
       const isIncomplete = requiredFields.some(field => !profile[field]);
 
       // Check if this is an OAuth user by looking at the auth provider
-      const { data: { user } } = await supabase.auth.getUser();
       const provider = user?.app_metadata?.provider;
       const isOAuthUser = provider === 'google' || provider === 'apple';
 
       // For OAuth users with incomplete profiles, redirect to profile completion
       // ProfileCompletionPage will handle showing terms acceptance after completion
       if (isIncomplete && isOAuthUser) {
-        setCurrentView('profile-completion');
+        setViewIfChanged('profile-completion');
         setLoading(false);
         return;
       }
 
       // For complete profiles, check if user has accepted terms
       if (!profile.terms_accepted) {
-        setCurrentView('terms-acceptance');
+        setViewIfChanged('terms-acceptance');
         setLoading(false);
         return;
       }
 
       // Redirect based on user type
       if (profile?.is_admin) {
-        setCurrentView('admin');
+        setViewIfChanged('admin');
       } else {
-        setCurrentView('app');
+        setViewIfChanged('app');
       }
     } catch (error) {
       console.error('Error checking user type:', error);
-      // On error, sign out and redirect to welcome
-      await supabase.auth.signOut();
-      setCurrentView('welcome');
+      // If we're authenticated but offline / profile fetch fails, do NOT force logout.
+      // Keep the user in the app to avoid the "logged out" flash/offline-stuck behavior.
+      if (isAuthenticated) {
+        setViewIfChanged('app');
+      } else {
+        setViewIfChanged('welcome');
+      }
     } finally {
       setLoading(false);
     }
@@ -353,18 +228,13 @@ const Index = () => {
   const handleRegister = async (formData: any) => {
     // Registration passes user directly - use it immediately
     if (formData?.user) {
-      setUser(formData.user);
       setCurrentView('terms-acceptance');
       return;
     }
     
-    // Fallback: get user from auth if not passed
-    if (formData?.email) {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (user) {
-        setUser(user);
-        setCurrentView('terms-acceptance');
-      }
+    // Fallback: if auth is already established, proceed
+    if (isAuthenticated && user) {
+      setCurrentView('terms-acceptance');
     }
   };
 
@@ -376,7 +246,6 @@ const Index = () => {
   const handleProfileCancel = async () => {
     // Sign out the user if they cancel profile completion
     await supabase.auth.signOut();
-    setUser(null);
     setCurrentView('welcome');
   };
 
@@ -388,31 +257,15 @@ const Index = () => {
     }
     
     await supabase.auth.signOut();
-    setUser(null);
     setCurrentView('welcome');
   };
 
   const handleTermsAccept = () => {
-    // ANDROID FIX: Ensure session storage is updated before state change
-    sessionStorage.setItem('driplove_user_session', 'authenticated');
-    sessionStorage.removeItem('driplove_current_view');
-    
     // Update view
     setCurrentView('app');
-    
-    // ANDROID FIX: Force a hard reload after brief delay if view doesn't update
-    // This ensures Android properly transitions to the main app
-    setTimeout(() => {
-      // Only reload if we're somehow stuck on terms-acceptance view
-      const currentSessionView = sessionStorage.getItem('driplove_current_view');
-      if (currentSessionView === 'terms-acceptance') {
-        window.location.reload();
-      }
-    }, 500);
   };
 
-  // CRITICAL FIX: Show nothing while validating cached session (prevents welcome screen flash)
-  if (loading && cachedAuth) {
+  if (loading) {
     return (
       <div className="w-full h-screen flex items-center justify-center bg-gradient-to-br from-purple-500 to-pink-500">
         <div className="w-12 h-12 border-4 border-white border-t-transparent rounded-full animate-spin" />

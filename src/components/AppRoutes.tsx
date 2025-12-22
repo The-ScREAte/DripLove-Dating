@@ -1,5 +1,5 @@
 import React, { Suspense, lazy } from 'react';
-import { Routes, Route } from 'react-router-dom';
+import { Routes, Route, Navigate } from 'react-router-dom';
 import { useMobileOAuth } from '@/hooks/useMobileOAuth';
 import { useNavigate } from 'react-router-dom';
 
@@ -29,7 +29,13 @@ const InfluencerSetPassword = lazy(() => import('../pages/InfluencerSetPassword'
 // Minimal fallback - just blank screen
 const PageLoader = () => null;
 
-const AppRoutes = () => {
+const AppRoutes = ({
+  user,
+  isAuthenticated,
+}: {
+  user: any | null;
+  isAuthenticated: boolean;
+}) => {
   // Initialize mobile OAuth handler inside router context
   useMobileOAuth();
   const navigate = useNavigate();
@@ -37,8 +43,15 @@ const AppRoutes = () => {
   return (
     <Suspense fallback={<PageLoader />}>
       <Routes>
-        <Route path="/" element={<Index />} />
-        <Route path="/discover" element={<DiscoverPage currentUser={null} />} />
+        <Route path="/" element={<Index user={user} isAuthenticated={isAuthenticated} />} />
+        <Route
+          path="/discover"
+          element={
+            isAuthenticated && user
+              ? <DiscoverPage currentUser={user} />
+              : <Navigate to="/" replace />
+          }
+        />
         <Route path="/face-verification" element={<FaceVerificationPage />} />
         <Route path="/payment-success" element={<PaymentSuccess />} />
         <Route path="/unsubscribe" element={<Unsubscribe />} />

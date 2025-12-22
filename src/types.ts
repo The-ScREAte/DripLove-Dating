@@ -19,6 +19,7 @@ export interface PotentialMatch {
   date_of_birth: string;
   interests: string[];
   images: string[];
+  is_verified?: boolean;
   gender: string;
   latitude?: number;
   longitude?: number;

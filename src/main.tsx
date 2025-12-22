@@ -42,6 +42,10 @@ const LoadingScreen = () => (
 // App wrapper that handles initialization
 const AppWrapper = () => {
   const [isInitialized, setIsInitialized] = React.useState(false);
+  const [authChecked, setAuthChecked] = React.useState(false);
+  const [hasSession, setHasSession] = React.useState(false);
+  const [user, setUser] = React.useState<any | null>(null);
+  const authSubscriptionRef = React.useRef<{ unsubscribe: () => void } | null>(null);
 
   // Lock body and set root heights so only the inner app scrolls. This prevents mobile browsers
   // from resizing the viewport (100vh) and causing fixed elements to float during touch/drag.
@@ -129,6 +133,27 @@ const AppWrapper = () => {
         // Show the app immediately for faster perceived performance
         setIsInitialized(true);
 
+        // Auth bootstrap MUST happen before rendering routes (prevents Welcome/Login flash)
+        try {
+          const { supabase } = await import('./integrations/supabase/client');
+          const { data: { session } } = await supabase.auth.getSession();
+          setHasSession(!!session);
+          setUser(session?.user ?? null);
+
+          // Keep session signal up-to-date
+          const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, nextSession) => {
+            setHasSession(!!nextSession);
+            setUser(nextSession?.user ?? null);
+          });
+
+          authSubscriptionRef.current = subscription;
+        } catch {
+          setHasSession(false);
+          setUser(null);
+        } finally {
+          setAuthChecked(true);
+        }
+
         // Initialize heavy operations in the background
         setTimeout(async () => {
           try {
@@ -187,17 +212,6 @@ const AppWrapper = () => {
             }
           }
 
-          // Initialize Supabase auth check (background)
-          try {
-            const { supabase } = await import('./integrations/supabase/client');
-            const { data: { user } } = await supabase.auth.getUser();
-            if (user) {
-              // Silent session handling
-            }
-          } catch (error) {
-            // Ignore auth check failures
-          }
-
           // Background initialization complete
         }, 100); // Small delay to ensure app renders first
 
@@ -208,13 +222,21 @@ const AppWrapper = () => {
     };
 
     initializeApp();
+
+    return () => {
+      const sub = authSubscriptionRef.current;
+      authSubscriptionRef.current = null;
+      if (sub && typeof sub.unsubscribe === 'function') {
+        try { sub.unsubscribe(); } catch {}
+      }
+    };
   }, []);
 
-  if (!isInitialized) {
+  if (!isInitialized || !authChecked) {
     return <LoadingScreen />;
   }
 
-  return <App />;
+  return <App user={user} isAuthenticated={hasSession} />;
 };
 
 // Store root to prevent double mount warning in development

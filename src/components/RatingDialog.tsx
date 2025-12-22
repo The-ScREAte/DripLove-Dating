@@ -3,10 +3,10 @@
  * Shows platform-specific rating interface - triggered on second match
  */
 
-import React, { useState, useEffect } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
-import { Star, X } from 'lucide-react';
+import { Star } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { 
   getRatingData, 
@@ -40,12 +40,13 @@ const RatingDialog: React.FC<RatingDialogProps> = ({
   const [hoveredRating, setHoveredRating] = useState(0);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const { toast } = useToast();
-  const platform = detectPlatform();
+  const platform = useMemo(() => detectPlatform(), []);
+  const ratingDataRef = useRef(getRatingData());
+  const isWeb = platform === 'web';
 
   useEffect(() => {
     if (show && isRatingAvailable()) {
-      const data = getRatingData();
-      if (!data.hasRated) {
+      if (!ratingDataRef.current.hasRated) {
         setIsOpen(true);
         markRatingShown();
       }
@@ -62,7 +63,7 @@ const RatingDialog: React.FC<RatingDialogProps> = ({
   };
 
   const handleRateNow = async () => {
-    if (platform === 'web' && selectedRating === 0) {
+    if (isWeb && selectedRating === 0) {
       toast({
         title: "Please select a rating",
         description: "Tap the stars to rate your experience",
@@ -76,19 +77,20 @@ const RatingDialog: React.FC<RatingDialogProps> = ({
     try {
       // For native platforms (iOS/Android), close dialog first then request review
       // This ensures the native review modal can appear on top
-      if (platform !== 'web') {
-        // Mark as rated first
-        markUserHasRated(platform);
-        
+      if (!isWeb) {
         // Close our dialog
         setIsOpen(false);
         onClose?.();
-        
-        // Small delay to ensure our dialog is fully closed before native modal appears
-        await new Promise(resolve => setTimeout(resolve, 300));
-        
-        // Now request the native review - this will show Apple/Google's native modal
-        await openRatingInterface();
+
+        // Ensure the Dialog close/unmount is committed before the native modal
+        await new Promise<void>((resolve, reject) => {
+          requestAnimationFrame(() => {
+            openRatingInterface().then(resolve).catch(reject);
+          });
+        });
+
+        // Mark as rated
+        markUserHasRated(platform);
         
         // Call callback
         if (onRatingComplete) {
@@ -152,7 +154,7 @@ const RatingDialog: React.FC<RatingDialogProps> = ({
 
         <div className="py-6">
           {/* Star Rating - Only show for web */}
-          {platform === 'web' && (
+          {isWeb && (
             <div className="flex justify-center gap-3 mb-6">
               {[1, 2, 3, 4, 5].map((star) => (
                 <button
@@ -179,13 +181,13 @@ const RatingDialog: React.FC<RatingDialogProps> = ({
           <div>
             <Button
               onClick={handleRateNow}
-              disabled={isSubmitting || (platform === 'web' && selectedRating === 0)}
+              disabled={isSubmitting || (isWeb && selectedRating === 0)}
               className="w-full bg-pink-600 hover:bg-pink-700 text-white font-medium py-5"
             >
               {isSubmitting ? (
                 'Please wait...'
               ) : (
-                platform === 'web' ? 'Submit Rating' : 'Rate Now'
+                isWeb ? 'Submit Rating' : 'Rate Now'
               )}
             </Button>
           </div>

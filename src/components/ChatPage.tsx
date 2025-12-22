@@ -2,7 +2,7 @@ import React, { useState, useEffect, useLayoutEffect, useRef } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import { usePushNotifications } from '@/hooks/usePushNotifications';
-import { requestNotificationPermission, sendPushNotification } from '@/services/pushNotifications';
+import { requestNotificationPermission } from '@/services/pushNotifications';
 // ⭐ ANDROID FIX: Use platform utils instead of synchronous Capacitor import
 import { isAndroidPlatform, isIOSPlatform, getPlatformSync } from '@/utils/platformUtils';
 import { useVirtualizer } from '@tanstack/react-virtual';
@@ -47,12 +47,20 @@ const CACHE_DURATION = 30000; // 30 seconds - keep matches fresh
 
 // Global cache for individual chat messages - NEVER expire, only update
 const chatMessagesCache = new Map<string, { messages: ChatMessage[], timestamp: number }>();
-const MESSAGE_CACHE_DURATION = Infinity; // Never expire - always show cached messages instantly
+const MESSAGE_CACHE_DURATION = Infinity; // Never expire - always show cached messages instantly (capped by MAX_CACHED_MESSAGES)
+
+// Hard cap to prevent WebView/Android memory blowups
+const MAX_CACHED_MESSAGES = 500;
+
+const trimCachedMessages = (messages: ChatMessage[]) => {
+  if (messages.length <= MAX_CACHED_MESSAGES) return messages;
+  return messages.slice(messages.length - MAX_CACHED_MESSAGES);
+};
 
 // Make caches globally accessible for preloading
 if (typeof window !== 'undefined') {
   (window as any).chatMatchesCache = chatMatchesCache;
-  (window as any).chatMessagesCache = chatMessagesCache;
+  (window as any).chatMessagesCache = chatMessagesCache; 
 }
 
 const ChatPage = ({ currentUser, onUnreadChange, onDetailViewChange }: ChatPageProps) => {
@@ -93,9 +101,28 @@ const ChatPage = ({ currentUser, onUnreadChange, onDetailViewChange }: ChatPageP
 
   // Ensure virtual row heights are up-to-date for variable-height messages (e.g. replies).
   // Some WebViews can be inconsistent with ResizeObserver timing; forcing a measure here prevents overlap.
+  const lastMeasuredMessageCountRef = useRef<number>(0);
+
   useLayoutEffect(() => {
-    rowVirtualizer.measure();
+    if (messages.length !== lastMeasuredMessageCountRef.current) {
+      rowVirtualizer.measure();
+      lastMeasuredMessageCountRef.current = messages.length;
+    }
   }, [rowVirtualizer, messages.length]);
+
+  // Centralized debounced fetchMatches scheduler (prevents realtime burst storms)
+  const fetchMatchesDebounceTimerRef = useRef<number | null>(null);
+
+  const scheduleFetchMatches = () => {
+    if (!currentUser?.id) return;
+    if (fetchMatchesDebounceTimerRef.current) {
+      window.clearTimeout(fetchMatchesDebounceTimerRef.current);
+    }
+    fetchMatchesDebounceTimerRef.current = window.setTimeout(() => {
+      fetchMatchesDebounceTimerRef.current = null;
+      void fetchMatches();
+    }, 300);
+  };
   const backgroundFetchingRef = useRef(false);
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [pullDistance, setPullDistance] = useState(0);
@@ -160,13 +187,6 @@ const ChatPage = ({ currentUser, onUnreadChange, onDetailViewChange }: ChatPageP
       // No cache or stale cache, fetch immediately
       fetchMatches();
     }
-    
-    // Force cleanup of expired matches on mount
-    setTimeout(() => {
-      if (currentUser?.id && chatCache.chats.length > 0) {
-        checkExpiredMatches(chatCache.chats as any);
-      }
-    }, 1000);
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [currentUser]);
 
@@ -200,102 +220,50 @@ const ChatPage = ({ currentUser, onUnreadChange, onDetailViewChange }: ChatPageP
     matchesRef.current = matches;
   }, [matches]);
 
-  // Real-time subscription for matches table
+  // Real-time subscription for matches table (filtered to current user)
   useEffect(() => {
     if (!currentUser || !currentUser.id) return;
-    
-    const channel = supabase
-      .channel('chat-matches')
+
+    const handleMatchesChange = () => {
+      scheduleFetchMatches();
+      onUnreadChange?.();
+    };
+
+    // Supabase realtime filters only support a single condition, so subscribe twice.
+    const channelUser1 = supabase
+      .channel('chat-matches-user1')
       .on(
         'postgres_changes',
         {
           event: '*',
           schema: 'public',
           table: 'matches',
+          filter: `user1_id=eq.${currentUser.id}`,
         },
-        (payload) => {
-            // ⭐ Update cache and refresh immediately for instant updates
-            fetchMatches();
-            // Update unread count badge in tab bar
-            onUnreadChange?.();
-          }
+        handleMatchesChange
       )
+      .subscribe();
+
+    const channelUser2 = supabase
+      .channel('chat-matches-user2')
       .on(
         'postgres_changes',
         {
-          event: 'INSERT',
+          event: '*',
           schema: 'public',
-          table: 'chats',
+          table: 'matches',
+          filter: `user2_id=eq.${currentUser.id}`,
         },
-        (payload) => {
-          const newMsg = payload.new as ChatMessage;
-          
-          // INSTANT UPDATE: Update specific match in the list immediately
-          if (newMsg.match_id) {
-            setMatches(prev => {
-              const updated = prev.map(match => {
-                if (match.id === newMsg.match_id) {
-                  // Increment unread count if we're NOT the sender and NOT viewing this chat
-                  const shouldIncrementUnread = newMsg.sender_id !== currentUser.id && selectedMatch?.id !== newMsg.match_id;
-                  
-                  return {
-                    ...match,
-                    last_message: newMsg.message,
-                    last_message_time: newMsg.created_at,
-                    unread_messages: shouldIncrementUnread ? (match.unread_messages || 0) + 1 : (match.unread_messages || 0),
-                  };
-                }
-                return match;
-              });
-              
-              // Re-sort by most recent message
-              const sorted = updated.sort((a, b) => {
-                const aTime = new Date(a.last_message_time || a.created_at).getTime();
-                const bTime = new Date(b.last_message_time || b.created_at).getTime();
-                return bTime - aTime;
-              });
-              
-              // ⭐ Update global cache with new data
-              updateChatCache(sorted as any);
-              
-              return sorted;
-            });
-          }
-          
-          // Also trigger unread count update
-          onUnreadChange?.();
-        }
-      )
-      .on(
-        'postgres_changes',
-        {
-          event: 'UPDATE',
-          schema: 'public',
-          table: 'chats',
-        },
-        (payload) => {
-          // When a message is updated (deleted_for, etc), refresh match list
-          fetchMatches();
-        }
-      )
-      .on(
-        'postgres_changes',
-        {
-          event: 'DELETE',
-          schema: 'public',
-          table: 'chats',
-        },
-        (payload) => {
-          // When a message is deleted, refresh match list
-          fetchMatches();
-        }
+        handleMatchesChange
       )
       .subscribe();
 
     return () => {
-      supabase.removeChannel(channel);
+      supabase.removeChannel(channelUser1);
+      supabase.removeChannel(channelUser2);
     };
-  }, [currentUser?.id]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [currentUser?.id, onUnreadChange]);
 
   // ⭐ ANDROID OPTIMIZATION: Reduced polling frequency (5s instead of 2s)
   // Real-time subscription handles instant updates, polling is just a fallback
@@ -396,43 +364,11 @@ const ChatPage = ({ currentUser, onUnreadChange, onDetailViewChange }: ChatPageP
       // Refresh the matches list when there were changes while inside the conversation
       // OR when we're returning to the chat list view
       if (matchesNeedsRefreshRef.current) {
-        void fetchMatches();
+        scheduleFetchMatches();
       }
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selectedMatch]);
-
-  // Fallback: periodically refresh read flags for recent messages to ensure double-check appears
-  useEffect(() => {
-    if (!selectedMatch || !currentUser?.id) return;
-    
-    // Poll for read status updates every 2 seconds when we have unread sent messages
-    const hasUnreadSent = messages.some(m => m.sender_id === currentUser.id && !m.is_read);
-    
-    if (hasUnreadSent) {
-      const interval = setInterval(async () => {
-        try {
-          const { data, error } = await supabase
-            .from('chats')
-            .select('id, is_read')
-            .eq('match_id', selectedMatch.id)
-            .eq('sender_id', currentUser.id);
-          
-          if (!error && Array.isArray(data)) {
-            // Update only the is_read flag for matching messages
-            setMessages(prev => prev.map(msg => {
-              const updated = data.find(d => d.id === msg.id);
-              return updated ? { ...msg, is_read: updated.is_read } : msg;
-            }));
-          }
-        } catch (e) {
-          // Silently handle polling errors
-        }
-      }, 2000);
-      
-      return () => clearInterval(interval);
-    }
-  }, [messages, selectedMatch, currentUser?.id]);
 
   // ⭐ ANDROID OPTIMIZATION: Reduced message polling (3s instead of 1s)
   // Real-time subscription handles instant updates, polling is just a fallback
@@ -476,26 +412,24 @@ const ChatPage = ({ currentUser, onUnreadChange, onDetailViewChange }: ChatPageP
     }
   }, [messages]);
 
-  // Dismiss keyboard on scroll (like iMessages) - mobile only
+  // Single scroll listener: bottom tracking (all platforms) + keyboard dismiss (mobile)
   useEffect(() => {
+    const container = messagesContainerRef.current;
+    if (!container) return;
+
     const isMobile = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
-    if (!isMobile || !messagesContainerRef.current) return;
+    let lastScrollTop = container.scrollTop;
+    let scrollTimeout: NodeJS.Timeout | null = null;
 
-    let lastScrollTop = 0;
-    let scrollTimeout: NodeJS.Timeout;
-
-    const handleScroll = (e: Event) => {
-      const target = e.target as HTMLElement;
-      const currentScrollTop = target.scrollTop;
-
-      // Track whether user is near bottom to control auto-scroll behavior
-      const threshold = 24; // px from bottom considered "at bottom"
-      const distanceFromBottom = target.scrollHeight - (target.scrollTop + target.clientHeight);
+    const handleScroll = () => {
+      const threshold = 24;
+      const currentScrollTop = container.scrollTop;
+      const distanceFromBottom = container.scrollHeight - (container.scrollTop + container.clientHeight);
       isAtBottomRef.current = distanceFromBottom <= threshold;
 
       // Only dismiss keyboard when scrolling up (like iMessages)
-      if (currentScrollTop < lastScrollTop) {
-        clearTimeout(scrollTimeout);
+      if (isMobile && currentScrollTop < lastScrollTop) {
+        if (scrollTimeout) clearTimeout(scrollTimeout);
         scrollTimeout = setTimeout(() => {
           const activeElement = document.activeElement as HTMLElement;
           if (activeElement && (activeElement.tagName === 'INPUT' || activeElement.tagName === 'TEXTAREA')) {
@@ -507,34 +441,14 @@ const ChatPage = ({ currentUser, onUnreadChange, onDetailViewChange }: ChatPageP
       lastScrollTop = currentScrollTop;
     };
 
-    const container = messagesContainerRef.current;
-    container.addEventListener('scroll', handleScroll);
-
-    return () => {
-      container.removeEventListener('scroll', handleScroll);
-      clearTimeout(scrollTimeout);
-    };
-  }, [selectedMatch]);
-
-  // Track bottom position on all platforms (desktop/web too)
-  useEffect(() => {
-    const container = messagesContainerRef.current;
-    if (!container) return;
-
-    const handleScroll = () => {
-      const threshold = 24;
-      const distanceFromBottom = container.scrollHeight - (container.scrollTop + container.clientHeight);
-      isAtBottomRef.current = distanceFromBottom <= threshold;
-    };
-
     container.addEventListener('scroll', handleScroll, { passive: true });
-    // Initialize once attached
     handleScroll();
 
     return () => {
       container.removeEventListener('scroll', handleScroll);
+      if (scrollTimeout) clearTimeout(scrollTimeout);
     };
-  }, [messagesContainerRef.current]);
+  }, [selectedMatch]);
 
   useEffect(() => {
     if (!currentUser || !currentUser.id) return;
@@ -583,7 +497,7 @@ const ChatPage = ({ currentUser, onUnreadChange, onDetailViewChange }: ChatPageP
                   return !(m.message === newMsg.message && m.sender_id === newMsg.sender_id);
                 });
                 
-                const updated = [...withoutTemp, newMsg];
+                const updated = trimCachedMessages([...withoutTemp, newMsg]);
                 // Update cache with new message
                 chatMessagesCache.set(selectedMatch.id, {
                   messages: updated,
@@ -613,29 +527,16 @@ const ChatPage = ({ currentUser, onUnreadChange, onDetailViewChange }: ChatPageP
           },
           (payload) => {
             const updatedMsg = payload.new as ChatMessage;
-            
-            // Always update the message in the cache (store full data)
-            const cachedData = chatMessagesCache.get(selectedMatch.id);
-            if (cachedData) {
-              const updatedCacheMessages = cachedData.messages.map(m =>
-                m.id === updatedMsg.id ? { ...m, ...updatedMsg } : m
+
+            // Update the specific message in state (single state update; prevents double renders)
+            setMessages((prev) => {
+              const updated = trimCachedMessages(
+                prev.map(m => (m.id === updatedMsg.id ? { ...m, ...updatedMsg } : m))
               );
               chatMessagesCache.set(selectedMatch.id, {
-                messages: updatedCacheMessages,
+                messages: updated,
                 timestamp: Date.now()
               });
-            }
-            
-            // Update message even if deleted - it will show as "deleted"
-            setMessages((prev) => 
-              prev.map(m => m.id === updatedMsg.id ? { ...m, ...updatedMsg } : m)
-            );
-            
-            // Update the specific message in state
-            setMessages((prev) => {
-              const updated = prev.map(m => 
-                m.id === updatedMsg.id ? { ...m, ...updatedMsg } : m
-              );
               return updated;
             });
           }
@@ -654,12 +555,13 @@ const ChatPage = ({ currentUser, onUnreadChange, onDetailViewChange }: ChatPageP
             // Remove the message from state
             setMessages((prev) => {
               const updated = prev.filter(m => m.id !== deletedMsg.id);
+              const trimmed = trimCachedMessages(updated);
               // Update cache
               chatMessagesCache.set(selectedMatch.id, {
-                messages: updated,
+                messages: trimmed,
                 timestamp: Date.now()
               });
-              return updated;
+              return trimmed;
             });
           }
         )
@@ -732,12 +634,15 @@ const ChatPage = ({ currentUser, onUnreadChange, onDetailViewChange }: ChatPageP
         return match;
       });
       
-      // Re-sort by most recent message
-      const sorted = updated.sort((a, b) => {
-        const aTime = new Date(a.last_message_time || a.created_at).getTime();
-        const bTime = new Date(b.last_message_time || b.created_at).getTime();
-        return bTime - aTime;
-      });
+      // Re-sort by most recent message only if this match isn't already at the top
+      let sorted = updated;
+      if (sorted.length > 1 && sorted[0]?.id !== matchId) {
+        sorted = sorted.sort((a, b) => {
+          const aTime = new Date(a.last_message_time || a.created_at).getTime();
+          const bTime = new Date(b.last_message_time || b.created_at).getTime();
+          return bTime - aTime;
+        });
+      }
       
       // Update cache with optimistic data
       chatMatchesCache.set(currentUser.id, {
@@ -822,9 +727,6 @@ const ChatPage = ({ currentUser, onUnreadChange, onDetailViewChange }: ChatPageP
       setMatches(processedMatches);
       // Clear the refresh flag when we've just fetched
       matchesNeedsRefreshRef.current = false;
-      
-      // Check for expired matches and send notifications
-      checkExpiredMatches(processedMatches);
     } catch (error) {
       toast({
         title: 'Error',
@@ -836,66 +738,6 @@ const ChatPage = ({ currentUser, onUnreadChange, onDetailViewChange }: ChatPageP
       if (showLoading) {
         setIsRefreshing(false);
         setPullDistance(0);
-      }
-    }
-  };
-
-  // Check for expired matches and handle dissolution/notifications
-  const checkExpiredMatches = async (matchesList: ChatMatch[]) => {
-    if (!currentUser || !currentUser.id) return;
-
-    const EXPIRATION_DAYS = 10;
-    const WARNING_DAYS = 9; // Send notification after 9 days (1 day before expiration)
-    const MS_PER_DAY = 24 * 60 * 60 * 1000;
-    const now = new Date();
-    
-    const expiredMatchIds: string[] = [];
-
-    for (const match of matchesList) {
-      const hasMessages = !!match.last_message;
-      if (hasMessages) continue; // Skip matches with messages
-
-      const matchCreated = new Date(match.created_at);
-      const daysSinceMatch = (now.getTime() - matchCreated.getTime()) / MS_PER_DAY;
-
-      // Dissolve match if 10 days have passed
-      if (daysSinceMatch >= EXPIRATION_DAYS) {
-        expiredMatchIds.push(match.id);
-      }
-      // Send warning notification if 9 days have passed
-      else if (daysSinceMatch >= WARNING_DAYS && daysSinceMatch < WARNING_DAYS + 0.1) {
-        const partnerId = match.user1_id === currentUser.id ? match.user2_id : match.user1_id;
-        const partnerName = match.first_name;
-        
-        try {
-          // Send notification via push notification service
-          await sendPushNotification({
-            title: t('chat.matchExpiringTitle'),
-            body: t('chat.matchExpiringBody', { name: partnerName }),
-            userId: currentUser.id,
-            type: 'match',
-            data: { matchId: match.id, partnerId }
-          });
-
-        } catch (error) {
-        }
-      }
-    }
-    
-    // Delete all expired matches in one batch
-    if (expiredMatchIds.length > 0) {
-      try {
-        const { error } = await supabase
-          .from('matches')
-          .delete()
-          .in('id', expiredMatchIds);
-
-        if (!error) {
-          // Clear cache so next fetch gets fresh data without expired matches
-          chatMatchesCache.delete(currentUser.id);
-        } else {
-        }
-      } catch (error) {
       }
     }
   };
@@ -952,9 +794,9 @@ const ChatPage = ({ currentUser, onUnreadChange, onDetailViewChange }: ChatPageP
       const visibleMessages = processedMessages;
       
       
-      // Update cache with all messages
+      // Update cache with all messages (bounded)
       chatMessagesCache.set(selectedMatch.id, {
-        messages: processedMessages,
+        messages: trimCachedMessages(processedMessages),
         timestamp: Date.now()
       });
 
@@ -997,9 +839,9 @@ const ChatPage = ({ currentUser, onUnreadChange, onDetailViewChange }: ChatPageP
       const newMessages = mappedMessages as unknown as ChatMessage[];
       
       // Merge new messages with cached messages
-      const allMessages = cached 
-        ? [...cached.messages, ...newMessages]
-        : newMessages;
+      const allMessages = trimCachedMessages(
+        cached ? [...cached.messages, ...newMessages] : newMessages
+      );
       
       // Update cache with merged messages
       chatMessagesCache.set(matchId, {
@@ -1030,28 +872,6 @@ const ChatPage = ({ currentUser, onUnreadChange, onDetailViewChange }: ChatPageP
     if (!selectedMatch) return;
 
     try {
-      // Try to check if unread fields exist in matches table
-      const { data: schemaCheck } = await supabase
-        .from('matches')
-        .select('id')
-        .limit(1)
-        .single();
-
-      if (schemaCheck) {
-        // Try updating unread count with proper error handling
-        try {
-          const isUser1 = selectedMatch.user1_id === currentUser.id;
-          const unreadField = isUser1 ? 'user1_unread_count' : 'user2_unread_count';
-          const updateData = { [unreadField]: 0 };
-          await supabase
-            .from('matches')
-            .update(updateData)
-            .eq('id', selectedMatch.id);
-        } catch (unreadError) {
-          // Silently handle if unread fields don't exist
-        }
-      }
-
       // Try to update chat messages as read with proper error handling
       try {
         const { error } = await supabase
@@ -1144,7 +964,7 @@ const ChatPage = ({ currentUser, onUnreadChange, onDetailViewChange }: ChatPageP
 
     // Add to messages immediately
     setMessages(prev => {
-      const updated = [...prev, optimisticMessage];
+      const updated = trimCachedMessages([...prev, optimisticMessage]);
       // Update cache
       chatMessagesCache.set(selectedMatch.id, {
         messages: updated,
@@ -1219,13 +1039,14 @@ const ChatPage = ({ currentUser, onUnreadChange, onDetailViewChange }: ChatPageP
                 seen.add(m.id);
               }
             }
-            chatMessagesCache.set(selectedMatch.id, { messages: unique, timestamp: Date.now() });
-            return unique;
+            const trimmed = trimCachedMessages(unique);
+            chatMessagesCache.set(selectedMatch.id, { messages: trimmed, timestamp: Date.now() });
+            return trimmed;
           }
 
           // If temp doesn't exist and server message not present, append server message
           if (!hasServer) {
-            const updated = [...prev, serverMsg];
+            const updated = trimCachedMessages([...prev, serverMsg]);
             chatMessagesCache.set(selectedMatch.id, { messages: updated, timestamp: Date.now() });
             return updated;
           }
@@ -1237,7 +1058,7 @@ const ChatPage = ({ currentUser, onUnreadChange, onDetailViewChange }: ChatPageP
     } catch (error) {
       // Remove optimistic message on error
       setMessages(prev => {
-        const updated = prev.filter(msg => msg.id !== tempId);
+        const updated = trimCachedMessages(prev.filter(msg => msg.id !== tempId));
         chatMessagesCache.set(selectedMatch.id, {
           messages: updated,
           timestamp: Date.now()
@@ -1254,7 +1075,7 @@ const ChatPage = ({ currentUser, onUnreadChange, onDetailViewChange }: ChatPageP
       return;
     }
 
-    // Send push notification and update unread count (non-blocking)
+    // Send push notification (non-blocking)
     // These operations should not block message sending or show errors to user
     (async () => {
       try {
@@ -1269,33 +1090,6 @@ const ChatPage = ({ currentUser, onUnreadChange, onDetailViewChange }: ChatPageP
         try {
           const result = await sendMessageNotification(senderName, messageText, recipientId, selectedMatch.id);
         } catch (notificationError) {
-        }
-
-        // Try to update unread count (only if field exists)
-        try {
-          const isUser1 = selectedMatch.user1_id === currentUser.id;
-          const unreadField = isUser1 ? 'user2_unread_count' : 'user1_unread_count';
-          
-          // Get current unread count for the other user
-          const { data: matchData, error: matchError } = await supabase
-            .from('matches')
-            .select(unreadField)
-            .eq('id', selectedMatch.id)
-            .single();
-          
-          let newCount = 1;
-          if (!matchError && matchData && typeof matchData[unreadField] === 'number') {
-            newCount = matchData[unreadField] + 1;
-          }
-          
-          const updateData = { [unreadField]: newCount };
-          await supabase
-            .from('matches')
-            .update(updateData)
-            .eq('id', selectedMatch.id);
-          
-        } catch (unreadError) {
-          // Silently handle if unread fields don't exist
         }
 
         onUnreadChange?.();
@@ -1394,9 +1188,9 @@ const ChatPage = ({ currentUser, onUnreadChange, onDetailViewChange }: ChatPageP
         // Update cache
         const cachedData = chatMessagesCache.get(selectedMatch.id);
         if (cachedData) {
-          const updatedMessages = cachedData.messages.map(m =>
+          const updatedMessages = trimCachedMessages(cachedData.messages.map(m =>
             m.id === messageId ? { ...m, deleted_for: deletedFor } : m
-          );
+          ));
           chatMessagesCache.set(selectedMatch.id, {
             messages: updatedMessages,
             timestamp: Date.now()
@@ -1764,7 +1558,7 @@ const ChatPage = ({ currentUser, onUnreadChange, onDetailViewChange }: ChatPageP
 
   {/* Scrollable Chat List (only this area scrolls) */}
   <div
-    className="flex-1 overflow-y-auto pb-35"
+    className="flex-1 overflow-y-auto pb-44 sm:pb-35"
     style={{ 
       WebkitOverflowScrolling: 'touch',
       paddingTop: getPlatformSync() === 'android' ? '0px' : (newMatchList.length > 0 ? '0px' : '54px')
