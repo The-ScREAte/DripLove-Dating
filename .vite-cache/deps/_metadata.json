@@ -2,411 +2,417 @@
   "hash": "6b2cb4a1",
   "configHash": "e0741d08",
   "lockfileHash": "d5384f93",
-  "browserHash": "c14bad47",
+  "browserHash": "581bcafd",
   "optimized": {
     "react-router-dom": {
       "src": "../../node_modules/react-router-dom/dist/index.mjs",
       "file": "react-router-dom.js",
-      "fileHash": "115cb3f0",
+      "fileHash": "a8b6691b",
       "needsInterop": false
     },
     "@supabase/supabase-js": {
       "src": "../../node_modules/@supabase/supabase-js/dist/module/index.js",
       "file": "@supabase_supabase-js.js",
-      "fileHash": "294364b1",
+      "fileHash": "666667f3",
       "needsInterop": false
     },
     "lucide-react": {
       "src": "../../node_modules/lucide-react/dist/esm/lucide-react.js",
       "file": "lucide-react.js",
-      "fileHash": "24bedb69",
+      "fileHash": "69f8cf83",
       "needsInterop": false
     },
     "@tanstack/react-query": {
       "src": "../../node_modules/@tanstack/react-query/build/modern/index.js",
       "file": "@tanstack_react-query.js",
-      "fileHash": "e6740b34",
+      "fileHash": "579a171b",
       "needsInterop": false
     },
     "class-variance-authority": {
       "src": "../../node_modules/class-variance-authority/dist/index.mjs",
       "file": "class-variance-authority.js",
-      "fileHash": "b2b2b5c2",
+      "fileHash": "5d5bfba5",
       "needsInterop": false
     },
     "clsx": {
       "src": "../../node_modules/clsx/dist/clsx.mjs",
       "file": "clsx.js",
-      "fileHash": "db2ef881",
+      "fileHash": "c3908d93",
       "needsInterop": false
     },
     "tailwind-merge": {
       "src": "../../node_modules/tailwind-merge/dist/bundle-mjs.mjs",
       "file": "tailwind-merge.js",
-      "fileHash": "d4e5d352",
+      "fileHash": "ed423c83",
       "needsInterop": false
     },
     "sonner": {
       "src": "../../node_modules/sonner/dist/index.mjs",
       "file": "sonner.js",
-      "fileHash": "d3570f68",
+      "fileHash": "c4f65076",
       "needsInterop": false
     },
     "i18next": {
       "src": "../../node_modules/i18next/dist/esm/i18next.js",
       "file": "i18next.js",
-      "fileHash": "6cbe3716",
+      "fileHash": "27c0a6b4",
       "needsInterop": false
     },
     "react-i18next": {
       "src": "../../node_modules/react-i18next/dist/es/index.js",
       "file": "react-i18next.js",
-      "fileHash": "58e9a5c1",
+      "fileHash": "c67105ef",
       "needsInterop": false
     },
     "react/jsx-dev-runtime": {
       "src": "../../node_modules/react/jsx-dev-runtime.js",
       "file": "react_jsx-dev-runtime.js",
-      "fileHash": "69f3ad85",
+      "fileHash": "733d3ed5",
       "needsInterop": true
     },
     "@capacitor-community/apple-sign-in": {
       "src": "../../node_modules/@capacitor-community/apple-sign-in/dist/esm/index.js",
       "file": "@capacitor-community_apple-sign-in.js",
-      "fileHash": "5a0ee524",
+      "fileHash": "fb9ae11d",
       "needsInterop": false
     },
     "@capacitor-community/camera-preview": {
       "src": "../../node_modules/@capacitor-community/camera-preview/dist/esm/index.js",
       "file": "@capacitor-community_camera-preview.js",
-      "fileHash": "8a164bbb",
+      "fileHash": "2a2ba7b0",
       "needsInterop": false
     },
     "@capacitor-firebase/messaging": {
       "src": "../../node_modules/@capacitor-firebase/messaging/dist/esm/index.js",
       "file": "@capacitor-firebase_messaging.js",
-      "fileHash": "a6d08ae8",
+      "fileHash": "90633a1c",
       "needsInterop": false
     },
     "@capacitor/app": {
       "src": "../../node_modules/@capacitor/app/dist/esm/index.js",
       "file": "@capacitor_app.js",
-      "fileHash": "539fb337",
+      "fileHash": "79238848",
       "needsInterop": false
     },
     "@capacitor/browser": {
       "src": "../../node_modules/@capacitor/browser/dist/esm/index.js",
       "file": "@capacitor_browser.js",
-      "fileHash": "bc13a53e",
+      "fileHash": "15117f56",
       "needsInterop": false
     },
     "@capacitor/camera": {
       "src": "../../node_modules/@capacitor/camera/dist/esm/index.js",
       "file": "@capacitor_camera.js",
-      "fileHash": "6885dfc6",
+      "fileHash": "0aa72298",
       "needsInterop": false
     },
     "@capacitor/keyboard": {
       "src": "../../node_modules/@capacitor/keyboard/dist/esm/index.js",
       "file": "@capacitor_keyboard.js",
-      "fileHash": "dde19536",
+      "fileHash": "0b488932",
       "needsInterop": false
     },
     "@capacitor/push-notifications": {
       "src": "../../node_modules/@capacitor/push-notifications/dist/esm/index.js",
       "file": "@capacitor_push-notifications.js",
-      "fileHash": "5044a670",
+      "fileHash": "e951457e",
       "needsInterop": false
     },
     "@capacitor/status-bar": {
       "src": "../../node_modules/@capacitor/status-bar/dist/esm/index.js",
       "file": "@capacitor_status-bar.js",
-      "fileHash": "a99f6a3b",
+      "fileHash": "b62b69de",
       "needsInterop": false
     },
     "@radix-ui/react-alert-dialog": {
       "src": "../../node_modules/@radix-ui/react-alert-dialog/dist/index.mjs",
       "file": "@radix-ui_react-alert-dialog.js",
-      "fileHash": "3864f72e",
+      "fileHash": "1362642a",
       "needsInterop": false
     },
     "@radix-ui/react-avatar": {
       "src": "../../node_modules/@radix-ui/react-avatar/dist/index.mjs",
       "file": "@radix-ui_react-avatar.js",
-      "fileHash": "212c9b87",
+      "fileHash": "f635b741",
       "needsInterop": false
     },
     "@radix-ui/react-checkbox": {
       "src": "../../node_modules/@radix-ui/react-checkbox/dist/index.mjs",
       "file": "@radix-ui_react-checkbox.js",
-      "fileHash": "1fe073c1",
+      "fileHash": "295959bb",
       "needsInterop": false
     },
     "@radix-ui/react-dialog": {
       "src": "../../node_modules/@radix-ui/react-dialog/dist/index.mjs",
       "file": "@radix-ui_react-dialog.js",
-      "fileHash": "0cd4806d",
+      "fileHash": "291e018e",
       "needsInterop": false
     },
     "@radix-ui/react-dropdown-menu": {
       "src": "../../node_modules/@radix-ui/react-dropdown-menu/dist/index.mjs",
       "file": "@radix-ui_react-dropdown-menu.js",
-      "fileHash": "4f88175e",
+      "fileHash": "c0cac0d3",
       "needsInterop": false
     },
     "@radix-ui/react-label": {
       "src": "../../node_modules/@radix-ui/react-label/dist/index.mjs",
       "file": "@radix-ui_react-label.js",
-      "fileHash": "ef932b1e",
+      "fileHash": "3f1d4175",
       "needsInterop": false
     },
     "@radix-ui/react-scroll-area": {
       "src": "../../node_modules/@radix-ui/react-scroll-area/dist/index.mjs",
       "file": "@radix-ui_react-scroll-area.js",
-      "fileHash": "0f50a8ba",
+      "fileHash": "3532096a",
       "needsInterop": false
     },
     "@radix-ui/react-select": {
       "src": "../../node_modules/@radix-ui/react-select/dist/index.mjs",
       "file": "@radix-ui_react-select.js",
-      "fileHash": "12fb5e37",
+      "fileHash": "b77925c4",
       "needsInterop": false
     },
     "@radix-ui/react-slider": {
       "src": "../../node_modules/@radix-ui/react-slider/dist/index.mjs",
       "file": "@radix-ui_react-slider.js",
-      "fileHash": "0f5cd9fc",
+      "fileHash": "91e8bffc",
       "needsInterop": false
     },
     "@radix-ui/react-slot": {
       "src": "../../node_modules/@radix-ui/react-slot/dist/index.mjs",
       "file": "@radix-ui_react-slot.js",
-      "fileHash": "0e67f912",
+      "fileHash": "a8bba612",
       "needsInterop": false
     },
     "@radix-ui/react-switch": {
       "src": "../../node_modules/@radix-ui/react-switch/dist/index.mjs",
       "file": "@radix-ui_react-switch.js",
-      "fileHash": "50f0faa6",
+      "fileHash": "8ab75499",
       "needsInterop": false
     },
     "@radix-ui/react-tabs": {
       "src": "../../node_modules/@radix-ui/react-tabs/dist/index.mjs",
       "file": "@radix-ui_react-tabs.js",
-      "fileHash": "5740d846",
+      "fileHash": "1fd65ba2",
       "needsInterop": false
     },
     "@radix-ui/react-toast": {
       "src": "../../node_modules/@radix-ui/react-toast/dist/index.mjs",
       "file": "@radix-ui_react-toast.js",
-      "fileHash": "3087f72d",
+      "fileHash": "c0e8d7cb",
       "needsInterop": false
     },
     "@radix-ui/react-tooltip": {
       "src": "../../node_modules/@radix-ui/react-tooltip/dist/index.mjs",
       "file": "@radix-ui_react-tooltip.js",
-      "fileHash": "d3843cb5",
+      "fileHash": "da3b1430",
       "needsInterop": false
     },
     "@southdevs/capacitor-google-auth": {
       "src": "../../node_modules/@southdevs/capacitor-google-auth/dist/esm/index.js",
       "file": "@southdevs_capacitor-google-auth.js",
-      "fileHash": "61a95846",
+      "fileHash": "01e6c6d3",
       "needsInterop": false
     },
     "@tanstack/react-virtual": {
       "src": "../../node_modules/@tanstack/react-virtual/dist/esm/index.js",
       "file": "@tanstack_react-virtual.js",
-      "fileHash": "e5cb9faa",
+      "fileHash": "50ab62b7",
       "needsInterop": false
     },
     "browser-image-compression": {
       "src": "../../node_modules/browser-image-compression/dist/browser-image-compression.mjs",
       "file": "browser-image-compression.js",
-      "fileHash": "0e371fc1",
+      "fileHash": "fde9d448",
       "needsInterop": false
     },
     "capacitor-rate-app": {
       "src": "../../node_modules/capacitor-rate-app/dist/esm/index.js",
       "file": "capacitor-rate-app.js",
-      "fileHash": "fc86a72b",
+      "fileHash": "b1cbe907",
       "needsInterop": false
     },
     "capacitor-video-player": {
       "src": "../../node_modules/capacitor-video-player/dist/esm/index.js",
       "file": "capacitor-video-player.js",
-      "fileHash": "633d60af",
+      "fileHash": "677cfb07",
       "needsInterop": false
     },
     "cordova-plugin-purchase": {
       "src": "../../node_modules/cordova-plugin-purchase/www/store.js",
       "file": "cordova-plugin-purchase.js",
-      "fileHash": "4a4f511f",
+      "fileHash": "99485e8b",
       "needsInterop": true
     },
     "embla-carousel-react": {
       "src": "../../node_modules/embla-carousel-react/esm/embla-carousel-react.esm.js",
       "file": "embla-carousel-react.js",
-      "fileHash": "9a139123",
+      "fileHash": "aebbf518",
       "needsInterop": false
     },
     "i18next-browser-languagedetector": {
       "src": "../../node_modules/i18next-browser-languagedetector/dist/esm/i18nextBrowserLanguageDetector.js",
       "file": "i18next-browser-languagedetector.js",
-      "fileHash": "892bebe8",
+      "fileHash": "d364de12",
       "needsInterop": false
     },
     "nanoid": {
       "src": "../../node_modules/nanoid/index.browser.js",
       "file": "nanoid.js",
-      "fileHash": "5de6ebc6",
+      "fileHash": "59e49f44",
       "needsInterop": false
     },
     "next-themes": {
       "src": "../../node_modules/next-themes/dist/index.mjs",
       "file": "next-themes.js",
-      "fileHash": "1e02b7e8",
+      "fileHash": "b392569a",
       "needsInterop": false
     },
     "react": {
       "src": "../../node_modules/react/index.js",
       "file": "react.js",
-      "fileHash": "da2c82ea",
+      "fileHash": "29705676",
       "needsInterop": true
     },
     "react-dom": {
       "src": "../../node_modules/react-dom/index.js",
       "file": "react-dom.js",
-      "fileHash": "6e0d18e4",
+      "fileHash": "da7f2074",
       "needsInterop": true
     },
     "react-dom/client": {
       "src": "../../node_modules/react-dom/client.js",
       "file": "react-dom_client.js",
-      "fileHash": "e06747b3",
+      "fileHash": "73d7026a",
       "needsInterop": true
     },
     "react-helmet": {
       "src": "../../node_modules/react-helmet/es/Helmet.js",
       "file": "react-helmet.js",
-      "fileHash": "6f758795",
+      "fileHash": "31bcbee7",
       "needsInterop": false
     },
     "react/jsx-runtime": {
       "src": "../../node_modules/react/jsx-runtime.js",
       "file": "react_jsx-runtime.js",
-      "fileHash": "3539868d",
+      "fileHash": "7b469d6c",
       "needsInterop": true
+    },
+    "date-fns": {
+      "src": "../../node_modules/date-fns/index.js",
+      "file": "date-fns.js",
+      "fileHash": "a86e12cb",
+      "needsInterop": false
     }
   },
   "chunks": {
-    "web-77B4376B": {
-      "file": "web-77B4376B.js"
+    "web-ONDFKDBA": {
+      "file": "web-ONDFKDBA.js"
     },
-    "web-EZQ4OPTW": {
-      "file": "web-EZQ4OPTW.js"
+    "web-7XSZERCE": {
+      "file": "web-7XSZERCE.js"
     },
-    "browser-OEGO7DCU": {
-      "file": "browser-OEGO7DCU.js"
+    "web-EXYBMKDC": {
+      "file": "web-EXYBMKDC.js"
     },
-    "web-XATMM5XR": {
-      "file": "web-XATMM5XR.js"
+    "browser-MBQQQNHC": {
+      "file": "browser-MBQQQNHC.js"
     },
-    "web-5PZINXBZ": {
-      "file": "web-5PZINXBZ.js"
+    "web-5MCYWUMP": {
+      "file": "web-5MCYWUMP.js"
     },
-    "web-2BS6GBFI": {
-      "file": "web-2BS6GBFI.js"
+    "web-5R7DNFBT": {
+      "file": "web-5R7DNFBT.js"
     },
-    "web-4AG7YORW": {
-      "file": "web-4AG7YORW.js"
+    "web-EYPIH35U": {
+      "file": "web-EYPIH35U.js"
     },
-    "web-BCVUFJQR": {
-      "file": "web-BCVUFJQR.js"
+    "web-EUDOIUFF": {
+      "file": "web-EUDOIUFF.js"
     },
-    "web-OJMVRIAG": {
-      "file": "web-OJMVRIAG.js"
+    "web-EGQDC3LO": {
+      "file": "web-EGQDC3LO.js"
+    },
+    "chunk-R7ETFTBR": {
+      "file": "chunk-R7ETFTBR.js"
     },
     "chunk-TCQMTAGU": {
       "file": "chunk-TCQMTAGU.js"
     },
-    "chunk-CEUUQLNA": {
-      "file": "chunk-CEUUQLNA.js"
+    "chunk-VVN3GYGW": {
+      "file": "chunk-VVN3GYGW.js"
     },
-    "chunk-VFE2ILTE": {
-      "file": "chunk-VFE2ILTE.js"
+    "chunk-QHNTFP7L": {
+      "file": "chunk-QHNTFP7L.js"
     },
-    "chunk-ZC6QMYOX": {
-      "file": "chunk-ZC6QMYOX.js"
+    "chunk-DIYPSGFJ": {
+      "file": "chunk-DIYPSGFJ.js"
     },
-    "chunk-VGMVROR5": {
-      "file": "chunk-VGMVROR5.js"
+    "chunk-4TQCI3NB": {
+      "file": "chunk-4TQCI3NB.js"
     },
-    "chunk-UNSMH54V": {
-      "file": "chunk-UNSMH54V.js"
+    "chunk-ZTSPFQCL": {
+      "file": "chunk-ZTSPFQCL.js"
     },
-    "chunk-EIAWBNG2": {
-      "file": "chunk-EIAWBNG2.js"
+    "chunk-LBURSQOQ": {
+      "file": "chunk-LBURSQOQ.js"
     },
-    "chunk-WLNR5IQR": {
-      "file": "chunk-WLNR5IQR.js"
+    "chunk-Y2ZVGGK4": {
+      "file": "chunk-Y2ZVGGK4.js"
     },
-    "chunk-MPYDKREG": {
-      "file": "chunk-MPYDKREG.js"
+    "chunk-F44W6ALJ": {
+      "file": "chunk-F44W6ALJ.js"
     },
-    "chunk-FFATTHUA": {
-      "file": "chunk-FFATTHUA.js"
+    "chunk-C4WXLWL6": {
+      "file": "chunk-C4WXLWL6.js"
     },
-    "chunk-F7NSKONC": {
-      "file": "chunk-F7NSKONC.js"
+    "chunk-QCRMSIAT": {
+      "file": "chunk-QCRMSIAT.js"
     },
-    "chunk-2WKFAOYP": {
-      "file": "chunk-2WKFAOYP.js"
+    "chunk-PGPF6XDF": {
+      "file": "chunk-PGPF6XDF.js"
     },
-    "chunk-VCB7SA53": {
-      "file": "chunk-VCB7SA53.js"
-    },
-    "chunk-KREX35Z5": {
-      "file": "chunk-KREX35Z5.js"
-    },
-    "chunk-OX27EVYO": {
-      "file": "chunk-OX27EVYO.js"
+    "chunk-5TMECOND": {
+      "file": "chunk-5TMECOND.js"
     },
     "chunk-ZMAP7OQT": {
       "file": "chunk-ZMAP7OQT.js"
     },
-    "chunk-GIKVNII4": {
-      "file": "chunk-GIKVNII4.js"
+    "chunk-UHYBTFRT": {
+      "file": "chunk-UHYBTFRT.js"
     },
-    "chunk-ZMHY535C": {
-      "file": "chunk-ZMHY535C.js"
+    "chunk-YMW4TWC5": {
+      "file": "chunk-YMW4TWC5.js"
     },
-    "chunk-WEGMSTPT": {
-      "file": "chunk-WEGMSTPT.js"
+    "chunk-K4ACZY46": {
+      "file": "chunk-K4ACZY46.js"
     },
-    "chunk-QKVPWGRF": {
-      "file": "chunk-QKVPWGRF.js"
+    "chunk-O2ESG4QE": {
+      "file": "chunk-O2ESG4QE.js"
+    },
+    "chunk-X3T6COJA": {
+      "file": "chunk-X3T6COJA.js"
     },
     "chunk-VHWGK3ZV": {
       "file": "chunk-VHWGK3ZV.js"
     },
-    "chunk-LIEENW5U": {
-      "file": "chunk-LIEENW5U.js"
+    "chunk-6EAUJK3H": {
+      "file": "chunk-6EAUJK3H.js"
     },
-    "chunk-MHZWAHLZ": {
-      "file": "chunk-MHZWAHLZ.js"
+    "chunk-G7Y47P27": {
+      "file": "chunk-G7Y47P27.js"
     },
     "chunk-KDVGFZWC": {
       "file": "chunk-KDVGFZWC.js"
     },
-    "chunk-DQTDWSXG": {
-      "file": "chunk-DQTDWSXG.js"
+    "chunk-V6E3BSZD": {
+      "file": "chunk-V6E3BSZD.js"
     },
-    "chunk-BYIBYIM7": {
-      "file": "chunk-BYIBYIM7.js"
+    "chunk-FXJVXTVJ": {
+      "file": "chunk-FXJVXTVJ.js"
     },
-    "chunk-HXA6O6EE": {
-      "file": "chunk-HXA6O6EE.js"
+    "chunk-4B2QHNJT": {
+      "file": "chunk-4B2QHNJT.js"
     }
   }
 }

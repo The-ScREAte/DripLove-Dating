@@ -16,7 +16,7 @@ import {
   t,
   use
 } from "./chunk-VHWGK3ZV.js";
-import "./chunk-HXA6O6EE.js";
+import "./chunk-4B2QHNJT.js";
 export {
   changeLanguage,
   createInstance,
