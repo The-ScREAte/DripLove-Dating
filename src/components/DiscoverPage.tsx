@@ -764,9 +764,14 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, isPremium }: DiscoverPage
       
       filteredProfiles = unlockedProfiles;
 
-      // 🚨 FLAG for UI MESSAGE - local profiles exhausted
-      if (filteredProfiles.length > 0) {
-        setLocalProfilesExhausted(true);
+      // ✨ Show gentle toast (once) when premium users see unlocked country profiles
+      if (filteredProfiles.length > 0 && !localProfilesExhausted) {
+        setLocalProfilesExhausted(true); // Flag to prevent repeated toasts
+        toast({
+          title: '🌍 Showing matches from your selected countries',
+          description: 'You\'ve seen nearby profiles. Exploring your unlocked countries now.',
+          duration: 4000,
+        });
       }
     }
     // 3️⃣ Free-user fallback (same country only) - ACTIVE users only
@@ -1608,7 +1613,7 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, isPremium }: DiscoverPage
         .in('gender', allowedGenders)
         .eq('account_status', 'active')
         .eq('is_admin', false)
-        .eq('is_archived', false)
+        .eq('is_archived', false) // PHASE 1: Active profiles only
         .limit(100); // Larger pool for stratified sampling
 
       if (error) throw error;
@@ -1616,8 +1621,50 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, isPremium }: DiscoverPage
       // ⭐ Initialize distanceMap early for premium fallback
       const distanceMap: { [key: string]: number } = {};
       
+      // =====================================================
+      // PHASE 2: ARCHIVED FALLBACK (only if Phase 1 returns 0)
+      // Same logic as main fetch - mirror the two-phase system
+      // =====================================================
+      let activeProfiles = newProfiles || [];
+      let usingArchivedFallback = false;
+      
+      if (activeProfiles.length === 0) {
+        console.log('[LoadMore] Phase 1 returned 0 active profiles, trying archived fallback...');
+        
+        let archivedQuery = supabase.from('profiles').select(PROFILE_SELECT);
+        
+        if (allExcludedIds.length > 0) {
+          archivedQuery = archivedQuery.not('id', 'in', `(${allExcludedIds.join(',')})`);
+        }
+        
+        // Build country filter based on user type
+        if (isPremium && allowedCountryCodes.length > 0) {
+          archivedQuery = archivedQuery.in('country_code', allowedCountryCodes);
+        } else if (baseCountryCode) {
+          archivedQuery = archivedQuery.eq('country_code', baseCountryCode);
+        }
+
+        const { data: archivedProfiles, error: archivedError } = await archivedQuery
+          .eq('is_archived', true) // PHASE 2: Archived users
+          .eq('account_status', 'active') // Still respect account status
+          .eq('is_admin', false)
+          .in('gender', allowedGenders)
+          .limit(50);
+
+        if (!archivedError && archivedProfiles && archivedProfiles.length > 0) {
+          console.log(`[LoadMore] Phase 2: Found ${archivedProfiles.length} archived profiles`);
+          activeProfiles = archivedProfiles;
+          usingArchivedFallback = true;
+          
+          // Update fallback state if we're now showing archived profiles
+          if (!isArchivedFallback) {
+            setIsArchivedFallback(true);
+          }
+        }
+      }
+      
       // If no new profiles found, try premium fallback before giving up
-      if ((!newProfiles || newProfiles.length === 0) && hasUnlockedCountries) {
+      if (activeProfiles.length === 0 && hasUnlockedCountries) {
         // Try unlocked countries only as fallback
         const fallbackProfiles = await fetchUnlockedCountryProfiles({
           unlockedCountries,
@@ -1628,9 +1675,14 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, isPremium }: DiscoverPage
         });
         
         if (fallbackProfiles.length > 0) {
-          // Show banner if not already shown
+          // ✨ Show gentle toast (once) for premium fallback
           if (!localProfilesExhausted) {
             setLocalProfilesExhausted(true);
+            toast({
+              title: '🌍 Showing matches from your selected countries',
+              description: 'You\'ve seen nearby profiles. Exploring your unlocked countries now.',
+              duration: 4000,
+            });
           }
           
           // Continue with fallback profiles
@@ -1677,17 +1729,18 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, isPremium }: DiscoverPage
       }
       
       // If no new profiles found even after premium fallback, we've exhausted the pool
-      // BUT: Only mark exhausted if premium fallback isn't available
+      // BUT: Only mark exhausted if premium fallback isn't available AND we didn't use archived fallback
       if (
-        (!newProfiles || newProfiles.length === 0) &&
-        !hasUnlockedCountries
+        activeProfiles.length === 0 &&
+        !hasUnlockedCountries &&
+        !usingArchivedFallback
       ) {
         setNoMoreProfiles(true); // Mark that we've exhausted all available profiles
         return;
       }
 
       // Apply same filtering logic as original fetch using location service
-      let filteredProfiles = newProfiles;
+      let filteredProfiles = activeProfiles;
       const userMaxDistanceRaw = (currentUser as any).max_distance ?? (currentUser as any).distance_preference ?? 50;
       const userMaxDistance = Number(userMaxDistanceRaw);
       const safeUserMaxDistance = Number.isFinite(userMaxDistance) && userMaxDistance > 0 ? userMaxDistance : 50;
@@ -2674,78 +2727,6 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, isPremium }: DiscoverPage
               </div>
             </div>
             <p className="text-xs text-gray-600 text-center mt-2">{t('discover.swipeGuide.tapToClose')}</p>
-          </div>
-        </div>
-      )}
-      
-      {/* 🌍 Premium: Local Profiles Exhausted Banner */}
-      {localProfilesExhausted && isPremium && (
-        <div className="absolute top-4 left-0 right-0 z-[9998] px-4 animate-fade-in">
-          <div className="bg-gradient-to-r from-indigo-600 via-purple-600 to-pink-600 text-white text-sm rounded-2xl px-5 py-4 shadow-2xl border border-white/20 backdrop-blur-sm"
-               style={{
-                 animation: 'slideDown 0.5s ease-out, fadeOut 0.5s ease-in 7.5s forwards',
-                 boxShadow: '0 10px 40px -10px rgba(99, 102, 241, 0.5)'
-               }}>
-            <style>{`
-              @keyframes slideDown {
-                from { transform: translateY(-100%); opacity: 0; }
-                to { transform: translateY(0); opacity: 1; }
-              }
-              @keyframes fadeOut {
-                from { opacity: 1; }
-                to { opacity: 0; pointer-events: none; }
-              }
-            `}</style>
-            <div className="flex items-start gap-3">
-              <div className="text-2xl" role="img" aria-label="globe">🌍</div>
-              <div className="flex-1">
-                <div className="font-bold text-base mb-1">Local profiles are currently exhausted</div>
-                <div className="text-sm opacity-95 leading-relaxed">
-                  Extend your distance to see more nearby matches — or enjoy discovering people from the countries you unlocked!
-                </div>
-              </div>
-              <button 
-                onClick={() => setLocalProfilesExhausted(false)}
-                className="text-white/80 hover:text-white transition-colors ml-2 -mt-1"
-                aria-label="Close banner"
-              >
-                <X className="w-5 h-5" />
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-      
-      {/* 🕐 Archived Fallback Banner - Two-phase discover */}
-      {isArchivedFallback && (
-        <div className="absolute top-4 left-0 right-0 z-[9998] px-4 animate-fade-in">
-          <div className="bg-gradient-to-r from-slate-700 to-slate-900 text-white text-xs rounded-xl px-4 py-3 shadow-lg"
-               style={{
-                 animation: 'slideDown 0.5s ease-out, fadeOut 0.5s ease-in 5.5s forwards',
-               }}>
-            <style>{`
-              @keyframes slideDown {
-                from { transform: translateY(-100%); opacity: 0; }
-                to { transform: translateY(0); opacity: 1; }
-              }
-              @keyframes fadeOut {
-                from { opacity: 1; }
-                to { opacity: 0; pointer-events: none; }
-              }
-            `}</style>
-            <div className="flex items-center gap-2">
-              <div className="text-base" role="img" aria-label="clock">🕐</div>
-              <div className="flex-1">
-                {t('discover.archivedFallback', "You've seen all recently active profiles. Showing more profiles to keep things going.")}
-              </div>
-              <button 
-                onClick={() => setIsArchivedFallback(false)}
-                className="text-white/80 hover:text-white transition-colors ml-2"
-                aria-label="Close banner"
-              >
-                <X className="w-4 h-4" />
-              </button>
-            </div>
           </div>
         </div>
       )}

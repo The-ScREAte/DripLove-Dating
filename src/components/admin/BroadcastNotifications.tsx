@@ -103,7 +103,6 @@ export default function BroadcastNotifications() {
   const [isLoadingCountries, setIsLoadingCountries] = useState(false);
   const [isLoadingUsers, setIsLoadingUsers] = useState(false);
   const [isSending, setIsSending] = useState(false);
-  const [sendProgress, setSendProgress] = useState({ sent: 0, total: 0, failed: 0 });
   const { toast } = useToast();
   const [searchTerm, setSearchTerm] = useState('');
   const [activeTab, setActiveTab] = useState('new');
@@ -115,7 +114,6 @@ export default function BroadcastNotifications() {
   const [campaignRecipients, setCampaignRecipients] = useState<Recipient[]>([]);
   const [isLoadingRecipients, setIsLoadingRecipients] = useState(false);
   const [showCampaignDetails, setShowCampaignDetails] = useState(false);
-  const [currentCampaignId, setCurrentCampaignId] = useState<string | null>(null);
 
   useEffect(() => {
     loadCountries();
@@ -328,10 +326,8 @@ export default function BroadcastNotifications() {
     }
   };
 
-  const sendNotifications = async (retryFailed = false, existingCampaignId?: string, runInBackground = false) => {
-    let recipientsToSend = Array.from(selectedUsers);
-    
-    if (!retryFailed && selectedUsers.size === 0) {
+  const sendNotifications = async () => {
+    if (selectedUsers.size === 0) {
       toast({
         title: 'No Users Selected',
         description: 'Please select at least one user to send notifications to.',
@@ -349,185 +345,46 @@ export default function BroadcastNotifications() {
       return;
     }
 
-    // Store notification data before resetting form (for background processing)
-    const notificationTitleToSend = notificationTitle;
-    const notificationMessageToSend = notificationMessage;
-    const selectedCountriesArray = Array.from(selectedCountries);
+    setIsSending(true);
 
-    // If running in background, show toast and reset form immediately
-    if (runInBackground) {
+    try {
+      // Call edge function to handle broadcast server-side
+      const { data, error } = await supabase.functions.invoke('send-broadcast-campaign', {
+        body: {
+          title: notificationTitle,
+          message: notificationMessage,
+          targetCountries: Array.from(selectedCountries),
+          userIds: Array.from(selectedUsers),
+          notificationType: 'system',
+        },
+      });
+
+      if (error) throw error;
+
       toast({
-        title: 'Broadcast Started',
-        description: `Sending notifications to ${recipientsToSend.length} users in the background. You can leave this page.`,
+        title: 'Broadcast Queued',
+        description: `Sending to ${selectedUsers.size} users. Processing continues in background. You can leave this page.`,
         duration: 5000,
       });
-      
-      // Reset form immediately so user can leave
+
+      // Reset form
       setNotificationTitle('');
       setNotificationMessage('');
       setSelectedUsers(new Set());
-      setIsSending(false);
-    } else {
-      setIsSending(true);
-    }
-    
-    setSendProgress({ sent: 0, total: recipientsToSend.length, failed: 0 });
-
-    try {
-      const { data: { user } } = await supabase.auth.getUser();
       
-      let campaignId = existingCampaignId;
-      
-      // Create or update campaign
-      if (!retryFailed || !existingCampaignId) {
-        const { data: campaign, error: campaignError } = await supabase
-          .from('broadcast_campaigns')
-          .insert({
-            admin_id: user?.id,
-            title: notificationTitleToSend,
-            message: notificationMessageToSend,
-            notification_type: 'system',
-            target_countries: selectedCountriesArray,
-            total_recipients: recipientsToSend.length,
-            successful_sends: 0,
-            failed_sends: 0,
-          })
-          .select()
-          .single();
-
-        if (campaignError) throw campaignError;
-        campaignId = campaign.id;
-        if (!runInBackground) {
-          setCurrentCampaignId(campaignId);
-        }
-
-        // Create recipient records
-        const recipients = recipientsToSend.map(userId => ({
-          campaign_id: campaignId,
-          user_id: userId,
-          status: 'pending' as const,
-        }));
-
-        const { error: recipientsError } = await supabase
-          .from('broadcast_recipients')
-          .insert(recipients);
-
-        if (recipientsError) throw recipientsError;
-      }
-
-      let successCount = 0;
-      let failureCount = 0;
-
-      // Send notifications in batches
-      const batchSize = 10;
-      for (let i = 0; i < recipientsToSend.length; i += batchSize) {
-        const batch = recipientsToSend.slice(i, i + batchSize);
-        
-        const results = await Promise.allSettled(
-          batch.map(async (userId) => {
-            try {
-              const { data, error } = await supabase.functions.invoke('send-push-notification', {
-                body: {
-                  title: notificationTitleToSend,
-                  body: notificationMessageToSend,
-                  userId: userId,
-                  type: 'system',
-                  data: { action: 'open_discover' }
-                }
-              });
-
-              if (error) throw error;
-              
-              const success = data?.success || false;
-              
-              // Update recipient status
-              await supabase
-                .from('broadcast_recipients')
-                .update({
-                  status: success ? 'sent' : 'failed',
-                  error_message: success ? null : 'Notification failed to send',
-                  sent_at: success ? new Date().toISOString() : null,
-                })
-                .eq('campaign_id', campaignId)
-                .eq('user_id', userId);
-
-              return { success, userId };
-            } catch (error) {
-              console.error(`Failed to send to user ${userId}:`, error);
-              
-              // Update recipient status
-              await supabase
-                .from('broadcast_recipients')
-                .update({
-                  status: 'failed',
-                  error_message: error instanceof Error ? error.message : 'Unknown error',
-                })
-                .eq('campaign_id', campaignId)
-                .eq('user_id', userId);
-              
-              return { success: false, userId };
-            }
-          })
-        );
-
-        results.forEach(result => {
-          if (result.status === 'fulfilled' && result.value.success) {
-            successCount++;
-          } else {
-            failureCount++;
-          }
-        });
-
-        setSendProgress({
-          sent: successCount,
-          total: recipientsToSend.length,
-          failed: failureCount,
-        });
-
-        if (i + batchSize < recipientsToSend.length) {
-          await new Promise(resolve => setTimeout(resolve, 500));
-        }
-      }
-
-      // Update campaign stats
-      await supabase
-        .from('broadcast_campaigns')
-        .update({
-          successful_sends: successCount,
-          failed_sends: failureCount,
-          updated_at: new Date().toISOString(),
-        })
-        .eq('id', campaignId);
-
-      if (!runInBackground) {
-        setIsSending(false);
-
-        toast({
-          title: 'Notifications Sent',
-          description: `Successfully sent ${successCount} notifications. ${failureCount > 0 ? `${failureCount} failed.` : ''}`,
-          variant: successCount > 0 ? 'default' : 'destructive',
-        });
-
-        if (successCount > 0) {
-          setNotificationTitle('');
-          setNotificationMessage('');
-          setSelectedUsers(new Set());
-        }
-      }
-      
+      // Refresh campaign history
       if (activeTab === 'history') {
         loadCampaigns();
       }
     } catch (error) {
-      console.error('Error sending notifications:', error);
-      if (!runInBackground) {
-        toast({
-          title: 'Error',
-          description: 'Failed to process notification campaign',
-          variant: 'destructive',
-        });
-        setIsSending(false);
-      }
+      console.error('Error starting broadcast:', error);
+      toast({
+        title: 'Error',
+        description: error instanceof Error ? error.message : 'Failed to start broadcast campaign',
+        variant: 'destructive',
+      });
+    } finally {
+      setIsSending(false);
     }
   };
 
@@ -885,50 +742,24 @@ export default function BroadcastNotifications() {
                       {selectedUsersWithTokens} will receive push notification
                     </p>
                   </div>
-                  <div className="flex gap-2">
-                    <Button
-                      variant="outline"
-                      onClick={() => sendNotifications(false, undefined, true)}
-                      disabled={isSending || !notificationTitle.trim() || !notificationMessage.trim() || selectedUsers.size === 0}
-                      className="h-8 text-xs"
-                      title="Send in background - you can leave this page"
-                    >
-                      <Send className="w-3 h-3 mr-1" />
-                      Send & Leave
-                    </Button>
-                    <Button
-                      onClick={() => sendNotifications()}
-                      disabled={isSending || !notificationTitle.trim() || !notificationMessage.trim() || selectedUsers.size === 0}
-                      className="min-w-[140px] h-8 text-xs"
-                    >
-                      {isSending ? (
-                        <>
-                          <Loader2 className="w-3 h-3 mr-2 animate-spin" />
-                          Sending... {sendProgress.sent}/{sendProgress.total}
-                        </>
-                      ) : (
-                        <>
-                          <Send className="w-3 h-3 mr-2" />
-                          Send & Wait
-                        </>
-                      )}
-                    </Button>
-                  </div>
+                  <Button
+                    onClick={sendNotifications}
+                    disabled={isSending || !notificationTitle.trim() || !notificationMessage.trim() || selectedUsers.size === 0}
+                    className="h-8 text-xs"
+                  >
+                    {isSending ? (
+                      <>
+                        <Loader2 className="w-3 h-3 mr-2 animate-spin" />
+                        Starting...
+                      </>
+                    ) : (
+                      <>
+                        <Send className="w-3 h-3 mr-2" />
+                        Send Broadcast
+                      </>
+                    )}
+                  </Button>
                 </div>
-
-                {isSending && (
-                  <div className="space-y-2">
-                    <div className="w-full bg-gray-200 rounded-full h-1.5">
-                      <div
-                        className="bg-purple-600 h-1.5 rounded-full transition-all duration-300"
-                        style={{ width: `${(sendProgress.sent / sendProgress.total) * 100}%` }}
-                      />
-                    </div>
-                    <p className="text-[10px] text-center text-gray-500">
-                      Sent: {sendProgress.sent} | Failed: {sendProgress.failed} | Remaining: {sendProgress.total - sendProgress.sent - sendProgress.failed}
-                    </p>
-                  </div>
-                )}
               </CardContent>
             </Card>
           )}

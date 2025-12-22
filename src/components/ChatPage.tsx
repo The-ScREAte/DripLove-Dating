@@ -30,6 +30,17 @@ interface ChatPageProps {
   onDetailViewChange?: (inDetail: boolean) => void;
 }
 
+// Dormant conversations constants
+const DORMANT_DAYS = 30;
+const MS_PER_DAY = 24 * 60 * 60 * 1000;
+
+const isDormantChat = (match: ChatMatch) => {
+  if (!match.last_message_time) return false;
+
+  const lastActivity = new Date(match.last_message_time).getTime();
+  return Date.now() - lastActivity > DORMANT_DAYS * MS_PER_DAY;
+};
+
 // Global cache for chat matches - persists across component mounts
 const chatMatchesCache = new Map<string, { matches: ChatMatch[], timestamp: number }>();
 const CACHE_DURATION = 30000; // 30 seconds - keep matches fresh
@@ -98,6 +109,9 @@ const ChatPage = ({ currentUser, onUnreadChange, onDetailViewChange }: ChatPageP
   
   // Rating dialog state
   const [messagesSentCount, setMessagesSentCount] = useState(0);
+  
+  // Dormant conversations state
+  const [showDormant, setShowDormant] = useState(false);
   const [showRatingDialog, setShowRatingDialog] = useState(false);
   
   // Reply state
@@ -1444,6 +1458,8 @@ const ChatPage = ({ currentUser, onUnreadChange, onDetailViewChange }: ChatPageP
     }, 2000);
   };
 
+  // NOTE: This handles user feedback prompts (separate from dormant conversations feature).
+  // The "heading somewhere" prompt asks users if they're progressing with a conversation.
   const handleDormancyResponse = async (response: boolean) => {
     if (!selectedMatch) return;
 
@@ -1597,12 +1613,6 @@ const ChatPage = ({ currentUser, onUnreadChange, onDetailViewChange }: ChatPageP
     setSwipeStartY(0);
   };
 
-
-  const filteredMatches = matches.filter(match => {
-    const partnerName = `${match.partner?.first_name || ''} ${match.partner?.last_name || ''}`.toLowerCase();
-    return match.last_message; // Only show conversations with messages
-  });
-
   // If there's no authenticated user yet, render a light loading state to avoid
   // dereferencing `currentUser.id` in JSX/handlers. Hooks above must remain
   // unconditionally called (so don't early-return before them).
@@ -1673,7 +1683,15 @@ const ChatPage = ({ currentUser, onUnreadChange, onDetailViewChange }: ChatPageP
 
   if (!selectedMatch) {
     const newMatchList = matches.filter(m => !m.last_message);
-    const conversationList = matches.filter(m => m.last_message);
+    
+    // NOTE: Dormancy applies only to active (non-archived) users.
+    // Archived users are filtered earlier in processMatchesData.
+    const activeConversations = matches.filter(
+      m => m.last_message && !isDormantChat(m)
+    );
+    const dormantConversations = matches.filter(
+      m => m.last_message && isDormantChat(m)
+    );
     
     return (
   <div className="fixed inset-0 flex flex-col bg-gray-50">
@@ -1766,7 +1784,7 @@ const ChatPage = ({ currentUser, onUnreadChange, onDetailViewChange }: ChatPageP
         </div>
       </div>
     )}
-          {conversationList.length === 0 && newMatchList.length === 0 ? (
+          {activeConversations.length === 0 && dormantConversations.length === 0 && newMatchList.length === 0 ? (
             <div className="flex flex-col items-center justify-center p-8 text-center mt-20">
               <div className="mb-6">
                 <div className="w-24 h-24 mx-auto rounded-full bg-gradient-to-br from-pink-100 to-purple-100 flex items-center justify-center">
@@ -1787,7 +1805,7 @@ const ChatPage = ({ currentUser, onUnreadChange, onDetailViewChange }: ChatPageP
                 <span>{t('chat.startSwipingInDripCheck')}</span>
               </div>
             </div>
-          ) : conversationList.length === 0 ? (
+          ) : activeConversations.length === 0 && dormantConversations.length === 0 ? (
             <div className="flex flex-col items-center justify-center p-8 text-center mt-12">
               <div className="mb-6">
                 <div className="w-20 h-20 mx-auto rounded-full bg-gradient-to-br from-pink-100 to-purple-100 flex items-center justify-center">
@@ -1802,7 +1820,8 @@ const ChatPage = ({ currentUser, onUnreadChange, onDetailViewChange }: ChatPageP
               </p>
             </div>
           ) : (
-            conversationList.map((match, index) => {
+            <>
+            {activeConversations.map((match, index) => {
               // Determine the correct partner ID for avatar
               const partnerId = match.partner?.id || 
                                (match.user1_id === currentUser.id ? match.user2_id : match.user1_id);
@@ -1859,7 +1878,63 @@ const ChatPage = ({ currentUser, onUnreadChange, onDetailViewChange }: ChatPageP
                 </div>
               </div>
               );
-            })
+            })}
+            
+            {/* Dormant Conversations Section */}
+            {dormantConversations.length > 0 && (
+              <div className="mt-4">
+                <button
+                  onClick={() => setShowDormant(v => !v)}
+                  className="w-full text-sm text-gray-500 px-4 py-2 flex justify-between items-center hover:bg-gray-50 transition-colors"
+                >
+                  <span>Earlier conversations ({dormantConversations.length})</span>
+                  <span>{showDormant ? '▲' : '▼'}</span>
+                </button>
+
+                {showDormant && (
+                  <div className="opacity-70">
+                    {dormantConversations.map(match => {
+                      const partnerId = match.partner?.id || 
+                                       (match.user1_id === currentUser.id ? match.user2_id : match.user1_id);
+                      
+                      return (
+                        <div
+                          key={match.id}
+                          className="p-4 border-b border-gray-200 cursor-pointer hover:bg-gray-100 transition-colors bg-white"
+                          onClick={() => setSelectedMatch(match)}
+                        >
+                          <div className="flex items-center space-x-3">
+                            <ChatUserAvatar
+                              userId={partnerId}
+                              firstName={match.first_name}
+                              lastName={match.last_name}
+                              onClick={() => handleUserProfileClick(partnerId)}
+                              size="md"
+                            />
+                            <div className="flex-1 min-w-0">
+                              <div className="flex justify-between items-start">
+                                <h3 className="font-medium text-gray-700 truncate">
+                                  {match.first_name} {match.last_name}
+                                </h3>
+                                {match.last_message_time && (
+                                  <span className="text-xs text-gray-400 ml-2">
+                                    {new Date(match.last_message_time).toLocaleDateString()}
+                                  </span>
+                                )}
+                              </div>
+                              <p className="text-xs text-gray-500 truncate mt-1">
+                                {match.last_message}
+                              </p>
+                            </div>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
+              </div>
+            )}
+            </>
           )}
         </div>
 

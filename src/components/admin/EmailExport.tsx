@@ -36,6 +36,7 @@ export default function EmailExport() {
   const [premiumFilter, setPremiumFilter] = useState<string>('all');
   const [intentFilter, setIntentFilter] = useState<string>('all');
   const [statusFilter, setStatusFilter] = useState<string>('active');
+  const [includeArchived, setIncludeArchived] = useState<boolean>(false);
   const [isLoadingCountries, setIsLoadingCountries] = useState(false);
   const [isLoadingEmails, setIsLoadingEmails] = useState(false);
   const [emails, setEmails] = useState<string[]>([]);
@@ -109,7 +110,7 @@ export default function EmailExport() {
       // Build the query
       let query = supabase
         .from('profiles')
-        .select('id, email, gender, preference, relationship_intent, account_status, country');
+        .select('id, email, gender, preference, relationship_intent, account_status, country, is_archived');
 
       // Apply country filter
       if (selectedCountries.size > 0) {
@@ -135,6 +136,15 @@ export default function EmailExport() {
       if (statusFilter !== 'all') {
         query = query.eq('account_status', statusFilter);
       }
+
+      // Apply archive filter (only if NOT including archived)
+      if (!includeArchived) {
+        query = query.or('is_archived.is.null,is_archived.eq.false');
+      }
+
+      // Safety: exclude deleted/suspended users (even if archived is checked)
+      query = query.neq('account_status', 'deleted')
+                   .neq('account_status', 'suspended');
 
       const { data: profiles, error: profileError } = await query;
 
@@ -306,6 +316,21 @@ export default function EmailExport() {
                 </SelectContent>
               </Select>
             </div>
+          </div>
+
+          {/* Include Archived Checkbox */}
+          <div className="flex items-center space-x-2 p-3 border rounded-lg bg-blue-50">
+            <Checkbox
+              id="include-archived"
+              checked={includeArchived}
+              onCheckedChange={(checked) => setIncludeArchived(checked as boolean)}
+            />
+            <label
+              htmlFor="include-archived"
+              className="text-sm font-medium cursor-pointer"
+            >
+              Include archived users (for re-engagement emails)
+            </label>
           </div>
 
           {/* Country Selection */}

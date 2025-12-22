@@ -924,7 +924,8 @@ const AdminPageComponent = ({ currentUser, onLogout }: AdminPageProps) => {
           preference, 
           relationship_intent,
           last_login_at,
-          login_count
+          login_count,
+          is_archived
         `)
         .eq('is_admin', false)
         .order('created_at', { ascending: false });
@@ -1898,6 +1899,11 @@ const AdminPageComponent = ({ currentUser, onLogout }: AdminPageProps) => {
                                   {user.city}, {user.country} • Age {user.age}
                                   {user.gender && ` • ${user.gender.charAt(0).toUpperCase() + user.gender.slice(1)}`}
                                 </p>
+                                {(user as any).is_archived && (
+                                  <Badge variant="outline" className="text-[10px] h-4 text-gray-500 mt-1">
+                                    Archived
+                                  </Badge>
+                                )}
                                 <div className="flex gap-1 mt-0.5 flex-wrap">
                                 {user.preference && (
                                     <Badge variant="outline" className="text-[10px] px-1.5 py-0 h-4">
