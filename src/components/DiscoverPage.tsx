@@ -46,7 +46,7 @@ import { calculateDistance } from '@/constants/locationData';
 import { checkAndTriggerRefill } from '@/utils/performanceOptimizer';
 import { debounce, createPagination, userDataCache } from '@/utils/performanceOptimizer';
 import { locationService } from '@/services/locationService';
-import { getTodaySwipeCount, checkSwipeRestrictions } from '@/utils/profileCompletion';
+import { getTodaySwipeCount } from '@/utils/profileCompletion';
 import { enqueue } from '@/lib/queue';
 import { getLanguageName } from '@/utils/languageNames';
 import PremiumUpgrade from './PremiumUpgrade';
@@ -83,13 +83,59 @@ const seededRandomFromString = (seedStr: string) => {
   };
 };
 
-const buildFeedSignature = (baseCountryCode: string, unlockedCountries: string[], isPremium: boolean) => {
+const buildFeedSignature = (baseCountryCode: string, unlockedCountries: string[], isPremium: boolean, maxDistance: number) => {
   const unlockedSignature = isPremium ? [...unlockedCountries].sort().join(',') : '';
-  return `v2_${hashStringToInt(`${baseCountryCode}|${unlockedSignature}|${isPremium ? 'premium' : 'free'}`).toString(36)}`;
+  return `v4_${hashStringToInt(`${baseCountryCode}|${unlockedSignature}|${maxDistance}|${isPremium ? 'premium' : 'free'}`).toString(36)}`;
 };
 
 const buildSavedOrderKey = (userId: string, feedSignature: string) =>
   `driplove_profile_order_${userId}_${todayStr()}_${feedSignature}`;
+
+const normalizeCountryCodeList = (value: unknown, baseCountryCode?: string): string[] => {
+  const normalize = (items: unknown[]): string[] => {
+    const result = items
+      .filter((c): c is string => typeof c === 'string')
+      .map((c) => c.trim())
+      .filter((c) => c.length > 0);
+    return baseCountryCode ? result.filter((c) => c !== baseCountryCode) : result;
+  };
+
+  if (Array.isArray(value)) {
+    return normalize(value);
+  }
+
+  if (typeof value === 'string') {
+    const trimmed = value.trim();
+    if (trimmed.length === 0) return [];
+
+    try {
+      const parsed = JSON.parse(trimmed);
+      if (Array.isArray(parsed)) return normalize(parsed);
+    } catch {
+      // ignore
+    }
+
+    const cleaned = trimmed.replace(/[{}\[\]"]+/g, '');
+    const parts = cleaned.split(',').map((s) => s.trim()).filter(Boolean);
+    return normalize(parts);
+  }
+
+  return [];
+};
+
+// Seeded random for deterministic mixing
+const seededRandom = (seed: string) => {
+  let hash = 0;
+  for (let i = 0; i < seed.length; i++) {
+    hash = ((hash << 5) - hash) + seed.charCodeAt(i);
+    hash = hash & hash;
+  }
+  let state = Math.abs(hash);
+  return () => {
+    state = (state * 1103515245 + 12345) & 0x7fffffff;
+    return state / 0x7fffffff;
+  };
+};
 
 // ⭐ ANDROID OPTIMIZATION: Global abort controller for canceling image loads on swipe
 let currentImageAbortController: AbortController | null = null;
@@ -108,11 +154,6 @@ interface AdData {
 // Union type for matches and ads
 type MatchOrAd = PotentialMatch | AdData;
 
-// Make cache globally accessible for preloading
-if (typeof window !== 'undefined') {
-  (window as any).discoverCache = discoverCache;
-}
-
 interface DiscoverPageProps {
   currentUser: CurrentUser;
   onNavigateToChat?: (userId: string) => void;
@@ -127,13 +168,23 @@ interface PassedUser {
 const DiscoverPage = ({ currentUser, onNavigateToChat, isPremium }: DiscoverPageProps) => {
   const { t } = useTranslation();
   
+  // Track viewport height safely (no SSR crash)
+  const [vh, setVh] = useState<number>(() => (typeof window !== 'undefined' ? window.innerHeight : 800));
+  useEffect(() => {
+    const onResize = () => setVh(window.innerHeight);
+    window.addEventListener('resize', onResize);
+    return () => window.removeEventListener('resize', onResize);
+  }, []);
+  
   // IAP: Track if buy is enabled
   const [canBuy, setCanBuy] = useState(false);
   useEffect(() => {
     function onProductUpdated() {
       // @ts-ignore
       const p = window.CdvPurchase?.store?.get('com.driplove.dating.premium.monthlysub1');
-      setCanBuy(!!p && !!p.getOffer());
+      // More robust offer detection (handles plugin variations)
+      const offer = (p as any)?.getOffer?.() ?? (p as any)?.offers?.[0];
+      setCanBuy(!!offer);
     }
     // @ts-ignore
     const store = window.CdvPurchase?.store;
@@ -182,12 +233,13 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, isPremium }: DiscoverPage
   const [profileMissingFields, setProfileMissingFields] = useState<string[]>([]);
   const [showProfileCompletionModal, setShowProfileCompletionModal] = useState(false);
   const [todaySwipeCount, setTodaySwipeCount] = useState(0);
-  const [localProfilesExhausted, setLocalProfilesExhausted] = useState(false);
   const [isArchivedFallback, setIsArchivedFallback] = useState(false); // Two-phase: true when showing archived profiles
   
   // Dynamic content height management
   const contentRef = useRef<HTMLDivElement>(null);
   const [contentHeight, setContentHeight] = useState(0);
+  // PHASE 0: Required refs (must exist before any fetching logic)
+  const initializedUserRef = useRef<string | null>(null);
   const backgroundFetchingRef = useRef(false);
   // Suppress immediate full fetch when we have fresh cached data and the component remounts
   const suppressFetchRef = useRef(false);
@@ -414,23 +466,14 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, isPremium }: DiscoverPage
         setProfileCompletion(completion);
         setProfileMissingFields([]);
 
+        // Defensive: if DB says they're complete enough, don't show the modal.
+        if (completion >= 70) {
+          setShowProfileCompletionModal(false);
+        }
+
         // Get today's swipe count
         const swipeCount = await getTodaySwipeCount(currentUser.id);
         setTodaySwipeCount(swipeCount);
-
-        // CRITICAL: Check swipe restrictions on mount/reload
-        const restrictions = await checkSwipeRestrictions(currentUser.id, completion, isPremium || false);
-        
-        // If user can't swipe, block them immediately
-        if (!restrictions.canSwipe) {
-          if (restrictions.requiresProfileCompletion) {
-            // Show profile completion modal if they need to complete profile
-            setShowProfileCompletionModal(true);
-          } else if (restrictions.reason === 'Daily limit reached') {
-            // Show out of swipes screen if they've hit daily limit
-            setIsOutOfSwipes(true);
-          }
-        }
       } catch (error) {
         console.error('Error in fetchUserProfileCompletion:', error);
       }
@@ -500,7 +543,7 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, isPremium }: DiscoverPage
   );
 
   const shouldReshuffle = useCallback(() => {
-    const now = Date.now();
+    const now = Date.now(); 
     const tenMinutes = 10 * 60 * 1000; // 10 minutes in milliseconds
     return now - lastShuffleTime > tenMinutes;
   }, [lastShuffleTime]);
@@ -511,6 +554,7 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, isPremium }: DiscoverPage
   // ⭐ TINDER-STYLE: Load all images for ONE profile with instant abort support
   const loadAllImagesForProfile = useCallback(async (profileId: string) => {
     // ⭐ RULE 3: Cancel previous load if user swiped
+    // NOTE: Supabase queries can't be aborted; this only prevents stale state updates
     if (currentImageAbortController) {
       currentImageAbortController.abort();
       currentImageAbortController = null;
@@ -541,16 +585,8 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, isPremium }: DiscoverPage
     backgroundFetchingRef.current = true;
 
     try {
-      const result = await fetchPotentialMatchesData(currentUser.id, allowedGenders);
-      if (result) {
-        const { matches, images, distances, index } = result;
-        
-        const matchesWithAds = injectAds(matches);
-        
-        // DISABLED: Background fetch no longer updates cache to prevent profile shuffling
-        // The cache will only be updated on manual refresh or navigation
-        // ⭐ REMOVED: Duplicate verification fetching (handled in main fetch)
-      }
+      // Phase 9: Background fetch is read-only (must not set React state)
+      await fetchPotentialMatchesData(currentUser.id, allowedGenders);
     } catch (error) {
       // Silently handle background fetch errors
     } finally {
@@ -594,8 +630,8 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, isPremium }: DiscoverPage
 
     if (error) return [];
 
-    // Mark all unlocked country profiles with distance = 999
-    (data || []).forEach(p => distanceMap[p.id] = 999);
+    // Mark all unlocked country profiles with distance = 999 (only if not already set)
+    (data || []).forEach(p => distanceMap[p.id] ??= 999);
     return data || [];
   }, []);
 
@@ -681,31 +717,30 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, isPremium }: DiscoverPage
     const userMaxDistance = Number(userMaxDistanceRaw);
     const safeUserMaxDistance = Number.isFinite(userMaxDistance) && userMaxDistance > 0 ? userMaxDistance : 50;
 
+    // ⭐ CRITICAL: Block fetch if profile completion < 70% after 8 swipes (prevents edge-case abuse)
+    if (profileCompletion < 70 && todaySwipeCount >= 8) {
+      setShowProfileCompletionModal(true);
+      return { matches: [], images: {}, distances: {}, index: 0 };
+    }
+
     const baseCountryCode = (currentUserData?.country_code || '').trim();
 
-    // Get unlocked countries for premium users
-    const unlockedCountries: string[] = Array.isArray(currentUserData?.unlocked_countries)
-      ? currentUserData.unlocked_countries
-          .filter((c): c is string => typeof c === 'string' && c.trim().length > 0)
-          .map(c => c.trim())
+    // Get unlocked countries for premium users (robust to array/JSON/string shapes)
+    const unlockedCountries: string[] = isPremium
+      ? normalizeCountryCodeList(
+          (currentUserData as any)?.unlocked_countries ?? (currentUser as any)?.unlocked_countries,
+          baseCountryCode
+        )
       : [];
-
-    // IMPORTANT: Non-premium users ONLY see profiles in their own country.
-    // Premium users can additionally see profiles from unlocked countries.
-    const allowedCountryCodes = Array.from(
-      new Set([
-        ...(baseCountryCode ? [baseCountryCode] : []),
-        ...(isPremium ? unlockedCountries : []),
-      ])
-    );
 
     // Get location-based matches (distance filter)
     const locationMatches = await locationService.getLocationBasedMatches(userId, safeUserMaxDistance);
 
     // ⭐ OPTIMIZED: Single pass to build both distanceMap and locationProfileIds (50ms saved)
     const distanceMap: { [key: string]: number } = {};
+    // Distance ONLY applies to the local country.
     const locationProfileIds = uniqUuids(locationMatches
-      .filter((m) => !allowedCountryCodes.length || allowedCountryCodes.includes(m.country_code))
+      .filter((m) => !baseCountryCode || m.country_code === baseCountryCode)
       .map((match) => {
         distanceMap[match.profile_id] = match.distance_km;
         return match.profile_id;
@@ -717,12 +752,6 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, isPremium }: DiscoverPage
 
     // ⭐ PREMIUM FIX: Detect if premium user has unlocked countries
     const hasUnlockedCountries = isPremium && unlockedCountries.length > 0;
-    const localProfilesEmpty = locationProfileIds.length === 0;
-    
-    // ⭐ RESET BANNER: If local profiles exist again, reset the exhausted banner
-    if (locationProfileIds.length > 0 && localProfilesExhausted) {
-      setLocalProfilesExhausted(false);
-    }
 
     let filteredProfiles: any[] = [];
     let usingArchivedFallback = false; // Track if we're showing archived profiles
@@ -731,90 +760,165 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, isPremium }: DiscoverPage
     // PHASE 1: ACTIVE USERS ONLY (is_archived = false)
     // =====================================================
     
-    // 1️⃣ Normal local flow - ACTIVE users only
-    if (locationProfileIds.length > 0) {
-      let query = supabase
-        .from('profiles')
-        .select(PROFILE_SELECT)
-        .in('id', locationProfileIds);
+    if (isPremium) {
+      // STEP 1: fetch local distance-based profiles (local country only)
+      const localProfiles = locationProfileIds.length
+        ? await (async () => {
+            let query = supabase
+              .from('profiles')
+              .select(PROFILE_SELECT)
+              .in('id', locationProfileIds);
 
-      // Enforce country rules at DB level too
-      if (allowedCountryCodes.length > 0) {
-        query = query.in('country_code', allowedCountryCodes);
-      }
+            if (baseCountryCode) {
+              query = query.eq('country_code', baseCountryCode);
+            }
 
-      if (excludedIds.length > 0) {
-        query = query.not('id', 'in', `(${excludedIds.join(',')})`);
-      }
+            if (excludedIds.length > 0) {
+              query = query.not('id', 'in', `(${excludedIds.join(',')})`);
+            }
 
-      const { data: profiles, error } = await query
-        .in('gender', allowedGenders)
-        .eq('account_status', 'active')
-        .eq('is_admin', false)
-        .eq('is_archived', false) // PHASE 1: Active users only
-        .limit(100);
+            const { data: profiles, error } = await query
+              .in('gender', allowedGenders)
+              .eq('account_status', 'active')
+              .eq('is_admin', false)
+              .eq('is_archived', false)
+              .limit(100);
 
-      if (error) throw error;
-      filteredProfiles = profiles || [];
-    }
-    // 2️⃣ PREMIUM FALLBACK — unlocked countries ONLY when local is empty
-    else if (hasUnlockedCountries) {
-      const unlockedProfiles = await fetchUnlockedCountryProfiles({
-        unlockedCountries,
-        excludedIds,
-        allowedGenders,
-        distanceMap,
-        limit: 100
+            if (error) throw error;
+            return profiles || [];
+          })()
+        : [];
+
+      // STEP 2: fetch unlocked country profiles (premium only, no distance filter)
+      const intlProfiles = hasUnlockedCountries
+        ? await fetchUnlockedCountryProfiles({
+            unlockedCountries,
+            excludedIds: uniqUuids([...excludedIds, ...localProfiles.map(p => p.id)]),
+            allowedGenders,
+            distanceMap,
+            limit: 100
+          })
+        : [];
+
+      // STEP 3: Apply age filtering to EACH group separately
+      const userMinAge = currentUserData?.min_age || 18;
+      const userMaxAge = currentUserData?.max_age || 99;
+      
+      const filterAge = (profiles: any[]) => profiles.filter(profile => {
+        if (!profile.date_of_birth) return false;
+        const age = calculateAge(profile.date_of_birth);
+        return age >= userMinAge && age <= userMaxAge;
       });
       
-      filteredProfiles = unlockedProfiles;
-
-      // ✨ Show gentle toast (once) when premium users see unlocked country profiles
-      if (filteredProfiles.length > 0 && !localProfilesExhausted) {
-        setLocalProfilesExhausted(true); // Flag to prevent repeated toasts
-        toast({
-          title: '🌍 Showing matches from your selected countries',
-          description: 'You\'ve seen nearby profiles. Exploring your unlocked countries now.',
-          duration: 4000,
-        });
-      }
-    }
-    // 3️⃣ Free-user fallback (same country only) - ACTIVE users only
-    else if (baseCountryCode) {
-      let query = supabase.from('profiles').select(PROFILE_SELECT);
-
-      if (excludedIds.length > 0) {
-        query = query.not('id', 'in', `(${excludedIds.join(',')})`);
-      }
-
-      const { data: profiles, error } = await query
-        .in('gender', allowedGenders)
-        .eq('account_status', 'active')
-        .eq('is_admin', false)
-        .eq('is_archived', false) // PHASE 1: Active users only
-        .eq('country_code', baseCountryCode)
-        .limit(100);
-
-      if (error) throw error;
-      filteredProfiles = profiles || [];
-    }
-
-    // ⭐ PREMIUM FEATURE: Mix unlocked countries with local profiles ONLY if local profiles exist
-    // If local is empty, unlocked countries are already fetched in premium fallback above
-    if (unlockedCountries.length > 0 && isPremium && locationProfileIds.length > 0 && filteredProfiles.length > 0) {
-      const existingIds = new Set(filteredProfiles.map(p => p.id));
-      const allExcludedIds = [...excludedIds, ...Array.from(existingIds)];
+      const localFiltered = filterAge(localProfiles).filter(p => p.id !== userId);
+      const intlFiltered = filterAge(intlProfiles).filter(p => p.id !== userId);
       
-      const unlockedProfiles = await fetchUnlockedCountryProfiles({
-        unlockedCountries,
-        excludedIds: allExcludedIds,
-        allowedGenders,
-        distanceMap,
-        limit: 50
-      });
+      // STEP 4: Stratify EACH group separately (keeps fairness without country bias)
+      const dailySeed = todayStr();
+      const stratifiedLocal = localFiltered.length > 0
+        ? getStratifiedBatches(localFiltered, 15, 4, `${userId}_${dailySeed}_local`)
+        : [];
+      const stratifiedIntl = intlFiltered.length > 0
+        ? getStratifiedBatches(intlFiltered, 15, 4, `${userId}_${dailySeed}_intl`)
+        : [];
+      
+      // STEP 5: MIX local and international profiles (soft interleaving)
+      if (stratifiedLocal.length > 0 && stratifiedIntl.length > 0) {
+        const rand = seededRandom(`${userId}_${dailySeed}_mix`);
+        const result: any[] = [];
+        let l = 0;
+        let i = 0;
+        let localStreak = 0;
+        
+        while (l < stratifiedLocal.length || i < stratifiedIntl.length) {
+          const canLocal = l < stratifiedLocal.length;
+          const canIntl = i < stratifiedIntl.length;
+          
+          if (!canIntl) {
+            result.push(stratifiedLocal[l++]);
+            continue;
+          }
+          if (!canLocal) {
+            result.push(stratifiedIntl[i++]);
+            continue;
+          }
+          
+          // Dynamic mixing: probability adapts to remaining intl/local ratio, with a hard cap
+          // so locals never "exhaust first" and users can't detect a fixed cadence.
+          const remainingLocal = stratifiedLocal.length - l;
+          const remainingIntl = stratifiedIntl.length - i;
+          const remainingTotal = remainingLocal + remainingIntl;
+          const ratio = remainingTotal > 0 ? remainingIntl / remainingTotal : 0;
+          // Base 0.25 .. 0.65 depending on remaining ratio
+          const intlChance = 0.25 + ratio * 0.4;
+          const pickIntl = localStreak >= 3 ? true : rand() < intlChance;
+          
+          if (pickIntl) {
+            result.push(stratifiedIntl[i++]);
+            localStreak = 0;
+          } else {
+            result.push(stratifiedLocal[l++]);
+            localStreak++;
+          }
+        }
+        
+        filteredProfiles = result;
+      } else {
+        // Only one pool available
+        filteredProfiles = [...stratifiedLocal, ...stratifiedIntl];
+      }
+      
+      // Reset archived fallback flag if we found active profiles
+      if (filteredProfiles.length > 0) {
+        usingArchivedFallback = false;
+      }
+    } else {
+      // Free users: local country only
+      if (locationProfileIds.length > 0) {
+        let query = supabase
+          .from('profiles')
+          .select(PROFILE_SELECT)
+          .in('id', locationProfileIds);
 
-      if (unlockedProfiles.length > 0) {
-        filteredProfiles = [...filteredProfiles, ...unlockedProfiles];
+        if (baseCountryCode) {
+          query = query.eq('country_code', baseCountryCode);
+        }
+
+        if (excludedIds.length > 0) {
+          query = query.not('id', 'in', `(${excludedIds.join(',')})`);
+        }
+
+        const { data: profiles, error } = await query
+          .in('gender', allowedGenders)
+          .eq('account_status', 'active')
+          .eq('is_admin', false)
+          .eq('is_archived', false)
+          .limit(100);
+
+        if (error) throw error;
+        filteredProfiles = profiles || [];
+      } else if (baseCountryCode) {
+        let query = supabase.from('profiles').select(PROFILE_SELECT);
+
+        if (excludedIds.length > 0) {
+          query = query.not('id', 'in', `(${excludedIds.join(',')})`);
+        }
+
+        const { data: profiles, error } = await query
+          .in('gender', allowedGenders)
+          .eq('account_status', 'active')
+          .eq('is_admin', false)
+          .eq('is_archived', false)
+          .eq('country_code', baseCountryCode)
+          .limit(100);
+
+        if (error) throw error;
+        filteredProfiles = profiles || [];
+        
+        // Reset archived fallback flag if we found active profiles
+        if (filteredProfiles.length > 0) {
+          usingArchivedFallback = false;
+        }
       }
     }
 
@@ -823,6 +927,14 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, isPremium }: DiscoverPage
     // =====================================================
     if (filteredProfiles.length === 0) {
       // Phase 1 returned 0 active profiles, trying archived fallback
+      // Define allowed countries for archived query
+      const allowedCountryCodes = Array.from(
+        new Set([
+          ...(baseCountryCode ? [baseCountryCode] : []),
+          ...(isPremium ? unlockedCountries : []),
+        ])
+      );
+      
       let archivedQuery = supabase.from('profiles').select(PROFILE_SELECT);
       
       if (excludedIds.length > 0) {
@@ -846,30 +958,88 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, isPremium }: DiscoverPage
       if (!archivedError && archivedProfiles && archivedProfiles.length > 0) {
         filteredProfiles = archivedProfiles;
         usingArchivedFallback = true;
+        
+        // STEP 5b: Mix archived profiles for premium users (same logic as regular fetch)
+        if (isPremium && baseCountryCode && unlockedCountries.length > 0) {
+          const localArchived = filteredProfiles.filter(p => (p.country_code || '').trim() === baseCountryCode);
+          const intlArchived = filteredProfiles.filter(p => (p.country_code || '').trim() !== baseCountryCode);
+          
+          if (localArchived.length > 0 && intlArchived.length > 0) {
+            const localStrata = getStratifiedBatches(localArchived);
+            const intlStrata = getStratifiedBatches(intlArchived);
+            const mixSeed = `${userId}_${todayStr()}_archived`;
+            const rng = seededRandom(mixSeed);
+            
+            const mixed: typeof filteredProfiles = [];
+            let localStrataIdx = 0, intlStrataIdx = 0;
+            let localBatchIdx = 0, intlBatchIdx = 0;
+            let localStreak = 0;
+            
+            while (localStrataIdx < localStrata.length || intlStrataIdx < intlStrata.length) {
+              const hasLocal = localStrataIdx < localStrata.length && localBatchIdx < localStrata[localStrataIdx].length;
+              const hasIntl = intlStrataIdx < intlStrata.length && intlBatchIdx < intlStrata[intlStrataIdx].length;
+              
+              if (!hasLocal && !hasIntl) break;
+              if (!hasIntl) { mixed.push(...localStrata[localStrataIdx].slice(localBatchIdx)); break; }
+              if (!hasLocal) { mixed.push(...intlStrata[intlStrataIdx].slice(intlBatchIdx)); break; }
+              
+              const remainingLocal = (localStrata.length - localStrataIdx) + (localStrataIdx < localStrata.length ? (localStrata[localStrataIdx].length - localBatchIdx) - 1 : 0);
+              const remainingIntl = (intlStrata.length - intlStrataIdx) + (intlStrataIdx < intlStrata.length ? (intlStrata[intlStrataIdx].length - intlBatchIdx) - 1 : 0);
+              const remainingTotal = remainingLocal + remainingIntl;
+              const ratio = remainingTotal > 0 ? remainingIntl / remainingTotal : 0;
+              const intlChance = 0.25 + ratio * 0.4;
+              const pickIntl = localStreak >= 3 ? true : rng() < intlChance;
+              if (pickIntl) {
+                mixed.push(intlStrata[intlStrataIdx][intlBatchIdx++]);
+                localStreak = 0;
+                if (intlBatchIdx >= intlStrata[intlStrataIdx].length) { intlStrataIdx++; intlBatchIdx = 0; }
+              } else {
+                mixed.push(localStrata[localStrataIdx][localBatchIdx++]);
+                localStreak++;
+                if (localBatchIdx >= localStrata[localStrataIdx].length) { localStrataIdx++; localBatchIdx = 0; localStreak = 0; }
+              }
+            }
+            
+            filteredProfiles = mixed;
+          }
+        }
       }
     }
     
     // Update the fallback state
     setIsArchivedFallback(usingArchivedFallback);
+
+    // If we still have no candidates after archived fallback, mark exhausted here.
+    if (filteredProfiles.length === 0) {
+      setNoMoreProfiles(true);
+      return { matches: [], images: {}, distances: distanceMap, index: 0 };
+    }
  
-    // Apply age filtering
-    const userMinAge = currentUserData?.min_age || 18;
-    const userMaxAge = currentUserData?.max_age || 99;
-    
-    filteredProfiles = filteredProfiles.filter(profile => {
-      if (!profile.date_of_birth) return false;
-      const age = calculateAge(profile.date_of_birth);
-      return age >= userMinAge && age <= userMaxAge;
-    });
+    // For FREE users: Apply age filtering and stratification here
+    // (Premium users already did this per-group before mixing)
+    if (!isPremium) {
+      const userMinAge = currentUserData?.min_age || 18;
+      const userMaxAge = currentUserData?.max_age || 99;
+      
+      filteredProfiles = filteredProfiles.filter(profile => {
+        if (!profile.date_of_birth) return false;
+        const age = calculateAge(profile.date_of_birth);
+        return age >= userMinAge && age <= userMaxAge;
+      });
+      
+      filteredProfiles = filteredProfiles.filter(profile => profile.id !== userId);
+      
+      // Apply stratified sampling for free users
+      const dailySeed = todayStr();
+      filteredProfiles = getStratifiedBatches(filteredProfiles, 15, 4, `${userId}_${dailySeed}`);
+    }
 
     // Add empty images array and precomputed distance
-    const profilesWithImages = filteredProfiles
-      .filter(profile => profile.id !== userId)
-      .map(profile => ({
-        ...profile,
-        images: [],
-        distance: distanceMap[profile.id] // Precomputed distance from locationService
-      }));
+    const profilesWithImages = filteredProfiles.map(profile => ({
+      ...profile,
+      images: [],
+      distance: distanceMap[profile.id] // Precomputed distance from locationService
+    }));
 
     // ⭐ DEDUPLICATION: Remove any duplicate profiles by ID
     const uniqueProfiles = Array.from(
@@ -959,13 +1129,12 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, isPremium }: DiscoverPage
     
     // ⭐ Check if we have a saved profile order for today
     // IMPORTANT: include the “feed signature” so unlocking countries regenerates a mixed order
-    const feedSignature = buildFeedSignature(baseCountryCode, unlockedCountries, !!isPremium);
+    const feedSignature = buildFeedSignature(baseCountryCode, unlockedCountries, !!isPremium, safeUserMaxDistance);
     const savedOrderKey = buildSavedOrderKey(userId, feedSignature);
     const unlockedSignature = (isPremium ? [...unlockedCountries].sort() : []).join(',');
     const savedOrder = localStorage.getItem(savedOrderKey);
     
     let shuffled: typeof uniqueProfiles;
-    let shouldMixThisGeneration = !savedOrder;
     
     if (savedOrder) {
       // Restore saved order
@@ -991,19 +1160,11 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, isPremium }: DiscoverPage
       } catch (error) {
         // If parse fails, apply stratified sampling
         shuffled = getStratifiedBatches(uniqueProfiles, 15, 4, shuffleSeed);
-        shouldMixThisGeneration = true;
       }
     } else {
       // First time today - apply stratified sampling for fair distribution
       // Get 4 batches of 15 profiles each (60 total) with fair distribution
       shuffled = getStratifiedBatches(uniqueProfiles, 15, 4, shuffleSeed);
-    }
-
-    // Premium-only: after stratified/country interleave, enforce local+intl mixing so intl
-    // profiles don’t get “pushed to the end” when locals dominate.
-    if (shouldMixThisGeneration && isPremium && baseCountryCode && unlockedCountries.length > 0) {
-      const mixSeed = `${shuffleSeed}_${unlockedSignature}`;
-      shuffled = mixLocalAndInternational(shuffled, baseCountryCode, mixSeed);
     }
 
     // Save profile order to localStorage (post-mix)
@@ -1273,12 +1434,6 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, isPremium }: DiscoverPage
       // Load in background - don't await
       (async () => {
         try {
-          // ⭐ ANDROID OPTIMIZATION: Abort if user already moved past this profile
-          if (currentIndex !== indexOfProfileBeingLoaded) {
-            requestedImageProfileIds.current.delete(user.id);
-            return;
-          }
-
           const { data: images } = await supabase
             .from('user_images')
             .select('image_url, is_approved')
@@ -1332,9 +1487,6 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, isPremium }: DiscoverPage
   const preloadNextProfileImages = useCallback((matches: PotentialMatch[], alreadyLoaded: { [key: string]: string[] }, startIdx: number) => {
     preloadProfileImages(matches, startIdx);
   }, [preloadProfileImages]);
-
-  // Track if we've already initialized for this user to prevent re-fetching
-  const initializedUserRef = useRef<string | null>(null);
 
   // Main effect to fetch data - optimized for fast loading
   useEffect(() => {
@@ -1670,11 +1822,9 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, isPremium }: DiscoverPage
       // Enforce country rules early for speed + correctness
       const baseCountryCode = (currentUser.country_code || '').trim();
       
-      // Get unlocked countries for premium users with proper filtering
-      const unlockedCountries: string[] = isPremium && Array.isArray(currentUser.unlocked_countries)
-        ? currentUser.unlocked_countries
-            .filter((c): c is string => typeof c === 'string' && c.trim().length > 0)
-            .map(c => c.trim())
+      // Get unlocked countries for premium users (robust to array/JSON/string shapes)
+      const unlockedCountries: string[] = isPremium
+        ? normalizeCountryCodeList((currentUser as any).unlocked_countries, baseCountryCode)
         : [];
       
       const allowedCountryCodes = Array.from(
@@ -1687,44 +1837,73 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, isPremium }: DiscoverPage
       // ⭐ PREMIUM FIX: Check if we have unlocked countries
       const hasUnlockedCountries = isPremium && unlockedCountries.length > 0;
 
-      let query = supabase.from('profiles').select(PROFILE_SELECT);
-
-      if (allExcludedIds.length > 0) {
-        query = query.not('id', 'in', `(${allExcludedIds.join(',')})`);
-      }
-
-      if (allowedCountryCodes.length > 0) {
-        query = query.in('country_code', allowedCountryCodes);
-      }
-
-      const { data: newProfiles, error } = await query
-        .in('gender', allowedGenders)
-        .eq('account_status', 'active')
-        .eq('is_admin', false)
-        .eq('is_archived', false) // PHASE 1: Active profiles only
-        .limit(100); // Larger pool for stratified sampling
-
-      if (error) throw error;
-      
-      // ⭐ Initialize distanceMap early for premium fallback
+      // Build a unified pool: local(distance-filtered, local country only) + unlocked countries (no distance)
       const distanceMap: { [key: string]: number } = {};
-      
-      // =====================================================
-      // PHASE 2: ARCHIVED FALLBACK (only if Phase 1 returns 0)
-      // Same logic as main fetch - mirror the two-phase system
-      // =====================================================
-      let activeProfiles = newProfiles || [];
+
+      const userMaxDistanceRaw = (currentUser as any).max_distance ?? (currentUser as any).distance_preference ?? 50;
+      const userMaxDistance = Number(userMaxDistanceRaw);
+      const safeUserMaxDistance = Number.isFinite(userMaxDistance) && userMaxDistance > 0 ? userMaxDistance : 50;
+
+      const locationMatches = await locationService.getLocationBasedMatches(currentUser.id, safeUserMaxDistance * 2);
+      const locationProfileIds = uniqUuids(locationMatches
+        .filter((m) => !baseCountryCode || m.country_code === baseCountryCode)
+        .map((match) => {
+          distanceMap[match.profile_id] = match.distance_km;
+          return match.profile_id;
+        }));
+
+      const localProfiles = locationProfileIds.length
+        ? await (async () => {
+            let localQuery = supabase
+              .from('profiles')
+              .select(PROFILE_SELECT)
+              .in('id', locationProfileIds);
+
+            if (baseCountryCode) {
+              localQuery = localQuery.eq('country_code', baseCountryCode);
+            }
+
+            if (allExcludedIds.length > 0) {
+              localQuery = localQuery.not('id', 'in', `(${allExcludedIds.join(',')})`);
+            }
+
+            const { data: localData, error: localError } = await localQuery
+              .in('gender', allowedGenders)
+              .eq('account_status', 'active')
+              .eq('is_admin', false)
+              .eq('is_archived', false)
+              .limit(100);
+
+            if (localError) throw localError;
+            return localData || [];
+          })()
+        : [];
+
+      const intlProfiles = hasUnlockedCountries
+        ? await fetchUnlockedCountryProfiles({
+            unlockedCountries,
+            excludedIds: uniqUuids([...allExcludedIds, ...localProfiles.map(p => p.id)]),
+            allowedGenders,
+            distanceMap,
+            limit: 100
+          })
+        : [];
+
+      let activeProfiles = [...localProfiles, ...intlProfiles];
       let usingArchivedFallback = false;
-      
+
+      // Reset archived fallback flag if we found active profiles
+      if (activeProfiles.length > 0 && isArchivedFallback) {
+        setIsArchivedFallback(false);
+      }
+
       if (activeProfiles.length === 0) {
-        // Phase 1 returned 0 active profiles, trying archived fallback
         let archivedQuery = supabase.from('profiles').select(PROFILE_SELECT);
-        
+
         if (allExcludedIds.length > 0) {
           archivedQuery = archivedQuery.not('id', 'in', `(${allExcludedIds.join(',')})`);
         }
-        
-        // Build country filter based on user type
+
         if (isPremium && allowedCountryCodes.length > 0) {
           archivedQuery = archivedQuery.in('country_code', allowedCountryCodes);
         } else if (baseCountryCode) {
@@ -1732,8 +1911,8 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, isPremium }: DiscoverPage
         }
 
         const { data: archivedProfiles, error: archivedError } = await archivedQuery
-          .eq('is_archived', true) // PHASE 2: Archived users
-          .eq('account_status', 'active') // Still respect account status
+          .eq('is_archived', true)
+          .eq('account_status', 'active')
           .eq('is_admin', false)
           .in('gender', allowedGenders)
           .limit(50);
@@ -1741,122 +1920,18 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, isPremium }: DiscoverPage
         if (!archivedError && archivedProfiles && archivedProfiles.length > 0) {
           activeProfiles = archivedProfiles;
           usingArchivedFallback = true;
-          
-          // Update fallback state if we're now showing archived profiles
           if (!isArchivedFallback) {
             setIsArchivedFallback(true);
           }
         }
       }
-      
-      // If no new profiles found, try premium fallback before giving up
-      if (activeProfiles.length === 0 && hasUnlockedCountries) {
-        // Try unlocked countries only as fallback
-        const fallbackProfiles = await fetchUnlockedCountryProfiles({
-          unlockedCountries,
-          excludedIds: allExcludedIds,
-          allowedGenders,
-          distanceMap,
-          limit: 100
-        });
-        
-        if (fallbackProfiles.length > 0) {
-          // ✨ Show gentle toast (once) for premium fallback
-          if (!localProfilesExhausted) {
-            setLocalProfilesExhausted(true);
-            toast({
-              title: '🌍 Showing matches from your selected countries',
-              description: 'You\'ve seen nearby profiles. Exploring your unlocked countries now.',
-              duration: 4000,
-            });
-          }
-          
-          // Continue with fallback profiles
-          const profilesWithImages = fallbackProfiles.map(profile => ({
-            ...profile,
-            images: [],
-            distance: distanceMap[profile.id]
-          }));
 
-          // Apply age filtering
-          const userMinAge = currentUser.min_age || 18;
-          const userMaxAge = currentUser.max_age || 99;
-          const ageFiltered = profilesWithImages.filter(profile => {
-            if (!profile.date_of_birth) return false;
-            const age = calculateAge(profile.date_of_birth);
-            return age >= userMinAge && age <= userMaxAge;
-          });
-
-          // Apply stratified sampling
-          const today = new Date().toISOString().split('T')[0];
-          const refillSeed = `${currentUser.id}_refill_${today}_${Date.now()}`;
-          const stratifiedProfiles = stratifiedSample(ageFiltered, 15, refillSeed);
-          
-          // Remove duplicates
-          const existingProfileIds = new Set(potentialMatches.map(p => !isAd(p) ? p.id : null).filter(Boolean));
-          const uniqueProfiles = stratifiedProfiles.filter(profile => !existingProfileIds.has(profile.id));
-          
-          if (uniqueProfiles.length > 0) {
-            const newProfilesWithAds = injectAds(uniqueProfiles);
-            setPotentialMatches(prev => mergeDecksWithoutProfileDupes(prev, newProfilesWithAds));
-            
-            // Preload images
-            preloadNextProfileImages(uniqueProfiles, userImages, 0);
-            
-            // Batch fetch languages
-            const newProfileIds = uniqueProfiles.map(p => p.id).filter(Boolean);
-            if (newProfileIds.length > 0) {
-              batchFetchLanguages(newProfileIds);
-            }
-            
-            return; // Success - exit early
-          }
-        }
-      }
-      
-      // If no new profiles found even after premium fallback, we've exhausted the pool
-      // BUT: Only mark exhausted if premium fallback isn't available AND we didn't use archived fallback
-      if (
-        activeProfiles.length === 0 &&
-        !hasUnlockedCountries &&
-        !usingArchivedFallback
-      ) {
-        setNoMoreProfiles(true); // Mark that we've exhausted all available profiles
+      if (activeProfiles.length === 0) {
+        setNoMoreProfiles(true);
         return;
       }
 
-      // Apply same filtering logic as original fetch using location service
       let filteredProfiles = activeProfiles;
-      const userMaxDistanceRaw = (currentUser as any).max_distance ?? (currentUser as any).distance_preference ?? 50;
-      const userMaxDistance = Number(userMaxDistanceRaw);
-      const safeUserMaxDistance = Number.isFinite(userMaxDistance) && userMaxDistance > 0 ? userMaxDistance : 50;
-
-
-      // Get location-based matches for distance filtering
-      // Refill widening: broaden distance to avoid “no profiles” gaps while still filtering later.
-      const locationMatches = await locationService.getLocationBasedMatches(currentUser.id, safeUserMaxDistance * 2);
-      // ⭐ OPTIMIZED: Single pass for distanceMap and locationProfileIds (30ms saved)
-      const locationProfileIds = uniqUuids(locationMatches
-        .filter((m) => !allowedCountryCodes.length || allowedCountryCodes.includes(m.country_code))
-        .map((match) => {
-          distanceMap[match.profile_id] = match.distance_km;
-          return match.profile_id;
-        }));
-
-      // Filter profiles to only those within distance range AND allowed countries
-      filteredProfiles = filteredProfiles.filter((profile) => {
-        if (allowedCountryCodes.length && !allowedCountryCodes.includes(profile.country_code)) {
-          return false;
-        }
-
-        if (!profile.latitude || !profile.longitude) {
-          return profile.country_code === baseCountryCode;
-        }
-
-        return locationProfileIds.includes(profile.id);
-      });
-
-      // ⭐ PREMIUM FEATURE: Also fetch profiles from unlocked countries for premium users\n      if (isPremium && currentUser.unlocked_countries && Array.isArray(currentUser.unlocked_countries) && currentUser.unlocked_countries.length > 0) {\n        const existingIds = new Set(filteredProfiles.map(p => p.id));\n        const premiumExcludedIds = uniqUuids([...allExcludedIds, ...Array.from(existingIds)]);\n        const unlockedCountryCodes = (currentUser.unlocked_countries || [])\n          .filter((c): c is string => typeof c === 'string' && c.trim().length > 0)\n          .map(c => c.trim());\n        \n        if (unlockedCountryCodes.length > 0) {\n          const unlockedProfiles = await fetchUnlockedCountryProfiles({\n            unlockedCountries: unlockedCountryCodes,\n            excludedIds: premiumExcludedIds,\n            allowedGenders,\n            distanceMap,\n            limit: 50\n          });\n\n          if (unlockedProfiles.length > 0) {\n            filteredProfiles = [...filteredProfiles, ...unlockedProfiles];\n          }\n        }\n      }
 
       // Apply age filtering
       const userMinAge = currentUser.min_age || 18;
@@ -1870,7 +1945,7 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, isPremium }: DiscoverPage
       const profilesWithImages = filteredProfiles.map(profile => ({
         ...profile,
         images: [],
-        distance: distanceMap[profile.id]
+        distance: typeof distanceMap[profile.id] === 'number' ? distanceMap[profile.id] : 999
       }));
 
       // ⭐ STRATIFIED SAMPLING: Apply fair distribution to refilled profiles
@@ -1928,13 +2003,9 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, isPremium }: DiscoverPage
     // Filter out ads - only preload real profiles
     const realMatches = potentialMatches.filter(m => !isAd(m));
     
-    // Preload upcoming profiles (4 on Android, 10 on iOS)
-    const batchSize = isAndroidPlatform() ? 4 : 10;
-    const upcoming = realMatches.slice(currentIndex, currentIndex + batchSize);
-    
-    // Preload images for upcoming profiles
-    if (upcoming.length > 0) {
-      preloadProfileImages(upcoming as PotentialMatch[], 0);
+    // Preload images for upcoming profiles (pass full array and current position)
+    if (realMatches.length > 0) {
+      preloadProfileImages(realMatches as PotentialMatch[], currentIndex);
     }
   }, [potentialMatches, currentIndex, hasCompletedInitialFetch, preloadProfileImages]);
 
@@ -1949,7 +2020,13 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, isPremium }: DiscoverPage
       return;
     }
 
+    // Prevent double-swipes: max 2 pending swipes at once
+    if (pendingSwipesRef.current > 2) {
+      return;
+    }
+
     // Check profile completion restriction (70% after 8 swipes) - MUST be checked BEFORE swipe
+    // Applies to BOTH premium and free users
     if (profileCompletion < 70 && todaySwipeCount >= 8) {
       toast({
         title: t('discover.errors.profileCompletionRequired'),
@@ -1961,8 +2038,8 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, isPremium }: DiscoverPage
     }
 
     // Check daily limit - MUST be checked BEFORE swipe
-    // Free users: 16 swipes, Premium users: 65 swipes
-    const swipeLimit = isPremium ? 65 : 16;
+    // Free users: 16 swipes, Premium users: 85 swipes
+    const swipeLimit = isPremium ? 85 : 16;
     if (todaySwipeCount >= swipeLimit) {
       setIsOutOfSwipes(true);
       toast({
@@ -2009,9 +2086,32 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, isPremium }: DiscoverPage
         const usageResult = await checkUsageLimit('swipe');
         if (!usageResult.success) {
           // rollback: restore the card at front and remove from exclusion list
+          // Also restore deterministic daily order so reloads don't reshuffle.
+          try {
+            const baseCountryCode = (currentUser?.country_code || '').trim();
+            const unlockedCountries: string[] = (isPremium && Array.isArray((currentUser as any)?.unlocked_countries))
+              ? (currentUser as any).unlocked_countries
+                  .filter((c: unknown): c is string => typeof c === 'string' && c.trim().length > 0)
+                  .map((c: string) => c.trim())
+              : [];
+            const userMaxDistanceRaw = (currentUser as any)?.max_distance ?? (currentUser as any)?.distance_preference ?? 50;
+            const userMaxDistance = Number(userMaxDistanceRaw);
+            const safeUserMaxDistance = Number.isFinite(userMaxDistance) && userMaxDistance > 0 ? userMaxDistance : 50;
+            const feedSignature = buildFeedSignature(baseCountryCode, unlockedCountries, !!isPremium, safeUserMaxDistance);
+            const savedOrderKey = buildSavedOrderKey(currentUser?.id || '', feedSignature);
+            const savedOrder = localStorage.getItem(savedOrderKey);
+            if (savedOrder) {
+              const orderIds: string[] = JSON.parse(savedOrder);
+              if (!orderIds.includes(prevMatch.id)) {
+                localStorage.setItem(savedOrderKey, JSON.stringify([prevMatch.id, ...orderIds]));
+              }
+            }
+          } catch {
+            // ignore localStorage errors
+          }
           locallySwipedProfileIds.current.delete(prevMatch.id);
           persistSwipedIds(); // Keep sessionStorage in sync
-          setPotentialMatches(prev => [prevMatch, ...prev]);
+          setPotentialMatches(prev => mergeDecksWithoutProfileDupes([prevMatch], prev));
           setCurrentIndex(0);
           setTodaySwipeCount(prev => Math.max(0, prev - 1));
           setIsOutOfSwipes(true);
@@ -2098,9 +2198,31 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, isPremium }: DiscoverPage
             }
           } catch (fallbackErr) {
             // If even fallback fails, rollback to keep UI consistent
+            try {
+              const baseCountryCode = (currentUser?.country_code || '').trim();
+              const unlockedCountries: string[] = (isPremium && Array.isArray((currentUser as any)?.unlocked_countries))
+                ? (currentUser as any).unlocked_countries
+                    .filter((c: unknown): c is string => typeof c === 'string' && c.trim().length > 0)
+                    .map((c: string) => c.trim())
+                : [];
+              const userMaxDistanceRaw = (currentUser as any)?.max_distance ?? (currentUser as any)?.distance_preference ?? 50;
+              const userMaxDistance = Number(userMaxDistanceRaw);
+              const safeUserMaxDistance = Number.isFinite(userMaxDistance) && userMaxDistance > 0 ? userMaxDistance : 50;
+              const feedSignature = buildFeedSignature(baseCountryCode, unlockedCountries, !!isPremium, safeUserMaxDistance);
+              const savedOrderKey = buildSavedOrderKey(currentUser?.id || '', feedSignature);
+              const savedOrder = localStorage.getItem(savedOrderKey);
+              if (savedOrder) {
+                const orderIds: string[] = JSON.parse(savedOrder);
+                if (!orderIds.includes(prevMatch.id)) {
+                  localStorage.setItem(savedOrderKey, JSON.stringify([prevMatch.id, ...orderIds]));
+                }
+              }
+            } catch {
+              // ignore localStorage errors
+            }
             locallySwipedProfileIds.current.delete(prevMatch.id);
             persistSwipedIds(); // Keep sessionStorage in sync
-            setPotentialMatches(prev => [prevMatch, ...prev]);
+            setPotentialMatches(prev => mergeDecksWithoutProfileDupes([prevMatch], prev));
             setCurrentIndex(0);
             setTodaySwipeCount(prev => Math.max(0, prev - 1));
             toast({ 
@@ -2160,9 +2282,31 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, isPremium }: DiscoverPage
         }
       } catch (jobErr) {
         // On unexpected errors, attempt a rollback to keep UX consistent
+        try {
+          const baseCountryCode = (currentUser?.country_code || '').trim();
+          const unlockedCountries: string[] = (isPremium && Array.isArray((currentUser as any)?.unlocked_countries))
+            ? (currentUser as any).unlocked_countries
+                .filter((c: unknown): c is string => typeof c === 'string' && c.trim().length > 0)
+                .map((c: string) => c.trim())
+            : [];
+          const userMaxDistanceRaw = (currentUser as any)?.max_distance ?? (currentUser as any)?.distance_preference ?? 50;
+          const userMaxDistance = Number(userMaxDistanceRaw);
+          const safeUserMaxDistance = Number.isFinite(userMaxDistance) && userMaxDistance > 0 ? userMaxDistance : 50;
+          const feedSignature = buildFeedSignature(baseCountryCode, unlockedCountries, !!isPremium, safeUserMaxDistance);
+          const savedOrderKey = buildSavedOrderKey(currentUser?.id || '', feedSignature);
+          const savedOrder = localStorage.getItem(savedOrderKey);
+          if (savedOrder) {
+            const orderIds: string[] = JSON.parse(savedOrder);
+            if (!orderIds.includes(prevMatch.id)) {
+              localStorage.setItem(savedOrderKey, JSON.stringify([prevMatch.id, ...orderIds]));
+            }
+          }
+        } catch {
+          // ignore localStorage errors
+        }
         locallySwipedProfileIds.current.delete(prevMatch.id);
         persistSwipedIds(); // Keep sessionStorage in sync
-        setPotentialMatches(prev => [prevMatch, ...prev]);
+        setPotentialMatches(prev => mergeDecksWithoutProfileDupes([prevMatch], prev));
         setCurrentIndex(0);
         setTodaySwipeCount(prev => Math.max(0, prev - 1));
       } finally {
@@ -2174,7 +2318,13 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, isPremium }: DiscoverPage
   // Optimistic UI: move to next card instantly, then process pass in background
   // Function to execute pass after user confirms (used when "they liked you" popup is shown)
   const executePassLogic = async (matchToPass: PotentialMatch) => {
+    // Prevent double-swipes: max 2 pending swipes at once
+    if (pendingSwipesRef.current > 2) {
+      return;
+    }
+
     // Check profile completion restriction (70% after 8 swipes) - MUST be checked BEFORE swipe
+    // Applies to BOTH premium and free users
     if (profileCompletion < 70 && todaySwipeCount >= 8) {
       toast({
         title: t('discover.errors.profileCompletionRequired'),
@@ -2186,8 +2336,8 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, isPremium }: DiscoverPage
     }
 
     // Check daily limit - MUST be checked BEFORE swipe
-    // Free users: 16 swipes, Premium users: 65 swipes
-    const swipeLimit = isPremium ? 65 : 16;
+    // Free users: 16 swipes, Premium users: 85 swipes
+    const swipeLimit = isPremium ? 85 : 16;
     if (todaySwipeCount >= swipeLimit) {
       setIsOutOfSwipes(true);
       toast({
@@ -2201,8 +2351,9 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, isPremium }: DiscoverPage
     }
 
     // Optimistic path for pass: add to passed list locally, advance UI, persist in background and rollback on error
+    // ✅ Use the passed parameter, not undefined currentMatch
+    const prevMatch = matchToPass;
     const prevIndex = currentIndex;
-    const prevMatch = currentMatch;
 
     // CRITICAL: Add to local exclusion list immediately with 'pass' action (expires after 6 days)
     locallySwipedProfileIds.current.set(prevMatch.id, { action: 'pass', timestamp: Date.now() });
@@ -2234,9 +2385,32 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, isPremium }: DiscoverPage
         const usageResult = await checkUsageLimit('swipe');
         if (!usageResult.success) {
           // rollback: restore the card at front and remove from exclusion lists
+          // Also restore deterministic daily order so reloads don't reshuffle.
+          try {
+            const baseCountryCode = (currentUser?.country_code || '').trim();
+            const unlockedCountries: string[] = (isPremium && Array.isArray((currentUser as any)?.unlocked_countries))
+              ? (currentUser as any).unlocked_countries
+                  .filter((c: unknown): c is string => typeof c === 'string' && c.trim().length > 0)
+                  .map((c: string) => c.trim())
+              : [];
+            const userMaxDistanceRaw = (currentUser as any)?.max_distance ?? (currentUser as any)?.distance_preference ?? 50;
+            const userMaxDistance = Number(userMaxDistanceRaw);
+            const safeUserMaxDistance = Number.isFinite(userMaxDistance) && userMaxDistance > 0 ? userMaxDistance : 50;
+            const feedSignature = buildFeedSignature(baseCountryCode, unlockedCountries, !!isPremium, safeUserMaxDistance);
+            const savedOrderKey = buildSavedOrderKey(currentUser?.id || '', feedSignature);
+            const savedOrder = localStorage.getItem(savedOrderKey);
+            if (savedOrder) {
+              const orderIds: string[] = JSON.parse(savedOrder);
+              if (!orderIds.includes(prevMatch.id)) {
+                localStorage.setItem(savedOrderKey, JSON.stringify([prevMatch.id, ...orderIds]));
+              }
+            }
+          } catch {
+            // ignore localStorage errors
+          }
           locallySwipedProfileIds.current.delete(prevMatch.id);
           persistSwipedIds(); // Keep sessionStorage in sync
-          setPotentialMatches(prev => [prevMatch, ...prev]);
+          setPotentialMatches(prev => mergeDecksWithoutProfileDupes([prevMatch], prev));
           setCurrentIndex(0);
           setPassedUsers(prev => prev.filter(p => p.user_id !== prevMatch.id));
           setTodaySwipeCount(prev => Math.max(0, prev - 1));
@@ -2271,9 +2445,31 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, isPremium }: DiscoverPage
             }
           } catch (fallbackErr) {
             // On fallback failure, rollback
+            try {
+              const baseCountryCode = (currentUser?.country_code || '').trim();
+              const unlockedCountries: string[] = (isPremium && Array.isArray((currentUser as any)?.unlocked_countries))
+                ? (currentUser as any).unlocked_countries
+                    .filter((c: unknown): c is string => typeof c === 'string' && c.trim().length > 0)
+                    .map((c: string) => c.trim())
+                : [];
+              const userMaxDistanceRaw = (currentUser as any)?.max_distance ?? (currentUser as any)?.distance_preference ?? 50;
+              const userMaxDistance = Number(userMaxDistanceRaw);
+              const safeUserMaxDistance = Number.isFinite(userMaxDistance) && userMaxDistance > 0 ? userMaxDistance : 50;
+              const feedSignature = buildFeedSignature(baseCountryCode, unlockedCountries, !!isPremium, safeUserMaxDistance);
+              const savedOrderKey = buildSavedOrderKey(currentUser?.id || '', feedSignature);
+              const savedOrder = localStorage.getItem(savedOrderKey);
+              if (savedOrder) {
+                const orderIds: string[] = JSON.parse(savedOrder);
+                if (!orderIds.includes(prevMatch.id)) {
+                  localStorage.setItem(savedOrderKey, JSON.stringify([prevMatch.id, ...orderIds]));
+                }
+              }
+            } catch {
+              // ignore localStorage errors
+            }
             locallySwipedProfileIds.current.delete(prevMatch.id);
             persistSwipedIds(); // Keep sessionStorage in sync
-            setPotentialMatches(prev => [prevMatch, ...prev]);
+            setPotentialMatches(prev => mergeDecksWithoutProfileDupes([prevMatch], prev));
             setCurrentIndex(0);
             setPassedUsers(prev => prev.filter(p => p.user_id !== prevMatch.id));
             setTodaySwipeCount(prev => Math.max(0, prev - 1));
@@ -2283,9 +2479,31 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, isPremium }: DiscoverPage
         }
       } catch (jobErr) {
         // Unexpected error: rollback
+        try {
+          const baseCountryCode = (currentUser?.country_code || '').trim();
+          const unlockedCountries: string[] = (isPremium && Array.isArray((currentUser as any)?.unlocked_countries))
+            ? (currentUser as any).unlocked_countries
+                .filter((c: unknown): c is string => typeof c === 'string' && c.trim().length > 0)
+                .map((c: string) => c.trim())
+            : [];
+          const userMaxDistanceRaw = (currentUser as any)?.max_distance ?? (currentUser as any)?.distance_preference ?? 50;
+          const userMaxDistance = Number(userMaxDistanceRaw);
+          const safeUserMaxDistance = Number.isFinite(userMaxDistance) && userMaxDistance > 0 ? userMaxDistance : 50;
+          const feedSignature = buildFeedSignature(baseCountryCode, unlockedCountries, !!isPremium, safeUserMaxDistance);
+          const savedOrderKey = buildSavedOrderKey(currentUser?.id || '', feedSignature);
+          const savedOrder = localStorage.getItem(savedOrderKey);
+          if (savedOrder) {
+            const orderIds: string[] = JSON.parse(savedOrder);
+            if (!orderIds.includes(prevMatch.id)) {
+              localStorage.setItem(savedOrderKey, JSON.stringify([prevMatch.id, ...orderIds]));
+            }
+          }
+        } catch {
+          // ignore localStorage errors
+        }
         locallySwipedProfileIds.current.delete(prevMatch.id);
         persistSwipedIds(); // Keep sessionStorage in sync
-        setPotentialMatches(prev => [prevMatch, ...prev]);
+        setPotentialMatches(prev => mergeDecksWithoutProfileDupes([prevMatch], prev));
         setCurrentIndex(0);
         setPassedUsers(prev => prev.filter(p => p.user_id !== prevMatch.id));
         setTodaySwipeCount(prev => Math.max(0, prev - 1));
@@ -2389,6 +2607,30 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, isPremium }: DiscoverPage
       locallySwipedProfileIds.current.delete(lastPassedUser.user_id);
       persistSwipedIds(); // Persist to sessionStorage
 
+      // Restore deterministic daily order so this profile doesn't get appended/reordered on reload.
+      try {
+        const baseCountryCode = (currentUser?.country_code || '').trim();
+        const unlockedCountries: string[] = (isPremium && Array.isArray((currentUser as any)?.unlocked_countries))
+          ? (currentUser as any).unlocked_countries
+              .filter((c: unknown): c is string => typeof c === 'string' && c.trim().length > 0)
+              .map((c: string) => c.trim())
+          : [];
+        const userMaxDistanceRaw = (currentUser as any)?.max_distance ?? (currentUser as any)?.distance_preference ?? 50;
+        const userMaxDistance = Number(userMaxDistanceRaw);
+        const safeUserMaxDistance = Number.isFinite(userMaxDistance) && userMaxDistance > 0 ? userMaxDistance : 50;
+        const feedSignature = buildFeedSignature(baseCountryCode, unlockedCountries, !!isPremium, safeUserMaxDistance);
+        const savedOrderKey = buildSavedOrderKey(currentUser?.id || '', feedSignature);
+        const savedOrder = localStorage.getItem(savedOrderKey);
+        if (savedOrder) {
+          const orderIds: string[] = JSON.parse(savedOrder);
+          if (!orderIds.includes(lastPassedUser.user_id)) {
+            localStorage.setItem(savedOrderKey, JSON.stringify([lastPassedUser.user_id, ...orderIds]));
+          }
+        }
+      } catch {
+        // ignore localStorage errors
+      }
+
       // Update reverse usage count if not premium
       if (!isPremium) {
         setReverseUsageToday(prev => prev + 1);
@@ -2406,6 +2648,9 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, isPremium }: DiscoverPage
 
   // Helper to update cache after rollback
   const moveToNext = () => {
+    // ⭐ Capture currentIndex locally to prevent stale closure bugs
+    const indexToRemove = currentIndex;
+    
     // ⭐ ANDROID OPTIMIZATION: Abort any pending image loads for previous profile
     if (currentImageAbortController) {
       currentImageAbortController.abort();
@@ -2415,7 +2660,8 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, isPremium }: DiscoverPage
     // ⭐ CRITICAL FIX: Remove the swiped profile from array to prevent duplicates
     // Use callback to get accurate remaining count AFTER removal
     setPotentialMatches(prev => {
-      const newMatches = prev.filter((_, i) => i !== currentIndex);
+      const currentProfile = prev[indexToRemove];
+      const newMatches = prev.filter((_, i) => i !== indexToRemove);
       const remainingProfiles = newMatches.length;
       
       // ⭐ Update saved profile order in localStorage (remove swiped profile)
@@ -2426,9 +2672,11 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, isPremium }: DiscoverPage
               .filter((c: unknown): c is string => typeof c === 'string' && c.trim().length > 0)
               .map((c: string) => c.trim())
           : [];
-        const feedSignature = buildFeedSignature(baseCountryCode, unlockedCountries, !!isPremium);
+        const userMaxDistanceRaw = (currentUser as any)?.max_distance ?? (currentUser as any)?.distance_preference ?? 50;
+        const userMaxDistance = Number(userMaxDistanceRaw);
+        const safeUserMaxDistance = Number.isFinite(userMaxDistance) && userMaxDistance > 0 ? userMaxDistance : 50;
+        const feedSignature = buildFeedSignature(baseCountryCode, unlockedCountries, !!isPremium, safeUserMaxDistance);
         const savedOrderKey = buildSavedOrderKey(currentUser?.id || '', feedSignature);
-        const currentProfile = prev[currentIndex];
         
         if (currentProfile && 'id' in currentProfile) {
           const savedOrder = localStorage.getItem(savedOrderKey);
@@ -2650,14 +2898,11 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, isPremium }: DiscoverPage
     );
   }
 
-  // Show no profiles if we've exhausted all available profiles OR if initial fetch found none
-  // BUT: Premium users with unlocked countries should never see this unless truly exhausted
-  const hasUnlockedCountries = isPremium && currentUser?.unlocked_countries && 
-    Array.isArray(currentUser.unlocked_countries) && currentUser.unlocked_countries.length > 0;
-  
+  // Show no profiles if we've exhausted all available profiles OR if initial fetch found none.
+  // Premium users are handled by the unified local+intl pool, so no special-case gating is needed.
   if (
-    (noMoreProfiles && potentialMatches.length === 0 && !hasUnlockedCountries) || 
-    (potentialMatches.length === 0 && hasCompletedInitialFetch && !isLoading && !hasUnlockedCountries)
+    (noMoreProfiles && potentialMatches.length === 0) ||
+    (potentialMatches.length === 0 && hasCompletedInitialFetch && !isLoading)
   ) {
     return (
       <div className="min-h-screen w-full flex items-center justify-center" style={{ minHeight: 'calc(100vh - 152px)' }}>
@@ -2862,9 +3107,6 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, isPremium }: DiscoverPage
             ) : null}
             <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-transparent to-transparent pointer-events-none" />
           </DominantColorImageBg>
-
-// Helper component to extract and apply dominant color as background
-
         )}
 
         {/* ...existing code... */}
@@ -3027,8 +3269,8 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, isPremium }: DiscoverPage
                 paddingBottom: showMoreInfo 
                   ? `calc(${
                       isIOSPlatform() 
-                        ? (window.innerHeight < 700 ? '190px' : '180px')
-                        : (window.innerHeight < 700 ? '190px' : '180px')
+                        ? (vh < 700 ? '190px' : '180px')
+                        : (vh < 700 ? '190px' : '180px')
                     } + env(safe-area-inset-bottom, 0px))` 
                   : '0px'
               }}
