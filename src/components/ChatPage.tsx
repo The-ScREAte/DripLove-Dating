@@ -76,7 +76,6 @@ const ChatPage = ({ currentUser, onUnreadChange, onDetailViewChange }: ChatPageP
   const matchesRef = useRef<ChatMatch[]>([]);
   const [selectedMatch, setSelectedMatch] = useState<ChatMatch | null>(null);
   const [messages, setMessages] = useState<ChatMessage[]>([]);
-  const [newMessage, setNewMessage] = useState('');
   const [isSending, setIsSending] = useState(false);
   const [isUserProfileOpen, setIsUserProfileOpen] = useState(false);
   const [selectedUserId, setSelectedUserId] = useState<string>('');
@@ -372,16 +371,7 @@ const ChatPage = ({ currentUser, onUnreadChange, onDetailViewChange }: ChatPageP
 
   // ⭐ ANDROID OPTIMIZATION: Reduced message polling (3s instead of 1s)
   // Real-time subscription handles instant updates, polling is just a fallback
-  useEffect(() => {
-    if (!selectedMatch || !currentUser?.id) return;
-    
-    const interval = setInterval(() => {
-      // Fetch new messages in background
-      fetchMessagesInBackground(selectedMatch.id);
-    }, 3000); // ⭐ ANDROID FIX: Reduced from 1s to 3s - realtime handles instant updates
-    
-    return () => clearInterval(interval);
-  }, [selectedMatch, currentUser?.id]);
+  // NOTE: Message polling removed to avoid UI jank while typing.
 
   // Ensure on open we always start at the last message unless user scrolls up
   useEffect(() => {
@@ -897,48 +887,58 @@ const ChatPage = ({ currentUser, onUnreadChange, onDetailViewChange }: ChatPageP
     }
   };
 
-  const sendMessage = async () => {
-    if (!newMessage.trim() || !selectedMatch || isSending) return;
-    setIsSending(true);
+  const withTimeout = async <T,>(promise: Promise<T>, ms = 12000): Promise<T> => {
+    return await Promise.race([
+      promise,
+      new Promise<T>((_, reject) => {
+        window.setTimeout(() => reject(new Error('timeout')),
+        ms);
+      }),
+    ]);
+  };
+
+  const sendMessage = async (rawText: string) => {
+    const messageText = rawText.trim();
+    if (!messageText || !selectedMatch || isSending) return;
 
     if (selectedMatch.partner?.is_admin) {
       toast({
         title: t('chat.cannotSendToAdmin'),
         description: t('chat.cannotSendToAdminDesc'),
-        variant: "destructive"
+        variant: 'destructive'
       });
-      setIsSending(false);
       return;
     }
 
-    // Check if either user has blocked the other
+    setIsSending(true);
+
     try {
-      const partnerId = selectedMatch.user1_id === currentUser.id 
-        ? selectedMatch.user2_id 
-        : selectedMatch.user1_id;
+      // Check if either user has blocked the other
+      try {
+        const partnerId = selectedMatch.user1_id === currentUser.id
+          ? selectedMatch.user2_id
+          : selectedMatch.user1_id;
 
-      const { data: blockData, error: blockError } = await supabase
-        .from('blocks')
-        .select('id')
-        .or(`and(blocker_id.eq.${currentUser.id},blocked_id.eq.${partnerId}),and(blocker_id.eq.${partnerId},blocked_id.eq.${currentUser.id})`)
-        .limit(1);
+        const { data: blockData, error: blockError } = await supabase
+          .from('blocks')
+          .select('id')
+          .or(`and(blocker_id.eq.${currentUser.id},blocked_id.eq.${partnerId}),and(blocker_id.eq.${partnerId},blocked_id.eq.${currentUser.id})`)
+          .limit(1);
 
-      if (blockError) throw blockError;
+        if (blockError) throw blockError;
 
-      if (blockData && blockData.length > 0) {
-        toast({
-          title: t('chat.cannotSend'),
-          description: 'Cannot send messages to this user',
-          variant: "destructive"
-        });
-        setIsSending(false);
-        return;
+        if (blockData && blockData.length > 0) {
+          toast({
+            title: t('chat.cannotSend'),
+            description: 'Cannot send messages to this user',
+            variant: 'destructive'
+          });
+          return;
+        }
+      } catch {
+        // Continue with sending message if block check fails
       }
-    } catch (error) {
-      // Continue with sending message if block check fails
-    }
 
-    const messageText = newMessage.trim();
     const tempId = `temp_${Date.now()}`;
     
     
@@ -973,9 +973,6 @@ const ChatPage = ({ currentUser, onUnreadChange, onDetailViewChange }: ChatPageP
       return updated;
     });
 
-    // Clear input immediately
-    setNewMessage('');
-
     // Track messages sent and show rating dialog after 7 messages
     const newCount = messagesSentCount + 1;
     setMessagesSentCount(newCount);
@@ -987,21 +984,24 @@ const ChatPage = ({ currentUser, onUnreadChange, onDetailViewChange }: ChatPageP
       }
     }
 
-    try {
+      try {
       // Send the message to server
-      const { data, error } = await supabase
-        .from('chats')
-        .insert({
-          match_id: selectedMatch.id,
-          sender_id: currentUser.id,
-          message: messageText,
-          reply_to: replyingTo?.id || null
-        })
-        .select(`
-          *,
-          sender:profiles!chats_sender_id_fkey(first_name, last_name)
-        `)
-        .single();
+      const { data, error } = await withTimeout(
+        supabase
+          .from('chats')
+          .insert({
+            match_id: selectedMatch.id,
+            sender_id: currentUser.id,
+            message: messageText,
+            reply_to: replyingTo?.id || null
+          })
+          .select(`
+            *,
+            sender:profiles!chats_sender_id_fkey(first_name, last_name)
+          `)
+          .single(),
+        12000
+      );
       
       // Clear reply state after sending
       setReplyingTo(null);
@@ -1055,7 +1055,7 @@ const ChatPage = ({ currentUser, onUnreadChange, onDetailViewChange }: ChatPageP
           return prev;
         });
       }
-    } catch (error) {
+      } catch (error) {
       // Remove optimistic message on error
       setMessages(prev => {
         const updated = trimCachedMessages(prev.filter(msg => msg.id !== tempId));
@@ -1071,39 +1071,38 @@ const ChatPage = ({ currentUser, onUnreadChange, onDetailViewChange }: ChatPageP
         description: t('chat.failedToSend'),
         variant: 'destructive'
       });
-      setIsSending(false);
       return;
-    }
-
-    // Send push notification (non-blocking)
-    // These operations should not block message sending or show errors to user
-    (async () => {
-      try {
-        // Send push notification to the recipient
-        const recipientId = selectedMatch.user1_id === currentUser.id 
-          ? selectedMatch.user2_id 
-          : selectedMatch.user1_id;
-        const senderName = `${currentUser.first_name || ''} ${currentUser.last_name || ''}`.trim() || 'Someone';
-
-
-        // Use the proper notification service
-        try {
-          const result = await sendMessageNotification(senderName, messageText, recipientId, selectedMatch.id);
-        } catch (notificationError) {
-        }
-
-        onUnreadChange?.();
-        
-        // IMPORTANT: Refresh matches immediately when first message is sent
-        // This moves the match from "New Matches" to "Conversations" instantly
-        chatMatchesCache.delete(currentUser.id);
-        await fetchMatches();
-      } catch (error) {
-        // Log but don't show error to user - message was already sent successfully
       }
-    })();
 
-    setIsSending(false);
+      // Send push notification (non-blocking)
+      // These operations should not block message sending or show errors to user
+      (async () => {
+        try {
+          // Send push notification to the recipient
+          const recipientId = selectedMatch.user1_id === currentUser.id
+            ? selectedMatch.user2_id
+            : selectedMatch.user1_id;
+          const senderName = `${currentUser.first_name || ''} ${currentUser.last_name || ''}`.trim() || 'Someone';
+
+          try {
+            await sendMessageNotification(senderName, messageText, recipientId, selectedMatch.id);
+          } catch {
+            // ignore notification errors
+          }
+
+          onUnreadChange?.();
+
+          // IMPORTANT: Refresh matches immediately when first message is sent
+          // This moves the match from "New Matches" to "Conversations" instantly
+          chatMatchesCache.delete(currentUser.id);
+          await fetchMatches();
+        } catch {
+          // ignore post-send side effects
+        }
+      })();
+    } finally {
+      setIsSending(false);
+    }
   };
 
   const deleteMessage = async (messageId: string) => {
@@ -1866,8 +1865,7 @@ const ChatPage = ({ currentUser, onUnreadChange, onDetailViewChange }: ChatPageP
       {/* Message Input (fixed, non-scrolling). MessageInput now owns its container so it can control safe-area and stacking */}
       <div className="shrink-0 z-20">
         <MessageInput
-          newMessage={newMessage}
-          onMessageChange={setNewMessage}
+          matchId={selectedMatch?.id || null}
           onSendMessage={sendMessage}
           disabled={isSending}
           replyingTo={replyingTo}
