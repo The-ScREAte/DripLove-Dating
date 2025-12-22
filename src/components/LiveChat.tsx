@@ -2,7 +2,7 @@ import React, { useState, useRef, useEffect } from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { MessageCircle, Send, X, Sparkles } from 'lucide-react';
+import { MessageCircle, Send, X, Sparkles, Heart, Shield, Crown, HelpCircle, Star } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 
 interface Message {
@@ -21,7 +21,7 @@ const LiveChat: React.FC<LiveChatProps> = ({ open, onOpenChange }) => {
   const [messages, setMessages] = useState<Message[]>([
     {
       id: '1',
-      text: "Hello! I'm here to help you with any questions about DripLove. How can I assist you today?",
+      text: "Hi there! 👋 Welcome to DripLove Support!\n\nI'm DripBot, your personal assistant. I'm here to help you with anything you need - from understanding premium features to troubleshooting issues.\n\nHow can I make your DripLove experience better today?",
       sender: 'bot',
       timestamp: new Date(),
     },
@@ -40,12 +40,12 @@ const LiveChat: React.FC<LiveChatProps> = ({ open, onOpenChange }) => {
   }, [messages, isTyping]);
 
   const quickReplies = [
-    { text: "Premium Features", value: "premium" },
-    { text: "Edit Profile", value: "edit" },
-    { text: "Who Liked Me", value: "likes" },
-    { text: "Payment Issues", value: "payment-error" },
-    { text: "Report User", value: "report" },
-    { text: "Advertising", value: "ads" },
+    { text: "💎 Premium", value: "premium", icon: Crown },
+    { text: "✏️ Edit Profile", value: "edit", icon: HelpCircle },
+    { text: "❤️ Who Liked Me", value: "likes", icon: Heart },
+    { text: "💳 Payment Help", value: "payment-error", icon: HelpCircle },
+    { text: "🛡️ Report User", value: "report", icon: Shield },
+    { text: "📢 Advertising", value: "ads", icon: Star },
   ];
 
   const getAutoResponse = (userMessage: string): string => {
@@ -54,119 +54,163 @@ const LiveChat: React.FC<LiveChatProps> = ({ open, onOpenChange }) => {
     // Speak to agent/person
     if (msg.includes('agent') || msg.includes('speak to') || msg.includes('talk to') || 
         msg.includes('real person') || msg.includes('human') || msg.includes('representative') || 
-        msg.includes('live person') || msg.includes('actual person')) {
-      return "SPEAK TO SUPPORT\n\nI'd be happy to connect you with our support team.\n\nContact: driploveinfo@gmail.com\nResponse time: Within 24 hours\n\nPlease include:\n• Your registered email\n• Screenshot (if applicable)\n• Detailed description of your issue\n\nOur team will personally assist you and guarantee your issue will be resolved.\n\nIs there anything I can help you with in the meantime?";
+        msg.includes('live person') || msg.includes('actual person') || msg.includes('customer service')) {
+      return "🎧 CONNECT WITH OUR TEAM\n\nI'd be happy to connect you with a real person!\n\n📧 Email: driploveinfo@gmail.com\n⏰ Response: Within 24 hours\n\n📝 Please include:\n• Your registered email address\n• Screenshot (if applicable)\n• Detailed description of your concern\n\nOur dedicated support team personally reviews every message and guarantees a resolution.\n\nIn the meantime, is there anything else I can help you with?";
+    }
+
+    // Video/Voice calls
+    if (msg.includes('video call') || msg.includes('voice call') || msg.includes('call feature') || msg.includes('video chat')) {
+      return "📹 VIDEO & VOICE CALLS\n\nDripLove offers built-in calling features for matched users!\n\n✅ INCLUDED:\n• HD Video calls\n• Crystal-clear voice calls\n• In-app calling (no phone number needed)\n• End-to-end privacy\n\n📱 HOW TO USE:\n1. Open a chat with your match\n2. Tap the video or phone icon at the top\n3. Start your call!\n\n💡 Note: Both users must have matched and can access calls within the chat.";
+    }
+
+    // Face verification
+    if (msg.includes('face verif') || msg.includes('verify face') || msg.includes('verification') || msg.includes('selfie')) {
+      return "🔐 FACE VERIFICATION\n\nFace verification helps keep DripLove safe and authentic!\n\n✅ BENEFITS:\n• Verified badge on your profile\n• Higher trust from potential matches\n• Safer community for everyone\n\n📱 HOW TO VERIFY:\n1. Go to your Profile\n2. Tap the verification option\n3. Take a selfie following the on-screen guide\n4. Our system verifies you instantly\n\n🔒 Your selfie is processed securely and not stored publicly.";
     }
 
     // Edit profile
-    if (msg.includes('edit profile') || msg.includes('update profile') || msg.includes('change profile') || msg.includes('edit') || msg.includes('profile')) {
-      return "EDITING YOUR PROFILE\n\nEdit your profile with accurate information so others know who they're chatting with.\n\nSTEPS:\n1. Go to your Profile page\n2. Tap Edit at the top of the page\n3. Scroll down and open each tab:\n   • Photos - Add/update your pictures\n   • Bio - Describe yourself\n   • Interests - Select your hobbies\n   • Preferences - Set your match criteria\n   • Personal Info - Update your details\n4. Make your changes in each section\n5. Save all changes\n\nIMPORTANT:\nIf your profile updates don't appear immediately, close the app completely and reopen it to reflect changes.";
+    if (msg.includes('edit profile') || msg.includes('update profile') || msg.includes('change profile') || msg.includes('profile')) {
+      return "✏️ EDITING YOUR PROFILE\n\nMake your profile shine and attract better matches!\n\n📱 STEPS:\n1. Go to your Profile page\n2. Tap the Edit button at the top\n3. Update each section:\n   • 📸 Photos - Add your best pics\n   • 📝 Bio - Share your story\n   • 🎯 Interests - Show your passions\n   • ⚙️ Preferences - Set your criteria\n   • 👤 Personal Info - Update details\n4. Save all changes\n\n💡 PRO TIP: If changes don't appear immediately, close and reopen the app to refresh your profile.";
     }
 
     // Change photos
-    if (msg.includes('change photo') || msg.includes('add photo') || msg.includes('replace photo') || msg.includes('remove photo')) {
-      return "MANAGING YOUR PHOTOS\n\nTo update your photos:\n\n1. Go to your profile and tap Edit\n2. Tap on any photo slot to add, replace, or remove photos\n3. Your first photo serves as your main profile picture\n\nTip: Use clear, recent photos that accurately represent you for the best results.";
+    if (msg.includes('change photo') || msg.includes('add photo') || msg.includes('replace photo') || msg.includes('remove photo') || msg.includes('upload photo') || msg.includes('picture')) {
+      return "📸 MANAGING YOUR PHOTOS\n\nGreat photos = more matches!\n\n📱 TO UPDATE:\n1. Go to Profile → Edit\n2. Tap any photo slot to add, replace, or remove\n3. Your first photo is your main profile picture\n\n💡 PHOTO TIPS:\n• Use clear, well-lit photos\n• Show your face clearly in at least one photo\n• Add variety - hobbies, travel, with friends\n• Avoid heavy filters\n• Recent photos work best";
     }
 
     // Payment error
-    if (msg.includes('payment error') || msg.includes('payment fail') || msg.includes('payment issue') || msg.includes('payment problem') || msg.includes('billing error')) {
-      return "PAYMENT ISSUES\n\nIf you're experiencing payment errors:\n\nContact: driploveinfo@gmail.com\n\nPlease include:\n• Your registered email\n• Screenshot of the error\n• Payment method used\n• Transaction details (if available)\n\nResponse time: Within 24 hours\n\nWe guarantee your issue will be resolved. Our support team is here to help you.";
+    if (msg.includes('payment error') || msg.includes('payment fail') || msg.includes('payment issue') || msg.includes('payment problem') || msg.includes('billing error') || msg.includes('card declined') || msg.includes('transaction fail')) {
+      return "💳 PAYMENT SUPPORT\n\nI'm sorry you're experiencing payment issues. Let's get this resolved!\n\n📧 Contact: driploveinfo@gmail.com\n\n📝 Please include:\n• Your registered email\n• Screenshot of the error\n• Payment method used (card, mobile money, etc.)\n• Transaction ID or reference (if available)\n• Date and time of attempted payment\n\n⏰ Response: Within 24 hours\n\n🔒 We guarantee your payment issue will be resolved promptly. Your security is our priority.";
     }
 
     // Premium cost / pricing
-    if (msg.includes('price') || msg.includes('cost') || msg.includes('how much') || msg.includes('payment')) {
-      return "PREMIUM PRICING\n\nTo view current pricing and plans:\nProfile → Upgrade to Premium\n\nAccepted payment methods:\n• Credit/Debit Cards\n• Apple Pay\n• Google Pay\n\nAll plans include a 7-day money-back guarantee.\n\nFor payment issues, contact driploveinfo@gmail.com";
+    if (msg.includes('price') || msg.includes('cost') || msg.includes('how much') || msg.includes('pricing')) {
+      return "💰 PREMIUM PRICING\n\nTo view current pricing and plans:\n👉 Profile → Upgrade to Premium\n\n💳 ACCEPTED PAYMENTS:\n• Credit/Debit Cards\n• Mobile Money\n• Apple Pay (iOS)\n• Google Pay (Android)\n\n✅ INCLUDES:\n• 7-day money-back guarantee\n• Secure payment processing\n• Instant activation\n\n📧 For payment issues: driploveinfo@gmail.com";
     }
 
     // Premium features / what premium includes
-    if (msg.includes('premium') || msg.includes('upgrade') || msg.includes('subscription') || msg.includes('what does premium')) {
-      return "DRIPLOVE PREMIUM FEATURES\n\n• Unlimited daily swipes\n• See everyone who liked you\n• Unlimited reverse dislikes (undo passes)\n• Priority placement in discover feed\n• Explore matches in all countries\n• Ad-free experience\n• Priority customer support\n\nTo upgrade: Profile → Upgrade to Premium\n\nNote: After subscribing, if changes don't appear immediately, close the app completely and reopen it to activate premium features.";
+    if (msg.includes('premium') || msg.includes('upgrade') || msg.includes('subscription') || msg.includes('what does premium') || msg.includes('membership')) {
+      return "💎 DRIPLOVE PREMIUM\n\nUnlock the full dating experience!\n\n✨ PREMIUM FEATURES:\n• ♾️ Unlimited daily swipes\n• ❤️ See everyone who liked you\n• ↩️ Unlimited undo (reverse passes)\n• 🌍 Explore all countries worldwide\n• ⭐ Priority in discover feed\n• 🚫 Ad-free experience\n• 🎧 Priority customer support\n\n👉 Upgrade: Profile → Upgrade to Premium\n\n💡 TIP: After subscribing, close and reopen the app to activate all features instantly!";
     }
 
     // Cancel subscription
-    if (msg.includes('cancel') || msg.includes('unsubscribe') || msg.includes('stop subscription')) {
-      return "CANCEL SUBSCRIPTION\n\nTo cancel your subscription:\n\n1. Go to Profile → Account Actions\n2. Tap Cancel Subscription\n3. Confirm cancellation\n\nYour premium features will remain active until the end of your current billing period.";
+    if (msg.includes('cancel') || msg.includes('unsubscribe') || msg.includes('stop subscription') || msg.includes('end subscription')) {
+      return "❌ CANCEL SUBSCRIPTION\n\nWe're sad to see you go, but here's how:\n\n📱 STEPS:\n1. Go to Profile\n2. Open Account Actions\n3. Tap 'Cancel Subscription'\n4. Confirm cancellation\n\n📝 IMPORTANT:\n• Premium features remain active until your billing period ends\n• You won't be charged again\n• You can resubscribe anytime\n\n💭 Changed your mind? We'd love to know how we can improve! Email us at driploveinfo@gmail.com";
     }
 
     // Explore more countries
-    if (msg.includes('more countries') || msg.includes('other countries') || msg.includes('explore countries') || msg.includes('change country') || msg.includes('location')) {
-      return "EXPLORING OTHER COUNTRIES\n\nPREMIUM MEMBERS:\n1. Go to Profile\n2. Scroll to Preference\n3. Tap Edit at the top of the screen\n4. Select your desired countries\n\nYou can select up to 3 additional countries in addition to your own country (4 total).\n\nFREE USERS:\nMatching is limited to your registered country. Upgrade to Premium to access all countries.";
+    if (msg.includes('more countries') || msg.includes('other countries') || msg.includes('explore countries') || msg.includes('change country') || msg.includes('location') || msg.includes('international')) {
+      return "🌍 EXPLORE OTHER COUNTRIES\n\n💎 PREMIUM MEMBERS:\n1. Go to Profile\n2. Tap Edit at the top\n3. Find 'Preferences' section\n4. Select your desired countries\n\n✅ You can match in up to 4 countries total (your own + 3 more)!\n\n🆓 FREE USERS:\nMatching is limited to your registered country.\n\n💡 Upgrade to Premium to connect with people worldwide!";
     }
 
     // See who liked me
-    if (msg.includes('who liked') || msg.includes('see likes') || msg.includes('my likes') || msg.includes('who like me')) {
-      return "WHO LIKED ME\n\nPREMIUM MEMBERS:\nAccess the Likes tab from the bottom navigation to see all users who have liked your profile with full details.\n\nFREE USERS:\nYou can see the location of people who liked you, but full profile access requires Premium membership.\n\nUpgrade to Premium to unlock complete visibility of everyone who likes you.";
+    if (msg.includes('who liked') || msg.includes('see likes') || msg.includes('my likes') || msg.includes('who like me') || msg.includes('people who liked')) {
+      return "❤️ WHO LIKED ME\n\n💎 PREMIUM MEMBERS:\n• Access the Likes tab from bottom navigation\n• See complete profiles of everyone who liked you\n• Match instantly with one tap!\n\n🆓 FREE USERS:\n• See the general location of people who liked you\n• Upgrade to Premium for full access\n\n💡 TIP: Premium users match 3x faster because they can see and respond to likes immediately!";
     }
 
     // Daily swipes
-    if (msg.includes('swipe') || msg.includes('daily limit') || msg.includes('how many')) {
-      return "DAILY SWIPES\n\nFREE USERS:\n20 swipes per day (resets at midnight)\n\nPREMIUM MEMBERS:\nUnlimited swipes\n\nUpgrade to Premium for unlimited daily swipes and increased matching opportunities.";
+    if (msg.includes('swipe') || msg.includes('daily limit') || msg.includes('how many') || msg.includes('swipes left') || msg.includes('out of swipes')) {
+      return "👆 DAILY SWIPES\n\n🆓 FREE USERS:\n• 12 swipes per day\n• Resets at midnight (your local time)\n\n💎 PREMIUM MEMBERS:\n• Unlimited swipes - swipe all day!\n• No waiting, no limits\n\n💡 TIP: Make each swipe count! Read profiles carefully for better matches.\n\n👉 Upgrade to Premium for unlimited swipes!";
     }
 
     // Reporting users / safety
-    if (msg.includes('report') || msg.includes('unsafe') || msg.includes('uncomfortable') || msg.includes('block')) {
-      return "REPORTING USERS\n\nIf you encounter inconvenient or unsafe behavior:\n\n1. Go to their profile\n2. Tap the Report button\n3. Select the reason for reporting\n4. Submit your report\n\nYou can also:\n• Block users directly from their profile\n• Report chats that make you uncomfortable\n\nWe investigate all reports and will remove users from DripLove if necessary. Help us make DripLove a safe place for everyone.\n\nRemember: DripLove has a large pool of people. You will always find new matches.";
+    if (msg.includes('report') || msg.includes('unsafe') || msg.includes('uncomfortable') || msg.includes('harassment') || msg.includes('inappropriate') || msg.includes('fake profile') || msg.includes('scam')) {
+      return "🛡️ REPORTING & SAFETY\n\nYour safety is our top priority!\n\n📱 TO REPORT:\n1. Go to the user's profile\n2. Tap the Report button\n3. Select the reason\n4. Add details if needed\n5. Submit\n\n🚫 YOU CAN ALSO:\n• Block users directly from their profile\n• Report inappropriate messages in chat\n• Unmatch instantly\n\n⚡ We investigate all reports within 24 hours and take action to keep DripLove safe.\n\n💪 Together, we build a respectful community!";
+    }
+
+    // Block user
+    if (msg.includes('block')) {
+      return "🚫 BLOCKING USERS\n\n📱 TO BLOCK SOMEONE:\n1. Go to their profile\n2. Tap the Block button\n3. Confirm your choice\n\n✅ WHAT HAPPENS:\n• They can't see your profile\n• They can't message you\n• You won't see them in discover\n• Your existing chat is hidden\n\n💡 Blocked users are NOT notified. You can unblock from Settings if needed.";
     }
 
     // Advertising
-    if (msg.includes('advertis') || msg.includes('promote') || msg.includes('business') || msg.includes('marketing')) {
-      return "ADVERTISING ON DRIPLOVE\n\nWe provide advertising opportunities for companies and individuals.\n\nBENEFITS:\n• Location-based targeting\n• Reach users in specific regions\n• Customized ad placement\n• Targeted audience demographics\n\nINTERESTED?\nContact us: driploveinfo@gmail.com\n\nOur team will provide you with detailed information about advertising packages and pricing tailored to your needs.";
+    if (msg.includes('advertis') || msg.includes('promote') || msg.includes('business') || msg.includes('marketing') || msg.includes('sponsor')) {
+      return "📢 ADVERTISING ON DRIPLOVE\n\nReach thousands of engaged users!\n\n🎯 BENEFITS:\n• Location-based targeting\n• Demographic targeting\n• High engagement rates\n• Brand-safe environment\n• Customized campaigns\n\n📊 OUR AUDIENCE:\n• Young professionals\n• Active daily users\n• High purchasing intent\n\n📧 INTERESTED?\nEmail: driploveinfo@gmail.com\n\nWe'll create a custom advertising package tailored to your goals!";
     }
 
     // Change password
-    if (msg.includes('change password') || msg.includes('reset password') || msg.includes('update password')) {
-      return "CHANGING YOUR PASSWORD\n\nEMAIL SIGN-UP USERS:\nGo to Profile → Account Settings\n\nGOOGLE OR APPLE SIGN-IN USERS:\nPassword is managed through your Google or Apple account settings.\n\nTo reset your password, use the 'Forgot Password' option on the login screen.";
+    if (msg.includes('change password') || msg.includes('reset password') || msg.includes('update password') || msg.includes('forgot password') || msg.includes('new password')) {
+      return "🔐 PASSWORD HELP\n\n📧 EMAIL SIGN-UP USERS:\n• Go to Profile → Account Settings\n• Select 'Change Password'\n\n🔑 FORGOT PASSWORD?\n• Tap 'Forgot Password' on login screen\n• Check your email for reset link\n• Create a new secure password\n\n🍎 GOOGLE/APPLE SIGN-IN:\nYour password is managed through your Google or Apple account settings.\n\n💡 TIP: Use a strong, unique password for better security!";
     }
 
     // Delete account
-    if (msg.includes('delete account') || msg.includes('remove account') || msg.includes('close account')) {
-      return "DELETE ACCOUNT\n\nTo delete your account:\n\n1. Go to Profile → Account Actions\n2. Tap Delete Account\n3. Verify your identity\n\nIMPORTANT: This action is permanent and removes all your data. This cannot be undone.";
+    if (msg.includes('delete account') || msg.includes('remove account') || msg.includes('close account') || msg.includes('deactivate')) {
+      return "⚠️ DELETE ACCOUNT\n\n📱 TO DELETE:\n1. Go to Profile\n2. Open Account Actions\n3. Tap 'Delete Account'\n4. Verify your identity\n5. Confirm deletion\n\n🚨 WARNING:\n• This action is PERMANENT\n• All your data will be removed\n• Your matches and chats will be deleted\n• This cannot be undone\n\n💭 Taking a break instead? Consider just logging out - your profile stays safe!";
     }
 
     // Features
-    if (msg.includes('feature') || msg.includes('can i') || msg.includes('what can')) {
-      return "DRIPLOVE FEATURES\n\nFREE ACCOUNT:\n• Create profile with photos\n• Swipe and discover matches (20/day)\n• Chat with matches\n• Video & voice calls\n• Face verification\n• See locations of people who liked you\n\nPREMIUM ACCOUNT:\n• All free features\n• Unlimited swipes\n• See everyone who liked you (full profiles)\n• Explore all countries\n• Reverse dislikes\n• Priority in feed\n• Ad-free experience\n• Priority support";
+    if (msg.includes('feature') || msg.includes('can i') || msg.includes('what can') || msg.includes('how does') || msg.includes('app work')) {
+      return "📱 DRIPLOVE FEATURES\n\n🆓 FREE ACCOUNT:\n• Create stunning profile\n• 12 daily swipes\n• Match and chat\n• Video & voice calls\n• Face verification\n• See who liked you (location only)\n\n💎 PREMIUM ACCOUNT:\n• Everything in Free +\n• Unlimited swipes\n• See full profiles of admirers\n• Explore all countries\n• Reverse passes (undo)\n• Priority placement\n• No ads\n• VIP support\n\n👉 Ready to upgrade? Profile → Upgrade to Premium";
     }
 
     // Match/Dating help
-    if (msg.includes('match') || msg.includes('no match') || msg.includes('not working') || msg.includes('get more matches')) {
-      return "TIPS FOR BETTER MATCHES\n\n• Use clear, recent photos that represent you accurately\n• Write a genuine and unique bio\n• Be active and swipe regularly\n• Send personalized messages\n• Complete all profile sections\n• Keep your profile information up to date\n• Consider Premium for increased visibility\n\nRemember to close and reopen the app if profile updates don't appear immediately.";
+    if (msg.includes('match') || msg.includes('no match') || msg.includes('not working') || msg.includes('get more matches') || msg.includes('tips') || msg.includes('advice')) {
+      return "💕 GET MORE MATCHES\n\n✨ TOP TIPS:\n\n📸 PHOTOS:\n• Use clear, recent photos\n• Show your face in main photo\n• Add variety (hobbies, travel, lifestyle)\n• Smile - it works!\n\n📝 PROFILE:\n• Write a genuine, unique bio\n• Complete all sections\n• Share your interests\n• Be specific, not generic\n\n🎯 ACTIVITY:\n• Be active and swipe regularly\n• Respond to messages promptly\n• Send personalized openers\n\n💎 Consider Premium for increased visibility and unlimited opportunities!";
     }
 
     // Safety/Privacy
-    if (msg.includes('safe') || msg.includes('privacy') || msg.includes('security')) {
-      return "SAFETY & SECURITY\n\n• Face verification is required\n• All data is encrypted\n• Report and block suspicious users\n• Never share personal information prematurely\n• Reports are reviewed within 24 hours\n\nTo report a user: Tap their profile → Report User\n\nHelp us maintain a safe community for everyone.";
+    if (msg.includes('safe') || msg.includes('privacy') || msg.includes('security') || msg.includes('data') || msg.includes('information')) {
+      return "🔒 SAFETY & PRIVACY\n\n✅ YOUR SECURITY:\n• Face verification required\n• End-to-end encrypted chats\n• Report & block features\n• 24/7 moderation team\n\n🛡️ YOUR PRIVACY:\n• Your data is encrypted\n• We never share personal info\n• Control what's visible on profile\n• Delete account anytime\n\n📱 SAFETY TIPS:\n• Never share personal/financial info\n• Video call before meeting\n• Meet in public places first\n• Tell a friend about dates\n\n📧 Questions? driploveinfo@gmail.com";
     }
 
     // Account issues / login
-    if (msg.includes('account') || msg.includes('login') || msg.includes('password') || msg.includes('forgot')) {
-      return "ACCOUNT HELP\n\nFORGOT PASSWORD:\n• Tap 'Forgot Password' on login screen\n• Check your email for reset link\n\nLOGIN ISSUES:\n• Clear app cache\n• Update to latest version\n• Check internet connection\n• Try alternative login method\n• Close and reopen the app\n\nFor further assistance: driploveinfo@gmail.com";
+    if (msg.includes('account') || msg.includes('login') || msg.includes('sign in') || msg.includes('cant log') || msg.includes("can't log")) {
+      return "🔑 ACCOUNT HELP\n\n🔄 LOGIN ISSUES:\n• Check your internet connection\n• Update to the latest app version\n• Clear app cache\n• Try logging in with the same method you signed up\n\n📧 FORGOT PASSWORD:\n• Tap 'Forgot Password' on login\n• Check email for reset link\n\n🍎 GOOGLE/APPLE ISSUES:\n• Make sure you're using the same account\n• Check your Google/Apple account status\n\n📧 Still stuck? Email: driploveinfo@gmail.com with your registered email address.";
+    }
+
+    // Notifications
+    if (msg.includes('notif') || msg.includes('push') || msg.includes('alert')) {
+      return "🔔 NOTIFICATIONS\n\n📱 TO ENABLE:\n1. Go to your phone Settings\n2. Find DripLove in Apps\n3. Enable Notifications\n4. Allow all notification types\n\n✅ YOU'LL BE NOTIFIED FOR:\n• New matches\n• New messages\n• People who liked you\n• Special offers\n\n🔕 TO CUSTOMIZE:\nAdjust notification preferences in app Settings.\n\n💡 TIP: Keep notifications ON to never miss a potential match!";
+    }
+
+    // Unmatch
+    if (msg.includes('unmatch') || msg.includes('remove match') || msg.includes('delete match')) {
+      return "💔 UNMATCH\n\n📱 TO UNMATCH:\n1. Open the chat with the person\n2. Tap the menu icon (three dots)\n3. Select 'Unmatch'\n4. Confirm\n\n✅ WHAT HAPPENS:\n• The conversation is deleted\n• They can't message you\n• You're removed from each other's matches\n\n💡 Note: This action cannot be undone. Consider blocking if you feel unsafe.";
     }
 
     // Contact support
-    if (msg.includes('human') || msg.includes('support') || msg.includes('email') || msg.includes('contact')) {
-      return "CONTACT SUPPORT\n\nEmail: driploveinfo@gmail.com\nResponse time: Within 24 hours\n\nPlease include:\n• Your registered email\n• Screenshot (if applicable)\n• Detailed description of the issue\n\nWe guarantee your issue will be resolved. How else can I assist you?";
+    if (msg.includes('support') || msg.includes('email') || msg.includes('contact') || msg.includes('help')) {
+      return "📧 CONTACT SUPPORT\n\n🎧 Email: driploveinfo@gmail.com\n⏰ Response: Within 24 hours\n\n📝 FOR FASTER HELP, INCLUDE:\n• Your registered email\n• Screenshots (if applicable)\n• Detailed description\n• Your device type (iPhone/Android)\n\n✅ WE GUARANTEE:\n• Personal response (not automated!)\n• Issue resolution\n• Follow-up if needed\n\n💬 I'm also here to help! What's on your mind?";
     }
 
     // Greetings
-    if (msg.includes('hello') || msg.includes('hi') || msg.includes('hey')) {
-      return "Hello! I can help you with:\n\n• Premium features & pricing\n• Profile editing\n• Country exploration\n• Who liked me\n• Reporting users\n• Payment issues\n• Advertising opportunities\n• Match optimization\n• Safety & privacy\n• Account management\n\nWhat would you like to know?";
+    if (msg.includes('hello') || msg.includes('hi') || msg.includes('hey') || msg.includes('good morning') || msg.includes('good afternoon') || msg.includes('good evening')) {
+      return "Hey there! 👋 Great to chat with you!\n\nI can help you with:\n\n💎 Premium features & pricing\n✏️ Profile tips & editing\n🌍 Exploring other countries\n❤️ Who liked you\n🛡️ Reporting & safety\n💳 Payment issues\n📢 Advertising\n🔐 Account & password\n\nWhat would you like to know? Just ask or tap a quick reply below!";
     }
 
     // Thanks
-    if (msg.includes('thank') || msg.includes('thanks')) {
-      return "You're welcome! Is there anything else I can help you with?";
+    if (msg.includes('thank') || msg.includes('thanks') || msg.includes('appreciate') || msg.includes('helpful')) {
+      return "You're very welcome! 😊\n\nIt was my pleasure helping you. If you have any other questions in the future, I'm always here!\n\n💕 Wishing you great connections on DripLove!\n\nIs there anything else I can assist with?";
     }
 
-    // Default response
-    return "I can assist you with:\n\n• Premium features & pricing\n• Profile & photo management\n• Country exploration\n• Who liked me (free vs premium)\n• Reporting users & safety\n• Payment issues\n• Advertising opportunities\n• Daily swipe limits\n• Password & account issues\n• Account deletion\n• Match optimization\n• Contact support\n\nPlease select a topic or ask your question.";
+    // Goodbye
+    if (msg.includes('bye') || msg.includes('goodbye') || msg.includes('see you') || msg.includes('take care')) {
+      return "Goodbye! 👋\n\nThank you for chatting with DripBot. Have a wonderful time on DripLove!\n\n💕 May you find meaningful connections!\n\nCome back anytime you need help!";
+    }
+
+    // App not working
+    if (msg.includes('not working') || msg.includes('bug') || msg.includes('crash') || msg.includes('error') || msg.includes('broken') || msg.includes('stuck')) {
+      return "🔧 TROUBLESHOOTING\n\n📱 QUICK FIXES:\n1. Close and reopen the app completely\n2. Check your internet connection\n3. Update to the latest version\n4. Clear app cache\n5. Restart your phone\n\n📲 TO UPDATE:\n• iOS: App Store → Updates\n• Android: Play Store → Updates\n\n🔄 Still having issues?\nTry uninstalling and reinstalling the app.\n\n📧 Persistent problems? Email: driploveinfo@gmail.com with:\n• Your device type\n• App version\n• Description of the issue\n• Screenshot if possible";
+    }
+
+    // Super Like or special features
+    if (msg.includes('super') || msg.includes('boost') || msg.includes('spotlight')) {
+      return "⭐ SPECIAL FEATURES\n\n💎 PREMIUM PERKS:\n• Priority placement in discover feed\n• Your profile shown to more people\n• Stand out from the crowd\n• Increased visibility\n\n🚀 TO GET NOTICED:\n• Upgrade to Premium\n• Complete your profile 100%\n• Add quality photos\n• Be active daily\n\n👉 Upgrade: Profile → Upgrade to Premium";
+    }
+
+    // Age/Preferences
+    if (msg.includes('age') || msg.includes('prefer') || msg.includes('filter') || msg.includes('distance')) {
+      return "⚙️ PREFERENCES\n\n📱 TO UPDATE:\n1. Go to Profile\n2. Tap Edit at the top\n3. Find 'Preferences' section\n4. Adjust your settings:\n   • Age range\n   • Distance\n   • Gender preference\n   • Countries (Premium)\n5. Save changes\n\n💡 TIP: Wider preferences = more potential matches!\n\nClose and reopen the app if changes don't appear immediately.";
+    }
+
+    // Default response - more helpful and engaging
+    return "Thanks for your message! 💬\n\nI'm here to help with:\n\n💎 Premium features & pricing\n✏️ Profile editing & photos\n🌍 Country exploration\n❤️ Who liked you\n🛡️ Reporting & safety\n💳 Payment issues\n📢 Advertising opportunities\n🔐 Account & password\n📹 Video/voice calls\n🔔 Notifications\n\n📝 Just type your question or tap a quick reply!\n\n🎧 Need a human? Email: driploveinfo@gmail.com";
   };
 
   const handleSendMessage = (messageText?: string) => {
     const textToSend = messageText || inputValue.trim();
     if (!textToSend) return;
 
-    // Add user message
     const userMessage: Message = {
       id: Date.now().toString(),
       text: textToSend,
@@ -177,8 +221,10 @@ const LiveChat: React.FC<LiveChatProps> = ({ open, onOpenChange }) => {
     setMessages((prev) => [...prev, userMessage]);
     setInputValue('');
 
-    // Simulate typing
     setIsTyping(true);
+
+    // Variable delay for more natural feeling
+    const typingDelay = 800 + Math.random() * 1200;
 
     setTimeout(() => {
       const botResponse: Message = {
@@ -190,49 +236,56 @@ const LiveChat: React.FC<LiveChatProps> = ({ open, onOpenChange }) => {
 
       setMessages((prev) => [...prev, botResponse]);
       setIsTyping(false);
-    }, 1000 + Math.random() * 1000); // Random delay 1-2 seconds
+    }, typingDelay);
   };
 
   const handleQuickReply = (value: string) => {
     const quickReplyMap: Record<string, string> = {
-      premium: "What's Premium?",
-      pricing: "How much does it cost?",
+      premium: "What are premium features?",
+      pricing: "How much does premium cost?",
       edit: "How do I edit my profile?",
-      countries: "How do I explore more countries?",
-      likes: "Who liked me?",
-      swipes: "How many swipes do I get?",
-      "payment-error": "I have a payment error",
-      report: "How do I report a user?",
-      ads: "Tell me about advertising",
+      countries: "How can I explore more countries?",
+      likes: "Who liked my profile?",
+      swipes: "How many swipes do I get per day?",
+      "payment-error": "I'm having payment issues",
+      report: "How do I report someone?",
+      ads: "Tell me about advertising options",
     };
 
     handleSendMessage(quickReplyMap[value] || value);
   };
 
+  const handleKeyPress = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (e.key === 'Enter' && !e.shiftKey) {
+      e.preventDefault();
+      handleSendMessage();
+    }
+  };
+
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-[500px] h-[600px] flex flex-col p-0">
+      <DialogContent className="sm:max-w-[500px] h-[650px] flex flex-col p-0 gap-0">
         {/* Header */}
-        <DialogHeader className="px-6 py-4 bg-gradient-to-r from-pink-500 to-purple-600 text-white rounded-t-lg">
+        <DialogHeader className="px-6 py-4 bg-gradient-to-r from-pink-500 via-purple-500 to-indigo-500 text-white rounded-t-lg shrink-0">
           <DialogDescription className="sr-only">
-            Chat with support to get help with DripLove features and account management
+            Chat with DripBot to get help with DripLove features and account management
           </DialogDescription>
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-3">
-              <div className="w-10 h-10 bg-white rounded-full flex items-center justify-center">
-                <MessageCircle className="w-6 h-6 text-pink-500" />
+              <div className="w-12 h-12 bg-white rounded-full flex items-center justify-center shadow-lg">
+                <Heart className="w-6 h-6 text-pink-500 fill-pink-500" />
               </div>
               <div>
-                <DialogTitle className="text-white text-lg">Support Chat</DialogTitle>
-                <div className="text-xs text-white/90 flex items-center gap-1">
+                <DialogTitle className="text-white text-lg font-bold">DripBot Support</DialogTitle>
+                <div className="text-xs text-white/90 flex items-center gap-1.5">
                   <div className="w-2 h-2 bg-green-400 rounded-full animate-pulse"></div>
-                  <span>Online</span>
+                  <span>Always online • Instant replies</span>
                 </div>
               </div>
             </div>
             <button
               onClick={() => onOpenChange(false)}
-              className="text-white hover:text-white/80 transition-colors"
+              className="text-white/80 hover:text-white transition-colors p-1 rounded-full hover:bg-white/10"
             >
               <X className="w-5 h-5" />
             </button>
@@ -240,27 +293,29 @@ const LiveChat: React.FC<LiveChatProps> = ({ open, onOpenChange }) => {
         </DialogHeader>
 
         {/* Messages */}
-        <div className="flex-1 overflow-y-auto p-4 space-y-4 bg-gray-50">
+        <div className="flex-1 overflow-y-auto p-4 space-y-4 bg-gradient-to-b from-gray-50 to-white">
           {messages.map((message) => (
             <div
               key={message.id}
               className={`flex ${message.sender === 'user' ? 'justify-end' : 'justify-start'}`}
             >
               <div
-                className={`max-w-[80%] rounded-2xl px-4 py-2 ${
+                className={`max-w-[85%] rounded-2xl px-4 py-3 shadow-sm ${
                   message.sender === 'user'
                     ? 'bg-gradient-to-r from-pink-500 to-purple-600 text-white'
-                    : 'bg-white border border-gray-200 text-gray-800'
+                    : 'bg-white border border-gray-100 text-gray-800'
                 }`}
               >
                 {message.sender === 'bot' && (
-                  <div className="flex items-center gap-2 mb-1">
-                    <Sparkles className="w-3 h-3 text-purple-500" />
-                    <span className="text-xs font-semibold text-purple-600">DripBot</span>
+                  <div className="flex items-center gap-2 mb-2 pb-2 border-b border-gray-100">
+                    <div className="w-6 h-6 bg-gradient-to-r from-pink-500 to-purple-500 rounded-full flex items-center justify-center">
+                      <Sparkles className="w-3 h-3 text-white" />
+                    </div>
+                    <span className="text-xs font-semibold bg-gradient-to-r from-pink-600 to-purple-600 bg-clip-text text-transparent">DripBot</span>
                   </div>
                 )}
-                <div className="text-sm whitespace-pre-line">{message.text}</div>
-                <span className="text-xs opacity-70 mt-1 block">
+                <div className="text-sm whitespace-pre-line leading-relaxed">{message.text}</div>
+                <span className="text-xs opacity-60 mt-2 block text-right">
                   {message.timestamp.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
                 </span>
               </div>
@@ -269,13 +324,15 @@ const LiveChat: React.FC<LiveChatProps> = ({ open, onOpenChange }) => {
 
           {isTyping && (
             <div className="flex justify-start">
-              <div className="bg-white border border-gray-200 rounded-2xl px-4 py-3">
+              <div className="bg-white border border-gray-100 rounded-2xl px-4 py-3 shadow-sm">
                 <div className="flex items-center gap-2">
-                  <Sparkles className="w-3 h-3 text-purple-500" />
-                  <div className="flex gap-1">
-                    <div className="w-2 h-2 bg-gray-400 rounded-full animate-bounce"></div>
-                    <div className="w-2 h-2 bg-gray-400 rounded-full animate-bounce" style={{ animationDelay: '0.2s' }}></div>
-                    <div className="w-2 h-2 bg-gray-400 rounded-full animate-bounce" style={{ animationDelay: '0.4s' }}></div>
+                  <div className="w-6 h-6 bg-gradient-to-r from-pink-500 to-purple-500 rounded-full flex items-center justify-center">
+                    <Sparkles className="w-3 h-3 text-white" />
+                  </div>
+                  <div className="flex gap-1.5">
+                    <div className="w-2 h-2 bg-purple-400 rounded-full animate-bounce"></div>
+                    <div className="w-2 h-2 bg-purple-400 rounded-full animate-bounce" style={{ animationDelay: '0.15s' }}></div>
+                    <div className="w-2 h-2 bg-purple-400 rounded-full animate-bounce" style={{ animationDelay: '0.3s' }}></div>
                   </div>
                 </div>
               </div>
@@ -286,14 +343,14 @@ const LiveChat: React.FC<LiveChatProps> = ({ open, onOpenChange }) => {
 
         {/* Quick Replies */}
         {messages.length < 4 && (
-          <div className="px-4 py-2 bg-white border-t border-gray-200">
-            <p className="text-xs text-gray-500 mb-2">Quick replies:</p>
+          <div className="px-4 py-3 bg-white border-t border-gray-100 shrink-0">
+            <p className="text-xs text-gray-500 mb-2 font-medium">💡 Quick topics:</p>
             <div className="flex flex-wrap gap-2">
               {quickReplies.map((reply) => (
                 <button
                   key={reply.value}
                   onClick={() => handleQuickReply(reply.value)}
-                  className="px-3 py-1.5 text-xs bg-purple-100 text-purple-700 rounded-full hover:bg-purple-200 transition-colors"
+                  className="px-3 py-1.5 text-xs bg-gradient-to-r from-pink-50 to-purple-50 text-purple-700 rounded-full hover:from-pink-100 hover:to-purple-100 transition-all border border-purple-100 font-medium"
                 >
                   {reply.text}
                 </button>
@@ -303,23 +360,26 @@ const LiveChat: React.FC<LiveChatProps> = ({ open, onOpenChange }) => {
         )}
 
         {/* Input */}
-        <div className="p-4 bg-white border-t border-gray-200 rounded-b-lg">
+        <div className="p-4 bg-white border-t border-gray-100 rounded-b-lg shrink-0">
           <div className="flex gap-2">
             <Input
               value={inputValue}
               onChange={(e) => setInputValue(e.target.value)}
-              onKeyPress={(e) => e.key === 'Enter' && handleSendMessage()}
+              onKeyPress={handleKeyPress}
               placeholder="Type your message..."
-              className="flex-1"
+              className="flex-1 border-gray-200 focus:border-purple-400 focus:ring-purple-400"
             />
             <Button
               onClick={() => handleSendMessage()}
-              disabled={!inputValue.trim()}
-              className="bg-gradient-to-r from-pink-500 to-purple-600 hover:from-pink-600 hover:to-purple-700"
+              disabled={!inputValue.trim() || isTyping}
+              className="bg-gradient-to-r from-pink-500 to-purple-600 hover:from-pink-600 hover:to-purple-700 text-white px-4"
             >
               <Send className="w-4 h-4" />
             </Button>
           </div>
+          <p className="text-xs text-gray-400 mt-2 text-center">
+            Powered by DripLove • Need a human? Email driploveinfo@gmail.com
+          </p>
         </div>
       </DialogContent>
     </Dialog>
