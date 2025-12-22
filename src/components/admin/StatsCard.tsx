@@ -122,42 +122,42 @@ const StatsCard: React.FC<StatsCardProps> = ({ stats }) => {
 
 
       <CardContent className="pt-0">
-        <div className="grid grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-2">
-          <div className="flex flex-col items-center p-2 bg-blue-50 rounded-lg">
-            <Users className="w-4 h-4 text-blue-600 mb-1" />
-            <span className="text-lg font-bold text-blue-600">{stats.total_users}</span>
-            <span className="text-xs text-gray-600">Users</span>
+        <div className="grid grid-cols-4 md:grid-cols-6 lg:grid-cols-8 gap-1.5">
+          <div className="flex flex-col items-center p-1.5 bg-blue-50 rounded">
+            <Users className="w-3 h-3 text-blue-600 mb-0.5" />
+            <span className="text-sm font-bold text-blue-600">{stats.total_users}</span>
+            <span className="text-[10px] text-gray-600">Users</span>
           </div>
           
-          <div className="flex flex-col items-center p-2 bg-pink-50 rounded-lg">
-            <Heart className="w-4 h-4 text-pink-600 mb-1" />
-            <span className="text-lg font-bold text-pink-600">{stats.total_matches}</span>
-            <span className="text-xs text-gray-600">Matches</span>
+          <div className="flex flex-col items-center p-1.5 bg-pink-50 rounded">
+            <Heart className="w-3 h-3 text-pink-600 mb-0.5" />
+            <span className="text-sm font-bold text-pink-600">{stats.total_matches}</span>
+            <span className="text-[10px] text-gray-600">Matches</span>
           </div>
           
-          <div className="flex flex-col items-center p-2 bg-green-50 rounded-lg">
-            <MessageSquare className="w-4 h-4 text-green-600 mb-1" />
-            <span className="text-lg font-bold text-green-600">{stats.total_messages}</span>
-            <span className="text-xs text-gray-600">Messages</span>
+          <div className="flex flex-col items-center p-1.5 bg-green-50 rounded">
+            <MessageSquare className="w-3 h-3 text-green-600 mb-0.5" />
+            <span className="text-sm font-bold text-green-600">{stats.total_messages}</span>
+            <span className="text-[10px] text-gray-600">Messages</span>
           </div>
           
           {/* Active Now */}
-          <div className="flex flex-col items-center p-2 bg-emerald-50 rounded-lg border border-emerald-200">
+          <div className="flex flex-col items-center p-1.5 bg-emerald-50 rounded border border-emerald-200">
             <div className="relative">
-              <Radio className="w-4 h-4 text-emerald-600 mb-1" />
-              <span className="absolute -top-0.5 -right-0.5 w-2 h-2 bg-emerald-500 rounded-full animate-pulse" />
+              <Radio className="w-3 h-3 text-emerald-600 mb-0.5" />
+              <span className="absolute -top-0.5 -right-0.5 w-1.5 h-1.5 bg-emerald-500 rounded-full animate-pulse" />
             </div>
-            <span className="text-lg font-bold text-emerald-600">{stats.active_now ?? 0}</span>
-            <span className="text-xs text-emerald-700">Active Now</span>
+            <span className="text-sm font-bold text-emerald-600">{stats.active_now ?? 0}</span>
+            <span className="text-[10px] text-emerald-700">Now</span>
           </div>
           
           {/* Active Today with dropdown */}
-          <div className="flex flex-col items-center p-2 bg-purple-50 rounded-lg">
-            <Activity className="w-4 h-4 text-purple-600 mb-1" />
-            <span className="text-lg font-bold text-purple-600">{displayActiveToday}</span>
+          <div className="flex flex-col items-center p-1.5 bg-purple-50 rounded">
+            <Activity className="w-3 h-3 text-purple-600 mb-0.5" />
+            <span className="text-sm font-bold text-purple-600">{displayActiveToday}</span>
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
-                <Button variant="ghost" size="sm" className="text-xs text-gray-600 px-1 py-0 h-auto">
+                <Button variant="ghost" size="sm" className="text-[10px] text-gray-600 px-0.5 py-0 h-auto">
                   {isToday ? 'Today' : format(selectedDate, 'MMM d')}
                   <ChevronDown className="w-2 h-2 ml-0.5" />
                 </Button>
@@ -176,46 +176,46 @@ const StatsCard: React.FC<StatsCardProps> = ({ stats }) => {
             </DropdownMenu>
           </div>
           
-          <div className="flex flex-col items-center p-2 bg-indigo-50 rounded-lg">
-            <UserPlus className="w-4 h-4 text-indigo-600 mb-1" />
-            <span className="text-lg font-bold text-indigo-600">{stats.new_users_this_week}</span>
-            <span className="text-xs text-gray-600">New/Week</span>
+          <div className="flex flex-col items-center p-1.5 bg-indigo-50 rounded">
+            <UserPlus className="w-3 h-3 text-indigo-600 mb-0.5" />
+            <span className="text-sm font-bold text-indigo-600">{stats.new_users_this_week}</span>
+            <span className="text-[10px] text-gray-600">New/Wk</span>
           </div>
           
-          <div className="flex flex-col items-center p-2 bg-yellow-50 rounded-lg">
-            <Pause className="w-4 h-4 text-yellow-600 mb-1" />
-            <span className="text-lg font-bold text-yellow-600">{stats.users_on_hold}</span>
-            <span className="text-xs text-gray-600">On Hold</span>
+          <div className="flex flex-col items-center p-1.5 bg-yellow-50 rounded">
+            <Pause className="w-3 h-3 text-yellow-600 mb-0.5" />
+            <span className="text-sm font-bold text-yellow-600">{stats.users_on_hold}</span>
+            <span className="text-[10px] text-gray-600">Hold</span>
           </div>
           
-          <div className="flex flex-col items-center p-2 bg-red-50 rounded-lg">
-            <UserX className="w-4 h-4 text-red-600 mb-1" />
-            <span className="text-lg font-bold text-red-600">{stats.blocked_users}</span>
-            <span className="text-xs text-gray-600">Blocked</span>
+          <div className="flex flex-col items-center p-1.5 bg-red-50 rounded">
+            <UserX className="w-3 h-3 text-red-600 mb-0.5" />
+            <span className="text-sm font-bold text-red-600">{stats.blocked_users}</span>
+            <span className="text-[10px] text-gray-600">Blocked</span>
           </div>
           
-          <div className="flex flex-col items-center p-2 bg-gray-50 rounded-lg">
-            <Shield className="w-4 h-4 text-gray-600 mb-1" />
-            <span className="text-lg font-bold text-gray-600">{stats.total_admins}</span>
-            <span className="text-xs text-gray-600">Admins</span>
+          <div className="flex flex-col items-center p-1.5 bg-gray-50 rounded">
+            <Shield className="w-3 h-3 text-gray-600 mb-0.5" />
+            <span className="text-sm font-bold text-gray-600">{stats.total_admins}</span>
+            <span className="text-[10px] text-gray-600">Admins</span>
           </div>
           
-          <div className="flex flex-col items-center p-2 bg-orange-50 rounded-lg">
-            <Crown className="w-4 h-4 text-orange-600 mb-1" />
-            <span className="text-lg font-bold text-orange-600">{stats.premium_users}</span>
-            <span className="text-xs text-gray-600">Premium</span>
+          <div className="flex flex-col items-center p-1.5 bg-orange-50 rounded">
+            <Crown className="w-3 h-3 text-orange-600 mb-0.5" />
+            <span className="text-sm font-bold text-orange-600">{stats.premium_users}</span>
+            <span className="text-[10px] text-gray-600">Premium</span>
           </div>
           
-          <div className="flex flex-col items-center p-2 bg-teal-50 rounded-lg">
-            <Calendar className="w-4 h-4 text-teal-600 mb-1" />
-            <span className="text-lg font-bold text-teal-600">{stats.active_users_30_days || 0}</span>
-            <span className="text-xs text-gray-600">30 Days</span>
+          <div className="flex flex-col items-center p-1.5 bg-teal-50 rounded">
+            <Calendar className="w-3 h-3 text-teal-600 mb-0.5" />
+            <span className="text-sm font-bold text-teal-600">{stats.active_users_30_days || 0}</span>
+            <span className="text-[10px] text-gray-600">30 Days</span>
           </div>
           
-          <div className="flex flex-col items-center p-2 bg-amber-50 rounded-lg">
-            <Archive className="w-4 h-4 text-amber-600 mb-1" />
-            <span className="text-lg font-bold text-amber-600">{stats.archived_users || 0}</span>
-            <span className="text-xs text-gray-600">Archived</span>
+          <div className="flex flex-col items-center p-1.5 bg-amber-50 rounded">
+            <Archive className="w-3 h-3 text-amber-600 mb-0.5" />
+            <span className="text-sm font-bold text-amber-600">{stats.archived_users || 0}</span>
+            <span className="text-[10px] text-gray-600">Archived</span>
           </div>
         </div>
       </CardContent>
