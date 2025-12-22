@@ -822,43 +822,24 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, isPremium }: DiscoverPage
         ? getStratifiedBatches(intlFiltered, 15, 4, `${userId}_${dailySeed}_intl`)
         : [];
       
-      // STEP 5: MIX local and international profiles (soft interleaving)
+      // STEP 5: MIX local and international profiles with deterministic interleaving
+      // Pattern: 2 local, 2 intl (cycling through all countries), repeat
       if (stratifiedLocal.length > 0 && stratifiedIntl.length > 0) {
-        const rand = seededRandom(`${userId}_${dailySeed}_mix`);
         const result: any[] = [];
-        let l = 0;
-        let i = 0;
-        let localStreak = 0;
+        let localIdx = 0;
+        let intlIdx = 0;
+        const localBatchSize = 2;
+        const intlBatchSize = 2;
         
-        while (l < stratifiedLocal.length || i < stratifiedIntl.length) {
-          const canLocal = l < stratifiedLocal.length;
-          const canIntl = i < stratifiedIntl.length;
-          
-          if (!canIntl) {
-            result.push(stratifiedLocal[l++]);
-            continue;
-          }
-          if (!canLocal) {
-            result.push(stratifiedIntl[i++]);
-            continue;
+        while (localIdx < stratifiedLocal.length || intlIdx < stratifiedIntl.length) {
+          // Add batch of local profiles
+          for (let j = 0; j < localBatchSize && localIdx < stratifiedLocal.length; j++) {
+            result.push(stratifiedLocal[localIdx++]);
           }
           
-          // Dynamic mixing: probability adapts to remaining intl/local ratio, with a hard cap
-          // so locals never "exhaust first" and users can't detect a fixed cadence.
-          const remainingLocal = stratifiedLocal.length - l;
-          const remainingIntl = stratifiedIntl.length - i;
-          const remainingTotal = remainingLocal + remainingIntl;
-          const ratio = remainingTotal > 0 ? remainingIntl / remainingTotal : 0;
-          // Base 0.25 .. 0.65 depending on remaining ratio
-          const intlChance = 0.25 + ratio * 0.4;
-          const pickIntl = localStreak >= 3 ? true : rand() < intlChance;
-          
-          if (pickIntl) {
-            result.push(stratifiedIntl[i++]);
-            localStreak = 0;
-          } else {
-            result.push(stratifiedLocal[l++]);
-            localStreak++;
+          // Add batch of international profiles (already country-interleaved by getStratifiedBatches)
+          for (let j = 0; j < intlBatchSize && intlIdx < stratifiedIntl.length; j++) {
+            result.push(stratifiedIntl[intlIdx++]);
           }
         }
         
