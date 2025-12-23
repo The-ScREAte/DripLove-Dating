@@ -2002,6 +2002,7 @@ const AdminPageComponent = ({ currentUser, onLogout }: AdminPageProps) => {
                   latitude: currentUser.latitude,
                   longitude: currentUser.longitude
                 }}
+                onViewProfile={handleViewProfile}
               />
             </TabsContent>
 
@@ -2047,9 +2048,14 @@ const AdminPageComponent = ({ currentUser, onLogout }: AdminPageProps) => {
         {selectedUserId && (
           <UserProfileModal
             isOpen={isProfileModalOpen}
-            onClose={() => {
+            onClose={(wasEdited) => {
               setIsProfileModalOpen(false);
               setSelectedUserId(null);
+              // Refresh users list if admin edited preferences
+              if (wasEdited) {
+                userDataCache.clear();
+                fetchUsers();
+              }
             }}
             userId={selectedUserId}
             isAdmin={true}

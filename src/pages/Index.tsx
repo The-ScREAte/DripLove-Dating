@@ -257,6 +257,8 @@ const Index = ({
     }
     
     await supabase.auth.signOut();
+    // Reset the routing ref so re-auth can properly route again
+    didRouteRef.current = false;
     setCurrentView('welcome');
   };
 
