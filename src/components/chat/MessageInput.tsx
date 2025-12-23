@@ -1,4 +1,4 @@
-import React, { useEffect, useRef } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { Input } from '@/components/ui/input';
 import { X } from 'lucide-react';
 import { containsBadWords } from '@/utils/textModeration';
@@ -6,25 +6,29 @@ import { useTranslation } from 'react-i18next';
 import { ChatMessage } from '@/types';
 
 interface MessageInputProps {
-  newMessage: string;
-  onMessageChange: (message: string) => void;
-  onSendMessage: () => void;
+  matchId: string | null;
+  onSendMessage: (text: string) => void;
   disabled?: boolean;
   replyingTo?: ChatMessage | null;
   onCancelReply?: () => void;
 }
 
 const MessageInput: React.FC<MessageInputProps> = ({
-  newMessage,
-  onMessageChange,
+  matchId,
   onSendMessage,
   disabled = false,
   replyingTo,
   onCancelReply
 }) => {
   const { t } = useTranslation();
+  const [draft, setDraft] = useState('');
   const inputRef = useRef<HTMLInputElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
+
+  // Clear draft when switching conversations
+  useEffect(() => {
+    setDraft('');
+  }, [matchId]);
 
   // Keep CSS var --input-bar-height in sync with actual input container height
   useEffect(() => {
@@ -55,11 +59,25 @@ const MessageInput: React.FC<MessageInputProps> = ({
   const handleKeyPress = (e: React.KeyboardEvent) => {
     if (e.key === 'Enter' && !e.shiftKey) {
       e.preventDefault();
-      if (containsBadWords(newMessage)) {
+      if (containsBadWords(draft)) {
         alert(t('chat.inappropriateLanguage'));
         return;
       }
-      onSendMessage();
+      if (draft.trim()) {
+        onSendMessage(draft.trim());
+        setDraft('');
+      }
+    }
+  };
+
+  const handleSend = () => {
+    if (containsBadWords(draft)) {
+      alert(t('chat.inappropriateLanguage'));
+      return;
+    }
+    if (draft.trim()) {
+      onSendMessage(draft.trim());
+      setDraft('');
     }
   };
 
@@ -103,8 +121,8 @@ const MessageInput: React.FC<MessageInputProps> = ({
           <div className="flex-1 flex items-center space-x-2 bg-gray-100 rounded-full px-4 py-2">
             <Input
               ref={inputRef}
-              value={newMessage}
-              onChange={(e) => onMessageChange(e.target.value)}
+              value={draft}
+              onChange={(e) => setDraft(e.target.value)}
               onKeyPress={handleKeyPress}
               placeholder={t('chat.typeMessage')}
               className="flex-1 h-10 rounded-md border border-input text-base ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium file:text-foreground placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50 md:text-sm flex-1 border-none bg-transparent focus:ring-0 p-0"
@@ -113,8 +131,8 @@ const MessageInput: React.FC<MessageInputProps> = ({
             />
           </div>
           <button
-            onClick={onSendMessage}
-            disabled={!newMessage.trim() || disabled}
+            onClick={handleSend}
+            disabled={!draft.trim() || disabled}
             className="inline-flex items-center justify-center gap-2 whitespace-nowrap text-sm font-medium ring-offset-background transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 [&_svg]:pointer-events-none [&_svg]:size-4 [&_svg]:shrink-0 bg-primary text-primary-foreground hover:bg-primary/90 rounded-full w-12 h-12 p-0"
             aria-label={t('chat.sendMessage')}
           >
