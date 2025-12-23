@@ -1166,10 +1166,10 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, isPremium, profileComplet
         .gte('age', userMinAge)
         .lte('age', userMaxAge);
 
-      // Apply distance filtering for local country
-      if (baseCountryCode && userLocation) {
-        const userLat = userLocation.latitude;
-        const userLon = userLocation.longitude;
+      // Apply distance filtering for local country (use currentUserData for location)
+      const userLat = (currentUserData as any)?.latitude;
+      const userLon = (currentUserData as any)?.longitude;
+      if (baseCountryCode && userLat && userLon) {
         const maxDistanceKm = currentUserData?.max_distance || 50;
         const radiusInDegrees = maxDistanceKm / 111.32;
 
@@ -2300,10 +2300,10 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, isPremium, profileComplet
           .gte('age', userMinAge)
           .lte('age', userMaxAge);
 
-        // Apply distance filtering for local country
-        if (baseCountryCode && userLocation) {
-          const userLat = userLocation.latitude;
-          const userLon = userLocation.longitude;
+        // Apply distance filtering for local country (use currentUserData for location)
+        const userLat = (currentUserData as any)?.latitude || currentUser.latitude;
+        const userLon = (currentUserData as any)?.longitude || currentUser.longitude;
+        if (baseCountryCode && userLat && userLon) {
           const maxDistanceKm = (currentUserData as any)?.max_distance || currentUser.max_distance || 50;
           const radiusInDegrees = maxDistanceKm / 111.32;
 
