@@ -1,0 +1,352 @@
+diff --git a/node_modules/@capacitor/status-bar/android/.classpath b/node_modules/@capacitor/status-bar/android/.classpath
+new file mode 100644
+index 0000000..bbe97e5
+--- /dev/null
++++ b/node_modules/@capacitor/status-bar/android/.classpath
+@@ -0,0 +1,6 @@
++<?xml version="1.0" encoding="UTF-8"?>
++<classpath>
++	<classpathentry kind="con" path="org.eclipse.jdt.launching.JRE_CONTAINER/org.eclipse.jdt.internal.debug.ui.launcher.StandardVMType/JavaSE-17/"/>
++	<classpathentry kind="con" path="org.eclipse.buildship.core.gradleclasspathcontainer"/>
++	<classpathentry kind="output" path="bin/default"/>
++</classpath>
+diff --git a/node_modules/@capacitor/status-bar/android/.project b/node_modules/@capacitor/status-bar/android/.project
+new file mode 100644
+index 0000000..f1db8bb
+--- /dev/null
++++ b/node_modules/@capacitor/status-bar/android/.project
+@@ -0,0 +1,34 @@
++<?xml version="1.0" encoding="UTF-8"?>
++<projectDescription>
++	<name>android-capacitor-status-bar</name>
++	<comment>Project android-capacitor-status-bar created by Buildship.</comment>
++	<projects>
++	</projects>
++	<buildSpec>
++		<buildCommand>
++			<name>org.eclipse.jdt.core.javabuilder</name>
++			<arguments>
++			</arguments>
++		</buildCommand>
++		<buildCommand>
++			<name>org.eclipse.buildship.core.gradleprojectbuilder</name>
++			<arguments>
++			</arguments>
++		</buildCommand>
++	</buildSpec>
++	<natures>
++		<nature>org.eclipse.jdt.core.javanature</nature>
++		<nature>org.eclipse.buildship.core.gradleprojectnature</nature>
++	</natures>
++	<filteredResources>
++		<filter>
++			<id>1762455965571</id>
++			<name></name>
++			<type>30</type>
++			<matcher>
++				<id>org.eclipse.core.resources.regexFilterMatcher</id>
++				<arguments>node_modules|\.git|__CREATED_BY_JAVA_LANGUAGE_SERVER__</arguments>
++			</matcher>
++		</filter>
++	</filteredResources>
++</projectDescription>
+diff --git a/node_modules/@capacitor/status-bar/android/.settings/org.eclipse.buildship.core.prefs b/node_modules/@capacitor/status-bar/android/.settings/org.eclipse.buildship.core.prefs
+new file mode 100644
+index 0000000..68c9fab
+--- /dev/null
++++ b/node_modules/@capacitor/status-bar/android/.settings/org.eclipse.buildship.core.prefs
+@@ -0,0 +1,2 @@
++connection.project.dir=../../../../android
++eclipse.preferences.version=1
+diff --git a/node_modules/@capacitor/status-bar/android/.settings/org.eclipse.jdt.core.prefs b/node_modules/@capacitor/status-bar/android/.settings/org.eclipse.jdt.core.prefs
+new file mode 100644
+index 0000000..626e0e1
+--- /dev/null
++++ b/node_modules/@capacitor/status-bar/android/.settings/org.eclipse.jdt.core.prefs
+@@ -0,0 +1,4 @@
++eclipse.preferences.version=1
++org.eclipse.jdt.core.compiler.codegen.targetPlatform=17
++org.eclipse.jdt.core.compiler.compliance=17
++org.eclipse.jdt.core.compiler.source=17
+diff --git a/node_modules/@capacitor/status-bar/android/build/intermediates/aapt_friendly_merged_manifests/release/processReleaseManifest/aapt/AndroidManifest.xml b/node_modules/@capacitor/status-bar/android/build/intermediates/aapt_friendly_merged_manifests/release/processReleaseManifest/aapt/AndroidManifest.xml
+new file mode 100644
+index 0000000..a2f2321
+--- /dev/null
++++ b/node_modules/@capacitor/status-bar/android/build/intermediates/aapt_friendly_merged_manifests/release/processReleaseManifest/aapt/AndroidManifest.xml
+@@ -0,0 +1,7 @@
++<?xml version="1.0" encoding="utf-8"?>
++<manifest xmlns:android="http://schemas.android.com/apk/res/android"
++    package="com.capacitorjs.plugins.statusbar" >
++
++    <uses-sdk android:minSdkVersion="23" />
++
++</manifest>
+\ No newline at end of file
+diff --git a/node_modules/@capacitor/status-bar/android/build/intermediates/aapt_friendly_merged_manifests/release/processReleaseManifest/aapt/output-metadata.json b/node_modules/@capacitor/status-bar/android/build/intermediates/aapt_friendly_merged_manifests/release/processReleaseManifest/aapt/output-metadata.json
+new file mode 100644
+index 0000000..d76e4cc
+--- /dev/null
++++ b/node_modules/@capacitor/status-bar/android/build/intermediates/aapt_friendly_merged_manifests/release/processReleaseManifest/aapt/output-metadata.json
+@@ -0,0 +1,18 @@
++{
++  "version": 3,
++  "artifactType": {
++    "type": "AAPT_FRIENDLY_MERGED_MANIFESTS",
++    "kind": "Directory"
++  },
++  "applicationId": "com.capacitorjs.plugins.statusbar",
++  "variantName": "release",
++  "elements": [
++    {
++      "type": "SINGLE",
++      "filters": [],
++      "attributes": [],
++      "outputFile": "AndroidManifest.xml"
++    }
++  ],
++  "elementType": "File"
++}
+\ No newline at end of file
+diff --git a/node_modules/@capacitor/status-bar/android/build/intermediates/aar_metadata/release/writeReleaseAarMetadata/aar-metadata.properties b/node_modules/@capacitor/status-bar/android/build/intermediates/aar_metadata/release/writeReleaseAarMetadata/aar-metadata.properties
+new file mode 100644
+index 0000000..1211b1e
+--- /dev/null
++++ b/node_modules/@capacitor/status-bar/android/build/intermediates/aar_metadata/release/writeReleaseAarMetadata/aar-metadata.properties
+@@ -0,0 +1,6 @@
++aarFormatVersion=1.0
++aarMetadataVersion=1.0
++minCompileSdk=1
++minCompileSdkExtension=0
++minAndroidGradlePluginVersion=1.0.0
++coreLibraryDesugaringEnabled=false
+diff --git a/node_modules/@capacitor/status-bar/android/build/intermediates/annotation_processor_list/release/javaPreCompileRelease/annotationProcessors.json b/node_modules/@capacitor/status-bar/android/build/intermediates/annotation_processor_list/release/javaPreCompileRelease/annotationProcessors.json
+new file mode 100644
+index 0000000..9e26dfe
+--- /dev/null
++++ b/node_modules/@capacitor/status-bar/android/build/intermediates/annotation_processor_list/release/javaPreCompileRelease/annotationProcessors.json
+@@ -0,0 +1 @@
++{}
+\ No newline at end of file
+diff --git a/node_modules/@capacitor/status-bar/android/build/intermediates/compile_library_classes_jar/release/bundleLibCompileToJarRelease/classes.jar b/node_modules/@capacitor/status-bar/android/build/intermediates/compile_library_classes_jar/release/bundleLibCompileToJarRelease/classes.jar
+new file mode 100644
+index 0000000..9f38433
+Binary files /dev/null and b/node_modules/@capacitor/status-bar/android/build/intermediates/compile_library_classes_jar/release/bundleLibCompileToJarRelease/classes.jar differ
+diff --git a/node_modules/@capacitor/status-bar/android/build/intermediates/compile_r_class_jar/release/generateReleaseRFile/R.jar b/node_modules/@capacitor/status-bar/android/build/intermediates/compile_r_class_jar/release/generateReleaseRFile/R.jar
+new file mode 100644
+index 0000000..f75e024
+Binary files /dev/null and b/node_modules/@capacitor/status-bar/android/build/intermediates/compile_r_class_jar/release/generateReleaseRFile/R.jar differ
+diff --git a/node_modules/@capacitor/status-bar/android/build/intermediates/compile_symbol_list/release/generateReleaseRFile/R.txt b/node_modules/@capacitor/status-bar/android/build/intermediates/compile_symbol_list/release/generateReleaseRFile/R.txt
+new file mode 100644
+index 0000000..e69de29
+diff --git a/node_modules/@capacitor/status-bar/android/build/intermediates/incremental/mergeReleaseJniLibFolders/merger.xml b/node_modules/@capacitor/status-bar/android/build/intermediates/incremental/mergeReleaseJniLibFolders/merger.xml
+new file mode 100644
+index 0000000..eb049d7
+--- /dev/null
++++ b/node_modules/@capacitor/status-bar/android/build/intermediates/incremental/mergeReleaseJniLibFolders/merger.xml
+@@ -0,0 +1,2 @@
++<?xml version="1.0" encoding="utf-8"?>
++<merger version="3"><dataSet config="main" ignore_pattern="!.svn:!.git:!.ds_store:!*.scc:.*:&lt;dir>_*:!CVS:!thumbs.db:!picasa.ini:!*~"><source path="/Users/deanonearth/Desktop/dataing-buddy-auth-hub/node_modules/@capacitor/status-bar/android/src/main/jniLibs"/></dataSet><dataSet config="release" ignore_pattern="!.svn:!.git:!.ds_store:!*.scc:.*:&lt;dir>_*:!CVS:!thumbs.db:!picasa.ini:!*~"><source path="/Users/deanonearth/Desktop/dataing-buddy-auth-hub/node_modules/@capacitor/status-bar/android/src/release/jniLibs"/></dataSet></merger>
+\ No newline at end of file
+diff --git a/node_modules/@capacitor/status-bar/android/build/intermediates/incremental/mergeReleaseShaders/merger.xml b/node_modules/@capacitor/status-bar/android/build/intermediates/incremental/mergeReleaseShaders/merger.xml
+new file mode 100644
+index 0000000..56277dd
+--- /dev/null
++++ b/node_modules/@capacitor/status-bar/android/build/intermediates/incremental/mergeReleaseShaders/merger.xml
+@@ -0,0 +1,2 @@
++<?xml version="1.0" encoding="utf-8"?>
++<merger version="3"><dataSet config="main" ignore_pattern="!.svn:!.git:!.ds_store:!*.scc:.*:&lt;dir>_*:!CVS:!thumbs.db:!picasa.ini:!*~"><source path="/Users/deanonearth/Desktop/dataing-buddy-auth-hub/node_modules/@capacitor/status-bar/android/src/main/shaders"/></dataSet><dataSet config="release" ignore_pattern="!.svn:!.git:!.ds_store:!*.scc:.*:&lt;dir>_*:!CVS:!thumbs.db:!picasa.ini:!*~"><source path="/Users/deanonearth/Desktop/dataing-buddy-auth-hub/node_modules/@capacitor/status-bar/android/src/release/shaders"/></dataSet></merger>
+\ No newline at end of file
+diff --git a/node_modules/@capacitor/status-bar/android/build/intermediates/incremental/packageReleaseAssets/merger.xml b/node_modules/@capacitor/status-bar/android/build/intermediates/incremental/packageReleaseAssets/merger.xml
+new file mode 100644
+index 0000000..ffd60a5
+--- /dev/null
++++ b/node_modules/@capacitor/status-bar/android/build/intermediates/incremental/packageReleaseAssets/merger.xml
+@@ -0,0 +1,2 @@
++<?xml version="1.0" encoding="utf-8"?>
++<merger version="3"><dataSet config="main" ignore_pattern="!.svn:!.git:!.ds_store:!*.scc:.*:&lt;dir>_*:!CVS:!thumbs.db:!picasa.ini:!*~"><source path="/Users/deanonearth/Desktop/dataing-buddy-auth-hub/node_modules/@capacitor/status-bar/android/src/main/assets"/></dataSet><dataSet config="release" ignore_pattern="!.svn:!.git:!.ds_store:!*.scc:.*:&lt;dir>_*:!CVS:!thumbs.db:!picasa.ini:!*~"><source path="/Users/deanonearth/Desktop/dataing-buddy-auth-hub/node_modules/@capacitor/status-bar/android/src/release/assets"/></dataSet><dataSet config="generated" ignore_pattern="!.svn:!.git:!.ds_store:!*.scc:.*:&lt;dir>_*:!CVS:!thumbs.db:!picasa.ini:!*~"><source path="/Users/deanonearth/Desktop/dataing-buddy-auth-hub/node_modules/@capacitor/status-bar/android/build/intermediates/shader_assets/release/compileReleaseShaders/out"/></dataSet></merger>
+\ No newline at end of file
+diff --git a/node_modules/@capacitor/status-bar/android/build/intermediates/incremental/release/packageReleaseResources/compile-file-map.properties b/node_modules/@capacitor/status-bar/android/build/intermediates/incremental/release/packageReleaseResources/compile-file-map.properties
+new file mode 100644
+index 0000000..945535e
+--- /dev/null
++++ b/node_modules/@capacitor/status-bar/android/build/intermediates/incremental/release/packageReleaseResources/compile-file-map.properties
+@@ -0,0 +1 @@
++#Wed Dec 17 22:17:26 MST 2025
+diff --git a/node_modules/@capacitor/status-bar/android/build/intermediates/incremental/release/packageReleaseResources/merger.xml b/node_modules/@capacitor/status-bar/android/build/intermediates/incremental/release/packageReleaseResources/merger.xml
+new file mode 100644
+index 0000000..ab13014
+--- /dev/null
++++ b/node_modules/@capacitor/status-bar/android/build/intermediates/incremental/release/packageReleaseResources/merger.xml
+@@ -0,0 +1,2 @@
++<?xml version="1.0" encoding="utf-8"?>
++<merger version="3"><dataSet aapt-namespace="http://schemas.android.com/apk/res-auto" config="main$Generated" generated="true" ignore_pattern="!.svn:!.git:!.ds_store:!*.scc:.*:&lt;dir>_*:!CVS:!thumbs.db:!picasa.ini:!*~"><source path="/Users/deanonearth/Desktop/dataing-buddy-auth-hub/node_modules/@capacitor/status-bar/android/src/main/res"/></dataSet><dataSet aapt-namespace="http://schemas.android.com/apk/res-auto" config="main" generated-set="main$Generated" ignore_pattern="!.svn:!.git:!.ds_store:!*.scc:.*:&lt;dir>_*:!CVS:!thumbs.db:!picasa.ini:!*~"><source path="/Users/deanonearth/Desktop/dataing-buddy-auth-hub/node_modules/@capacitor/status-bar/android/src/main/res"/></dataSet><dataSet aapt-namespace="http://schemas.android.com/apk/res-auto" config="release$Generated" generated="true" ignore_pattern="!.svn:!.git:!.ds_store:!*.scc:.*:&lt;dir>_*:!CVS:!thumbs.db:!picasa.ini:!*~"><source path="/Users/deanonearth/Desktop/dataing-buddy-auth-hub/node_modules/@capacitor/status-bar/android/src/release/res"/></dataSet><dataSet aapt-namespace="http://schemas.android.com/apk/res-auto" config="release" generated-set="release$Generated" ignore_pattern="!.svn:!.git:!.ds_store:!*.scc:.*:&lt;dir>_*:!CVS:!thumbs.db:!picasa.ini:!*~"><source path="/Users/deanonearth/Desktop/dataing-buddy-auth-hub/node_modules/@capacitor/status-bar/android/src/release/res"/></dataSet><dataSet aapt-namespace="http://schemas.android.com/apk/res-auto" config="generated$Generated" generated="true" ignore_pattern="!.svn:!.git:!.ds_store:!*.scc:.*:&lt;dir>_*:!CVS:!thumbs.db:!picasa.ini:!*~"><source path="/Users/deanonearth/Desktop/dataing-buddy-auth-hub/node_modules/@capacitor/status-bar/android/build/generated/res/resValues/release"/></dataSet><dataSet aapt-namespace="http://schemas.android.com/apk/res-auto" config="generated" generated-set="generated$Generated" ignore_pattern="!.svn:!.git:!.ds_store:!*.scc:.*:&lt;dir>_*:!CVS:!thumbs.db:!picasa.ini:!*~"><source path="/Users/deanonearth/Desktop/dataing-buddy-auth-hub/node_modules/@capacitor/status-bar/android/build/generated/res/resValues/release"/></dataSet><mergedItems/></merger>
+\ No newline at end of file
+diff --git a/node_modules/@capacitor/status-bar/android/build/intermediates/javac/release/compileReleaseJavaWithJavac/classes/com/capacitorjs/plugins/statusbar/StatusBar$ChangeListener.class b/node_modules/@capacitor/status-bar/android/build/intermediates/javac/release/compileReleaseJavaWithJavac/classes/com/capacitorjs/plugins/statusbar/StatusBar$ChangeListener.class
+new file mode 100644
+index 0000000..d48d579
+Binary files /dev/null and b/node_modules/@capacitor/status-bar/android/build/intermediates/javac/release/compileReleaseJavaWithJavac/classes/com/capacitorjs/plugins/statusbar/StatusBar$ChangeListener.class differ
+diff --git a/node_modules/@capacitor/status-bar/android/build/intermediates/javac/release/compileReleaseJavaWithJavac/classes/com/capacitorjs/plugins/statusbar/StatusBar.class b/node_modules/@capacitor/status-bar/android/build/intermediates/javac/release/compileReleaseJavaWithJavac/classes/com/capacitorjs/plugins/statusbar/StatusBar.class
+new file mode 100644
+index 0000000..bc8c330
+Binary files /dev/null and b/node_modules/@capacitor/status-bar/android/build/intermediates/javac/release/compileReleaseJavaWithJavac/classes/com/capacitorjs/plugins/statusbar/StatusBar.class differ
+diff --git a/node_modules/@capacitor/status-bar/android/build/intermediates/javac/release/compileReleaseJavaWithJavac/classes/com/capacitorjs/plugins/statusbar/StatusBarConfig.class b/node_modules/@capacitor/status-bar/android/build/intermediates/javac/release/compileReleaseJavaWithJavac/classes/com/capacitorjs/plugins/statusbar/StatusBarConfig.class
+new file mode 100644
+index 0000000..16bc00a
+Binary files /dev/null and b/node_modules/@capacitor/status-bar/android/build/intermediates/javac/release/compileReleaseJavaWithJavac/classes/com/capacitorjs/plugins/statusbar/StatusBarConfig.class differ
+diff --git a/node_modules/@capacitor/status-bar/android/build/intermediates/javac/release/compileReleaseJavaWithJavac/classes/com/capacitorjs/plugins/statusbar/StatusBarInfo.class b/node_modules/@capacitor/status-bar/android/build/intermediates/javac/release/compileReleaseJavaWithJavac/classes/com/capacitorjs/plugins/statusbar/StatusBarInfo.class
+new file mode 100644
+index 0000000..1bc1f54
+Binary files /dev/null and b/node_modules/@capacitor/status-bar/android/build/intermediates/javac/release/compileReleaseJavaWithJavac/classes/com/capacitorjs/plugins/statusbar/StatusBarInfo.class differ
+diff --git a/node_modules/@capacitor/status-bar/android/build/intermediates/javac/release/compileReleaseJavaWithJavac/classes/com/capacitorjs/plugins/statusbar/StatusBarPlugin.class b/node_modules/@capacitor/status-bar/android/build/intermediates/javac/release/compileReleaseJavaWithJavac/classes/com/capacitorjs/plugins/statusbar/StatusBarPlugin.class
+new file mode 100644
+index 0000000..b859820
+Binary files /dev/null and b/node_modules/@capacitor/status-bar/android/build/intermediates/javac/release/compileReleaseJavaWithJavac/classes/com/capacitorjs/plugins/statusbar/StatusBarPlugin.class differ
+diff --git a/node_modules/@capacitor/status-bar/android/build/intermediates/local_only_symbol_list/release/parseReleaseLocalResources/R-def.txt b/node_modules/@capacitor/status-bar/android/build/intermediates/local_only_symbol_list/release/parseReleaseLocalResources/R-def.txt
+new file mode 100644
+index 0000000..78ac5b8
+--- /dev/null
++++ b/node_modules/@capacitor/status-bar/android/build/intermediates/local_only_symbol_list/release/parseReleaseLocalResources/R-def.txt
+@@ -0,0 +1,2 @@
++R_DEF: Internal format may change without notice
++local
+diff --git a/node_modules/@capacitor/status-bar/android/build/intermediates/manifest_merge_blame_file/release/processReleaseManifest/manifest-merger-blame-release-report.txt b/node_modules/@capacitor/status-bar/android/build/intermediates/manifest_merge_blame_file/release/processReleaseManifest/manifest-merger-blame-release-report.txt
+new file mode 100644
+index 0000000..18e4dc1
+--- /dev/null
++++ b/node_modules/@capacitor/status-bar/android/build/intermediates/manifest_merge_blame_file/release/processReleaseManifest/manifest-merger-blame-release-report.txt
+@@ -0,0 +1,7 @@
++1<?xml version="1.0" encoding="utf-8"?>
++2<manifest xmlns:android="http://schemas.android.com/apk/res/android"
++3    package="com.capacitorjs.plugins.statusbar" >
++4
++5    <uses-sdk android:minSdkVersion="23" />
++6
++7</manifest>
+diff --git a/node_modules/@capacitor/status-bar/android/build/intermediates/merged_manifest/release/processReleaseManifest/AndroidManifest.xml b/node_modules/@capacitor/status-bar/android/build/intermediates/merged_manifest/release/processReleaseManifest/AndroidManifest.xml
+new file mode 100644
+index 0000000..a2f2321
+--- /dev/null
++++ b/node_modules/@capacitor/status-bar/android/build/intermediates/merged_manifest/release/processReleaseManifest/AndroidManifest.xml
+@@ -0,0 +1,7 @@
++<?xml version="1.0" encoding="utf-8"?>
++<manifest xmlns:android="http://schemas.android.com/apk/res/android"
++    package="com.capacitorjs.plugins.statusbar" >
++
++    <uses-sdk android:minSdkVersion="23" />
++
++</manifest>
+\ No newline at end of file
+diff --git a/node_modules/@capacitor/status-bar/android/build/intermediates/navigation_json/release/extractDeepLinksRelease/navigation.json b/node_modules/@capacitor/status-bar/android/build/intermediates/navigation_json/release/extractDeepLinksRelease/navigation.json
+new file mode 100644
+index 0000000..0637a08
+--- /dev/null
++++ b/node_modules/@capacitor/status-bar/android/build/intermediates/navigation_json/release/extractDeepLinksRelease/navigation.json
+@@ -0,0 +1 @@
++[]
+\ No newline at end of file
+diff --git a/node_modules/@capacitor/status-bar/android/build/intermediates/nested_resources_validation_report/release/generateReleaseResources/nestedResourcesValidationReport.txt b/node_modules/@capacitor/status-bar/android/build/intermediates/nested_resources_validation_report/release/generateReleaseResources/nestedResourcesValidationReport.txt
+new file mode 100644
+index 0000000..08f4ebe
+--- /dev/null
++++ b/node_modules/@capacitor/status-bar/android/build/intermediates/nested_resources_validation_report/release/generateReleaseResources/nestedResourcesValidationReport.txt
+@@ -0,0 +1 @@
++0 Warning/Error
+\ No newline at end of file
+diff --git a/node_modules/@capacitor/status-bar/android/build/intermediates/runtime_library_classes_jar/release/bundleLibRuntimeToJarRelease/classes.jar b/node_modules/@capacitor/status-bar/android/build/intermediates/runtime_library_classes_jar/release/bundleLibRuntimeToJarRelease/classes.jar
+new file mode 100644
+index 0000000..4414f5e
+Binary files /dev/null and b/node_modules/@capacitor/status-bar/android/build/intermediates/runtime_library_classes_jar/release/bundleLibRuntimeToJarRelease/classes.jar differ
+diff --git a/node_modules/@capacitor/status-bar/android/build/intermediates/symbol_list_with_package_name/release/generateReleaseRFile/package-aware-r.txt b/node_modules/@capacitor/status-bar/android/build/intermediates/symbol_list_with_package_name/release/generateReleaseRFile/package-aware-r.txt
+new file mode 100644
+index 0000000..5c9a663
+--- /dev/null
++++ b/node_modules/@capacitor/status-bar/android/build/intermediates/symbol_list_with_package_name/release/generateReleaseRFile/package-aware-r.txt
+@@ -0,0 +1 @@
++com.capacitorjs.plugins.statusbar
+diff --git a/node_modules/@capacitor/status-bar/android/build/outputs/logs/manifest-merger-release-report.txt b/node_modules/@capacitor/status-bar/android/build/outputs/logs/manifest-merger-release-report.txt
+new file mode 100644
+index 0000000..1a0e6de
+--- /dev/null
++++ b/node_modules/@capacitor/status-bar/android/build/outputs/logs/manifest-merger-release-report.txt
+@@ -0,0 +1,16 @@
++-- Merging decision tree log ---
++manifest
++ADDED from /Users/deanonearth/Desktop/dataing-buddy-auth-hub/node_modules/@capacitor/status-bar/android/src/main/AndroidManifest.xml:1:1-2:12
++INJECTED from /Users/deanonearth/Desktop/dataing-buddy-auth-hub/node_modules/@capacitor/status-bar/android/src/main/AndroidManifest.xml:1:1-2:12
++	package
++		INJECTED from /Users/deanonearth/Desktop/dataing-buddy-auth-hub/node_modules/@capacitor/status-bar/android/src/main/AndroidManifest.xml
++	xmlns:android
++		ADDED from /Users/deanonearth/Desktop/dataing-buddy-auth-hub/node_modules/@capacitor/status-bar/android/src/main/AndroidManifest.xml:1:11-69
++uses-sdk
++INJECTED from /Users/deanonearth/Desktop/dataing-buddy-auth-hub/node_modules/@capacitor/status-bar/android/src/main/AndroidManifest.xml reason: use-sdk injection requested
++INJECTED from /Users/deanonearth/Desktop/dataing-buddy-auth-hub/node_modules/@capacitor/status-bar/android/src/main/AndroidManifest.xml
++INJECTED from /Users/deanonearth/Desktop/dataing-buddy-auth-hub/node_modules/@capacitor/status-bar/android/src/main/AndroidManifest.xml
++	android:targetSdkVersion
++		INJECTED from /Users/deanonearth/Desktop/dataing-buddy-auth-hub/node_modules/@capacitor/status-bar/android/src/main/AndroidManifest.xml
++	android:minSdkVersion
++		INJECTED from /Users/deanonearth/Desktop/dataing-buddy-auth-hub/node_modules/@capacitor/status-bar/android/src/main/AndroidManifest.xml
+diff --git a/node_modules/@capacitor/status-bar/android/build/tmp/compileReleaseJavaWithJavac/previous-compilation-data.bin b/node_modules/@capacitor/status-bar/android/build/tmp/compileReleaseJavaWithJavac/previous-compilation-data.bin
+new file mode 100644
+index 0000000..8303e1b
+Binary files /dev/null and b/node_modules/@capacitor/status-bar/android/build/tmp/compileReleaseJavaWithJavac/previous-compilation-data.bin differ
+diff --git a/node_modules/@capacitor/status-bar/android/src/main/java/com/capacitorjs/plugins/statusbar/StatusBar.java b/node_modules/@capacitor/status-bar/android/src/main/java/com/capacitorjs/plugins/statusbar/StatusBar.java
+index 0239bd8..e466b6c 100644
+--- a/node_modules/@capacitor/status-bar/android/src/main/java/com/capacitorjs/plugins/statusbar/StatusBar.java
++++ b/node_modules/@capacitor/status-bar/android/src/main/java/com/capacitorjs/plugins/statusbar/StatusBar.java
+@@ -23,6 +23,7 @@ public class StatusBar {
+     private final ChangeListener listener;
+     private final AppCompatActivity activity;
+     private String currentStyle = "DEFAULT";
++    private boolean isOverlaid = false;
+ 
+     public StatusBar(AppCompatActivity activity, StatusBarConfig config, ChangeListener listener) {
+         // save initial color of the status bar
+@@ -63,11 +64,7 @@ public class StatusBar {
+ 
+     @SuppressWarnings("deprecation")
+     public void setBackgroundColor(int color) {
+-        Window window = activity.getWindow();
+-        window.clearFlags(WindowManager.LayoutParams.FLAG_TRANSLUCENT_STATUS);
+-        window.addFlags(WindowManager.LayoutParams.FLAG_DRAWS_SYSTEM_BAR_BACKGROUNDS);
+-        window.setStatusBarColor(color);
+-        // update the local color field as well
++        // Avoid deprecated status bar color APIs; keep value for informational purposes.
+         currentStatusBarColor = color;
+     }
+ 
+@@ -91,30 +88,16 @@ public class StatusBar {
+ 
+     @SuppressWarnings("deprecation")
+     public void setOverlaysWebView(Boolean overlays) {
+-        View decorView = activity.getWindow().getDecorView();
+-        int uiOptions = decorView.getSystemUiVisibility();
+-        if (overlays) {
+-            // Sets the layout to a fullscreen one that does not hide the actual status bar, so the WebView is displayed behind it.
+-            uiOptions = uiOptions | View.SYSTEM_UI_FLAG_LAYOUT_STABLE | View.SYSTEM_UI_FLAG_LAYOUT_FULLSCREEN;
+-            decorView.setSystemUiVisibility(uiOptions);
+-            currentStatusBarColor = activity.getWindow().getStatusBarColor();
+-            activity.getWindow().setStatusBarColor(Color.TRANSPARENT);
+-        } else {
+-            // Sets the layout to a normal one that displays the WebView below the status bar.
+-            uiOptions = uiOptions & ~View.SYSTEM_UI_FLAG_LAYOUT_STABLE & ~View.SYSTEM_UI_FLAG_LAYOUT_FULLSCREEN;
+-            decorView.setSystemUiVisibility(uiOptions);
+-            // recover the previous color of the status bar
+-            activity.getWindow().setStatusBarColor(currentStatusBarColor);
+-        }
++        Window window = activity.getWindow();
++        // Preferred edge-to-edge behavior (no deprecated systemUiVisibility or statusBarColor calls)
++        WindowCompat.setDecorFitsSystemWindows(window, !overlays);
++        isOverlaid = overlays != null && overlays;
+         listener.onChange(statusBarOverlayChanged, getInfo());
+     }
+ 
+     @SuppressWarnings("deprecation")
+     private boolean getIsOverlaid() {
+-        return (
+-            (activity.getWindow().getDecorView().getSystemUiVisibility() & View.SYSTEM_UI_FLAG_LAYOUT_FULLSCREEN) ==
+-            View.SYSTEM_UI_FLAG_LAYOUT_FULLSCREEN
+-        );
++        return isOverlaid;
+     }
+ 
+     public StatusBarInfo getInfo() {

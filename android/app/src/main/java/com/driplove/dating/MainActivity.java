@@ -8,6 +8,7 @@ import android.os.Build;
 import android.os.Bundle;
 import android.webkit.WebSettings;
 import android.webkit.WebView;
+import androidx.core.view.WindowCompat;
 import com.getcapacitor.BridgeActivity;
 
 public class MainActivity extends BridgeActivity {
@@ -15,6 +16,9 @@ public class MainActivity extends BridgeActivity {
     @Override
     public void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
+
+        // Edge-to-edge: allow content to draw behind system bars.
+        WindowCompat.setDecorFitsSystemWindows(getWindow(), false);
         
         // Enable WebView debugging for development
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.KITKAT) {
