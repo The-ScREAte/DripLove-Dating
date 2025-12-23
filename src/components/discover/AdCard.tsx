@@ -60,10 +60,10 @@ const AdCard: React.FC<AdCardProps> = ({ ad, onSwipe }) => {
             {/* Mute/Unmute Button */}
             <button
               onClick={toggleMute}
-              className="absolute top-4 right-4 bg-black/50 text-white p-2 rounded-full z-10"
+              className="absolute top-6 right-4 md:top-4 bg-black/50 text-white p-1.5 md:p-2 rounded-full z-10"
               aria-label={isMuted ? 'Unmute' : 'Mute'}
             >
-              {isMuted ? <VolumeX className="w-5 h-5" /> : <Volume2 className="w-5 h-5" />}
+              {isMuted ? <VolumeX className="w-4 h-4 md:w-5 md:h-5" /> : <Volume2 className="w-4 h-4 md:w-5 md:h-5" />}
             </button>
           </>
         ) : (
@@ -78,14 +78,14 @@ const AdCard: React.FC<AdCardProps> = ({ ad, onSwipe }) => {
         <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-transparent to-transparent" />
         
         {/* Ad Badge */}
-        <div className="absolute top-4 left-4 bg-yellow-400 text-black px-3 py-1 rounded-full text-xs font-bold">
+        <div className="absolute top-6 left-4 md:top-4 bg-yellow-400 text-black px-2 py-0.5 md:px-3 md:py-1 rounded-full text-[10px] md:text-xs font-bold">
           Sponsored
         </div>
       </div>
 
       {/* Ad Info */}
-      <div className="p-6 bg-white">
-        <h2 className="text-2xl font-bold mb-2">{ad.name}</h2>
+      <div className="p-2 pb-3 bg-white">
+        <h2 className="text-2xl font-bold mb-">{ad.name}</h2>
         <p className="text-gray-600 mb-4">{ad.about}</p>
         
         {ad.link && (

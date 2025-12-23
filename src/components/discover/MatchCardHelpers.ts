@@ -82,44 +82,40 @@ export const buildSlides = (
     return [{ type: 'placeholder' as const, content: '', index: -1 }];
   }
 
-  // Mix images with non-image content deterministically
+  // Structured mixing: image first, then alternate bio/fun facts with images
   const mixedSlides: SlideContent[] = [];
 
-  // Start with first image
+  // Always start with first image
   mixedSlides.push(imageSlides[0]);
 
-  const shuffledNonImage = seededShuffle(nonImageContent, rand);
+  let imageIndex = 1; // Track next image to add
+  let contentIndex = 0; // Track next content to add
 
-  // Insert content after images
-  if (shuffledNonImage.length > 0) {
-    if (imageSlides.length > 1) {
-      mixedSlides.push(imageSlides[1]); // 2nd image
-      mixedSlides.push(shuffledNonImage[0]); // First text content
+  // Add bio first if available
+  const bioContent = nonImageContent.find(c => c.type === 'bio');
+  const funContent = nonImageContent.find(c => c.type !== 'bio');
 
-      // Add remaining images
-      let nonImageIndex = 1;
-      for (let i = 2; i < imageSlides.length; i++) {
-        if (nonImageIndex < shuffledNonImage.length && (i % 2 === 0)) {
-          mixedSlides.push(shuffledNonImage[nonImageIndex]);
-          nonImageIndex++;
-        }
-        mixedSlides.push(imageSlides[i]);
-      }
+  if (bioContent) {
+    mixedSlides.push(bioContent);
+    contentIndex++;
+  }
 
-      // Add any remaining text content at the end
-      while (nonImageIndex < shuffledNonImage.length) {
-        mixedSlides.push(shuffledNonImage[nonImageIndex]);
-        nonImageIndex++;
-      }
-    } else {
-      // Only 1 image, add all text content after it
-      shuffledNonImage.forEach(content => mixedSlides.push(content));
-    }
-  } else {
-    // No text content, just add remaining images
-    for (let i = 1; i < imageSlides.length; i++) {
-      mixedSlides.push(imageSlides[i]);
-    }
+  // Add second image if available
+  if (imageIndex < imageSlides.length) {
+    mixedSlides.push(imageSlides[imageIndex]);
+    imageIndex++;
+  }
+
+  // Add fun fact if available
+  if (funContent) {
+    mixedSlides.push(funContent);
+    contentIndex++;
+  }
+
+  // Add remaining images
+  while (imageIndex < imageSlides.length) {
+    mixedSlides.push(imageSlides[imageIndex]);
+    imageIndex++;
   }
 
   return mixedSlides;

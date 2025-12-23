@@ -4,10 +4,13 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { useToast } from '@/hooks/use-toast';
-import { Trash2, Upload, Video, Image as ImageIcon, Volume2, VolumeX, Play } from 'lucide-react';
+import { Trash2, Upload, Video, Image as ImageIcon, Volume2, VolumeX, Play, Eye } from 'lucide-react';
 import { Card, CardContent } from '@/components/ui/card';
 import { compressImage } from '@/utils/imageCompression';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
+import { ChevronDown, ChevronUp } from 'lucide-react';
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 
 interface Ad {
   id: string;
@@ -40,6 +43,9 @@ const AdsManagement = () => {
   const [ads, setAds] = useState<Ad[]>([]);
   const [loading, setLoading] = useState(false);
   const [uploading, setUploading] = useState(false);
+  const [previewAd, setPreviewAd] = useState<Ad | null>(null);
+  const [isMuted, setIsMuted] = useState(true);
+  const videoRef = React.useRef<HTMLVideoElement>(null);
   const [formData, setFormData] = useState({
     name: '',
     about: '',
@@ -386,10 +392,19 @@ const AdsManagement = () => {
             </div>
 
             <div>
-              <label className="block text-sm font-medium mb-2">Target Countries (leave empty for all)</label>
+              <label className="block text-sm font-medium mb-2">
+                Target Countries ({formData.target_countries.length} selected)
+              </label>
               <div className="grid grid-cols-2 gap-2 max-h-40 overflow-y-auto p-2 border rounded-md">
                 {COUNTRY_OPTIONS.map((country) => (
-                  <label key={country.code} className="flex items-center gap-2 cursor-pointer text-sm">
+                  <label 
+                    key={country.code} 
+                    className={`flex items-center gap-2 cursor-pointer text-sm p-2 rounded transition-colors ${
+                      formData.target_countries.includes(country.code) 
+                        ? 'bg-purple-50 border border-purple-200' 
+                        : 'hover:bg-gray-50'
+                    }`}
+                  >
                     <input
                       type="checkbox"
                       checked={formData.target_countries.includes(country.code)}
@@ -400,15 +415,17 @@ const AdsManagement = () => {
                           setFormData(prev => ({ ...prev, target_countries: prev.target_countries.filter(c => c !== country.code) }));
                         }
                       }}
-                      className="rounded"
+                      className="rounded w-4 h-4"
                     />
-                    {country.name}
+                    <span className={formData.target_countries.includes(country.code) ? 'font-medium' : ''}>
+                      {country.name}
+                    </span>
                   </label>
                 ))}
               </div>
-              {formData.target_countries.length > 0 && (
-                <p className="text-xs text-gray-500 mt-1">
-                  Selected: {formData.target_countries.map(c => COUNTRY_OPTIONS.find(o => o.code === c)?.name).join(', ')}
+              {formData.target_countries.length === 0 && (
+                <p className="text-xs text-gray-500 mt-1 italic">
+                  No countries selected (ad will show to all countries)
                 </p>
               )}
             </div>
@@ -462,13 +479,21 @@ const AdsManagement = () => {
                           <span className="text-xs bg-green-100 text-green-600 px-2 py-0.5 rounded">Image</span>
                         )}
                         {ad.target_countries && ad.target_countries.length > 0 ? (
-                          <div className="flex flex-wrap gap-1">
-                            {ad.target_countries.map((code) => (
-                              <span key={code} className="text-xs bg-purple-100 text-purple-600 px-2 py-0.5 rounded">
-                                {COUNTRY_OPTIONS.find(c => c.code === code)?.name || code}
-                              </span>
-                            ))}
-                          </div>
+                          <Collapsible>
+                            <CollapsibleTrigger className="flex items-center gap-1 text-xs bg-purple-100 text-purple-600 px-2 py-1 rounded hover:bg-purple-200 transition-colors">
+                              <span>{ad.target_countries.length} {ad.target_countries.length === 1 ? 'country' : 'countries'}</span>
+                              <ChevronDown className="w-3 h-3" />
+                            </CollapsibleTrigger>
+                            <CollapsibleContent className="mt-1">
+                              <div className="flex flex-wrap gap-1 p-2 bg-purple-50 rounded border border-purple-100">
+                                {ad.target_countries.map((code) => (
+                                  <span key={code} className="text-xs bg-white text-purple-700 px-2 py-0.5 rounded border border-purple-200">
+                                    {COUNTRY_OPTIONS.find(c => c.code === code)?.name || code}
+                                  </span>
+                                ))}
+                              </div>
+                            </CollapsibleContent>
+                          </Collapsible>
                         ) : (
                           <span className="text-xs bg-gray-100 text-gray-600 px-2 py-0.5 rounded">All countries</span>
                         )}
@@ -487,13 +512,24 @@ const AdsManagement = () => {
                         {new Date(ad.created_at).toLocaleDateString()}
                       </p>
                     </div>
-                    <Button
-                      variant="destructive"
-                      size="icon"
-                      onClick={() => handleDelete(ad.id)}
-                    >
-                      <Trash2 className="h-4 w-4" />
-                    </Button>
+                    <div className="flex gap-2">
+                      <Button
+                        variant="outline"
+                        size="icon"
+                        onClick={() => setPreviewAd(ad)}
+                        title="Preview ad"
+                      >
+                        <Eye className="h-4 w-4" />
+                      </Button>
+                      <Button
+                        variant="destructive"
+                        size="icon"
+                        onClick={() => handleDelete(ad.id)}
+                        title="Delete ad"
+                      >
+                        <Trash2 className="h-4 w-4" />
+                      </Button>
+                    </div>
                   </div>
                 </CardContent>
               </Card>
@@ -501,6 +537,71 @@ const AdsManagement = () => {
           </div>
         )}
       </div>
+
+      {/* Preview Modal */}
+      <Dialog open={!!previewAd} onOpenChange={() => setPreviewAd(null)}>
+        <DialogContent className="max-w-md h-[80vh] p-0">
+          <DialogHeader className="p-4 pb-0">
+            <DialogTitle>Ad Preview</DialogTitle>
+          </DialogHeader>
+          {previewAd && (
+            <div className="flex-1 flex flex-col h-full overflow-hidden">
+              {/* Ad preview matching AdCard.tsx exactly */}
+              <div className="flex-1 relative overflow-hidden">
+                {previewAd.media_type === 'video' && previewAd.video_url ? (
+                  <>
+                    <video
+                      ref={videoRef}
+                      src={previewAd.video_url}
+                      muted={isMuted}
+                      loop
+                      playsInline
+                      autoPlay
+                      className="w-full h-full object-cover"
+                    />
+                    {/* Mute/Unmute Button */}
+                    <button
+                      onClick={() => setIsMuted(!isMuted)}
+                      className="absolute top-6 right-4 md:top-4 bg-black/50 text-white p-1.5 md:p-2 rounded-full z-10"
+                      aria-label={isMuted ? 'Unmute' : 'Mute'}
+                    >
+                      {isMuted ? <VolumeX className="w-4 h-4 md:w-5 md:h-5" /> : <Volume2 className="w-4 h-4 md:w-5 md:h-5" />}
+                    </button>
+                  </>
+                ) : (
+                  <img
+                    src={previewAd.image_url}
+                    alt={previewAd.name}
+                    className="w-full h-full object-cover"
+                  />
+                )}
+                <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-transparent to-transparent" />
+                
+                {/* Ad Badge */}
+                <div className="absolute top-6 left-4 md:top-4 bg-yellow-400 text-black px-2 py-0.5 md:px-3 md:py-1 rounded-full text-[10px] md:text-xs font-bold">
+                  Sponsored
+                </div>
+              </div>
+
+              {/* Ad Info */}
+              <div className="p-4 bg-white">
+                <h2 className="text-2xl font-bold mb-2">{previewAd.name}</h2>
+                <p className="text-gray-600 mb-4">{previewAd.about}</p>
+                
+                {previewAd.link && (
+                  <Button
+                    onClick={() => window.open(previewAd.link!, '_blank', 'noopener,noreferrer')}
+                    className="w-full bg-gradient-to-r from-yellow-400 to-yellow-600 hover:from-yellow-500 hover:to-yellow-700 text-black font-bold"
+                  >
+                    <Play className="w-4 h-4 mr-2" />
+                    {previewAd.link_as || 'Click here'}
+                  </Button>
+                )}
+              </div>
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
     </div>
   );
 };

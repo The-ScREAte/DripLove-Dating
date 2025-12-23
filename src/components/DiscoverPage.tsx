@@ -27,9 +27,9 @@ const AdinkraBarFallback = () => (
 );
 
 // ⭐ Wrapped lazy AdinkraBar with suspense
-const LazyAdinkraBar = memo(() => (
+const LazyAdinkraBar = memo(({ userCountry }: { userCountry?: string }) => (
   <Suspense fallback={<AdinkraBarFallback />}>
-    <AdinkraBar />
+    <AdinkraBar userCountry={userCountry} />
   </Suspense>
 ));
 LazyAdinkraBar.displayName = 'LazyAdinkraBar';
@@ -440,8 +440,11 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, isPremium, profileComplet
   
   // Get user's country code for filtering ads
   const userCountryCode = useMemo(() => {
-    return currentUser?.country_code || '';
-  }, [currentUser?.country_code]);
+    // IMPORTANT: Ads are targeted by COUNTRY only.
+    // Do not depend on city/lat/lng geocoding, because those can be wrong/missing.
+    // We normalize either the saved ISO2 `country_code` or the human-readable `country`.
+    return normalizeCountryCode(currentUser?.country_code || currentUser?.country || '');
+  }, [currentUser?.country_code, currentUser?.country]);
   
   useEffect(() => {
     const fetchAds = async () => {
@@ -453,13 +456,14 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, isPremium, profileComplet
 
         if (error) throw error;
 
-        // Filter ads by user's country - show ad if target_countries is empty OR includes user's country
+        // Filter ads by COUNTRY only.
+        // Show ad if target_countries is empty OR includes user's country.
         const filteredAds = (data || []).filter((ad: any) => {
-          const targetCountries = ad.target_countries || [];
+          const targetCountries = normalizeCountryCodeList(ad.target_countries);
           // If no target countries specified, show to everyone
           if (targetCountries.length === 0) return true;
           // Otherwise, only show if user's country is in the list
-          return userCountryCode && targetCountries.includes(userCountryCode);
+          return Boolean(userCountryCode) && targetCountries.includes(userCountryCode);
         });
 
         // Mark ads with isAd property
@@ -3278,7 +3282,7 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, isPremium, profileComplet
              onTouchEnd={handleTouchEnd}
              onMouseDown={handleMouseDown}>
           <AdCard ad={currentMatch} onSwipe={moveToNext} />
-          <LazyAdinkraBar />
+          <LazyAdinkraBar userCountry={currentUser?.country} />
           <SwipeButtons
             onPass={handlePass}
             onReverse={handleReverse}
@@ -3725,7 +3729,7 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, isPremium, profileComplet
           </div>
           
           {/* AdinkraBar - between image and info sections */}
-          <LazyAdinkraBar />
+          <LazyAdinkraBar userCountry={currentUser?.country} />
 
           {/* Info section - dynamic height that fits content exactly */}
           <div className={`discover-info-area bg-white transition-all duration-300 flex-shrink-0 -mt-0.1 ${

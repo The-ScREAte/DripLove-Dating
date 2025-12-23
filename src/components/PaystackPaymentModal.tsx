@@ -72,7 +72,7 @@ const PaystackPaymentModal: React.FC<PaystackPaymentModalProps> = ({
       loadPaystackScript()
         .then(() => undefined)
         .catch(err => console.error('[PaystackModal] Failed to load Paystack script:', err));
-      if (!isOneTime) setSelectedPaymentMethod('card'); // enforce card for subscriptions
+      // Allow user to choose payment method for both one-time and subscriptions
     }
   }, [isOpen, isOneTime]);
 
@@ -251,18 +251,16 @@ const PaystackPaymentModal: React.FC<PaystackPaymentModalProps> = ({
             >
               💳 Card
             </button>
-            {isOneTime && (
-              <button
-                onClick={() => setSelectedPaymentMethod('momo')}
-                className={`flex-1 px-4 py-2 rounded border text-sm font-medium ${
-                  selectedPaymentMethod === 'momo' 
-                    ? 'bg-green-600 text-white border-green-600' 
-                    : 'bg-gray-100 text-gray-700 border-gray-300 hover:bg-gray-200'
-                }`}
-              >
-                📱 Mobile Money
-              </button>
-            )}
+            <button
+              onClick={() => setSelectedPaymentMethod('momo')}
+              className={`flex-1 px-4 py-2 rounded border text-sm font-medium ${
+                selectedPaymentMethod === 'momo' 
+                  ? 'bg-green-600 text-white border-green-600' 
+                  : 'bg-gray-100 text-gray-700 border-gray-300 hover:bg-gray-200'
+              }`}
+            >
+              📱 Mobile Money
+            </button>
             {/* Apple In-App Purchase button removed as per request */}
           </div>
         </div>

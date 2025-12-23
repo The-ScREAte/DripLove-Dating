@@ -349,6 +349,33 @@ const MatchCard: React.FC<MatchCardProps> = ({
                   </button>
                 </div>
               )}
+
+              {/* Optimized cultural sign glow effect */}
+              {stableMatch.adinkra_symbols && stableMatch.adinkra_symbols.length > 0 && (
+                <div 
+                  className="absolute left-1/2 transform -translate-x-1/2 z-50"
+                  style={{ top: 'clamp(-0.25rem, env(safe-area-inset-top, -0.25rem) + 0.125rem, 1rem)' }}
+                >
+                  <div className="relative flex flex-col items-center">
+                    {/* Single optimized glow layer */}
+                    <div className="relative w-24 h-24 flex items-center justify-center overflow-visible">
+                      {/* Single efficient gradient layer */}
+                      <div
+                        className="absolute inset-0 w-full h-full"
+                        style={{
+                          background: 'radial-gradient(circle at center, rgba(255, 98, 0, 0.25), transparent 80%)',
+                          filter: 'blur(0px)',
+                        }}
+                      ></div>
+
+                      {/* Adinkra Symbol */}
+                      <div className="relative z-10">
+                        <UserAdinkraDisplay adinkraSymbols={stableMatch.adinkra_symbols} />
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              )}
               {/* ⭐ PHASE 1.8: Use memoized SlideRenderer (40-60% Android render improvement) */}
               <SlideRenderer
                 slide={currentSlideData}
@@ -386,32 +413,7 @@ const MatchCard: React.FC<MatchCardProps> = ({
             </div>
           )}
 
-          {/* Optimized cultural sign glow effect */}
-          {match.adinkra_symbols && match.adinkra_symbols.length > 0 && (
-            <div 
-              className="absolute left-1/2 transform -translate-x-1/2 z-10"
-              style={{ top: 'clamp(-0.25rem, env(safe-area-inset-top, -0.25rem) + 0.125rem, 1rem)', pointerEvents: 'none' }}
-            >
-              <div className="relative flex flex-col items-center">
-                {/* Single optimized glow layer */}
-                <div className="relative w-24 h-24 flex items-center justify-center overflow-visible">
-                  {/* Single efficient gradient layer */}
-                  <div
-                    className="absolute inset-0 w-full h-full"
-                    style={{
-                      background: 'radial-gradient(circle at center, rgba(255, 98, 0, 0.25), transparent 80%)',
-                      filter: 'blur(0px)',
-                    }}
-                  ></div>
-
-                  {/* Cultural Sign Symbol */}
-                  <div className="relative z-10">
-                    <UserAdinkraDisplay adinkraSymbols={match.adinkra_symbols} />
-                  </div>
-                </div>
-              </div>
-            </div>
-          )}
+          {/* Cultural sign is shown in the top-center */}
 
           {/* Report Modal */}
           {showReportModal && (

@@ -1,120 +1,112 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
-
-// Adinkra symbols data - SVGs stored as strings to avoid JSX parsing issues
-const adinkraSymbols = [
-  { 
-    name: 'Aya', 
-    meaning: 'The fern. Symbol of endurance and resourcefulness.',
-    svgContent: '<ellipse cx="12" cy="12" rx="10" ry="6" fill="#A5D6A7" stroke="#388E3C" stroke-width="2"/><path d="M12 6v12M9 9l6 6M15 9l-6 6" stroke="#388E3C" stroke-width="2"/>'
-  },
-  { 
-    name: 'Nkyinkyim', 
-    meaning: 'Twisting. Symbol of initiative, dynamism, and versatility.',
-    svgContent: '<path d="M6 18c6-12 12 0 12-12" stroke="#E53935" stroke-width="2" fill="none"/><circle cx="6" cy="18" r="1.5" fill="#F9A825"/><circle cx="18" cy="6" r="1.5" fill="#43A047"/>'
-  },
-  { 
-    name: 'Eban', 
-    meaning: 'Fence. Symbol of love, safety, and security.',
-    svgContent: '<rect x="4" y="4" width="16" height="16" rx="4" fill="#FFFDE7" stroke="#E53935" stroke-width="2"/><path d="M7 4v16M12 4v16M17 4v16" stroke="#43A047" stroke-width="2"/>'
-  },
-  { 
-    name: 'Fihankra', 
-    meaning: 'House/compound. Symbol of security and safety.',
-    svgContent: '<rect x="6" y="10" width="12" height="8" fill="#E3F2FD" stroke="#1E88E5" stroke-width="2"/><polygon points="12,4 6,10 18,10" fill="#F9A825" stroke="#E53935" stroke-width="2"/>'
-  },
-  { 
-    name: 'Gye Nyame', 
-    meaning: 'Except for God. Symbol of the supremacy of God.',
-    svgContent: '<circle cx="12" cy="12" r="11" stroke="#F9A825" stroke-width="2" fill="#FFFDE7"/><path d="M12 5c-1.5 1.5-1.5 4.5 0 6s1.5 4.5 0 6" stroke="#E53935" stroke-width="2" fill="none"/><path d="M12 19c1.5-1.5 1.5-4.5 0-6s-1.5-4.5 0-6" stroke="#43A047" stroke-width="2" fill="none"/><circle cx="12" cy="12" r="1.5" fill="#1E88E5"/>'
-  },
-  { 
-    name: 'Sankofa', 
-    meaning: 'Go back and get it. Symbol of learning from the past.',
-    svgContent: '<circle cx="12" cy="12" r="11" stroke="#43A047" stroke-width="2" fill="#E8F5E9"/><path d="M16 12c0-2.2-1.8-4-4-4s-4 1.8-4 4 1.8 4 4 4c1.5 0 3-1.2 3-3" stroke="#E53935" stroke-width="2" fill="none"/><path d="M12 15l3-3-3-3" stroke="#F9A825" stroke-width="2" fill="none"/>'
-  },
-  { 
-    name: 'Duafe', 
-    meaning: 'Wooden comb. Symbol of beauty, cleanliness, feminine qualities.',
-    svgContent: '<rect x="3" y="6" width="18" height="12" rx="6" fill="#FFF3E0" stroke="#E53935" stroke-width="2"/><rect x="9" y="3" width="6" height="6" rx="3" fill="#F9A825" stroke="#43A047" stroke-width="2"/><rect x="7" y="15" width="1.5" height="4" fill="#1E88E5"/><rect x="11" y="15" width="1.5" height="4" fill="#1E88E5"/><rect x="15" y="15" width="1.5" height="4" fill="#1E88E5"/>'
-  },
-  { 
-    name: 'Fawohodie', 
-    meaning: 'Independence. Symbol of freedom, emancipation, independence.',
-    svgContent: '<rect x="6" y="6" width="12" height="12" rx="6" fill="#E3F2FD" stroke="#1E88E5" stroke-width="2"/><path d="M12 6v12M6 12h12" stroke="#E53935" stroke-width="2"/><circle cx="12" cy="12" r="2" fill="#F9A825"/>'
-  },
-  { 
-    name: 'Akoma', 
-    meaning: 'The heart. Symbol of patience and tolerance.',
-    svgContent: '<path d="M12 21s-6-4.5-6-9a6 6 0 0 1 12 0c0 4.5-6 9-6 9z" fill="#E53935" stroke="#F9A825" stroke-width="2"/><circle cx="9" cy="10.5" r="1.5" fill="#FFFDE7"/><circle cx="15" cy="10.5" r="1.5" fill="#FFFDE7"/>'
-  },
-  { 
-    name: 'Akoben', 
-    meaning: 'War horn. Symbol of vigilance and wariness.',
-    svgContent: '<ellipse cx="12" cy="12" rx="10" ry="6" fill="#a5d6a7" stroke="#388e3c" stroke-width="2"/><path d="M12 6v12M9 9l6 6M15 9l-6 6" stroke="#388e3c" stroke-width="2"/>'
-  },
-  { 
-    name: 'Adinkrahene', 
-    meaning: 'Chief of the adinkra symbols. Symbol of greatness, charisma, and leadership.',
-    svgContent: '<circle cx="12" cy="12" r="10" fill="#f9a825" stroke="#e53935" stroke-width="2"/><circle cx="12" cy="12" r="5" fill="#43a047"/>'
-  },
-  { 
-    name: 'Bese Saka', 
-    meaning: 'Sack of cola nuts. Symbol of affluence, power, abundance, unity.',
-    svgContent: '<ellipse cx="12" cy="15" rx="8" ry="5" fill="#e3f2fd" stroke="#1e88e5" stroke-width="2"/><ellipse cx="12" cy="9" rx="5" ry="3" fill="#f9a825" stroke="#e53935" stroke-width="2"/>'
-  },
-  { 
-    name: 'Dame-Dame', 
-    meaning: 'Checkerboard. Symbol of intelligence and ingenuity.',
-    svgContent: '<rect x="4" y="4" width="16" height="16" fill="#fffde7" stroke="#e53935" stroke-width="2"/><rect x="4" y="4" width="8" height="8" fill="#43a047"/><rect x="12" y="12" width="8" height="8" fill="#f9a825"/>'
-  },
-  { 
-    name: 'Dwennimmen', 
-    meaning: "Ram's horns. Symbol of humility together with strength.",
-    svgContent: '<circle cx="12" cy="12" r="10" fill="#fff3e0" stroke="#e53935" stroke-width="2"/><path d="M8 16c-3-3 3-9 6-6" stroke="#43a047" stroke-width="2" fill="none"/><path d="M16 16c3-3-3-9-6-6" stroke="#43a047" stroke-width="2" fill="none"/>'
-  },
-  { 
-    name: 'Nyame Dua', 
-    meaning: "Tree of God. Symbol of God's presence and protection.",
-    svgContent: '<rect x="10" y="14" width="4" height="8" fill="#43a047"/><circle cx="12" cy="10" r="6" fill="#f9a825" stroke="#e53935" stroke-width="2"/>'
-  },
-  { 
-    name: 'Boa Me Na Me Mmoa Wo', 
-    meaning: 'Help me and let me help you. Symbol of cooperation and interdependence.',
-    svgContent: '<rect x="6" y="6" width="12" height="12" rx="6" fill="#e3f2fd" stroke="#1e88e5" stroke-width="2"/><path d="M12 6v12M6 12h12" stroke="#e53935" stroke-width="2"/>'
-  },
-];
+import { AFRICAN_SYMBOL_GROUPS, type AfricanSymbol } from '@/constants/africanSymbols';
 
 const ROTATE_INTERVAL_MS = 2 * 60 * 1000; // 2 minutes
 const SYMBOLS_PER_SET = 4;
 
-const AdinkraSymbol: React.FC<{ svgContent: string }> = ({ svgContent }) => (
-  <svg 
-    width="24" 
-    height="24" 
-    viewBox="0 0 24 24"
-    dangerouslySetInnerHTML={{ __html: svgContent }}
-  />
-);
+interface AdinkraBarProps {
+  userCountry?: string; // User's country to determine which symbols to show
+}
 
-const AdinkraBar: React.FC = () => {
+const AdinkraSymbol: React.FC<{ svgContent: string }> = ({ svgContent }) => {
+  // Extract inner content from SVG (remove outer <svg> tags) and scale viewBox
+  const innerContent = svgContent
+    .replace(/<svg[^>]*>/, '') // Remove opening svg tag
+    .replace(/<\/svg>/, ''); // Remove closing svg tag
+
+  return (
+    <svg 
+      width="24" 
+      height="24" 
+      viewBox="0 0 48 48"
+      dangerouslySetInnerHTML={{ __html: innerContent }}
+    />
+  );
+};
+
+const AdinkraBar: React.FC<AdinkraBarProps> = ({ userCountry }) => {
   const { t } = useTranslation();
   const [tooltipIdx, setTooltipIdx] = useState<number | null>(null);
-  const [setIndex, setSetIndex] = useState(() => Math.floor(Math.random() * Math.ceil(adinkraSymbols.length / SYMBOLS_PER_SET)));
+  const [setIndex, setSetIndex] = useState(0);
+  
+  // Get symbols based on user's country, mixing with European symbols
+  const symbolPool = useMemo(() => {
+    const europeanGroup = AFRICAN_SYMBOL_GROUPS.find(g => g.id === 'western-zodiac');
+    const europeanSymbols = europeanGroup?.symbols || [];
+    
+    // Try to find user's country symbols
+    let userCountrySymbols: AfricanSymbol[] = [];
+    if (userCountry) {
+      const normalizedCountry = userCountry.toLowerCase().trim();
+      
+      // Map common country names to symbol group IDs
+      const countryMap: Record<string, string> = {
+        'ghana': 'ghana-adinkra',
+        'nigeria': 'nigeria-nsibidi',
+        'ethiopia': 'ethiopia-geez',
+        'benin': 'benin-ifa',
+        'zimbabwe': 'zimbabwe-ndebele',
+        'south africa': 'south-africa-san',
+        'congo': 'congo-kuba',
+        'mali': 'mali-dogon',
+        'morocco': 'morocco-berber',
+        'egypt': 'egypt-hieroglyphs',
+        'united states': 'western-zodiac',
+        'usa': 'western-zodiac',
+        'us': 'western-zodiac',
+        'canada': 'western-zodiac',
+        'mexico': 'western-zodiac',
+        'brazil': 'western-zodiac'
+      };
+      
+      const groupId = countryMap[normalizedCountry];
+      if (groupId) {
+        const group = AFRICAN_SYMBOL_GROUPS.find(g => g.id === groupId);
+        userCountrySymbols = group?.symbols || [];
+      }
+    }
+    
+    // If no country-specific symbols, use Ghana Adinkra as default
+    if (userCountrySymbols.length === 0) {
+      const ghanaGroup = AFRICAN_SYMBOL_GROUPS.find(g => g.id === 'ghana-adinkra');
+      userCountrySymbols = ghanaGroup?.symbols || [];
+    }
+    
+    // Mix: 60% user country symbols, 40% European symbols
+    const totalSymbols = Math.max(userCountrySymbols.length, 8);
+    const userSymbolCount = Math.ceil(totalSymbols * 0.6);
+    const europeanSymbolCount = Math.ceil(totalSymbols * 0.4);
+    
+    // Shuffle and combine
+    const shuffledUserSymbols = [...userCountrySymbols].sort(() => Math.random() - 0.5);
+    const shuffledEuropeanSymbols = [...europeanSymbols].sort(() => Math.random() - 0.5);
+    
+    const mixed: AfricanSymbol[] = [];
+    
+    // Alternate between user and European symbols
+    for (let i = 0; i < Math.max(userSymbolCount, europeanSymbolCount); i++) {
+      if (i < shuffledUserSymbols.length && mixed.length < totalSymbols) {
+        mixed.push(shuffledUserSymbols[i]);
+      }
+      if (i < shuffledEuropeanSymbols.length && mixed.length < totalSymbols) {
+        mixed.push(shuffledEuropeanSymbols[i]);
+      }
+    }
+    
+    return mixed;
+  }, [userCountry]);
   
   useEffect(() => {
+    const maxSets = Math.ceil(symbolPool.length / SYMBOLS_PER_SET);
     const interval = setInterval(() => {
-      let next;
-      do {
-        next = Math.floor(Math.random() * Math.ceil(adinkraSymbols.length / SYMBOLS_PER_SET));
-      } while (next === setIndex && Math.ceil(adinkraSymbols.length / SYMBOLS_PER_SET) > 1);
-      setSetIndex(next);
+      setSetIndex(prev => (prev + 1) % maxSets);
     }, ROTATE_INTERVAL_MS);
     return () => clearInterval(interval);
-  }, [setIndex]);
+  }, [symbolPool.length]);
   
   const start = setIndex * SYMBOLS_PER_SET;
-  const visibleSymbols = adinkraSymbols.slice(start, start + SYMBOLS_PER_SET);
+  const visibleSymbols = symbolPool.slice(start, start + SYMBOLS_PER_SET);
   
   return (
     <div
@@ -135,17 +127,17 @@ const AdinkraBar: React.FC = () => {
           tabIndex={0}
           aria-label={symbol.name + ' symbol'}
         >
-          <AdinkraSymbol svgContent={symbol.svgContent} />
+          <AdinkraSymbol svgContent={symbol.svg} />
         </button>
       ))}
-      {tooltipIdx !== null && tooltipIdx < adinkraSymbols.length && (
+      {tooltipIdx !== null && tooltipIdx < symbolPool.length && (
         <div
           className="fixed left-1/2 top-1/12 z-50 px-4 py-3 rounded-lg shadow-lg bg-white border border-gray-300 text-xs text-gray-800 animate-fade-in flex flex-col items-center"
           style={{ transform: 'translate(-50%, -75%)', minWidth: 180, maxWidth: 260 }}
           onClick={() => setTooltipIdx(null)}
         >
-          <strong className="text-base mb-1">{adinkraSymbols[tooltipIdx].name}</strong>
-          <div className="mt-1 text-center">{t(`adinkraMeanings.${adinkraSymbols[tooltipIdx].name}`)}</div>
+          <strong className="text-base mb-1">{symbolPool[tooltipIdx].name}</strong>
+          <div className="mt-1 text-center">{symbolPool[tooltipIdx].meaning}</div>
           <div className="text-[10px] text-gray-400 mt-2">({t('common.clickToClose')})</div>
         </div>
       )}

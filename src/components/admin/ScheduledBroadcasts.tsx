@@ -8,9 +8,10 @@ import { useToast } from '@/hooks/use-toast';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { ScrollArea } from '@/components/ui/scroll-area';
-import { Loader2, Plus, Edit, Trash2, Calendar, Clock, Play, Pause } from 'lucide-react';
+import { Loader2, Plus, Edit, Trash2, Calendar, Clock, Play, Pause, ChevronDown, ChevronUp } from 'lucide-react';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Switch } from '@/components/ui/switch';
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 import {
   Dialog,
   DialogContent,
@@ -411,13 +412,23 @@ export default function ScheduledBroadcasts() {
                         <span>{broadcast.time_to_send}</span>
                       </div>
                       {broadcast.target_countries && broadcast.target_countries.length > 0 ? (
-                        <div className="flex flex-wrap gap-1">
-                          {broadcast.target_countries.map((code) => (
-                            <Badge key={code} variant="outline" className="text-xs">
-                              {getCountryName(code)}
+                        <Collapsible>
+                          <CollapsibleTrigger className="flex items-center gap-1 text-xs">
+                            <Badge variant="outline" className="bg-purple-50 hover:bg-purple-100 transition-colors">
+                              {broadcast.target_countries.length} {broadcast.target_countries.length === 1 ? 'country' : 'countries'}
+                              <ChevronDown className="w-3 h-3 ml-1" />
                             </Badge>
-                          ))}
-                        </div>
+                          </CollapsibleTrigger>
+                          <CollapsibleContent className="mt-1">
+                            <div className="flex flex-wrap gap-1 p-2 bg-purple-50 rounded border border-purple-100">
+                              {broadcast.target_countries.map((code) => (
+                                <Badge key={code} variant="outline" className="text-xs bg-white">
+                                  {getCountryName(code)}
+                                </Badge>
+                              ))}
+                            </div>
+                          </CollapsibleContent>
+                        </Collapsible>
                       ) : (
                         <Badge variant="outline" className="text-xs bg-green-50">All countries</Badge>
                       )}
@@ -559,7 +570,7 @@ export default function ScheduledBroadcasts() {
             </div>
 
             <div className="space-y-2">
-              <Label>Target Countries (leave empty for all)</Label>
+              <Label>Target Countries ({selectedCountries.length} selected)</Label>
               {isLoadingCountries ? (
                 <div className="flex items-center justify-center py-4">
                   <Loader2 className="w-4 h-4 animate-spin" />
@@ -570,7 +581,11 @@ export default function ScheduledBroadcasts() {
                     {countries.map((country) => (
                       <div
                         key={country.code}
-                        className="flex items-center justify-between p-2 hover:bg-gray-50 rounded cursor-pointer"
+                        className={`flex items-center justify-between p-2 rounded cursor-pointer transition-colors ${
+                          selectedCountries.includes(country.code)
+                            ? 'bg-purple-50 border border-purple-200'
+                            : 'hover:bg-gray-50'
+                        }`}
                         onClick={() => toggleCountry(country.code)}
                       >
                         <div className="flex items-center gap-2">
@@ -578,9 +593,11 @@ export default function ScheduledBroadcasts() {
                             type="checkbox"
                             checked={selectedCountries.includes(country.code)}
                             onChange={() => toggleCountry(country.code)}
-                            className="w-4 h-4"
+                            className="w-4 h-4 rounded"
                           />
-                          <span className="text-sm">{country.name}</span>
+                          <span className={`text-sm ${
+                            selectedCountries.includes(country.code) ? 'font-medium' : ''
+                          }`}>{country.name}</span>
                         </div>
                         <Badge variant="outline" className="text-xs">
                           {country.userCount} users
@@ -589,6 +606,11 @@ export default function ScheduledBroadcasts() {
                     ))}
                   </div>
                 </ScrollArea>
+              )}
+              {selectedCountries.length === 0 && (
+                <p className="text-xs text-gray-500 mt-1 italic">
+                  No countries selected (broadcast will go to all countries)
+                </p>
               )}
             </div>
 

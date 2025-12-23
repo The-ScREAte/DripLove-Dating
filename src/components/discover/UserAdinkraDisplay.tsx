@@ -9,6 +9,21 @@ interface UserAdinkraDisplayProps {
   adinkraSymbols: string[];
 }
 
+const normalizeSvgSize = (svg: string, size: number) => {
+  // Ensure the rendered SVG fits inside our fixed-size container.
+  // Preserve stroke-width and other attributes, only adjust dimensions.
+  return svg
+    .replace(/width=("|')\d+("|')/g, `width="${size}"`)
+    .replace(/height=("|')\d+("|')/g, `height="${size}"`)
+    .replace(/stroke-width=("|')40("|')/g, `stroke-width="3"`) // Fix malformed stroke-width
+    .replace(/stroke-width=("|')(\d+)("|')/g, (match, q1, width, q2) => {
+      // Scale stroke-width proportionally if original was for 48px
+      const originalSize = 48;
+      const scaledWidth = Math.max(1, Math.round((parseInt(width) * size) / originalSize));
+      return `stroke-width="${scaledWidth}"`;
+    });
+};
+
 const UserAdinkraDisplay: React.FC<UserAdinkraDisplayProps> = React.memo(({ adinkraSymbols }) => {
   const [currentIndex, setCurrentIndex] = useState(0);
   const [nextIndex, setNextIndex] = useState(0);
@@ -80,7 +95,7 @@ const UserAdinkraDisplay: React.FC<UserAdinkraDisplayProps> = React.memo(({ adin
   const nextSymbol = ALL_SYMBOLS.find(s => s.name === nextSymbolName);
   const NextSvgComponent = AdinkraSvgComponents[nextSymbolName as AdinkraSymbolName];
 
-  if (!currentSymbol || !CurrentSvgComponent) {
+  if (!currentSymbol || (!CurrentSvgComponent && !currentSymbol.svg)) {
     return null;
   }
 
@@ -114,11 +129,19 @@ const UserAdinkraDisplay: React.FC<UserAdinkraDisplayProps> = React.memo(({ adin
             zIndex: isTransitioning ? 1 : 2
           }}
         >
-          <CurrentSvgComponent className="w-10 h-10" />
+          {CurrentSvgComponent ? (
+            <CurrentSvgComponent className="w-10 h-10" />
+          ) : (
+            <span
+              className="block"
+              style={{ width: 40, height: 40, display: 'flex', alignItems: 'center', justifyContent: 'center' }}
+              dangerouslySetInnerHTML={{ __html: normalizeSvgSize(currentSymbol.svg, 40) }}
+            />
+          )}
         </div>
         
         {/* Next Symbol - rendered during transition and becomes visible */}
-        {NextSvgComponent && (
+        {(NextSvgComponent || nextSymbol?.svg) && (
           <div 
             className="absolute inset-0 w-10 h-10 flex items-center justify-center transition-opacity duration-500 ease-in-out"
             style={{ 
@@ -128,7 +151,15 @@ const UserAdinkraDisplay: React.FC<UserAdinkraDisplayProps> = React.memo(({ adin
               zIndex: isTransitioning ? 2 : 1
             }}
           >
-            <NextSvgComponent className="w-10 h-10" />
+            {NextSvgComponent ? (
+              <NextSvgComponent className="w-10 h-10" />
+            ) : nextSymbol?.svg ? (
+              <span
+                className="block"
+                style={{ width: 40, height: 40, display: 'flex', alignItems: 'center', justifyContent: 'center' }}
+                dangerouslySetInnerHTML={{ __html: normalizeSvgSize(nextSymbol.svg, 40) }}
+              />
+            ) : null}
           </div>
         )}
       </div>

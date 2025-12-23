@@ -1279,7 +1279,9 @@ const AdminPageComponent = ({ currentUser, onLogout }: AdminPageProps) => {
         await removePushToken(currentUser.id);
       }
       
-      await supabase.auth.signOut();
+      const { error } = await supabase.auth.signOut();
+      if (error) throw error;
+      
       onLogout();
     } catch (error) {
       console.error('Error signing out:', error);

@@ -186,6 +186,13 @@ const ChatPage = ({ currentUser, onUnreadChange, onDetailViewChange }: ChatPageP
       // No cache or stale cache, fetch immediately
       fetchMatches();
     }
+    
+    // Force cleanup of expired matches on mount
+    setTimeout(() => {
+      if (currentUser?.id && chatCache.chats.length > 0) {
+        checkExpiredMatches(chatCache.chats as any);
+      }
+    }, 1000);
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [currentUser]);
 
@@ -745,6 +752,9 @@ const ChatPage = ({ currentUser, onUnreadChange, onDetailViewChange }: ChatPageP
       setMatches(processedMatches);
       // Clear the refresh flag when we've just fetched
       matchesNeedsRefreshRef.current = false;
+      
+      // Check for expired matches and send notifications
+      checkExpiredMatches(processedMatches);
     } catch (error) {
       toast({
         title: 'Error',
@@ -756,6 +766,72 @@ const ChatPage = ({ currentUser, onUnreadChange, onDetailViewChange }: ChatPageP
       if (showLoading) {
         setIsRefreshing(false);
         setPullDistance(0);
+      }
+    }
+  };
+
+  // Check for expired matches and handle dissolution/notifications
+  const checkExpiredMatches = async (matchesList: ChatMatch[]) => {
+    if (!currentUser || !currentUser.id) return;
+
+    const EXPIRATION_DAYS = 10;
+    const WARNING_DAYS = 9; // Send notification after 9 days (1 day before expiration)
+    const MS_PER_DAY = 24 * 60 * 60 * 1000;
+    const now = new Date();
+    
+    const expiredMatchIds: string[] = [];
+
+    for (const match of matchesList) {
+      const hasMessages = !!match.last_message;
+      if (hasMessages) continue; // Skip matches with messages
+
+      const matchCreated = new Date(match.created_at);
+      const daysSinceMatch = (now.getTime() - matchCreated.getTime()) / MS_PER_DAY;
+
+      // Dissolve match if 10 days have passed
+      if (daysSinceMatch >= EXPIRATION_DAYS) {
+        expiredMatchIds.push(match.id);
+      }
+      // Send warning notification if 9 days have passed
+      else if (daysSinceMatch >= WARNING_DAYS && daysSinceMatch < WARNING_DAYS + 0.1) {
+        const partnerId = match.user1_id === currentUser.id ? match.user2_id : match.user1_id;
+        const partnerName = match.first_name;
+        
+        try {
+          // Send notification via push notification service
+          const { sendPushNotification } = await import('@/services/pushNotifications');
+          await sendPushNotification({
+            title: t('chat.matchExpiringTitle'),
+            body: t('chat.matchExpiringBody', { name: partnerName }),
+            userId: currentUser.id,
+            type: 'match',
+            data: { matchId: match.id, partnerId }
+          });
+
+        } catch (error) {
+          console.error('[ChatPage] Error sending expiration notification:', error);
+        }
+      }
+    }
+    
+    // Delete all expired matches in one batch
+    if (expiredMatchIds.length > 0) {
+      try {
+        const { error } = await supabase
+          .from('matches')
+          .delete()
+          .in('id', expiredMatchIds);
+
+        if (!error) {
+          // Clear cache so next fetch gets fresh data without expired matches
+          chatMatchesCache.delete(currentUser.id);
+          // Refresh the matches list
+          fetchMatches();
+        } else {
+          console.error('[ChatPage] Error deleting expired matches:', error);
+        }
+      } catch (error) {
+        console.error('[ChatPage] Error in checkExpiredMatches:', error);
       }
     }
   };
