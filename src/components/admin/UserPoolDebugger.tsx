@@ -4,10 +4,11 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/components/ui/use-toast';
+import { ScrollArea } from '@/components/ui/scroll-area';
 import { 
   RefreshCw, Users, MapPin, Heart, X, Clock, 
   Database, Server, Wifi, AlertCircle, CheckCircle,
-  Bell, Mail, CreditCard, Archive
+  Bell, Mail, CreditCard, Archive, ImageOff, Eye, EyeOff
 } from 'lucide-react';
 
 interface UserPoolStats {
@@ -32,6 +33,21 @@ interface SystemStats {
   recentLikes: number;
 }
 
+interface ProfileHealthIssue {
+  userId: string;
+  firstName: string;
+  lastName: string;
+  email: string;
+  issues: string[];
+}
+
+interface HealthStats {
+  usersWithNoImages: ProfileHealthIssue[];
+  usersWithBrokenImages: ProfileHealthIssue[];
+  usersNeverSeen: ProfileHealthIssue[];
+  usersWithIncompleteProfiles: ProfileHealthIssue[];
+}
+
 interface Props {
   currentUserId: string;
   userPreferences?: {
@@ -42,13 +58,15 @@ interface Props {
     latitude?: number;
     longitude?: number;
   };
+  onViewProfile?: (userId: string) => void;
 }
 
-const UserPoolDebugger: React.FC<Props> = ({ currentUserId, userPreferences }) => {
+const UserPoolDebugger: React.FC<Props> = ({ currentUserId, userPreferences, onViewProfile }) => {
   const [stats, setStats] = useState<UserPoolStats | null>(null);
   const [systemStats, setSystemStats] = useState<SystemStats | null>(null);
+  const [healthStats, setHealthStats] = useState<HealthStats | null>(null);
   const [isLoading, setIsLoading] = useState(false);
-  const [activeTab, setActiveTab] = useState<'userPool' | 'system'>('userPool');
+  const [activeTab, setActiveTab] = useState<'userPool' | 'system' | 'health'>('userPool');
   const { toast } = useToast();
 
   const calculateAge = (dateOfBirth: string) => {
@@ -251,6 +269,135 @@ const UserPoolDebugger: React.FC<Props> = ({ currentUserId, userPreferences }) =
     }
   };
 
+  const analyzeProfileHealth = async () => {
+    setIsLoading(true);
+    try {
+      // Fetch all active profiles
+      const { data: profiles, error: profilesError } = await supabase
+        .from('profiles')
+        .select('id, first_name, last_name, email, gender, preference, date_of_birth, country, city, bio, is_admin, account_status')
+        .eq('account_status', 'active')
+        .eq('is_admin', false);
+
+      if (profilesError) throw profilesError;
+
+      // Fetch all user images
+      const { data: allImages, error: imagesError } = await supabase
+        .from('user_images')
+        .select('user_id, image_url, is_approved');
+
+      if (imagesError) throw imagesError;
+
+      // Fetch all likes to determine users who have never been seen
+      const { data: allLikes, error: likesError } = await supabase
+        .from('likes')
+        .select('liked_id');
+
+      if (likesError) throw likesError;
+
+      // Fetch all passes
+      const { data: allPasses, error: passesError } = await supabase
+        .from('passes')
+        .select('passed_id');
+
+      if (passesError) throw passesError;
+
+      // Create sets for quick lookup
+      const usersWithImages = new Set<string>();
+      const imagesByUser = new Map<string, { url: string; approved: boolean }[]>();
+
+      (allImages || []).forEach(img => {
+        if (img.user_id) {
+          usersWithImages.add(img.user_id);
+          if (!imagesByUser.has(img.user_id)) {
+            imagesByUser.set(img.user_id, []);
+          }
+          imagesByUser.get(img.user_id)!.push({ url: img.image_url, approved: img.is_approved || false });
+        }
+      });
+
+      const seenUsers = new Set<string>();
+      (allLikes || []).forEach(like => {
+        if (like.liked_id) seenUsers.add(like.liked_id);
+      });
+      (allPasses || []).forEach(pass => {
+        if (pass.passed_id) seenUsers.add(pass.passed_id);
+      });
+
+      // Analyze profiles
+      const usersWithNoImages: ProfileHealthIssue[] = [];
+      const usersNeverSeen: ProfileHealthIssue[] = [];
+      const usersWithIncompleteProfiles: ProfileHealthIssue[] = [];
+
+      (profiles || []).forEach(profile => {
+        const issues: string[] = [];
+        const hasImages = usersWithImages.has(profile.id);
+        const hasBeenSeen = seenUsers.has(profile.id);
+
+        // Check for no images
+        if (!hasImages) {
+          usersWithNoImages.push({
+            userId: profile.id,
+            firstName: profile.first_name || '',
+            lastName: profile.last_name || '',
+            email: profile.email || '',
+            issues: ['No profile images']
+          });
+        }
+
+        // Check if never seen (not liked or passed by anyone)
+        if (!hasBeenSeen) {
+          usersNeverSeen.push({
+            userId: profile.id,
+            firstName: profile.first_name || '',
+            lastName: profile.last_name || '',
+            email: profile.email || '',
+            issues: ['Never been seen by other users']
+          });
+        }
+
+        // Check for incomplete profile
+        if (!profile.gender || !profile.preference || !profile.bio || !profile.city) {
+          const missing: string[] = [];
+          if (!profile.gender) missing.push('gender');
+          if (!profile.preference) missing.push('preference');
+          if (!profile.bio) missing.push('bio');
+          if (!profile.city) missing.push('city');
+          
+          usersWithIncompleteProfiles.push({
+            userId: profile.id,
+            firstName: profile.first_name || '',
+            lastName: profile.last_name || '',
+            email: profile.email || '',
+            issues: [`Missing: ${missing.join(', ')}`]
+          });
+        }
+      });
+
+      setHealthStats({
+        usersWithNoImages,
+        usersWithBrokenImages: [], // Would need server-side check for broken URLs
+        usersNeverSeen,
+        usersWithIncompleteProfiles
+      });
+
+      toast({
+        title: "Health Check Complete",
+        description: `Found ${usersWithNoImages.length} users without images, ${usersNeverSeen.length} unseen profiles.`,
+      });
+
+    } catch (error) {
+      console.error('Error analyzing profile health:', error);
+      toast({
+        title: "Error",
+        description: "Failed to analyze profile health",
+        variant: "destructive"
+      });
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
   return (
     <Card className="w-full">
       <CardHeader className="pb-2">
@@ -279,6 +426,15 @@ const UserPoolDebugger: React.FC<Props> = ({ currentUserId, userPreferences }) =
           >
             <Server className="w-3 h-3 mr-1" />
             System
+          </Button>
+          <Button 
+            variant={activeTab === 'health' ? 'default' : 'outline'}
+            size="sm"
+            onClick={() => setActiveTab('health')}
+            className="flex-1 text-xs"
+          >
+            <AlertCircle className="w-3 h-3 mr-1" />
+            Health
           </Button>
         </div>
 
@@ -482,6 +638,114 @@ const UserPoolDebugger: React.FC<Props> = ({ currentUserId, userPreferences }) =
                     </p>
                   </div>
                 )}
+              </div>
+            )}
+          </>
+        )}
+
+        {activeTab === 'health' && (
+          <>
+            <Button 
+              onClick={analyzeProfileHealth} 
+              disabled={isLoading}
+              className="w-full"
+              size="sm"
+            >
+              {isLoading ? (
+                <>
+                  <RefreshCw className="w-3 h-3 mr-1 animate-spin" />
+                  Checking...
+                </>
+              ) : (
+                <>
+                  <AlertCircle className="w-3 h-3 mr-1" />
+                  Check Profile Health
+                </>
+              )}
+            </Button>
+
+            {healthStats && (
+              <div className="space-y-3">
+                {/* No Images */}
+                <div className="border rounded p-2">
+                  <div className="flex items-center gap-2 mb-2">
+                    <ImageOff className="w-4 h-4 text-red-500" />
+                    <span className="font-medium text-sm">No Images ({healthStats.usersWithNoImages.length})</span>
+                  </div>
+                  {healthStats.usersWithNoImages.length > 0 ? (
+                    <ScrollArea className="h-32">
+                      <div className="space-y-1">
+                        {healthStats.usersWithNoImages.slice(0, 20).map(user => (
+                          <div key={user.userId} className="flex items-center justify-between text-xs p-1 bg-red-50 rounded">
+                            <span>{user.firstName} {user.lastName}</span>
+                            {onViewProfile && (
+                              <Button size="sm" variant="ghost" className="h-5 px-1" onClick={() => onViewProfile(user.userId)}>
+                                <Eye className="w-3 h-3" />
+                              </Button>
+                            )}
+                          </div>
+                        ))}
+                      </div>
+                    </ScrollArea>
+                  ) : (
+                    <p className="text-xs text-gray-500">All users have images</p>
+                  )}
+                </div>
+
+                {/* Never Seen */}
+                <div className="border rounded p-2">
+                  <div className="flex items-center gap-2 mb-2">
+                    <EyeOff className="w-4 h-4 text-orange-500" />
+                    <span className="font-medium text-sm">Never Seen ({healthStats.usersNeverSeen.length})</span>
+                  </div>
+                  {healthStats.usersNeverSeen.length > 0 ? (
+                    <ScrollArea className="h-32">
+                      <div className="space-y-1">
+                        {healthStats.usersNeverSeen.slice(0, 20).map(user => (
+                          <div key={user.userId} className="flex items-center justify-between text-xs p-1 bg-orange-50 rounded">
+                            <span>{user.firstName} {user.lastName}</span>
+                            {onViewProfile && (
+                              <Button size="sm" variant="ghost" className="h-5 px-1" onClick={() => onViewProfile(user.userId)}>
+                                <Eye className="w-3 h-3" />
+                              </Button>
+                            )}
+                          </div>
+                        ))}
+                      </div>
+                    </ScrollArea>
+                  ) : (
+                    <p className="text-xs text-gray-500">All users have been seen</p>
+                  )}
+                </div>
+
+                {/* Incomplete Profiles */}
+                <div className="border rounded p-2">
+                  <div className="flex items-center gap-2 mb-2">
+                    <AlertCircle className="w-4 h-4 text-yellow-500" />
+                    <span className="font-medium text-sm">Incomplete ({healthStats.usersWithIncompleteProfiles.length})</span>
+                  </div>
+                  {healthStats.usersWithIncompleteProfiles.length > 0 ? (
+                    <ScrollArea className="h-32">
+                      <div className="space-y-1">
+                        {healthStats.usersWithIncompleteProfiles.slice(0, 20).map(user => (
+                          <div key={user.userId} className="flex items-center justify-between text-xs p-1 bg-yellow-50 rounded">
+                            <div>
+                              <span>{user.firstName} {user.lastName}</span>
+                              <span className="text-gray-400 ml-1">({user.issues[0]})</span>
+                            </div>
+                            {onViewProfile && (
+                              <Button size="sm" variant="ghost" className="h-5 px-1" onClick={() => onViewProfile(user.userId)}>
+                                <Eye className="w-3 h-3" />
+                              </Button>
+                            )}
+                          </div>
+                        ))}
+                      </div>
+                    </ScrollArea>
+                  ) : (
+                    <p className="text-xs text-gray-500">All profiles complete</p>
+                  )}
+                </div>
               </div>
             )}
           </>

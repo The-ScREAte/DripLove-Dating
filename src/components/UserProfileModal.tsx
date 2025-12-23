@@ -16,7 +16,7 @@ import { getCountriesList } from '@/constants/locationData';
 
 interface UserProfileModalProps {
   isOpen: boolean;
-  onClose: () => void;
+  onClose: (wasEdited?: boolean) => void;
   userId: string;
   isAdmin?: boolean;
 }
@@ -25,6 +25,7 @@ const UserProfileModal = ({ isOpen, onClose, userId, isAdmin = false }: UserProf
   const { t } = useTranslation();
   const { toast } = useToast();
   const [profile, setProfile] = useState<any>(null);
+  const [wasEdited, setWasEdited] = useState(false);
   const [userImages, setUserImages] = useState<string[]>([]);
   const [deletingImageIndex, setDeletingImageIndex] = useState<number | null>(null);
   const [loading, setLoading] = useState(true);
@@ -179,6 +180,7 @@ const UserProfileModal = ({ isOpen, onClose, userId, isAdmin = false }: UserProf
       }));
 
       setIsEditingPreferences(false);
+      setWasEdited(true);
       toast({
         title: 'Success',
         description: 'User preferences updated successfully',
@@ -213,7 +215,8 @@ const UserProfileModal = ({ isOpen, onClose, userId, isAdmin = false }: UserProf
 
   const handleClose = () => {
     setIsEditingPreferences(false);
-    onClose();
+    onClose(wasEdited);
+    setWasEdited(false);
   };
 
   if (loading) {

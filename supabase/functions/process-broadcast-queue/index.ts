@@ -6,10 +6,10 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
 
-const BATCH_SIZE = 25; // Process 25 recipients per execution
+const BATCH_SIZE = 50; // Process 50 recipients per execution (increased from 25)
 const MAX_RETRIES = 3; // Maximum retry attempts per recipient
 const STALE_PROCESSING_MINUTES = 10; // Self-heal processing recipients stuck longer than this
-const MAX_CHAIN_DEPTH = 20; // Safety to prevent infinite self-invocation
+const MAX_CHAIN_DEPTH = 100; // Safety to prevent infinite self-invocation (increased from 20)
 
 serve(async (req) => {
   if (req.method === 'OPTIONS') {
