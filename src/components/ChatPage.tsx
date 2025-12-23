@@ -369,6 +369,34 @@ const ChatPage = ({ currentUser, onUnreadChange, onDetailViewChange }: ChatPageP
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selectedMatch]);
 
+  // Mark messages as read when app goes to background or page is hidden
+  useEffect(() => {
+    if (!selectedMatch || !currentUser?.id) return;
+    
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === 'hidden') {
+        // Mark as read when user leaves the chat/app
+        markMessagesAsRead();
+      }
+    };
+    
+    const handleBeforeUnload = () => {
+      // Attempt to mark as read before page unloads
+      markMessagesAsRead();
+    };
+    
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+    window.addEventListener('beforeunload', handleBeforeUnload);
+    
+    return () => {
+      // Also mark as read when unmounting the effect (e.g., when chat is closed)
+      markMessagesAsRead();
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
+      window.removeEventListener('beforeunload', handleBeforeUnload);
+    };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selectedMatch, currentUser?.id]);
+
   // ⭐ ANDROID OPTIMIZATION: Reduced message polling (3s instead of 1s)
   // Real-time subscription handles instant updates, polling is just a fallback
   // NOTE: Message polling removed to avoid UI jank while typing.
@@ -862,7 +890,7 @@ const ChatPage = ({ currentUser, onUnreadChange, onDetailViewChange }: ChatPageP
     if (!selectedMatch) return;
 
     try {
-      // Try to update chat messages as read with proper error handling
+      // Step 1: Mark all chat messages as read
       try {
         const { error } = await supabase
           .from('chats')
@@ -879,6 +907,35 @@ const ChatPage = ({ currentUser, onUnreadChange, onDetailViewChange }: ChatPageP
         }
       } catch (chatError) {
         // Silently handle read status errors
+      }
+
+      // Step 2: Reset the unread count in the matches table
+      try {
+        const isUser1 = selectedMatch.user1_id === currentUser.id;
+        const unreadField = isUser1 ? 'user1_unread_count' : 'user2_unread_count';
+        
+        const { error: matchError } = await supabase
+          .from('matches')
+          .update({ [unreadField]: 0 })
+          .eq('id', selectedMatch.id);
+        
+        if (!matchError) {
+          // Update local matches state to reflect zero unread count
+          setMatches(prev => prev.map(m => 
+            m.id === selectedMatch.id ? { ...m, unread_messages: 0 } : m
+          ));
+          
+          // Update cache as well
+          const cached = chatMatchesCache.get(currentUser.id);
+          if (cached) {
+            cached.matches = cached.matches.map(m => 
+              m.id === selectedMatch.id ? { ...m, unread_messages: 0 } : m
+            );
+            chatMatchesCache.set(currentUser.id, cached);
+          }
+        }
+      } catch (matchError) {
+        // Silently handle match update errors
       }
 
       onUnreadChange?.();
@@ -985,8 +1042,8 @@ const ChatPage = ({ currentUser, onUnreadChange, onDetailViewChange }: ChatPageP
     }
 
       try {
-      // Send the message to server
-      const { data, error } = await withTimeout(
+      // Send the message to server with timeout
+      const queryPromise = new Promise<{ data: any; error: any }>((resolve) => {
         supabase
           .from('chats')
           .insert({
@@ -999,9 +1056,11 @@ const ChatPage = ({ currentUser, onUnreadChange, onDetailViewChange }: ChatPageP
             *,
             sender:profiles!chats_sender_id_fkey(first_name, last_name)
           `)
-          .single(),
-        12000
-      );
+          .single()
+          .then(resolve);
+      });
+      
+      const { data, error } = await withTimeout(queryPromise, 12000);
       
       // Clear reply state after sending
       setReplyingTo(null);
@@ -1385,7 +1444,7 @@ const ChatPage = ({ currentUser, onUnreadChange, onDetailViewChange }: ChatPageP
     }
   };
 
-  const handleSwipeMove = (e: React.TouchEvent) => {
+  const handleSwipeMove = async (e: React.TouchEvent) => {
     if (!isSwiping) return;
     
     const touch = e.touches[0];
@@ -1396,6 +1455,8 @@ const ChatPage = ({ currentUser, onUnreadChange, onDetailViewChange }: ChatPageP
     if (Math.abs(deltaX) > Math.abs(deltaY) && deltaX > 50) {
       // Trigger back navigation
       setIsSwiping(false);
+      // Mark messages as read before leaving
+      await markMessagesAsRead();
       setSelectedMatch(null);
     }
   };
@@ -1748,7 +1809,9 @@ const ChatPage = ({ currentUser, onUnreadChange, onDetailViewChange }: ChatPageP
     );
   }
 
-  const handleBackClick = () => {
+  const handleBackClick = async () => {
+    // Mark messages as read before leaving
+    await markMessagesAsRead();
     // Clear cache to force fresh data
     chatMatchesCache.delete(currentUser.id);
     // Refresh matches immediately
