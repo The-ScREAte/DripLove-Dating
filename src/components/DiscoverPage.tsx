@@ -15,6 +15,9 @@ import { discoverCache, DISCOVER_CACHE_DURATION, DISCOVER_CACHE_MAX_ENTRIES, tri
 // ⭐ Import stratified sampling for fair profile distribution
 import { stratifiedSample, getStratifiedBatches } from '@/utils/stratifiedSampling';
 
+// ⭐ Import activity-based visibility weighting (Tinder-style)
+import { applyActivityWeighting, getSwipeFatigueRescueCandidates, injectRescueProfiles } from '@/utils/activityWeighting';
+
 // ⭐ Import background component
 import DominantColorImageBg from './discover/DominantColorImageBg';
 
@@ -371,6 +374,11 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, isPremium, profileComplet
   const [showProfileCompletionModal, setShowProfileCompletionModal] = useState(false);
   const [todaySwipeCount, setTodaySwipeCount] = useState(0);
   const [isArchivedFallback, setIsArchivedFallback] = useState(false); // Two-phase: true when showing archived profiles
+  
+  // ⭐ SWIPE FATIGUE RESCUE: Track consecutive non-match swipes (Tinder-style)
+  // After 12+ non-match swipes, inject active profiles to prevent user fatigue
+  const [noMatchStreak, setNoMatchStreak] = useState(0);
+  const FATIGUE_RESCUE_THRESHOLD = 12; // Trigger rescue after 12 non-match swipes
   
   // Dynamic content height management
   const contentRef = useRef<HTMLDivElement>(null);
@@ -939,8 +947,8 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, isPremium, profileComplet
       }));
 
     // ⭐ STRATIFIED SAMPLING: Fetch all profiles then apply fair distribution
-    // Common profile select fields (includes created_at for stratified sampling)
-    const PROFILE_SELECT = 'id, first_name, last_name, bio, city, country, country_code, occupation, education_level, date_of_birth, interests, gender, latitude, longitude, fun_fact, perfect_first_date, last_googled, relationship_intent, smoking, drinking, exercise_level, sleeping_schedule, introvert_extrovert, spontaneous_planner, messy_organized, adinkra_symbols, created_at';
+    // Common profile select fields (includes created_at for stratified sampling and last_login_at for activity weighting)
+    const PROFILE_SELECT = 'id, first_name, last_name, bio, city, country, country_code, occupation, education_level, date_of_birth, interests, gender, latitude, longitude, fun_fact, perfect_first_date, last_googled, relationship_intent, smoking, drinking, exercise_level, sleeping_schedule, introvert_extrovert, spontaneous_planner, messy_organized, adinkra_symbols, created_at, last_login_at';
 
     // ⭐ PREMIUM FIX: Detect if premium user has unlocked countries
     const hasUnlockedCountries = premiumForFeed && unlockedCountries.length > 0;
@@ -1064,11 +1072,18 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, isPremium, profileComplet
           return !cc ? false : allowedCountryCodes.includes(cc);
         });
 
+      // ⭐ ACTIVITY WEIGHTING: Bias toward recently active users (Tinder-style)
+      // Active users (within 72h) appear earlier for higher match probability
+      // This is a SOFT reorder - no one is removed, just repositioned
+      const activityWeightedProfiles = applyActivityWeighting(
+        allActive,
+        `${userId}_${dailySeed}_activity`
+      );
 
       // Apply round-robin mixing directly (no per-country stratification beforehand)
       // This produces a truly interleaved feed: A, B, C, A, B, C...
       const mixedProfiles = mixByCountryRoundRobin(
-        allActive,
+        activityWeightedProfiles,
         allowedCountryCodes,
         `${userId}_${dailySeed}_countries`
       );
@@ -1226,7 +1241,7 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, isPremium, profileComplet
       return { matches: [], images: {}, distances: distanceMap, index: 0 };
     }
  
-    // For FREE users: Apply age filtering and stratification here
+    // For FREE users: Apply age filtering, activity weighting, and stratification here
     // (Premium users already did this per-group before mixing)
     if (!premiumForFeed) {
       const userMinAge = currentUserData?.min_age || 18;
@@ -1240,8 +1255,12 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, isPremium, profileComplet
       
       filteredProfiles = filteredProfiles.filter(profile => profile.id !== userId);
       
-      // Apply stratified sampling for free users
+      // ⭐ ACTIVITY WEIGHTING: Bias toward recently active users (Tinder-style)
+      // Active users (within 72h) appear earlier for higher match probability
       const dailySeed = todayStr();
+      filteredProfiles = applyActivityWeighting(filteredProfiles, `${userId}_${dailySeed}_activity`);
+      
+      // Apply stratified sampling for free users
       filteredProfiles = getStratifiedBatches(filteredProfiles, 15, 4, `${userId}_${dailySeed}`);
     }
 
@@ -2428,7 +2447,49 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, isPremium, profileComplet
     }
   }, [potentialMatches, currentIndex, noMoreProfiles, isLoadingMore, hasCompletedInitialFetch, loadMoreMatches]);
 
-  // ⭐ 3B: CENTRALIZED IMAGE PRELOADING - Single source of truth
+  // ⭐ SWIPE FATIGUE RESCUE: Inject active profiles after long no-match streaks
+  // This prevents user fatigue and increases retention (Tinder-style behavior)
+  useEffect(() => {
+    if (noMatchStreak < FATIGUE_RESCUE_THRESHOLD) return;
+    if (potentialMatches.length === 0) return;
+    
+    // Get rescue candidates from remaining profiles
+    const remainingProfiles = potentialMatches
+      .slice(currentIndex)
+      .filter((p): p is PotentialMatch => !isAd(p));
+    
+    if (remainingProfiles.length < 5) return; // Not enough profiles to rescue from
+    
+    // Get active rescue candidates
+    const rescueCandidates = getSwipeFatigueRescueCandidates(
+      remainingProfiles,
+      3, // Inject up to 3 rescue profiles
+      `${currentUser?.id}_rescue_${Date.now()}`
+    );
+    
+    if (rescueCandidates.length === 0) return;
+    
+    // Inject rescue profiles near the front of the queue (positions 2-5)
+    setPotentialMatches(prev => {
+      const currentProfiles = prev.slice(currentIndex);
+      const rescueIds = new Set(rescueCandidates.map(p => p.id));
+      
+      // Remove rescue profiles from their current positions
+      const withoutRescue = currentProfiles.filter(p => !isAd(p) ? !rescueIds.has(p.id) : true);
+      
+      // Inject at positions 2, 4, 6 (skip first profile which is current)
+      const injected = injectRescueProfiles(withoutRescue, rescueCandidates, {
+        maxPercent: 0.15,
+        spacing: [2, 4],
+        startPosition: 1
+      });
+      
+      return [...prev.slice(0, currentIndex), ...injected];
+    });
+    
+    // Reset streak after rescue
+    setNoMatchStreak(0);
+  }, [noMatchStreak, potentialMatches, currentIndex, currentUser?.id]);
   // Automatically preloads upcoming profiles based on current position
   useEffect(() => {
     if (!hasCompletedInitialFetch || potentialMatches.length === 0) return;
@@ -2670,6 +2731,9 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, isPremium, profileComplet
         } else {
           // RPC succeeded — if server reports a match, show animation
           if ((rpcData as any)?.match) {
+            // ⭐ SWIPE FATIGUE RESCUE: Reset streak on match
+            setNoMatchStreak(0);
+            
             setMatchedUser(prevMatch);
             setShowMatchAnimation(true);
             
@@ -2697,6 +2761,9 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, isPremium, profileComplet
               // ignore notification errors
             }
           } else {
+            // ⭐ SWIPE FATIGUE RESCUE: Increment streak on no-match like
+            setNoMatchStreak(prev => prev + 1);
+            
             // Like was recorded but no match - send like notification
             try {
               const { data: likeCountData, error: countError } = await supabase
@@ -2968,6 +3035,9 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, isPremium, profileComplet
       });
     }
 
+    // ⭐ SWIPE FATIGUE RESCUE: Increment streak on pass (passes never result in matches)
+    setNoMatchStreak(prev => prev + 1);
+    
     // Execute pass normally
     await executePassLogic(currentMatch);
   };
