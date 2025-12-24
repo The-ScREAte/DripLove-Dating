@@ -16,7 +16,7 @@ export interface ProfileWithActivity {
   id: string;
   last_login_at?: string | null;
   created_at?: string | null;
-  [key: string]: any;
+  [key: string]: unknown;
 }
 
 // 72-hour activity window (Tinder's standard)
@@ -106,11 +106,13 @@ export function applyActivityWeighting<T extends ProfileWithActivity>(
 export function getSwipeFatigueRescueCandidates<T extends ProfileWithActivity>(
   profiles: T[],
   count: number = 3,
-  seed: string = ''
+  seed: string = '',
+  likedMeIds?: Iterable<string>
 ): T[] {
   if (profiles.length === 0) return [];
   
   const now = Date.now();
+  const likedSet = likedMeIds ? new Set(Array.from(likedMeIds)) : null;
   
   // Find recently active profiles
   const activeCandidates = profiles.filter(profile => {
@@ -119,13 +121,32 @@ export function getSwipeFatigueRescueCandidates<T extends ProfileWithActivity>(
     
     const lastActiveMs = new Date(lastActiveStr).getTime();
     return now - lastActiveMs <= ACTIVE_WINDOW_MS;
-  });
+  }); 
+
+  // Prefer “liked me” candidates first (still activity-gated)
+  const activeLikedMe = likedSet
+    ? activeCandidates.filter((p) => likedSet.has(p.id))
+    : [];
+  const activeNonLiked = likedSet
+    ? activeCandidates.filter((p) => !likedSet.has(p.id))
+    : activeCandidates;
   
   if (activeCandidates.length === 0) return [];
   
-  // Shuffle and take top N
-  const shuffled = shuffleWithSeed(activeCandidates, `${seed}_rescue`);
-  return shuffled.slice(0, count);
+  // Shuffle deterministically within groups, then take top N
+  const shuffledLiked = shuffleWithSeed(activeLikedMe, `${seed}_rescue_liked_me`);
+  const shuffledOther = shuffleWithSeed(activeNonLiked, `${seed}_rescue_active`);
+
+  const seen = new Set<string>();
+  const merged: T[] = [];
+  for (const p of [...shuffledLiked, ...shuffledOther]) {
+    if (seen.has(p.id)) continue;
+    seen.add(p.id);
+    merged.push(p);
+    if (merged.length >= count) break;
+  }
+
+  return merged;
 }
 
 /**
@@ -144,11 +165,13 @@ export function injectRescueProfiles<T extends { id: string }>(
     maxPercent?: number;
     spacing?: [number, number]; // [min, max] positions between injections
     startPosition?: number;
+    seed?: string; // required for deterministic spacing
   } = {}
 ): T[] {
   if (rescueProfiles.length === 0 || feed.length === 0) return feed;
   
-  const { maxPercent = 0.15, spacing = [3, 6], startPosition = 0 } = options;
+  const { maxPercent = 0.15, spacing = [3, 6], startPosition = 0, seed = '' } = options;
+  const random = seededRandom(hashString(`${seed}_spacing`));
   
   // Cap at maxPercent of feed
   const maxToInject = Math.ceil(feed.length * maxPercent);
@@ -168,7 +191,7 @@ export function injectRescueProfiles<T extends { id: string }>(
   for (const profile of uniqueToInject) {
     // Calculate next injection position
     const [minSpace, maxSpace] = spacing;
-    const space = minSpace + Math.floor(Math.random() * (maxSpace - minSpace + 1));
+    const space = minSpace + Math.floor(random() * (maxSpace - minSpace + 1));
     currentPos += space;
     
     if (currentPos >= result.length) break;

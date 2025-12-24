@@ -66,10 +66,10 @@ serve(async (req) => {
       // Optionally: notify your app server, log, or trigger a webhook
     }
 
-    // Mark as canceled, keep expires_at as is
+    // Mark as cancelled, keep expires_at as is
     const { error: updateErr } = await supabase
       .from('user_subscriptions')
-      .update({ status: 'canceled' })
+      .update({ status: 'cancelled', auto_renew: false })
       .eq('id', sub.id)
     if (updateErr) return json(500, { error: updateErr.message })
 

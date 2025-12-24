@@ -143,7 +143,7 @@ serve(async (req) => {
         const { error: cancelError } = await supabase
           .from('user_subscriptions')
           .update({
-            status: 'canceled',
+            status: 'cancelled',
             auto_renew: false,
             updated_at: new Date().toISOString()
           })

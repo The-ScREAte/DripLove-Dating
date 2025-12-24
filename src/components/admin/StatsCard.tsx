@@ -126,7 +126,28 @@ const StatsCard: React.FC<StatsCardProps> = ({ stats }) => {
           <div className="flex flex-col items-center p-1.5 bg-blue-50 rounded">
             <Users className="w-3 h-3 text-blue-600 mb-0.5" />
             <span className="text-sm font-bold text-blue-600">{stats.total_users}</span>
-            <span className="text-[10px] text-gray-600">Users</span>
+            <span className="text-[10px] text-gray-600">All Time Users</span>
+          </div>
+           <div className="flex flex-col items-center p-1.5 bg-teal-50 rounded">
+            <Calendar className="w-3 h-3 text-teal-600 mb-0.5" />
+            <span className="text-sm font-bold text-teal-600">{stats.active_users_30_days || 0}</span>
+            <span className="text-[10px] text-gray-600">Current Users</span>
+          </div>
+
+               {/* Active Now */}
+          <div className="flex flex-col items-center p-1.5 bg-emerald-50 rounded border border-emerald-200">
+            <div className="relative">
+              <Radio className="w-3 h-3 text-emerald-600 mb-0.5" />
+              <span className="absolute -top-0.5 -right-0.5 w-1.5 h-1.5 bg-emerald-500 rounded-full animate-pulse" />
+            </div>
+            <span className="text-sm font-bold text-emerald-600">{stats.active_now ?? 0}</span>
+            <span className="text-[10px] text-emerald-700">Active Now</span>
+          </div>
+
+             <div className="flex flex-col items-center p-1.5 bg-indigo-50 rounded">
+            <UserPlus className="w-3 h-3 text-indigo-600 mb-0.5" />
+            <span className="text-sm font-bold text-indigo-600">{stats.new_users_this_week}</span>
+            <span className="text-[10px] text-gray-600">New/Wk</span>
           </div>
           
           <div className="flex flex-col items-center p-1.5 bg-pink-50 rounded">
@@ -141,15 +162,7 @@ const StatsCard: React.FC<StatsCardProps> = ({ stats }) => {
             <span className="text-[10px] text-gray-600">Messages</span>
           </div>
           
-          {/* Active Now */}
-          <div className="flex flex-col items-center p-1.5 bg-emerald-50 rounded border border-emerald-200">
-            <div className="relative">
-              <Radio className="w-3 h-3 text-emerald-600 mb-0.5" />
-              <span className="absolute -top-0.5 -right-0.5 w-1.5 h-1.5 bg-emerald-500 rounded-full animate-pulse" />
-            </div>
-            <span className="text-sm font-bold text-emerald-600">{stats.active_now ?? 0}</span>
-            <span className="text-[10px] text-emerald-700">Now</span>
-          </div>
+     
           
           {/* Active Today with dropdown */}
           <div className="flex flex-col items-center p-1.5 bg-purple-50 rounded">
@@ -176,11 +189,6 @@ const StatsCard: React.FC<StatsCardProps> = ({ stats }) => {
             </DropdownMenu>
           </div>
           
-          <div className="flex flex-col items-center p-1.5 bg-indigo-50 rounded">
-            <UserPlus className="w-3 h-3 text-indigo-600 mb-0.5" />
-            <span className="text-sm font-bold text-indigo-600">{stats.new_users_this_week}</span>
-            <span className="text-[10px] text-gray-600">New/Wk</span>
-          </div>
           
           <div className="flex flex-col items-center p-1.5 bg-yellow-50 rounded">
             <Pause className="w-3 h-3 text-yellow-600 mb-0.5" />
@@ -206,11 +214,7 @@ const StatsCard: React.FC<StatsCardProps> = ({ stats }) => {
             <span className="text-[10px] text-gray-600">Premium</span>
           </div>
           
-          <div className="flex flex-col items-center p-1.5 bg-teal-50 rounded">
-            <Calendar className="w-3 h-3 text-teal-600 mb-0.5" />
-            <span className="text-sm font-bold text-teal-600">{stats.active_users_30_days || 0}</span>
-            <span className="text-[10px] text-gray-600">30 Days</span>
-          </div>
+         
           
           <div className="flex flex-col items-center p-1.5 bg-amber-50 rounded">
             <Archive className="w-3 h-3 text-amber-600 mb-0.5" />

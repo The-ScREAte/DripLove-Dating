@@ -79,12 +79,9 @@ const PaymentSuccess: React.FC = () => {
       setUpgrading(false);
       return;
     }
-    
-    // ...removed console.log...
-    
+
     // If no payment parameters, redirect to discover page
     if (!status && !tx_ref && !transaction_id) {
-      // ...removed console.log...
       toast({
         title: 'Invalid Access',
         description: 'Please initiate payment to access this page.',
@@ -93,7 +90,7 @@ const PaymentSuccess: React.FC = () => {
       navigate('/discover');
       return;
     }
-    
+
     // Handle different payment statuses
     if (status === 'cancelled') {
       toast({
@@ -101,33 +98,30 @@ const PaymentSuccess: React.FC = () => {
         description: 'Your payment was cancelled. No charges were made.',
         variant: 'default',
       });
-      setTimeout(() => navigate('/discover'), 2000); // Redirect after 2 seconds
+      setTimeout(() => navigate('/discover'), 2000);
       return;
     }
-    
+
     if (status === 'failed') {
       toast({
         title: 'Payment Failed',
         description: 'Your payment could not be processed. Please try again.',
         variant: 'destructive',
       });
-      setTimeout(() => navigate('/discover'), 2000); // Redirect after 2 seconds
+      setTimeout(() => navigate('/discover'), 2000);
       return;
     }
-    
+
     if (status !== 'successful' || !txnId) {
-      // ...removed console.log...
       setError('Payment verification failed. Please contact support if money was deducted.');
-      // Auto-redirect after 10 seconds for error cases
       setRedirectCountdown(10);
       const timer = setTimeout(() => {
         navigate('/discover');
       }, 10000);
       setRedirectTimer(timer);
-      
-      // Countdown timer
+
       const countdownInterval = setInterval(() => {
-        setRedirectCountdown(prev => {
+        setRedirectCountdown((prev) => {
           if (prev && prev > 1) {
             return prev - 1;
           } else {
@@ -136,142 +130,46 @@ const PaymentSuccess: React.FC = () => {
           }
         });
       }, 1000);
-      
       return;
     }
-    
-    // Process successful payment
-    if (status === 'successful' && txnId) {
-      setUpgrading(true);
-      supabase.auth.getSession().then(async ({ data: { session } }) => {
-        const user = session?.user;
-        if (!user) {
-          setError('User session expired. Please log in again.');
-          setUpgrading(false);
-          setTimeout(() => navigate('/auth'), 3000);
+
+    // Paystack success path: verify server-side before granting premium.
+    setUpgrading(true);
+    (async () => {
+      const { data: { session } } = await supabase.auth.getSession();
+      const user = session?.user;
+      if (!user) {
+        setError('User session expired. Please log in again.');
+        setUpgrading(false);
+        setTimeout(() => navigate('/auth'), 3000);
+        return;
+      }
+
+      try {
+        const referenceToVerify = reference || txnId;
+        const { data: verifyData, error: verifyError } = await supabase.functions.invoke('paystack-verify', {
+          body: {
+            reference: referenceToVerify,
+            payment_type: payment_type === 'one-time' ? 'one-time' : 'subscription',
+          },
+        });
+
+        if (verifyError || !verifyData?.ok || !verifyData?.verified) {
+          const details = (verifyError as any)?.message || verifyData?.error || 'Verification failed';
+          setError(
+            `Payment verification failed: ${details}. If money was deducted, contact support with reference: ${referenceToVerify}`
+          );
           return;
         }
 
-        try {
-          // ...removed console.log...
-          // ...removed console.log...
-          // ...removed console.log...
-          // ...removed console.log...
-          
-          // Since Paystack confirmed the payment was successful,
-          // create the subscription directly
-          const expiryDate = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000);
-          const subscriptionData = {
-            user_id: user.id,
-            plan_name: 'premium',
-            status: 'active',
-            flutterwave_transaction_id: txnId, // Using existing field for Paystack transaction
-            starts_at: new Date().toISOString(),
-            expires_at: expiryDate.toISOString(),
-            next_billing_date: payment_type === 'one-time' ? null : expiryDate.toISOString(), // No next billing for one-time
-            auto_renew: payment_type !== 'one-time', // No auto-renewal for one-time payments
-            payment_method: 'paystack', // Changed from flutterwave to paystack
-            updated_at: new Date().toISOString(),
-          };
-          
-          // ...removed console.log...
-          
-          // First, check if user already has a subscription
-          const { data: existingSubscription } = await supabase
-            .from('user_subscriptions')
-            .select('*')
-            .eq('user_id', user.id)
-            .single();
-          
-          let subscriptionResult;
-          let subscriptionError;
-          
-          if (existingSubscription) {
-            // Update existing subscription
-            // ...removed console.log...
-            const expiryDate = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000);
-            const { data, error } = await supabase
-              .from('user_subscriptions')
-              .update({
-                plan_name: 'premium',
-                status: 'active',
-                flutterwave_transaction_id: txnId, // Using existing field for Paystack transaction
-                expires_at: expiryDate.toISOString(),
-                next_billing_date: payment_type === 'one-time' ? null : expiryDate.toISOString(), // No next billing for one-time
-                auto_renew: payment_type !== 'one-time', // No auto-renewal for one-time payments
-                payment_method: 'paystack', // Changed from flutterwave to paystack
-                updated_at: new Date().toISOString(),
-              })
-              .eq('user_id', user.id)
-              .select();
-            subscriptionResult = data;
-            subscriptionError = error;
-          } else {
-            // Create new subscription
-            // ...removed console.log...
-            const { data, error } = await supabase
-              .from('user_subscriptions')
-              .insert([subscriptionData])
-              .select();
-            subscriptionResult = data;
-            subscriptionError = error;
-          }
-          
-          // ...removed console.log...
-          
-          if (subscriptionError) {
-            console.error('Subscription error:', subscriptionError);
-            const errorDetails = subscriptionError.message || subscriptionError.details || 'Unknown database error';
-            setError(`Could not activate premium: ${errorDetails}. Please contact support with transaction ID: ${txnId}`);
-          } else {
-            // ...removed console.log...
-            // ...removed console.log...
-            setUpgradeSuccess(true);
-            
-            // Verify the subscription was created with premium plan
-            if (subscriptionResult && subscriptionResult[0] && subscriptionResult[0].plan_name === 'premium') {
-              // ...removed console.log...
-              
-              // Let's also test the subscription fetch immediately
-              try {
-                // ...removed console.log...
-                const { data: testData, error: testError } = await supabase.rpc('get_user_subscription', {
-                  user_id_param: user.id
-                });
-                // ...removed console.log...
-                
-                const subscriptionTestData = testData as any;
-                if (subscriptionTestData && subscriptionTestData.plan_name === 'premium') {
-                  // ...removed console.log...
-                } else {
-                  // ...removed console.log...
-                }
-              } catch (testErr) {
-                console.error('❌ Subscription fetch test ERROR:', testErr);
-              }
-              
-              // Removed: Premium Activated toast
-              
-              // Force a small delay to ensure database consistency before redirect
-              setTimeout(() => {
-                // ...removed console.log...
-              }, 1000);
-              
-              // Don't redirect automatically - let user click the button
-              // The button will navigate with ?premium=activated parameter
-            } else {
-              console.error('⚠️ Subscription created but plan_name is not premium:', subscriptionResult);
-              setError('Subscription created but premium access may not be active. Please contact support.');
-            }
-          }
-        } catch (err) {
-          console.error('Unexpected error during premium activation:', err);
-          setError('An unexpected error occurred. Please contact support with transaction ID: ' + txnId);
-        }
-        
+        setUpgradeSuccess(true);
+      } catch (err: any) {
+        console.error('Payment processing error:', err);
+        setError(`Payment processing failed: ${err.message || 'Unknown error'}`);
+      } finally {
         setUpgrading(false);
-      });
-    }
+      }
+    })();
   }, [location.search, toast, navigate, isAuthenticated]);
 
   // Show loading while checking authentication

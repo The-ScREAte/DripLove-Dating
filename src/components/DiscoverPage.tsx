@@ -376,9 +376,13 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, isPremium, profileComplet
   const [isArchivedFallback, setIsArchivedFallback] = useState(false); // Two-phase: true when showing archived profiles
   
   // ⭐ SWIPE FATIGUE RESCUE: Track consecutive non-match swipes (Tinder-style)
-  // After 12+ non-match swipes, inject active profiles to prevent user fatigue
+  // After 8+ non-match swipes, inject active profiles to prevent user fatigue
   const [noMatchStreak, setNoMatchStreak] = useState(0);
-  const FATIGUE_RESCUE_THRESHOLD = 12; // Trigger rescue after 12 non-match swipes
+  const FATIGUE_RESCUE_THRESHOLD = 8; // Trigger rescue after 8 non-match swipes
+
+  // ⭐ RESCUE COOLDOWN: Prevent rescue spam in edge cases (fast swipes, ads, refills)
+  const lastRescueRef = useRef<number>(0);
+  const RESCUE_COOLDOWN_MS = 3 * 60 * 1000; // 3 minutes
   
   // Dynamic content height management
   const contentRef = useRef<HTMLDivElement>(null);
@@ -1072,27 +1076,26 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, isPremium, profileComplet
           return !cc ? false : allowedCountryCodes.includes(cc);
         });
 
-      // ⭐ ACTIVITY WEIGHTING: Bias toward recently active users (Tinder-style)
-      // Active users (within 72h) appear earlier for higher match probability
-      // This is a SOFT reorder - no one is removed, just repositioned
-      const activityWeightedProfiles = applyActivityWeighting(
-        allActive,
-        `${userId}_${dailySeed}_activity`
-      );
-
-      // Apply round-robin mixing directly (no per-country stratification beforehand)
+      // Apply round-robin mixing directly first (defines eligible country distribution)
       // This produces a truly interleaved feed: A, B, C, A, B, C...
       const mixedProfiles = mixByCountryRoundRobin(
-        activityWeightedProfiles,
+        allActive,
         allowedCountryCodes,
         `${userId}_${dailySeed}_countries`
+      );
+
+      // ⭐ ACTIVITY WEIGHTING (Premium): Bias toward recently active users AFTER country mix
+      // Soft reorder only: no users removed, premium rules preserved
+      const activityWeightedMixed = applyActivityWeighting(
+        mixedProfiles,
+        `${userId}_${dailySeed}_activity`
       );
 
 
       // STEP 6: For Premium multi-country, preserve the country rotation
       // Stratified sampling would re-group by account age and destroy the alternation
       // Premium users pay for the best experience → keep pure round-robin mixing
-      filteredProfiles = mixedProfiles.slice(0, 60);
+      filteredProfiles = activityWeightedMixed.slice(0, 60);
 
 
       if (import.meta.env.DEV) {
@@ -1255,13 +1258,13 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, isPremium, profileComplet
       
       filteredProfiles = filteredProfiles.filter(profile => profile.id !== userId);
       
-      // ⭐ ACTIVITY WEIGHTING: Bias toward recently active users (Tinder-style)
-      // Active users (within 72h) appear earlier for higher match probability
       const dailySeed = todayStr();
-      filteredProfiles = applyActivityWeighting(filteredProfiles, `${userId}_${dailySeed}_activity`);
-      
       // Apply stratified sampling for free users
       filteredProfiles = getStratifiedBatches(filteredProfiles, 15, 4, `${userId}_${dailySeed}`);
+
+      // ⭐ ACTIVITY WEIGHTING (Free): Apply AFTER stratification so active users rise to the top
+      // Soft reorder only: no filters/premium rules touched
+      filteredProfiles = applyActivityWeighting(filteredProfiles, `${userId}_${dailySeed}_activity`);
     }
 
     // Add empty images array and precomputed distance
@@ -2452,6 +2455,10 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, isPremium, profileComplet
   useEffect(() => {
     if (noMatchStreak < FATIGUE_RESCUE_THRESHOLD) return;
     if (potentialMatches.length === 0) return;
+    if (isArchivedFallback) return;
+
+    const now = Date.now();
+    if (now - lastRescueRef.current < RESCUE_COOLDOWN_MS) return;
     
     // Get rescue candidates from remaining profiles
     const remainingProfiles = potentialMatches
@@ -2461,10 +2468,13 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, isPremium, profileComplet
     if (remainingProfiles.length < 5) return; // Not enough profiles to rescue from
     
     // Get active rescue candidates
+    const todaySeed = todayStr();
+    const likedMeSet = new Set(usersWhoLikedMeIds);
     const rescueCandidates = getSwipeFatigueRescueCandidates(
       remainingProfiles,
       3, // Inject up to 3 rescue profiles
-      `${currentUser?.id}_rescue_${Date.now()}`
+      `${currentUser?.id || 'anon'}_${todaySeed}_rescue`,
+      likedMeSet
     );
     
     if (rescueCandidates.length === 0) return;
@@ -2481,15 +2491,17 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, isPremium, profileComplet
       const injected = injectRescueProfiles(withoutRescue, rescueCandidates, {
         maxPercent: 0.15,
         spacing: [2, 4],
-        startPosition: 1
+        startPosition: 1,
+        seed: `${currentUser?.id || 'anon'}_${todaySeed}_rescue_spacing`
       });
       
       return [...prev.slice(0, currentIndex), ...injected];
     });
     
+    lastRescueRef.current = now;
     // Reset streak after rescue
     setNoMatchStreak(0);
-  }, [noMatchStreak, potentialMatches, currentIndex, currentUser?.id]);
+  }, [noMatchStreak, potentialMatches, currentIndex, currentUser?.id, usersWhoLikedMeIds]);
   // Automatically preloads upcoming profiles based on current position
   useEffect(() => {
     if (!hasCompletedInitialFetch || potentialMatches.length === 0) return;
@@ -3036,7 +3048,10 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, isPremium, profileComplet
     }
 
     // ⭐ SWIPE FATIGUE RESCUE: Increment streak on pass (passes never result in matches)
-    setNoMatchStreak(prev => prev + 1);
+    // Ads should never affect fatigue.
+    if (!isAd(currentMatch)) {
+      setNoMatchStreak(prev => prev + 1);
+    }
     
     // Execute pass normally
     await executePassLogic(currentMatch);

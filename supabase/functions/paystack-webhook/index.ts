@@ -2,6 +2,7 @@
 // Handles Paystack webhook events, especially payment failures and subscription updates
 import { serve } from 'https://deno.land/std@0.177.0/http/server.ts'
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.45.0'
+import type { SupabaseClient } from 'https://esm.sh/@supabase/supabase-js@2.45.0'
 import { crypto } from 'https://deno.land/std@0.177.0/crypto/mod.ts'
 
 const PAYSTACK_SECRET_KEY = Deno.env.get('PAYSTACK_SECRET_KEY')
@@ -50,7 +51,7 @@ async function verifyPaystackSignature(body: string, signature: string): Promise
   }
 }
 
-async function findUserByEmail(supabase: any, email: string) {
+async function findUserByEmail(supabase: SupabaseClient, email: string) {
   try {
     const { data, error } = await supabase
       .from('profiles')
@@ -68,6 +69,34 @@ async function findUserByEmail(supabase: any, email: string) {
     console.error('Error finding user:', error)
     return null
   }
+}
+
+function addDays(date: Date, days: number) {
+  const result = new Date(date)
+  result.setUTCDate(result.getUTCDate() + days)
+  return result
+}
+
+function extractCustomerEmail(eventData: unknown): string | null {
+  const email = (eventData as { customer?: { email?: unknown } } | null)?.customer?.email
+  return typeof email === 'string' && email.includes('@') ? email : null
+}
+
+function extractSubscriptionCode(eventData: unknown): string | null {
+  const data = eventData as
+    | {
+        subscription_code?: unknown
+        subscription?: { subscription_code?: unknown } | null
+        data?: { subscription_code?: unknown } | null
+      }
+    | null
+
+  // Paystack typically includes this on subscription.create
+  const code =
+    data?.subscription_code ||
+    data?.subscription?.subscription_code ||
+    data?.data?.subscription_code
+  return typeof code === 'string' && code.length > 0 ? code : null
 }
 
 serve(async (req) => {
@@ -92,120 +121,154 @@ serve(async (req) => {
     
     const supabase = createClient(SUPABASE_URL!, SUPABASE_SERVICE_ROLE_KEY!)
     
-    switch (event.event) {
-      case 'subscription.disable':
-      case 'subscription.not_renew':
-      case 'charge.failed':
-      case 'invoice.payment_failed': {
-        console.log('[PAYSTACK-WEBHOOK] Processing payment failure event')
-        
-        const customer = event.data.customer
-        if (!customer?.email) {
-          console.log('[PAYSTACK-WEBHOOK] No customer email found')
-          return json(400, { error: 'No customer email found' })
-        }
+    const eventType = event.event
+    const eventData = event.data
 
-        // Find user by email
-        const user = await findUserByEmail(supabase, customer.email)
-        if (!user) {
-          console.log('[PAYSTACK-WEBHOOK] User not found for email:', customer.email)
-          return json(404, { error: 'User not found' })
-        }
+    // Cancellation-type events: do NOT count as payment failures.
+    if (eventType === 'subscription.disable' || eventType === 'subscription.not_renew') {
+      console.log('[PAYSTACK-WEBHOOK] Processing subscription cancellation event')
 
-        // Get current subscription and payment attempts
-        const { data: subscription } = await supabase
-          .from('user_subscriptions')
-          .select('payment_attempts, status')
-          .eq('user_id', user.id)
-          .eq('status', 'active')
-          .single()
+      const email = extractCustomerEmail(eventData)
+      if (!email) return json(400, { error: 'No customer email found' })
 
-        if (!subscription) {
-          console.log('[PAYSTACK-WEBHOOK] No active subscription found for user:', user.id)
-          return json(404, { error: 'No active subscription found' })
-        }
+      const user = await findUserByEmail(supabase, email)
+      if (!user) return json(404, { error: 'User not found' })
 
-        const currentAttempts = subscription.payment_attempts || 0
-        const newAttempts = currentAttempts + 1
+      const { error: updateError } = await supabase
+        .from('user_subscriptions')
+        .update({
+          auto_renew: false,
+          updated_at: new Date().toISOString(),
+        })
+        .eq('user_id', user.id)
+        .eq('payment_method', 'paystack')
 
-        console.log(`[PAYSTACK-WEBHOOK] Payment failed for user ${user.id}, attempt ${newAttempts}/3`)
-
-        // Update payment attempts
-        await supabase
-          .from('user_subscriptions')
-          .update({ 
-            payment_attempts: newAttempts,
-            updated_at: new Date().toISOString()
-          })
-          .eq('user_id', user.id)
-          .eq('status', 'active')
-
-        // If 3rd attempt failed, deactivate subscription
-        if (newAttempts >= 3) {
-          console.log(`[PAYSTACK-WEBHOOK] 3rd payment attempt failed for user ${user.id}, deactivating subscription`)
-          
-          // Handle payment failure - downgrade to free
-          const { error: failureError } = await supabase.rpc('handle_payment_failure', {
-            p_user_id: user.id,
-            p_reason: `Payment failed after ${newAttempts} attempts. Event: ${event.event}. Gateway response: ${event.data.gateway_response || 'Unknown error'}`
-          })
-
-          if (failureError) {
-            console.error('[PAYSTACK-WEBHOOK] Error handling payment failure:', failureError)
-            return json(500, { error: 'Failed to handle payment failure' })
-          }
-
-          console.log('[PAYSTACK-WEBHOOK] Successfully deactivated subscription after 3 failed attempts for user:', user.id)
-        } else {
-          console.log(`[PAYSTACK-WEBHOOK] Payment failed for user ${user.id}, will retry. Attempt ${newAttempts}/3`)
-        }
-        break
+      if (updateError) {
+        console.error('[PAYSTACK-WEBHOOK] Error updating auto_renew:', updateError)
+        return json(500, { error: 'Failed to update subscription cancellation' })
       }
 
-      case 'subscription.create':
-      case 'charge.success':
-      case 'invoice.create':
-      case 'invoice.update': {
-        console.log('[PAYSTACK-WEBHOOK] Processing payment success event')
-        
-        const customer = event.data.customer
-        if (!customer?.email) {
-          console.log('[PAYSTACK-WEBHOOK] No customer email found')
-          return json(400, { error: 'No customer email found' })
-        }
-
-        // Find user by email
-        const user = await findUserByEmail(supabase, customer.email)
-        if (!user) {
-          console.log('[PAYSTACK-WEBHOOK] User not found for email:', customer.email)
-          return json(404, { error: 'User not found' })
-        }
-
-        // Update subscription to active and reset payment attempts
-        const { error: updateError } = await supabase
-          .from('user_subscriptions')
-          .update({
-            status: 'active',
-            plan_name: 'premium',
-            payment_attempts: 0, // Reset payment attempts on successful payment
-            updated_at: new Date().toISOString()
-          })
-          .eq('user_id', user.id)
-          .in('status', ['payment_failed', 'expired', 'active']) // Include active to reset attempts
-
-        if (updateError) {
-          console.error('[PAYSTACK-WEBHOOK] Error updating subscription:', updateError)
-        } else {
-          console.log('[PAYSTACK-WEBHOOK] Successfully reactivated subscription and reset payment attempts for user:', user.id)
-        }
-        break
-      }
-      
-      default:
-        console.log('[PAYSTACK-WEBHOOK] Unhandled event type:', event.event)
+      return json(200, { message: 'Cancellation processed' })
     }
 
-    return json(200, { message: 'Webhook processed successfully' })
+    // Payment failures (Paystack retries happen; we keep your 3-attempt logic)
+    if (eventType === 'charge.failed' || eventType === 'invoice.payment_failed') {
+      console.log('[PAYSTACK-WEBHOOK] Processing payment failure event')
+
+      const email = extractCustomerEmail(eventData)
+      if (!email) return json(400, { error: 'No customer email found' })
+
+      const user = await findUserByEmail(supabase, email)
+      if (!user) return json(404, { error: 'User not found' })
+
+      const { data: subscription } = await supabase
+        .from('user_subscriptions')
+        .select('id, payment_attempts, status')
+        .eq('user_id', user.id)
+        .eq('payment_method', 'paystack')
+        .eq('status', 'active')
+        .single()
+
+      if (!subscription) {
+        console.log('[PAYSTACK-WEBHOOK] No active subscription found for user:', user.id)
+        return json(404, { error: 'No active subscription found' })
+      }
+
+      const currentAttempts = subscription.payment_attempts || 0
+      const newAttempts = currentAttempts + 1
+      console.log(`[PAYSTACK-WEBHOOK] Payment failed for user ${user.id}, attempt ${newAttempts}/3`)
+
+      await supabase
+        .from('user_subscriptions')
+        .update({
+          payment_attempts: newAttempts,
+          updated_at: new Date().toISOString(),
+        })
+        .eq('user_id', user.id)
+        .eq('payment_method', 'paystack')
+
+      if (newAttempts >= 3) {
+        console.log(`[PAYSTACK-WEBHOOK] 3rd payment attempt failed for user ${user.id}, deactivating subscription`)
+
+        const { error: failureError } = await supabase.rpc('handle_payment_failure', {
+          p_user_id: user.id,
+          p_reason: `Payment failed after ${newAttempts} attempts. Event: ${eventType}. Gateway response: ${eventData?.gateway_response || 'Unknown error'}`,
+        })
+
+        if (failureError) {
+          console.error('[PAYSTACK-WEBHOOK] Error handling payment failure:', failureError)
+          return json(500, { error: 'Failed to handle payment failure' })
+        }
+      }
+
+      return json(200, { message: 'Failure processed' })
+    }
+
+    // Successful payment / renewal events: extend the subscription period.
+    if (eventType === 'charge.success' || eventType === 'subscription.create') {
+      console.log('[PAYSTACK-WEBHOOK] Processing payment success/renewal event')
+
+      const email = extractCustomerEmail(eventData)
+      if (!email) return json(400, { error: 'No customer email found' })
+
+      const user = await findUserByEmail(supabase, email)
+      if (!user) return json(404, { error: 'User not found' })
+
+      const { data: currentSub } = await supabase
+        .from('user_subscriptions')
+        .select('id, expires_at, payment_method, auto_renew, flutterwave_transaction_id')
+        .eq('user_id', user.id)
+        .eq('payment_method', 'paystack')
+        .order('created_at', { ascending: false })
+        .limit(1)
+        .maybeSingle()
+
+      if (!currentSub?.id) {
+        // If a user somehow paid but has no subscription row, we can't safely create it here
+        // without knowing your full schema defaults.
+        console.log('[PAYSTACK-WEBHOOK] No subscription row found for user:', user.id)
+        return json(404, { error: 'No subscription row found' })
+      }
+
+      const nextExpiry =
+        currentSub.expires_at && new Date(currentSub.expires_at) > new Date()
+          ? addDays(new Date(currentSub.expires_at), 30)
+          : addDays(new Date(), 30)
+      const subscriptionCode = extractSubscriptionCode(eventData)
+
+      const updatePayload: Record<string, unknown> = {
+        status: 'active',
+        plan_name: 'premium',
+        payment_method: 'paystack',
+        auto_renew: true,
+        payment_attempts: 0,
+        expires_at: nextExpiry.toISOString(),
+        next_billing_date: nextExpiry.toISOString(),
+        updated_at: new Date().toISOString(),
+      }
+
+      // Store Paystack subscription_code so cancel-subscription can disable it later.
+      if (subscriptionCode && currentSub.flutterwave_transaction_id !== subscriptionCode) {
+        updatePayload.flutterwave_transaction_id = subscriptionCode
+      }
+
+      const { error: updateError } = await supabase
+        .from('user_subscriptions')
+        .update(updatePayload)
+        .eq('user_id', user.id)
+        .eq('payment_method', 'paystack')
+
+      if (updateError) {
+        console.error('[PAYSTACK-WEBHOOK] Error updating subscription:', updateError)
+        return json(500, { error: 'Failed to update subscription' })
+      }
+
+      return json(200, { message: 'Success processed' })
+    }
+
+    console.log('[PAYSTACK-WEBHOOK] Unhandled event type:', eventType)
+    return json(200, { message: 'Unhandled event ignored' })
+
   } catch (error) {
     console.error('[PAYSTACK-WEBHOOK] Error processing webhook:', error)
     return json(500, { error: 'Internal server error' })
