@@ -1,13 +1,14 @@
 /**
  * Stratified Sampling for Fair Profile Distribution
  * 
- * Ensures new users get visibility (47%) while established users stay visible (53%)
+ * Ensures new users get visibility (30%) while established users stay visible (70%)
+ * Tinder-balanced approach: reduced new-user dominance for better fairness
  * 
  * Distribution per batch of 15 (optimized for 16 free swipes):
- * - Bucket A (Very New, ≤7 days): 3 profiles (20%)
- * - Bucket B (New, 8-30 days): 4 profiles (27%)
- * - Bucket C (Regular, 1-6 months): 4 profiles (27%)
- * - Bucket D (Veteran, >6 months): 4 profiles (26%)
+ * - Bucket A (Very New, ≤7 days): 2 profiles (13%)
+ * - Bucket B (New, 8-30 days): 3 profiles (20%)
+ * - Bucket C (Regular, 1-6 months): 5 profiles (33%)
+ * - Bucket D (Veteran, >6 months): 5 profiles (34%)
  */
 
 export interface ProfileBuckets<T> {
@@ -24,11 +25,14 @@ export interface BucketQuotas {
   veteran: number;
 }
 
+// Tinder-balanced quotas: new users still get visibility but don't dominate
+// OLD: 47% new users (veryNew 3 + new 4 = 7/15)
+// NEW: 33% new users (veryNew 2 + new 3 = 5/15) - fairer for established users
 const DEFAULT_QUOTAS: BucketQuotas = {
-  veryNew: 3,  // 20%
-  new: 4,      // 27%
-  regular: 4,  // 27%
-  veteran: 4   // 26%
+  veryNew: 2,  // 13% (was 20%)
+  new: 3,      // 20% (was 27%)
+  regular: 5,  // 33% (was 27%)
+  veteran: 5   // 34% (was 26%)
 };
 
 /**
