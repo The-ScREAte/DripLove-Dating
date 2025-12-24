@@ -968,9 +968,19 @@ const AdminPageComponent = ({ currentUser, onLogout }: AdminPageProps) => {
         }
 
         const premiumRows: any[] = Array.isArray(premiumRowsRaw) ? premiumRowsRaw : [];
+        console.log(`🔍 Premium RPC returned ${premiumRows.length} rows for ${userIds.length} users`);
+        
         premiumRows.forEach((row: any) => {
-          if (row?.user_id) premiumMap.set(row.user_id, !!row.is_premium);
+          if (!row?.user_id) return;
+
+          // Be resilient to duplicate rows per user_id (some DB function versions can return
+          // multiple rows due to subscription history). If any row says premium, treat as premium.
+          const current = premiumMap.get(row.user_id) ?? false;
+          premiumMap.set(row.user_id, current || !!row.is_premium);
         });
+        
+        const premiumCount = Array.from(premiumMap.values()).filter(v => v).length;
+        console.log(`✅ After mapping: ${premiumCount} premium users out of ${userIds.length} total users`);
       }
 
       // Map users and attach premium flag
@@ -1074,11 +1084,12 @@ const AdminPageComponent = ({ currentUser, onLogout }: AdminPageProps) => {
 
   // Clear cache when premium filter changes to prevent stale cached data
   useEffect(() => {
+    console.log(`🗑️ Clearing cache due to premium filter change: ${premiumFilter}`);
     userDataCache.clear();
     if (isAdmin && activeTab === 'users') {
       fetchUsers();
     }
-  }, [premiumFilter]);
+  }, [premiumFilter, isAdmin, activeTab, fetchUsers]);
 
   const updateUserStatus = async (userId: string, newStatus: string) => {
     try {

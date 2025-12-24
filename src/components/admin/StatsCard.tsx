@@ -42,6 +42,7 @@ const StatsCard: React.FC<StatsCardProps> = ({ stats }) => {
   const [selectedDate, setSelectedDate] = useState<Date>(new Date());
   const [selectedDateCount, setSelectedDateCount] = useState<number | null>(null);
   const [isLoadingHistory, setIsLoadingHistory] = useState(false);
+  const [currentPremiumUsers, setCurrentPremiumUsers] = useState<number | null>(null);
 
   // Load historical data on mount
   useEffect(() => {
@@ -67,6 +68,28 @@ const StatsCard: React.FC<StatsCardProps> = ({ stats }) => {
     };
 
     loadHistoricalData();
+  }, []);
+
+  // Load current premium users count (active subscriptions right now)
+  useEffect(() => {
+    const loadCurrentPremiumUsers = async () => {
+      try {
+        const { data, error } = await (supabase as any).rpc('admin_get_current_premium_users_count');
+        if (error) {
+          console.error('Failed to load current premium users:', error);
+          setCurrentPremiumUsers(0);
+          return;
+        }
+
+        // RPC returns an integer
+        setCurrentPremiumUsers(typeof data === 'number' ? data : Number(data ?? 0));
+      } catch (err) {
+        console.error('Error loading current premium users:', err);
+        setCurrentPremiumUsers(0);
+      }
+    };
+
+    loadCurrentPremiumUsers();
   }, []);
 
   // When selecting a historical date
@@ -201,17 +224,17 @@ const StatsCard: React.FC<StatsCardProps> = ({ stats }) => {
             <span className="text-sm font-bold text-red-600">{stats.blocked_users}</span>
             <span className="text-[10px] text-gray-600">Blocked</span>
           </div>
-          
+
           <div className="flex flex-col items-center p-1.5 bg-gray-50 rounded">
-            <Shield className="w-3 h-3 text-gray-600 mb-0.5" />
-            <span className="text-sm font-bold text-gray-600">{stats.total_admins}</span>
-            <span className="text-[10px] text-gray-600">Admins</span>
+            <Crown className="w-3 h-3 text-gray-600 mb-0.5" />
+            <span className="text-sm font-bold text-gray-600">{currentPremiumUsers ?? 0}</span>
+            <span className="text-[10px] text-gray-600">Current Premium</span>
           </div>
           
           <div className="flex flex-col items-center p-1.5 bg-orange-50 rounded">
             <Crown className="w-3 h-3 text-orange-600 mb-0.5" />
             <span className="text-sm font-bold text-orange-600">{stats.premium_users}</span>
-            <span className="text-[10px] text-gray-600">Premium</span>
+            <span className="text-[10px] text-gray-600">Premium Now</span>
           </div>
           
          

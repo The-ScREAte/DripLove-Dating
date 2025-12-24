@@ -22,6 +22,39 @@ export const isAndroid = () => {
   return Capacitor.getPlatform() === 'android';
 };
 
+function tryParseJson(input: unknown): any | null {
+  if (typeof input !== 'string') return null;
+  try {
+    return JSON.parse(input);
+  } catch {
+    return null;
+  }
+}
+
+function extractPurchaseTokenFromAny(obj: any): string | null {
+  if (!obj) return null;
+
+  const direct =
+    obj.purchaseToken ||
+    obj?.nativePurchase?.purchaseToken ||
+    obj?.receipt?.purchaseToken ||
+    obj?.payload?.purchaseToken;
+
+  if (typeof direct === 'string' && direct.length > 0) return direct;
+
+  if (typeof obj.receipt === 'string') {
+    const parsed = tryParseJson(obj.receipt);
+    if (parsed?.purchaseToken && typeof parsed.purchaseToken === 'string') return parsed.purchaseToken;
+  }
+
+  if (typeof obj.payload === 'string') {
+    const parsed = tryParseJson(obj.payload);
+    if (parsed?.purchaseToken && typeof parsed.purchaseToken === 'string') return parsed.purchaseToken;
+  }
+
+  return null;
+}
+
 export function initGoogleIAP() {
   return new Promise<void>((resolve, reject) => {
     // Only initialize on Android
@@ -100,15 +133,11 @@ export function initGoogleIAP() {
               window.googleIapInitialized = true;
             }
           })
-          .approved(async (t: any) => {
+          .approved((t: any) => {
             noopLog('[Google IAP] Transaction approved:', t?.productId);
 
-            // On many Android configurations, `.verified()` is not reliably emitted
-            // (e.g., when no validator is configured). If we only activate premium
-            // in `.verified()`, the user never gets premium.
-            //
-            // To match the working Apple/Paystack behavior (DB updated -> UI sees premium),
-            // activate premium here for user-initiated purchases.
+            // Never grant entitlement client-side.
+            // Trigger verification and let the server update user_subscriptions.
             if (!window.googleIapPurchaseInitiated) {
               if (t?.finish && typeof t.finish === 'function') t.finish();
               return;
@@ -116,54 +145,59 @@ export function initGoogleIAP() {
 
             window.googleIapPurchaseInitiated = false;
 
+            if (t?.verify && typeof t.verify === 'function') {
+              t.verify();
+              return;
+            }
+
+            console.error('[Google IAP] verify() not available on transaction');
+            alert('Subscription could not be verified. Please try again.');
+            if (t?.finish && typeof t.finish === 'function') t.finish();
+          })
+          .verified(async (r: any) => {
+            noopLog('[Google IAP] Purchase verified:', r?.productId);
+
             try {
               const { supabase } = await import('@/integrations/supabase/client');
               const { data: { user } } = await supabase.auth.getUser();
 
-              if (user) {
-                const expiryDate = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000);
-
-                const purchaseToken =
-                  t?.purchaseToken ||
-                  t?.transactionId ||
-                  t?.id ||
-                  t?.nativePurchase?.purchaseToken ||
-                  t?.productId ||
-                  null;
-
-                await supabase
-                  .from('user_subscriptions')
-                  .upsert({
-                    user_id: user.id,
-                    plan_name: 'premium',
-                    status: 'active',
-                    flutterwave_transaction_id: purchaseToken,
-                    starts_at: new Date().toISOString(),
-                    expires_at: expiryDate.toISOString(),
-                    next_billing_date: expiryDate.toISOString(),
-                    auto_renew: true,
-                    payment_method: 'google',
-                    payment_attempts: 0,
-                    updated_at: new Date().toISOString(),
-                  }, { onConflict: 'user_id' });
-
-                noopLog('[Google IAP] Premium activated for user:', user.id);
-                window.location.href = '/payment-success?status=successful&payment_type=iap';
+              if (!user) {
+                alert('Please log in to complete your purchase.');
+                return;
               }
-            } catch (error) {
-              console.error('[Google IAP] Error activating premium on approved:', error);
-              alert('Payment processing failed. Please try again or contact support.');
-            } finally {
-              if (t?.finish && typeof t.finish === 'function') t.finish();
-            }
-          })
-          .verified(async (r: any) => {
-            // Keep handler for completeness; some environments may still emit verified.
-            // We do not rely on it for entitlement activation.
-            noopLog('[Google IAP] Purchase verified:', r?.productId);
 
-            if (r?.finish && typeof r.finish === 'function') {
-              r.finish();
+              const receiptData = r?.receipt || r?.payload || r?.transactionReceipt;
+              const productId = r?.productId || r?.id;
+              const purchaseToken = extractPurchaseTokenFromAny(r) || (typeof r?.transactionId === 'string' ? r.transactionId : null);
+              const transactionId = (typeof r?.transactionId === 'string' ? r.transactionId : null) || purchaseToken || `google_${Date.now()}`;
+
+              if (!productId || !purchaseToken) {
+                console.error('[Google IAP] Missing productId/purchaseToken for server validation');
+                alert('Subscription could not be verified. Please try again.');
+                return;
+              }
+
+              const { data: validation, error: validationError } = await supabase.functions.invoke('google-iap-validator', {
+                body: {
+                  receiptData,
+                  productId,
+                  purchaseToken,
+                  transactionId,
+                },
+              });
+
+              if (validationError || !validation?.valid) {
+                console.error('[Google IAP] Server validation failed:', validationError || validation);
+                alert('Subscription could not be verified. Please try again.');
+                return;
+              }
+
+              window.location.href = '/payment-success?status=successful&payment_type=iap';
+            } catch (error) {
+              console.error('[Google IAP] Error during server validation:', error);
+              alert('Subscription could not be verified. Please try again.');
+            } finally {
+              if (r?.finish && typeof r.finish === 'function') r.finish();
             }
           })
           .unverified((r: any, err: any) => {
@@ -391,7 +425,7 @@ export function restoreGooglePurchases(): Promise<{ restored: boolean; message: 
       }
     };
 
-    const activateSubscription = async (productId: string, transactionId?: string, receiptData?: string) => {
+    const validateAndSyncSubscription = async (productId: string, transactionId?: string, purchaseToken?: string | null, receiptData?: any) => {
       try {
         const { supabase } = await import('@/integrations/supabase/client');
         const { data: { user } } = await supabase.auth.getUser();
@@ -401,83 +435,36 @@ export function restoreGooglePurchases(): Promise<{ restored: boolean; message: 
           return false;
         }
         
-        let expiryDate = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000);
-        let isActiveSubscription = false;
-        
-        // Try server validation if we have receipt data
-        if (receiptData) {
-          noopLog('[Google IAP] Validating restored receipt with server...');
-          try {
-            const { data: validation, error: valError } = await supabase.functions.invoke('google-iap-validator', {
-              body: {
-                receiptData: receiptData,
-                productId: productId,
-                userId: user.id,
-                purchaseToken: receiptData,
-                transactionId: transactionId
-              }
-            });
-            
-            if (valError) {
-              console.warn('[Google IAP] Validation error:', valError);
-            } else if (validation?.active && validation?.expiresDate) {
-              const serverExpiry = new Date(validation.expiresDate);
-              // Check if subscription is actually still active
-              if (serverExpiry > new Date()) {
-                expiryDate = serverExpiry;
-                isActiveSubscription = true;
-                noopLog('[Google IAP] Server confirmed active subscription, expires:', expiryDate);
-              } else {
-                noopLog('[Google IAP] Server validation shows subscription has expired:', serverExpiry);
-                return false;
-              }
-            } else if (validation && !validation.active) {
-              noopLog('[Google IAP] Server validation: subscription is not active');
-              return false;
-            }
-          } catch (valError) {
-            console.warn('[Google IAP] Validation failed, checking product ownership:', valError);
-          }
-        }
-        
-        // Only proceed if we confirmed an active subscription
-        if (!isActiveSubscription && !receiptData) {
-          // No receipt data and no validation - trust the product.owned flag
-          noopLog('[Google IAP] No receipt data, trusting product ownership');
-          isActiveSubscription = true;
-        }
-        
-        if (!isActiveSubscription) {
-          noopLog('[Google IAP] Cannot confirm active subscription');
+        const token = purchaseToken || extractPurchaseTokenFromAny(receiptData);
+
+        if (!token) {
+          console.warn('[Google IAP] Missing purchaseToken during restore; cannot verify');
           return false;
         }
-        
-        const subscriptionData = {
-          user_id: user.id,
-          plan_name: 'premium',
-          status: 'active',
-          flutterwave_transaction_id: transactionId || productId,
-          starts_at: new Date().toISOString(),
-          expires_at: expiryDate.toISOString(),
-          next_billing_date: expiryDate.toISOString(),
-          auto_renew: true,
-          payment_method: 'google',
-          payment_attempts: 0,
-          updated_at: new Date().toISOString(),
-        };
-        
-        noopLog('[Google IAP] Updating subscription...');
-        
-        const { error: upsertError } = await supabase
-          .from('user_subscriptions')
-          .upsert(subscriptionData, { onConflict: 'user_id' });
-        
-        if (upsertError) {
-          console.error('[Google IAP] Database update error:', upsertError);
+
+        noopLog('[Google IAP] Validating restored purchase with server...');
+        const { data: validation, error: valError } = await supabase.functions.invoke('google-iap-validator', {
+          body: {
+            receiptData,
+            productId,
+            userId: user.id,
+            purchaseToken: token,
+            transactionId,
+          },
+        });
+
+        if (valError || !validation?.valid) {
+          console.warn('[Google IAP] Server validation failed during restore:', valError || validation);
           return false;
         }
-        
-        noopLog('[Google IAP] ✅ Subscription restored successfully!');
+
+        if (!validation.active) {
+          noopLog('[Google IAP] Server validation: subscription is not active');
+          return false;
+        }
+
+        // Entitlement is server-owned. The validator updates user_subscriptions.
+        noopLog('[Google IAP] ✅ Subscription validated/restored successfully');
         return true;
       } catch (error) {
         console.error('[Google IAP] Error activating subscription:', error);
@@ -492,10 +479,11 @@ export function restoreGooglePurchases(): Promise<{ restored: boolean; message: 
         noopLog('[Google IAP] Found owned product during restore:', product.id);
         
         const transaction = product.transaction || product.latestTransaction;
-        const receiptData = transaction?.receipt || transaction?.purchaseToken;
-        const transactionId = transaction?.transactionId || transaction?.id;
+        const receiptData = transaction?.receipt || transaction;
+        const purchaseToken = extractPurchaseTokenFromAny(transaction) || extractPurchaseTokenFromAny(product) || null;
+        const transactionId = transaction?.transactionId || transaction?.id || purchaseToken || undefined;
         
-        const success = await activateSubscription(product.id, transactionId, receiptData);
+        const success = await validateAndSyncSubscription(product.id, transactionId, purchaseToken, receiptData);
         
         if (success) {
           hasRestoredPurchase = true;
@@ -515,10 +503,11 @@ export function restoreGooglePurchases(): Promise<{ restored: boolean; message: 
             noopLog('[Google IAP] Found already-owned product:', id);
             
             const transaction = product.transaction || product.latestTransaction;
-            const receiptData = transaction?.receipt || transaction?.purchaseToken;
-            const transactionId = transaction?.transactionId || transaction?.id;
+            const receiptData = transaction?.receipt || transaction;
+            const purchaseToken = extractPurchaseTokenFromAny(transaction) || extractPurchaseTokenFromAny(product) || null;
+            const transactionId = transaction?.transactionId || transaction?.id || purchaseToken || undefined;
             
-            const success = await activateSubscription(id, transactionId, receiptData);
+            const success = await validateAndSyncSubscription(id, transactionId, purchaseToken, receiptData);
             
             if (success) {
               hasRestoredPurchase = true;

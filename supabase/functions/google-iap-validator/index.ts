@@ -21,7 +21,128 @@ function json(status: number, body: unknown) {
   })
 }
 
-serve(async (req) => {
+function base64UrlEncode(data: string | ArrayBuffer): string {
+  let base64: string
+
+  if (typeof data === 'string') {
+    base64 = btoa(data)
+  } else {
+    const bytes = new Uint8Array(data)
+    let binary = ''
+    for (let i = 0; i < bytes.length; i++) {
+      binary += String.fromCharCode(bytes[i])
+    }
+    base64 = btoa(binary)
+  }
+
+  return base64
+    .replace(/\+/g, '-')
+    .replace(/\//g, '_')
+    .replace(/=/g, '')
+}
+
+function pemToArrayBuffer(pem: string): ArrayBuffer {
+  const b64 = pem
+    .replace(/-----BEGIN PRIVATE KEY-----/, '')
+    .replace(/-----END PRIVATE KEY-----/, '')
+    .replace(/\s/g, '')
+
+  const binary = atob(b64)
+  const bytes = new Uint8Array(binary.length)
+  for (let i = 0; i < binary.length; i++) {
+    bytes[i] = binary.charCodeAt(i)
+  }
+  return bytes.buffer
+}
+
+async function generateAccessToken(serviceAccount: any, scope: string): Promise<string> {
+  const now = Math.floor(Date.now() / 1000)
+  const expiry = now + 3600
+
+  const header = {
+    alg: 'RS256',
+    typ: 'JWT',
+  }
+
+  const payload = {
+    iss: serviceAccount.client_email,
+    sub: serviceAccount.client_email,
+    aud: 'https://oauth2.googleapis.com/token',
+    iat: now,
+    exp: expiry,
+    scope,
+  }
+
+  const privateKey = await crypto.subtle.importKey(
+    'pkcs8',
+    pemToArrayBuffer(serviceAccount.private_key),
+    {
+      name: 'RSASSA-PKCS1-v1_5',
+      hash: 'SHA-256',
+    },
+    false,
+    ['sign'],
+  )
+
+  const encodedHeader = base64UrlEncode(JSON.stringify(header))
+  const encodedPayload = base64UrlEncode(JSON.stringify(payload))
+  const signatureInput = `${encodedHeader}.${encodedPayload}`
+
+  const signature = await crypto.subtle.sign(
+    'RSASSA-PKCS1-v1_5',
+    privateKey,
+    new TextEncoder().encode(signatureInput),
+  )
+
+  const encodedSignature = base64UrlEncode(signature)
+  const jwt = `${signatureInput}.${encodedSignature}`
+
+  const tokenResponse = await fetch('https://oauth2.googleapis.com/token', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/x-www-form-urlencoded',
+    },
+    body: `grant_type=urn:ietf:params:oauth:grant-type:jwt-bearer&assertion=${jwt}`,
+  })
+
+  const tokenData = await tokenResponse.json()
+  if (!tokenResponse.ok || !tokenData?.access_token) {
+    throw new Error(`Failed to get Google OAuth token: ${tokenResponse.status} ${JSON.stringify(tokenData)}`)
+  }
+
+  return tokenData.access_token
+}
+
+async function getAndroidPublisherAccessToken(): Promise<string> {
+  const base64Json =
+    Deno.env.get('GOOGLE_PLAY_SERVICE_ACCOUNT') ||
+    Deno.env.get('GOOGLE_PLAY_SERVICE_ACCOUNT_BASE64') ||
+    Deno.env.get('FIREBASE_SERVICE_ACCOUNT') ||
+    Deno.env.get('FCM_CREDENTIALS')
+
+  if (!base64Json) {
+    throw new Error('Missing service account secret. Set GOOGLE_PLAY_SERVICE_ACCOUNT (base64 JSON).')
+  }
+
+  const serviceAccountJson = atob(base64Json)
+  const serviceAccount = JSON.parse(serviceAccountJson)
+  return await generateAccessToken(serviceAccount, 'https://www.googleapis.com/auth/androidpublisher')
+}
+
+function candidateSubscriptionIds(productId: string): string[] {
+  const raw = (productId || '').trim()
+  const candidates: string[] = []
+
+  if (raw) candidates.push(raw)
+
+  // Legacy mapping (some clients may still send the fully-qualified string)
+  if (raw === 'com.driplove.dating.premium.monthly') candidates.push('premium_monthly')
+
+  // Dedupe while preserving order
+  return Array.from(new Set(candidates))
+}
+
+serve(async (req: Request) => {
   if (req.method === 'OPTIONS') return new Response(null, { headers: corsHeaders })
 
   try {
@@ -38,13 +159,12 @@ serve(async (req) => {
     if (userError || !userData.user) return json(401, { error: 'Invalid user token' })
 
     // 2️⃣ Parse request body
-    const { receiptData, productId, purchaseToken, transactionId } = await req.json()
+    const { productId, purchaseToken, transactionId } = await req.json()
     
     console.log('🧾 [GOOGLE-IAP-VALIDATOR] Validating purchase:', {
       productId,
       hasPurchaseToken: !!purchaseToken,
       hasTransactionId: !!transactionId,
-      hasReceiptData: !!receiptData
     })
 
     // Accept all possible product IDs (Apple and Google formats)
@@ -66,27 +186,93 @@ serve(async (req) => {
       return json(400, { valid: false, error: 'Invalid product ID' })
     }
 
-    // 3️⃣ For Google Play, we trust the cordova-plugin-purchase verification
-    // The plugin already verifies the purchase with Google Play before calling .verified()
-    // We just need to activate the subscription in our database
-    
-    console.log('✅ [GOOGLE-IAP-VALIDATOR] Google Play purchase verified by plugin')
+    if (!purchaseToken || typeof purchaseToken !== 'string') {
+      return json(400, { valid: false, error: 'Missing purchaseToken' })
+    }
 
-    // Calculate expiry date (30 days from now for monthly subscription)
-    const expiryDate = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000)
+    // 3️⃣ Verify with Google Play Developer API
+    const packageName = Deno.env.get('GOOGLE_PACKAGE_NAME') || 'com.driplove.dating'
+    const subscriptionIds = candidateSubscriptionIds(productId)
 
-    // 4️⃣ Update Supabase subscription
+    console.log('🔐 [GOOGLE-IAP-VALIDATOR] Fetching Android Publisher access token')
+    const accessToken = await getAndroidPublisherAccessToken()
+
+    let googleJson: any = null
+    let lastError: { status: number; body: any; subscriptionId: string } | null = null
+
+    for (const subscriptionId of subscriptionIds) {
+      const url = `https://androidpublisher.googleapis.com/androidpublisher/v3/applications/${encodeURIComponent(packageName)}/purchases/subscriptions/${encodeURIComponent(subscriptionId)}/tokens/${encodeURIComponent(purchaseToken)}`
+      console.log('🌐 [GOOGLE-IAP-VALIDATOR] Calling Google API:', { packageName, subscriptionId })
+
+      const googleResp = await fetch(url, {
+        method: 'GET',
+        headers: {
+          Authorization: `Bearer ${accessToken}`,
+        },
+      })
+
+      const body = await googleResp.json().catch(() => null)
+
+      if (googleResp.ok) {
+        googleJson = body
+        lastError = null
+        break
+      }
+
+      console.warn('⚠️ [GOOGLE-IAP-VALIDATOR] Google API attempt failed:', {
+        subscriptionId,
+        status: googleResp.status,
+      })
+      lastError = { status: googleResp.status, body, subscriptionId }
+    }
+
+    if (!googleJson) {
+      console.error('❌ [GOOGLE-IAP-VALIDATOR] Google API error:', lastError)
+      return json(200, {
+        valid: false,
+        active: false,
+        error: 'Google verification failed',
+        details: lastError,
+      })
+    }
+
+    const expiryTimeMillis = Number(googleJson?.expiryTimeMillis)
+    const startTimeMillis = Number(googleJson?.startTimeMillis)
+
+    if (!Number.isFinite(expiryTimeMillis)) {
+      console.error('❌ [GOOGLE-IAP-VALIDATOR] Missing expiryTimeMillis:', googleJson)
+      return json(200, { valid: false, active: false, error: 'Invalid Google response' })
+    }
+
+    const now = Date.now()
+    const isActive = expiryTimeMillis > now
+    const expiresAt = new Date(expiryTimeMillis).toISOString()
+    const startsAt = Number.isFinite(startTimeMillis) ? new Date(startTimeMillis).toISOString() : new Date().toISOString()
+    const autoRenew = typeof googleJson?.autoRenewing === 'boolean' ? googleJson.autoRenewing : true
+
+    if (!isActive) {
+      console.log('ℹ️ [GOOGLE-IAP-VALIDATOR] Subscription not active per Google:', { expiresAt })
+      return json(200, {
+        valid: true,
+        active: false,
+        expiresDate: expiresAt,
+        expires_at: expiresAt,
+        transaction_id: transactionId || purchaseToken,
+      })
+    }
+
+    // 4️⃣ Update Supabase subscription ONLY after Google confirms active
     const { error: upsertError } = await supabaseClient
       .from('user_subscriptions')
       .upsert({
         user_id: userData.user.id,
         plan_name: 'premium',
         status: 'active',
-        starts_at: new Date().toISOString(),
-        expires_at: expiryDate.toISOString(),
-        next_billing_date: expiryDate.toISOString(),
-        flutterwave_transaction_id: transactionId || purchaseToken || null,
-        auto_renew: true,
+        starts_at: startsAt,
+        expires_at: expiresAt,
+        next_billing_date: expiresAt,
+        flutterwave_transaction_id: purchaseToken,
+        auto_renew: autoRenew,
         payment_method: 'google',
         payment_attempts: 0,
         updated_at: new Date().toISOString(),
@@ -102,8 +288,10 @@ serve(async (req) => {
     return json(200, {
       valid: true,
       active: true,
-      expires_at: expiryDate.toISOString(),
+      expiresDate: expiresAt,
+      expires_at: expiresAt,
       transaction_id: transactionId || purchaseToken,
+      purchaseToken,
     })
 
   } catch (err) {
