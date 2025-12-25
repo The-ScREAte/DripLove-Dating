@@ -107,50 +107,70 @@ export default function EmailExport() {
     setEmails([]);
     
     try {
-      // Build the query
-      let query = supabase
-        .from('profiles')
-        .select('id, email, gender, preference, relationship_intent, account_status, country, is_archived');
+      // Fetch ALL profiles in batches to bypass 1000 limit
+      const allProfiles: any[] = [];
+      const BATCH_SIZE = 1000;
+      let offset = 0;
+      let hasMore = true;
+      
+      while (hasMore) {
+        // Build the query for each batch
+        let query = supabase
+          .from('profiles')
+          .select('id, email, gender, preference, relationship_intent, account_status, country, is_archived');
 
-      // Apply country filter
-      if (selectedCountries.size > 0) {
-        query = query.in('country', Array.from(selectedCountries));
+        // Apply country filter
+        if (selectedCountries.size > 0) {
+          query = query.in('country', Array.from(selectedCountries));
+        }
+
+        // Apply gender filter
+        if (genderFilter !== 'all') {
+          query = query.eq('gender', genderFilter);
+        }
+
+        // Apply preference filter
+        if (preferenceFilter !== 'all') {
+          query = query.eq('preference', preferenceFilter);
+        }
+
+        // Apply intent filter
+        if (intentFilter !== 'all') {
+          query = query.eq('relationship_intent', intentFilter);
+        }
+
+        // Apply status filter
+        if (statusFilter !== 'all') {
+          query = query.eq('account_status', statusFilter);
+        }
+
+        // Apply archive filter (only if NOT including archived)
+        if (!includeArchived) {
+          query = query.or('is_archived.is.null,is_archived.eq.false');
+        }
+
+        // Safety: exclude deleted/suspended users (even if archived is checked)
+        query = query.neq('account_status', 'deleted')
+                     .neq('account_status', 'suspended');
+
+        // Add pagination
+        query = query.range(offset, offset + BATCH_SIZE - 1);
+
+        const { data: profiles, error: profileError } = await query;
+
+        if (profileError) throw profileError;
+        
+        if (profiles && profiles.length > 0) {
+          allProfiles.push(...profiles);
+          offset += BATCH_SIZE;
+          // If we got less than batch size, we've reached the end
+          hasMore = profiles.length === BATCH_SIZE;
+        } else {
+          hasMore = false;
+        }
       }
 
-      // Apply gender filter
-      if (genderFilter !== 'all') {
-        query = query.eq('gender', genderFilter);
-      }
-
-      // Apply preference filter
-      if (preferenceFilter !== 'all') {
-        query = query.eq('preference', preferenceFilter);
-      }
-
-      // Apply intent filter
-      if (intentFilter !== 'all') {
-        query = query.eq('relationship_intent', intentFilter);
-      }
-
-      // Apply status filter
-      if (statusFilter !== 'all') {
-        query = query.eq('account_status', statusFilter);
-      }
-
-      // Apply archive filter (only if NOT including archived)
-      if (!includeArchived) {
-        query = query.or('is_archived.is.null,is_archived.eq.false');
-      }
-
-      // Safety: exclude deleted/suspended users (even if archived is checked)
-      query = query.neq('account_status', 'deleted')
-                   .neq('account_status', 'suspended');
-
-      const { data: profiles, error: profileError } = await query;
-
-      if (profileError) throw profileError;
-
-      let filteredProfiles = profiles || [];
+      let filteredProfiles = allProfiles;
 
       // Apply premium filter (requires joining with subscriptions)
       if (premiumFilter !== 'all') {
@@ -183,7 +203,7 @@ export default function EmailExport() {
 
       toast({
         title: 'Emails Fetched',
-        description: `Found ${emailList.length} email addresses`,
+        description: `Found ${emailList.length} email addresses (fetched in ${Math.ceil(allProfiles.length / 1000)} batches)`,
       });
     } catch (error) {
       console.error('Error fetching emails:', error);

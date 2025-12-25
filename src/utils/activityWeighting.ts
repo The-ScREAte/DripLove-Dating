@@ -12,11 +12,11 @@
  * - Deterministic shuffle still applies
  */
 
+// Minimal interface - profiles just need id and optional activity timestamps
 export interface ProfileWithActivity {
   id: string;
   last_login_at?: string | null;
   created_at?: string | null;
-  [key: string]: unknown;
 }
 
 // 72-hour activity window (Tinder's standard)
@@ -57,7 +57,7 @@ function shuffleWithSeed<T>(arr: T[], seed: string): T[] {
  * 
  * This is a SOFT weighting - no one is removed, just reordered.
  */
-export function applyActivityWeighting<T extends ProfileWithActivity>(
+export function applyActivityWeighting<T extends { id: string; last_login_at?: string | null; created_at?: string | null }>(
   profiles: T[],
   seed: string = ''
 ): T[] {
@@ -103,7 +103,7 @@ export function applyActivityWeighting<T extends ProfileWithActivity>(
  * @param seed - Seed for deterministic shuffling
  * @returns Array of recently active profiles
  */
-export function getSwipeFatigueRescueCandidates<T extends ProfileWithActivity>(
+export function getSwipeFatigueRescueCandidates<T extends { id: string; last_login_at?: string | null; created_at?: string | null }>(
   profiles: T[],
   count: number = 3,
   seed: string = '',
