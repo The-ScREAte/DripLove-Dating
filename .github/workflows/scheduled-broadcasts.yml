@@ -3,6 +3,7 @@ name: Process Scheduled Broadcasts
 on:
   schedule:
     - cron: '*/15 * * * *' # Every 15 minutes
+  workflow_dispatch: # Allow manual triggering for testing
 
 jobs:
   process:
@@ -10,7 +11,14 @@ jobs:
     steps:
       - name: Call Edge Function
         run: |
+          if [ -z "${{ secrets.SUPABASE_URL }}" ] || [ -z "${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}" ]; then
+            echo "::error::Missing required secrets. Please configure SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY in repository settings."
+            exit 1
+          fi
+          
           curl -X POST \
             '${{ secrets.SUPABASE_URL }}/functions/v1/process-scheduled-broadcasts' \
             -H 'Authorization: Bearer ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}' \
-            -H 'Content-Type: application/json'
+            -H 'Content-Type: application/json' \
+            --fail-with-body \
+            || { echo "::error::Failed to call edge function"; exit 1; }
