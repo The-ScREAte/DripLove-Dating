@@ -1574,6 +1574,7 @@ export type Database = {
         Args: { p_user1_id: string; p_user2_id: string }
         Returns: Json
       }
+      admin_get_current_premium_users_count: { Args: never; Returns: number }
       admin_get_premium_status_for_users: {
         Args: { target_user_ids: string[] }
         Returns: {

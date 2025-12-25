@@ -141,9 +141,25 @@ const AppWrapper = () => {
           setUser(session?.user ?? null);
 
           // Keep session signal up-to-date
-          const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, nextSession) => {
-            setHasSession(!!nextSession);
-            setUser(nextSession?.user ?? null);
+          // IMPORTANT: Only log out user on explicit SIGNED_OUT event
+          // Token refresh failures should NOT log the user out - just retry
+          const { data: { subscription } } = supabase.auth.onAuthStateChange((event, nextSession) => {
+            // Handle specific auth events
+            if (event === 'SIGNED_OUT') {
+              // User explicitly signed out
+              setHasSession(false);
+              setUser(null);
+            } else if (event === 'SIGNED_IN' || event === 'TOKEN_REFRESHED' || event === 'USER_UPDATED') {
+              // User signed in or token refreshed - update session
+              setHasSession(!!nextSession);
+              setUser(nextSession?.user ?? null);
+            } else if (event === 'INITIAL_SESSION') {
+              // Initial session on app load
+              setHasSession(!!nextSession);
+              setUser(nextSession?.user ?? null);
+            }
+            // For other events (like password recovery), don't change auth state
+            // This prevents accidental logouts from token refresh failures
           });
 
           authSubscriptionRef.current = subscription;
