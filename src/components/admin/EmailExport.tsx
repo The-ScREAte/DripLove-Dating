@@ -7,7 +7,7 @@ import { useToast } from '@/hooks/use-toast';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { ScrollArea } from '@/components/ui/scroll-area';
-import { Loader2, Copy, Check, Mail, Users, Globe, Filter} from 'lucide-react';
+import { Loader2, Copy, Check, Mail, Users, Globe, Filter, Download } from 'lucide-react';
 import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 
@@ -218,9 +218,9 @@ export default function EmailExport() {
   };
 
   const copyToClipboard = async () => {
-    const csvEmails = emails.join(', ');
+    const emailText = emails.join(', ');
     try {
-      await navigator.clipboard.writeText(csvEmails);
+      await navigator.clipboard.writeText(emailText);
       setCopied(true);
       toast({
         title: 'Copied!',
@@ -232,6 +232,34 @@ export default function EmailExport() {
       toast({
         title: 'Error',
         description: 'Failed to copy to clipboard',
+        variant: 'destructive',
+      });
+    }
+  };
+
+  const downloadAsCSV = () => {
+    try {
+      // Create CSV content with one email per line
+      const csvContent = 'email\n' + emails.join('\n');
+      const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.setAttribute('download', `emails_export_${new Date().toISOString().split('T')[0]}.csv`);
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      URL.revokeObjectURL(url);
+      
+      toast({
+        title: 'Downloaded!',
+        description: `${emails.length} emails saved to CSV file`,
+      });
+    } catch (error) {
+      console.error('Failed to download:', error);
+      toast({
+        title: 'Error',
+        description: 'Failed to download CSV file',
         variant: 'destructive',
       });
     }
@@ -427,32 +455,42 @@ export default function EmailExport() {
       {emails.length > 0 && (
         <Card>
           <CardHeader>
-            <div className="flex items-center justify-between">
+            <div className="flex items-center justify-between flex-wrap gap-2">
               <CardTitle className="flex items-center gap-2">
                 <Mail className="h-5 w-5" />
                 Email Results
                 <Badge variant="secondary">{emails.length} emails</Badge>
               </CardTitle>
-              <Button
-                onClick={copyToClipboard}
-                variant={copied ? "default" : "outline"}
-                className="gap-2"
-              >
-                {copied ? (
-                  <>
-                    <Check className="h-4 w-4" />
-                    Copied!
-                  </>
-                ) : (
-                  <>
-                    <Copy className="h-4 w-4" />
-                    Copy All
-                  </>
-                )}
-              </Button>
+              <div className="flex gap-2">
+                <Button
+                  onClick={downloadAsCSV}
+                  variant="outline"
+                  className="gap-2"
+                >
+                  <Download className="h-4 w-4" />
+                  Download CSV
+                </Button>
+                <Button
+                  onClick={copyToClipboard}
+                  variant={copied ? "default" : "outline"}
+                  className="gap-2"
+                >
+                  {copied ? (
+                    <>
+                      <Check className="h-4 w-4" />
+                      Copied!
+                    </>
+                  ) : (
+                    <>
+                      <Copy className="h-4 w-4" />
+                      Copy All
+                    </>
+                  )}
+                </Button>
+              </div>
             </div>
             <CardDescription>
-              Comma-separated email addresses ready to copy
+              Comma-separated email addresses ready to copy or download
             </CardDescription>
           </CardHeader>
           <CardContent>

@@ -93,8 +93,7 @@ serve(async (req: Request) => {
     console.log(`Queueing broadcast campaign for ${userIds.length} selected users`);
 
     // Only enqueue users who currently have push tokens.
-    // IMPORTANT: don't use a single massive `.in(...)` with hundreds/thousands of UUIDs;
-    // it can exceed URL limits and return 400 from PostgREST.
+    // Chunk the lookup to avoid URL limits
     const tokenUserIdSet = new Set<string>();
     const TOKEN_LOOKUP_CHUNK_SIZE = 100;
     for (const chunk of chunkArray(userIds, TOKEN_LOOKUP_CHUNK_SIZE)) {
@@ -115,6 +114,10 @@ serve(async (req: Request) => {
     }
 
     const deliverableUserIds = Array.from(tokenUserIdSet);
+    
+    // Calculate users WITHOUT tokens - we'll still track them
+    const usersWithoutTokens = userIds.filter(id => !tokenUserIdSet.has(id));
+    console.log(`${deliverableUserIds.length} users have push tokens, ${usersWithoutTokens.length} do not`);
 
     if (deliverableUserIds.length === 0) {
       throw new Error('No selected users have push notifications enabled (no push tokens found).');
@@ -132,7 +135,7 @@ serve(async (req: Request) => {
         total_recipients: deliverableUserIds.length,
         successful_sends: 0,
         failed_sends: 0,
-        status: 'queued', // Will be processed by background worker
+        status: 'queued',
       })
       .select()
       .single();
@@ -144,7 +147,7 @@ serve(async (req: Request) => {
 
     console.log(`Created campaign ${campaign.id} with status: queued`);
 
-    // Create recipient records - they will be processed by the background worker
+    // Create recipient records in batches to avoid timeout
     const recipientsToInsert = deliverableUserIds.map(userId => ({
       campaign_id: campaign.id,
       user_id: userId,
@@ -152,16 +155,26 @@ serve(async (req: Request) => {
       retry_count: 0,
     }));
 
-    const { error: recipientsError } = await supabase
-      .from('broadcast_recipients')
-      .insert(recipientsToInsert);
+    // Insert in chunks of 500 to avoid timeout
+    const RECIPIENT_BATCH_SIZE = 500;
+    for (let i = 0; i < recipientsToInsert.length; i += RECIPIENT_BATCH_SIZE) {
+      const batch = recipientsToInsert.slice(i, i + RECIPIENT_BATCH_SIZE);
+      const { error: recipientsError } = await supabase
+        .from('broadcast_recipients')
+        .insert(batch);
 
-    if (recipientsError) {
-      console.error('Recipients creation error:', recipientsError);
-      throw recipientsError;
+      if (recipientsError) {
+        console.error(`Recipients creation error (batch ${i / RECIPIENT_BATCH_SIZE + 1}):`, recipientsError);
+        throw recipientsError;
+      }
     }
 
     console.log(`Queued ${deliverableUserIds.length} recipients for background processing`);
+
+    // Immediately trigger the queue processor to start processing
+    supabase.functions.invoke('process-broadcast-queue', {
+      body: { campaignId: campaign.id, depth: 0 }
+    }).catch(err => console.warn('Failed to trigger queue processor:', err));
 
     // Return immediately - background worker will process
     return new Response(

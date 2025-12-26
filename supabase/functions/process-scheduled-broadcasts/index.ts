@@ -6,6 +6,17 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 }
 
+const BATCH_SIZE = 1000; // Supabase default limit
+
+// Helper to chunk arrays
+const chunkArray = <T,>(arr: T[], size: number): T[][] => {
+  const chunks: T[][] = [];
+  for (let i = 0; i < arr.length; i += size) {
+    chunks.push(arr.slice(i, i + size));
+  }
+  return chunks;
+};
+
 serve(async (req) => {
   if (req.method === 'OPTIONS') {
     return new Response('ok', { headers: corsHeaders })
@@ -43,76 +54,111 @@ serve(async (req) => {
 
     for (const broadcast of broadcasts) {
       try {
-        // Get target users (excluding admins)
-        let query = supabase
-          .from('profiles')
-          .select('id, first_name, last_name')
-          .eq('account_status', 'active')
-          .eq('is_admin', false)
+        // Fetch ALL target users in batches (bypass 1000 limit)
+        const allProfiles: { id: string; first_name: string; last_name: string }[] = [];
+        let offset = 0;
+        let hasMore = true;
 
-        // Filter by countries if specified
-        if (broadcast.target_countries && broadcast.target_countries.length > 0) {
-          query = query.in('country', broadcast.target_countries)
+        while (hasMore) {
+          let query = supabase
+            .from('profiles')
+            .select('id, first_name, last_name')
+            .eq('account_status', 'active')
+            .eq('is_admin', false)
+            .range(offset, offset + BATCH_SIZE - 1);
+
+          // Filter by countries if specified
+          if (broadcast.target_countries && broadcast.target_countries.length > 0) {
+            query = query.in('country', broadcast.target_countries)
+          }
+
+          const { data: profiles, error: profileError } = await query;
+
+          if (profileError) {
+            console.error('Error fetching profiles:', profileError);
+            break;
+          }
+
+          if (profiles && profiles.length > 0) {
+            allProfiles.push(...profiles);
+            offset += BATCH_SIZE;
+            hasMore = profiles.length === BATCH_SIZE;
+          } else {
+            hasMore = false;
+          }
         }
 
-        const { data: profiles, error: profileError } = await query
+        console.log(`Found ${allProfiles.length} total eligible users for broadcast: ${broadcast.title}`);
 
-        if (profileError) {
-          console.error('Error fetching profiles:', profileError)
-          continue
-        }
-
-        const userIds = profiles?.map(p => p.id) || []
-
-        if (userIds.length === 0) {
+        if (allProfiles.length === 0) {
           console.log(`No users found for broadcast: ${broadcast.title}`)
           continue
         }
 
-        // Get push tokens for these users
-        const { data: tokens } = await supabase
-          .from('push_tokens')
-          .select('user_id, token, platform')
-          .in('user_id', userIds)
+        // Get push tokens for ALL users in chunks to avoid URL limits
+        const allTokens: { user_id: string; token: string; platform: string }[] = [];
+        const userIdChunks = chunkArray(allProfiles.map(p => p.id), 100);
 
-        if (!tokens || tokens.length === 0) {
+        for (const chunk of userIdChunks) {
+          const { data: tokens } = await supabase
+            .from('push_tokens')
+            .select('user_id, token, platform')
+            .in('user_id', chunk);
+
+          if (tokens) {
+            allTokens.push(...tokens);
+          }
+        }
+
+        if (allTokens.length === 0) {
           console.log(`No push tokens found for broadcast: ${broadcast.title}`)
           continue
         }
 
-        console.log(`Sending to ${tokens.length} users for: ${broadcast.title}`)
+        console.log(`Sending to ${allTokens.length} users for: ${broadcast.title}`)
 
-        // Send push notifications
+        // Send push notifications in parallel batches
         let successful = 0
         let failed = 0
+        const sendBatchSize = 50; // Send 50 at a time
 
-        for (const tokenData of tokens) {
-          try {
-            const payload = {
-              to: tokenData.token,
-              title: broadcast.title,
-              body: broadcast.message,
-              sound: 'default',
-              priority: 'high',
-            }
+        for (let i = 0; i < allTokens.length; i += sendBatchSize) {
+          const tokenBatch = allTokens.slice(i, i + sendBatchSize);
+          
+          const batchResults = await Promise.allSettled(
+            tokenBatch.map(async (tokenData) => {
+              try {
+                const payload = {
+                  to: tokenData.token,
+                  title: broadcast.title,
+                  body: broadcast.message,
+                  sound: 'default',
+                  priority: 'high',
+                }
 
-            const response = await fetch('https://exp.host/--/api/v2/push/send', {
-              method: 'POST',
-              headers: {
-                'Content-Type': 'application/json',
-              },
-              body: JSON.stringify(payload),
+                const response = await fetch('https://exp.host/--/api/v2/push/send', {
+                  method: 'POST',
+                  headers: {
+                    'Content-Type': 'application/json',
+                  },
+                  body: JSON.stringify(payload),
+                })
+
+                return response.ok;
+              } catch (error) {
+                console.error('Error sending push notification:', error)
+                return false;
+              }
             })
+          );
 
-            if (response.ok) {
-              successful++
+          batchResults.forEach((result) => {
+            if (result.status === 'fulfilled' && result.value) {
+              successful++;
             } else {
-              failed++
+              failed++;
             }
-          } catch (error) {
-            console.error('Error sending push notification:', error)
-            failed++
-          }
+          });
         }
 
         // Record execution in history
@@ -120,7 +166,7 @@ serve(async (req) => {
           .from('scheduled_broadcast_history')
           .insert({
             scheduled_broadcast_id: broadcast.id,
-            total_recipients: tokens.length,
+            total_recipients: allTokens.length,
             successful_sends: successful,
             failed_sends: failed,
           })
@@ -146,12 +192,14 @@ serve(async (req) => {
         results.push({
           id: broadcast.id,
           title: broadcast.title,
+          totalUsers: allProfiles.length,
+          usersWithTokens: allTokens.length,
           successful,
           failed,
           nextSend: nextSend.toISOString(),
         })
 
-        console.log(`Completed broadcast: ${broadcast.title} - ${successful} sent, ${failed} failed`)
+        console.log(`Completed broadcast: ${broadcast.title} - ${successful} sent, ${failed} failed out of ${allTokens.length} tokens`)
       } catch (error: unknown) {
         console.error(`Error processing broadcast ${broadcast.id}:`, error)
         results.push({

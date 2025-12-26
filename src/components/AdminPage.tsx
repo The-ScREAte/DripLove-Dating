@@ -905,53 +905,71 @@ const AdminPageComponent = ({ currentUser, onLogout }: AdminPageProps) => {
         return;
       }
 
-      // Fetch ALL users (not paginated in query - pagination happens in UI)
-      let query = supabase
-        .from('profiles')
-        .select(`
-          id, 
-          first_name, 
-          last_name, 
-          email, 
-          account_status, 
-          created_at, 
-          city, 
-          country, 
-          date_of_birth, 
-          is_admin, 
-          gender, 
-          preference, 
-          relationship_intent,
-          last_login_at,
-          login_count,
-          is_archived
-        `)
-        .eq('is_admin', false)
-        .order('created_at', { ascending: false });
+      // Fetch ALL users in batches to bypass 1000 limit
+      const allData: any[] = [];
+      const BATCH_SIZE = 1000;
+      let offset = 0;
+      let hasMore = true;
 
-      if (statusFilter !== 'all') {
-        query = query.eq('account_status', statusFilter);
-      }
-      
-      if (genderFilter !== 'all') {
-        query = query.eq('gender', genderFilter);
-      }
-      
-      if (interestedInFilter !== 'all') {
-        query = query.eq('preference', interestedInFilter);
-      }
-      
-      if (countryFilter !== 'all') {
-        query = query.eq('country', countryFilter);
-      }
-      
-      if (relationshipIntentFilter !== 'all') {
-        query = query.eq('relationship_intent', relationshipIntentFilter);
+      while (hasMore) {
+        let query = supabase
+          .from('profiles')
+          .select(`
+            id, 
+            first_name, 
+            last_name, 
+            email, 
+            account_status, 
+            created_at, 
+            city, 
+            country, 
+            date_of_birth, 
+            is_admin, 
+            gender, 
+            preference, 
+            relationship_intent,
+            last_login_at,
+            login_count,
+            is_archived
+          `)
+          .eq('is_admin', false)
+          .order('created_at', { ascending: false })
+          .range(offset, offset + BATCH_SIZE - 1);
+
+        if (statusFilter !== 'all') {
+          query = query.eq('account_status', statusFilter);
+        }
+        
+        if (genderFilter !== 'all') {
+          query = query.eq('gender', genderFilter);
+        }
+        
+        if (interestedInFilter !== 'all') {
+          query = query.eq('preference', interestedInFilter);
+        }
+        
+        if (countryFilter !== 'all') {
+          query = query.eq('country', countryFilter);
+        }
+        
+        if (relationshipIntentFilter !== 'all') {
+          query = query.eq('relationship_intent', relationshipIntentFilter);
+        }
+
+        const { data: batchData, error } = await query;
+
+        if (error) throw error;
+
+        if (batchData && batchData.length > 0) {
+          allData.push(...batchData);
+          offset += BATCH_SIZE;
+          hasMore = batchData.length === BATCH_SIZE;
+        } else {
+          hasMore = false;
+        }
       }
 
-      const { data, error } = await query;
-
-      if (error) throw error;
+      const data = allData;
 
       // Determine premium via admin RPC (bypasses RLS on user_subscriptions)
       const userIds = (data || []).map(u => u.id).filter(Boolean);
