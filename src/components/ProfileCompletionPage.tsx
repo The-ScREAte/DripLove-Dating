@@ -480,6 +480,15 @@ const ProfileCompletionPage = () => {
       // Don't block user flow if notification fails
     }
     
+    // Schedule the 20-minute delayed love notification (fire-and-forget)
+    try {
+      supabase.functions.invoke('send-signup-welcome', {
+        body: { userId: user.id, delayMinutes: 20 }
+      }).catch(err => console.error('Failed to schedule delayed notification:', err));
+    } catch (error) {
+      console.error('Failed to invoke signup welcome function:', error);
+    }
+    
     // ANDROID FIX: Update session storage before navigation
     sessionStorage.setItem('driplove_user_session', 'authenticated');
     sessionStorage.removeItem('driplove_current_view');

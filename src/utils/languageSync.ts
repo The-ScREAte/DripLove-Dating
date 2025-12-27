@@ -4,21 +4,27 @@ import { getLanguageForCountry } from '@/i18n/config';
 
 /**
  * Detect and set language based on device language or region
+ * For African languages (Swahili, etc.), defaults to English - user can manually switch
+ * For major international languages (French, German, Chinese, Portuguese, Arabic), auto-detect
  */
 export const detectDeviceLanguage = () => {
   // Get device language (e.g., 'en-US', 'fr-FR', 'ar-SA')
   const deviceLanguage = navigator.language || navigator.languages?.[0] || 'en';
   
   // Extract the language code (e.g., 'en' from 'en-US')
-  const languageCode = deviceLanguage.split('-')[0];
+  const languageCode = deviceLanguage.split('-')[0].toLowerCase();
   
-  // Supported languages in the app
-  const supportedLanguages = ['en', 'fr', 'de', 'zh', 'sw', 'pt', 'ar'];
+  // Languages that auto-detect (major international languages)
+  const autoDetectLanguages = ['en', 'fr', 'de', 'zh', 'pt', 'ar'];
   
-  // Use the detected language if supported, otherwise default to 'en'
-  const detectedLanguage = supportedLanguages.includes(languageCode) ? languageCode : 'en';
+  // African languages should default to English until user switches
+  // Swahili (sw) and other African languages will default to English
+  if (autoDetectLanguages.includes(languageCode)) {
+    return languageCode;
+  }
   
-  return detectedLanguage;
+  // For all other languages (including Swahili), default to English
+  return 'en';
 };
 
 /**

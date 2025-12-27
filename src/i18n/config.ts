@@ -22,18 +22,41 @@ const resources = {
   ar: { translation: ar },
 };
 
+// Get the appropriate default language based on device settings
+const getDefaultLanguage = (): string => {
+  // Check sessionStorage first for user's explicit choice
+  const savedLanguage = sessionStorage.getItem('preferredLanguage');
+  if (savedLanguage) return savedLanguage;
+  
+  // Get device language
+  const deviceLanguage = navigator.language || (navigator as any).languages?.[0] || 'en';
+  const languageCode = deviceLanguage.split('-')[0].toLowerCase();
+  
+  // Languages where we auto-set based on device (non-African languages)
+  const autoSetLanguages = ['fr', 'de', 'zh', 'pt', 'ar'];
+  
+  // For French, German, Chinese, Portuguese, Arabic - use device language
+  if (autoSetLanguages.includes(languageCode)) {
+    return languageCode;
+  }
+  
+  // For Swahili and other African languages, default to English
+  // User can manually switch to their preferred language
+  return 'en';
+};
+
 i18n
   .use(LanguageDetector)
   .use(initReactI18next)
   .init({
     resources,
     fallbackLng: 'en',
-    lng: sessionStorage.getItem('preferredLanguage') || 'en', // Check sessionStorage first
+    lng: getDefaultLanguage(), // Use intelligent default language detection
     interpolation: {
       escapeValue: false, // React already escapes values
     },
     detection: {
-      order: ['querystring', 'sessionStorage', 'localStorage', 'navigator'],
+      order: ['querystring', 'sessionStorage', 'localStorage'],
       caches: ['sessionStorage', 'localStorage'],
       lookupQuerystring: 'lang',
       lookupSessionStorage: 'preferredLanguage',
