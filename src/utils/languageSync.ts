@@ -15,15 +15,16 @@ export const detectDeviceLanguage = () => {
   const languageCode = deviceLanguage.split('-')[0].toLowerCase();
   
   // Languages that auto-detect (major international languages)
-  const autoDetectLanguages = ['en', 'fr', 'de', 'zh', 'pt', 'ar'];
+  // Arabic removed - defaults to English like African languages
+  const autoDetectLanguages = ['en', 'fr', 'de', 'zh', 'pt'];
   
-  // African languages should default to English until user switches
-  // Swahili (sw) and other African languages will default to English
+  // African languages and Arabic should default to English until user switches
+  // Swahili (sw), Arabic (ar), and other languages will default to English
   if (autoDetectLanguages.includes(languageCode)) {
     return languageCode;
   }
   
-  // For all other languages (including Swahili), default to English
+  // For all other languages (including Swahili and Arabic), default to English
   return 'en';
 };
 
