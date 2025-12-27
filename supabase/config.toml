@@ -54,3 +54,6 @@ verify_jwt = true
 
 [functions.process-broadcast-queue]
 verify_jwt = false
+
+[functions.send-signup-welcome]
+verify_jwt = false
