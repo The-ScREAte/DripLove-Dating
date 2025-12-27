@@ -32,15 +32,16 @@ const getDefaultLanguage = (): string => {
   const deviceLanguage = navigator.language || (navigator as any).languages?.[0] || 'en';
   const languageCode = deviceLanguage.split('-')[0].toLowerCase();
   
-  // Languages where we auto-set based on device (non-African languages)
-  const autoSetLanguages = ['fr', 'de', 'zh', 'pt', 'ar'];
+  // Languages where we auto-set based on device (non-African languages, excluding Arabic)
+  // Arabic now defaults to English like African languages until user switches
+  const autoSetLanguages = ['fr', 'de', 'zh', 'pt'];
   
-  // For French, German, Chinese, Portuguese, Arabic - use device language
+  // For French, German, Chinese, Portuguese - use device language
   if (autoSetLanguages.includes(languageCode)) {
     return languageCode;
   }
   
-  // For Swahili and other African languages, default to English
+  // For Swahili, Arabic, and other African languages, default to English
   // User can manually switch to their preferred language
   return 'en';
 };
