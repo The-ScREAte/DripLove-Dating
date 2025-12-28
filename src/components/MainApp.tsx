@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback, useMemo, lazy, Suspense } from 'react';
+import React, { useState, useEffect, useCallback, useMemo, useRef, lazy, Suspense } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Button } from '@/components/ui/button';
 import { Heart, MessageCircle, Users, User } from 'lucide-react';
@@ -9,10 +9,14 @@ import PrivacyPolicy from '@/components/PrivacyPolicy';
 import DripCoupleIcon from '@/components/DripCoupleIcon';
 import RatingDialog from '@/components/RatingDialog';
 import { supabase, SUPABASE_URL } from '@/integrations/supabase/client';
+import type { Database } from '@/integrations/supabase/types';
 import { useToast } from '@/hooks/use-toast';
 import { usePushNotifications } from '@/hooks/usePushNotifications';
 import { loadUserLanguage } from '@/utils/languageSync';
 import { useActivityTracker } from '@/hooks/useActivityTracker';
+import type { ChatMatchesCacheValue, LikedMeCacheValue } from '@/types/cacheTypes';
+
+type ProfileRow = Database['public']['Tables']['profiles']['Row'];
 
 // Lazy load tab components - reduces initial bundle by ~700KB
 // Each component only loads when user navigates to that tab
@@ -20,7 +24,7 @@ const DiscoverPage = lazy(() => import('@/components/DiscoverPage'));
 const ChatPage = lazy(() => import('@/components/ChatPage'));
 const LikedMePage = lazy(() => import('@/components/LikedMePage'));
 const ProfilePage = lazy(() => import('@/components/ProfilePage'));
-import AppUpdatePopup from '@/components/AppUpdatePopup';
+import AppUpdatePopup from '@/components/AppUpdatePopup'; 
 
 // Tab loading fallback
 const TabLoader = () => (
@@ -55,12 +59,13 @@ if (import.meta.env.DEV) {
 // No SafeArea helpers here; header/nav will be fixed to viewport
 
 interface MainAppProps {
-  user: any;
+  user: { id: string } | null;
   onLogout: () => void;
 }
 
 const MainApp = ({ user, onLogout }: MainAppProps) => {
   const { t, i18n } = useTranslation();
+  const userId = user?.id;
   
   // ⭐ CRITICAL FIX: Move ALL hooks BEFORE any conditional returns
   const [activeTab, setActiveTab] = useState('dripcheck');
@@ -68,33 +73,144 @@ const MainApp = ({ user, onLogout }: MainAppProps) => {
   const [isKeyboardOpen, setIsKeyboardOpen] = useState(false);
   const [showTerms, setShowTerms] = useState(false);
   const [showPrivacy, setShowPrivacy] = useState(false);
-  const [profile, setProfile] = useState<any>(null);
+  const [profile, setProfile] = useState<ProfileRow | null>(null);
   const [isPremium, setIsPremium] = useState(false);
   const [unreadCount, setUnreadCount] = useState(0);
   const { toast } = useToast();
+
+  // Cached set of match IDs for this user (used to cheaply filter realtime chat events)
+  const userMatchIdSetRef = useRef<Set<string>>(new Set());
   
   // Track user activity for accurate "Active Users" stats
-  useActivityTracker(user?.id);
+  useActivityTracker(userId);
 
-  // Safety check - if no user data, show error (AFTER all hooks)
-  if (!user || !user.id) {
-    return (
-      <div className="min-h-fill flex items-center justify-center bg-gradient-to-br from-pink-50 to-purple-50 p-4">
-        <div className="text-center bg-white rounded-lg p-8 shadow-lg max-w-md w-full">
-          <h2 className="text-xl font-bold text-gray-800 mb-4">{t('errors.noUserData')}</h2>
-          <p className="text-gray-600 mb-6">
-            {t('errors.unableToLoadUser')}
-          </p>
-          <button 
-            onClick={onLogout}
-            className="bg-pink-500 hover:bg-pink-600 text-white px-6 py-2 rounded-lg font-medium"
-          >
-            {t('auth.backToLogin')}
-          </button>
-        </div>
-      </div>
-    );
-  }
+  const fetchUserProfile = useCallback(async () => {
+    if (!userId) {
+      console.warn('[MainApp] No user ID provided');
+      return;
+    }
+
+    try {
+      const { data, error } = await supabase
+        .from('profiles')
+        .select('*')
+        .eq('id', userId)
+        .maybeSingle();
+
+      if (error) {
+        console.error('[MainApp] Profile fetch error:', error);
+        toast({
+          title: 'Profile Error',
+          description: 'Failed to load profile data. Please try refreshing.',
+          variant: 'destructive',
+        });
+        return;
+      }
+
+      if (!data) {
+        console.warn('[MainApp] No profile found for user:', userId);
+        toast({
+          title: 'Profile not found',
+          description: 'No profile found for this user.',
+          variant: 'destructive',
+        });
+        return;
+      }
+
+      setProfile(data as unknown as ProfileRow);
+
+      // Check premium status from user_subscriptions
+      if (data?.id) {
+        try {
+          const { data: subData, error: subError } = await supabase
+            .from('user_subscriptions')
+            .select('plan_name, status')
+            .eq('user_id', data.id)
+            .eq('plan_name', 'premium')
+            .eq('status', 'active')
+            .maybeSingle();
+
+          if (subError) {
+            console.error('[MainApp] Subscription fetch error:', subError);
+          }
+
+          setIsPremium(!!subData);
+        } catch (subErr) {
+          console.error('[MainApp] Subscription check failed:', subErr);
+          setIsPremium(false);
+        }
+      }
+    } catch (err) {
+      console.error('[MainApp] Fatal error in fetchUserProfile:', err);
+      toast({
+        title: 'Error',
+        description: 'Failed to load user data. Please restart the app.',
+        variant: 'destructive',
+      });
+    }
+  }, [toast, userId]);
+
+  const fetchUnreadCount = useCallback(async () => {
+    if (!userId) return;
+
+    type MatchUnreadRow = {
+      id: string;
+      user1_id: string;
+      user2_id: string;
+      user1_unread_count: number | null;
+      user2_unread_count: number | null;
+    };
+    type MatchesUnreadQueryResult = {
+      data: MatchUnreadRow[] | null;
+      error: { message?: string } | null;
+    };
+    type MatchesUnreadClient = {
+      from: (table: 'matches') => {
+        select: (columns: string) => {
+          or: (filters: string) => Promise<MatchesUnreadQueryResult>;
+        };
+      };
+    };
+
+    try {
+      const matchesClient = supabase as unknown as MatchesUnreadClient;
+      const { data, error } = await matchesClient
+        .from('matches')
+        .select('id,user1_id,user2_id,user1_unread_count,user2_unread_count')
+        .or(`user1_id.eq.${userId},user2_id.eq.${userId}`);
+
+      if (error) throw error;
+
+      const rows = data || [];
+      userMatchIdSetRef.current = new Set(rows.map((r) => r.id));
+
+      let total = 0;
+      for (const row of rows) {
+        const isUser1 = row.user1_id === userId;
+        const raw = isUser1 ? row.user1_unread_count : row.user2_unread_count;
+        const n = Number(raw);
+        if (Number.isFinite(n) && n > 0) total += n;
+      }
+
+      setUnreadCount(total);
+    } catch (err) {
+      const message =
+        typeof err === 'object' && err && 'message' in err
+          ? String((err as { message?: unknown }).message)
+          : undefined;
+      console.error('[MainApp] ❌ Error fetching unread count:', message || err);
+    }
+  }, [userId]);
+
+  // Throttled unread count refresh to prevent excessive calls
+  const lastUnreadRefreshRef = useRef<number>(0);
+  const throttledFetchUnreadCount = useCallback(() => {
+    const now = Date.now();
+    if (now - lastUnreadRefreshRef.current >= 2000) {
+      lastUnreadRefreshRef.current = now;
+      void fetchUnreadCount();
+    }
+  }, [fetchUnreadCount]);
 
   // Simple keyboard detection for mobile
   useEffect(() => {
@@ -118,7 +234,7 @@ const MainApp = ({ user, onLogout }: MainAppProps) => {
     const registerDeviceToken = async () => {
       try {
         const { Capacitor } = await import('@capacitor/core');
-        if (!Capacitor.isNativePlatform() || !user?.id) {
+        if (!Capacitor.isNativePlatform() || !userId) {
           // Silent notification handling
           return;
         }
@@ -226,27 +342,36 @@ const MainApp = ({ user, onLogout }: MainAppProps) => {
     
     // Add a small delay to prevent race conditions
     setTimeout(registerDeviceToken, 1000);
-  }, [user?.id]);
+  }, [userId]);
+
+  const ensureWindowCaches = useCallback(() => {
+    if (typeof window === 'undefined') return;
+    if (!window.likedMeCache) {
+      window.likedMeCache = new Map<string, LikedMeCacheValue>();
+    }
+    if (!window.chatMatchesCache) {
+      window.chatMatchesCache = new Map<string, ChatMatchesCacheValue>();
+    }
+  }, []);
 
   // Global liked me preloader function
-  const preloadLikedMeData = async (userId: string) => {
+  const preloadLikedMeData = useCallback(async (targetUserId: string) => {
+    ensureWindowCaches();
     try {
       // 1. Get all likes for this user
       const { data: likes, error: likesError } = await supabase
         .from('likes')
         .select('liker_id, created_at')
-        .eq('liked_id', userId);
+        .eq('liked_id', targetUserId);
       
       if (likesError) throw likesError;
       if (!likes || likes.length === 0) {
         // Cache empty result
-        if (typeof window !== 'undefined' && (window as any).likedMeCache) {
-          (window as any).likedMeCache.set(userId, {
-            likers: [],
-            userImages: {},
-            timestamp: Date.now()
-          });
-        }
+        window.likedMeCache?.set(targetUserId, {
+          likers: [],
+          userImages: {},
+          timestamp: Date.now(),
+        });
         return;
       }
 
@@ -255,11 +380,11 @@ const MainApp = ({ user, onLogout }: MainAppProps) => {
         supabase
           .from('matches')
           .select('user1_id, user2_id')
-          .or(`user1_id.eq.${userId},user2_id.eq.${userId}`),
+          .or(`user1_id.eq.${targetUserId},user2_id.eq.${targetUserId}`),
         supabase
           .from('blocks')
           .select('blocked_id, blocker_id')
-          .or(`blocker_id.eq.${userId},blocked_id.eq.${userId}`)
+          .or(`blocker_id.eq.${targetUserId},blocked_id.eq.${targetUserId}`)
       ]);
 
       if (matchesRes.error) throw matchesRes.error;
@@ -268,10 +393,10 @@ const MainApp = ({ user, onLogout }: MainAppProps) => {
       const matches = matchesRes.data || [];
       const blockedUsers = blocksRes.data || [];
       const matchedIds = matches.map(match =>
-        match.user1_id === userId ? match.user2_id : match.user1_id
+        match.user1_id === targetUserId ? match.user2_id : match.user1_id
       );
       const blockedIds = blockedUsers.map(block =>
-        block.blocker_id === userId ? block.blocked_id : block.blocker_id
+        block.blocker_id === targetUserId ? block.blocked_id : block.blocker_id
       );
 
       // 3. Filter likerIds
@@ -281,13 +406,11 @@ const MainApp = ({ user, onLogout }: MainAppProps) => {
 
       if (likerIds.length === 0) {
         // Cache empty result
-        if (typeof window !== 'undefined' && (window as any).likedMeCache) {
-          (window as any).likedMeCache.set(userId, {
-            likers: [],
-            userImages: {},
-            timestamp: Date.now()
-          });
-        }
+        window.likedMeCache?.set(targetUserId, {
+          likers: [],
+          userImages: {},
+          timestamp: Date.now(),
+        });
         return;
       }
 
@@ -300,35 +423,31 @@ const MainApp = ({ user, onLogout }: MainAppProps) => {
 
       if (profileError) throw profileError;
 
-      const likers = profiles || [];
+      const likers = (profiles || []) as unknown as LikedMeCacheValue['likers'];
 
       // 5. Fetch first images for these profiles
       let imagesData = null;
       if (likerIds.length > 0) {
-        try {
-          const { data: approvedImages, error: imagesError } = await supabase
+        const { data: approvedImages, error: imagesError } = await supabase
+          .from('user_images')
+          .select('user_id, image_url, image_order')
+          .in('user_id', likerIds)
+          .eq('is_approved', true)
+          .order('image_order', { ascending: true });
+
+        if (imagesError && imagesError.message.includes('does not exist')) {
+          const { data: fallbackImages, error: fallbackError } = await supabase
             .from('user_images')
             .select('user_id, image_url, image_order')
             .in('user_id', likerIds)
-            .eq('is_approved', true)
             .order('image_order', { ascending: true });
 
-          if (imagesError && imagesError.message.includes('does not exist')) {
-            const { data: fallbackImages, error: fallbackError } = await supabase
-              .from('user_images')
-              .select('user_id, image_url, image_order')
-              .in('user_id', likerIds)
-              .order('image_order', { ascending: true });
-
-            if (fallbackError) throw fallbackError;
-            imagesData = fallbackImages;
-          } else if (imagesError) {
-            throw imagesError;
-          } else {
-            imagesData = approvedImages;
-          }
-        } catch (error) {
-          throw error;
+          if (fallbackError) throw fallbackError;
+          imagesData = fallbackImages;
+        } else if (imagesError) {
+          throw imagesError;
+        } else {
+          imagesData = approvedImages;
         }
       }
 
@@ -343,15 +462,12 @@ const MainApp = ({ user, onLogout }: MainAppProps) => {
           }
         }
         
-        // Store initial cache with first images
-        if (typeof window !== 'undefined' && (window as any).likedMeCache) {
-          (window as any).likedMeCache.set(userId, {
-            likers,
-            userImages: imageMap,
-            timestamp: Date.now(),
-            fullyLoaded: false
-          });
-        }
+        window.likedMeCache?.set(targetUserId, {
+          likers,
+          userImages: imageMap,
+          timestamp: Date.now(),
+          fullyLoaded: false,
+        });
 
         // Progressive loading: Load remaining images in background
         setTimeout(async () => {
@@ -374,12 +490,10 @@ const MainApp = ({ user, onLogout }: MainAppProps) => {
                 }
 
                 // Update cache with all images
-                if (typeof window !== 'undefined' && (window as any).likedMeCache) {
-                  const existingCache = (window as any).likedMeCache.get(userId);
-                  if (existingCache) {
-                    existingCache.userImages = fullImageMap;
-                    existingCache.fullyLoaded = true;
-                  }
+                const existingCache = window.likedMeCache?.get(targetUserId);
+                if (existingCache) {
+                  existingCache.userImages = fullImageMap;
+                  existingCache.fullyLoaded = true;
                 }
               }
             } catch (error) {
@@ -390,10 +504,11 @@ const MainApp = ({ user, onLogout }: MainAppProps) => {
     } catch (error) {
       // Silently handle preload errors
     }
-  };
+  }, [ensureWindowCaches]);
 
   // Global chat preloader function - needs to match ChatPage cache
-  const preloadChatMatches = async (userId: string) => {
+  const preloadChatMatches = useCallback(async (targetUserId: string) => {
+    ensureWindowCaches();
     try {
       const { data: matches, error } = await supabase
         .from('matches')
@@ -403,17 +518,17 @@ const MainApp = ({ user, onLogout }: MainAppProps) => {
           user2:profiles!matches_user2_id_fkey(id, first_name, last_name, is_admin),
           chats(id, message, created_at, sender_id)
         `)
-        .or(`user1_id.eq.${userId},user2_id.eq.${userId}`)
+        .or(`user1_id.eq.${targetUserId},user2_id.eq.${targetUserId}`)
         .order('created_at', { ascending: false });
 
       if (error) throw error;
 
       const processedMatches = (matches?.map(match => {
-        const partner = match.user1_id === userId ? match.user2 : match.user1;
+        const partner = match.user1_id === targetUserId ? match.user2 : match.user1;
         const lastMessage = match.chats?.[match.chats.length - 1];
         let unreadCount = 0;
         if ('user1_unread_count' in match && 'user2_unread_count' in match) {
-          unreadCount = match.user1_id === userId ? Number(match.user1_unread_count) : Number(match.user2_unread_count);
+          unreadCount = match.user1_id === targetUserId ? Number(match.user1_unread_count) : Number(match.user2_unread_count);
         }
         if (!Number.isFinite(unreadCount) || unreadCount < 0) unreadCount = 0;
         return {
@@ -435,16 +550,14 @@ const MainApp = ({ user, onLogout }: MainAppProps) => {
         });
 
       // Store in cache for ChatPage to use
-      if (typeof window !== 'undefined' && (window as any).chatMatchesCache) {
-        (window as any).chatMatchesCache.set(userId, {
-          matches: processedMatches,
-          timestamp: Date.now()
-        });
-      }
+      window.chatMatchesCache?.set(targetUserId, {
+        matches: processedMatches,
+        timestamp: Date.now(),
+      });
     } catch (error) {
       // Silently handle preload errors
     }
-  };
+  }, [ensureWindowCaches]);
 
   // Initialize push notifications silently in background
   const {
@@ -456,7 +569,9 @@ const MainApp = ({ user, onLogout }: MainAppProps) => {
     sendMessageNotification,
     sendLikeNotification,
     recordUserActivity
-  } = usePushNotifications(user?.id);
+  } = usePushNotifications(userId);
+  
+  
 
   // Record activity on tab changes and meaningful interactions
   useEffect(() => {
@@ -472,51 +587,50 @@ const MainApp = ({ user, onLogout }: MainAppProps) => {
 
   // Preload data as soon as app loads - OPTIMIZED FOR ANDROID PERFORMANCE
   useEffect(() => {
-    if (user?.id) {
-      // Load user's saved language preference (non-blocking)
-      loadUserLanguage(user.id).catch(() => {});
-      
-      // IMMEDIATE: Load only the currently active tab's data
-      if (activeTab === 'chat') {
-        preloadChatMatches(user.id);
-      } else if (activeTab === 'liked') {
-        preloadLikedMeData(user.id);
-      }
-      
-      // DEFERRED: Load other tabs in background after 1 second (prevents UI blocking)
-      setTimeout(() => {
-        if (activeTab !== 'chat') {
-          preloadChatMatches(user.id);
-        }
-        if (activeTab !== 'liked') {
-          preloadLikedMeData(user.id);
-        }
-      }, 1000);
-      
-      // Set up periodic refresh every 60 seconds when not on respective tabs
-      const interval = setInterval(() => {
-        if (activeTab !== 'chat') {
-          preloadChatMatches(user.id);
-        }
-        if (activeTab !== 'liked') {
-          preloadLikedMeData(user.id);
-        }
-      }, 60000);
+    if (!userId) return;
 
-      return () => clearInterval(interval);
+    loadUserLanguage(userId).catch(() => {});
+
+    if (activeTab === 'chat') {
+      void preloadChatMatches(userId);
+    } else if (activeTab === 'liked') {
+      void preloadLikedMeData(userId);
     }
-  }, [user?.id]);
+
+    const timeout = setTimeout(() => {
+      if (activeTab !== 'chat') {
+        void preloadChatMatches(userId);
+      }
+      if (activeTab !== 'liked') {
+        void preloadLikedMeData(userId);
+      }
+    }, 1000);
+
+    const interval = setInterval(() => {
+      if (activeTab !== 'chat') {
+        void preloadChatMatches(userId);
+      }
+      if (activeTab !== 'liked') {
+        void preloadLikedMeData(userId);
+      }
+    }, 60000);
+
+    return () => {
+      clearTimeout(timeout);
+      clearInterval(interval);
+    };
+  }, [activeTab, preloadChatMatches, preloadLikedMeData, userId]);
 
   // Listen for new match events to refresh chat data
   useEffect(() => {
-    if (!user?.id) return;
+    if (!userId) return;
     
     const handleNewMatch = (event: CustomEvent) => {
-      if (event.detail.userId === user.id) {
+      if (event.detail.userId === userId) {
         // Reload chat matches in background
-        preloadChatMatches(user.id);
+        void preloadChatMatches(userId);
         // Update unread count
-        fetchUnreadCount();
+        void fetchUnreadCount();
       }
     };
     
@@ -525,57 +639,49 @@ const MainApp = ({ user, onLogout }: MainAppProps) => {
     return () => {
       window.removeEventListener('newMatch', handleNewMatch as EventListener);
     };
-  }, [user?.id]);
+  }, [fetchUnreadCount, preloadChatMatches, userId]);
+
+  // Initial load / user change: fetch profile + unread once.
+  // Do not refetch unread purely on tab switch; it should only change due to realtime events or reading a thread.
+  useEffect(() => {
+    if (!userId) return;
+    void fetchUserProfile();
+    void fetchUnreadCount();
+  }, [fetchUnreadCount, fetchUserProfile, userId]);
+
+  // Preload tab-specific data without mutating unread state.
+  useEffect(() => {
+    if (!userId) return;
+    if (activeTab === 'chat') {
+      void preloadChatMatches(userId);
+    } else if (activeTab === 'liked') {
+      void preloadLikedMeData(userId);
+    }
+  }, [activeTab, preloadChatMatches, preloadLikedMeData, userId]);
 
   useEffect(() => {
-    if (user?.id) {
-      fetchUserProfile();
-      fetchUnreadCount();
-      
-      // Only preload data for the active tab to save resources
-      // Other tabs will load on demand when user switches to them
-      if (activeTab === 'chat') {
-        preloadChatMatches(user.id);
-      } else if (activeTab === 'liked') {
-        preloadLikedMeData(user.id);
-      }
-    }
-  }, [user?.id, activeTab]); // Preload based on active tab
-
-  // Throttled unread count refresh to prevent excessive calls
-  const lastUnreadRefreshRef = React.useRef<number>(0);
-  const throttledFetchUnreadCount = React.useCallback(() => {
-    const now = Date.now();
-    // Only refresh if at least 2 seconds have passed since last refresh
-    if (now - lastUnreadRefreshRef.current >= 2000) {
-      lastUnreadRefreshRef.current = now;
-      fetchUnreadCount();
-    }
-  }, []);
-
-  useEffect(() => {
-    if (!user?.id) return;
+    if (!userId) return;
 
     // Use two filtered subscriptions for better performance (matches user1 or user2)
     const channel1 = supabase
-      .channel(`nav-matches-user1-${user.id}`)
+      .channel(`nav-matches-user1-${userId}`)
       .on('postgres_changes', {
         event: '*',
         schema: 'public',
         table: 'matches',
-        filter: `user1_id=eq.${user.id}`
+        filter: `user1_id=eq.${userId}`
       }, () => {
         throttledFetchUnreadCount();
       })
       .subscribe();
 
     const channel2 = supabase
-      .channel(`nav-matches-user2-${user.id}`)
+      .channel(`nav-matches-user2-${userId}`)
       .on('postgres_changes', {
         event: '*',
         schema: 'public',
         table: 'matches',
-        filter: `user2_id=eq.${user.id}`
+        filter: `user2_id=eq.${userId}`
       }, () => {
         throttledFetchUnreadCount();
       })
@@ -585,23 +691,27 @@ const MainApp = ({ user, onLogout }: MainAppProps) => {
       supabase.removeChannel(channel1);
       supabase.removeChannel(channel2);
     };
-  }, [user?.id, throttledFetchUnreadCount]); // Depend on user.id rather than full user object
+  }, [throttledFetchUnreadCount, userId]);
 
   // Refresh unread badge based on chat events addressed to the user
   useEffect(() => {
-    if (!user?.id) return;
+    if (!userId) return;
 
     const channel = supabase
-      .channel(`nav-chats-${user.id}`)
+      .channel(`nav-chats-${userId}`)
       .on(
         'postgres_changes',
         {
           event: 'INSERT',
           schema: 'public',
           table: 'chats',
-          filter: `receiver_id=eq.${user.id}`,
         },
-        () => {
+        (payload) => {
+          const row = payload.new as { match_id?: string; sender_id?: string; is_read?: boolean | null };
+          if (!row?.match_id) return;
+          if (row.sender_id === userId) return;
+          if (row.is_read === true) return;
+          if (!userMatchIdSetRef.current.has(row.match_id)) return;
           throttledFetchUnreadCount();
         }
       )
@@ -611,9 +721,12 @@ const MainApp = ({ user, onLogout }: MainAppProps) => {
           event: 'UPDATE',
           schema: 'public',
           table: 'chats',
-          filter: `receiver_id=eq.${user.id}`,
         },
-        () => {
+        (payload) => {
+          const row = payload.new as { match_id?: string; sender_id?: string };
+          if (!row?.match_id) return;
+          if (!userMatchIdSetRef.current.has(row.match_id)) return;
+          // Read receipts will come through as UPDATEs; refresh either way.
           throttledFetchUnreadCount();
         }
       )
@@ -622,115 +735,27 @@ const MainApp = ({ user, onLogout }: MainAppProps) => {
     return () => {
       supabase.removeChannel(channel);
     };
-  }, [user?.id, throttledFetchUnreadCount]);
+  }, [throttledFetchUnreadCount, userId]);
 
-  const fetchUserProfile = async () => {
-    if (!user?.id) {
-      console.warn('[MainApp] No user ID provided');
-      return;
-    }
-
-    try {
-      const { data, error } = await supabase
-        .from('profiles')
-        .select('*')
-        .eq('id', user.id)
-        .maybeSingle();
-
-      if (error) {
-        console.error('[MainApp] Profile fetch error:', error);
-        toast({
-          title: 'Profile Error',
-          description: 'Failed to load profile data. Please try refreshing.',
-          variant: 'destructive',
-        });
-        return;
-      }
-
-      if (!data) {
-        console.warn('[MainApp] No profile found for user:', user.id);
-        toast({
-          title: 'Profile not found',
-          description: 'No profile found for this user.',
-          variant: 'destructive',
-        });
-        return;
-      }
-
-      // Profile fetch complete
-      setProfile(data);
-      
-      // Check premium status from user_subscriptions
-      if (data?.id) {
-        try {
-          const { data: subData, error: subError } = await supabase
-            .from('user_subscriptions')
-            .select('plan_name, status')
-            .eq('user_id', data.id)
-            .eq('plan_name', 'premium')
-            .eq('status', 'active')
-            .maybeSingle();
-          
-          if (subError) {
-            console.error('[MainApp] Subscription fetch error:', subError);
-          }
-          
-          setIsPremium(!!subData);
-          // Subscription status updated
-        } catch (subErr) {
-          console.error('[MainApp] Subscription check failed:', subErr);
-          setIsPremium(false); // Default to free
-        }
-      }
-    } catch (err) {
-      console.error('[MainApp] Fatal error in fetchUserProfile:', err);
-      toast({
-        title: 'Error',
-        description: 'Failed to load user data. Please restart the app.',
-        variant: 'destructive',
-      });
-    }
-  };
-
-  const fetchUnreadCount = async () => {
-    if (!user?.id) return;
-
-    try {
-      // Source of truth: unread chat messages addressed to this user.
-      // This avoids relying on `matches.user*_unread_count` which can drift if triggers fail.
-      const { count, error } = await supabase
-        .from('chats')
-        .select('id', { count: 'exact', head: true })
-        .eq('receiver_id', user.id)
-        .eq('is_read', false);
-
-      if (error) throw error;
-
-      setUnreadCount(count || 0);
-    } catch (error) {
-      console.error('[MainApp] ❌ Error fetching unread count:', error);
-    }
-  };
-
-  const handleNavigateToChat = () => {
+  const handleNavigateToChat = useCallback(() => {
     setActiveTab('chat');
-  };
+  }, []);
 
-  const handleShowTerms = () => {
+  const handleShowTerms = useCallback(() => {
     setShowTerms(true);
-  };
+  }, []);
 
-  const handleShowPrivacy = () => {
+  const handleShowPrivacy = useCallback(() => {
     setShowPrivacy(true);
-  };
+  }, []);
 
-  const handleBackFromTerms = () => {
+  const handleBackFromTerms = useCallback(() => {
     setShowTerms(false);
-  };
+  }, []);
 
-  const handleBackFromPrivacy = () => {
+  const handleBackFromPrivacy = useCallback(() => {
     setShowPrivacy(false);
-  };
+  }, []);
 
   // Memoize tab change handler to prevent re-creating function on every render
   const handleTabChange = useCallback((tab: string) => {
@@ -783,6 +808,23 @@ const MainApp = ({ user, onLogout }: MainAppProps) => {
 
     return currentPageComponent;
   };
+
+  if (!userId) {
+    return (
+      <div className="min-h-fill flex items-center justify-center bg-gradient-to-br from-pink-50 to-purple-50 p-4">
+        <div className="text-center bg-white rounded-lg p-8 shadow-lg max-w-md w-full">
+          <h2 className="text-xl font-bold text-gray-800 mb-4">{t('errors.noUserData')}</h2>
+          <p className="text-gray-600 mb-6">{t('errors.unableToLoadUser')}</p>
+          <button
+            onClick={onLogout}
+            className="bg-pink-500 hover:bg-pink-600 text-white px-6 py-2 rounded-lg font-medium"
+          >
+            {t('auth.backToLogin')}
+          </button>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="w-full h-screen bg-gray-100" style={{ margin: 0, padding: 0, position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, overflow: 'hidden' }}>

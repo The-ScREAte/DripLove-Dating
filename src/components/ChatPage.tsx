@@ -86,41 +86,6 @@ const markExpirationWarningSent = (matchId: string): void => {
   }
 };
 
-type UnreadMatchIdRow = { match_id: string | null };
-
-const fetchUnreadMatchIdsForMatches = async (
-  matchIds: string[],
-  receiverId: string
-): Promise<UnreadMatchIdRow[]> => {
-  if (matchIds.length === 0) return [];
-
-  // Supabase type generation can cause “excessively deep” instantiation in some projects.
-  // We intentionally use a narrow, safe cast to avoid the TS recursion while keeping runtime behavior identical.
-  const q = (supabase as unknown as {
-    from: (table: 'chats') => {
-      select: (columns: 'match_id') => {
-        in: (column: 'match_id', values: string[]) => {
-          eq: (column: 'receiver_id', value: string) => {
-            eq: (column: 'is_read', value: boolean) => Promise<{
-              data: UnreadMatchIdRow[] | null;
-              error: unknown;
-            }>;
-          };
-        };
-      };
-    };
-  })
-    .from('chats')
-    .select('match_id')
-    .in('match_id', matchIds)
-    .eq('receiver_id', receiverId)
-    .eq('is_read', false);
-
-  const { data, error } = await q;
-  if (error) return [];
-  return data || [];
-};
-
 const ChatPage = ({ currentUser, onUnreadChange, onDetailViewChange }: ChatPageProps) => {
   const { t } = useTranslation();
   
@@ -267,13 +232,19 @@ const ChatPage = ({ currentUser, onUnreadChange, onDetailViewChange }: ChatPageP
           event: 'INSERT',
           schema: 'public',
           table: 'chats',
-          filter: `receiver_id=eq.${currentUser.id}`,
         },
         (payload) => {
-          const newMsg = payload.new as ChatMessage;
-          if (!newMsg || newMsg.is_read) return;
-          const matchId = (newMsg as unknown as { match_id?: string }).match_id;
+          const newMsg = payload.new as { match_id?: string; sender_id?: string; is_read?: boolean | null; message?: string; created_at?: string };
+          if (!newMsg || newMsg.is_read === true) return;
+          const matchId = newMsg.match_id;
           if (!matchId) return;
+
+          // Only treat as incoming if it wasn't sent by the current user
+          if (newMsg.sender_id === currentUser.id) return;
+
+          // Only care about matches that exist in our current list
+          const isMyMatch = matchesRef.current.some((m) => m.id === matchId);
+          if (!isMyMatch) return;
 
           // If user is currently viewing this chat, it will be marked read immediately; don't increment.
           if (selectedMatch?.id === matchId) return;
@@ -862,23 +833,7 @@ const ChatPage = ({ currentUser, onUnreadChange, onDetailViewChange }: ChatPageP
 
       const processedMatches = processMatchesData((matches || []) as unknown as MatchRow[]);
 
-      // Enrich with per-match unread counts from chats table (receiver_id + is_read=false)
-      const matchIds: string[] = processedMatches.map((m) => m.id);
-      if (matchIds.length > 0) {
-        const unreadRows = await fetchUnreadMatchIdsForMatches(matchIds, currentUser.id);
-
-        const unreadByMatchId = new Map<string, number>();
-        for (const row of unreadRows || []) {
-          const mid = (row as unknown as { match_id?: string }).match_id;
-          if (!mid) continue;
-          unreadByMatchId.set(mid, (unreadByMatchId.get(mid) || 0) + 1);
-        }
-
-        for (const m of processedMatches) {
-          const derived = unreadByMatchId.get(m.id) || 0;
-          m.unread_messages = Math.max(Number(m.unread_messages || 0), derived);
-        }
-      }
+      // Unread counts come from match-level counters (user1_unread_count/user2_unread_count).
       
       // ⭐ OPTIMIZED: Fast shallow comparison instead of expensive JSON.stringify
       const listChanged = processedMatches.length !== chatCache.chats.length ||
@@ -924,23 +879,7 @@ const ChatPage = ({ currentUser, onUnreadChange, onDetailViewChange }: ChatPageP
 
       const processedMatches = processMatchesData((matches || []) as unknown as MatchRow[]);
 
-      // Enrich with per-match unread counts from chats table (receiver_id + is_read=false)
-      const matchIds: string[] = processedMatches.map((m) => m.id);
-      if (matchIds.length > 0) {
-        const unreadRows = await fetchUnreadMatchIdsForMatches(matchIds, currentUser.id);
-
-        const unreadByMatchId = new Map<string, number>();
-        for (const row of unreadRows || []) {
-          const mid = (row as unknown as { match_id?: string }).match_id;
-          if (!mid) continue;
-          unreadByMatchId.set(mid, (unreadByMatchId.get(mid) || 0) + 1);
-        }
-
-        for (const m of processedMatches) {
-          const derived = unreadByMatchId.get(m.id) || 0;
-          m.unread_messages = Math.max(Number(m.unread_messages || 0), derived);
-        }
-      }
+      // Unread counts come from match-level counters (user1_unread_count/user2_unread_count).
       
       // ⭐ Update global cache (survives route changes like Instagram)
       updateChatCache(processedMatches as unknown as CachedChat[]);
@@ -1166,57 +1105,54 @@ const ChatPage = ({ currentUser, onUnreadChange, onDetailViewChange }: ChatPageP
     if (!selectedMatch) return;
 
     try {
-      // Step 1: Mark all chat messages as read
-      try {
-        const { error } = await supabase
-          .from('chats')
-          .update({ is_read: true })
-          .eq('match_id', selectedMatch.id)
-          .neq('sender_id', currentUser.id)
-          .eq('is_read', false);
-        
-        if (!error) {
-          // Update local state to show double checkmarks immediately
-          setMessages(prev => prev.map(msg => 
-            msg.sender_id !== currentUser.id ? { ...msg, is_read: true } : msg
-          ));
-        }
-      } catch (chatError) {
-        // Silently handle read status errors
+      // Step 1: Mark all incoming chat messages as read
+      const { error: chatError } = await supabase
+        .from('chats')
+        .update({ is_read: true })
+        .eq('match_id', selectedMatch.id)
+        .neq('sender_id', currentUser.id)
+        .or('is_read.is.null,is_read.eq.false');
+
+      if (chatError) {
+        console.error('[ChatPage] Failed to mark chats as read:', chatError);
+      } else {
+        // Update local state to show double checkmarks immediately
+        setMessages(prev => prev.map(msg =>
+          msg.sender_id !== currentUser.id ? { ...msg, is_read: true } : msg
+        ));
       }
 
       // Step 2: Reset the unread count in the matches table
-      try {
-        const isUser1 = selectedMatch.user1_id === currentUser.id;
-        const unreadField = isUser1 ? 'user1_unread_count' : 'user2_unread_count';
-        
-        const { error: matchError } = await supabase
-          .from('matches')
-          .update({ [unreadField]: 0 })
-          .eq('id', selectedMatch.id);
-        
-        if (!matchError) {
-          // Update local matches state to reflect zero unread count
-          setMatches(prev => prev.map(m => 
-            m.id === selectedMatch.id ? { ...m, unread_messages: 0 } : m
-          ));
-          
-          // Update cache as well
-          const cached = chatMatchesCache.get(currentUser.id);
-          if (cached) {
-            cached.matches = cached.matches.map(m => 
-              m.id === selectedMatch.id ? { ...m, unread_messages: 0 } : m
-            );
-            chatMatchesCache.set(currentUser.id, cached);
-          }
-        }
-      } catch (matchError) {
-        // Silently handle match update errors
-      }
+      const isUser1 = selectedMatch.user1_id === currentUser.id;
+      const unreadField = isUser1 ? 'user1_unread_count' : 'user2_unread_count';
 
-      onUnreadChange?.();
+      const { error: matchError } = await supabase
+        .from('matches')
+        .update({ [unreadField]: 0 })
+        .eq('id', selectedMatch.id);
+
+      if (matchError) {
+        console.error('[ChatPage] Failed to reset match unread counter:', matchError);
+      } else {
+        // Update local matches state to reflect zero unread count
+        setMatches(prev => prev.map(m =>
+          m.id === selectedMatch.id ? { ...m, unread_messages: 0 } : m
+        ));
+
+        // Update cache as well
+        const cached = chatMatchesCache.get(currentUser.id);
+        if (cached) {
+          cached.matches = cached.matches.map(m =>
+            m.id === selectedMatch.id ? { ...m, unread_messages: 0 } : m
+          );
+          chatMatchesCache.set(currentUser.id, cached);
+        }
+      }
     } catch (error) {
-      // Silently handle any schema-related errors
+      console.error('[ChatPage] markMessagesAsRead unexpected error:', error);
+    } finally {
+      // Always ask the parent to refresh nav unread badge
+      onUnreadChange?.();
     }
   };
 

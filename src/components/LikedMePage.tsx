@@ -20,6 +20,8 @@ import { useVirtualizer } from '@tanstack/react-virtual';
 // FIX #1: Import blob cache for instant Android image loading
 import { preloadImageToBlob } from '@/utils/imageCache';
 
+import type { AppUser, LikedMeCacheValue, LikerProfile } from '@/types/cacheTypes';
+
 // =========================================================
 // GLOBAL CACHES
 // =========================================================
@@ -27,11 +29,7 @@ import { preloadImageToBlob } from '@/utils/imageCache';
 const LIKED_ME_CACHE_TTL = 5 * 60 * 1000; // 5 minutes
 const LIKED_ME_STORAGE_KEY_PREFIX = 'likedMe_v1_';
 
-type LikedMeCacheValue = { 
-  likers: any[]; 
-  userImages: { [key: string]: string[] }; 
-  timestamp: number;
-};
+type CurrentUser = AppUser;
 
 const getStorageKey = (userId: string) =>
   `${LIKED_ME_STORAGE_KEY_PREFIX}${userId}`;
@@ -68,7 +66,7 @@ const likedMeCache = new Map<string, LikedMeCacheValue>();
 
 const likedMePollIntervals = new Map<string, ReturnType<typeof setInterval>>();
 
-const hasListChanged = (previous: any[], next: any[]) => {
+const hasListChanged = (previous: LikerProfile[], next: LikerProfile[]) => {
   if (previous.length !== next.length) return true;
   const prevMap = new Map(previous.map(p => [p.id, p.updated_at]));
   for (const n of next) {
@@ -78,7 +76,7 @@ const hasListChanged = (previous: any[], next: any[]) => {
 };
 
 if (typeof window !== 'undefined') {
-  (window as any).likedMeCache = likedMeCache;
+  window.likedMeCache = likedMeCache;
 }
 
 // =========================================================
@@ -86,7 +84,7 @@ if (typeof window !== 'undefined') {
 // =========================================================
 
 interface LikedMePageProps {
-  currentUser: any;
+  currentUser: CurrentUser;
   isPremium?: boolean;
 }
 
@@ -97,9 +95,9 @@ const LikedMePage = ({ currentUser, isPremium = false }: LikedMePageProps) => {
   // ------------------
   // STATE HOOKS (must stay in same order forever)
   // ------------------
-  const [likers, setLikers] = useState<any[]>([]);
+  const [likers, setLikers] = useState<LikerProfile[]>([]);
   const [loading, setLoading] = useState(true);
-  const [selectedProfile, setSelectedProfile] = useState<any>(null);
+  const [selectedProfile, setSelectedProfile] = useState<LikerProfile | null>(null);
   const [userImages, setUserImages] = useState<{ [key: string]: string[] }>({});
   const [blockDialogOpen, setBlockDialogOpen] = useState(false);
   const [imageIndex, setImageIndex] = useState(0);
@@ -276,42 +274,17 @@ const LikedMePage = ({ currentUser, isPremium = false }: LikedMePageProps) => {
     }
   }, [currentUser?.id, isPremium]);
 
-
-  // Background fetching function
-  const fetchLikersInBackground = useCallback(async () => {
-    if (!currentUser?.id || backgroundFetchingRef.current) return;
-    backgroundFetchingRef.current = true;
-
-    try {
-      const result = await fetchLikersData(currentUser.id);
-      if (result) {
-        const { likers: newLikers, userImages: newUserImages } = result;
-        const cached = likedMeCache.get(currentUser.id);
-        const shouldUpdate = hasListChanged(cached?.likers || [], newLikers);
-
-        if (shouldUpdate) {
-          const cacheValue: LikedMeCacheValue = {
-            likers: newLikers,
-            userImages: newUserImages,
-            timestamp: Date.now()
-          };
-
-          likedMeCache.set(currentUser.id, cacheValue);
-          writeCacheToStorage(currentUser.id, cacheValue);
-
-          setLikers(newLikers);
-          setUserImages(newUserImages);
-        } else if (cached) {
-          cached.timestamp = Date.now();
-          writeCacheToStorage(currentUser.id, cached);
-        }
-      }
-    } catch (error) {
-      // Silently handle background fetch errors
-    } finally {
-      backgroundFetchingRef.current = false;
-    }
-  }, [currentUser?.id]);
+  const supabaseRpc = useCallback(
+    (fn: string, params: Record<string, unknown>) => {
+      return (supabase as unknown as {
+        rpc: (
+          fn: string,
+          params: Record<string, unknown>
+        ) => Promise<{ data: unknown; error: unknown }>;
+      }).rpc(fn, params);
+    },
+    []
+  );
 
   // Shared data fetching logic
   const fetchLikersData = useCallback(async (userId: string) => {
@@ -375,35 +348,31 @@ const LikedMePage = ({ currentUser, isPremium = false }: LikedMePageProps) => {
 
     if (profileError) throw profileError;
 
-    const likers = profiles || [];
+    const likers = (profiles || []) as unknown as LikerProfile[];
 
     // 5. Fetch all first images for these profiles in one query
     let imagesData = null;
     if (likerIds.length > 0) {
-      try {
-        const { data: approvedImages, error: imagesError } = await supabase
+      const { data: approvedImages, error: imagesError } = await supabase
+        .from('user_images')
+        .select('user_id, image_url, image_order')
+        .in('user_id', likerIds)
+        .eq('is_approved', true)
+        .order('image_order', { ascending: true });
+
+      if (imagesError && imagesError.message.includes('does not exist')) {
+        const { data: fallbackImages, error: fallbackError } = await supabase
           .from('user_images')
           .select('user_id, image_url, image_order')
           .in('user_id', likerIds)
-          .eq('is_approved', true)
           .order('image_order', { ascending: true });
 
-        if (imagesError && imagesError.message.includes('does not exist')) {
-          const { data: fallbackImages, error: fallbackError } = await supabase
-            .from('user_images')
-            .select('user_id, image_url, image_order')
-            .in('user_id', likerIds)
-            .order('image_order', { ascending: true });
-
-          if (fallbackError) throw fallbackError;
-          imagesData = fallbackImages;
-        } else if (imagesError) {
-          throw imagesError;
-        } else {
-          imagesData = approvedImages;
-        }
-      } catch (error) {
-        throw error;
+        if (fallbackError) throw fallbackError;
+        imagesData = fallbackImages;
+      } else if (imagesError) {
+        throw imagesError;
+      } else {
+        imagesData = approvedImages;
       }
     }
 
@@ -430,6 +399,42 @@ const LikedMePage = ({ currentUser, isPremium = false }: LikedMePageProps) => {
 
     return { likers, userImages: imageMap };
   }, []);
+
+  // Background fetching function
+  const fetchLikersInBackground = useCallback(async () => {
+    if (!currentUser?.id || backgroundFetchingRef.current) return;
+    backgroundFetchingRef.current = true;
+
+    try {
+      const result = await fetchLikersData(currentUser.id);
+      if (result) {
+        const { likers: newLikers, userImages: newUserImages } = result;
+        const cached = likedMeCache.get(currentUser.id);
+        const shouldUpdate = hasListChanged(cached?.likers || [], newLikers);
+
+        if (shouldUpdate) {
+          const cacheValue: LikedMeCacheValue = {
+            likers: newLikers,
+            userImages: newUserImages,
+            timestamp: Date.now(),
+          };
+
+          likedMeCache.set(currentUser.id, cacheValue);
+          writeCacheToStorage(currentUser.id, cacheValue);
+
+          setLikers(newLikers);
+          setUserImages(newUserImages);
+        } else if (cached) {
+          cached.timestamp = Date.now();
+          writeCacheToStorage(currentUser.id, cached);
+        }
+      }
+    } catch {
+      // Silently handle background fetch errors
+    } finally {
+      backgroundFetchingRef.current = false;
+    }
+  }, [currentUser?.id, fetchLikersData]);
 
   // ⭐ ANDROID OPTIMIZATION: Lighter preload - skip createImageBitmap on Android (causes lag)
   const preloadFirstProfilesWithBlobs = useCallback(async (
@@ -557,13 +562,15 @@ const LikedMePage = ({ currentUser, isPremium = false }: LikedMePageProps) => {
 
     try {
       // Try to fetch approved images first
-      let { data: images, error } = await supabase
+      const { data: initialImages, error } = await supabase
         .from('user_images')
         .select('image_url')
         .eq('user_id', profileId)
         .eq('is_approved', true) // Only show approved images
         .order('image_order')
         .abortSignal(controller.signal);
+
+      let images = initialImages;
 
       if (controller.signal.aborted) return;
 
@@ -640,8 +647,7 @@ const LikedMePage = ({ currentUser, isPremium = false }: LikedMePageProps) => {
     }
 
     checkLockoutStatus();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [currentUser?.id]);
+  }, [currentUser?.id, checkLockoutStatus, fetchLikers, fetchLikersInBackground]);
 
   // ⭐ ANDROID OPTIMIZATION: Increased polling interval (60s instead of 30s)
   useEffect(() => {
@@ -700,14 +706,7 @@ const LikedMePage = ({ currentUser, isPremium = false }: LikedMePageProps) => {
     }
     
     return result;
-  }, [
-    selectedProfile?.id, 
-    selectedProfile?.bio, 
-    selectedProfile?.fun_fact, 
-    selectedProfile?.perfect_first_date, 
-    selectedProfile?.last_googled,
-    userImages
-  ]);
+  }, [selectedProfile, userImages]);
 
   // Clamp currentSlide if slides array shrinks
   useEffect(() => {
@@ -729,8 +728,8 @@ const LikedMePage = ({ currentUser, isPremium = false }: LikedMePageProps) => {
     [isPremium, lockoutEndDate]
   );
 
-  const setLockoutPeriod = async () => {
-    if (isPremium) return;
+  const setLockoutPeriod = useCallback(async () => {
+    if (isPremium || !currentUser?.id) return;
 
     try {
       const lockoutDate = new Date();
@@ -747,7 +746,7 @@ const LikedMePage = ({ currentUser, isPremium = false }: LikedMePageProps) => {
     } catch (error) {
       console.error('Error setting cooldown:', error);
     }
-  };
+  }, [currentUser?.id, isPremium]);
 
     const handleNavigationClick = useCallback((e: React.MouseEvent) => {
     if (!selectedProfile) return;
@@ -765,7 +764,7 @@ const LikedMePage = ({ currentUser, isPremium = false }: LikedMePageProps) => {
     }
   }, [selectedProfile, slides.length]);
 
-  const handleLikeBack = async (profileId: string) => {
+  const handleLikeBack = useCallback(async (profileId: string) => {
     // Optimistic update - remove profile immediately
     const profileToRemove = likers.find(liker => liker.id === profileId);
     setLikers(prev => prev.filter(liker => liker.id !== profileId));
@@ -832,9 +831,9 @@ const LikedMePage = ({ currentUser, isPremium = false }: LikedMePageProps) => {
         variant: "destructive",
       });
     }
-  };
+  }, [currentUser?.id, hasInteractedToday, isPremium, likers, setLockoutPeriod, toast]);
 
-  const handlePass = async (profileId: string) => {
+  const handlePass = useCallback(async (profileId: string) => {
     // Optimistic update - remove profile immediately
     const profileToRemove = likers.find(liker => liker.id === profileId);
     setLikers(prev => prev.filter(liker => liker.id !== profileId));
@@ -867,12 +866,11 @@ const LikedMePage = ({ currentUser, isPremium = false }: LikedMePageProps) => {
 
     try {
       // Use the same RPC as DiscoverPage for consistency
-      const rpcName = 'pass_and_usage_batched';
-      const { data: rpcData, error: rpcError } = await supabase.rpc((rpcName as any), {
+      const { error: rpcError } = await supabaseRpc('pass_and_usage_batched', {
         passer_id_param: currentUser.id,
         passed_id_param: profileId,
-        premium_param: !!isPremium
-      } as any);
+        premium_param: !!isPremium,
+      });
 
       if (rpcError) {
         console.error('RPC error:', rpcError);
@@ -934,20 +932,20 @@ const LikedMePage = ({ currentUser, isPremium = false }: LikedMePageProps) => {
         variant: "destructive",
       });
     }
-  };
+  }, [currentUser?.id, hasInteractedToday, isPremium, likers, setLockoutPeriod, supabaseRpc, toast]);
 
-  const handleBlock = () => {
+  const handleBlock = useCallback(() => {
     setBlockDialogOpen(true);
-  };
+  }, []);
 
-  const handleBlockSuccess = () => {
+  const handleBlockSuccess = useCallback(() => {
     if (selectedProfile) {
       setLikers(prev => prev.filter(liker => liker.id !== selectedProfile.id));
       setSelectedProfile(null);
     }
-  };
+  }, [selectedProfile]);
 
-  const handleProfileClick = (liker: any, index: number) => {
+  const handleProfileClick = (liker: LikerProfile, index: number) => {
     // For free users, only allow clicking if they're premium
     if (!isPremium) {
       setShowPremiumUpgrade(true);
@@ -1425,13 +1423,21 @@ const LikedMePage = ({ currentUser, isPremium = false }: LikedMePageProps) => {
         <BlockDialog
           isOpen={blockDialogOpen}
           onClose={() => setBlockDialogOpen(false)}
-          userToBlock={selectedProfile}
+          userToBlock={
+            selectedProfile
+              ? {
+                  id: selectedProfile.id,
+                  first_name: selectedProfile.first_name ?? '',
+                  last_name: selectedProfile.last_name ?? '',
+                } as { id: string; first_name: string; last_name: string }
+              : null
+          }
           currentUserId={currentUser?.id || ''}
           onBlockSuccess={handleBlockSuccess}
         />
       </div>
     );
-  }, [selectedProfile, userImages, slides, currentSlide, showMoreInfo, platform, handleNavigationClick, handleBlock, handlePass, handleLikeBack, blockDialogOpen, currentUser?.id, handleBlockSuccess, calculateAge, t]);
+  }, [selectedProfile, userImages, slides, currentSlide, showMoreInfo, platform, handleNavigationClick, handleBlock, handlePass, handleLikeBack, blockDialogOpen, currentUser?.id, handleBlockSuccess, calculateAge, t, ageByLikerId, getSafeImageSrc]);
 
   // ⭐ All early returns MUST be after all hooks
   if (showPremiumUpgrade) {
