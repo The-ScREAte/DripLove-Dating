@@ -329,7 +329,111 @@ interface AdsRow {
   target_countries: unknown;
 }
 
-type ProfileRow = Partial<CurrentUser> & { id: string };
+type ProfileRow = Pick<
+  CurrentUser,
+  | 'id'
+  | 'first_name'
+  | 'last_name'
+  | 'bio'
+  | 'city'
+  | 'country'
+  | 'country_code'
+  | 'occupation'
+  | 'education_level'
+  | 'date_of_birth'
+  | 'interests'
+  | 'gender'
+  | 'is_verified'
+  | 'latitude'
+  | 'longitude'
+  | 'fun_fact'
+  | 'perfect_first_date'
+  | 'last_googled'
+  | 'relationship_intent'
+  | 'smoking'
+  | 'drinking'
+  | 'exercise_level'
+  | 'sleeping_schedule'
+  | 'introvert_extrovert'
+  | 'spontaneous_planner'
+  | 'messy_organized'
+  | 'adinkra_symbols'
+  | 'created_at'
+  | 'last_login_at'
+>;
+
+const toPotentialMatch = (
+  profile: ProfileRow,
+  extras?: { images?: string[]; distance?: number }
+): PotentialMatch => {
+  const interestsRaw = profile.interests;
+  const interests = Array.isArray(interestsRaw)
+    ? interestsRaw.filter((i): i is string => typeof i === 'string')
+    : [];
+
+  const adinkraRaw = profile.adinkra_symbols;
+  const adinkra_symbols = Array.isArray(adinkraRaw)
+    ? adinkraRaw.filter((i): i is string => typeof i === 'string')
+    : undefined;
+
+  return {
+    id: profile.id,
+    first_name: profile.first_name ?? '',
+    last_name: profile.last_name ?? '',
+    bio: profile.bio ?? '',
+    city: profile.city ?? '',
+    country: profile.country ?? '',
+    country_code: profile.country_code ?? '',
+    occupation: profile.occupation ?? '',
+    education_level: profile.education_level ?? '',
+    date_of_birth: profile.date_of_birth ?? '',
+    interests,
+    images: extras?.images ?? [],
+    is_verified: profile.is_verified ?? undefined,
+    gender: profile.gender ?? '',
+    latitude: profile.latitude ?? undefined,
+    longitude: profile.longitude ?? undefined,
+    fun_fact: profile.fun_fact ?? undefined,
+    perfect_first_date: profile.perfect_first_date ?? undefined,
+    last_googled: profile.last_googled ?? undefined,
+    relationship_intent: profile.relationship_intent ?? undefined,
+    smoking: profile.smoking ?? undefined,
+    drinking: profile.drinking ?? undefined,
+    exercise_level: profile.exercise_level ?? undefined,
+    sleeping_schedule: profile.sleeping_schedule ?? undefined,
+    introvert_extrovert: profile.introvert_extrovert ?? undefined,
+    spontaneous_planner: profile.spontaneous_planner ?? undefined,
+    messy_organized: profile.messy_organized ?? undefined,
+    adinkra_symbols,
+    distance: extras?.distance,
+  };
+};
+
+// Helper function to check if a match is an ad (stable module-scope type guard)
+const isAd = (match: PotentialMatch | AdData): match is AdData => {
+  return (match as AdData).isAd === true;
+};
+
+// Dedupe helper (prevent profile duplicates without blocking ad repeats)
+const mergeDecksWithoutProfileDupes = (prev: MatchOrAd[], incoming: MatchOrAd[]) => {
+  const seenProfileIds = new Set<string>();
+  for (const item of prev) {
+    if (!isAd(item)) seenProfileIds.add(item.id);
+  }
+
+  const result: MatchOrAd[] = [...prev];
+  for (const item of incoming) {
+    if (isAd(item)) {
+      result.push(item);
+      continue;
+    }
+    if (seenProfileIds.has(item.id)) continue;
+    seenProfileIds.add(item.id);
+    result.push(item);
+  }
+
+  return result;
+};
 
 type WindowWithIntervals = Window & {
   continuousLoadingInterval?: number | null;
@@ -560,11 +664,6 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, isPremium, profileComplet
     }
   }, [potentialMatches.length, currentIndex]);
 
-  // Helper function to check if current match is an ad
-  const isAd = (match: PotentialMatch | AdData): match is AdData => {
-    return (match as AdData).isAd === true;
-  };
-
   // Dedupe helpers (prevent profile duplicates without blocking ad repeats)
   const dedupeById = <T extends { id: string }>(arr: T[]) => {
     const map = new Map<string, T>();
@@ -572,25 +671,6 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, isPremium, profileComplet
     return Array.from(map.values());
   };
 
-  const mergeDecksWithoutProfileDupes = (prev: MatchOrAd[], incoming: MatchOrAd[]) => {
-    const seenProfileIds = new Set<string>();
-    for (const item of prev) {
-      if (!isAd(item)) seenProfileIds.add(item.id);
-    }
-
-    const result: MatchOrAd[] = [...prev];
-    for (const item of incoming) {
-      if (isAd(item)) {
-        result.push(item);
-        continue;
-      }
-      if (seenProfileIds.has(item.id)) continue;
-      seenProfileIds.add(item.id);
-      result.push(item);
-    }
-
-    return result;
-  };
 
   // Stable ad shuffle - deterministic based on user ID and date
   const stableShuffledAds = useMemo(() => {
@@ -822,23 +902,6 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, isPremium, profileComplet
     }
   }, []);
 
-  // Background fetching function
-  const fetchPotentialMatchesInBackground = useCallback(async () => {
-    if (!currentUser?.id || backgroundFetchingRef.current) return;
-    backgroundFetchingRef.current = true;
-
-    try {
-      // Phase 9: Background fetch is read-only (must not set React state)
-      await fetchPotentialMatchesData(currentUser.id, allowedGenders);
-    } catch (error) {
-      // Silently handle background fetch errors
-    } finally {
-      backgroundFetchingRef.current = false;
-      // Allow full fetches again after background refresh completes
-      suppressFetchRef.current = false;
-    }
-  }, [currentUser?.id, allowedGenders, fetchPotentialMatchesData]);
-
   // ⭐ HELPER: Fetch unlocked country profiles (consolidated to avoid duplication)
   const fetchUnlockedCountryProfiles = useCallback(async ({
     unlockedCountries,
@@ -853,7 +916,7 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, isPremium, profileComplet
     distanceMap: { [key: string]: number },
     limit?: number
   }) => {
-    const PROFILE_SELECT = 'id, first_name, last_name, bio, city, country, country_code, occupation, education_level, date_of_birth, interests, gender, latitude, longitude, fun_fact, perfect_first_date, last_googled, relationship_intent, smoking, drinking, exercise_level, sleeping_schedule, introvert_extrovert, spontaneous_planner, messy_organized, adinkra_symbols, created_at';
+    const PROFILE_SELECT = 'id, first_name, last_name, bio, city, country, country_code, occupation, education_level, date_of_birth, interests, gender, latitude, longitude, fun_fact, perfect_first_date, last_googled, relationship_intent, smoking, drinking, exercise_level, sleeping_schedule, introvert_extrovert, spontaneous_planner, messy_organized, adinkra_symbols, created_at, last_login_at';
 
     // IMPORTANT: Fetch per-country to avoid a single country dominating the SQL LIMIT
     // (which can make the feed look like only US+one country even though others are unlocked).
@@ -993,11 +1056,9 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, isPremium, profileComplet
     const premiumForFeed = premiumActive;
 
     // Get unlocked countries for premium users (robust to array/JSON/string shapes)
+    const unlockedCountriesRaw = currentUserData?.unlocked_countries ?? currentUser.unlocked_countries;
     const unlockedCountries: string[] = premiumForFeed
-      ? normalizeCountryCodeList(
-          (currentUserData as any)?.unlocked_countries ?? (currentUser as any)?.unlocked_countries,
-          baseCountryCode
-        )
+      ? normalizeCountryCodeList(unlockedCountriesRaw, baseCountryCode)
       : [];
 
 
@@ -1022,13 +1083,13 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, isPremium, profileComplet
     const hasUnlockedCountries = premiumForFeed && unlockedCountries.length > 0;
 
 
-    let filteredProfiles: any[] = [];
+    let filteredProfiles: ProfileRow[] = [];
     let usingArchivedFallback = false; // Track if we're showing archived profiles
 
     // Keep these in outer scope so our final empty-state logic can distinguish
     // “local distance exhausted” vs “truly no profiles” for Premium.
-    let localProfiles: any[] = [];
-    let intlProfiles: any[] = [];
+    let localProfiles: ProfileRow[] = [];
+    let intlProfiles: ProfileRow[] = [];
     
     // =====================================================
     // PHASE 1: ACTIVE USERS ONLY (is_archived = false)
@@ -1059,7 +1120,7 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, isPremium, profileComplet
               .limit(100);
 
             if (error) throw error;
-            return profiles || [];
+            return Array.isArray(profiles) ? (profiles as unknown as ProfileRow[]) : [];
           })()
         : [];
 
@@ -1082,9 +1143,12 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, isPremium, profileComplet
           }
 
           const { data: fallbackLocal, error: fallbackError } = await fallbackQuery;
-          if (!fallbackError && fallbackLocal && fallbackLocal.length > 0) {
-            fallbackLocal.forEach((p: any) => (distanceMap[p.id] ??= 999));
-            localProfiles = fallbackLocal;
+          const fallbackRows: ProfileRow[] = Array.isArray(fallbackLocal)
+            ? (fallbackLocal as unknown as ProfileRow[])
+            : [];
+          if (!fallbackError && fallbackRows.length > 0) {
+            fallbackRows.forEach((p) => (distanceMap[p.id] ??= 999));
+            localProfiles = fallbackRows;
           }
         } catch (e) {
           // ignore fallback errors; premium can still show intl
@@ -1108,7 +1172,7 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, isPremium, profileComplet
       const userMinAge = currentUserData?.min_age || 18;
       const userMaxAge = currentUserData?.max_age || 99;
       
-      const filterAge = (profiles: any[]) => profiles.filter(profile => {
+      const filterAge = (profiles: ProfileRow[]) => profiles.filter((profile) => {
         // Premium: keep profiles even if DOB is missing; only enforce range when DOB is present.
         if (!profile.date_of_birth) return true;
         const age = calculateAge(profile.date_of_birth);
@@ -1162,8 +1226,7 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, isPremium, profileComplet
       filteredProfiles = activityWeightedMixed.slice(0, 60);
 
 
-      if (import.meta.env.DEV) {
-      }
+      // (dev-only logging removed)
       
       // Reset archived fallback flag if we found active profiles
       if (filteredProfiles.length > 0) {
@@ -1193,7 +1256,7 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, isPremium, profileComplet
           .limit(100);
 
         if (error) throw error;
-        filteredProfiles = profiles || [];
+        filteredProfiles = Array.isArray(profiles) ? (profiles as unknown as ProfileRow[]) : [];
       } else if (baseCountryCode) {
         let query = supabase.from('profiles').select(PROFILE_SELECT);
 
@@ -1210,7 +1273,7 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, isPremium, profileComplet
           .limit(100);
 
         if (error) throw error;
-        filteredProfiles = profiles || [];
+        filteredProfiles = Array.isArray(profiles) ? (profiles as unknown as ProfileRow[]) : [];
         
         // Reset archived fallback flag if we found active profiles
         if (filteredProfiles.length > 0) {
@@ -1253,8 +1316,8 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, isPremium, profileComplet
         .lte('age', userMaxAge);
 
       // Apply distance filtering for local country (use currentUserData for location)
-      const userLat = (currentUserData as any)?.latitude;
-      const userLon = (currentUserData as any)?.longitude;
+      const userLat = currentUserData?.latitude;
+      const userLon = currentUserData?.longitude;
       if (baseCountryCode && userLat && userLon) {
         const maxDistanceKm = currentUserData?.max_distance || 50;
         const radiusInDegrees = maxDistanceKm / 111.32;
@@ -1274,14 +1337,14 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, isPremium, profileComplet
         .limit(50);
 
       if (!archivedError && archivedProfiles && archivedProfiles.length > 0) {
-        filteredProfiles = archivedProfiles;
+        filteredProfiles = Array.isArray(archivedProfiles) ? (archivedProfiles as unknown as ProfileRow[]) : [];
         usingArchivedFallback = true;
         
         // Mix archived profiles the same way (explicit country rotation).
         if (premiumForFeed && allowedCountryCodes.length > 1) {
           const mixSeed = `${userId}_${todayStr()}_archived`;
           filteredProfiles = mixByCountryRoundRobin(
-            (filteredProfiles as any[]).filter((p) => allowedCountryCodes.includes(normalizeCountryCode(p.country_code || ''))),
+            filteredProfiles.filter((p) => allowedCountryCodes.includes(normalizeCountryCode(p.country_code || ''))),
             allowedCountryCodes,
             mixSeed
           );
@@ -1332,15 +1395,16 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, isPremium, profileComplet
     }
 
     // Add empty images array and precomputed distance
-    const profilesWithImages = filteredProfiles.map(profile => ({
-      ...profile,
-      images: [],
-      distance: distanceMap[profile.id] // Precomputed distance from locationService
-    }));
+    const profilesWithImages: PotentialMatch[] = filteredProfiles.map((profile) =>
+      toPotentialMatch(profile, {
+        images: [],
+        distance: distanceMap[profile.id], // Precomputed distance from locationService
+      })
+    );
 
 
     // ⭐ DEDUPLICATION: Remove any duplicate profiles by ID
-    const uniqueProfiles = Array.from(
+    const uniqueProfiles: PotentialMatch[] = Array.from(
       new Map(profilesWithImages.map(p => [p.id, p])).values()
     );
 
@@ -1463,11 +1527,16 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, isPremium, profileComplet
     
     if (savedOrderRaw) {
       try {
-        const parsed = JSON.parse(savedOrderRaw);
+        const parsed: unknown = JSON.parse(savedOrderRaw);
+        const obj = (parsed && typeof parsed === 'object') ? (parsed as Record<string, unknown>) : null;
 
-        const savedPremium = !!(parsed as any)?.premium;
-        const savedCountries = Array.isArray((parsed as any)?.countries) ? (parsed as any).countries : [];
-        const savedIds = Array.isArray((parsed as any)?.order) ? (parsed as any).order : [];
+        const savedPremium = obj?.premium === true;
+        const savedCountries = Array.isArray(obj?.countries)
+          ? obj!.countries.filter((c): c is string => typeof c === 'string')
+          : [];
+        const savedIds = Array.isArray(obj?.order)
+          ? obj!.order.filter((id): id is string => typeof id === 'string')
+          : [];
 
 
         const samePremium = savedPremium === premiumForFeed;
@@ -1570,8 +1639,8 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, isPremium, profileComplet
       while (injectionIndex < limitedPriorityProfiles.length && currentPos < nonPriorityProfiles.length) {
         // Variable interval: 25-40 profiles for most injections
         // First injection happens earlier (8-15 profiles) for early engagement
-        let minInterval = injectionIndex === 0 ? 8 : 25;
-        let maxInterval = injectionIndex === 0 ? 15 : 40;
+        const minInterval = injectionIndex === 0 ? 8 : 25;
+        const maxInterval = injectionIndex === 0 ? 15 : 40;
         
         // Use deterministic hash to pick interval and offset
         const intervalRange = maxInterval - minInterval;
@@ -1818,7 +1887,7 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, isPremium, profileComplet
       premiumEmptyAutoRetryRef.current = false;
       setPremiumTrulyEmptyAfterRetry(true);
     }
-  }, [isPremium, potentialMatches.length, noMoreProfiles]);
+  }, [premiumActive, potentialMatches.length, noMoreProfiles]);
 
   // ⭐ PARALLEL IMAGE PRELOADING - Load images in background without blocking
   // ⭐ ANDROID OPTIMIZATION: Reduced batch size for Android (2 vs 10 for iOS)
@@ -2016,7 +2085,15 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, isPremium, profileComplet
     // Start immediately without setTimeout
     initializeProfiles();
     fetchReverseUsage();
-  }, [currentUser?.id, premiumActive, premiumResolved, subscriptionLoading, isPremium]); // Refetch when premium resolves/changes
+  }, [
+    currentUser?.id,
+    premiumActive,
+    premiumResolved,
+    subscriptionLoading,
+    fetchPotentialMatches,
+    fetchReverseUsage,
+    persistSwipedIds,
+  ]); // Refetch when premium resolves/changes
 
 
   // Cleanup on unmount (minimal now that continuous loader is removed)
@@ -2024,9 +2101,12 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, isPremium, profileComplet
     return () => {
       // Cleanup any remaining global references
       try {
-        if (typeof window !== 'undefined' && (window as any).continuousLoadingInterval) {
-          clearInterval((window as any).continuousLoadingInterval);
-          (window as any).continuousLoadingInterval = null;
+        if (typeof window !== 'undefined') {
+          const win = window as WindowWithIntervals;
+          if (win.continuousLoadingInterval) {
+            clearInterval(win.continuousLoadingInterval);
+            win.continuousLoadingInterval = null;
+          }
         }
       } catch (e) {
         // ignore cleanup errors
@@ -2284,25 +2364,25 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, isPremium, profileComplet
       // even if `currentUser` props are stale.
       const { data: currentUserData } = await supabase
         .from('profiles')
-        .select('max_distance, distance_preference, country_code, min_age, max_age, unlocked_countries')
+        .select('max_distance, distance_preference, country_code, min_age, max_age, unlocked_countries, latitude, longitude')
         .eq('id', currentUser.id)
         .single();
+
+      const currentUserSettings = currentUserData as unknown as Partial<CurrentUser> | null;
       
       // ⭐ STRATIFIED REFILL: Include created_at for stratified sampling
-      const PROFILE_SELECT = 'id, first_name, last_name, bio, city, country, country_code, occupation, education_level, date_of_birth, interests, gender, latitude, longitude, fun_fact, perfect_first_date, last_googled, relationship_intent, smoking, drinking, exercise_level, sleeping_schedule, introvert_extrovert, spontaneous_planner, messy_organized, adinkra_symbols, created_at';
+      const PROFILE_SELECT = 'id, first_name, last_name, bio, city, country, country_code, occupation, education_level, date_of_birth, interests, gender, latitude, longitude, fun_fact, perfect_first_date, last_googled, relationship_intent, smoking, drinking, exercise_level, sleeping_schedule, introvert_extrovert, spontaneous_planner, messy_organized, adinkra_symbols, created_at, last_login_at';
 
       // Enforce country rules early for speed + correctness
-      const baseCountryCode = normalizeCountryCode(String((currentUserData as any)?.country_code ?? currentUser.country_code ?? ''));
+      const baseCountryCode = normalizeCountryCode(String(currentUserData?.country_code ?? currentUser.country_code ?? ''));
 
       // Use a single, reliable premium flag for refills.
       const premiumForFeed = premiumActive;
       
       // Get unlocked countries for premium users (robust to array/JSON/string shapes)
+      const unlockedCountriesRaw = currentUserData?.unlocked_countries ?? currentUser.unlocked_countries;
       const unlockedCountries: string[] = premiumForFeed
-        ? normalizeCountryCodeList(
-            (currentUserData as any)?.unlocked_countries ?? (currentUser as any).unlocked_countries,
-            baseCountryCode
-          )
+        ? normalizeCountryCodeList(unlockedCountriesRaw, baseCountryCode)
         : [];
       
       const allowedCountryCodes = Array.from(
@@ -2318,7 +2398,12 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, isPremium, profileComplet
       // Build a unified pool: local(distance-filtered, local country only) + unlocked countries (no distance)
       const distanceMap: { [key: string]: number } = {};
 
-      const userMaxDistanceRaw = (currentUserData as any)?.max_distance ?? (currentUserData as any)?.distance_preference ?? (currentUser as any).max_distance ?? (currentUser as any).distance_preference ?? 50;
+      const userMaxDistanceRaw =
+        currentUserData?.max_distance ??
+        currentUserData?.distance_preference ??
+        currentUser.max_distance ??
+        currentUser.distance_preference ??
+        50;
       const userMaxDistance = Number(userMaxDistanceRaw);
       const safeUserMaxDistance = Number.isFinite(userMaxDistance) && userMaxDistance > 0 ? userMaxDistance : 50;
 
@@ -2353,12 +2438,12 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, isPremium, profileComplet
               .limit(100);
 
             if (localError) throw localError;
-            return localData || [];
+            return Array.isArray(localData) ? (localData as unknown as ProfileRow[]) : [];
           })()
         : [];
 
       // ⭐ PREMIUM FALLBACK: If distance-local is empty, fetch local country without distance constraint.
-      let effectiveLocalProfiles = localProfiles;
+      let effectiveLocalProfiles: ProfileRow[] = localProfiles;
       if (premiumForFeed && baseCountryCode && effectiveLocalProfiles.length === 0) {
         try {
           let fallbackQuery = supabase
@@ -2376,9 +2461,12 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, isPremium, profileComplet
           }
 
           const { data: fallbackLocal, error: fallbackError } = await fallbackQuery;
-          if (!fallbackError && fallbackLocal && fallbackLocal.length > 0) {
-            fallbackLocal.forEach((p: any) => (distanceMap[p.id] ??= 999));
-            effectiveLocalProfiles = fallbackLocal;
+          const fallbackRows: ProfileRow[] = Array.isArray(fallbackLocal)
+            ? (fallbackLocal as unknown as ProfileRow[])
+            : [];
+          if (!fallbackError && fallbackRows.length > 0) {
+            fallbackRows.forEach((p) => (distanceMap[p.id] ??= 999));
+            effectiveLocalProfiles = fallbackRows;
           }
         } catch {
           // ignore
@@ -2395,7 +2483,7 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, isPremium, profileComplet
           })
         : [];
 
-      let activeProfiles = [...effectiveLocalProfiles, ...intlProfiles];
+      let activeProfiles: ProfileRow[] = [...effectiveLocalProfiles, ...intlProfiles];
       let usingArchivedFallback = false;
 
       // Reset archived fallback flag if we found active profiles
@@ -2417,17 +2505,17 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, isPremium, profileComplet
         }
 
         // Apply age filtering to archived profiles
-        const userMinAge = (currentUserData as any)?.min_age || currentUser.min_age || 18;
-        const userMaxAge = (currentUserData as any)?.max_age || currentUser.max_age || 99;
+        const userMinAge = currentUserData?.min_age ?? currentUser.min_age ?? 18;
+        const userMaxAge = currentUserData?.max_age ?? currentUser.max_age ?? 99;
         archivedQuery = archivedQuery
           .gte('age', userMinAge)
           .lte('age', userMaxAge);
 
         // Apply distance filtering for local country (use currentUserData for location)
-        const userLat = (currentUserData as any)?.latitude || currentUser.latitude;
-        const userLon = (currentUserData as any)?.longitude || currentUser.longitude;
+        const userLat = currentUserSettings?.latitude ?? currentUser.latitude;
+        const userLon = currentUserSettings?.longitude ?? currentUser.longitude;
         if (baseCountryCode && userLat && userLon) {
-          const maxDistanceKm = (currentUserData as any)?.max_distance || currentUser.max_distance || 50;
+          const maxDistanceKm = currentUserData?.max_distance ?? currentUser.max_distance ?? 50;
           const radiusInDegrees = maxDistanceKm / 111.32;
 
           archivedQuery = archivedQuery
@@ -2445,7 +2533,9 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, isPremium, profileComplet
           .limit(50);
 
         if (!archivedError && archivedProfiles && archivedProfiles.length > 0) {
-          activeProfiles = archivedProfiles;
+          activeProfiles = Array.isArray(archivedProfiles)
+            ? (archivedProfiles as unknown as ProfileRow[])
+            : [];
           usingArchivedFallback = true;
           if (!isArchivedFallback) {
             setIsArchivedFallback(true);
@@ -2464,11 +2554,11 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, isPremium, profileComplet
         return;
       }
 
-      let filteredProfiles = activeProfiles;
+      let filteredProfiles: ProfileRow[] = activeProfiles;
 
       // Apply age filtering
-      const userMinAge = (currentUserData as any)?.min_age || currentUser.min_age || 18;
-      const userMaxAge = (currentUserData as any)?.max_age || currentUser.max_age || 99;
+      const userMinAge = currentUserData?.min_age ?? currentUser.min_age ?? 18;
+      const userMaxAge = currentUserData?.max_age ?? currentUser.max_age ?? 99;
       filteredProfiles = filteredProfiles.filter(profile => {
         // Premium: keep profiles even if DOB is missing; only enforce range when DOB is present.
         if (!profile.date_of_birth) return true;
@@ -2477,11 +2567,12 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, isPremium, profileComplet
         return age >= userMinAge && age <= userMaxAge;
       });
 
-      const profilesWithImages = filteredProfiles.map(profile => ({
-        ...profile,
-        images: [],
-        distance: typeof distanceMap[profile.id] === 'number' ? distanceMap[profile.id] : 999
-      }));
+      const profilesWithImages: PotentialMatch[] = filteredProfiles.map((profile) =>
+        toPotentialMatch(profile, {
+          images: [],
+          distance: typeof distanceMap[profile.id] === 'number' ? distanceMap[profile.id] : 999,
+        })
+      );
 
       // Keep refill mixed across the selected countries too (prevents drift back to “mostly local”).
       const today = new Date().toISOString().split('T')[0];
@@ -2527,7 +2618,20 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, isPremium, profileComplet
     } finally {
       setIsLoadingMore(false);
     }
-  }, [currentUser, allowedGenders, potentialMatches, isLoadingMore, userImages, preloadNextProfileImages, injectAds, fetchUnlockedCountryProfiles, batchFetchLanguages, premiumActive]);
+  }, [
+    currentUser,
+    allowedGenders,
+    potentialMatches,
+    isLoadingMore,
+    userImages,
+    preloadNextProfileImages,
+    injectAds,
+    fetchUnlockedCountryProfiles,
+    batchFetchLanguages,
+    premiumActive,
+    isArchivedFallback,
+    premiumTrulyEmptyAfterRetry,
+  ]);
 
   // ⭐ AUTO-REFILL ON SWIPE - Load more profiles as user swipes
   // Triggers when 15 REAL profiles remaining (excludes ads) - SINGLE SOURCE OF TRUTH for reloads
@@ -2598,7 +2702,7 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, isPremium, profileComplet
     lastRescueRef.current = now;
     // Reset streak after rescue
     setNoMatchStreak(0);
-  }, [noMatchStreak, potentialMatches, currentIndex, currentUser?.id, usersWhoLikedMeIds]);
+  }, [noMatchStreak, potentialMatches, currentIndex, currentUser?.id, usersWhoLikedMeIds, RESCUE_COOLDOWN_MS, isArchivedFallback]);
   // Automatically preloads upcoming profiles based on current position
   useEffect(() => {
     if (!hasCompletedInitialFetch || potentialMatches.length === 0) return;
@@ -2693,22 +2797,25 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, isPremium, profileComplet
           // rollback: restore the card at front and remove from exclusion list
           // Also restore deterministic daily order so reloads don't reshuffle.
           try {
-            const baseCountryCode = (currentUser?.country_code || '').trim();
-            const unlockedCountries: string[] = (isPremium && Array.isArray((currentUser as any)?.unlocked_countries))
-              ? (currentUser as any).unlocked_countries
-                  .filter((c: unknown): c is string => typeof c === 'string' && c.trim().length > 0)
-                  .map((c: string) => c.trim())
-              : [];
-            const userMaxDistanceRaw = (currentUser as any)?.max_distance ?? (currentUser as any)?.distance_preference ?? 50;
+            const baseCountryCode = normalizeCountryCode(String(currentUser?.country_code ?? ''));
+            const unlockedCountries = normalizeCountryCodeList(currentUser?.unlocked_countries, baseCountryCode);
+            const userMaxDistanceRaw = currentUser?.max_distance ?? currentUser?.distance_preference ?? 50;
             const userMaxDistance = Number(userMaxDistanceRaw);
             const safeUserMaxDistance = Number.isFinite(userMaxDistance) && userMaxDistance > 0 ? userMaxDistance : 50;
             const feedSignature = buildFeedSignature(baseCountryCode, unlockedCountries, !!isPremium, safeUserMaxDistance);
             const savedOrderKey = buildSavedOrderKey(currentUser?.id || '', feedSignature);
             const savedOrder = localStorage.getItem(savedOrderKey);
             if (savedOrder) {
-              const orderIds: string[] = JSON.parse(savedOrder);
+              const parsed: unknown = JSON.parse(savedOrder);
+              const obj = (parsed && typeof parsed === 'object') ? (parsed as Record<string, unknown>) : null;
+              const orderIds = Array.isArray(obj?.order)
+                ? obj!.order.filter((id): id is string => typeof id === 'string')
+                : (Array.isArray(parsed)
+                    ? parsed.filter((id): id is string => typeof id === 'string')
+                    : []);
               if (!orderIds.includes(prevMatch.id)) {
-                localStorage.setItem(savedOrderKey, JSON.stringify([prevMatch.id, ...orderIds]));
+                const next = { premium: !!isPremium, countries: unlockedCountries, order: [prevMatch.id, ...orderIds] };
+                localStorage.setItem(savedOrderKey, JSON.stringify(next));
               }
             }
           } catch {
@@ -2731,11 +2838,14 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, isPremium, profileComplet
 
         // Then attempt the batched RPC to record the like and detect mutual
         const rpcName = 'like_and_usage_batched';
-        const { data: rpcData, error: rpcError } = await supabase.rpc((rpcName as any), {
+        const rpc = (supabase as unknown as {
+          rpc: (fn: string, args?: Record<string, unknown>) => Promise<{ data: unknown; error: unknown }>;
+        }).rpc;
+        const { data: rpcData, error: rpcError } = await rpc(rpcName, {
           liker_id_param: currentUser.id,
           liked_id_param: prevMatch.id,
-          premium_param: !!isPremium
-        } as any);
+          premium_param: !!isPremium,
+        });
 
         if (rpcError) {
           // Fallback: attempt to insert like and check mutual
@@ -2751,13 +2861,13 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, isPremium, profileComplet
               
               // Check how many likes the target user has received and send notification
               try {
-                const { data: likeCountData, error: countError } = await supabase
+                const { count, error: countError } = await supabase
                   .from('likes')
                   .select('id', { count: 'exact', head: true })
                   .eq('liked_id', prevMatch.id);
                 
                 if (!countError) {
-                  const likeCount = (likeCountData as any) || 0;
+                  const likeCount = typeof count === 'number' ? count : 0;
                   
                   // Send notification on every like
                   await sendMultipleLikesNotification(prevMatch.id, likeCount);
@@ -2783,8 +2893,9 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, isPremium, profileComplet
               }
               
               // Clear chat cache to force refresh when user opens ChatPage
-              if (typeof window !== 'undefined' && (window as any).chatMatchesCache) {
-                (window as any).chatMatchesCache.delete(currentUser.id);
+              if (typeof window !== 'undefined') {
+                const win = window as WindowWithIntervals;
+                win.chatMatchesCache?.delete(currentUser.id);
               }
               
               // Trigger global event to notify ChatPage of new match
@@ -2804,22 +2915,25 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, isPremium, profileComplet
           } catch (fallbackErr) {
             // If even fallback fails, rollback to keep UI consistent
             try {
-              const baseCountryCode = (currentUser?.country_code || '').trim();
-              const unlockedCountries: string[] = (isPremium && Array.isArray((currentUser as any)?.unlocked_countries))
-                ? (currentUser as any).unlocked_countries
-                    .filter((c: unknown): c is string => typeof c === 'string' && c.trim().length > 0)
-                    .map((c: string) => c.trim())
-                : [];
-              const userMaxDistanceRaw = (currentUser as any)?.max_distance ?? (currentUser as any)?.distance_preference ?? 50;
+              const baseCountryCode = normalizeCountryCode(String(currentUser?.country_code ?? ''));
+              const unlockedCountries = normalizeCountryCodeList(currentUser?.unlocked_countries, baseCountryCode);
+              const userMaxDistanceRaw = currentUser?.max_distance ?? currentUser?.distance_preference ?? 50;
               const userMaxDistance = Number(userMaxDistanceRaw);
               const safeUserMaxDistance = Number.isFinite(userMaxDistance) && userMaxDistance > 0 ? userMaxDistance : 50;
               const feedSignature = buildFeedSignature(baseCountryCode, unlockedCountries, !!isPremium, safeUserMaxDistance);
               const savedOrderKey = buildSavedOrderKey(currentUser?.id || '', feedSignature);
               const savedOrder = localStorage.getItem(savedOrderKey);
               if (savedOrder) {
-                const orderIds: string[] = JSON.parse(savedOrder);
+                const parsed: unknown = JSON.parse(savedOrder);
+                const obj = (parsed && typeof parsed === 'object') ? (parsed as Record<string, unknown>) : null;
+                const orderIds = Array.isArray(obj?.order)
+                  ? obj!.order.filter((id): id is string => typeof id === 'string')
+                  : (Array.isArray(parsed)
+                      ? parsed.filter((id): id is string => typeof id === 'string')
+                      : []);
                 if (!orderIds.includes(prevMatch.id)) {
-                  localStorage.setItem(savedOrderKey, JSON.stringify([prevMatch.id, ...orderIds]));
+                  const next = { premium: !!isPremium, countries: unlockedCountries, order: [prevMatch.id, ...orderIds] };
+                  localStorage.setItem(savedOrderKey, JSON.stringify(next));
                 }
               }
             } catch {
@@ -2839,7 +2953,11 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, isPremium, profileComplet
           }
         } else {
           // RPC succeeded — if server reports a match, show animation
-          if ((rpcData as any)?.match) {
+          const hasMatch =
+            !!rpcData &&
+            typeof rpcData === 'object' &&
+            Boolean((rpcData as Record<string, unknown>).match);
+          if (hasMatch) {
             // ⭐ SWIPE FATIGUE RESCUE: Reset streak on match
             setNoMatchStreak(0);
             
@@ -2852,8 +2970,9 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, isPremium, profileComplet
             }
             
             // Clear chat cache to force refresh when user opens ChatPage
-            if (typeof window !== 'undefined' && (window as any).chatMatchesCache) {
-              (window as any).chatMatchesCache.delete(currentUser.id);
+            if (typeof window !== 'undefined') {
+              const win = window as WindowWithIntervals;
+              win.chatMatchesCache?.delete(currentUser.id);
             }
             
             // Trigger global event to notify ChatPage of new match
@@ -2875,13 +2994,13 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, isPremium, profileComplet
             
             // Like was recorded but no match - send like notification
             try {
-              const { data: likeCountData, error: countError } = await supabase
+              const { count, error: countError } = await supabase
                 .from('likes')
                 .select('id', { count: 'exact', head: true })
                 .eq('liked_id', prevMatch.id);
               
               if (!countError) {
-                const likeCount = (likeCountData as any) || 0;
+                const likeCount = typeof count === 'number' ? count : 0;
                 
                 // Send notification on every like
                 await sendMultipleLikesNotification(prevMatch.id, likeCount);
@@ -2894,22 +3013,25 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, isPremium, profileComplet
       } catch (jobErr) {
         // On unexpected errors, attempt a rollback to keep UX consistent
         try {
-          const baseCountryCode = (currentUser?.country_code || '').trim();
-          const unlockedCountries: string[] = (isPremium && Array.isArray((currentUser as any)?.unlocked_countries))
-            ? (currentUser as any).unlocked_countries
-                .filter((c: unknown): c is string => typeof c === 'string' && c.trim().length > 0)
-                .map((c: string) => c.trim())
-            : [];
-          const userMaxDistanceRaw = (currentUser as any)?.max_distance ?? (currentUser as any)?.distance_preference ?? 50;
+          const baseCountryCode = normalizeCountryCode(String(currentUser?.country_code ?? ''));
+          const unlockedCountries = normalizeCountryCodeList(currentUser?.unlocked_countries, baseCountryCode);
+          const userMaxDistanceRaw = currentUser?.max_distance ?? currentUser?.distance_preference ?? 50;
           const userMaxDistance = Number(userMaxDistanceRaw);
           const safeUserMaxDistance = Number.isFinite(userMaxDistance) && userMaxDistance > 0 ? userMaxDistance : 50;
           const feedSignature = buildFeedSignature(baseCountryCode, unlockedCountries, !!isPremium, safeUserMaxDistance);
           const savedOrderKey = buildSavedOrderKey(currentUser?.id || '', feedSignature);
           const savedOrder = localStorage.getItem(savedOrderKey);
           if (savedOrder) {
-            const orderIds: string[] = JSON.parse(savedOrder);
+            const parsed: unknown = JSON.parse(savedOrder);
+            const obj = (parsed && typeof parsed === 'object') ? (parsed as Record<string, unknown>) : null;
+            const orderIds = Array.isArray(obj?.order)
+              ? obj!.order.filter((id): id is string => typeof id === 'string')
+              : (Array.isArray(parsed)
+                  ? parsed.filter((id): id is string => typeof id === 'string')
+                  : []);
             if (!orderIds.includes(prevMatch.id)) {
-              localStorage.setItem(savedOrderKey, JSON.stringify([prevMatch.id, ...orderIds]));
+              const next = { premium: !!isPremium, countries: unlockedCountries, order: [prevMatch.id, ...orderIds] };
+              localStorage.setItem(savedOrderKey, JSON.stringify(next));
             }
           }
         } catch {
@@ -2999,22 +3121,25 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, isPremium, profileComplet
           // rollback: restore the card at front and remove from exclusion lists
           // Also restore deterministic daily order so reloads don't reshuffle.
           try {
-            const baseCountryCode = (currentUser?.country_code || '').trim();
-            const unlockedCountries: string[] = (isPremium && Array.isArray((currentUser as any)?.unlocked_countries))
-              ? (currentUser as any).unlocked_countries
-                  .filter((c: unknown): c is string => typeof c === 'string' && c.trim().length > 0)
-                  .map((c: string) => c.trim())
-              : [];
-            const userMaxDistanceRaw = (currentUser as any)?.max_distance ?? (currentUser as any)?.distance_preference ?? 50;
+            const baseCountryCode = normalizeCountryCode(String(currentUser?.country_code ?? ''));
+            const unlockedCountries = normalizeCountryCodeList(currentUser?.unlocked_countries, baseCountryCode);
+            const userMaxDistanceRaw = currentUser?.max_distance ?? currentUser?.distance_preference ?? 50;
             const userMaxDistance = Number(userMaxDistanceRaw);
             const safeUserMaxDistance = Number.isFinite(userMaxDistance) && userMaxDistance > 0 ? userMaxDistance : 50;
             const feedSignature = buildFeedSignature(baseCountryCode, unlockedCountries, !!isPremium, safeUserMaxDistance);
             const savedOrderKey = buildSavedOrderKey(currentUser?.id || '', feedSignature);
             const savedOrder = localStorage.getItem(savedOrderKey);
             if (savedOrder) {
-              const orderIds: string[] = JSON.parse(savedOrder);
+              const parsed: unknown = JSON.parse(savedOrder);
+              const obj = (parsed && typeof parsed === 'object') ? (parsed as Record<string, unknown>) : null;
+              const orderIds = Array.isArray(obj?.order)
+                ? obj!.order.filter((id): id is string => typeof id === 'string')
+                : (Array.isArray(parsed)
+                    ? parsed.filter((id): id is string => typeof id === 'string')
+                    : []);
               if (!orderIds.includes(prevMatch.id)) {
-                localStorage.setItem(savedOrderKey, JSON.stringify([prevMatch.id, ...orderIds]));
+                const next = { premium: !!isPremium, countries: unlockedCountries, order: [prevMatch.id, ...orderIds] };
+                localStorage.setItem(savedOrderKey, JSON.stringify(next));
               }
             }
           } catch {
@@ -3037,11 +3162,14 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, isPremium, profileComplet
         }
 
         const rpcName = 'pass_and_usage_batched';
-        const { data: rpcData, error: rpcError } = await supabase.rpc((rpcName as any), {
+        const rpc = (supabase as unknown as {
+          rpc: (fn: string, args?: Record<string, unknown>) => Promise<{ data: unknown; error: unknown }>;
+        }).rpc;
+        const { data: rpcData, error: rpcError } = await rpc(rpcName, {
           passer_id_param: currentUser.id,
           passed_id_param: prevMatch.id,
-          premium_param: !!isPremium
-        } as any);
+          premium_param: !!isPremium,
+        });
 
         if (rpcError) {
           // Fallback: insert pass directly
@@ -3058,22 +3186,25 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, isPremium, profileComplet
           } catch (fallbackErr) {
             // On fallback failure, rollback
             try {
-              const baseCountryCode = (currentUser?.country_code || '').trim();
-              const unlockedCountries: string[] = (isPremium && Array.isArray((currentUser as any)?.unlocked_countries))
-                ? (currentUser as any).unlocked_countries
-                    .filter((c: unknown): c is string => typeof c === 'string' && c.trim().length > 0)
-                    .map((c: string) => c.trim())
-                : [];
-              const userMaxDistanceRaw = (currentUser as any)?.max_distance ?? (currentUser as any)?.distance_preference ?? 50;
+              const baseCountryCode = normalizeCountryCode(String(currentUser?.country_code ?? ''));
+              const unlockedCountries = normalizeCountryCodeList(currentUser?.unlocked_countries, baseCountryCode);
+              const userMaxDistanceRaw = currentUser?.max_distance ?? currentUser?.distance_preference ?? 50;
               const userMaxDistance = Number(userMaxDistanceRaw);
               const safeUserMaxDistance = Number.isFinite(userMaxDistance) && userMaxDistance > 0 ? userMaxDistance : 50;
               const feedSignature = buildFeedSignature(baseCountryCode, unlockedCountries, !!isPremium, safeUserMaxDistance);
               const savedOrderKey = buildSavedOrderKey(currentUser?.id || '', feedSignature);
               const savedOrder = localStorage.getItem(savedOrderKey);
               if (savedOrder) {
-                const orderIds: string[] = JSON.parse(savedOrder);
+                const parsed: unknown = JSON.parse(savedOrder);
+                const obj = (parsed && typeof parsed === 'object') ? (parsed as Record<string, unknown>) : null;
+                const orderIds = Array.isArray(obj?.order)
+                  ? obj!.order.filter((id): id is string => typeof id === 'string')
+                  : (Array.isArray(parsed)
+                      ? parsed.filter((id): id is string => typeof id === 'string')
+                      : []);
                 if (!orderIds.includes(prevMatch.id)) {
-                  localStorage.setItem(savedOrderKey, JSON.stringify([prevMatch.id, ...orderIds]));
+                  const next = { premium: !!isPremium, countries: unlockedCountries, order: [prevMatch.id, ...orderIds] };
+                  localStorage.setItem(savedOrderKey, JSON.stringify(next));
                 }
               }
             } catch {
@@ -3092,22 +3223,25 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, isPremium, profileComplet
       } catch (jobErr) {
         // Unexpected error: rollback
         try {
-          const baseCountryCode = (currentUser?.country_code || '').trim();
-          const unlockedCountries: string[] = (isPremium && Array.isArray((currentUser as any)?.unlocked_countries))
-            ? (currentUser as any).unlocked_countries
-                .filter((c: unknown): c is string => typeof c === 'string' && c.trim().length > 0)
-                .map((c: string) => c.trim())
-            : [];
-          const userMaxDistanceRaw = (currentUser as any)?.max_distance ?? (currentUser as any)?.distance_preference ?? 50;
+          const baseCountryCode = normalizeCountryCode(String(currentUser?.country_code ?? ''));
+          const unlockedCountries = normalizeCountryCodeList(currentUser?.unlocked_countries, baseCountryCode);
+          const userMaxDistanceRaw = currentUser?.max_distance ?? currentUser?.distance_preference ?? 50;
           const userMaxDistance = Number(userMaxDistanceRaw);
           const safeUserMaxDistance = Number.isFinite(userMaxDistance) && userMaxDistance > 0 ? userMaxDistance : 50;
           const feedSignature = buildFeedSignature(baseCountryCode, unlockedCountries, !!isPremium, safeUserMaxDistance);
           const savedOrderKey = buildSavedOrderKey(currentUser?.id || '', feedSignature);
           const savedOrder = localStorage.getItem(savedOrderKey);
           if (savedOrder) {
-            const orderIds: string[] = JSON.parse(savedOrder);
+            const parsed: unknown = JSON.parse(savedOrder);
+            const obj = (parsed && typeof parsed === 'object') ? (parsed as Record<string, unknown>) : null;
+            const orderIds = Array.isArray(obj?.order)
+              ? obj!.order.filter((id): id is string => typeof id === 'string')
+              : (Array.isArray(parsed)
+                  ? parsed.filter((id): id is string => typeof id === 'string')
+                  : []);
             if (!orderIds.includes(prevMatch.id)) {
-              localStorage.setItem(savedOrderKey, JSON.stringify([prevMatch.id, ...orderIds]));
+              const next = { premium: !!isPremium, countries: unlockedCountries, order: [prevMatch.id, ...orderIds] };
+              localStorage.setItem(savedOrderKey, JSON.stringify(next));
             }
           }
         } catch {
@@ -3210,7 +3344,7 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, isPremium, profileComplet
 
         if (!profileError && profileData) {
           // Add the user back with empty images array (will be loaded when needed)
-          const userWithImages = { ...(profileData as any), images: [] };
+          const userWithImages = toPotentialMatch(profileData as unknown as ProfileRow, { images: [] });
           const newMatches = [...potentialMatches];
           newMatches.splice(currentIndex, 0, userWithImages);
           setPotentialMatches(newMatches);
@@ -3226,22 +3360,25 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, isPremium, profileComplet
 
       // Restore deterministic daily order so this profile doesn't get appended/reordered on reload.
       try {
-        const baseCountryCode = (currentUser?.country_code || '').trim();
-        const unlockedCountries: string[] = (isPremium && Array.isArray((currentUser as any)?.unlocked_countries))
-          ? (currentUser as any).unlocked_countries
-              .filter((c: unknown): c is string => typeof c === 'string' && c.trim().length > 0)
-              .map((c: string) => c.trim())
-          : [];
-        const userMaxDistanceRaw = (currentUser as any)?.max_distance ?? (currentUser as any)?.distance_preference ?? 50;
+        const baseCountryCode = normalizeCountryCode(String(currentUser?.country_code ?? ''));
+        const unlockedCountries = normalizeCountryCodeList(currentUser?.unlocked_countries, baseCountryCode);
+        const userMaxDistanceRaw = currentUser?.max_distance ?? currentUser?.distance_preference ?? 50;
         const userMaxDistance = Number(userMaxDistanceRaw);
         const safeUserMaxDistance = Number.isFinite(userMaxDistance) && userMaxDistance > 0 ? userMaxDistance : 50;
         const feedSignature = buildFeedSignature(baseCountryCode, unlockedCountries, !!isPremium, safeUserMaxDistance);
         const savedOrderKey = buildSavedOrderKey(currentUser?.id || '', feedSignature);
         const savedOrder = localStorage.getItem(savedOrderKey);
         if (savedOrder) {
-          const orderIds: string[] = JSON.parse(savedOrder);
+          const parsed: unknown = JSON.parse(savedOrder);
+          const obj = (parsed && typeof parsed === 'object') ? (parsed as Record<string, unknown>) : null;
+          const orderIds = Array.isArray(obj?.order)
+            ? obj!.order.filter((id): id is string => typeof id === 'string')
+            : (Array.isArray(parsed)
+                ? parsed.filter((id): id is string => typeof id === 'string')
+                : []);
           if (!orderIds.includes(lastPassedUser.user_id)) {
-            localStorage.setItem(savedOrderKey, JSON.stringify([lastPassedUser.user_id, ...orderIds]));
+            const next = { premium: !!isPremium, countries: unlockedCountries, order: [lastPassedUser.user_id, ...orderIds] };
+            localStorage.setItem(savedOrderKey, JSON.stringify(next));
           }
         }
       } catch {
@@ -3282,13 +3419,9 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, isPremium, profileComplet
       
       // ⭐ Update saved profile order in localStorage (remove swiped profile)
       try {
-        const baseCountryCode = (currentUser?.country_code || '').trim();
-        const unlockedCountries: string[] = (isPremium && Array.isArray((currentUser as any)?.unlocked_countries))
-          ? (currentUser as any).unlocked_countries
-              .filter((c: unknown): c is string => typeof c === 'string' && c.trim().length > 0)
-              .map((c: string) => c.trim())
-          : [];
-        const userMaxDistanceRaw = (currentUser as any)?.max_distance ?? (currentUser as any)?.distance_preference ?? 50;
+        const baseCountryCode = normalizeCountryCode(String(currentUser?.country_code ?? ''));
+        const unlockedCountries = normalizeCountryCodeList(currentUser?.unlocked_countries, baseCountryCode);
+        const userMaxDistanceRaw = currentUser?.max_distance ?? currentUser?.distance_preference ?? 50;
         const userMaxDistance = Number(userMaxDistanceRaw);
         const safeUserMaxDistance = Number.isFinite(userMaxDistance) && userMaxDistance > 0 ? userMaxDistance : 50;
         const feedSignature = buildFeedSignature(baseCountryCode, unlockedCountries, !!isPremium, safeUserMaxDistance);
@@ -3297,9 +3430,16 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, isPremium, profileComplet
         if (currentProfile && 'id' in currentProfile) {
           const savedOrder = localStorage.getItem(savedOrderKey);
           if (savedOrder) {
-            const orderIds: string[] = JSON.parse(savedOrder);
-            const updatedOrder = orderIds.filter(id => id !== currentProfile.id);
-            localStorage.setItem(savedOrderKey, JSON.stringify(updatedOrder));
+            const parsed: unknown = JSON.parse(savedOrder);
+            const obj = (parsed && typeof parsed === 'object') ? (parsed as Record<string, unknown>) : null;
+            const orderIds = Array.isArray(obj?.order)
+              ? obj!.order.filter((id): id is string => typeof id === 'string')
+              : (Array.isArray(parsed)
+                  ? parsed.filter((id): id is string => typeof id === 'string')
+                  : []);
+            const updatedOrder = orderIds.filter((id) => id !== currentProfile.id);
+            const next = { premium: !!isPremium, countries: unlockedCountries, order: updatedOrder };
+            localStorage.setItem(savedOrderKey, JSON.stringify(next));
           }
         }
       } catch (error) {
@@ -3901,7 +4041,7 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, isPremium, profileComplet
                 calculateDistance={calculateDistance}
                 swipeDirection={swipeUI.swipeDirection}
                 swipeDistance={swipeUI.swipeDistance}
-                isVerified={!!(currentMatch as any)?.is_verified}
+                isVerified={!!currentMatch.is_verified}
                 isSwipeAreaOnly={true} // Render only swipeable image area
                 isDetailsAreaOnly={false}
                 getOptimizedUrl={getOptimizedUrl}
@@ -3954,7 +4094,7 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, isPremium, profileComplet
                 calculateDistance={calculateDistance}
                 swipeDirection={swipeUI.swipeDirection}
                 swipeDistance={swipeUI.swipeDistance}
-                isVerified={!!(currentMatch as any)?.is_verified}
+                isVerified={!!currentMatch.is_verified}
                 isSwipeAreaOnly={false}
                 isDetailsAreaOnly={true} // Render only details/info area
                 getOptimizedUrl={getOptimizedUrl}
