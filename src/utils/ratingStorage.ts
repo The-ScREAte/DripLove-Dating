@@ -1,6 +1,12 @@
 /**
  * Rating Storage Utilities
  * Manages local storage for rating pop-up timing and user preferences
+ * 
+ * Best Practices:
+ * - Show after positive moments only (2nd or 3rd match)
+ * - Minimum 3 weeks between prompts
+ * - If dismissed, wait longer before showing again
+ * - Once rated, never show again
  */
 
 const RATING_STORAGE_KEY = 'driplove_rating';
@@ -11,6 +17,7 @@ export interface RatingStorageData {
   dismissCount: number;
   platform: 'ios' | 'android' | 'web' | null;
   matchCount: number;
+  lastDismissedAt: number | null;
 }
 
 /**
@@ -20,7 +27,12 @@ export const getRatingData = (): RatingStorageData => {
   try {
     const stored = localStorage.getItem(RATING_STORAGE_KEY);
     if (stored) {
-      return JSON.parse(stored);
+      const data = JSON.parse(stored);
+      // Ensure lastDismissedAt exists for backwards compatibility
+      return {
+        ...data,
+        lastDismissedAt: data.lastDismissedAt ?? null
+      };
     }
   } catch (error) {
     console.error('[Rating] Error reading rating data:', error);
@@ -32,6 +44,7 @@ export const getRatingData = (): RatingStorageData => {
     dismissCount: 0,
     platform: null,
     matchCount: 0,
+    lastDismissedAt: null,
   };
 };
 
@@ -49,50 +62,93 @@ export const saveRatingData = (data: Partial<RatingStorageData>): void => {
 };
 
 /**
+ * Calculate the waiting period based on dismiss count
+ * Each dismiss adds more time before showing again
+ */
+const getWaitingPeriod = (dismissCount: number): number => {
+  // Base: 3 weeks = 21 days
+  // After 1 dismiss: 4 weeks
+  // After 2 dismisses: 6 weeks
+  // After 3+ dismisses: 8 weeks
+  const baseWeeks = 3;
+  const additionalWeeks = Math.min(dismissCount, 3) * 1.5;
+  const totalDays = (baseWeeks + additionalWeeks) * 7;
+  return totalDays * 24 * 60 * 60 * 1000; // Convert to milliseconds
+};
+
+/**
  * Check if we should show the rating pop-up based on match count
- * Shows on second match, then again after 3 weeks
+ * Shows on 2nd or 3rd match, then again after 3+ weeks
  */
 export const shouldShowRatingPopup = (): boolean => {
   const data = getRatingData();
   
-  // Don't show if user has already rated
+  // Never show if user has already rated
   if (data.hasRated) {
     return false;
   }
   
   const now = Date.now();
   
-  // First time - check if we have at least 2 matches
+  // First time - check if we have 2+ matches (positive moment)
   if (data.lastShown === null) {
     return data.matchCount >= 2;
   }
   
-  // Subsequent shows - check if 3 weeks have passed
-  const threeWeeks = 21 * 24 * 60 * 60 * 1000; // 3 weeks in milliseconds
-  const timeSinceLastShown = now - data.lastShown;
+  // If user dismissed, use increased waiting period based on dismiss count
+  const waitingPeriod = getWaitingPeriod(data.dismissCount);
   
-  return timeSinceLastShown >= threeWeeks;
+  // Check if enough time has passed since last shown
+  const timeSinceLastShown = now - data.lastShown;
+  if (timeSinceLastShown < waitingPeriod) {
+    return false;
+  }
+  
+  // If dismissed, also check time since last dismiss
+  if (data.lastDismissedAt) {
+    const timeSinceDismiss = now - data.lastDismissedAt;
+    if (timeSinceDismiss < waitingPeriod) {
+      return false;
+    }
+  }
+  
+  return true;
 };
 
 /**
  * Increment match count and check if rating should be shown
  * Returns true if the rating popup should be triggered
+ * Only triggers on positive moments (matches, not failures)
  */
 export const incrementMatchCount = (): boolean => {
   const data = getRatingData();
   const newCount = data.matchCount + 1;
   saveRatingData({ matchCount: newCount });
   
-  // Show on exactly 2nd match if never shown before
-  if (data.lastShown === null && newCount === 2 && !data.hasRated) {
+  // Never show if already rated
+  if (data.hasRated) {
+    return false;
+  }
+  
+  // Show on exactly 2nd or 3rd match if never shown before
+  if (data.lastShown === null && (newCount === 2 || newCount === 3)) {
     return true;
   }
   
-  // Also check for recurring (3 weeks passed)
-  if (data.lastShown !== null && !data.hasRated) {
-    const threeWeeks = 21 * 24 * 60 * 60 * 1000;
+  // Check for recurring (minimum 3 weeks passed, with dismiss penalty)
+  if (data.lastShown !== null) {
+    const waitingPeriod = getWaitingPeriod(data.dismissCount);
     const timeSinceLastShown = Date.now() - data.lastShown;
-    if (timeSinceLastShown >= threeWeeks) {
+    
+    // Also require a new match to be a positive moment
+    if (timeSinceLastShown >= waitingPeriod) {
+      // If dismissed recently, wait for dismiss period too
+      if (data.lastDismissedAt) {
+        const timeSinceDismiss = Date.now() - data.lastDismissedAt;
+        if (timeSinceDismiss < waitingPeriod) {
+          return false;
+        }
+      }
       return true;
     }
   }
@@ -119,11 +175,15 @@ export const markUserHasRated = (platform: 'ios' | 'android' | 'web'): void => {
 };
 
 /**
- * Increment dismiss count
+ * Increment dismiss count and record dismiss time
+ * Longer wait before showing again after each dismiss
  */
 export const incrementDismissCount = (): void => {
   const data = getRatingData();
-  saveRatingData({ dismissCount: data.dismissCount + 1 });
+  saveRatingData({ 
+    dismissCount: data.dismissCount + 1,
+    lastDismissedAt: Date.now()
+  });
 };
 
 /**

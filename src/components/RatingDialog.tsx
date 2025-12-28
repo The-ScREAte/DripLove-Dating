@@ -129,10 +129,12 @@ const RatingDialog: React.FC<RatingDialogProps> = ({
     handleClose();
   };
 
-  // Don't allow closing by clicking outside - user must choose an action
+  // Allow closing but record as dismiss
   const handleOpenChange = (open: boolean) => {
-    // Prevent closing unless user explicitly clicks a button
-    return;
+    if (!open) {
+      incrementDismissCount();
+      handleClose();
+    }
   };
 
   return (
@@ -140,13 +142,12 @@ const RatingDialog: React.FC<RatingDialogProps> = ({
       <DialogContent 
         className="sm:max-w-md"
         onClick={(e) => e.stopPropagation()}
-        hideCloseButton={true}
       >
         <DialogHeader className="space-y-3 pt-2">
-          <DialogTitle className="text-xl font-semibold text-center text-gray-900">
+          <DialogTitle className="text-xl font-semibold text-center text-gray-900 dark:text-gray-100">
             Rate DripLove
           </DialogTitle>
-          <DialogDescription className="text-center text-gray-600 leading-relaxed">
+          <DialogDescription className="text-center text-gray-600 dark:text-gray-400 leading-relaxed">
             Your feedback helps us improve DripLove.<br />
             <span className="font-semibold text-pink-600">RATE US TO BE A PRIORITY!</span>
           </DialogDescription>
@@ -169,7 +170,7 @@ const RatingDialog: React.FC<RatingDialogProps> = ({
                     className={`w-10 h-10 transition-colors ${
                       star <= (hoveredRating || selectedRating)
                         ? 'fill-yellow-400 text-yellow-400'
-                        : 'text-gray-300'
+                        : 'text-gray-300 dark:text-gray-600'
                     }`}
                   />
                 </button>
@@ -177,8 +178,8 @@ const RatingDialog: React.FC<RatingDialogProps> = ({
             </div>
           )}
 
-          {/* Action Button */}
-          <div>
+          {/* Action Buttons */}
+          <div className="space-y-3">
             <Button
               onClick={handleRateNow}
               disabled={isSubmitting || (isWeb && selectedRating === 0)}
@@ -189,6 +190,15 @@ const RatingDialog: React.FC<RatingDialogProps> = ({
               ) : (
                 isWeb ? 'Submit Rating' : 'Rate Now'
               )}
+            </Button>
+            
+            {/* Maybe Later button - always visible */}
+            <Button
+              variant="ghost"
+              onClick={handleMaybeLater}
+              className="w-full text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200"
+            >
+              Maybe later
             </Button>
           </div>
         </div>
