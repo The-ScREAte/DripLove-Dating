@@ -64,6 +64,8 @@ const LocationFilter = ({ currentUser, onLocationUpdate }: LocationFilterProps) 
 
       if (success) {
         setUserLocation(prev => prev ? { ...prev, maxDistance: distance } : null);
+        // Clear location cache when preferences change
+        locationService.clearCache(currentUser.id);
         onLocationUpdate?.();
       }
       setIsLoading(false);
