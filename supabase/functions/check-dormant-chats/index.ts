@@ -70,7 +70,32 @@ Deno.serve(async (req) => {
       console.log(`  - User2 response: ${match.user2_heading_somewhere}`);
 
       // STEP 1: Ask the question after 3 days of first message (only once)
+      // Check if we already have dormancy question in the chat to prevent duplicates
       if (daysSinceFirstMsg >= 3 && !match.dormancy_check_asked_at) {
+        // First check if a dormancy question already exists in this match's chat
+        const { data: existingDormancyMsg, error: checkError } = await supabaseClient
+          .from('chats')
+          .select('id')
+          .eq('match_id', match.id)
+          .eq('sender_id', '00000000-0000-0000-0000-000000000000')
+          .ilike('message', '%heading somewhere%')
+          .limit(1);
+
+        if (checkError) {
+          console.error(`[check-dormant-chats] ❌ Error checking existing dormancy msg:`, checkError);
+        }
+
+        // Skip if a dormancy question already exists
+        if (existingDormancyMsg && existingDormancyMsg.length > 0) {
+          console.log(`[check-dormant-chats] ⚠️ Dormancy question already exists for match ${match.id}, updating dormancy_check_asked_at`);
+          // Just update the flag to prevent future checks
+          await supabaseClient
+            .from('matches')
+            .update({ dormancy_check_asked_at: now.toISOString() })
+            .eq('id', match.id);
+          continue;
+        }
+
         console.log(`[check-dormant-chats] ⏰ Asking dormancy check question for match ${match.id}`);
         
         // Send system message to both users

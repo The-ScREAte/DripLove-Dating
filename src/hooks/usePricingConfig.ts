@@ -159,19 +159,27 @@ async function getGooglePrice(): Promise<{ price: string; currency: string; form
         const pricing = product.pricing;
         
         if (pricing) {
+          // Get the raw price and currency from Google Play
+          const rawPrice = pricing.price || product.price || '';
+          const rawCurrency = pricing.currency || product.priceCurrency || 'USD';
+          const numericPrice = extractNumericPrice(rawPrice);
+          
+          // Google Play returns prices in the user's Play Store country currency
+          // which is the correct localized price for the user
           return {
-            formattedPrice: pricing.price || product.price || '',
-            price: extractNumericPrice(pricing.price || product.price || ''),
-            currency: pricing.currency || 'USD',
+            formattedPrice: rawPrice,
+            price: numericPrice,
+            currency: rawCurrency,
           };
         }
         
         // Fallback to product.price directly
         if (product.price) {
+          const rawCurrency = product.priceCurrency || 'USD';
           return {
             formattedPrice: product.price,
             price: extractNumericPrice(product.price),
-            currency: product.priceCurrency || 'USD',
+            currency: rawCurrency,
           };
         }
       }

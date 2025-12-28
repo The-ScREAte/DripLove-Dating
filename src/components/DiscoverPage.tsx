@@ -461,15 +461,18 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, isPremium, profileComplet
   useEffect(() => {
     const fetchAds = async () => {
       try {
-        const { data, error } = await supabase
+        // Build query with server-side filtering when possible
+        let query = supabase
           .from('ads')
-          .select('*')
+          .select('id, name, about, image_url, video_url, link, link_as, media_type, target_countries')
           .order('created_at', { ascending: false });
+
+        const { data, error } = await query;
 
         if (error) throw error;
 
-        // Filter ads by COUNTRY only.
-        // Show ad if target_countries is empty OR includes user's country.
+        // Filter ads by COUNTRY only - still needed for target_countries array filtering
+        // Server-side contains filter for arrays isn't reliable with empty arrays
         const filteredAds = (data || []).filter((ad: any) => {
           const targetCountries = normalizeCountryCodeList(ad.target_countries);
           // If no target countries specified, show to everyone
@@ -616,10 +619,10 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, isPremium, profileComplet
       if (!currentUser?.id) return;
 
       try {
-        // Fetch user profile
+        // Fetch user profile - only select fields needed for profile completion calculation
         const { data: profile, error: profileError } = await supabase
           .from('profiles')
-          .select('*')
+          .select('id, first_name, last_name, bio, city, country, date_of_birth, gender, preference, occupation, education_level, relationship_intent, interests, adinkra_symbols, fun_fact, perfect_first_date, profile_completion')
           .eq('id', currentUser.id)
           .single();
 
@@ -661,7 +664,8 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, isPremium, profileComplet
     };
 
     fetchUserProfileCompletion();
-  }, [currentUser?.id, premiumActive]);
+    // NOTE: Removed premiumActive from dependencies - profile completion doesn't depend on premium status
+  }, [currentUser?.id]);
 
   const fetchReverseUsage = useCallback(async () => {
     if (!currentUser?.id) return;
