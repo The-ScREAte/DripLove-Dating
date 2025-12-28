@@ -581,6 +581,43 @@ const MainApp = ({ user, onLogout }: MainAppProps) => {
     };
   }, [user?.id, throttledFetchUnreadCount]); // Depend on user.id rather than full user object
 
+  // Refresh unread badge based on chat events addressed to the user
+  useEffect(() => {
+    if (!user?.id) return;
+
+    const channel = supabase
+      .channel(`nav-chats-${user.id}`)
+      .on(
+        'postgres_changes',
+        {
+          event: 'INSERT',
+          schema: 'public',
+          table: 'chats',
+          filter: `receiver_id=eq.${user.id}`,
+        },
+        () => {
+          throttledFetchUnreadCount();
+        }
+      )
+      .on(
+        'postgres_changes',
+        {
+          event: 'UPDATE',
+          schema: 'public',
+          table: 'chats',
+          filter: `receiver_id=eq.${user.id}`,
+        },
+        () => {
+          throttledFetchUnreadCount();
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [user?.id, throttledFetchUnreadCount]);
+
   const fetchUserProfile = async () => {
     if (!user?.id) {
       console.warn('[MainApp] No user ID provided');
@@ -653,21 +690,17 @@ const MainApp = ({ user, onLogout }: MainAppProps) => {
     if (!user?.id) return;
 
     try {
-      // Always use matches table for unread count
-      const { data, error } = await supabase
-        .from('matches')
-        .select('user1_unread_count, user2_unread_count, user1_id, user2_id')
-        .or(`user1_id.eq.${user.id},user2_id.eq.${user.id}`);
+      // Source of truth: unread chat messages addressed to this user.
+      // This avoids relying on `matches.user*_unread_count` which can drift if triggers fail.
+      const { count, error } = await supabase
+        .from('chats')
+        .select('id', { count: 'exact', head: true })
+        .eq('receiver_id', user.id)
+        .eq('is_read', false);
 
       if (error) throw error;
 
-      const total = data?.reduce((sum, match) => {
-        const isUser1 = match.user1_id === user.id;
-        const unread = isUser1 ? Number(match.user1_unread_count) : Number(match.user2_unread_count);
-        return sum + (Number.isFinite(unread) && unread > 0 ? unread : 0);
-      }, 0) || 0;
-
-      setUnreadCount(total);
+      setUnreadCount(count || 0);
     } catch (error) {
       console.error('[MainApp] ❌ Error fetching unread count:', error);
     }

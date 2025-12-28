@@ -6,7 +6,7 @@ import { requestNotificationPermission } from '@/services/pushNotifications';
 // ⭐ ANDROID FIX: Use platform utils instead of synchronous Capacitor import
 import { isAndroidPlatform, isIOSPlatform, getPlatformSync } from '@/utils/platformUtils';
 import { useVirtualizer } from '@tanstack/react-virtual';
-import { chatCache, updateChatCache, isCacheValid, cacheUserName } from '@/cache/chatCache';
+import { chatCache, updateChatCache, isCacheValid, cacheUserName, type CachedChat } from '@/cache/chatCache';
 // SafeAreaView removed — use plain divs with env(...) padding where necessary
 import UserProfileModal from './UserProfileModal';
 import BlockDialog from './BlockDialog';
@@ -23,6 +23,11 @@ import { CurrentUser, ChatMatch, ChatMessage } from '@/types';
 import { useTranslation } from 'react-i18next';
 import { getRatingData } from '@/utils/ratingStorage';
 import { useChatKeyboardFix } from '@/hooks/useChatKeyboardFix';
+
+type WindowWithChatCaches = Window & {
+  chatMatchesCache?: typeof chatMatchesCache;
+  chatMessagesCache?: typeof chatMessagesCache;
+};
 
 interface ChatPageProps {
   currentUser: CurrentUser;
@@ -59,9 +64,62 @@ const trimCachedMessages = (messages: ChatMessage[]) => {
 
 // Make caches globally accessible for preloading
 if (typeof window !== 'undefined') {
-  (window as any).chatMatchesCache = chatMatchesCache;
-  (window as any).chatMessagesCache = chatMessagesCache; 
+  const w = window as WindowWithChatCaches;
+  w.chatMatchesCache = chatMatchesCache;
+  w.chatMessagesCache = chatMessagesCache;
 }
+
+const EXPIRING_WARNING_SENT_KEY_PREFIX = 'driplove_match_expiring_warned_v1:';
+const wasExpirationWarningSent = (matchId: string): boolean => {
+  try {
+    return window.localStorage.getItem(`${EXPIRING_WARNING_SENT_KEY_PREFIX}${matchId}`) !== null;
+  } catch {
+    return false;
+  }
+};
+
+const markExpirationWarningSent = (matchId: string): void => {
+  try {
+    window.localStorage.setItem(`${EXPIRING_WARNING_SENT_KEY_PREFIX}${matchId}`, String(Date.now()));
+  } catch {
+    // ignore
+  }
+};
+
+type UnreadMatchIdRow = { match_id: string | null };
+
+const fetchUnreadMatchIdsForMatches = async (
+  matchIds: string[],
+  receiverId: string
+): Promise<UnreadMatchIdRow[]> => {
+  if (matchIds.length === 0) return [];
+
+  // Supabase type generation can cause “excessively deep” instantiation in some projects.
+  // We intentionally use a narrow, safe cast to avoid the TS recursion while keeping runtime behavior identical.
+  const q = (supabase as unknown as {
+    from: (table: 'chats') => {
+      select: (columns: 'match_id') => {
+        in: (column: 'match_id', values: string[]) => {
+          eq: (column: 'receiver_id', value: string) => {
+            eq: (column: 'is_read', value: boolean) => Promise<{
+              data: UnreadMatchIdRow[] | null;
+              error: unknown;
+            }>;
+          };
+        };
+      };
+    };
+  })
+    .from('chats')
+    .select('match_id')
+    .in('match_id', matchIds)
+    .eq('receiver_id', receiverId)
+    .eq('is_read', false);
+
+  const { data, error } = await q;
+  if (error) return [];
+  return data || [];
+};
 
 const ChatPage = ({ currentUser, onUnreadChange, onDetailViewChange }: ChatPageProps) => {
   const { t } = useTranslation();
@@ -190,11 +248,72 @@ const ChatPage = ({ currentUser, onUnreadChange, onDetailViewChange }: ChatPageP
     // Force cleanup of expired matches on mount
     setTimeout(() => {
       if (currentUser?.id && chatCache.chats.length > 0) {
-        checkExpiredMatches(chatCache.chats as any);
+        checkExpiredMatches(chatCache.chats as unknown as ChatMatch[]);
       }
     }, 1000);
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [currentUser]);
+
+  // Reliability: listen for incoming unread chats addressed to this user.
+  // This keeps unread badges working even if match-level unread counters drift.
+  useEffect(() => {
+    if (!currentUser?.id) return;
+
+    const channel = supabase
+      .channel(`unread-chats:${currentUser.id}`)
+      .on(
+        'postgres_changes',
+        {
+          event: 'INSERT',
+          schema: 'public',
+          table: 'chats',
+          filter: `receiver_id=eq.${currentUser.id}`,
+        },
+        (payload) => {
+          const newMsg = payload.new as ChatMessage;
+          if (!newMsg || newMsg.is_read) return;
+          const matchId = (newMsg as unknown as { match_id?: string }).match_id;
+          if (!matchId) return;
+
+          // If user is currently viewing this chat, it will be marked read immediately; don't increment.
+          if (selectedMatch?.id === matchId) return;
+
+          // Update match list immediately (badge + sort + last message)
+          setMatches(prev => {
+            const updated = prev.map(m => {
+              if (m.id !== matchId) return m;
+              const currentUnread = Number.isFinite(m.unread_messages) ? Number(m.unread_messages) : 0;
+              return {
+                ...m,
+                unread_messages: currentUnread + 1,
+                last_message: newMsg.message || m.last_message,
+                last_message_time: (newMsg.created_at || m.last_message_time) as string,
+              };
+            });
+
+            // Move updated match to the top by most recent activity
+            const sorted = [...updated].sort((a, b) => {
+              const aTime = new Date(a.last_message_time || a.created_at).getTime();
+              const bTime = new Date(b.last_message_time || b.created_at).getTime();
+              return bTime - aTime;
+            });
+
+            // Update caches for instant render
+            chatMatchesCache.set(currentUser.id, { matches: sorted, timestamp: Date.now() });
+            updateChatCache(sorted as unknown as CachedChat[]);
+
+            return sorted;
+          });
+
+          onUnreadChange?.();
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [currentUser?.id, selectedMatch?.id, onUnreadChange]);
 
   // Handle deep linking from notifications - auto-select match if matchId in URL or hash
   useEffect(() => {
@@ -286,6 +405,7 @@ const ChatPage = ({ currentUser, onUnreadChange, onDetailViewChange }: ChatPageP
     return () => {
       clearInterval(interval);
     };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [currentUser?.id, selectedMatch]);
 
   // ⭐ ANDROID OPTIMIZATION: Lazy preload only top 3 chats, with longer delays
@@ -309,6 +429,7 @@ const ChatPage = ({ currentUser, onUnreadChange, onDetailViewChange }: ChatPageP
     // ⭐ ANDROID FIX: Start preloading after 2s delay (increased from 1s)
     const timer = setTimeout(preloadChats, 2000);
     return () => clearTimeout(timer);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [currentUser?.id, selectedMatch, matches]);
 
   // Listen for new match events from DiscoverPage
@@ -331,6 +452,7 @@ const ChatPage = ({ currentUser, onUnreadChange, onDetailViewChange }: ChatPageP
     return () => {
       window.removeEventListener('newMatch', handleNewMatch as EventListener);
     };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [currentUser?.id, onUnreadChange]);
 
   useEffect(() => {
@@ -439,7 +561,7 @@ const ChatPage = ({ currentUser, onUnreadChange, onDetailViewChange }: ChatPageP
 
   // Single scroll listener: bottom tracking (all platforms) + keyboard dismiss (mobile)
   useEffect(() => {
-    const container = messagesContainerRef.current;
+    const container = messagesContainerRef.current; 
     if (!container) return;
 
     const isMobile = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
@@ -599,47 +721,85 @@ const ChatPage = ({ currentUser, onUnreadChange, onDetailViewChange }: ChatPageP
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selectedMatch, currentUser?.id, onUnreadChange]);
 
-  const processMatchesData = (matches: any[]) => {
-    const matchesWithPartner = (matches?.map(match => {
-      const partner = match.user1_id === currentUser.id ? match.user2 : match.user1;
-      
-      // ⭐ Skip matches where partner is archived
-      if (partner?.is_archived === true) {
-        return null;
-      }
-      
-      // ⭐ Cache partner name globally for instant render
-      if (partner?.id && partner.first_name && partner.last_name) {
-        cacheUserName(partner.id, partner.first_name, partner.last_name);
-      }
-      
-      // Since chats are ordered DESC by created_at, the first one is the most recent
-      const lastMessage = match.chats?.[0];
-      let unreadCount = 0;
-      if ('user1_unread_count' in match && 'user2_unread_count' in match) {
-        unreadCount = match.user1_id === currentUser.id ? Number(match.user1_unread_count) : Number(match.user2_unread_count);
-      }
-      if (!Number.isFinite(unreadCount) || unreadCount < 0) unreadCount = 0;
-      return {
-        ...match,
-        partner,
-        last_message_obj: lastMessage,
-        unread_messages: unreadCount,
-        id: match.id,
-        first_name: partner?.first_name || '',
-        last_name: partner?.last_name || '',
-        last_message: lastMessage?.message || '',
-        last_message_time: lastMessage?.created_at || match.created_at
-      };
-    }).filter(Boolean) || [])
-      // Sort by most recent message time (desc)
-      .sort((a: any, b: any) => {
+  type MatchRowProfile = {
+    id?: string;
+    first_name?: string;
+    last_name?: string;
+    is_admin?: boolean;
+    is_archived?: boolean;
+  };
+
+  type MatchRowChat = {
+    id: string;
+    message: string;
+    created_at: string;
+    sender_id: string;
+  };
+
+  type MatchRow = {
+    id: string;
+    created_at: string;
+    user1_id: string;
+    user2_id: string;
+    user1?: MatchRowProfile | null;
+    user2?: MatchRowProfile | null;
+    chats?: MatchRowChat[] | null;
+    user1_unread_count?: unknown;
+    user2_unread_count?: unknown;
+  };
+
+  const processMatchesData = (rows: MatchRow[]): ChatMatch[] => {
+    const mapped: ChatMatch[] = (rows || [])
+      .map((row) => {
+        const partner = row.user1_id === currentUser.id ? row.user2 : row.user1;
+
+        if (partner?.is_archived === true) return null;
+
+        const partnerId = partner?.id;
+        const firstName = partner?.first_name || '';
+        const lastName = partner?.last_name || '';
+
+        if (partnerId && firstName && lastName) {
+          cacheUserName(partnerId, firstName, lastName);
+        }
+
+        const lastMessage = row.chats?.[0];
+        const isUser1 = row.user1_id === currentUser.id;
+        const rawUnread = isUser1 ? row.user1_unread_count : row.user2_unread_count;
+        let unreadCount = Number(rawUnread);
+        if (!Number.isFinite(unreadCount) || unreadCount < 0) unreadCount = 0;
+
+        const match: ChatMatch = {
+          id: row.id,
+          created_at: row.created_at,
+          user1_id: row.user1_id,
+          user2_id: row.user2_id,
+          partner: partnerId
+            ? {
+                id: partnerId,
+                first_name: firstName,
+                last_name: lastName,
+                is_admin: partner?.is_admin === true,
+              }
+            : undefined,
+          first_name: firstName,
+          last_name: lastName,
+          last_message_obj: lastMessage,
+          unread_messages: unreadCount,
+          last_message: lastMessage?.message || '',
+          last_message_time: lastMessage?.created_at || row.created_at,
+        };
+
+        return match;
+      })
+      .filter((m): m is ChatMatch => Boolean(m))
+      .sort((a, b) => {
         const aTime = new Date(a.last_message_time || a.created_at).getTime();
         const bTime = new Date(b.last_message_time || b.created_at).getTime();
         return bTime - aTime;
       });
 
-    return matchesWithPartner as unknown as ChatMatch[];
+    return mapped;
   };
 
   // Optimistically update a specific match in the cached list (for instant UI updates)
@@ -700,7 +860,25 @@ const ChatPage = ({ currentUser, onUnreadChange, onDetailViewChange }: ChatPageP
 
       if (error) throw error;
 
-      const processedMatches = processMatchesData(matches || []);
+      const processedMatches = processMatchesData((matches || []) as unknown as MatchRow[]);
+
+      // Enrich with per-match unread counts from chats table (receiver_id + is_read=false)
+      const matchIds: string[] = processedMatches.map((m) => m.id);
+      if (matchIds.length > 0) {
+        const unreadRows = await fetchUnreadMatchIdsForMatches(matchIds, currentUser.id);
+
+        const unreadByMatchId = new Map<string, number>();
+        for (const row of unreadRows || []) {
+          const mid = (row as unknown as { match_id?: string }).match_id;
+          if (!mid) continue;
+          unreadByMatchId.set(mid, (unreadByMatchId.get(mid) || 0) + 1);
+        }
+
+        for (const m of processedMatches) {
+          const derived = unreadByMatchId.get(m.id) || 0;
+          m.unread_messages = Math.max(Number(m.unread_messages || 0), derived);
+        }
+      }
       
       // ⭐ OPTIMIZED: Fast shallow comparison instead of expensive JSON.stringify
       const listChanged = processedMatches.length !== chatCache.chats.length ||
@@ -710,7 +888,7 @@ const ChatPage = ({ currentUser, onUnreadChange, onDetailViewChange }: ChatPageP
         );
       
       if (listChanged) {
-        updateChatCache(processedMatches as any);
+        updateChatCache(processedMatches as unknown as CachedChat[]);
         setMatches(processedMatches);
       }
       
@@ -744,10 +922,28 @@ const ChatPage = ({ currentUser, onUnreadChange, onDetailViewChange }: ChatPageP
 
       if (error) throw error;
 
-      const processedMatches = processMatchesData(matches || []);
+      const processedMatches = processMatchesData((matches || []) as unknown as MatchRow[]);
+
+      // Enrich with per-match unread counts from chats table (receiver_id + is_read=false)
+      const matchIds: string[] = processedMatches.map((m) => m.id);
+      if (matchIds.length > 0) {
+        const unreadRows = await fetchUnreadMatchIdsForMatches(matchIds, currentUser.id);
+
+        const unreadByMatchId = new Map<string, number>();
+        for (const row of unreadRows || []) {
+          const mid = (row as unknown as { match_id?: string }).match_id;
+          if (!mid) continue;
+          unreadByMatchId.set(mid, (unreadByMatchId.get(mid) || 0) + 1);
+        }
+
+        for (const m of processedMatches) {
+          const derived = unreadByMatchId.get(m.id) || 0;
+          m.unread_messages = Math.max(Number(m.unread_messages || 0), derived);
+        }
+      }
       
       // ⭐ Update global cache (survives route changes like Instagram)
-      updateChatCache(processedMatches as any);
+      updateChatCache(processedMatches as unknown as CachedChat[]);
 
       setMatches(processedMatches);
       // Clear the refresh flag when we've just fetched
@@ -794,6 +990,9 @@ const ChatPage = ({ currentUser, onUnreadChange, onDetailViewChange }: ChatPageP
       }
       // Send warning notification if 9 days have passed
       else if (daysSinceMatch >= WARNING_DAYS && daysSinceMatch < WARNING_DAYS + 0.1) {
+        if (wasExpirationWarningSent(match.id)) {
+          continue;
+        }
         const partnerId = match.user1_id === currentUser.id ? match.user2_id : match.user1_id;
         const partnerName = match.first_name;
         
@@ -807,6 +1006,8 @@ const ChatPage = ({ currentUser, onUnreadChange, onDetailViewChange }: ChatPageP
             type: 'match',
             data: { matchId: match.id, partnerId }
           });
+
+          markExpirationWarningSent(match.id);
 
         } catch (error) {
           console.error('[ChatPage] Error sending expiration notification:', error);
@@ -848,8 +1049,6 @@ const ChatPage = ({ currentUser, onUnreadChange, onDetailViewChange }: ChatPageP
       // Filter out messages deleted for current user
       const visibleMessages = cached.messages.filter(msg => {
         const isDeletedForMe = msg.deleted_for && msg.deleted_for.includes(currentUser.id);
-        if (msg.deleted_for && msg.deleted_for.length > 0) {
-        }
         return !isDeletedForMe;
       });
       setMessages(visibleMessages);
@@ -896,6 +1095,7 @@ const ChatPage = ({ currentUser, onUnreadChange, onDetailViewChange }: ChatPageP
 
       setMessages(visibleMessages);
     } catch (error) {
+      // ignore fetch errors
     }
   };
 
@@ -1119,7 +1319,7 @@ const ChatPage = ({ currentUser, onUnreadChange, onDetailViewChange }: ChatPageP
 
       try {
       // Send the message to server with timeout
-      const queryPromise = new Promise<{ data: any; error: any }>((resolve) => {
+      const queryPromise = new Promise<{ data: unknown; error: unknown }>((resolve) => {
         supabase
           .from('chats')
           .insert({
@@ -1148,17 +1348,26 @@ const ChatPage = ({ currentUser, onUnreadChange, onDetailViewChange }: ChatPageP
 
       // Replace optimistic message with real one from server
       if (data) {
+        const serverData = data as unknown as ChatMessage;
         // INSTANT UPDATE: Update match list immediately with new message
-        updateMatchInBackground(selectedMatch.id, data);
+        updateMatchInBackground(selectedMatch.id, serverData);
         
         setMessages(prev => {
-          const serverMsg: ChatMessage = { 
-            ...data, 
-            sent_at: data.created_at, 
-            receiver_id: optimisticMessage.receiver_id 
-          } as ChatMessage;
+          const serverMsg: ChatMessage = {
+            id: serverData.id,
+            sender_id: serverData.sender_id,
+            receiver_id: optimisticMessage.receiver_id,
+            message: serverData.message,
+            sent_at: serverData.created_at || serverData.sent_at,
+            created_at: serverData.created_at,
+            is_read: serverData.is_read,
+            match_id: serverData.match_id || selectedMatch.id,
+            deleted_for: serverData.deleted_for,
+            reply_to: serverData.reply_to,
+            sender: serverData.sender,
+          };
 
-          const hasServer = prev.some(m => m.id === data.id);
+          const hasServer = prev.some(m => m.id === serverData.id);
           const hasTemp = prev.some(m => m.id === tempId);
 
 
@@ -1259,6 +1468,7 @@ const ChatPage = ({ currentUser, onUnreadChange, onDetailViewChange }: ChatPageP
       // Remove from UI immediately
       setMessages(prev => prev.filter(msg => msg.id !== messageId));
     } catch (error) {
+      // ignore delete errors
     }
   };
 
@@ -1331,7 +1541,9 @@ const ChatPage = ({ currentUser, onUnreadChange, onDetailViewChange }: ChatPageP
           });
         }
       }
-    } catch (error) {}
+    } catch (error) {
+      // ignore delete errors
+    }
   };
 
   const deleteMessageForEveryone = async (messageId: string) => {
@@ -1359,7 +1571,9 @@ const ChatPage = ({ currentUser, onUnreadChange, onDetailViewChange }: ChatPageP
       
       // Clear cache
       chatMessagesCache.delete(selectedMatch.id);
-    } catch (error) {}
+    } catch (error) {
+      // ignore delete errors
+    }
   };
 
   const handleScrollToMessage = (messageId: string) => {
@@ -1410,6 +1624,7 @@ const ChatPage = ({ currentUser, onUnreadChange, onDetailViewChange }: ChatPageP
       });
 
     } catch (error) {
+      // ignore update errors
     }
   };
 
