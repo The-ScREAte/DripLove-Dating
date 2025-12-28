@@ -358,6 +358,12 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, isPremium, profileComplet
   const [usersWhoLikedMeIds, setUsersWhoLikedMeIds] = useState<string[]>([]);
   // New: Store images by userId for instant access
   const [userImages, setUserImages] = useState<{ [key: string]: string[] }>({});
+  // `preloadProfileImages` is memoized and runs off the UI thread; keep a ref so we don't
+  // accidentally re-fetch images due to a stale `userImages` closure.
+  const userImagesRef = useRef<{ [key: string]: string[] }>({});
+  useEffect(() => {
+    userImagesRef.current = userImages;
+  }, [userImages]);
   // We avoid storing HTMLImageElement objects in state to prevent GC pressure
   // and rely on useImagePreloader for actual image loading status.
   const [preloadedImages, setPreloadedImages] = useState<{ [key: string]: string[] }>({});
@@ -1768,38 +1774,65 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, isPremium, profileComplet
     const batchSize = isAndroid ? 2 : 6;
     const profilesToLoad = profiles.slice(startIndex, startIndex + batchSize);
     
-    profilesToLoad.forEach((user, profileIndex) => {
-      if (!user?.id) return;
-      if (userImages[user.id]?.length > 0) return; // Already loaded
-      if (requestedImageProfileIds.current.has(user.id)) return; // Already loading
-      
-      // ⭐ ANDROID OPTIMIZATION: Stop loading next images if user moved away from this index
-      const indexOfProfileBeingLoaded = startIndex + profileIndex;
-      
-      requestedImageProfileIds.current.add(user.id);
-      
-      // Load in background - don't await
-      (async () => {
-        try {
-          const { data: images } = await supabase
-            .from('user_images')
-            .select('image_url, is_approved')
-            .eq('user_id', user.id)
-            .eq('is_approved', true)
-            .order('image_order', { ascending: true });
+    // Filter out profiles that are already loaded or currently loading
+    const profilesNeedingImages = profilesToLoad.filter((user) => {
+      if (!user?.id) return false;
+      if (userImagesRef.current[user.id]?.length > 0) return false; // Already loaded
+      if (requestedImageProfileIds.current.has(user.id)) return false; // Already loading
+      return true;
+    });
 
-          if (!images || images.length === 0) {
+    if (profilesNeedingImages.length === 0) return;
+
+    const idsToLoad = profilesNeedingImages.map((u) => u.id);
+    idsToLoad.forEach((id) => requestedImageProfileIds.current.add(id));
+
+    // Load in background - don't await
+    (async () => {
+      try {
+        type UserImageRow = { user_id: string; image_url: string; image_order: number | null };
+
+        // ⭐ PERFORMANCE: Batch fetch images for this preload window (avoid per-profile N+1 queries)
+        const { data: imageRows } = await supabase
+          .from('user_images')
+          .select('user_id, image_url, image_order')
+          .in('user_id', idsToLoad)
+          .eq('is_approved', true)
+          .order('user_id', { ascending: true })
+          .order('image_order', { ascending: true })
+          .returns<UserImageRow[]>();
+
+        const byUser: Record<string, string[]> = {};
+        const allowedUserIds = new Set(idsToLoad);
+        for (const row of imageRows || []) {
+          if (!row?.user_id || !row?.image_url) continue;
+          if (!allowedUserIds.has(row.user_id)) continue;
+          if (!byUser[row.user_id]) byUser[row.user_id] = [];
+          byUser[row.user_id].push(row.image_url);
+        }
+
+        const userImageUpdates: Record<string, string[]> = {};
+        const usersWithImages: PotentialMatch[] = [];
+
+        // Build updates first, then apply in one state update to reduce re-renders.
+        for (const user of profilesNeedingImages) {
+          const imageUrls = byUser[user.id] || [];
+          if (imageUrls.length === 0) {
             requestedImageProfileIds.current.delete(user.id);
-            return;
+            continue;
           }
+          userImageUpdates[user.id] = imageUrls;
+          usersWithImages.push(user);
+        }
 
-          const imageUrls = images.map(img => img.image_url);
+        if (Object.keys(userImageUpdates).length > 0) {
+          setUserImages((prev) => ({ ...prev, ...userImageUpdates }));
+        }
 
-          // Update state immediately
-          setUserImages(prev => ({ ...prev, [user.id]: imageUrls }));
-
-          // iOS/Web: blob preloading for instant render; Android WebView: skip blobs (too expensive)
-          if (!isAndroid) {
+        // iOS/Web: blob preloading for instant render; Android WebView: skip blobs (too expensive)
+        if (!isAndroid) {
+          for (const user of usersWithImages) {
+            const imageUrls = userImageUpdates[user.id] || [];
             const blobMap: { [url: string]: string } = {};
             await Promise.all(
               imageUrls.map(async (originalUrl) => {
@@ -1811,16 +1844,22 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, isPremium, profileComplet
                 }
               })
             );
-
-            setPreloadedBlobImages(prev => ({ ...prev, [user.id]: blobMap }));
+            setPreloadedBlobImages((prev) => ({ ...prev, [user.id]: blobMap }));
+            requestedImageProfileIds.current.delete(user.id);
           }
-        } catch (error) {
-          // ignore preload errors; fallback to original URLs
-        } finally {
-          requestedImageProfileIds.current.delete(user.id);
+        } else {
+          // Android: no blob preloading; clear loading flags immediately after setting URLs.
+          for (const user of usersWithImages) {
+            requestedImageProfileIds.current.delete(user.id);
+          }
         }
-      })();
-    });
+      } catch {
+        // ignore preload errors; fallback to original URLs
+      } finally {
+        // Ensure we don't leak "loading" state
+        idsToLoad.forEach((id) => requestedImageProfileIds.current.delete(id));
+      }
+    })();
   }, []);
 
   // Legacy compatibility
@@ -2676,7 +2715,7 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, isPremium, profileComplet
 
             const { data: mutualLike } = await supabase
               .from('likes')
-              .select('*')
+              .select('id')
               .match({ liker_id: prevMatch.id, liked_id: currentUser.id })
               .maybeSingle();
 
