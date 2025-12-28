@@ -454,8 +454,14 @@ const MainApp = ({ user, onLogout }: MainAppProps) => {
     error: pushError,
     sendMatchNotification,
     sendMessageNotification,
-    sendLikeNotification
+    sendLikeNotification,
+    recordUserActivity
   } = usePushNotifications(user?.id);
+
+  // Record activity on tab changes and meaningful interactions
+  useEffect(() => {
+    recordUserActivity();
+  }, [activeTab, recordUserActivity]);
 
     // Silent push notification initialization - no user notifications
   useEffect(() => {

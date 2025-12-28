@@ -575,7 +575,7 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, isPremium, profileComplet
   }, [currentUser?.id]);
   
   const { toast } = useToast();
-  const { sendMatchNotification, sendMultipleLikesNotification } = usePushNotifications(currentUser?.id);
+  const { sendMatchNotification, sendMultipleLikesNotification, recordUserActivity } = usePushNotifications(currentUser?.id);
   const {
     subscription,
     loading: subscriptionLoading,
