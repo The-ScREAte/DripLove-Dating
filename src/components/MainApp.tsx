@@ -536,24 +536,50 @@ const MainApp = ({ user, onLogout }: MainAppProps) => {
     }
   }, [user?.id, activeTab]); // Preload based on active tab
 
+  // Throttled unread count refresh to prevent excessive calls
+  const lastUnreadRefreshRef = React.useRef<number>(0);
+  const throttledFetchUnreadCount = React.useCallback(() => {
+    const now = Date.now();
+    // Only refresh if at least 2 seconds have passed since last refresh
+    if (now - lastUnreadRefreshRef.current >= 2000) {
+      lastUnreadRefreshRef.current = now;
+      fetchUnreadCount();
+    }
+  }, []);
+
   useEffect(() => {
     if (!user?.id) return;
 
-    const channel = supabase
-      .channel('nav-matches')
+    // Use two filtered subscriptions for better performance (matches user1 or user2)
+    const channel1 = supabase
+      .channel(`nav-matches-user1-${user.id}`)
       .on('postgres_changes', {
         event: '*',
         schema: 'public',
         table: 'matches',
-      }, (payload) => {
-        fetchUnreadCount();
+        filter: `user1_id=eq.${user.id}`
+      }, () => {
+        throttledFetchUnreadCount();
+      })
+      .subscribe();
+
+    const channel2 = supabase
+      .channel(`nav-matches-user2-${user.id}`)
+      .on('postgres_changes', {
+        event: '*',
+        schema: 'public',
+        table: 'matches',
+        filter: `user2_id=eq.${user.id}`
+      }, () => {
+        throttledFetchUnreadCount();
       })
       .subscribe();
 
     return () => {
-      supabase.removeChannel(channel);
+      supabase.removeChannel(channel1);
+      supabase.removeChannel(channel2);
     };
-  }, [user?.id]); // Depend on user.id rather than full user object
+  }, [user?.id, throttledFetchUnreadCount]); // Depend on user.id rather than full user object
 
   const fetchUserProfile = async () => {
     if (!user?.id) {
