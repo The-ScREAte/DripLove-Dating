@@ -153,46 +153,63 @@ const MainApp = ({ user, onLogout }: MainAppProps) => {
   const fetchUnreadCount = useCallback(async () => {
     if (!userId) return;
 
-    type MatchUnreadRow = {
-      id: string;
-      user1_id: string;
-      user2_id: string;
-      user1_unread_count: number | null;
-      user2_unread_count: number | null;
-    };
-    type MatchesUnreadQueryResult = {
-      data: MatchUnreadRow[] | null;
-      error: { message?: string } | null;
-    };
-    type MatchesUnreadClient = {
+    type MatchIdRow = { id: string };
+    type MatchIdsQueryResult = { data: MatchIdRow[] | null; error: { message?: string } | null };
+    type UnreadCountQueryResult = { count: number | null; error: { message?: string } | null };
+
+    type MatchIdsClient = {
       from: (table: 'matches') => {
-        select: (columns: string) => {
-          or: (filters: string) => Promise<MatchesUnreadQueryResult>;
+        select: (columns: 'id') => {
+          or: (filters: string) => Promise<MatchIdsQueryResult>;
+        };
+      };
+    };
+
+    type ChatsCountClient = {
+      from: (table: 'chats') => {
+        select: (
+          columns: 'id',
+          options: { count: 'exact'; head: true }
+        ) => {
+          in: (column: 'match_id', values: string[]) => {
+            neq: (column: 'sender_id', value: string) => {
+              or: (filters: string) => Promise<UnreadCountQueryResult>;
+            };
+          };
         };
       };
     };
 
     try {
-      const matchesClient = supabase as unknown as MatchesUnreadClient;
-      const { data, error } = await matchesClient
+      // 1) Find matches that involve this user.
+      const matchIdsClient = supabase as unknown as MatchIdsClient;
+      const { data: matchRows, error: matchError } = await matchIdsClient
         .from('matches')
-        .select('id,user1_id,user2_id,user1_unread_count,user2_unread_count')
+        .select('id')
         .or(`user1_id.eq.${userId},user2_id.eq.${userId}`);
 
-      if (error) throw error;
+      if (matchError) throw matchError;
 
-      const rows = data || [];
-      userMatchIdSetRef.current = new Set(rows.map((r) => r.id));
+      const matchIds = (matchRows || []).map((m) => m.id).filter(Boolean);
+      userMatchIdSetRef.current = new Set(matchIds);
 
-      let total = 0;
-      for (const row of rows) {
-        const isUser1 = row.user1_id === userId;
-        const raw = isUser1 ? row.user1_unread_count : row.user2_unread_count;
-        const n = Number(raw);
-        if (Number.isFinite(n) && n > 0) total += n;
+      if (matchIds.length === 0) {
+        setUnreadCount(0);
+        return;
       }
 
-      setUnreadCount(total);
+      // 2) Count unread incoming messages across those matches.
+      // chats table has no receiver_id in this project; treat incoming as sender_id != userId.
+      const chatsClient = supabase as unknown as ChatsCountClient;
+      const { count, error } = await chatsClient
+        .from('chats')
+        .select('id', { count: 'exact', head: true })
+        .in('match_id', matchIds)
+        .neq('sender_id', userId)
+        .or('is_read.is.null,is_read.eq.false');
+
+      if (error) throw error;
+      setUnreadCount(count || 0);
     } catch (err) {
       const message =
         typeof err === 'object' && err && 'message' in err
