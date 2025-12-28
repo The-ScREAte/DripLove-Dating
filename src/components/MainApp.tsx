@@ -226,14 +226,20 @@ const MainApp = ({ user, onLogout }: MainAppProps) => {
     }
   }, [userId]);
 
-  // Throttled unread count refresh to prevent excessive calls
+  // Throttled unread count refresh to prevent excessive calls from realtime events
   const lastUnreadRefreshRef = useRef<number>(0);
   const throttledFetchUnreadCount = useCallback(() => {
     const now = Date.now();
-    if (now - lastUnreadRefreshRef.current >= 2000) {
+    if (now - lastUnreadRefreshRef.current >= 1500) {
       lastUnreadRefreshRef.current = now;
       void fetchUnreadCount();
     }
+  }, [fetchUnreadCount]);
+
+  // Force immediate refresh (bypasses throttle) - used after explicit user actions
+  const forceRefreshUnreadCount = useCallback(() => {
+    lastUnreadRefreshRef.current = Date.now();
+    void fetchUnreadCount();
   }, [fetchUnreadCount]);
 
   // Simple keyboard detection for mobile
@@ -801,7 +807,7 @@ const MainApp = ({ user, onLogout }: MainAppProps) => {
       case 'dripcheck':
         return <DiscoverPage currentUser={profile} onNavigateToChat={handleNavigateToChat} isPremium={isPremium} />;
       case 'chat':
-        return <ChatPage currentUser={profile} onUnreadChange={fetchUnreadCount} onDetailViewChange={setIsChatDetailOpen} />;
+        return <ChatPage currentUser={profile} onUnreadChange={forceRefreshUnreadCount} onDetailViewChange={setIsChatDetailOpen} />;
       case 'liked':
         return <LikedMePage key={profile.id} currentUser={profile} isPremium={isPremium} />;
       case 'profile':
@@ -819,7 +825,7 @@ const MainApp = ({ user, onLogout }: MainAppProps) => {
       default:
         return <DiscoverPage currentUser={profile} onNavigateToChat={handleNavigateToChat} isPremium={isPremium} />;
     }
-  }, [activeTab, profile, isPremium, handleNavigateToChat, fetchUnreadCount, setIsChatDetailOpen, fetchUserProfile, onLogout, handleShowTerms, handleShowPrivacy]);
+  }, [activeTab, profile, isPremium, handleNavigateToChat, forceRefreshUnreadCount, setIsChatDetailOpen, fetchUserProfile, onLogout, handleShowTerms, handleShowPrivacy]);
 
   const renderContent = () => {
     if (showTerms) {
@@ -901,7 +907,7 @@ const MainApp = ({ user, onLogout }: MainAppProps) => {
               className="w-full h-full" 
               style={{ display: activeTab === 'chat' ? 'block' : 'none' }}
             > 
-              <ChatPage currentUser={profile} onUnreadChange={fetchUnreadCount} onDetailViewChange={setIsChatDetailOpen} />
+              <ChatPage currentUser={profile} onUnreadChange={forceRefreshUnreadCount} onDetailViewChange={setIsChatDetailOpen} />
             </div>
           </Suspense>
 
