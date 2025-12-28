@@ -49,19 +49,44 @@ let webPricing: PricingConfig = {
   source: 'fallback',
 };
 
-// Load web pricing from database
-async function loadWebPricingFromDB(): Promise<void> {
+// Country-specific pricing from DB
+interface CountryPrice {
+  country: string;
+  currency: string;
+  price: number;
+}
+
+let countryPricesCache: CountryPrice[] = [];
+
+// Load web pricing from database based on user's country
+async function loadWebPricingFromDB(userCountryCode?: string): Promise<void> {
   try {
     const { data, error } = await supabase
       .from('payment_config')
-      .select('default_international_price, default_international_currency')
+      .select('default_international_price, default_international_currency, country_prices')
       .order('created_at', { ascending: false })
       .limit(1)
       .single();
 
     if (!error && data) {
-      const price = data.default_international_price?.toString() || '1.99';
-      const currency = data.default_international_currency || 'USD';
+      // Store country prices for later use
+      countryPricesCache = (data.country_prices as unknown as CountryPrice[]) || [];
+      
+      // Check if we have a country-specific price for the user
+      let price = data.default_international_price?.toString() || '1.99';
+      let currency = data.default_international_currency || 'USD';
+      
+      if (userCountryCode && countryPricesCache.length > 0) {
+        const countryPrice = countryPricesCache.find(
+          cp => cp.country?.toUpperCase() === userCountryCode?.toUpperCase()
+        );
+        if (countryPrice) {
+          price = countryPrice.price?.toString() || price;
+          currency = countryPrice.currency || currency;
+          console.log('[Pricing] Using country-specific price for', userCountryCode, ':', price, currency);
+        }
+      }
+      
       const symbol = currencySymbols[currency] || currency;
       const ghsPrice = calculateGHSPrice(price, currency);
       
@@ -79,6 +104,27 @@ async function loadWebPricingFromDB(): Promise<void> {
   } catch (error) {
     console.error('[Pricing] Error loading web pricing from DB:', error);
   }
+}
+
+// Get user's country code from their profile
+async function getUserCountryCode(userId?: string): Promise<string | null> {
+  if (!userId) return null;
+  
+  try {
+    const { data, error } = await supabase
+      .from('profiles')
+      .select('country_code')
+      .eq('id', userId)
+      .single();
+    
+    if (!error && data?.country_code) {
+      return data.country_code;
+    }
+  } catch (error) {
+    console.error('[Pricing] Error getting user country:', error);
+  }
+  
+  return null;
 }
 
 // Google Play product IDs (must match iap-google.ts)
@@ -302,11 +348,15 @@ async function loadPricingConfig(userId?: string): Promise<PricingConfig> {
     const Capacitor = await getCapacitor();
     const platform = Capacitor?.getPlatform() || 'web';
     
-    // Load web pricing from database first
-    await loadWebPricingFromDB();
+    // Get user's country code for country-specific pricing
+    const userCountryCode = await getUserCountryCode(userId);
     
-    // WEB: Use pricing from database
+    // Load web pricing from database first (with country-specific fallback)
+    await loadWebPricingFromDB(userCountryCode || undefined);
+    
+    // WEB: Use pricing from database (already country-specific if available)
     if (!(await isNativeApp())) {
+      console.log('[Pricing] Web platform, using DB pricing for country:', userCountryCode);
       return { ...webPricing };
     }
     
@@ -381,15 +431,15 @@ export function preloadPricingConfig(userId?: string): void {
   });
 }
 
-// Hook to use pricing config
-export function usePricingConfig(): PricingConfig {
+// Hook to use pricing config - accepts optional userId for country-specific pricing
+export function usePricingConfig(userId?: string): PricingConfig {
   const [config, setConfig] = useState<PricingConfig>(
     cachedConfig || { ...webPricing, loading: true }
   );
 
   useEffect(() => {
-    // If already cached, use it
-    if (cachedConfig) {
+    // If already cached and no userId change, use it
+    if (cachedConfig && !userId) {
       setConfig(cachedConfig);
       return;
     }
@@ -400,15 +450,15 @@ export function usePricingConfig(): PricingConfig {
       return;
     }
 
-    // Otherwise, load fresh
+    // Otherwise, load fresh with userId for country-specific pricing
     const loadConfig = async () => {
-      const freshConfig = await loadPricingConfig();
+      const freshConfig = await loadPricingConfig(userId);
       cachedConfig = freshConfig;
       setConfig(freshConfig);
     };
 
     loadConfig();
-  }, []);
+  }, [userId]);
 
   return config;
 }

@@ -152,47 +152,30 @@ const MainApp = ({ user, onLogout }: MainAppProps) => {
 
   const fetchUnreadCount = useCallback(async () => {
     if (!userId) return;
-
-    type MatchUnreadRow = {
-      id: string;
-      user1_id: string;
-      user2_id: string;
-      user1_unread_count: number | null;
-      user2_unread_count: number | null;
-    };
-    type MatchesUnreadQueryResult = {
-      data: MatchUnreadRow[] | null;
-      error: { message?: string } | null;
-    };
-    type MatchesUnreadClient = {
-      from: (table: 'matches') => {
-        select: (columns: string) => {
-          or: (filters: string) => Promise<MatchesUnreadQueryResult>;
-        };
-      };
-    };
-
     try {
-      // Only count unread for matches that belong to this user.
-      const matchesClient = supabase as unknown as MatchesUnreadClient;
-      const { data, error } = await matchesClient
+      // Fetch matches where current user is user1 or user2, using standard Supabase query
+      const { data: matchesData, error: matchesError } = await supabase
         .from('matches')
-        .select('id,user1_id,user2_id,user1_unread_count,user2_unread_count')
+        .select('id, user1_id, user2_id, user1_unread_count, user2_unread_count')
         .or(`user1_id.eq.${userId},user2_id.eq.${userId}`);
 
-      if (error) throw error;
+      if (matchesError) throw matchesError;
 
-      const rows = data || [];
+      const rows = matchesData || [];
       userMatchIdSetRef.current = new Set(rows.map((r) => r.id));
 
+      // Only count unread messages FOR the current user (not what they sent)
       let total = 0;
       for (const row of rows) {
         const isUser1 = row.user1_id === userId;
-        const raw = isUser1 ? row.user1_unread_count : row.user2_unread_count;
-        const n = Number(raw);
-        if (Number.isFinite(n) && n > 0) total += n;
+        // If user is user1, count user1_unread_count (messages user1 hasn't read)
+        // If user is user2, count user2_unread_count (messages user2 hasn't read)
+        const unreadForUser = isUser1 ? row.user1_unread_count : row.user2_unread_count;
+        const n = Number(unreadForUser) || 0;
+        if (n > 0) total += n;
       }
 
+      console.log('[MainApp] Unread count calculation:', { userId, matchCount: rows.length, total });
       setUnreadCount(total);
     } catch (err) {
       const message =
