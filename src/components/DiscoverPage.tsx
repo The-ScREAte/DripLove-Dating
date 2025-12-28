@@ -243,7 +243,8 @@ const normalizeCountryCodeList = (value: unknown, baseCountryCode?: string): str
       // ignore
     }
 
-    const cleaned = trimmed.replace(/[{}\[\]"]+/g, '');
+    // Note: `[` does not need escaping inside a character class; `]` does.
+    const cleaned = trimmed.replace(/[{}[\]"]+/g, '');
     const parts = cleaned.split(',').map((s) => normalizeCountryCode(s)).filter(Boolean);
     return normalize(parts);
   }
@@ -294,12 +295,50 @@ interface PassedUser {
   passed_at: Date;
 }
 
+type WindowWithCdvPurchase = Window & {
+  CdvPurchase?: {
+    store?: {
+      get?: (id: string) => unknown;
+      when?: () => {
+        productUpdated: (cb: () => void) => void;
+      };
+    };
+  };
+};
+
+type CdvPurchaseProduct = {
+  getOffer?: () => unknown;
+  offers?: unknown[];
+};
+
+interface UserImageRow {
+  image_url: string;
+  is_approved: boolean | null;
+  moderation_status: string | null;
+}
+
+interface AdsRow {
+  id: string;
+  name: string;
+  about: string;
+  image_url: string;
+  video_url: string | null;
+  link: string | null;
+  link_as: string | null;
+  media_type: string | null;
+  target_countries: unknown;
+}
+
+type ProfileRow = Partial<CurrentUser> & { id: string };
+
+type WindowWithIntervals = Window & {
+  continuousLoadingInterval?: number | null;
+  chatMatchesCache?: Map<string, unknown>;
+};
+
 const DiscoverPage = ({ currentUser, onNavigateToChat, isPremium, profileCompletion: parentProfileCompletion }: DiscoverPageProps) => {
   const { t } = useTranslation();
-  
-  // 🔍 DEBUG: Log premium status on mount
-  useEffect(() => {
-  }, [isPremium, currentUser?.id]);
+
   
   // Track viewport height safely (no SSR crash)
   const [vh, setVh] = useState<number>(() => (typeof window !== 'undefined' ? window.innerHeight : 800));
@@ -313,15 +352,18 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, isPremium, profileComplet
   const [canBuy, setCanBuy] = useState(false);
   useEffect(() => {
     function onProductUpdated() {
-      // @ts-ignore
-      const p = window.CdvPurchase?.store?.get('com.driplove.dating.premium.monthlysub1');
+      const win = window as WindowWithCdvPurchase;
+      const p = win.CdvPurchase?.store?.get?.('com.driplove.dating.premium.monthlysub1');
+      const product = (p as unknown as CdvPurchaseProduct | undefined);
+
       // More robust offer detection (handles plugin variations)
-      const offer = (p as any)?.getOffer?.() ?? (p as any)?.offers?.[0];
+      const offer = (typeof product?.getOffer === 'function' ? product.getOffer() : undefined)
+        ?? (Array.isArray(product?.offers) ? product.offers[0] : undefined);
       setCanBuy(!!offer);
     }
-    // @ts-ignore
-    const store = window.CdvPurchase?.store;
-    if (store && store.when) {
+    const win = window as WindowWithCdvPurchase;
+    const store = win.CdvPurchase?.store;
+    if (store?.when) {
       store.when().productUpdated(onProductUpdated);
     }
     onProductUpdated();
@@ -376,7 +418,7 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, isPremium, profileComplet
   const [reverseUsageToday, setReverseUsageToday] = useState(0);
   const [profileCompletion, setProfileCompletion] = useState(0);
   const [profileMissingFields, setProfileMissingFields] = useState<string[]>([]);
-  const [userProfileImages, setUserProfileImages] = useState<any[]>([]);
+  const [userProfileImages, setUserProfileImages] = useState<UserImageRow[]>([]);
   const [showProfileCompletionModal, setShowProfileCompletionModal] = useState(false);
   const [todaySwipeCount, setTodaySwipeCount] = useState(0);
   const [isArchivedFallback, setIsArchivedFallback] = useState(false); // Two-phase: true when showing archived profiles
@@ -468,7 +510,7 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, isPremium, profileComplet
     const fetchAds = async () => {
       try {
         // Build query with server-side filtering when possible
-        let query = supabase
+        const query = supabase
           .from('ads')
           .select('id, name, about, image_url, video_url, link, link_as, media_type, target_countries')
           .order('created_at', { ascending: false });
@@ -479,7 +521,9 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, isPremium, profileComplet
 
         // Filter ads by COUNTRY only - still needed for target_countries array filtering
         // Server-side contains filter for arrays isn't reliable with empty arrays
-        const filteredAds = (data || []).filter((ad: any) => {
+        const rows: AdsRow[] = Array.isArray(data) ? (data as unknown as AdsRow[]) : [];
+
+        const filteredAds = rows.filter((ad) => {
           const targetCountries = normalizeCountryCodeList(ad.target_countries);
           // If no target countries specified, show to everyone
           if (targetCountries.length === 0) return true;
@@ -488,8 +532,13 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, isPremium, profileComplet
         });
 
         // Mark ads with isAd property
-        const adsWithMarker: AdData[] = filteredAds.map((ad: any) => ({
-          ...ad,
+        const adsWithMarker: AdData[] = filteredAds.map((ad) => ({
+          id: ad.id,
+          name: ad.name,
+          about: ad.about,
+          image_url: ad.image_url,
+          link: ad.link,
+          link_as: ad.link_as,
           isAd: true as const
         }));
 
@@ -603,9 +652,13 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, isPremium, profileComplet
   // --- END: Swipe Guide Popup State ---
 
   // Check for premium activation from payment success (run once on mount)
+  const handledPremiumActivatedRef = useRef(false);
   useEffect(() => {
+    if (handledPremiumActivatedRef.current) return;
+
     const urlParams = new URLSearchParams(window.location.search);
     if (urlParams.get('premium') === 'activated') {
+      handledPremiumActivatedRef.current = true;
       refetchSubscription();
       toast({
         title: t('discover.welcomeToPremium.title'),
@@ -616,7 +669,7 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, isPremium, profileComplet
       const newUrl = window.location.pathname;
       window.history.replaceState({}, '', newUrl);
     }
-  }, []); // Empty dependency array - only run once on mount
+  }, [refetchSubscription, t, toast]);
 
   // Fetch current reverse usage for today
   // Fetch user profile and calculate completion on mount
@@ -784,7 +837,7 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, isPremium, profileComplet
       // Allow full fetches again after background refresh completes
       suppressFetchRef.current = false;
     }
-  }, [currentUser?.id, allowedGenders]);
+  }, [currentUser?.id, allowedGenders, fetchPotentialMatchesData]);
 
   // ⭐ HELPER: Fetch unlocked country profiles (consolidated to avoid duplication)
   const fetchUnlockedCountryProfiles = useCallback(async ({
@@ -830,21 +883,22 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, isPremium, profileComplet
         if (error) {
           return [];
         }
-        return data || [];
+        const rows: ProfileRow[] = Array.isArray(data) ? (data as unknown as ProfileRow[]) : [];
+        return rows;
       })
     );
 
     // Flatten + dedupe
-    const flat = results.flat();
-    const unique = Array.from(new Map(flat.map((p: any) => [p.id, p])).values());
+    const flat: ProfileRow[] = results.flat();
+    const unique: ProfileRow[] = Array.from(new Map(flat.map((p) => [p.id, p])).values());
 
     // Normalize fetched profile country codes to avoid mismatches (e.g. NGA→NG, KEN→KE).
-    unique.forEach((p: any) => {
-      p.country_code = normalizeCountryCode(p.country_code || '');
+    unique.forEach((p) => {
+      p.country_code = normalizeCountryCode(String(p.country_code || ''));
     });
 
     // Mark all unlocked country profiles with distance = 999 (only if not already set)
-    unique.forEach((p: any) => (distanceMap[p.id] ??= 999));
+    unique.forEach((p) => (distanceMap[p.id] ??= 999));
 
     // Hard cap to avoid unbounded growth
     return unique.slice(0, Math.max(limit, perCountryLimit * countryCodes.length));
@@ -862,7 +916,7 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, isPremium, profileComplet
     ] = await Promise.all([
       supabase
         .from('profiles')
-        .select('max_distance, distance_preference, country, country_code, min_age, max_age, preference, unlocked_countries, profile_completion')
+        .select('max_distance, distance_preference, country, country_code, min_age, max_age, preference, unlocked_countries, profile_completion, latitude, longitude')
         .eq('id', userId)
         .single(),
       supabase
