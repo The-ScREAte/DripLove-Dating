@@ -201,12 +201,19 @@ const MainApp = ({ user, onLogout }: MainAppProps) => {
       // 2) Count unread incoming messages across those matches.
       // chats table has no receiver_id in this project; treat incoming as sender_id != userId.
       const chatsClient = supabase as unknown as ChatsCountClient;
+      const deletedForValue = `{${userId}}`;
+      const unreadAndNotDeletedForMe =
+        `and(is_read.is.null,deleted_for.is.null),` +
+        `and(is_read.eq.false,deleted_for.is.null),` +
+        `and(is_read.is.null,deleted_for.not.cs.${deletedForValue}),` +
+        `and(is_read.eq.false,deleted_for.not.cs.${deletedForValue})`;
+
       const { count, error } = await chatsClient
         .from('chats')
         .select('id', { count: 'exact', head: true })
         .in('match_id', matchIds)
         .neq('sender_id', userId)
-        .or('is_read.is.null,is_read.eq.false');
+        .or(unreadAndNotDeletedForMe);
 
       if (error) throw error;
       setUnreadCount(count || 0);
