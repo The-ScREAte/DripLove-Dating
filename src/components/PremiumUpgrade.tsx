@@ -204,7 +204,8 @@ const PremiumUpgrade = ({ currentUser, onClose, preselectedPlan }: PremiumUpgrad
   }, [isAndroidNative]);
   
   // Use pricing config hook - now fetches localized IAP prices directly
-  const pricingConfig = usePricingConfig();
+  // Pass currentUser.id for country-specific pricing from DB
+  const pricingConfig = usePricingConfig(currentUser?.id);
   
   // Extract pricing info - displayPrice contains the full localized price from IAP
   const displayPrice = pricingConfig.displayPrice; // e.g., "$4.99", "₵39.99", "₦4,499"

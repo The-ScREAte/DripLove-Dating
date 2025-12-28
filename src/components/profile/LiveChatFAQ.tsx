@@ -140,7 +140,7 @@ const LiveChatFAQ: React.FC = () => {
   const [isOpen, setIsOpen] = useState(false);
   const [selectedCategory, setSelectedCategory] = useState<string>('all');
   const [selectedFAQ, setSelectedFAQ] = useState<FAQItem | null>(null);
-  const pricing = usePricingConfig();
+  const pricing = usePricingConfig(); // No userId needed for FAQ - uses cached/default
   const { isPremium } = useEnhancedSubscription();
 
   const filteredFAQs = selectedCategory === 'all' 
