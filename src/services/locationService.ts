@@ -19,9 +19,19 @@ export interface UserLocation {
   maxDistance?: number;
 }
 
+// Simple TTL cache to prevent repeated calls during rapid swiping
+interface CacheEntry {
+  data: LocationMatch[];
+  timestamp: number;
+}
+
 class LocationService {
+  private cache: Map<string, CacheEntry> = new Map();
+  private readonly CACHE_TTL_MS = 3 * 60 * 1000; // 3 minutes TTL
+
   /**
    * Get potential matches based on user's location and preferences
+   * Uses RPC for server-side filtering (fast), falls back to safe JS filtering if needed
    */
   async getLocationBasedMatches(
     userId: string, 
@@ -29,18 +39,85 @@ class LocationService {
   ): Promise<LocationMatch[]> {
     if (!userId) return [];
 
+    // Check cache first
+    const cacheKey = `${userId}:${maxDistance || 'default'}`;
+    const cached = this.cache.get(cacheKey);
+    if (cached && (Date.now() - cached.timestamp) < this.CACHE_TTL_MS) {
+      return cached.data;
+    }
+
     try {
-      return await this.getFallbackLocationMatches(userId, maxDistance);
+      // Try RPC first (server-side filtering - fast)
+      const result = await this.getRpcLocationMatches(userId, maxDistance);
+      
+      if (result.length > 0) {
+        // Cache the result
+        this.cache.set(cacheKey, { data: result, timestamp: Date.now() });
+        return result;
+      }
+      
+      // If RPC returns empty, try safe fallback
+      const fallback = await this.getSafeFallbackMatches(userId, maxDistance);
+      this.cache.set(cacheKey, { data: fallback, timestamp: Date.now() });
+      return fallback;
       
     } catch (error) {
-      return await this.getFallbackLocationMatches(userId, maxDistance);
+      // RPC failed, use safe fallback
+      try {
+        const fallback = await this.getSafeFallbackMatches(userId, maxDistance);
+        this.cache.set(cacheKey, { data: fallback, timestamp: Date.now() });
+        return fallback;
+      } catch {
+        return [];
+      }
     }
   }
 
   /**
-   * Fallback location matching when database functions aren't available
+   * Use the database RPC function for server-side location filtering
    */
-  private async getFallbackLocationMatches(
+  private async getRpcLocationMatches(
+    userId: string,
+    maxDistance?: number
+  ): Promise<LocationMatch[]> {
+    // Get user's max_distance preference if not provided
+    let searchDistance = maxDistance;
+    if (!searchDistance) {
+      const { data: user } = await supabase
+        .from('profiles')
+        .select('max_distance')
+        .eq('id', userId)
+        .single();
+      searchDistance = user?.max_distance || 50;
+    }
+
+    // Call the RPC function that does server-side filtering
+    const { data, error } = await supabase.rpc('find_matches_by_location', {
+      user_id: userId,
+      max_distance_km: searchDistance
+    });
+
+    if (error) {
+      throw error;
+    }
+
+    if (!data || data.length === 0) {
+      return [];
+    }
+
+    // Map RPC results to LocationMatch format
+    return data.map((row: any) => ({
+      profile_id: row.profile_id,
+      distance_km: Math.round((row.distance_km || 0) * 10) / 10,
+      city: row.city || '',
+      country_code: row.country_code || ''
+    }));
+  }
+
+  /**
+   * Safe fallback with proper filters and limits - NOT fetching all profiles
+   */
+  private async getSafeFallbackMatches(
     userId: string, 
     maxDistance: number = 50
   ): Promise<LocationMatch[]> {
@@ -55,37 +132,53 @@ class LocationService {
         .single();
 
       if (userError || !currentUser) {
-              // Silent error handling
         return [];
       }
 
       const searchDistance = maxDistance || currentUser.max_distance || 50;
 
-      // Get all potential matches
-      const { data: profiles, error: profilesError } = await supabase
+      // Build a SAFE query with proper filters and limits
+      let query = supabase
         .from('profiles')
         .select('id, first_name, date_of_birth, country, country_code, city, latitude, longitude')
-        .neq('id', userId);
+        .neq('id', userId)
+        .eq('account_status', 'active')
+        .eq('is_admin', false)
+        .eq('is_archived', false);
+
+      // If user has coordinates, prioritize users with coordinates
+      if (currentUser.latitude && currentUser.longitude) {
+        query = query
+          .not('latitude', 'is', null)
+          .not('longitude', 'is', null);
+      } else {
+        // If no coordinates, filter by same country
+        if (currentUser.country_code) {
+          query = query.eq('country_code', currentUser.country_code);
+        }
+      }
+
+      // IMPORTANT: Always limit results to prevent massive payloads
+      query = query.limit(300);
+
+      const { data: profiles, error: profilesError } = await query;
 
       if (profilesError || !profiles) {
-        // Silent error handling
         return [];
       }
 
-      // Filter and calculate distances
+      // Filter and calculate distances on the smaller set
       const matches: LocationMatch[] = [];
 
       for (const profile of profiles) {
-        // Skip profiles without location data
         if (!profile.country_code || !profile.city) continue;
 
-        let distance = 999; // Default high distance
+        let distance = 999;
         let includeProfile = false;
 
-        // Calculate age from date_of_birth
         const age = profile.date_of_birth ? this.calculateAge(profile.date_of_birth) : undefined;
 
-        // If both users have coordinates, calculate exact distance
+        // Calculate distance if both have coordinates
         if (
           currentUser.latitude && currentUser.longitude &&
           profile.latitude && profile.longitude
@@ -97,70 +190,66 @@ class LocationService {
             profile.longitude
           );
           
-          // Validate distance calculation - if distance is suspiciously large,
-          // fall back to country/city matching instead of coordinates
           if (distance > 1000) {
-            // Large distance detected - likely coordinate data issue
-            // Fall back to country/city matching instead
+            // Suspicious distance - fall back to country/city matching
             if (profile.country_code === currentUser.country_code) {
-              if (profile.city && currentUser.city && profile.city.toLowerCase() === currentUser.city.toLowerCase()) {
-                distance = 0; // Same city
+              if (profile.city?.toLowerCase() === currentUser.city?.toLowerCase()) {
+                distance = 0;
                 includeProfile = true;
               } else {
-                distance = 25; // Same country, different city
+                distance = 25;
                 includeProfile = searchDistance >= 25;
               }
-            } else if (currentUser.country_code && this.areCountriesInSameRegion(currentUser.country_code, profile.country_code)) {
-              distance = 100; // Regional match
-              includeProfile = searchDistance >= 100;
-            } else {
-              // Don't include profiles with suspicious coordinate distances
-              includeProfile = false;
             }
           } else {
             includeProfile = distance <= searchDistance;
           }
-        }
-        // Otherwise, use country/city matching
-        else {
-          // Same country gets priority
+        } else {
+          // Country/city matching
           if (profile.country_code === currentUser.country_code) {
-            // Same city gets even higher priority
-            if (profile.city && currentUser.city && profile.city.toLowerCase() === currentUser.city.toLowerCase()) {
-              distance = 0; // Same city
+            if (profile.city?.toLowerCase() === currentUser.city?.toLowerCase()) {
+              distance = 0;
               includeProfile = true;
             } else {
-              distance = 25; // Same country, different city
+              distance = 25;
               includeProfile = searchDistance >= 25;
             }
-          }
-          // Different country but within region could be considered
-          else if (currentUser.country_code && this.areCountriesInSameRegion(currentUser.country_code, profile.country_code)) {
-            distance = 100; // Regional match
-            includeProfile = searchDistance >= 100;
           }
         }
 
         if (includeProfile) {
           matches.push({
             profile_id: profile.id,
-            distance_km: Math.round(distance * 10) / 10, // Round to 1 decimal
+            distance_km: Math.round(distance * 10) / 10,
             city: profile.city,
             country_code: profile.country_code,
             first_name: profile.first_name,
-            age: age
+            age
           });
         }
       }
 
-      // Sort by distance
       matches.sort((a, b) => a.distance_km - b.distance_km);
-
       return matches;
 
     } catch (error) {
-      // Silent error handling
       return [];
+    }
+  }
+
+  /**
+   * Clear the location cache (useful when user updates location preferences)
+   */
+  clearCache(userId?: string): void {
+    if (userId) {
+      // Clear all cache entries for this user
+      for (const key of this.cache.keys()) {
+        if (key.startsWith(`${userId}:`)) {
+          this.cache.delete(key);
+        }
+      }
+    } else {
+      this.cache.clear();
     }
   }
 
@@ -179,13 +268,11 @@ class LocationService {
         max_distance: location.maxDistance || 50
       };
 
-      // Add coordinates if available
       if (location.latitude && location.longitude) {
         updateData.latitude = location.latitude;
         updateData.longitude = location.longitude;
         updateData.is_custom_city = false;
       } else {
-        // Try to get coordinates from our data
         const cityData = getCityCoordinates(location.countryCode, location.city);
         if (cityData) {
           updateData.latitude = cityData.latitude;
@@ -202,14 +289,14 @@ class LocationService {
         .eq('id', userId);
 
       if (error) {
-        // Silent error handling
         return false;
       }
 
+      // Clear cache when location is updated
+      this.clearCache(userId);
       return true;
 
     } catch (error) {
-      // Silent error handling
       return false;
     }
   }
@@ -226,7 +313,6 @@ class LocationService {
         .single();
 
       if (error || !data) {
-        // Silent error handling
         return null;
       }
 
@@ -240,7 +326,6 @@ class LocationService {
       };
 
     } catch (error) {
-      // Silent error handling
       return null;
     }
   }
@@ -262,19 +347,6 @@ class LocationService {
   }
 
   /**
-   * Check if two countries are in the same region (for broader matching)
-   * Updated for global compatibility - all users can connect worldwide
-   */
-  private areCountriesInSameRegion(country1: string, country2: string): boolean {
-    // For global compatibility, we'll prioritize same country matches
-    // but allow connections worldwide
-    if (country1 === country2) return true;
-    
-    // All users worldwide can connect regardless of region
-    return true;
-  }
-
-  /**
    * Get location statistics for debugging
    */
   async getLocationStats(): Promise<{
@@ -283,9 +355,13 @@ class LocationService {
     countryCounts: Record<string, number>;
   }> {
     try {
+      // Use a limited query for stats too
       const { data: profiles, error } = await supabase
         .from('profiles')
-        .select('country_code, latitude, longitude');
+        .select('country_code, latitude, longitude')
+        .eq('account_status', 'active')
+        .eq('is_admin', false)
+        .limit(1000);
 
       if (error || !profiles) {
         return { totalWithLocation: 0, totalWithCoordinates: 0, countryCounts: {} };
@@ -304,7 +380,6 @@ class LocationService {
       return { totalWithLocation, totalWithCoordinates, countryCounts };
 
     } catch (error) {
-      // Silent error handling
       return { totalWithLocation: 0, totalWithCoordinates: 0, countryCounts: {} };
     }
   }
