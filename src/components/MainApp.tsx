@@ -8,6 +8,7 @@ import TermsOfService from '@/components/TermsOfService';
 import PrivacyPolicy from '@/components/PrivacyPolicy';
 import DripCoupleIcon from '@/components/DripCoupleIcon';
 import RatingDialog from '@/components/RatingDialog';
+import AppUpdatePopup from '@/components/AppUpdatePopup';
 import { supabase, SUPABASE_URL } from '@/integrations/supabase/client';
 import type { Database } from '@/integrations/supabase/types';
 import { useToast } from '@/hooks/use-toast';
@@ -15,6 +16,7 @@ import { usePushNotifications } from '@/hooks/usePushNotifications';
 import { loadUserLanguage } from '@/utils/languageSync';
 import { useActivityTracker } from '@/hooks/useActivityTracker';
 import type { ChatMatchesCacheValue, LikedMeCacheValue } from '@/types/cacheTypes';
+import ProfilePage from '@/components/ProfilePage';
 
 type ProfileRow = Database['public']['Tables']['profiles']['Row'];
 
@@ -23,8 +25,6 @@ type ProfileRow = Database['public']['Tables']['profiles']['Row'];
 const DiscoverPage = lazy(() => import('@/components/DiscoverPage'));
 const ChatPage = lazy(() => import('@/components/ChatPage'));
 const LikedMePage = lazy(() => import('@/components/LikedMePage'));
-const ProfilePage = lazy(() => import('@/components/ProfilePage'));
-import AppUpdatePopup from '@/components/AppUpdatePopup'; 
 
 // Tab loading fallback
 const TabLoader = () => (
@@ -153,70 +153,47 @@ const MainApp = ({ user, onLogout }: MainAppProps) => {
   const fetchUnreadCount = useCallback(async () => {
     if (!userId) return;
 
-    type MatchIdRow = { id: string };
-    type MatchIdsQueryResult = { data: MatchIdRow[] | null; error: { message?: string } | null };
-    type UnreadCountQueryResult = { count: number | null; error: { message?: string } | null };
-
-    type MatchIdsClient = {
-      from: (table: 'matches') => {
-        select: (columns: 'id') => {
-          or: (filters: string) => Promise<MatchIdsQueryResult>;
-        };
-      };
+    type MatchUnreadRow = {
+      id: string;
+      user1_id: string;
+      user2_id: string;
+      user1_unread_count: number | null;
+      user2_unread_count: number | null;
     };
-
-    type ChatsCountClient = {
-      from: (table: 'chats') => {
-        select: (
-          columns: 'id',
-          options: { count: 'exact'; head: true }
-        ) => {
-          in: (column: 'match_id', values: string[]) => {
-            neq: (column: 'sender_id', value: string) => {
-              or: (filters: string) => Promise<UnreadCountQueryResult>;
-            };
-          };
+    type MatchesUnreadQueryResult = {
+      data: MatchUnreadRow[] | null;
+      error: { message?: string } | null;
+    };
+    type MatchesUnreadClient = {
+      from: (table: 'matches') => {
+        select: (columns: string) => {
+          or: (filters: string) => Promise<MatchesUnreadQueryResult>;
         };
       };
     };
 
     try {
-      // 1) Find matches that involve this user.
-      const matchIdsClient = supabase as unknown as MatchIdsClient;
-      const { data: matchRows, error: matchError } = await matchIdsClient
+      // Only count unread for matches that belong to this user.
+      const matchesClient = supabase as unknown as MatchesUnreadClient;
+      const { data, error } = await matchesClient
         .from('matches')
-        .select('id')
+        .select('id,user1_id,user2_id,user1_unread_count,user2_unread_count')
         .or(`user1_id.eq.${userId},user2_id.eq.${userId}`);
 
-      if (matchError) throw matchError;
+      if (error) throw error;
 
-      const matchIds = (matchRows || []).map((m) => m.id).filter(Boolean);
-      userMatchIdSetRef.current = new Set(matchIds);
+      const rows = data || [];
+      userMatchIdSetRef.current = new Set(rows.map((r) => r.id));
 
-      if (matchIds.length === 0) {
-        setUnreadCount(0);
-        return;
+      let total = 0;
+      for (const row of rows) {
+        const isUser1 = row.user1_id === userId;
+        const raw = isUser1 ? row.user1_unread_count : row.user2_unread_count;
+        const n = Number(raw);
+        if (Number.isFinite(n) && n > 0) total += n;
       }
 
-      // 2) Count unread incoming messages across those matches.
-      // chats table has no receiver_id in this project; treat incoming as sender_id != userId.
-      const chatsClient = supabase as unknown as ChatsCountClient;
-      const deletedForValue = `{${userId}}`;
-      const unreadAndNotDeletedForMe =
-        `and(is_read.is.null,deleted_for.is.null),` +
-        `and(is_read.eq.false,deleted_for.is.null),` +
-        `and(is_read.is.null,deleted_for.not.cs.${deletedForValue}),` +
-        `and(is_read.eq.false,deleted_for.not.cs.${deletedForValue})`;
-
-      const { count, error } = await chatsClient
-        .from('chats')
-        .select('id', { count: 'exact', head: true })
-        .in('match_id', matchIds)
-        .neq('sender_id', userId)
-        .or(unreadAndNotDeletedForMe);
-
-      if (error) throw error;
-      setUnreadCount(count || 0);
+      setUnreadCount(total);
     } catch (err) {
       const message =
         typeof err === 'object' && err && 'message' in err
