@@ -240,7 +240,23 @@ serve(async (req) => {
       const chargeAmountGHS = currentPricing.ghsAmount
       const chargeAmountKobo = chargeAmountGHS * 100 // Convert to kobo (Paystack's smallest unit)
 
-      // Create charge attempt record
+      // IDEMPOTENCY CHECK: Prevent double charges within same billing cycle
+      // Check if we already have a successful charge for this user within last 24 hours
+      const twentyFourHoursAgo = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString()
+      const { data: recentCharges } = await supabase
+        .from('paystack_charge_attempts')
+        .select('id, status, created_at')
+        .eq('user_id', sub.user_id)
+        .eq('status', 'success')
+        .gte('created_at', twentyFourHoursAgo)
+        .limit(1)
+
+      if (recentCharges && recentCharges.length > 0) {
+        console.log(`[PAYSTACK-RECURRING] Skipping user ${sub.user_id} - already charged within 24h`)
+        continue
+      }
+
+      // Create charge attempt record FIRST (for idempotency)
       const { error: attemptError } = await supabase
         .from('paystack_charge_attempts')
         .insert({
