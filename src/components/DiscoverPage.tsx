@@ -524,30 +524,54 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, isPremium, profileComplet
   const pendingSwipesRef = useRef(0);
   // Track locally swiped profile IDs with action type and timestamp
   // Stored as: { [userId]: { action: 'like' | 'pass', timestamp } }
-  const getStoredSwipedIds = (): Map<string, { action: 'like' | 'pass', timestamp: number }> => {
+  // CRITICAL: Use a stable ref that gets initialized from storage on mount
+  const getStoredSwipedIds = useCallback((): Map<string, { action: 'like' | 'pass', timestamp: number }> => {
+    if (!currentUser?.id) return new Map();
     try {
       // Prefer durable storage so refresh/app restart doesn't resurrect swiped profiles.
-      const key = `swiped_profiles_${currentUser?.id}`;
-      const stored = localStorage.getItem(key) ?? sessionStorage.getItem(key);
+      const key = `swiped_profiles_${currentUser.id}`;
+      // Try localStorage first (more durable), then sessionStorage as fallback
+      const stored = localStorage.getItem(key) || sessionStorage.getItem(key);
       if (!stored) return new Map();
       
       const data = JSON.parse(stored);
-      return new Map(Object.entries(data));
+      // Validate and reconstruct the Map with proper types
+      const map = new Map<string, { action: 'like' | 'pass', timestamp: number }>();
+      for (const [id, value] of Object.entries(data)) {
+        if (value && typeof value === 'object' && 'action' in value && 'timestamp' in value) {
+          const v = value as { action: string; timestamp: number };
+          if ((v.action === 'like' || v.action === 'pass') && typeof v.timestamp === 'number') {
+            map.set(id, { action: v.action, timestamp: v.timestamp });
+          }
+        }
+      }
+      return map;
     } catch {
       return new Map();
     }
-  };
-  const locallySwipedProfileIds = useRef<Map<string, { action: 'like' | 'pass', timestamp: number }>>(getStoredSwipedIds());
+  }, [currentUser?.id]);
   
-  // Persist swiped IDs to sessionStorage whenever they change
+  const locallySwipedProfileIds = useRef<Map<string, { action: 'like' | 'pass', timestamp: number }>>(new Map());
+  
+  // Initialize swiped IDs from storage on mount or when user changes
+  useEffect(() => {
+    if (!currentUser?.id) return;
+    const stored = getStoredSwipedIds();
+    locallySwipedProfileIds.current = stored;
+  }, [currentUser?.id, getStoredSwipedIds]);
+  
+  // Persist swiped IDs to BOTH localStorage and sessionStorage whenever they change
+  // This ensures swipes survive page refresh, app restart, and navigation
   const persistSwipedIds = useCallback(() => {
+    if (!currentUser?.id) return;
     try {
       const obj = Object.fromEntries(locallySwipedProfileIds.current);
-      const key = `swiped_profiles_${currentUser?.id}`;
-      sessionStorage.setItem(key, JSON.stringify(obj));
+      const key = `swiped_profiles_${currentUser.id}`;
+      // Write to both storages for redundancy
       localStorage.setItem(key, JSON.stringify(obj));
-    } catch (error) {
-      // ignore sessionStorage persistence errors
+      sessionStorage.setItem(key, JSON.stringify(obj));
+    } catch {
+      // ignore persistence errors
     }
   }, [currentUser?.id]);
 
