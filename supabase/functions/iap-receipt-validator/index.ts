@@ -169,7 +169,26 @@ serve(async (req) => {
       isActive,
     })
 
-    // 7️⃣ Update Supabase
+    // 7️⃣ IDEMPOTENCY CHECK: Check if this transaction was already processed
+    const { data: existingSub } = await supabaseClient
+      .from('user_subscriptions')
+      .select('id, flutterwave_transaction_id, expires_at')
+      .eq('user_id', userData.user.id)
+      .eq('flutterwave_transaction_id', latest.transaction_id)
+      .single()
+
+    if (existingSub && new Date(existingSub.expires_at) >= expiresDate) {
+      console.log('ℹ️ [IAP-RECEIPT-VALIDATOR] Transaction already processed, skipping update')
+      return json(200, {
+        valid: true,
+        active: true,
+        expires_at: existingSub.expires_at,
+        transaction_id: latest.transaction_id,
+        already_processed: true,
+      })
+    }
+
+    // 8️⃣ Update Supabase
     if (isActive) {
       const { error } = await supabaseClient
         .from('user_subscriptions')
