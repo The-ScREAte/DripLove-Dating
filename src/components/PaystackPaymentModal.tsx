@@ -131,11 +131,13 @@ const PaystackPaymentModal: React.FC<PaystackPaymentModalProps> = ({
         metadata,
         callback_url: `${window.location.origin}/payment-success?status=successful&payment_type=${isOneTime ? 'one-time' : 'subscription'}`,
       };
-      if (isOneTime) {
-        payload.amount = Number(amount);
-        payload.currency = (currency || 'GHS').toUpperCase();
-        payload.channels = [selectedPaymentMethod === 'momo' ? 'mobile_money' : 'card'];
-      }
+      // IMPORTANT: For recurring subscriptions we intentionally initialize an amount-based transaction
+      // (not a Paystack plan subscription). We store the authorization_code from the first payment
+      // and renew via charge_authorization on our own schedule.
+      payload.amount = Number(amount);
+      payload.currency = (currency || 'GHS').toUpperCase();
+      payload.channels = [selectedPaymentMethod === 'momo' ? 'mobile_money' : 'card'];
+
       const { data, error } = await supabase.functions.invoke('paystack-init', {
         body: payload,
       });
@@ -147,17 +149,8 @@ const PaystackPaymentModal: React.FC<PaystackPaymentModalProps> = ({
       window.location.href = data.authorization_url as string;
       return;
     } catch (serverErr) {
-      // IMPORTANT: recurring Paystack subscriptions require plan-based server init.
-      // If server init fails, do not silently fall back to inline amount-based init,
-      // because that would create a one-time transaction (no auto-renewal).
-      if (!isOneTime) {
-        console.error('[PaystackModal] Subscription init failed:', serverErr);
-        alert('Subscription initialization failed. Please try again later.');
-        setIsLoading(false);
-        return;
-      }
-
-      // If server init fails for one-time, attempt inline as fallback using public key
+      // If server init fails, attempt inline as fallback using public key.
+      // This still works for subscriptions because renewal is handled via saved authorization_code.
       try {
         const ref = 'DRIPLOVE-' + Date.now() + '-' + Math.random().toString(36).substring(2, 8);
         const trimmedKey = PAYSTACK_PUBLIC_KEY.trim();
@@ -184,17 +177,17 @@ const PaystackPaymentModal: React.FC<PaystackPaymentModalProps> = ({
             ],
           },
         };
-        if (isOneTime) {
-          const paystackAmount = Math.round(Number(amount) * 100);
-          if (!Number.isFinite(paystackAmount) || paystackAmount < 100) {
-            alert('Amount invalid. Minimum amount is 1.00');
-            setIsLoading(false);
-            return;
-          }
-          paymentConfig.amount = paystackAmount;
-          paymentConfig.currency = (currency || 'GHS').toUpperCase();
-          paymentConfig.channels = [selectedPaymentMethod === 'momo' ? 'mobile_money' : 'card'];
+
+        const paystackAmount = Math.round(Number(amount) * 100);
+        if (!Number.isFinite(paystackAmount) || paystackAmount < 100) {
+          alert('Amount invalid. Minimum amount is 1.00');
+          setIsLoading(false);
+          return;
         }
+        paymentConfig.amount = paystackAmount;
+        paymentConfig.currency = (currency || 'GHS').toUpperCase();
+        paymentConfig.channels = [selectedPaymentMethod === 'momo' ? 'mobile_money' : 'card'];
+
         const handler = (window as any).PaystackPop.setup(paymentConfig);
         handler.openIframe();
       } catch (fallbackErr) {

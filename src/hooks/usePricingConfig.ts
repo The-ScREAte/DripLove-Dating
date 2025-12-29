@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { supabase } from '@/integrations/supabase/client';
+import { convertToGHS } from '@/services/exchangeRateService';
 
 interface PricingConfig {
   price: string;
@@ -37,58 +38,38 @@ const currencySymbols: Record<string, string> = {
   AUD: 'A$',
 };
 
+const DEFAULT_INTERNATIONAL_PRICE_FALLBACK = '5';
+const DEFAULT_INTERNATIONAL_CURRENCY_FALLBACK = 'USD';
+
 // Default USD pricing for web (will be loaded from DB)
 let webPricing: PricingConfig = {
-  price: '1.99',
-  monthlyPrice: '1.99',
-  currency: 'USD',
+  price: DEFAULT_INTERNATIONAL_PRICE_FALLBACK,
+  monthlyPrice: DEFAULT_INTERNATIONAL_PRICE_FALLBACK,
+  currency: DEFAULT_INTERNATIONAL_CURRENCY_FALLBACK,
   currencySymbol: '$',
-  displayPrice: '$1.99/month',
-  ghsPrice: '32',
+  displayPrice: `${currencySymbols[DEFAULT_INTERNATIONAL_CURRENCY_FALLBACK] || DEFAULT_INTERNATIONAL_CURRENCY_FALLBACK}${DEFAULT_INTERNATIONAL_PRICE_FALLBACK}/month`,
+  ghsPrice: '80',
   loading: false,
   source: 'fallback',
 };
 
-// Country-specific pricing from DB
-interface CountryPrice {
-  country: string;
-  currency: string;
-  price: number;
-}
-
-let countryPricesCache: CountryPrice[] = [];
-
-// Load web pricing from database based on user's country
-async function loadWebPricingFromDB(userCountryCode?: string): Promise<void> {
+// Load web pricing from database (default international pricing only)
+async function loadWebPricingFromDB(): Promise<void> {
   try {
     const { data, error } = await supabase
       .from('payment_config')
-      .select('default_international_price, default_international_currency, country_prices')
+      .select('default_international_price, default_international_currency')
       .order('created_at', { ascending: false })
       .limit(1)
       .single();
 
     if (!error && data) {
-      // Store country prices for later use
-      countryPricesCache = (data.country_prices as unknown as CountryPrice[]) || [];
-      
-      // Check if we have a country-specific price for the user
-      let price = data.default_international_price?.toString() || '1.99';
-      let currency = data.default_international_currency || 'USD';
-      
-      if (userCountryCode && countryPricesCache.length > 0) {
-        const countryPrice = countryPricesCache.find(
-          cp => cp.country?.toUpperCase() === userCountryCode?.toUpperCase()
-        );
-        if (countryPrice) {
-          price = countryPrice.price?.toString() || price;
-          currency = countryPrice.currency || currency;
-          console.log('[Pricing] Using country-specific price for', userCountryCode, ':', price, currency);
-        }
-      }
+      // Use default international pricing for all users
+      const price = data.default_international_price?.toString() || DEFAULT_INTERNATIONAL_PRICE_FALLBACK;
+      const currency = data.default_international_currency || DEFAULT_INTERNATIONAL_CURRENCY_FALLBACK;
       
       const symbol = currencySymbols[currency] || currency;
-      const ghsPrice = calculateGHSPrice(price, currency);
+      const ghsPrice = await calculateGHSPrice(price, currency);
       
       webPricing = {
         price,
@@ -104,27 +85,6 @@ async function loadWebPricingFromDB(userCountryCode?: string): Promise<void> {
   } catch (error) {
     console.error('[Pricing] Error loading web pricing from DB:', error);
   }
-}
-
-// Get user's country code from their profile
-async function getUserCountryCode(userId?: string): Promise<string | null> {
-  if (!userId) return null;
-  
-  try {
-    const { data, error } = await supabase
-      .from('profiles')
-      .select('country_code')
-      .eq('id', userId)
-      .single();
-    
-    if (!error && data?.country_code) {
-      return data.country_code;
-    }
-  } catch (error) {
-    console.error('[Pricing] Error getting user country:', error);
-  }
-  
-  return null;
 }
 
 // Google Play product IDs (must match iap-google.ts)
@@ -317,29 +277,35 @@ async function getIAPPriceWithRetry(maxAttempts: number = 5): Promise<{ price: s
   return null;
 }
 
-// Calculate GHS price for Paystack based on IAP price
-function calculateGHSPrice(price: string, currency: string): string {
+// Calculate GHS price using real-time exchange rates
+async function calculateGHSPrice(price: string, currency: string): Promise<string> {
   const numericPrice = parseFloat(price);
   
   if (currency === 'GHS') {
     return price;
   }
   
-  // Approximate conversion rates to GHS
-  const toGHSRates: Record<string, number> = {
-    USD: 16,
-    EUR: 17,
-    GBP: 20,
-    NGN: 0.01,
-    ZAR: 0.85,
-    KES: 0.12,
-  };
-  
-  const rate = toGHSRates[currency] || 16;
-  const ghsAmount = numericPrice * rate;
-  
-  // Round to nearest whole number for GHS
-  return Math.round(ghsAmount).toString();
+  try {
+    // Use exchange rate API to get real conversion
+    const ghsAmount = await convertToGHS(numericPrice, currency);
+    return ghsAmount.toString();
+  } catch (error) {
+    console.error('[Pricing] Error calculating GHS price:', error);
+    
+    // Fallback to approximate rates if API fails
+    const fallbackRates: Record<string, number> = {
+      USD: 16,
+      EUR: 17,
+      GBP: 20,
+      NGN: 0.01,
+      ZAR: 0.85,
+      KES: 0.12,
+    };
+    
+    const rate = fallbackRates[currency] || 16;
+    const ghsAmount = numericPrice * rate;
+    return Math.round(ghsAmount).toString();
+  }
 }
 
 // Load pricing config - platform specific
@@ -348,15 +314,12 @@ async function loadPricingConfig(userId?: string): Promise<PricingConfig> {
     const Capacitor = await getCapacitor();
     const platform = Capacitor?.getPlatform() || 'web';
     
-    // Get user's country code for country-specific pricing
-    const userCountryCode = await getUserCountryCode(userId);
+    // Load web pricing from database (default international pricing)
+    await loadWebPricingFromDB();
     
-    // Load web pricing from database first (with country-specific fallback)
-    await loadWebPricingFromDB(userCountryCode || undefined);
-    
-    // WEB: Use pricing from database (already country-specific if available)
+    // WEB: Use pricing from database (default international pricing)
     if (!(await isNativeApp())) {
-      console.log('[Pricing] Web platform, using DB pricing for country:', userCountryCode);
+      console.log('[Pricing] Web platform, using default international pricing from DB');
       return { ...webPricing };
     }
     
@@ -366,7 +329,7 @@ async function loadPricingConfig(userId?: string): Promise<PricingConfig> {
       
       if (googlePrice && googlePrice.formattedPrice) {
         const symbol = extractCurrencySymbol(googlePrice.formattedPrice) || currencySymbols[googlePrice.currency] || googlePrice.currency;
-        const ghsPrice = calculateGHSPrice(googlePrice.price, googlePrice.currency);
+        const ghsPrice = await calculateGHSPrice(googlePrice.price, googlePrice.currency);
         
         const config: PricingConfig = {
           price: googlePrice.price,
@@ -392,7 +355,7 @@ async function loadPricingConfig(userId?: string): Promise<PricingConfig> {
       
       if (applePrice && applePrice.formattedPrice) {
         const symbol = extractCurrencySymbol(applePrice.formattedPrice) || currencySymbols[applePrice.currency] || applePrice.currency;
-        const ghsPrice = calculateGHSPrice(applePrice.price, applePrice.currency);
+        const ghsPrice = await calculateGHSPrice(applePrice.price, applePrice.currency);
         
         const config: PricingConfig = {
           price: applePrice.price,
@@ -431,7 +394,7 @@ export function preloadPricingConfig(userId?: string): void {
   });
 }
 
-// Hook to use pricing config - accepts optional userId for country-specific pricing
+// Hook to use pricing config - accepts optional userId for IAP loading
 export function usePricingConfig(userId?: string): PricingConfig {
   const [config, setConfig] = useState<PricingConfig>(
     cachedConfig || { ...webPricing, loading: true }
@@ -450,7 +413,7 @@ export function usePricingConfig(userId?: string): PricingConfig {
       return;
     }
 
-    // Otherwise, load fresh with userId for country-specific pricing
+    // Otherwise, load fresh (uses default international pricing for web, IAP for mobile)
     const loadConfig = async () => {
       const freshConfig = await loadPricingConfig(userId);
       cachedConfig = freshConfig;
@@ -463,7 +426,7 @@ export function usePricingConfig(userId?: string): PricingConfig {
   return config;
 }
 
-// Clear cache (useful for testing or when user changes country)
+// Clear cache (useful for testing or when pricing changes)
 export function clearPricingCache(): void {
   cachedConfig = null;
   configPromise = null;

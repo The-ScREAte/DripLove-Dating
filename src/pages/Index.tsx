@@ -15,6 +15,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { transformFormDataForSubmission } from '@/utils/formValidation';
 import VideoBackground from '@/components/VideoBackground';
 import { preloadPricingConfig } from '@/hooks/usePricingConfig';
+import { preloadExchangeRates } from '@/services/exchangeRateService';
 
 // Lazy load AdminPage (54KB) - only loads when admin features are accessed
 const LazyAdminPage = lazy(() => import('@/components/AdminPage'));
@@ -62,6 +63,7 @@ const Index = ({
     // If user is authenticated, run app-specific profile routing
     setLoading(true);
     preloadPricingConfig(user.id);
+    preloadExchangeRates(); // Preload exchange rates for currency conversion
     checkUserTypeAndRedirect(user.id);
   }, [isAuthenticated, user?.id]);
 

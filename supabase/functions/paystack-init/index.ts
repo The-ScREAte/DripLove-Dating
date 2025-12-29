@@ -6,7 +6,6 @@ interface InitRequest {
   email: string
   amount?: number // major units
   currency?: string
-  plan?: string
   channels?: string[]
   metadata?: Record<string, unknown>
   callback_url?: string
@@ -43,30 +42,22 @@ serve(async (req) => {
     const secret = Deno.env.get('PAYSTACK_SECRET_KEY')
     if (!secret) return json(500, { error: 'Missing PAYSTACK_SECRET_KEY' })
 
-    const { email, amount, currency, plan, channels, metadata, callback_url } = (await req.json()) as InitRequest
+    const body = (await req.json()) as Record<string, unknown>
+    const { email, amount, currency, channels, metadata, callback_url } = body as unknown as InitRequest
     if (!email) return json(400, { error: 'email required' })
 
-    const payload: Record<string, unknown> = { email }
-    let actualPlan = plan
-
-    // NOTE: We intentionally do NOT auto-fetch a plan code.
-    // This app primarily uses authorization-code recurring charges (charge_authorization),
-    // so a plan-based Paystack subscription could lead to double billing.
-    // If a plan is desired, it must be explicitly provided by the caller.
-
-    if (actualPlan) {
-      // For subscriptions, use plan directly without other parameters
-      payload.plan = actualPlan
-      // Remove any other parameters that might conflict with subscription plans
-      delete payload.channels
-      delete payload.amount
-      delete payload.currency
-    } else {
-      if (!amount) return json(400, { error: 'amount required' })
-      payload.amount = Math.round(Number(amount) * 100)
-      payload.currency = (currency || 'GHS').toUpperCase()
-      if (channels && channels.length) payload.channels = channels
+    // We do not support Paystack plan subscriptions in this app.
+    // Recurring charges are handled exclusively via saved authorization codes + cron.
+    if ('plan' in body && body.plan) {
+      return json(400, { error: 'Paystack plan subscriptions are disabled. Use amount-based initialization.' })
     }
+
+    const payload: Record<string, unknown> = { email }
+
+    if (!amount) return json(400, { error: 'amount required' })
+    payload.amount = Math.round(Number(amount) * 100)
+    payload.currency = (currency || 'GHS').toUpperCase()
+    if (channels && channels.length) payload.channels = channels
 
     if (metadata) payload.metadata = metadata
     // Include callback_url for both one-time and subscription payments

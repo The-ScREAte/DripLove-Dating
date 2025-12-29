@@ -263,32 +263,11 @@ const PremiumUpgrade = ({ currentUser, onClose, preselectedPlan }: PremiumUpgrad
   const currencySymbol = pricingConfig.currencySymbol;
   const ghsPrice = pricingConfig.ghsPrice;
   
-  // For Paystack on Android, always fetch USD pricing from admin dashboard
-  const [paystackPrice, setPaystackPrice] = useState('1.99');
-  
-  React.useEffect(() => {
-    if (isAndroidNative) {
-      const loadPaystackPrice = async () => {
-        try {
-          const { data } = await supabase
-            .from('payment_config')
-            .select('default_international_price')
-            .order('created_at', { ascending: false })
-            .limit(1)
-            .single();
-
-          if (data?.default_international_price) {
-            setPaystackPrice(data.default_international_price.toString());
-          }
-        } catch (error) {
-          console.error('[Paystack] Error loading price:', error);
-        }
-      };
-      loadPaystackPrice();
-    } else {
-      setPaystackPrice(monthlyPrice);
-    }
-  }, [isAndroidNative, monthlyPrice]);
+  // Paystack pricing: use monthlyPrice from pricingConfig which handles platform-specific logic
+  // - Web: DB default_international_price
+  // - Android: Google IAP price → fallback to DB default_international_price
+  // - iOS: Apple IAP price → fallback to DB default_international_price (but Paystack not shown on iOS)
+  const paystackPrice = monthlyPrice;
   
   const [paymentMethods, setPaymentMethods] = useState<Array<{ type: 'iap' | 'card' | 'momo' }>>([{ type: 'card' }]);
 
@@ -728,7 +707,7 @@ const PremiumUpgrade = ({ currentUser, onClose, preselectedPlan }: PremiumUpgrad
                   className="w-full p-3 bg-gradient-to-r from-green-500 to-emerald-600 text-white rounded-lg hover:from-green-600 hover:to-emerald-700 transition-all duration-200 font-semibold"
                 >
                   <div className="text-sm sm:text-base">💳 Pay with Paystack</div>
-                  <div className="text-xs opacity-90">${paystackPrice}/month • {t('premium.paymentOptions.monthly.subtitle')}</div>
+                  <div className="text-xs opacity-90">${paystackPrice || monthlyPrice}/month • {t('premium.paymentOptions.monthly.subtitle')}</div>
                 </button>
               )}
               
@@ -788,7 +767,7 @@ const PremiumUpgrade = ({ currentUser, onClose, preselectedPlan }: PremiumUpgrad
         onClose={() => setShowPaymentModal(false)}
         amount={parseFloat(ghsPrice)}
         currency="GHS"
-        displayAmount={parseFloat(paystackPrice)}
+        displayAmount={parseFloat(paystackPrice || monthlyPrice)}
         displayCurrency="USD"
         email={currentUser?.email || ''}
         onSuccess={handlePaymentSuccess}
