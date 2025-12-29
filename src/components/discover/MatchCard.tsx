@@ -62,6 +62,24 @@ const MatchCard: React.FC<MatchCardProps> = ({
   , imageStatus
 }) => {
   const { t } = useTranslation();
+
+  // Debug logging (enable with: localStorage.setItem('driplove_debug_swipe','1'))
+  useEffect(() => {
+    try {
+      if (typeof window === 'undefined') return;
+      if (window.localStorage.getItem('driplove_debug_swipe') !== '1') return;
+      // Use warn level so it shows up even when console hides logs.
+      console.warn('[MatchCard]', {
+        matchId: match.id,
+        isSwipeAreaOnly,
+        isDetailsAreaOnly,
+        imageIndex,
+        userImagesLen: Array.isArray(userImages) ? userImages.length : 0,
+      });
+    } catch {
+      // ignore
+    }
+  }, [match.id, isSwipeAreaOnly, isDetailsAreaOnly, imageIndex, userImages]);
   
   const [currentSlide, setCurrentSlide] = useState(0);
   const platform = useMemo(() => getPlatformSync(), []);

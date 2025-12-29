@@ -1,21 +1,17 @@
 import React from 'react';
 import { Button } from '@/components/ui/button';
-import { Heart, X, Undo2 } from 'lucide-react';
+import { Undo2 } from 'lucide-react';
 import { Capacitor } from '@capacitor/core';
 
 interface SwipeButtonsProps {
-  onPass: () => void;
   onReverse: () => void;
-  onLike: () => void;
   canReverse: boolean;
   reversesLeft?: number;
   isPremium?: boolean;
 }
 
 const SwipeButtons: React.FC<SwipeButtonsProps> = ({
-  onPass,
   onReverse,
-  onLike,
   canReverse,
   reversesLeft,
   isPremium
@@ -24,7 +20,6 @@ const SwipeButtons: React.FC<SwipeButtonsProps> = ({
   
   // Detect platform
   const platform = Capacitor.getPlatform();
-  const isWeb = platform === 'web';
   const isIOS = platform === 'ios';
   const isAndroid = platform === 'android';
   

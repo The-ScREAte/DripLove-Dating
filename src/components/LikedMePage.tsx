@@ -1,9 +1,9 @@
 import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { 
   Users, Heart, X, Calendar, MapPin, Shield, ChevronDown, ChevronUp, 
-  Briefcase, GraduationCap, Crown, Lock, Clock, User, Quote, Coffee, Search 
+  Briefcase, GraduationCap, Crown, Lock, User, Quote, Coffee, Search 
 } from 'lucide-react';
 
 // ANDROID FIX: Use platform utils instead of synchronous Capacitor import
@@ -11,7 +11,6 @@ import { getPlatformSync } from '@/utils/platformUtils';
 
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
-import { useSubscription } from '@/hooks/useSubscription';
 import BlockDialog from './BlockDialog';
 import PremiumUpgrade from './PremiumUpgrade';
 import { useTranslation } from 'react-i18next';

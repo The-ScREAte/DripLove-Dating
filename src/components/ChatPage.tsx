@@ -4,7 +4,7 @@ import { useToast } from '@/hooks/use-toast';
 import { usePushNotifications } from '@/hooks/usePushNotifications';
 import { requestNotificationPermission } from '@/services/pushNotifications';
 // ⭐ ANDROID FIX: Use platform utils instead of synchronous Capacitor import
-import { isAndroidPlatform, isIOSPlatform, getPlatformSync } from '@/utils/platformUtils';
+import { getPlatformSync } from '@/utils/platformUtils';
 import { useVirtualizer } from '@tanstack/react-virtual';
 import { chatCache, updateChatCache, isCacheValid, cacheUserName, type CachedChat } from '@/cache/chatCache';
 // SafeAreaView removed — use plain divs with env(...) padding where necessary
@@ -12,7 +12,6 @@ import UserProfileModal from './UserProfileModal';
 import BlockDialog from './BlockDialog';
 import ReportDialog from '@/components/ReportDialog';
 import DeleteChatDialog from './chat/DeleteChatDialog';
-import ChatUserList from './chat/ChatUserList';
 import MessageBubble from './chat/MessageBubble';
 import MessageInput from './chat/MessageInput';
 import ChatHeader from './chat/ChatHeader';
@@ -48,7 +47,6 @@ const isDormantChat = (match: ChatMatch) => {
 
 // Global cache for chat matches - persists across component mounts
 const chatMatchesCache = new Map<string, { matches: ChatMatch[], timestamp: number }>();
-const CACHE_DURATION = 30000; // 30 seconds - keep matches fresh
 
 // Global cache for individual chat messages - NEVER expire, only update
 const chatMessagesCache = new Map<string, { messages: ChatMessage[], timestamp: number }>();
