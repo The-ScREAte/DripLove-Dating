@@ -232,6 +232,8 @@ let currentImageAbortController: AbortController | null = null;
 interface AdData {
   id: string;
   image_url: string;
+  video_url?: string | null;
+  media_type?: string | null;
   name: string;
   about: string;
   link: string | null;
@@ -699,6 +701,8 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, isPremium, profileComplet
           name: ad.name,
           about: ad.about,
           image_url: ad.image_url,
+          video_url: ad.video_url,
+          media_type: ad.media_type,
           link: ad.link,
           link_as: ad.link_as,
           isAd: true as const
@@ -763,6 +767,24 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, isPremium, profileComplet
     
     return result;
   }, [stableShuffledAds, premiumActive]);
+
+  // If ads arrive after the initial profile fetch, inject them without changing the current card.
+  useEffect(() => {
+    if (!adsLoaded) return;
+    if (stableShuffledAds.length === 0) return;
+    if (potentialMatches.length === 0) return;
+    if (potentialMatches.some((m) => isAd(m))) return;
+
+    const current = potentialMatches[currentIndex];
+    if (!current || isAd(current)) return;
+
+    const profilesOnly = potentialMatches.filter((m): m is PotentialMatch => !isAd(m));
+    const withAds = injectAds(profilesOnly);
+    const nextIndex = withAds.findIndex((m) => !isAd(m) && m.id === current.id);
+
+    setPotentialMatches(withAds);
+    if (nextIndex >= 0) setCurrentIndex(nextIndex);
+  }, [adsLoaded, stableShuffledAds.length, potentialMatches, currentIndex, injectAds]);
 
   // --- BEGIN: Swipe Guide Popup State ---
   const [showSwipeGuide, setShowSwipeGuide] = useState(false);
