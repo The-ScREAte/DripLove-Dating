@@ -104,6 +104,7 @@ const authOptions = {
     // For mobile apps, we need to handle deep links manually
     persistSession: true,
     // CRITICAL: Enable auto refresh to keep sessions alive indefinitely
+    // Supabase will automatically refresh tokens before they expire
     autoRefreshToken: true,
     // Storage options - use Preferences on mobile for durability, localStorage on web
     storage: supabaseStorage,
@@ -119,7 +120,13 @@ const authOptions = {
     headers: {
       'Accept': 'application/json',
     }
-  }
+  },
+  // Realtime config - keep connections alive
+  realtime: {
+    params: {
+      eventsPerSecond: 10,
+    },
+  },
 };
 
 // Import the supabase client like this:

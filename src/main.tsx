@@ -139,26 +139,32 @@ const AppWrapper = () => {
         // Auth bootstrap MUST happen before rendering routes (prevents Welcome/Login flash)
         try {
           // Get existing session from storage first
-          const { data: { session } } = await supabase.auth.getSession();
+          const { data: { session }, error: sessionError } = await supabase.auth.getSession();
 
+          // CRITICAL: Only clear session on explicit errors, not on missing session
           if (session) {
             setHasSession(true);
             setUser(session.user);
-          } else {
+          } else if (!sessionError) {
+            // No session found, but no error - user is genuinely not logged in
             setHasSession(false);
             setUser(null);
           }
+          // If there's an error, don't change the state - might be a network issue
 
           // Keep session signal up-to-date
-          // IMPORTANT: Only log out user on explicit SIGNED_OUT event
-          // Token refresh failures should NOT log the user out - Supabase handles retries automatically
+          // CRITICAL: ONLY log out user on explicit SIGNED_OUT event
+          // Token refresh failures, network errors, etc. should NEVER log the user out
+          // Supabase handles retries automatically - we just need to not interfere
           const { data: { subscription } } = supabase.auth.onAuthStateChange((event, nextSession) => {
+            // ONLY SIGNED_OUT should clear the session
             if (event === 'SIGNED_OUT') {
               setHasSession(false);
               setUser(null);
               return;
             }
 
+            // Update session on successful auth events
             if (event === 'SIGNED_IN' || event === 'TOKEN_REFRESHED') {
               if (nextSession) {
                 setHasSession(true);
@@ -168,30 +174,41 @@ const AppWrapper = () => {
             }
 
             if (event === 'INITIAL_SESSION') {
-              setHasSession(!!nextSession);
-              setUser(nextSession?.user ?? null);
+              // Only update if we have a session - don't clear on null
+              if (nextSession) {
+                setHasSession(true);
+                setUser(nextSession.user);
+              }
               return;
             }
 
             if (event === 'USER_UPDATED') {
               if (nextSession) setUser(nextSession.user);
             }
+
+            // IGNORE all other events - they should not affect session state
+            // This includes: PASSWORD_RECOVERY, MFA_CHALLENGE_VERIFIED, etc.
           });
 
           authSubscriptionRef.current = subscription;
 
-          // Background session refresh check every 10 minutes
+          // Background session keep-alive check every 5 minutes
+          // This silently refreshes the session if needed, without ever forcing logout
           const refreshInterval = setInterval(async () => {
             try {
               const { data: { session: currentSession } } = await supabase.auth.getSession();
               if (currentSession) {
+                // Session is valid - keep state in sync
                 setHasSession(true);
                 setUser(currentSession.user);
               }
+              // If no session, DON'T log out - could be a network issue
+              // Only explicit SIGNED_OUT event should log out
             } catch {
-              // Network error during refresh check - ignore, don't logout
+              // Network error during refresh check - completely ignore
+              // The user stays logged in with their cached session
             }
-          }, 10 * 60 * 1000);
+          }, 5 * 60 * 1000); // 5 minutes
 
           (authSubscriptionRef.current as any)._refreshInterval = refreshInterval;
         } catch {
