@@ -17,7 +17,7 @@ export interface UseDiscoverFeedResult {
 }
 
 export function useDiscoverFeed(userId: string | null | undefined): UseDiscoverFeedResult {
-  const indexRef = useRef(0);
+  const [currentIndex, setCurrentIndex] = useState(0);
   const isRefillingRef = useRef(false);
 
   const [profiles, setProfiles] = useState<DiscoverFeedRow[]>([]);
@@ -34,7 +34,7 @@ export function useDiscoverFeed(userId: string | null | undefined): UseDiscoverF
       const cached = feedCache.get(userId);
       if (!force && cached && Date.now() - cached.fetchedAt < CACHE_TTL_MS) {
         setProfiles(cached.profiles);
-        indexRef.current = 0;
+        setCurrentIndex(0);
         return;
       }
 
@@ -45,7 +45,7 @@ export function useDiscoverFeed(userId: string | null | undefined): UseDiscoverF
         const rows = await getDiscoverFeed(userId, limit);
         feedCache.set(userId, { profiles: rows, fetchedAt: Date.now() });
         setProfiles(rows);
-        indexRef.current = 0;
+        setCurrentIndex(0);
       } catch (e) {
         setError(e);
         setProfiles([]);
@@ -63,10 +63,10 @@ export function useDiscoverFeed(userId: string | null | undefined): UseDiscoverF
   }, [userId, refresh]);
 
   // REFILL LOGIC (STEP 2)
-  const refillIfNeeded = useCallback(async () => {
+  const refillIfNeeded = useCallback(async (newIndex: number) => {
     if (!userId || isRefillingRef.current) return;
 
-    const remaining = profiles.length - indexRef.current - 1;
+    const remaining = profiles.length - newIndex - 1;
     if (remaining > REFILL_THRESHOLD) return;
 
     isRefillingRef.current = true;
@@ -95,11 +95,14 @@ export function useDiscoverFeed(userId: string | null | undefined): UseDiscoverF
   }, [userId, profiles.length]);
 
   const swipeNext = useCallback(() => {
-    indexRef.current += 1;
-    void refillIfNeeded();
+    setCurrentIndex((prev) => {
+      const newIndex = prev + 1;
+      void refillIfNeeded(newIndex);
+      return newIndex;
+    });
   }, [refillIfNeeded]);
 
-  const current = indexRef.current < profiles.length ? profiles[indexRef.current] ?? null : null;
+  const current = currentIndex < profiles.length ? profiles[currentIndex] ?? null : null;
 
   return {
     profiles,
