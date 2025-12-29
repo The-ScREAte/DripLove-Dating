@@ -1,5 +1,5 @@
 // Supabase Edge Function: paystack-webhook
-// Handles Paystack webhook events, especially payment failures and subscription updates
+// Handles Paystack webhook events, saves authorization codes for recurring billing
 import { serve } from 'https://deno.land/std@0.177.0/http/server.ts'
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.45.0'
 import type { SupabaseClient } from 'https://esm.sh/@supabase/supabase-js@2.45.0'
@@ -91,12 +91,80 @@ function extractSubscriptionCode(eventData: unknown): string | null {
       }
     | null
 
-  // Paystack typically includes this on subscription.create
   const code =
     data?.subscription_code ||
     data?.subscription?.subscription_code ||
     data?.data?.subscription_code
   return typeof code === 'string' && code.length > 0 ? code : null
+}
+
+interface AuthorizationData {
+  authorization_code?: string
+  signature?: string
+  reusable?: boolean
+  brand?: string
+  last4?: string
+  exp_month?: string
+  exp_year?: string
+  bank?: string
+  channel?: string
+  card_type?: string
+}
+
+function extractAuthorization(eventData: unknown): AuthorizationData | null {
+  const data = eventData as { authorization?: AuthorizationData } | null
+  return data?.authorization || null
+}
+
+async function saveAuthorization(
+  supabase: SupabaseClient,
+  userId: string,
+  email: string,
+  authorization: AuthorizationData,
+  amount: number,
+  currency: string
+) {
+  if (!authorization.authorization_code) {
+    console.log('[PAYSTACK-WEBHOOK] No authorization_code in response')
+    return
+  }
+
+  // Only save if reusable
+  if (authorization.reusable === false) {
+    console.log('[PAYSTACK-WEBHOOK] Authorization is not reusable, skipping save')
+    return
+  }
+
+  console.log(`[PAYSTACK-WEBHOOK] Saving authorization for user ${userId}`)
+
+  const { error } = await supabase
+    .from('paystack_authorizations')
+    .upsert({
+      user_id: userId,
+      email,
+      authorization_code: authorization.authorization_code,
+      signature: authorization.signature,
+      reusable: authorization.reusable ?? true,
+      brand: authorization.brand,
+      last4: authorization.last4,
+      exp_month: authorization.exp_month ? parseInt(authorization.exp_month) : null,
+      exp_year: authorization.exp_year ? parseInt(authorization.exp_year) : null,
+      bank: authorization.bank,
+      channel: authorization.channel,
+      card_type: authorization.card_type,
+      default_amount: amount, // Store in smallest unit (kobo/pesewas)
+      default_currency: currency,
+      status: 'active',
+      updated_at: new Date().toISOString(),
+    }, {
+      onConflict: 'user_id,authorization_code',
+    })
+
+  if (error) {
+    console.error('[PAYSTACK-WEBHOOK] Error saving authorization:', error)
+  } else {
+    console.log('[PAYSTACK-WEBHOOK] Authorization saved successfully')
+  }
 }
 
 serve(async (req) => {
@@ -118,13 +186,14 @@ serve(async (req) => {
 
     const event = JSON.parse(body)
     console.log('[PAYSTACK-WEBHOOK] Event type:', event.event)
+    console.log('[PAYSTACK-WEBHOOK] Event data:', JSON.stringify(event.data, null, 2))
     
     const supabase = createClient(SUPABASE_URL!, SUPABASE_SERVICE_ROLE_KEY!)
     
     const eventType = event.event
     const eventData = event.data
 
-    // Cancellation-type events: do NOT count as payment failures.
+    // Cancellation-type events: disable authorization and update subscription
     if (eventType === 'subscription.disable' || eventType === 'subscription.not_renew') {
       console.log('[PAYSTACK-WEBHOOK] Processing subscription cancellation event')
 
@@ -133,6 +202,12 @@ serve(async (req) => {
 
       const user = await findUserByEmail(supabase, email)
       if (!user) return json(404, { error: 'User not found' })
+
+      // Disable all user's authorizations
+      await supabase
+        .from('paystack_authorizations')
+        .update({ status: 'disabled', updated_at: new Date().toISOString() })
+        .eq('user_id', user.id)
 
       const { error: updateError } = await supabase
         .from('user_subscriptions')
@@ -151,7 +226,7 @@ serve(async (req) => {
       return json(200, { message: 'Cancellation processed' })
     }
 
-    // Payment failures (Paystack retries happen; we keep your 3-attempt logic)
+    // Payment failures - retry logic
     if (eventType === 'charge.failed' || eventType === 'invoice.payment_failed') {
       console.log('[PAYSTACK-WEBHOOK] Processing payment failure event')
 
@@ -190,6 +265,12 @@ serve(async (req) => {
       if (newAttempts >= 3) {
         console.log(`[PAYSTACK-WEBHOOK] 3rd payment attempt failed for user ${user.id}, deactivating subscription`)
 
+        // Disable authorizations
+        await supabase
+          .from('paystack_authorizations')
+          .update({ status: 'disabled', updated_at: new Date().toISOString() })
+          .eq('user_id', user.id)
+
         const { error: failureError } = await supabase.rpc('handle_payment_failure', {
           p_user_id: user.id,
           p_reason: `Payment failed after ${newAttempts} attempts. Event: ${eventType}. Gateway response: ${eventData?.gateway_response || 'Unknown error'}`,
@@ -204,7 +285,7 @@ serve(async (req) => {
       return json(200, { message: 'Failure processed' })
     }
 
-    // Successful payment / renewal events: extend the subscription period.
+    // Successful payment / renewal events
     if (eventType === 'charge.success' || eventType === 'subscription.create') {
       console.log('[PAYSTACK-WEBHOOK] Processing payment success/renewal event')
 
@@ -213,6 +294,15 @@ serve(async (req) => {
 
       const user = await findUserByEmail(supabase, email)
       if (!user) return json(404, { error: 'User not found' })
+
+      // Extract and save authorization for future recurring charges
+      const authorization = extractAuthorization(eventData)
+      const amount = eventData?.amount || 0 // Already in smallest unit
+      const currency = eventData?.currency || 'GHS'
+
+      if (authorization) {
+        await saveAuthorization(supabase, user.id, email, authorization, amount, currency)
+      }
 
       const { data: currentSub } = await supabase
         .from('user_subscriptions')
@@ -224,8 +314,6 @@ serve(async (req) => {
         .maybeSingle()
 
       if (!currentSub?.id) {
-        // If a user somehow paid but has no subscription row, we can't safely create it here
-        // without knowing your full schema defaults.
         console.log('[PAYSTACK-WEBHOOK] No subscription row found for user:', user.id)
         return json(404, { error: 'No subscription row found' })
       }
@@ -247,7 +335,6 @@ serve(async (req) => {
         updated_at: new Date().toISOString(),
       }
 
-      // Store Paystack subscription_code so cancel-subscription can disable it later.
       if (subscriptionCode && currentSub.flutterwave_transaction_id !== subscriptionCode) {
         updatePayload.flutterwave_transaction_id = subscriptionCode
       }

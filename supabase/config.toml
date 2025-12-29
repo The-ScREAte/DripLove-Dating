@@ -16,11 +16,20 @@ verify_jwt = false
 [functions.paystack-redirect]  
 verify_jwt = false
 
+[functions.paystack-verify]
+verify_jwt = true
+
 [functions.cancel-subscription]
 verify_jwt = true
 
 [functions.paystack-webhook]
 verify_jwt = false
+
+[functions.paystack-recurring-billing]
+verify_jwt = false
+
+[functions.admin-billing-trigger]
+verify_jwt = true
 
 [functions.subscription-checker]
 verify_jwt = false

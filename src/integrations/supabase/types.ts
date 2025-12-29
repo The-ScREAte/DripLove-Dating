@@ -435,6 +435,24 @@ export type Database = {
           },
         ]
       }
+      internal_secrets: {
+        Row: {
+          created_at: string
+          key: string
+          value: string
+        }
+        Insert: {
+          created_at?: string
+          key: string
+          value: string
+        }
+        Update: {
+          created_at?: string
+          key?: string
+          value?: string
+        }
+        Relationships: []
+      }
       likes: {
         Row: {
           created_at: string
@@ -697,6 +715,134 @@ export type Database = {
             columns: ["promo_code_id"]
             isOneToOne: false
             referencedRelation: "promo_codes"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      paystack_authorizations: {
+        Row: {
+          authorization_code: string
+          bank: string | null
+          brand: string | null
+          card_type: string | null
+          channel: string | null
+          created_at: string
+          default_amount: number
+          default_currency: string
+          email: string | null
+          exp_month: number | null
+          exp_year: number | null
+          id: string
+          last4: string | null
+          reusable: boolean | null
+          signature: string | null
+          status: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          authorization_code: string
+          bank?: string | null
+          brand?: string | null
+          card_type?: string | null
+          channel?: string | null
+          created_at?: string
+          default_amount: number
+          default_currency: string
+          email?: string | null
+          exp_month?: number | null
+          exp_year?: number | null
+          id?: string
+          last4?: string | null
+          reusable?: boolean | null
+          signature?: string | null
+          status?: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          authorization_code?: string
+          bank?: string | null
+          brand?: string | null
+          card_type?: string | null
+          channel?: string | null
+          created_at?: string
+          default_amount?: number
+          default_currency?: string
+          email?: string | null
+          exp_month?: number | null
+          exp_year?: number | null
+          id?: string
+          last4?: string | null
+          reusable?: boolean | null
+          signature?: string | null
+          status?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "paystack_authorizations_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      paystack_charge_attempts: {
+        Row: {
+          amount: number
+          created_at: string
+          currency: string
+          gateway_response: string | null
+          id: string
+          paystack_response: Json | null
+          reference: string
+          status: string
+          subscription_id: string | null
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          amount: number
+          created_at?: string
+          currency: string
+          gateway_response?: string | null
+          id?: string
+          paystack_response?: Json | null
+          reference: string
+          status?: string
+          subscription_id?: string | null
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          amount?: number
+          created_at?: string
+          currency?: string
+          gateway_response?: string | null
+          id?: string
+          paystack_response?: Json | null
+          reference?: string
+          status?: string
+          subscription_id?: string | null
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "paystack_charge_attempts_subscription_id_fkey"
+            columns: ["subscription_id"]
+            isOneToOne: false
+            referencedRelation: "user_subscriptions"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "paystack_charge_attempts_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
             referencedColumns: ["id"]
           },
         ]
