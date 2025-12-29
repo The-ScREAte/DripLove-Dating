@@ -5,6 +5,7 @@ import App from "./App.tsx";
 import "./index.css";
 import { initializeGoogleAuth } from "./utils/googleNativeAuth";
 import "./i18n/config"; // Initialize i18n
+import { supabase } from "./integrations/supabase/client";
 
 // Suppress non-critical console output in production
 if (import.meta.env.PROD) {
@@ -137,11 +138,9 @@ const AppWrapper = () => {
 
         // Auth bootstrap MUST happen before rendering routes (prevents Welcome/Login flash)
         try {
-          const { supabase } = await import('./integrations/supabase/client');
-          
           // Get existing session from storage first
           const { data: { session } } = await supabase.auth.getSession();
-          
+
           if (session) {
             setHasSession(true);
             setUser(session.user);
@@ -154,59 +153,50 @@ const AppWrapper = () => {
           // IMPORTANT: Only log out user on explicit SIGNED_OUT event
           // Token refresh failures should NOT log the user out - Supabase handles retries automatically
           const { data: { subscription } } = supabase.auth.onAuthStateChange((event, nextSession) => {
-            // Handle specific auth events
             if (event === 'SIGNED_OUT') {
-              // User explicitly signed out - only time we clear the session
               setHasSession(false);
               setUser(null);
-            } else if (event === 'SIGNED_IN' || event === 'TOKEN_REFRESHED') {
-              // User signed in or token refreshed - update session
+              return;
+            }
+
+            if (event === 'SIGNED_IN' || event === 'TOKEN_REFRESHED') {
               if (nextSession) {
                 setHasSession(true);
                 setUser(nextSession.user);
               }
-            } else if (event === 'INITIAL_SESSION') {
-              // Initial session on app load
+              return;
+            }
+
+            if (event === 'INITIAL_SESSION') {
               setHasSession(!!nextSession);
               setUser(nextSession?.user ?? null);
-            } else if (event === 'USER_UPDATED') {
-              // User profile updated - update user but keep session
-              if (nextSession) {
-                setUser(nextSession.user);
-              }
+              return;
             }
-            // CRITICAL: For all other events (PASSWORD_RECOVERY, etc.), do NOT change auth state
-            // This prevents accidental logouts from token refresh edge cases
+
+            if (event === 'USER_UPDATED') {
+              if (nextSession) setUser(nextSession.user);
+            }
           });
 
           authSubscriptionRef.current = subscription;
-          
+
           // Background session refresh check every 10 minutes
-          // This ensures the session stays alive even if the app is in the background
           const refreshInterval = setInterval(async () => {
             try {
               const { data: { session: currentSession } } = await supabase.auth.getSession();
               if (currentSession) {
-                // Session is still valid, Supabase auto-refreshes tokens
-                // Just ensure our state is in sync
                 setHasSession(true);
                 setUser(currentSession.user);
               }
-              // If no session and we had one before, don't auto-logout
-              // Let the explicit SIGNED_OUT event handle that
             } catch {
               // Network error during refresh check - ignore, don't logout
             }
-          }, 10 * 60 * 1000); // 10 minutes
-          
-          // Store interval for cleanup
+          }, 10 * 60 * 1000);
+
           (authSubscriptionRef.current as any)._refreshInterval = refreshInterval;
-          
         } catch {
-          // If Supabase client fails to load, don't change existing session state
-          // This prevents logouts due to network issues on app load
-          setHasSession(false);
-          setUser(null);
+          // If auth bootstrap fails (offline, transient errors), do NOT force a sign-out.
+          // Keep current state (defaults to logged out on cold start, but won't clear a valid session).
         } finally {
           setAuthChecked(true);
         }

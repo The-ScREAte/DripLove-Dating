@@ -2,6 +2,7 @@
 import { createClient } from '@supabase/supabase-js';
 import type { Database } from './types';
 import { Capacitor } from '@capacitor/core';
+import { Preferences } from '@capacitor/preferences';
 
 export const SUPABASE_URL = 'https://tgjsyyihabsovironesw.supabase.co';
 const SUPABASE_PUBLISHABLE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InRnanN5eWloYWJzb3Zpcm9uZXN3Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTAxMTQxMzYsImV4cCI6MjA2NTY5MDEzNn0.UFy_dLD3etnw34UdqMyn97soapS1ZaAP54rZAG1laR8';
@@ -25,6 +26,76 @@ const customFetch: typeof fetch = (input, init) => {
 };
 
 // Configure auth options for mobile deep linking and persistent sessions
+const STORAGE_MIGRATION_KEY_PREFIX = 'driplove:supabase:';
+
+// Supabase storage adapter:
+// - Native (Capacitor): persist in Preferences (UserDefaults/SharedPreferences)
+// - Web: localStorage
+// Also migrates any existing token from localStorage into Preferences on first read.
+const supabaseStorage = {
+  async getItem(key: string): Promise<string | null> {
+    try {
+      if (typeof window === 'undefined') return null;
+
+      if (Capacitor.isNativePlatform()) {
+        const prefKey = `${STORAGE_MIGRATION_KEY_PREFIX}${key}`;
+        const { value } = await Preferences.get({ key: prefKey });
+        if (value) return value;
+
+        // Migration path: if legacy localStorage has the value, promote it into Preferences.
+        const legacy = window.localStorage?.getItem(key);
+        if (legacy) {
+          await Preferences.set({ key: prefKey, value: legacy });
+          return legacy;
+        }
+        return null;
+      }
+
+      return window.localStorage?.getItem(key) ?? null;
+    } catch {
+      // Storage errors should never force logout.
+      try {
+        return typeof window !== 'undefined' ? (window.localStorage?.getItem(key) ?? null) : null;
+      } catch {
+        return null;
+      }
+    }
+  },
+
+  async setItem(key: string, value: string): Promise<void> {
+    try {
+      if (typeof window === 'undefined') return;
+
+      if (Capacitor.isNativePlatform()) {
+        await Preferences.set({ key: `${STORAGE_MIGRATION_KEY_PREFIX}${key}`, value });
+        // Keep localStorage in sync as a secondary cache (useful for debugging and web builds).
+        try { window.localStorage?.setItem(key, value); } catch {}
+        return;
+      }
+
+      window.localStorage?.setItem(key, value);
+    } catch {
+      // Ignore write errors
+    }
+  },
+
+  async removeItem(key: string): Promise<void> {
+    try {
+      if (typeof window === 'undefined') return;
+
+      if (Capacitor.isNativePlatform()) {
+        await Preferences.remove({ key: `${STORAGE_MIGRATION_KEY_PREFIX}${key}` });
+        try { window.localStorage?.removeItem(key); } catch {}
+        return;
+      }
+
+      window.localStorage?.removeItem(key);
+    } catch {
+      // Ignore remove errors
+    }
+  },
+};
+
 const authOptions = {
   auth: {
     // Don't set a global redirectTo - let each operation specify its own
@@ -34,8 +105,8 @@ const authOptions = {
     persistSession: true,
     // CRITICAL: Enable auto refresh to keep sessions alive indefinitely
     autoRefreshToken: true,
-    // Storage options - use localStorage for persistence across app restarts
-    storage: typeof window !== 'undefined' ? window.localStorage : undefined,
+    // Storage options - use Preferences on mobile for durability, localStorage on web
+    storage: supabaseStorage,
     storageKey: 'supabase.auth.token',
     // Disable debug logging to keep console clean
     debug: false,

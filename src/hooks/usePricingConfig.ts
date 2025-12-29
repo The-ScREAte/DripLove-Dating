@@ -9,6 +9,8 @@ interface PricingConfig {
   currencySymbol: string;
   displayPrice: string;
   ghsPrice: string;
+  defaultInternationalPrice: string;
+  defaultInternationalCurrency: string;
   loading: boolean;
   source: 'iap' | 'fallback';
 }
@@ -49,6 +51,8 @@ let webPricing: PricingConfig = {
   currencySymbol: '$',
   displayPrice: `${currencySymbols[DEFAULT_INTERNATIONAL_CURRENCY_FALLBACK] || DEFAULT_INTERNATIONAL_CURRENCY_FALLBACK}${DEFAULT_INTERNATIONAL_PRICE_FALLBACK}/month`,
   ghsPrice: '80',
+  defaultInternationalPrice: DEFAULT_INTERNATIONAL_PRICE_FALLBACK,
+  defaultInternationalCurrency: DEFAULT_INTERNATIONAL_CURRENCY_FALLBACK,
   loading: false,
   source: 'fallback',
 };
@@ -78,6 +82,8 @@ async function loadWebPricingFromDB(): Promise<void> {
         currencySymbol: symbol,
         displayPrice: `${symbol}${price}/month`,
         ghsPrice,
+        defaultInternationalPrice: price,
+        defaultInternationalCurrency: currency,
         loading: false,
         source: 'fallback',
       };
@@ -337,6 +343,8 @@ async function loadPricingConfig(userId?: string): Promise<PricingConfig> {
           currencySymbol: symbol,
           displayPrice: googlePrice.formattedPrice + '/month',
           ghsPrice,
+          defaultInternationalPrice: webPricing.defaultInternationalPrice,
+          defaultInternationalCurrency: webPricing.defaultInternationalCurrency,
           loading: false,
           source: 'iap',
         };
@@ -363,6 +371,8 @@ async function loadPricingConfig(userId?: string): Promise<PricingConfig> {
           currencySymbol: symbol,
           displayPrice: applePrice.formattedPrice + '/month',
           ghsPrice,
+          defaultInternationalPrice: webPricing.defaultInternationalPrice,
+          defaultInternationalCurrency: webPricing.defaultInternationalCurrency,
           loading: false,
           source: 'iap',
         };

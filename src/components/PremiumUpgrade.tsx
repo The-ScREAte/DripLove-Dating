@@ -11,6 +11,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import { useEnhancedSubscription } from '@/hooks/useEnhancedSubscription';
 import { usePricingConfig } from '@/hooks/usePricingConfig';
+import { convertCurrency } from '@/services/exchangeRateService';
 import { useTranslation } from 'react-i18next';
 import { Capacitor } from '@capacitor/core';
 
@@ -263,11 +264,67 @@ const PremiumUpgrade = ({ currentUser, onClose, preselectedPlan }: PremiumUpgrad
   const currencySymbol = pricingConfig.currencySymbol;
   const ghsPrice = pricingConfig.ghsPrice;
   
-  // Paystack pricing: use monthlyPrice from pricingConfig which handles platform-specific logic
-  // - Web: DB default_international_price
-  // - Android: Google IAP price → fallback to DB default_international_price
-  // - iOS: Apple IAP price → fallback to DB default_international_price (but Paystack not shown on iOS)
-  const paystackPrice = monthlyPrice;
+  // Paystack pricing (special case):
+  // Primary = DB "default international" price (USD) from Admin → converted to GHS via exchange-rate API.
+  // Fallback (Android only) = Android localized pricing (Google Play) + its precomputed GHS conversion.
+  const defaultInternationalPrice = pricingConfig.defaultInternationalPrice;
+  const defaultInternationalCurrency = pricingConfig.defaultInternationalCurrency;
+
+  const [paystackGhsAmount, setPaystackGhsAmount] = useState<number | null>(null);
+  const [paystackUseAndroidFallback, setPaystackUseAndroidFallback] = useState(false);
+
+  React.useEffect(() => {
+    let cancelled = false;
+
+    const computePaystackAmount = async () => {
+      setPaystackUseAndroidFallback(false);
+      setPaystackGhsAmount(null);
+
+      const baseAmount = parseFloat(defaultInternationalPrice || '0');
+      if (!Number.isFinite(baseAmount) || baseAmount <= 0) {
+        // If DB price is missing/invalid, fall back to existing behavior.
+        setPaystackUseAndroidFallback(true);
+        setPaystackGhsAmount(null);
+        return;
+      }
+
+      // Convert DB price → GHS using exchange-rate API (no approximate fallback here).
+      const converted = await convertCurrency(baseAmount, (defaultInternationalCurrency || 'USD').toUpperCase(), 'GHS');
+      if (cancelled) return;
+
+      if (converted === null) {
+        setPaystackUseAndroidFallback(true);
+        setPaystackGhsAmount(null);
+        return;
+      }
+
+      // Keep consistent with existing Paystack flow which uses whole GHS for amounts.
+      setPaystackGhsAmount(Math.round(converted));
+    };
+
+    computePaystackAmount();
+    return () => {
+      cancelled = true;
+    };
+  }, [defaultInternationalPrice, defaultInternationalCurrency]);
+
+  const paystackDisplayCurrency = paystackUseAndroidFallback && isAndroidNative ? currency : 'USD';
+  const paystackDisplayAmount = paystackUseAndroidFallback && isAndroidNative
+    ? parseFloat(monthlyPrice)
+    : parseFloat(defaultInternationalPrice);
+
+  const paystackChargedGhsAmount = paystackGhsAmount !== null
+    ? paystackGhsAmount
+    : (paystackUseAndroidFallback && isAndroidNative ? parseFloat(ghsPrice) : parseFloat(ghsPrice));
+
+  const paystackButtonSubtitle = (() => {
+    if (paystackUseAndroidFallback && isAndroidNative) {
+      // Localized pricing fallback
+      return `${currencySymbol}${monthlyPrice}/month • ${t('premium.paymentOptions.monthly.subtitle')}`;
+    }
+    // Primary DB USD pricing
+    return `$${defaultInternationalPrice}/month • ${t('premium.paymentOptions.monthly.subtitle')}`;
+  })();
   
   const [paymentMethods, setPaymentMethods] = useState<Array<{ type: 'iap' | 'card' | 'momo' }>>([{ type: 'card' }]);
 
@@ -707,7 +764,7 @@ const PremiumUpgrade = ({ currentUser, onClose, preselectedPlan }: PremiumUpgrad
                   className="w-full p-3 bg-gradient-to-r from-green-500 to-emerald-600 text-white rounded-lg hover:from-green-600 hover:to-emerald-700 transition-all duration-200 font-semibold"
                 >
                   <div className="text-sm sm:text-base">💳 Pay with Paystack</div>
-                  <div className="text-xs opacity-90">${paystackPrice || monthlyPrice}/month • {t('premium.paymentOptions.monthly.subtitle')}</div>
+                  <div className="text-xs opacity-90">{paystackButtonSubtitle}</div>
                 </button>
               )}
               
@@ -765,10 +822,10 @@ const PremiumUpgrade = ({ currentUser, onClose, preselectedPlan }: PremiumUpgrad
       <PaystackPaymentModal
         isOpen={showPaymentModal && (!deviceIsNative || !deviceIsIos)}
         onClose={() => setShowPaymentModal(false)}
-        amount={parseFloat(ghsPrice)}
+        amount={Number.isFinite(paystackChargedGhsAmount) ? paystackChargedGhsAmount : parseFloat(ghsPrice)}
         currency="GHS"
-        displayAmount={parseFloat(paystackPrice || monthlyPrice)}
-        displayCurrency="USD"
+        displayAmount={Number.isFinite(paystackDisplayAmount) ? paystackDisplayAmount : parseFloat(monthlyPrice)}
+        displayCurrency={paystackDisplayCurrency}
         email={currentUser?.email || ''}
         onSuccess={handlePaymentSuccess}
         paymentMethod={paymentMethods[0]?.type ?? 'card'}

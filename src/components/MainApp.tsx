@@ -17,6 +17,7 @@ import { loadUserLanguage } from '@/utils/languageSync';
 import { useActivityTracker } from '@/hooks/useActivityTracker';
 import type { ChatMatchesCacheValue, LikedMeCacheValue } from '@/types/cacheTypes';
 import ProfilePage from '@/components/ProfilePage';
+import { calculateProfileCompletion } from '@/utils/profileCompletion';
 
 type ProfileRow = Database['public']['Tables']['profiles']['Row'];
 
@@ -76,6 +77,8 @@ const MainApp = ({ user, onLogout }: MainAppProps) => {
   const [profile, setProfile] = useState<ProfileRow | null>(null);
   const [isPremium, setIsPremium] = useState(false);
   const [unreadCount, setUnreadCount] = useState(0);
+  const [profileCompletion, setProfileCompletion] = useState(0);
+  const [userImages, setUserImages] = useState<any[]>([]);
   const { toast } = useToast();
 
   // Cached set of match IDs for this user (used to cheaply filter realtime chat events)
@@ -118,6 +121,23 @@ const MainApp = ({ user, onLogout }: MainAppProps) => {
       }
 
       setProfile(data as unknown as ProfileRow);
+
+      // Fetch user images for profile completion calculation
+      try {
+        const { data: images, error: imagesError } = await supabase
+          .from('user_images')
+          .select('image_url, is_approved, moderation_status')
+          .eq('user_id', data.id);
+
+        if (!imagesError && images) {
+          setUserImages(images);
+          // Calculate profile completion using the same method as ProfilePage
+          const completionResult = calculateProfileCompletion(data, images);
+          setProfileCompletion(completionResult.completion);
+        }
+      } catch (imgErr) {
+        console.error('[MainApp] Failed to fetch images for profile completion:', imgErr);
+      }
 
       // Check premium status from user_subscriptions
       if (data?.id) {
@@ -768,7 +788,7 @@ const MainApp = ({ user, onLogout }: MainAppProps) => {
     
     switch (activeTab) {
       case 'dripcheck':
-        return <DiscoverPage currentUser={profile} onNavigateToChat={handleNavigateToChat} isPremium={isPremium} />;
+        return <DiscoverPage currentUser={profile} onNavigateToChat={handleNavigateToChat} isPremium={isPremium} profileCompletion={profileCompletion} />;
       case 'chat':
         return <ChatPage currentUser={profile} onUnreadChange={forceRefreshUnreadCount} onDetailViewChange={setIsChatDetailOpen} />;
       case 'liked':
@@ -786,9 +806,9 @@ const MainApp = ({ user, onLogout }: MainAppProps) => {
           />
         );
       default:
-        return <DiscoverPage currentUser={profile} onNavigateToChat={handleNavigateToChat} isPremium={isPremium} />;
+        return <DiscoverPage currentUser={profile} onNavigateToChat={handleNavigateToChat} isPremium={isPremium} profileCompletion={profileCompletion} />;
     }
-  }, [activeTab, profile, isPremium, handleNavigateToChat, forceRefreshUnreadCount, setIsChatDetailOpen, fetchUserProfile, onLogout, handleShowTerms, handleShowPrivacy]);
+  }, [activeTab, profile, isPremium, profileCompletion, handleNavigateToChat, forceRefreshUnreadCount, setIsChatDetailOpen, fetchUserProfile, onLogout, handleShowTerms, handleShowPrivacy]);
 
   const renderContent = () => {
     if (showTerms) {
@@ -861,7 +881,7 @@ const MainApp = ({ user, onLogout }: MainAppProps) => {
               className="w-full h-full" 
               style={{ display: activeTab === 'dripcheck' ? 'block' : 'none' }}
             > 
-              <DiscoverPage currentUser={profile} onNavigateToChat={handleNavigateToChat} isPremium={isPremium} />
+              <DiscoverPage currentUser={profile} onNavigateToChat={handleNavigateToChat} isPremium={isPremium} profileCompletion={profileCompletion} />
             </div>
           </Suspense>
 

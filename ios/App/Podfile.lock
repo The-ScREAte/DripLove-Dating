@@ -25,7 +25,7 @@ PODS:
     - FirebaseMessaging (~> 11.7.0)
   - CapacitorKeyboard (7.0.3):
     - Capacitor
-  - CapacitorPreferences (7.0.3):
+  - CapacitorPreferences (8.0.0):
     - Capacitor
   - CapacitorPushNotifications (7.0.3):
     - Capacitor
@@ -191,7 +191,7 @@ SPEC CHECKSUMS:
   CapacitorCordova: 435121e81a2df4d0034f0fb11fcefab5104cfdb5
   CapacitorFirebaseMessaging: 6ff1c604e1eb57e1698ef153adc2f21693a56353
   CapacitorKeyboard: 62f36104f26d53d8b3a2a43f2a69fe714f1777d5
-  CapacitorPreferences: 913eef88272c13eb6445b21e51fe8ef6635412cc
+  CapacitorPreferences: 443fabe9670226200e595658a87ef0b1566716d4
   CapacitorPushNotifications: bdd621fbd562be34a41f4a7b1750efa000447d5a
   CapacitorRateApp: 20928fa996851647e912bbf119af59a48a171712
   CapacitorStatusBar: 6e7af040d8fc4dd655999819625cae9c2d74c36f
@@ -210,6 +210,6 @@ SPEC CHECKSUMS:
   PromisesObjC: f5707f49cb48b9636751c5b2e7d227e43fba9f47
   SouthdevsCapacitorGoogleAuth: 453cab6e5f58fec290e30b2d918ded3434ad22c9
 
-PODFILE CHECKSUM: 5db72e52c23ce75508599fd2b5d9ce8d18d9d766
+PODFILE CHECKSUM: 7b80199b2ed8218dc5e2dcc0ec5e332a7f254e32
 
 COCOAPODS: 1.16.2
