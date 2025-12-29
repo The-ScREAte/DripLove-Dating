@@ -9,13 +9,14 @@ import { PotentialMatch } from '@/types';
  * are injected into the swipe queue at strategic positions.
  * 
  * Rules:
- * - 30% injection rate = ~1 injected profile every 3 cards
+ * - 30% injection rate = ~1 injected profile every 3-4 cards
  * - Never inject as "next card" - use positions +2 to +4
- * - Cap: max 30% of cards per session
- * - Cooldown: only 1 injection every 3 swipes minimum
+ * - Cap: max 30% of cards per session (only after 10+ swipes to avoid early blocking)
+ * - Cooldown: at least 3 swipes between injections
  * - Quality filter: only inject likers with 2+ photos
  * - Deduplicate: avoid same ID appearing twice
  * - Respect: passed today + blocked profiles excluded
+ * - Priority: most recent likers first (for higher match probability)
  */
 
 interface UseLikeBackInjectionOptions {
@@ -24,6 +25,7 @@ interface UseLikeBackInjectionOptions {
   passedTodayIds: Set<string>;
   inQueueIds: Set<string>;
   locallySwipedIds: Map<string, { action: 'like' | 'pass'; timestamp: number }>;
+  boostMode?: boolean; // Optional: 90% injection rate for turbo mode
 }
 
 interface LikerProfile {
@@ -55,15 +57,18 @@ interface LikerProfile {
   adinkra_symbols: string[] | null;
   is_verified: boolean | null;
   image_count: number;
+  liked_at: number; // Timestamp of when they liked (for recency sorting)
 }
 
 // Configuration
-const INJECT_RATE = 0.30; // 30%
-const EVERY_N_SWIPES = Math.round(1 / INJECT_RATE); // 3
+const NORMAL_INJECT_RATE = 0.30; // 30% normal
+const BOOST_INJECT_RATE = 0.90; // 90% boost mode
+const COOLDOWN_SWIPES = 3; // At least 3 swipes between injections
 const MIN_PHOTOS_REQUIRED = 2; // Quality filter
 const INJECTION_POSITION_MIN = 2; // Position +2
 const INJECTION_POSITION_MAX = 4; // Position +4
 const MAX_INJECTION_PERCENT = 0.30; // Cap at 30% of session
+const MIN_SWIPES_FOR_CAP = 10; // Only enforce cap after 10+ swipes
 
 export function useLikeBackInjection({
   userId,
@@ -71,15 +76,15 @@ export function useLikeBackInjection({
   passedTodayIds,
   inQueueIds,
   locallySwipedIds,
+  boostMode = false,
 }: UseLikeBackInjectionOptions) {
-  // Users who liked the current user (candidates for injection)
+  // Users who liked the current user (candidates for injection) - sorted by recency
   const [likedMeIds, setLikedMeIds] = useState<string[]>([]);
   const [likerProfiles, setLikerProfiles] = useState<Map<string, LikerProfile>>(new Map());
   
-  // Track injection state
+  // Track injection state (single counter, no double counting)
   const swipeCountRef = useRef(0);
   const injectedCountRef = useRef(0);
-  const totalSwipesRef = useRef(0);
   const lastInjectionSwipeRef = useRef(0);
   const injectedIdsRef = useRef<Set<string>>(new Set());
 
@@ -108,6 +113,12 @@ export function useLikeBackInjection({
         .eq('liker_id', userId);
 
       const myLikedIds = new Set(myLikes?.map(l => l.liked_id) || []);
+
+      // Build a map of liker_id -> liked_at timestamp for recency sorting
+      const likerTimestampMap = new Map<string, number>();
+      (likedUsers || []).forEach(l => {
+        likerTimestampMap.set(l.liker_id, new Date(l.created_at).getTime());
+      });
 
       // Filter out already liked back, blocked, passed today, already in queue
       const candidates = (likedUsers || [])
@@ -159,20 +170,26 @@ export function useLikeBackInjection({
         imageCountMap.set(row.user_id, (imageCountMap.get(row.user_id) || 0) + 1);
       });
 
-      // Filter by quality (2+ photos) and build profile map
+      // Filter by quality (2+ photos) and build profile map with liked_at timestamp
       const qualifiedProfiles = new Map<string, LikerProfile>();
-      const qualifiedIds: string[] = [];
+      const qualifiedWithTimestamp: { id: string; liked_at: number }[] = [];
 
       (profiles || []).forEach(p => {
         const imgCount = imageCountMap.get(p.id) || 0;
         if (imgCount >= MIN_PHOTOS_REQUIRED) {
+          const likedAt = likerTimestampMap.get(p.id) || 0;
           qualifiedProfiles.set(p.id, {
             ...p,
             image_count: imgCount,
+            liked_at: likedAt,
           } as LikerProfile);
-          qualifiedIds.push(p.id);
+          qualifiedWithTimestamp.push({ id: p.id, liked_at: likedAt });
         }
       });
+
+      // Sort by most recent like first (higher timestamp = more recent)
+      qualifiedWithTimestamp.sort((a, b) => b.liked_at - a.liked_at);
+      const qualifiedIds = qualifiedWithTimestamp.map(item => item.id);
 
       setLikerProfiles(qualifiedProfiles);
       setLikedMeIds(qualifiedIds);
@@ -265,24 +282,27 @@ export function useLikeBackInjection({
     };
   }, [userId, likedMeIds, blockedIds, passedTodayIds, inQueueIds, locallySwipedIds]);
 
+  // Get effective injection rate based on mode
+  const injectRate = boostMode ? BOOST_INJECT_RATE : NORMAL_INJECT_RATE;
+  const everyNSwipes = Math.round(1 / injectRate); // 3 for 30%, 1 for 90%
+
   // Check if we should inject on this swipe
   const shouldInjectNow = useCallback((): boolean => {
     const swipes = swipeCountRef.current;
-    const total = totalSwipesRef.current;
     const injected = injectedCountRef.current;
 
     // No candidates available
     if (likedMeIds.length === 0) return false;
 
-    // Don't exceed 30% injection cap
-    if (total > 0 && injected / total >= MAX_INJECTION_PERCENT) return false;
+    // Don't exceed 30% injection cap (only after MIN_SWIPES_FOR_CAP swipes to avoid early blocking)
+    if (swipes >= MIN_SWIPES_FOR_CAP && injected / swipes >= MAX_INJECTION_PERCENT) return false;
 
-    // Cooldown: at least 3 swipes since last injection
-    if (swipes - lastInjectionSwipeRef.current < EVERY_N_SWIPES) return false;
+    // Cooldown: at least COOLDOWN_SWIPES swipes since last injection
+    if (swipes - lastInjectionSwipeRef.current < COOLDOWN_SWIPES) return false;
 
-    // Main check: every 4th swipe
-    return swipes > 0 && swipes % EVERY_N_SWIPES === 0;
-  }, [likedMeIds.length]);
+    // Main check: every Nth swipe based on inject rate
+    return swipes > 0 && swipes % everyNSwipes === 0;
+  }, [likedMeIds.length, everyNSwipes]);
 
   // Get injection candidate
   const getInjectionCandidate = useCallback((): LikerProfile | null => {
@@ -354,7 +374,6 @@ export function useLikeBackInjection({
     addToQueue: (profile: PotentialMatch, position: number) => void
   ) => {
     swipeCountRef.current += 1;
-    totalSwipesRef.current += 1;
 
     if (!shouldInjectNow()) return;
 
@@ -380,7 +399,7 @@ export function useLikeBackInjection({
       name: `${candidate.first_name} ${candidate.last_name}`,
       position,
       totalInjected: injectedCountRef.current,
-      totalSwipes: totalSwipesRef.current,
+      totalSwipes: swipeCountRef.current,
     });
   }, [shouldInjectNow, getInjectionCandidate, getInjectionPosition, likerToMatch]);
 
@@ -393,7 +412,6 @@ export function useLikeBackInjection({
   const resetInjectionTracking = useCallback(() => {
     swipeCountRef.current = 0;
     injectedCountRef.current = 0;
-    totalSwipesRef.current = 0;
     lastInjectionSwipeRef.current = 0;
     injectedIdsRef.current.clear();
   }, []);
