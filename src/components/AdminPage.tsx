@@ -402,6 +402,64 @@ const AdminPageComponent = ({ currentUser, onLogout }: AdminPageProps) => {
             >
               Save Changes
             </Button>
+            
+            {/* Paystack Recurring Billing Trigger */}
+            <div className="mt-6 pt-4 border-t-2 border-yellow-200">
+              <h3 className="font-semibold mb-3 text-gray-800">Paystack Recurring Billing</h3>
+              <p className="text-sm text-gray-600 mb-3">
+                Manually trigger the recurring billing process to charge users with active subscriptions due for renewal.
+              </p>
+              <Button
+                onClick={async () => {
+                  try {
+                    toast({ title: 'Running billing...', description: 'Please wait while we process subscriptions.' });
+                    
+                    const { data: { session } } = await supabase.auth.getSession();
+                    if (!session?.access_token) {
+                      toast({ title: 'Error', description: 'Not authenticated', variant: 'destructive' });
+                      return;
+                    }
+                    
+                    const response = await fetch(
+                      'https://tgjsyyihabsovironesw.supabase.co/functions/v1/admin-billing-trigger',
+                      {
+                        method: 'POST',
+                        headers: {
+                          'Content-Type': 'application/json',
+                          'Authorization': `Bearer ${session.access_token}`,
+                        },
+                        body: JSON.stringify({}),
+                      }
+                    );
+                    
+                    const result = await response.json();
+                    
+                    if (response.ok && result.success) {
+                      toast({
+                        title: 'Billing Complete',
+                        description: `Processed: ${result.processed || 0}, Charged: ${result.charged || 0}, Failed: ${result.failed || 0}`,
+                      });
+                    } else {
+                      toast({
+                        title: 'Billing Failed',
+                        description: result.error || 'Unknown error',
+                        variant: 'destructive',
+                      });
+                    }
+                  } catch (error) {
+                    console.error('Billing trigger error:', error);
+                    toast({
+                      title: 'Error',
+                      description: 'Failed to trigger billing',
+                      variant: 'destructive',
+                    });
+                  }
+                }}
+                className="w-full bg-gradient-to-r from-green-500 to-emerald-600 hover:from-green-600 hover:to-emerald-700 text-white font-bold py-3 rounded-xl text-base shadow-lg transition-all duration-200"
+              >
+                🔄 Run Paystack Billing Now
+              </Button>
+            </div>
           </div>
         </div>
       )}
