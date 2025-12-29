@@ -319,7 +319,6 @@ async function loadPricingConfig(userId?: string): Promise<PricingConfig> {
     
     // WEB: Use pricing from database (default international pricing)
     if (!(await isNativeApp())) {
-      console.log('[Pricing] Web platform, using default international pricing from DB');
       return { ...webPricing };
     }
     

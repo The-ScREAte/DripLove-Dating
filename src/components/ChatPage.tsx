@@ -1106,13 +1106,6 @@ const ChatPage = ({ currentUser, onUnreadChange, onDetailViewChange }: ChatPageP
     const isUser1 = selectedMatch.user1_id === currentUser.id;
     const unreadField = isUser1 ? 'user1_unread_count' : 'user2_unread_count';
 
-    console.log('[ChatPage] markMessagesAsRead called:', {
-      matchId: selectedMatch.id,
-      isUser1,
-      unreadField,
-      userId: currentUser.id
-    });
-
     try {
       // Step 1: Mark all incoming chat messages as read
       const { error: chatError } = await supabase
@@ -1141,12 +1134,6 @@ const ChatPage = ({ currentUser, onUnreadChange, onDetailViewChange }: ChatPageP
       if (matchError) {
         console.error('[ChatPage] Failed to reset match unread counter:', matchError);
       } else {
-        console.log('[ChatPage] Successfully reset unread count:', {
-          matchId: selectedMatch.id,
-          unreadField,
-          result: updateData
-        });
-        
         // Update local matches state to reflect zero unread count
         setMatches(prev => prev.map(m =>
           m.id === selectedMatch.id ? { ...m, unread_messages: 0 } : m

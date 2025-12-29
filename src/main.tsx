@@ -6,7 +6,7 @@ import "./index.css";
 import { initializeGoogleAuth } from "./utils/googleNativeAuth";
 import "./i18n/config"; // Initialize i18n
 
-// Suppress non-critical console errors in production
+// Suppress non-critical console output in production
 if (import.meta.env.PROD) {
   const originalError = console.error;
   console.error = (...args) => {
@@ -27,9 +27,11 @@ if (import.meta.env.PROD) {
     originalError.apply(console, args);
   };
 
+  // Suppress all debug logs in production
   console.debug = () => {};
   console.info = () => {};
   console.warn = () => {};
+  console.log = () => {};
 }
 
 // Minimal loading screen component - no branding
