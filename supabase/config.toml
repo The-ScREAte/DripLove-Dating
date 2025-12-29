@@ -22,12 +22,6 @@ verify_jwt = true
 [functions.paystack-webhook]
 verify_jwt = false
 
-[functions.paystack-recurring-billing]
-verify_jwt = false
-
-[functions.paystack-recurring-billing-run]
-verify_jwt = true
-
 [functions.subscription-checker]
 verify_jwt = false
 

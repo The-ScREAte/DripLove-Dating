@@ -99,13 +99,6 @@ function extractSubscriptionCode(eventData: unknown): string | null {
   return typeof code === 'string' && code.length > 0 ? code : null
 }
 
-function extractMetadataSource(eventData: unknown): string | null {
-  const data = eventData as { metadata?: unknown } | null
-  const metadata = data?.metadata as { source?: unknown } | null
-  const source = metadata?.source
-  return typeof source === 'string' && source.length > 0 ? source : null
-}
-
 serve(async (req) => {
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders })
@@ -214,15 +207,6 @@ serve(async (req) => {
     // Successful payment / renewal events: extend the subscription period.
     if (eventType === 'charge.success' || eventType === 'subscription.create') {
       console.log('[PAYSTACK-WEBHOOK] Processing payment success/renewal event')
-
-      // Avoid double-processing: cron-based recurring billing updates the subscription itself.
-      if (eventType === 'charge.success') {
-        const source = extractMetadataSource(eventData)
-        if (source === 'driplove-cron') {
-          console.log('[PAYSTACK-WEBHOOK] Ignoring cron-originated charge.success event')
-          return json(200, { message: 'Cron charge ignored' })
-        }
-      }
 
       const email = extractCustomerEmail(eventData)
       if (!email) return json(400, { error: 'No customer email found' })

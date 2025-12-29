@@ -97,8 +97,12 @@ const AdminPageComponent = ({ currentUser, onLogout }: AdminPageProps) => {
   
   // All state hooks first - consistent order
   const [paymentMethods, setPaymentMethods] = useState<PaymentMethod[]>(defaultPaymentMethods);
-  const [defaultInternationalPrice, setDefaultInternationalPrice] = useState('');
+  const [premiumPriceOneTime, setPremiumPriceOneTime] = useState('50');
+  const [premiumPriceMonthly, setPremiumPriceMonthly] = useState('25');
+  const [defaultInternationalPrice, setDefaultInternationalPrice] = useState('1.99');
   const [defaultInternationalCurrency, setDefaultInternationalCurrency] = useState('USD');
+  // Now an array of { country, currency, price }
+  const [countryPrices, setCountryPrices] = useState<{ country: string; currency: string; price: string }[]>([]);
   const [loadingConfig, setLoadingConfig] = useState(true);
   const [showPaymentConfig, setShowPaymentConfig] = useState(false);
   const [stats, setStats] = useState<AdminStats | null>(null);
@@ -135,7 +139,6 @@ const AdminPageComponent = ({ currentUser, onLogout }: AdminPageProps) => {
   const [emailRecipient, setEmailRecipient] = useState<'reported' | 'reporter'>('reported');
   const [emailSubject, setEmailSubject] = useState('');
   const [emailBody, setEmailBody] = useState('');
-  const [runningPaystackBilling, setRunningPaystackBilling] = useState(false);
   
   // Constants
   const usersPerPage = 20;
@@ -151,7 +154,7 @@ const AdminPageComponent = ({ currentUser, onLogout }: AdminPageProps) => {
       try {
         const response = await supabase
           .from('payment_config')
-          .select('payment_methods, default_international_price, default_international_currency')
+          .select('premium_price, premium_price_monthly, payment_methods, country_prices, default_international_price, default_international_currency')
           .order('created_at', { ascending: false })
           .limit(1)
           .single();
@@ -160,13 +163,19 @@ const AdminPageComponent = ({ currentUser, onLogout }: AdminPageProps) => {
 
         const data = response.data as any; // Use any to bypass TypeScript issues
         setPaymentMethods(data.payment_methods as unknown as PaymentMethod[]);
-        setDefaultInternationalPrice(data.default_international_price?.toString() || '');
+        setPremiumPriceOneTime(data.premium_price?.toString() || '');
+        setPremiumPriceMonthly(data.premium_price_monthly?.toString() || '');
+        setDefaultInternationalPrice(data.default_international_price?.toString() || '1.99');
         setDefaultInternationalCurrency(data.default_international_currency || 'USD');
+        setCountryPrices(Array.isArray(data.country_prices) ? (data.country_prices as { country: string; currency: string; price: string }[]) : []);
       } catch (error) {
         console.error('Error fetching payment config:', error);
         setPaymentMethods(defaultPaymentMethods);
-        setDefaultInternationalPrice('');
+        setPremiumPriceOneTime('');
+        setPremiumPriceMonthly('');
+        setDefaultInternationalPrice('1.99');
         setDefaultInternationalCurrency('USD');
+        setCountryPrices([]);
       }
       setLoadingConfig(false);
     };
@@ -185,16 +194,6 @@ const AdminPageComponent = ({ currentUser, onLogout }: AdminPageProps) => {
   const handleSavePaymentConfig = async () => {
     setLoadingConfig(true);
     try {
-      const parsedDefaultIntl = Number(defaultInternationalPrice);
-      if (!Number.isFinite(parsedDefaultIntl) || parsedDefaultIntl <= 0) {
-        toast({
-          title: 'Invalid price',
-          description: 'Set a valid default international price (e.g. 9.99).',
-          variant: 'destructive',
-        });
-        return;
-      }
-
       // Get the first (and should be only) payment config record
       const { data: existing } = await supabase
         .from('payment_config')
@@ -208,14 +207,11 @@ const AdminPageComponent = ({ currentUser, onLogout }: AdminPageProps) => {
           .from('payment_config')
           .update({
             payment_methods: paymentMethods as unknown as any,
-            // Keep legacy columns aligned (but UI relies only on default international fields).
-            premium_price: parsedDefaultIntl,
-            premium_price_monthly: parsedDefaultIntl,
-            currency: defaultInternationalCurrency || 'USD',
-            default_international_price: parsedDefaultIntl,
+            premium_price: Number(premiumPriceOneTime) || 0,
+            premium_price_monthly: Number(premiumPriceMonthly) || 0,
+            default_international_price: Number(defaultInternationalPrice) || 1.99,
             default_international_currency: defaultInternationalCurrency || 'USD',
-            // Force-disable country-specific overrides.
-            country_prices: null,
+            country_prices: countryPrices,
             updated_at: new Date().toISOString(),
           })
           .eq('id', existing.id);
@@ -227,14 +223,11 @@ const AdminPageComponent = ({ currentUser, onLogout }: AdminPageProps) => {
           .from('payment_config')
           .insert({
             payment_methods: paymentMethods as unknown as any,
-            // Keep legacy columns aligned (but UI relies only on default international fields).
-            premium_price: parsedDefaultIntl,
-            premium_price_monthly: parsedDefaultIntl,
-            currency: defaultInternationalCurrency || 'USD',
-            default_international_price: parsedDefaultIntl,
+            premium_price: Number(premiumPriceOneTime) || 0,
+            premium_price_monthly: Number(premiumPriceMonthly) || 0,
+            default_international_price: Number(defaultInternationalPrice) || 1.99,
             default_international_currency: defaultInternationalCurrency || 'USD',
-            // Force-disable country-specific overrides.
-            country_prices: null,
+            country_prices: countryPrices,
           });
 
         if (error) throw error;
@@ -274,8 +267,16 @@ const AdminPageComponent = ({ currentUser, onLogout }: AdminPageProps) => {
               <span>⚙️</span> Configure Premium Payment
             </h2>
             <div className="mb-6 space-y-4">
+              <div>
+                <label className="block font-semibold mb-2 text-gray-700">Ghana One-Time Price (GHS)</label>
+                <Input value={premiumPriceOneTime} onChange={e => setPremiumPriceOneTime(e.target.value)} type="number" min="1" step="0.01" className="w-full border-2 border-yellow-200 focus:border-yellow-400 rounded-lg" />
+              </div>
+              <div>
+                <label className="block font-semibold mb-2 text-gray-700">Ghana Monthly Price (GHS)</label>
+                <Input value={premiumPriceMonthly} onChange={e => setPremiumPriceMonthly(e.target.value)} type="number" min="1" step="0.01" className="w-full border-2 border-yellow-200 focus:border-yellow-400 rounded-lg" />
+              </div>
               <div className="p-3 bg-blue-50 border-2 border-blue-200 rounded-lg">
-                <label className="block font-semibold mb-2 text-blue-800">Default International Price</label>
+                <label className="block font-semibold mb-2 text-blue-800">Default International Price (for countries not listed below)</label>
                 <div className="flex gap-2">
                   <select 
                     value={defaultInternationalCurrency} 
@@ -295,7 +296,62 @@ const AdminPageComponent = ({ currentUser, onLogout }: AdminPageProps) => {
                     className="flex-1 border-2 border-blue-300 focus:border-blue-400 rounded-lg" 
                   />
                 </div>
-                <p className="text-xs text-blue-600 mt-1">This is the only price used in-app (no country-specific overrides).</p>
+                <p className="text-xs text-blue-600 mt-1">This price will be shown to users from countries not in your country-specific list</p>
+              </div>
+            </div>
+            <div className="mb-6">
+              <h3 className="font-semibold mb-3 text-gray-800">Country-Specific Prices</h3>
+              <div className="space-y-3">
+                {countryPrices.map((entry, idx) => {
+                  const countryOptions = getCountriesList();
+                  const selectedCountry = countryOptions.find(c => c.code === entry.country);
+                  const currency = selectedCountry ? getCountryByCode(selectedCountry.code)?.currency || '' : '';
+                  return (
+                    <div key={idx} className="flex gap-2 items-center bg-yellow-50 rounded-lg p-2 border border-yellow-100 mb-1">
+                      {/* Country dropdown */}
+                      <select
+                        value={entry.country}
+                        onChange={e => {
+                          const v = e.target.value;
+                          const countryObj = getCountryByCode(v);
+                          setCountryPrices(prices => prices.map((p, i) => i === idx ? { ...p, country: v, currency: countryObj?.currency || '', price: p.price } : p));
+                        }}
+                        className="w-1/3 border-2 border-yellow-200 rounded-lg px-2 py-1 focus:border-yellow-400 bg-white"
+                      >
+                        <option value="">Select Country</option>
+                        {countryOptions.map(c => (
+                          <option key={c.code} value={c.code}>{c.name}</option>
+                        ))}
+                      </select>
+                      {/* Currency display (readonly) */}
+                      <Input
+                        value={entry.currency}
+                        readOnly
+                        className="w-1/4 bg-gray-100 cursor-not-allowed border-2 border-yellow-100 rounded-lg"
+                        placeholder="Currency"
+                      />
+                      {/* Price input */}
+                      <Input
+                        value={entry.price}
+                        onChange={e => {
+                          const v = e.target.value;
+                          setCountryPrices(prices => prices.map((p, i) => i === idx ? { ...p, price: v } : p));
+                        }}
+                        type="number"
+                        min="1"
+                        placeholder="Price"
+                        className="w-1/4 border-2 border-yellow-200 rounded-lg focus:border-yellow-400"
+                      />
+                      {/* Delete button */}
+                      <Button size="icon" variant="ghost" className="text-red-500 hover:bg-red-100" onClick={() => setCountryPrices(prices => prices.filter((_, i) => i !== idx))}>
+                        ✕
+                      </Button>
+                    </div>
+                  );
+                })}
+                <Button size="sm" variant="outline" className="mt-2 border-yellow-300 text-yellow-700 hover:bg-yellow-100" onClick={() => setCountryPrices(prices => [...prices, { country: '', currency: '', price: '' }])}>
+                  + Add Country
+                </Button>
               </div>
             </div>
             <div className="mb-6">
@@ -338,54 +394,6 @@ const AdminPageComponent = ({ currentUser, onLogout }: AdminPageProps) => {
                     )}
                   </div>
                 ))}
-              </div>
-            </div>
-
-            <div className="mb-6 p-3 bg-gray-50 border border-gray-200 rounded-xl">
-              <div className="flex items-center justify-between gap-3">
-                <div>
-                  <div className="font-semibold text-gray-800">Paystack Billing</div>
-                  <div className="text-xs text-gray-600">Admin-only manual trigger for recurring charges.</div>
-                </div>
-                <Button
-                  type="button"
-                  variant="outline"
-                  disabled={runningPaystackBilling}
-                  onClick={async () => {
-                    setRunningPaystackBilling(true);
-                    try {
-                      const { data, error } = await supabase.functions.invoke('paystack-recurring-billing-run', {
-                        body: {},
-                      });
-
-                      if (error) throw error;
-
-                      const result = (data as any)?.result;
-                      const charged = result?.charged;
-                      const failed = result?.failed;
-                      const processed = result?.processed;
-
-                      toast({
-                        title: 'Paystack billing run complete',
-                        description:
-                          typeof processed === 'number'
-                            ? `Processed: ${processed}, charged: ${charged ?? 0}, failed: ${failed ?? 0}`
-                            : 'Billing function ran successfully.',
-                      });
-                    } catch (err: any) {
-                      console.error('Failed to run Paystack billing:', err);
-                      toast({
-                        title: 'Error',
-                        description: 'Failed to run Paystack billing now',
-                        variant: 'destructive',
-                      });
-                    } finally {
-                      setRunningPaystackBilling(false);
-                    }
-                  }}
-                >
-                  {runningPaystackBilling ? 'Running…' : 'Run now'}
-                </Button>
               </div>
             </div>
             <Button

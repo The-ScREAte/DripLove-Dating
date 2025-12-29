@@ -56,18 +56,31 @@ serve(async (req) => {
     const payload: Record<string, unknown> = { email }
     let actualPlan = plan
 
-    // If plan is provided, use it for subscription
+    // If no plan provided but we need one (when amount is not provided), fetch from database
+    if (!plan && !amount) {
+      const { data: paymentConfig, error } = await supabaseClient
+        .from('payment_config')
+        .select('paystack_plan_code')
+        .limit(1)
+        .single()
+      
+      if (error || !paymentConfig?.paystack_plan_code) {
+        return json(400, { error: 'No plan provided and none configured in database' })
+      }
+      actualPlan = paymentConfig.paystack_plan_code
+    }
+
     if (actualPlan) {
+      // For subscriptions, use plan directly without other parameters
       payload.plan = actualPlan
       // Remove any other parameters that might conflict with subscription plans
       delete payload.channels
       delete payload.amount
       delete payload.currency
     } else {
-      // For one-time or amount-based subscriptions
-      if (!amount) return json(400, { error: 'amount required when no plan is provided' })
+      if (!amount) return json(400, { error: 'amount required for one-time' })
       payload.amount = Math.round(Number(amount) * 100)
-      payload.currency = (currency || 'USD').toUpperCase()
+      payload.currency = (currency || 'GHS').toUpperCase()
       if (channels && channels.length) payload.channels = channels
     }
 

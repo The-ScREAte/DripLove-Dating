@@ -130,11 +130,12 @@ const PaystackPaymentModal: React.FC<PaystackPaymentModalProps> = ({
         email: email.trim(),
         metadata,
         callback_url: `${window.location.origin}/payment-success?status=successful&payment_type=${isOneTime ? 'one-time' : 'subscription'}`,
-        amount: Number(amount),
-        currency: (currency || 'USD').toUpperCase(),
-        channels: [selectedPaymentMethod === 'momo' ? 'mobile_money' : 'card'],
       };
-      
+      if (isOneTime) {
+        payload.amount = Number(amount);
+        payload.currency = (currency || 'GHS').toUpperCase();
+        payload.channels = [selectedPaymentMethod === 'momo' ? 'mobile_money' : 'card'];
+      }
       const { data, error } = await supabase.functions.invoke('paystack-init', {
         body: payload,
       });
@@ -146,9 +147,17 @@ const PaystackPaymentModal: React.FC<PaystackPaymentModalProps> = ({
       window.location.href = data.authorization_url as string;
       return;
     } catch (serverErr) {
-      console.error('[PaystackModal] Server init failed:', serverErr);
-      
-      // Attempt inline initialization as fallback using public key
+      // IMPORTANT: recurring Paystack subscriptions require plan-based server init.
+      // If server init fails, do not silently fall back to inline amount-based init,
+      // because that would create a one-time transaction (no auto-renewal).
+      if (!isOneTime) {
+        console.error('[PaystackModal] Subscription init failed:', serverErr);
+        alert('Subscription initialization failed. Please try again later.');
+        setIsLoading(false);
+        return;
+      }
+
+      // If server init fails for one-time, attempt inline as fallback using public key
       try {
         const ref = 'DRIPLOVE-' + Date.now() + '-' + Math.random().toString(36).substring(2, 8);
         const trimmedKey = PAYSTACK_PUBLIC_KEY.trim();
@@ -175,17 +184,17 @@ const PaystackPaymentModal: React.FC<PaystackPaymentModalProps> = ({
             ],
           },
         };
-        
-        const paystackAmount = Math.round(Number(amount) * 100);
-        if (!Number.isFinite(paystackAmount) || paystackAmount < 100) {
-          alert('Amount invalid. Minimum amount is 1.00');
-          setIsLoading(false);
-          return;
+        if (isOneTime) {
+          const paystackAmount = Math.round(Number(amount) * 100);
+          if (!Number.isFinite(paystackAmount) || paystackAmount < 100) {
+            alert('Amount invalid. Minimum amount is 1.00');
+            setIsLoading(false);
+            return;
+          }
+          paymentConfig.amount = paystackAmount;
+          paymentConfig.currency = (currency || 'GHS').toUpperCase();
+          paymentConfig.channels = [selectedPaymentMethod === 'momo' ? 'mobile_money' : 'card'];
         }
-        paymentConfig.amount = paystackAmount;
-        paymentConfig.currency = (currency || 'USD').toUpperCase();
-        paymentConfig.channels = [selectedPaymentMethod === 'momo' ? 'mobile_money' : 'card'];
-        
         const handler = (window as any).PaystackPop.setup(paymentConfig);
         handler.openIframe();
       } catch (fallbackErr) {

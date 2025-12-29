@@ -27,7 +27,6 @@ const PremiumUpgrade = ({ currentUser, onClose, preselectedPlan }: PremiumUpgrad
   const [showPaymentModal, setShowPaymentModal] = useState(false);
   const [showPaymentOptions, setShowPaymentOptions] = useState(false);
   const [paymentType, setPaymentType] = useState<'subscription' | 'one-time' | 'iap' | 'google_iap' | null>(null);
-  const [paystackGhsAmount, setPaystackGhsAmount] = useState<number>(0);
   const [iapLoading, setIapLoading] = useState(false);
   const [canBuy, setCanBuy] = useState(false);
   const [iapLoadingTimeout, setIapLoadingTimeout] = useState(false);
@@ -209,80 +208,38 @@ const PremiumUpgrade = ({ currentUser, onClose, preselectedPlan }: PremiumUpgrad
   const pricingConfig = usePricingConfig(currentUser?.id);
   
   // Extract pricing info - displayPrice contains the full localized price from IAP
-  const displayPrice = pricingConfig.displayPrice; // e.g., "$4.99", "€5.99"
+  const displayPrice = pricingConfig.displayPrice; // e.g., "$4.99", "₵39.99", "₦4,499"
   const monthlyPrice = pricingConfig.monthlyPrice;
   const currency = pricingConfig.currency;
   const currencySymbol = pricingConfig.currencySymbol;
+  const ghsPrice = pricingConfig.ghsPrice;
   
-  // Paystack pricing: Get international default price and convert to GHS
-  const [paystackPrice, setPaystackPrice] = useState('');
+  // For Paystack on Android, always fetch USD pricing from admin dashboard
+  const [paystackPrice, setPaystackPrice] = useState('1.99');
   
   React.useEffect(() => {
-    const loadAndConvertPrice = async () => {
-      try {
-        let priceToUse = 0;
-        let currencyToUse = 'USD';
-        
-        // On Android, prioritize Google Play IAP price
-        if (isAndroidNative && pricingConfig.source === 'iap' && monthlyPrice && parseFloat(monthlyPrice) > 0) {
-          priceToUse = parseFloat(monthlyPrice);
-          currencyToUse = currency || 'USD';
-          console.log('[Paystack Android] Using Google Play IAP price:', priceToUse, currencyToUse);
-        } else {
-          // Fallback: Get international default price from DB
+    if (isAndroidNative) {
+      const loadPaystackPrice = async () => {
+        try {
           const { data } = await supabase
             .from('payment_config')
-            .select('default_international_price, default_international_currency')
+            .select('default_international_price')
             .order('created_at', { ascending: false })
             .limit(1)
             .single();
 
           if (data?.default_international_price) {
-            priceToUse = data.default_international_price;
-            currencyToUse = data.default_international_currency || 'USD';
-            console.log('[Paystack] Using DB international price:', priceToUse, currencyToUse);
+            setPaystackPrice(data.default_international_price.toString());
           }
+        } catch (error) {
+          console.error('[Paystack] Error loading price:', error);
         }
-        
-        if (priceToUse > 0) {
-          setPaystackPrice(priceToUse.toString());
-          
-          // If already in GHS, no conversion needed
-          if (currencyToUse.toUpperCase() === 'GHS') {
-            console.log('[Paystack] Price already in GHS:', priceToUse);
-            setPaystackGhsAmount(priceToUse);
-            return;
-          }
-          
-          // Convert to GHS using live exchange rate
-          try {
-            const response = await fetch(`https://api.exchangerate-api.com/v4/latest/${currencyToUse}`);
-            if (response.ok) {
-              const rateData = await response.json();
-              if (rateData.rates && rateData.rates.GHS) {
-                const ghsAmount = priceToUse * rateData.rates.GHS;
-                console.log(`[Paystack] Converting ${priceToUse} ${currencyToUse} to ${ghsAmount.toFixed(2)} GHS (rate: ${rateData.rates.GHS})`);
-                setPaystackGhsAmount(ghsAmount);
-              } else {
-                // Fallback rate if API doesn't return GHS
-                const fallbackGhs = priceToUse * 16;
-                console.log(`[Paystack] Using fallback conversion: ${priceToUse} ${currencyToUse} = ${fallbackGhs.toFixed(2)} GHS`);
-                setPaystackGhsAmount(fallbackGhs);
-              }
-            }
-          } catch (error) {
-            console.error('[Paystack] Exchange rate fetch failed, using fallback', error);
-            const fallbackGhs = priceToUse * 16;
-            setPaystackGhsAmount(fallbackGhs);
-          }
-        }
-      } catch (error) {
-        console.error('[Paystack] Error loading price:', error);
-      }
-    };
-    
-    loadAndConvertPrice();
-  }, [isAndroidNative, pricingConfig.source, monthlyPrice, currency]);
+      };
+      loadPaystackPrice();
+    } else {
+      setPaystackPrice(monthlyPrice);
+    }
+  }, [isAndroidNative, monthlyPrice]);
   
   const [paymentMethods, setPaymentMethods] = useState<any[]>([{ type: 'card' }]);
 
@@ -731,7 +688,7 @@ const PremiumUpgrade = ({ currentUser, onClose, preselectedPlan }: PremiumUpgrad
                   className="w-full p-3 bg-gradient-to-r from-green-500 to-emerald-600 text-white rounded-lg hover:from-green-600 hover:to-emerald-700 transition-all duration-200 font-semibold"
                 >
                   <div className="text-sm sm:text-base">💳 Pay with Paystack</div>
-                  <div className="text-xs opacity-90">${paystackPrice || '...'}/month • {t('premium.paymentOptions.monthly.subtitle')}</div>
+                  <div className="text-xs opacity-90">${paystackPrice}/month • {t('premium.paymentOptions.monthly.subtitle')}</div>
                 </button>
               )}
               
@@ -789,9 +746,9 @@ const PremiumUpgrade = ({ currentUser, onClose, preselectedPlan }: PremiumUpgrad
       <PaystackPaymentModal
         isOpen={showPaymentModal && (!deviceIsNative || !deviceIsIos)}
         onClose={() => setShowPaymentModal(false)}
-        amount={paystackGhsAmount}
+        amount={parseFloat(ghsPrice)}
         currency="GHS"
-        displayAmount={Number.parseFloat(paystackPrice || '0')}
+        displayAmount={parseFloat(paystackPrice)}
         displayCurrency="USD"
         email={currentUser?.email || ''}
         onSuccess={handlePaymentSuccess}
