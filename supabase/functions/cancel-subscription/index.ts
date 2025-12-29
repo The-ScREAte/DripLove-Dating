@@ -38,6 +38,30 @@ async function disablePaystackSubscription(subscription_code: string) {
   return await resp.json()
 }
 
+async function deactivatePaystackAuthorization(authorization_code: string) {
+  const resp = await fetch('https://api.paystack.co/customer/deactivate_authorization', {
+    method: 'POST',
+    headers: {
+      Authorization: `Bearer ${PAYSTACK_SECRET_KEY}`,
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({ authorization_code }),
+  })
+  return await resp.json()
+}
+
+async function deactivatePaystackAuthorization(authorization_code: string) {
+  const resp = await fetch('https://api.paystack.co/customer/deactivate_authorization', {
+    method: 'POST',
+    headers: {
+      Authorization: `Bearer ${PAYSTACK_SECRET_KEY}`,
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({ authorization_code }),
+  })
+  return await resp.json()
+}
+
 serve(async (req) => {
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders })
@@ -57,19 +81,51 @@ serve(async (req) => {
       .single()
     if (error || !sub) return json(404, { error: 'No active subscription found' })
 
-    // If Paystack, disable at provider
-    if (sub.payment_method === 'paystack' && sub.flutterwave_transaction_id) {
-      await disablePaystackSubscription(sub.flutterwave_transaction_id)
-    }
-    // If IAP, no external API call needed
-    if (sub.payment_method === 'iap') {
-      // Optionally: notify your app server, log, or trigger a webhook
+    // If Paystack, deactivate authorization codes to prevent future charges
+    if (sub.payment_method === 'paystack') {
+      // Deactivate saved authorization codes (prevents recurring charges)
+      const { data: authRows } = await supabase
+        .from('paystack_authorizations')
+        .select('authorization_code')
+        .eq('user_id', user_id)
+        .eq('status', 'active')
+
+      if (authRows && authRows.length > 0) {
+        for (const authRow of authRows) {
+          try {
+            await deactivatePaystackAuthorization(authRow.authorization_code)
+          } catch (err) {
+            console.error('Failed to deactivate Paystack auth:', err)
+            // Non-fatal: we still disable locally
+          }
+        }
+
+        // Mark all authorizations as disabled in DB
+        await supabase
+          .from('paystack_authorizations')
+          .update({ status: 'disabled', updated_at: new Date().toISOString() })
+          .eq('user_id', user_id)
+          .eq('status', 'active')
+      }
+
+      // Legacy: if subscription_code exists, try to disable it too
+      if (sub.flutterwave_transaction_id) {
+        try {
+          await disablePaystackSubscription(sub.flutterwave_transaction_id)
+        } catch (err) {
+          // Non-fatal
+        }
+      }
     }
 
-    // Mark as cancelled, keep expires_at as is
+    // Mark as cancelled, keep expires_at and plan_name as is (user stays premium until expiry)
     const { error: updateErr } = await supabase
       .from('user_subscriptions')
-      .update({ status: 'cancelled', auto_renew: false })
+      .update({ 
+        status: 'cancelled', 
+        auto_renew: false,
+        updated_at: new Date().toISOString()
+      })
       .eq('id', sub.id)
     if (updateErr) return json(500, { error: updateErr.message })
 

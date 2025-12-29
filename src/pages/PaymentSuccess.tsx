@@ -23,8 +23,16 @@ const PaymentSuccess: React.FC = () => {
   const [error, setError] = useState<string | null>(null);
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
-  const [redirectTimer, setRedirectTimer] = useState<NodeJS.Timeout | null>(null);
+  const [redirectTimer, setRedirectTimer] = useState<ReturnType<typeof setTimeout> | null>(null);
   const [redirectCountdown, setRedirectCountdown] = useState<number | null>(null);
+
+  const getErrorMessage = (err: unknown): string | undefined => {
+    if (err instanceof Error) return err.message
+    if (typeof err !== 'object' || !err) return undefined
+    if (!('message' in err)) return undefined
+    const msg = (err as { message?: unknown }).message
+    return typeof msg === 'string' ? msg : undefined
+  }
 
   // Cleanup timer on unmount
   useEffect(() => {
@@ -155,7 +163,7 @@ const PaymentSuccess: React.FC = () => {
         });
 
         if (verifyError || !verifyData?.ok || !verifyData?.verified) {
-          const details = (verifyError as any)?.message || verifyData?.error || 'Verification failed';
+          const details = getErrorMessage(verifyError) || verifyData?.error || 'Verification failed';
           setError(
             `Payment verification failed: ${details}. If money was deducted, contact support with reference: ${referenceToVerify}`
           );
@@ -163,9 +171,9 @@ const PaymentSuccess: React.FC = () => {
         }
 
         setUpgradeSuccess(true);
-      } catch (err: any) {
+      } catch (err: unknown) {
         console.error('Payment processing error:', err);
-        setError(`Payment processing failed: ${err.message || 'Unknown error'}`);
+        setError(`Payment processing failed: ${getErrorMessage(err) || 'Unknown error'}`);
       } finally {
         setUpgrading(false);
       }

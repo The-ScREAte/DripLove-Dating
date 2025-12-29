@@ -26,7 +26,12 @@ const Index = ({
   user,
   isAuthenticated,
 }: {
-  user: any | null;
+  user: ({
+    id: string;
+    email?: string | null;
+    app_metadata?: { provider?: string };
+    user_metadata?: Record<string, unknown>;
+  } & Record<string, unknown>) | null;
   isAuthenticated: boolean;
 }) => {
   const [currentView, setCurrentView] = useState<'welcome' | 'login' | 'register' | 'profile-completion' | 'terms-acceptance' | 'app' | 'admin' | 'about' | 'terms' | 'privacy'>(
@@ -63,7 +68,11 @@ const Index = ({
   const checkUserTypeAndRedirect = async (userId: string) => {
     try {
       // Fast-path: check sessionStorage for OAuth profile first
-      let profile: any = null;
+      let profile: (Record<string, unknown> & {
+        is_admin?: boolean;
+        account_status?: string;
+        terms_accepted?: boolean;
+      }) | null = null;
 
       try {
         if (typeof window !== 'undefined') {
@@ -225,9 +234,9 @@ const Index = ({
   };
 
   // Shortest possible registration: essentials only
-  const handleRegister = async (formData: any) => {
+  const handleRegister = async (formData: unknown) => {
     // Registration passes user directly - use it immediately
-    if (formData?.user) {
+    if (typeof formData === 'object' && formData && 'user' in formData) {
       setCurrentView('terms-acceptance');
       return;
     }

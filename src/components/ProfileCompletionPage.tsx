@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from 'react';
+import type { User } from '@supabase/supabase-js';
 import { useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { supabase } from '@/integrations/supabase/client';
@@ -23,18 +24,39 @@ import FaceVerification from '@/components/FaceVerification';
 import HoppingLogo from '@/components/HoppingLogo';
 
 interface ImageUpload {
-  file: File;
+  file: File | null;
   preview: string;
   moderationResult?: ModerationResult;
   status: 'uploading' | 'moderating' | 'approved' | 'pending' | 'rejected';
   hash?: string; // Store hash for duplicate detection
 }
 
+type StoredImageUpload = {
+  preview: string
+  moderationResult?: ModerationResult
+  status: ImageUpload['status']
+  hash?: string
+}
+
+function isStoredImageUpload(value: unknown): value is StoredImageUpload {
+  if (typeof value !== 'object' || !value) return false
+  const v = value as Record<string, unknown>
+  return typeof v.preview === 'string' && typeof v.status === 'string'
+}
+
+function getErrorMessage(err: unknown): string | undefined {
+  if (err instanceof Error) return err.message
+  if (typeof err !== 'object' || !err) return undefined
+  if (!('message' in err)) return undefined
+  const msg = (err as { message?: unknown }).message
+  return typeof msg === 'string' ? msg : undefined
+}
+
 const ProfileCompletionPage = () => {
   const navigate = useNavigate();
   const { toast } = useToast();
   const { t, i18n } = useTranslation();
-  const [user, setUser] = useState<any>(null);
+  const [user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
   const [showTermsAcceptance, setShowTermsAcceptance] = useState(false);
   
@@ -165,15 +187,23 @@ const ProfileCompletionPage = () => {
     const saved = sessionStorage.getItem('profilecompletion_images');
     if (saved) {
       try {
-        const parsed = JSON.parse(saved);
-        setImages(parsed.map((img: any) => ({
-          file: null,
-          preview: img.preview,
-          moderationResult: img.moderationResult,
-          status: img.status,
-          hash: img.hash // Restore hash for duplicate detection
-        })));
-      } catch {}
+        const parsed: unknown = JSON.parse(saved);
+
+        if (Array.isArray(parsed)) {
+          const restored = parsed
+            .filter(isStoredImageUpload)
+            .map((img) => ({
+              file: null,
+              preview: img.preview,
+              moderationResult: img.moderationResult,
+              status: img.status,
+              hash: img.hash,
+            }))
+          setImages(restored)
+        }
+      } catch (err) {
+        console.warn('[ProfileCompletionPage] Failed to restore images from sessionStorage:', err)
+      }
     }
   }, []);
 
@@ -227,7 +257,7 @@ const ProfileCompletionPage = () => {
   };
 
   const handleSelectChange = (field: string, value: string) => {
-    const updates: any = { [field]: value };
+    const updates: Record<string, string> = { [field]: value };
     
     // Auto-select opposite gender for preference, but allow manual override
     if (field === 'gender' && !formData.preference) {
@@ -744,10 +774,11 @@ const ProfileCompletionPage = () => {
 
       // Profile completed - navigate to terms
       handleProfileComplete();
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error('Profile completion error:', error);
       toast({
         title: "Error",
+        description: getErrorMessage(error) || undefined,
         variant: "destructive",
       });
     } finally {

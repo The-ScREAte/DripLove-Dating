@@ -30,8 +30,22 @@ import PremiumUpgrade from './PremiumUpgrade';
 import CollapsibleSection from './ui/CollapsibleSection';
 import { getLanguageForCountry } from '@/i18n/config';
 
+type UserImageRow = {
+  image_url: string | null
+  is_approved: boolean | null
+  moderation_status: string | null
+}
+
+type DiscoverCacheWindow = Window & {
+  discoverCache?: {
+    delete: (userId: string) => void
+  }
+}
+
 interface ProfilePageProps {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   currentUser: any;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   profile: any;
   onProfileUpdate: () => void;
   onLogout: () => void;
@@ -109,7 +123,7 @@ const ProfilePage = ({ currentUser, profile, onProfileUpdate, onLogout, onShowTe
   });
 
   // Initialize userImages state
-  const [userImages, setUserImages] = useState<any[]>([]);
+  const [userImages, setUserImages] = useState<UserImageRow[]>([]);
 
   useEffect(() => {
     if (profile) {
@@ -369,8 +383,9 @@ const ProfilePage = ({ currentUser, profile, onProfileUpdate, onLogout, onShowTe
   setIsEditing(false);
   
   // Clear discover cache to force refresh with new settings
-  if (typeof window !== 'undefined' && (window as any).discoverCache && currentUser?.id) {
-    (window as any).discoverCache.delete(currentUser.id);
+  const win = window as unknown as DiscoverCacheWindow
+  if (typeof window !== 'undefined' && win.discoverCache && currentUser?.id) {
+    win.discoverCache.delete(currentUser.id);
     
     // Show toast notification
     toast({
@@ -381,7 +396,7 @@ const ProfilePage = ({ currentUser, profile, onProfileUpdate, onLogout, onShowTe
   }
   
   onProfileUpdate();
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error('🚨 Save failed:', error);
     } finally {
       setIsSaving(false);

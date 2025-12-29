@@ -264,8 +264,9 @@ const MatchCard: React.FC<MatchCardProps> = ({
         setReportSuccess(false);
         setSelectedReason("");
       }, 1500);
-    } catch (err: any) {
-      setReportError(err.message || t('reportModal.error'));
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : undefined
+      setReportError(message || t('reportModal.error'));
     } finally {
       setReporting(false);
     }
@@ -311,8 +312,9 @@ const MatchCard: React.FC<MatchCardProps> = ({
         setSelectedReason("");
         setBlockReason("");
       }, 3000); // Give more time to read the block message
-    } catch (err: any) {
-      setReportError(err.message || "Failed to block user");
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : undefined
+      setReportError(message || "Failed to block user");
     } finally {
       setIsBlocking(false);
     }

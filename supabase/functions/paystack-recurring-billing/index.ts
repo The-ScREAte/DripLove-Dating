@@ -1,5 +1,7 @@
 // Supabase Edge Function: paystack-recurring-billing
 // Processes recurring charges for subscriptions using saved authorization codes
+// eslint-disable-next-line @typescript-eslint/ban-ts-comment
+// @ts-nocheck
 import { serve } from 'https://deno.land/std@0.177.0/http/server.ts'
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.45.0'
 
@@ -92,6 +94,7 @@ serve(async (req) => {
       .eq('auto_renew', true)
       .eq('payment_method', 'paystack')
       .eq('plan_name', 'premium')
+      .not('next_billing_date', 'is', null)
       .lte('next_billing_date', now)
 
     if (subError) {

@@ -14,8 +14,62 @@ import { usePricingConfig } from '@/hooks/usePricingConfig';
 import { useTranslation } from 'react-i18next';
 import { Capacitor } from '@capacitor/core';
 
+type TimeoutHandle = ReturnType<typeof setTimeout>
+
+type CdvStoreProduct = {
+  owned?: boolean
+  getOffer?: () => unknown
+  title?: string
+  description?: string
+}
+
+type CdvStoreWhen = {
+  productUpdated: (cb: () => void) => CdvStoreWhen
+  verified: (cb: (r?: unknown) => void) => CdvStoreWhen
+  unverified: (cb: (r?: unknown) => void) => CdvStoreWhen
+}
+
+type CdvStore = {
+  get?: (id: string) => CdvStoreProduct | undefined
+  when?: () => CdvStoreWhen
+  error?: (cb: (e?: unknown) => void) => void
+}
+
+function getCdvStore(): CdvStore | undefined {
+  return (window as unknown as { CdvPurchase?: { store?: CdvStore } }).CdvPurchase?.store
+}
+
+function isFlagEnabled(flagName: 'iapInitializationFailed' | 'googleIapInitializationFailed'): boolean {
+  const flags = window as unknown as {
+    iapInitializationFailed?: boolean
+    googleIapInitializationFailed?: boolean
+  }
+  return flags[flagName] === true
+}
+
+function isCancellationError(err: unknown): boolean {
+  const message =
+    typeof err === 'object' && err && 'message' in err && typeof (err as { message?: unknown }).message === 'string'
+      ? ((err as { message: string }).message || '').toLowerCase()
+      : ''
+
+  const code =
+    typeof err === 'object' && err && 'code' in err
+      ? (err as { code?: unknown }).code
+      : undefined
+
+  return message.includes('cancel') || code === 'UserCancel' || code === 2
+}
+
+function getProductId(value: unknown): string | undefined {
+  if (typeof value !== 'object' || !value) return undefined
+  if (!('productId' in value)) return undefined
+  const productId = (value as { productId?: unknown }).productId
+  return typeof productId === 'string' ? productId : undefined
+}
+
 interface PremiumUpgradeProps {
-  currentUser: any;
+  currentUser: ({ id?: string | null; email?: string | null } & Record<string, unknown>);
   onClose?: () => void;
   preselectedPlan?: 'premium';
 }
@@ -59,12 +113,10 @@ const PremiumUpgrade = ({ currentUser, onClose, preselectedPlan }: PremiumUpgrad
   const showPaystackOption = (!deviceIsNative || isAndroidNative) && !deviceIsIos;
 
   React.useEffect(() => {
-    const productUpdateTimeouts: NodeJS.Timeout[] = [];
-    let loadingTimeout: NodeJS.Timeout | undefined;
+    const productUpdateTimeouts: TimeoutHandle[] = [];
 
-    function onProductUpdated(p?: any) {
-      // @ts-ignore
-      const store = window.CdvPurchase?.store;
+    function onProductUpdated() {
+      const store = getCdvStore();
 
       const product2 = store?.get?.('com.driplove.dating.premium.monthlysub2');
       const product3 = store?.get?.('com.driplove.dating.premium.monthlysub3');
@@ -77,25 +129,26 @@ const PremiumUpgrade = ({ currentUser, onClose, preselectedPlan }: PremiumUpgrad
         setIapLoadingTimeout(false);
       }
 
-      // @ts-ignore
-      if (window.iapInitializationFailed && !hasOffer) {
+      if (isFlagEnabled('iapInitializationFailed') && !hasOffer) {
         setIapLoadingTimeout(true);
         setCanBuy(false);
       }
     }
 
-    function onVerified(r?: any) {
-      const isOurProduct = r?.productId === 'com.driplove.dating.premium.monthlysub2' ||
-        r?.productId === 'com.driplove.dating.premium.monthlysub3';
+    function onVerified(r?: unknown) {
+      const productId = getProductId(r)
+      const isOurProduct = productId === 'com.driplove.dating.premium.monthlysub2' ||
+        productId === 'com.driplove.dating.premium.monthlysub3';
       if (isOurProduct) {
         setIapLoading(false);
         setShowPaymentOptions(false);
       }
     }
 
-    function onUnverified(r?: any) {
-      const isOurProduct = r?.productId === 'com.driplove.dating.premium.monthlysub2' ||
-        r?.productId === 'com.driplove.dating.premium.monthlysub3';
+    function onUnverified(r?: unknown) {
+      const productId = getProductId(r)
+      const isOurProduct = productId === 'com.driplove.dating.premium.monthlysub2' ||
+        productId === 'com.driplove.dating.premium.monthlysub3';
       if (isOurProduct) {
         setIapLoading(false);
         toast({
@@ -105,8 +158,8 @@ const PremiumUpgrade = ({ currentUser, onClose, preselectedPlan }: PremiumUpgrad
       }
     }
 
-    function onError(e?: any) {
-      if (e?.code === 'UserCancel' || e?.code === 2 || e?.message?.toLowerCase()?.includes('cancel')) {
+    function onError(e?: unknown) {
+      if (isCancellationError(e)) {
         setIapLoading(false);
         toast({
           title: 'Purchase cancelled',
@@ -115,8 +168,7 @@ const PremiumUpgrade = ({ currentUser, onClose, preselectedPlan }: PremiumUpgrad
       }
     }
 
-    // @ts-ignore
-    const store = window.CdvPurchase?.store;
+    const store = getCdvStore();
     if (store && store.when && typeof store.when === 'function') {
       try {
         store.when()
@@ -139,7 +191,7 @@ const PremiumUpgrade = ({ currentUser, onClose, preselectedPlan }: PremiumUpgrad
     onProductUpdated();
     productUpdateTimeouts.push(setTimeout(onProductUpdated, 1000));
 
-    loadingTimeout = setTimeout(() => {
+    const loadingTimeout = setTimeout(() => {
       if (!canBuyRef.current) {
         console.warn('[UI] IAP loading timeout - products not available after 8 seconds');
         setIapLoadingTimeout(true);
@@ -159,12 +211,10 @@ const PremiumUpgrade = ({ currentUser, onClose, preselectedPlan }: PremiumUpgrad
   React.useEffect(() => {
     if (!isAndroidNative) return;
 
-    const timeouts: NodeJS.Timeout[] = [];
-    let loadingTimeout: NodeJS.Timeout | undefined;
+    const timeouts: TimeoutHandle[] = [];
 
     const checkGoogleIAP = async () => {
-      // @ts-ignore
-      const store = window.CdvPurchase?.store;
+      const store = getCdvStore();
 
       const googleProduct = store?.get?.('premium_monthly');
       const hasOffer = !!googleProduct?.getOffer?.();
@@ -178,8 +228,7 @@ const PremiumUpgrade = ({ currentUser, onClose, preselectedPlan }: PremiumUpgrad
         }
       }
 
-      // @ts-ignore
-      if (window.googleIapInitializationFailed && !hasOffer) {
+      if (isFlagEnabled('googleIapInitializationFailed') && !hasOffer) {
         setGoogleIapLoadingTimeout(true);
         setCanBuyGoogle(false);
       }
@@ -189,7 +238,7 @@ const PremiumUpgrade = ({ currentUser, onClose, preselectedPlan }: PremiumUpgrad
     timeouts.push(setTimeout(checkGoogleIAP, 1000));
     timeouts.push(setTimeout(checkGoogleIAP, 3000));
 
-    loadingTimeout = setTimeout(() => {
+    const loadingTimeout = setTimeout(() => {
       if (!googleCanBuyRef.current) {
         setGoogleIapLoadingTimeout(true);
       }
@@ -241,7 +290,7 @@ const PremiumUpgrade = ({ currentUser, onClose, preselectedPlan }: PremiumUpgrad
     }
   }, [isAndroidNative, monthlyPrice]);
   
-  const [paymentMethods, setPaymentMethods] = useState<any[]>([{ type: 'card' }]);
+  const [paymentMethods, setPaymentMethods] = useState<Array<{ type: 'iap' | 'card' | 'momo' }>>([{ type: 'card' }]);
 
   const handleUpgrade = () => {
     // Don't allow upgrade if price is still loading
@@ -254,7 +303,7 @@ const PremiumUpgrade = ({ currentUser, onClose, preselectedPlan }: PremiumUpgrad
     }
     
     // Check if we're on iOS and IAP initialization has failed
-    if (isIosNative && window.iapInitializationFailed) {
+    if (isIosNative && isFlagEnabled('iapInitializationFailed')) {
       toast({
         title: 'Connection Failed',
         description: 'Please try again later.',
@@ -286,16 +335,11 @@ const PremiumUpgrade = ({ currentUser, onClose, preselectedPlan }: PremiumUpgrad
         await buyMonthly();
         clearTimeout(timeoutId);
         // Success: let the purchase flow complete
-      } catch (err: any) {
+      } catch (err: unknown) {
         clearTimeout(timeoutId);
         setIapLoading(false);
-        
-        // Check if it's a user cancellation (don't show error for that)
-        const isCancellation = err?.message?.toLowerCase().includes('cancel') || 
-                              err?.code === 'UserCancel' || 
-                              err?.code === 2;
-        
-        if (!isCancellation) {
+
+        if (!isCancellationError(err)) {
           toast({
             title: 'Unable to complete purchase',
             description: 'Please check your connection and try again.',
@@ -318,15 +362,11 @@ const PremiumUpgrade = ({ currentUser, onClose, preselectedPlan }: PremiumUpgrad
         await buyGoogleMonthly();
         clearTimeout(timeoutId);
         // Success: let the purchase flow complete
-      } catch (err: any) {
+      } catch (err: unknown) {
         clearTimeout(timeoutId);
         setGoogleIapLoading(false);
-        
-        const isCancellation = err?.message?.toLowerCase().includes('cancel') || 
-                              err?.code === 'UserCancel' || 
-                              err?.code === 2;
-        
-        if (!isCancellation) {
+
+        if (!isCancellationError(err)) {
           toast({
             title: 'Unable to complete purchase',
             description: 'Please check your connection and try again.',
@@ -412,7 +452,7 @@ const PremiumUpgrade = ({ currentUser, onClose, preselectedPlan }: PremiumUpgrad
           variant: 'destructive',
         });
       }
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error('[PremiumUpgrade] Restore error:', error);
       
       // Even on error, check if subscription is actually active
@@ -752,7 +792,7 @@ const PremiumUpgrade = ({ currentUser, onClose, preselectedPlan }: PremiumUpgrad
         displayCurrency="USD"
         email={currentUser?.email || ''}
         onSuccess={handlePaymentSuccess}
-        paymentMethod={paymentMethods[0]?.type || 'card'}
+        paymentMethod={paymentMethods[0]?.type ?? 'card'}
         isOneTime={paymentType === 'one-time'}
       />
     </div>

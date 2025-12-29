@@ -1,7 +1,6 @@
 // Supabase Edge Function: paystack-init
 // Initializes Paystack transaction server-side using secret key and returns authorization_url/reference
 import { serve } from 'https://deno.land/std@0.177.0/http/server.ts'
-import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.45.0'
 
 interface InitRequest {
   email: string
@@ -44,31 +43,16 @@ serve(async (req) => {
     const secret = Deno.env.get('PAYSTACK_SECRET_KEY')
     if (!secret) return json(500, { error: 'Missing PAYSTACK_SECRET_KEY' })
 
-    // Initialize Supabase client
-    const supabaseClient = createClient(
-      Deno.env.get('SUPABASE_URL') ?? '',
-      Deno.env.get('SUPABASE_ANON_KEY') ?? ''
-    )
-
     const { email, amount, currency, plan, channels, metadata, callback_url } = (await req.json()) as InitRequest
     if (!email) return json(400, { error: 'email required' })
 
     const payload: Record<string, unknown> = { email }
     let actualPlan = plan
 
-    // If no plan provided but we need one (when amount is not provided), fetch from database
-    if (!plan && !amount) {
-      const { data: paymentConfig, error } = await supabaseClient
-        .from('payment_config')
-        .select('paystack_plan_code')
-        .limit(1)
-        .single()
-      
-      if (error || !paymentConfig?.paystack_plan_code) {
-        return json(400, { error: 'No plan provided and none configured in database' })
-      }
-      actualPlan = paymentConfig.paystack_plan_code
-    }
+    // NOTE: We intentionally do NOT auto-fetch a plan code.
+    // This app primarily uses authorization-code recurring charges (charge_authorization),
+    // so a plan-based Paystack subscription could lead to double billing.
+    // If a plan is desired, it must be explicitly provided by the caller.
 
     if (actualPlan) {
       // For subscriptions, use plan directly without other parameters
@@ -78,7 +62,7 @@ serve(async (req) => {
       delete payload.amount
       delete payload.currency
     } else {
-      if (!amount) return json(400, { error: 'amount required for one-time' })
+      if (!amount) return json(400, { error: 'amount required' })
       payload.amount = Math.round(Number(amount) * 100)
       payload.currency = (currency || 'GHS').toUpperCase()
       if (channels && channels.length) payload.channels = channels

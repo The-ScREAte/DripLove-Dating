@@ -17,24 +17,26 @@ const Unsubscribe: React.FC = () => {
   const navigate = useNavigate();
   const { toast } = useToast();
 
-  const openAppleSubscriptionManagement = async () => {
+  const openNativeSubscriptionManagement = async (platform: 'ios' | 'android') => {
     try {
-      // For iOS, open Apple's subscription management
-      if (Capacitor.getPlatform() === 'ios') {
+      if (platform === 'ios') {
         // iOS 15+: Direct link to subscription management in Settings
-        // Using itms-apps:// scheme to open directly in App Store app
         const url = 'itms-apps://apps.apple.com/account/subscriptions';
         
-        // Use window.open for iOS as it properly opens the URL
         if (window.open) {
           window.open(url, '_system');
         } else {
-          // Fallback to showing manual instructions
           setShowManageInstructions(true);
         }
-      } else {
-        // Fallback for web or Android
-        setError('Please manage your subscription through your Apple account settings.');
+      } else if (platform === 'android') {
+        // Android: Open Google Play subscriptions
+        const url = 'https://play.google.com/store/account/subscriptions';
+        
+        if (window.open) {
+          window.open(url, '_system');
+        } else {
+          setShowManageInstructions(true);
+        }
       }
     } catch (err) {
       console.error('Error opening subscription management:', err);
@@ -66,13 +68,41 @@ const Unsubscribe: React.FC = () => {
         throw new Error('No active subscription found');
       }
 
-      // For Apple IAP subscriptions, we MUST redirect to Apple's subscription management
-      // Apps cannot programmatically cancel Apple subscriptions
-      if (isNativeApp() && subscription.payment_method === 'apple') {
-        // Mark as pending cancellation in database
+      // For iOS/Android IAP subscriptions, redirect to native settings
+      if (isNativeApp() && (subscription.payment_method === 'apple' || subscription.payment_method === 'google' || subscription.payment_method === 'iap')) {
+        const platform = Capacitor.getPlatform() as 'ios' | 'android';
+        
+        // Open native subscription management
+        await openNativeSubscriptionManagement(platform);
+        
+        toast({
+          title: `Cancel in ${platform === 'ios' ? 'Apple' : 'Google Play'} Settings`,
+          description: `You will be redirected to manage your subscription. Cancel there and it will show as cancelled in the app.`,
+        });
+        
+        return;
+      }
+
+      // For Paystack subscriptions, call the cancel-subscription Edge Function
+      if (subscription.payment_method === 'paystack') {
+        const { error: cancelError } = await supabase.functions.invoke('cancel-subscription', {
+          body: { user_id: user.id }
+        });
+
+        if (cancelError) {
+          throw new Error(cancelError.message || 'Failed to cancel subscription');
+        }
+
+        toast({
+          title: 'Subscription Cancelled',
+          description: `Your subscription has been cancelled. You will remain premium until ${subscription.expires_at ? new Date(subscription.expires_at).toLocaleDateString() : 'the end of your period'}.`,
+        });
+      } else {
+        // Fallback for other payment methods
         const { error: updateError } = await supabase
           .from('user_subscriptions')
           .update({ 
+            status: 'cancelled',
             auto_renew: false,
             updated_at: new Date().toISOString()
           })
@@ -83,43 +113,10 @@ const Unsubscribe: React.FC = () => {
           throw new Error(updateError.message || 'Failed to update subscription status');
         }
 
-        // Open Apple's subscription management
-        await openAppleSubscriptionManagement();
-        
         toast({
-          title: 'Cancel in Apple Settings',
-          description: 'You will be redirected to manage your subscription in Apple Settings. Please cancel there to complete the process.',
+          title: 'Subscription Cancelled',
+          description: 'Your subscription has been successfully cancelled.',
         });
-        
-        return;
-      }
-
-      // For non-Apple subscriptions (Paystack, web subscriptions, etc.)
-
-      // For non-Apple subscriptions (Paystack, etc.), update status to cancelled
-      const { error: updateError } = await supabase
-        .from('user_subscriptions')
-        .update({ 
-          status: 'cancelled',
-          auto_renew: false,
-          updated_at: new Date().toISOString()
-        })
-        .eq('user_id', user.id)
-        .eq('id', subscription.id);
-
-      if (updateError) {
-        throw new Error(updateError.message || 'Failed to update subscription status');
-      }
-
-      // Show success message for non-Apple subscriptions
-      toast({
-        title: 'Subscription Cancelled',
-        description: 'Your subscription has been successfully cancelled.',
-      });
-
-      // For Paystack subscriptions, we should also call their API to cancel
-      // This ensures the subscription is cancelled on the provider's side too
-      if (subscription.payment_method === 'paystack' && subscription.flutterwave_transaction_id) {
       }
 
       navigate('/');
@@ -137,14 +134,32 @@ const Unsubscribe: React.FC = () => {
         
         {showManageInstructions ? (
           <div className="text-left space-y-4">
-            <p className="text-gray-700 font-semibold">To cancel your Apple subscription:</p>
-            <ol className="list-decimal list-inside space-y-2 text-gray-600 text-sm">
-              <li>Open the <strong>Settings</strong> app on your iPhone/iPad</li>
-              <li>Tap your <strong>Apple ID</strong> at the top</li>
-              <li>Tap <strong>Subscriptions</strong></li>
-              <li>Select <strong>DripLove</strong></li>
-              <li>Tap <strong>Cancel Subscription</strong></li>
-            </ol>
+            <p className="text-gray-700 font-semibold">To cancel your subscription:</p>
+            
+            {Capacitor.getPlatform() === 'ios' ? (
+              <div>
+                <p className="text-sm text-gray-600 mb-2">For Apple/iOS:</p>
+                <ol className="list-decimal list-inside space-y-2 text-gray-600 text-sm">
+                  <li>Open the <strong>Settings</strong> app on your iPhone/iPad</li>
+                  <li>Tap your <strong>Apple ID</strong> at the top</li>
+                  <li>Tap <strong>Subscriptions</strong></li>
+                  <li>Select <strong>DripLove</strong></li>
+                  <li>Tap <strong>Cancel Subscription</strong></li>
+                </ol>
+              </div>
+            ) : (
+              <div>
+                <p className="text-sm text-gray-600 mb-2">For Google Play/Android:</p>
+                <ol className="list-decimal list-inside space-y-2 text-gray-600 text-sm">
+                  <li>Open the <strong>Google Play Store</strong> app</li>
+                  <li>Tap your <strong>Profile</strong> icon at the top right</li>
+                  <li>Tap <strong>Payments & subscriptions</strong> → <strong>Subscriptions</strong></li>
+                  <li>Select <strong>DripLove</strong></li>
+                  <li>Tap <strong>Cancel subscription</strong></li>
+                </ol>
+              </div>
+            )}
+            
             <Button
               onClick={() => {
                 setShowManageInstructions(false);

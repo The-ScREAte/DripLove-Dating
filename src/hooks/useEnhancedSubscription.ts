@@ -8,6 +8,7 @@ interface SubscriptionStatus {
   status: string
   expires_at: string | null
   is_active: boolean
+  payment_method?: string
 }
 
 // Check if we should verify with the native store
@@ -103,7 +104,8 @@ export function useEnhancedSubscription() {
           plan_name: 'free',
           status: 'active',
           expires_at: null,
-          is_active: false
+          is_active: false,
+          payment_method: undefined
         })
         setLoading(false)
         return
@@ -141,7 +143,8 @@ export function useEnhancedSubscription() {
             plan_name: 'free',
             status: 'expired',
             expires_at: quickCheck.expires_at,
-            is_active: false
+            is_active: false,
+            payment_method: quickCheck.payment_method
           })
         } else {
           // Verify with native store if on mobile
@@ -153,7 +156,8 @@ export function useEnhancedSubscription() {
               plan_name: 'free',
               status: 'expired',
               expires_at: quickCheck.expires_at,
-              is_active: false
+              is_active: false,
+              payment_method: quickCheck.payment_method
             })
           } else {
             // Active premium subscription
@@ -161,7 +165,8 @@ export function useEnhancedSubscription() {
               plan_name: quickCheck.plan_name,
               status: quickCheck.status,
               expires_at: quickCheck.expires_at,
-              is_active: true
+              is_active: true,
+              payment_method: quickCheck.payment_method
             })
           }
         }
@@ -171,7 +176,8 @@ export function useEnhancedSubscription() {
           plan_name: 'free',
           status: 'active',
           expires_at: null,
-          is_active: false
+          is_active: false,
+          payment_method: undefined
         })
       }
 
@@ -195,7 +201,8 @@ export function useEnhancedSubscription() {
             plan_name: 'free',
             status: 'active',
             expires_at: null,
-            is_active: false
+            is_active: false,
+            payment_method: undefined
           })
         }
       }
@@ -207,7 +214,8 @@ export function useEnhancedSubscription() {
           plan_name: 'free',
           status: 'active',
           expires_at: null,
-          is_active: false
+          is_active: false,
+          payment_method: undefined
         })
       }
     }
@@ -230,7 +238,8 @@ export function useEnhancedSubscription() {
           plan_name: 'free',
           status: 'active',
           expires_at: null,
-          is_active: false
+          is_active: false,
+          payment_method: undefined
         })
         setLoading(false)
       }

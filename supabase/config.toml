@@ -31,6 +31,9 @@ verify_jwt = false
 [functions.admin-billing-trigger]
 verify_jwt = true
 
+[functions.deactivate-user-payments]
+verify_jwt = false
+
 [functions.subscription-checker]
 verify_jwt = false
 

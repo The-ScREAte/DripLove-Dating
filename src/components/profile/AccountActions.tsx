@@ -267,7 +267,18 @@ const AccountActions = ({ currentUser, onLogout, onShowTerms, onShowPrivacy, hid
         }
       }
 
-      // If re-auth is successful, delete face from AWS Rekognition
+      // If re-auth is successful, deactivate all payment methods first
+      try {
+        console.log('[ACCOUNT-DELETE] Deactivating payment methods...');
+        await supabase.functions.invoke('deactivate-user-payments', {
+          body: { user_id: currentUser.id }
+        });
+      } catch (paymentError) {
+        console.error('Error deactivating payment methods:', paymentError);
+        // Non-fatal: continue with deletion even if this fails
+      }
+
+      // Delete face from AWS Rekognition
       try {
         const { data: profile } = await supabase
           .from('profiles')
@@ -421,17 +432,79 @@ const AccountActions = ({ currentUser, onLogout, onShowTerms, onShowPrivacy, hid
           </Button>
         )}
 
-        {/* 6. Cancel Subscription - Destructive action, but reversible */}
-        {(isPremium || (subscriptionStatus && subscriptionStatus.plan_name === 'premium')) && 
-         (!subscriptionStatus || subscriptionStatus.status === 'active') && (
-          <Button
-            variant="outline"
-            size={isAndroidNative ? 'sm' : 'default'}
-            className={`w-full flex items-center justify-center space-x-2 border-orange-300 text-orange-600 hover:bg-orange-50 ${isAndroidNative ? 'text-xs' : ''}`}
-            onClick={() => navigate('/unsubscribe')}
-          >
-            {t('settings.cancelSubscription')}
-          </Button>
+        {/* 6. Subscription Management - Cancel or Resume */}
+        {(isPremium || (subscriptionStatus && subscriptionStatus.plan_name === 'premium')) && (
+          <div className="space-y-3">
+            {/* Show subscription status if cancelled */}
+            {subscriptionStatus && subscriptionStatus.status === 'cancelled' && subscriptionStatus.expires_at && (
+              <div className="p-4 bg-orange-50 border border-orange-200 rounded-lg">
+                <div className="flex items-center gap-2 mb-2">
+                  <AlertTriangle className="w-4 h-4 text-orange-600" />
+                  <span className="font-semibold text-orange-800">Subscription Cancelled</span>
+                </div>
+                <p className="text-sm text-orange-700">
+                  Your premium access ends on {new Date(subscriptionStatus.expires_at).toLocaleDateString()}
+                </p>
+              </div>
+            )}
+
+            {/* Cancel button for active subscriptions */}
+            {(!subscriptionStatus || subscriptionStatus.status === 'active') && (
+              <Button
+                variant="outline"
+                size={isAndroidNative ? 'sm' : 'default'}
+                className={`w-full flex items-center justify-center space-x-2 border-orange-300 text-orange-600 hover:bg-orange-50 ${isAndroidNative ? 'text-xs' : ''}`}
+                onClick={() => navigate('/unsubscribe')}
+              >
+                {t('settings.cancelSubscription')}
+              </Button>
+            )}
+
+            {/* Resume button for cancelled Paystack subscriptions */}
+            {subscriptionStatus && 
+             subscriptionStatus.status === 'cancelled' && 
+             subscriptionStatus.payment_method === 'paystack' && (
+              <Button
+                variant="outline"
+                size={isAndroidNative ? 'sm' : 'default'}
+                className={`w-full flex items-center justify-center space-x-2 border-green-300 text-green-600 hover:bg-green-50 ${isAndroidNative ? 'text-xs' : ''}`}
+                onClick={async () => {
+                  try {
+                    const { data: { user } } = await supabase.auth.getUser();
+                    if (!user) return;
+
+                    const { error } = await supabase
+                      .from('user_subscriptions')
+                      .update({ 
+                        status: 'active',
+                        auto_renew: true,
+                        updated_at: new Date().toISOString()
+                      })
+                      .eq('user_id', user.id)
+                      .eq('status', 'cancelled');
+
+                    if (error) throw error;
+
+                    toast({
+                      title: 'Subscription Resumed',
+                      description: 'Your subscription has been reactivated and will auto-renew.',
+                    });
+
+                    // Refresh the page to update UI
+                    window.location.reload();
+                  } catch (err: any) {
+                    toast({
+                      title: 'Error',
+                      description: 'Failed to resume subscription. Please try again.',
+                      variant: 'destructive',
+                    });
+                  }
+                }}
+              >
+                Resume Subscription
+              </Button>
+            )}
+          </div>
         )}
         {/* Delete Account always visible */}
         <div className="flex flex-col sm:flex-row gap-4 mt-4">
