@@ -301,52 +301,52 @@ const AuthForm = ({ isLogin, onToggle, onBack }: AuthFormProps) => {
           return;
         }
 
-        // Check if user profile exists and get account status
-        const { data: profile, error: profileError } = await supabase
-          .from('profiles')
-          .select('id, is_admin, account_status')
-          .eq('id', authData.user.id)
-          .maybeSingle();
+        // Post-login profile checks are handled by the main app routing (Index.tsx).
+        // Doing a blocking profile query here can fail transiently (native storage/session
+        // hydration, network hiccups) and incorrectly force a logout.
+        //
+        // We only do a best-effort status check here; failures should not block login.
+        try {
+          const { data: profile, error: profileError } = await supabase
+            .from('profiles')
+            .select('id, account_status')
+            .eq('id', authData.user.id)
+            .maybeSingle();
 
-        if (profileError || !profile) {
-          // Sign out the user since they don't have a profile
-          await supabase.auth.signOut();
+          if (!profileError && profile) {
+            if (profile.account_status === 'blocked') {
+              await supabase.auth.signOut();
+              toast({
+                title: t('auth.accountBlocked'),
+                description: t('auth.accountBlockedDesc'),
+                variant: 'destructive',
+              });
+              setLoading(false);
+              return;
+            }
 
-          // Don't flash an error toast; instead guide them into registration.
-          // (A missing profile means signup wasn't completed.)
-          onToggle();
-          setLoading(false);
-          return;
-        }
+            if (profile.account_status === 'on_hold') {
+              await supabase.auth.signOut();
+              toast({
+                title: t('auth.accountOnHold'),
+                description: t('auth.accountOnHoldDesc'),
+                variant: 'destructive',
+              });
+              setLoading(false);
+              return;
+            }
 
-        // Check account status
-        if (profile.account_status === 'blocked') {
-          await supabase.auth.signOut();
-          toast({
-            title: t('auth.accountBlocked'),
-            description: t('auth.accountBlockedDesc'),
-            variant: "destructive",
-          });
-          setLoading(false);
-          return;
-        }
+            // Save profile ID to session for downstream pages that use it.
+            try {
+              sessionStorage.setItem('profile_id', profile.id);
+            } catch {}
+          }
+        } catch {}
 
-        if (profile.account_status === 'on_hold') {
-          await supabase.auth.signOut();
-          toast({
-            title: t('auth.accountOnHold'),
-            description: t('auth.accountOnHoldDesc'),
-            variant: "destructive",
-          });
-          setLoading(false);
-          return;
-        }
-
-        // Save profile ID to session
-        sessionStorage.setItem('profile_id', profile.id);
-
-        // Save current language to user's profile
-        await saveLanguageToProfile(authData.user.id);
+        // Best-effort: persist language preference; ignore failures.
+        try {
+          await saveLanguageToProfile(authData.user.id);
+        } catch {}
 
         // Always redirect to home page and let the main app handle routing
         // The auth state change will trigger the proper view (admin/app)
