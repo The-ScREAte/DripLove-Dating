@@ -3,16 +3,16 @@ import { supabase } from '@/integrations/supabase/client';
 import { PotentialMatch } from '@/types';
 
 /**
- * 25% Like-Back Injection Hook
+ * 35% Like-Back Injection Hook
  * 
  * Implements Tinder-style "like-back injection" where profiles that liked the current user
  * are injected into the swipe queue at strategic positions.
  * 
  * Rules:
- * - 25% injection rate = 1 injected profile every 4 cards
+ * - 35% injection rate = ~1 injected profile every 3 cards
  * - Never inject as "next card" - use positions +2 to +4
- * - Cap: max 25% of cards per session
- * - Cooldown: only 1 injection every 4 swipes minimum
+ * - Cap: max 35% of cards per session
+ * - Cooldown: only 1 injection every 3 swipes minimum
  * - Quality filter: only inject likers with 2+ photos
  * - Deduplicate: avoid same ID appearing twice
  * - Respect: passed today + blocked profiles excluded
@@ -58,12 +58,12 @@ interface LikerProfile {
 }
 
 // Configuration
-const INJECT_RATE = 0.25; // 25%
-const EVERY_N_SWIPES = Math.round(1 / INJECT_RATE); // 4
+const INJECT_RATE = 0.35; // 35%
+const EVERY_N_SWIPES = Math.round(1 / INJECT_RATE); // 3
 const MIN_PHOTOS_REQUIRED = 2; // Quality filter
 const INJECTION_POSITION_MIN = 2; // Position +2
 const INJECTION_POSITION_MAX = 4; // Position +4
-const MAX_INJECTION_PERCENT = 0.25; // Cap at 25% of session
+const MAX_INJECTION_PERCENT = 0.35; // Cap at 35% of session
 
 export function useLikeBackInjection({
   userId,
@@ -274,10 +274,10 @@ export function useLikeBackInjection({
     // No candidates available
     if (likedMeIds.length === 0) return false;
 
-    // Don't exceed 25% injection cap
+    // Don't exceed 35% injection cap
     if (total > 0 && injected / total >= MAX_INJECTION_PERCENT) return false;
 
-    // Cooldown: at least 4 swipes since last injection
+    // Cooldown: at least 3 swipes since last injection
     if (swipes - lastInjectionSwipeRef.current < EVERY_N_SWIPES) return false;
 
     // Main check: every 4th swipe
