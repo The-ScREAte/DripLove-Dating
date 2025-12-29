@@ -38,6 +38,18 @@ async function disablePaystackSubscription(subscription_code: string) {
   return await resp.json()
 }
 
+async function deactivatePaystackAuthorization(authorization_code: string) {
+  const resp = await fetch('https://api.paystack.co/customer/deactivate_authorization', {
+    method: 'POST',
+    headers: {
+      Authorization: `Bearer ${PAYSTACK_SECRET_KEY}`,
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({ authorization_code }),
+  })
+  return await resp.json()
+}
+
 serve(async (req) => {
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders })
@@ -58,8 +70,40 @@ serve(async (req) => {
     if (error || !sub) return json(404, { error: 'No active subscription found' })
 
     // If Paystack, disable at provider
-    if (sub.payment_method === 'paystack' && sub.flutterwave_transaction_id) {
-      await disablePaystackSubscription(sub.flutterwave_transaction_id)
+    if (sub.payment_method === 'paystack') {
+      // New model (no plan codes): deactivate saved authorization codes (prevents future charges).
+      const { data: authRow } = await supabase
+        .from('paystack_authorizations')
+        .select('authorization_code')
+        .eq('user_id', user_id)
+        .eq('status', 'active')
+        .order('created_at', { ascending: false })
+        .limit(1)
+        .maybeSingle()
+
+      if (authRow?.authorization_code) {
+        try {
+          await deactivatePaystackAuthorization(authRow.authorization_code)
+        } catch {
+          // Non-fatal: we still cancel locally.
+        }
+
+        await supabase
+          .from('paystack_authorizations')
+          .update({ status: 'disabled', updated_at: new Date().toISOString() })
+          .eq('user_id', user_id)
+          .eq('status', 'active')
+      }
+
+      // Legacy model (plan-code subscription): still attempt provider disable if we have a subscription_code.
+      // NOTE: In the new flow flutterwave_transaction_id may be a reference; this call will simply fail silently.
+      if (sub.flutterwave_transaction_id) {
+        try {
+          await disablePaystackSubscription(sub.flutterwave_transaction_id)
+        } catch {
+          // Non-fatal
+        }
+      }
     }
     // If IAP, no external API call needed
     if (sub.payment_method === 'iap') {
@@ -69,7 +113,7 @@ serve(async (req) => {
     // Mark as cancelled, keep expires_at as is
     const { error: updateErr } = await supabase
       .from('user_subscriptions')
-      .update({ status: 'cancelled', auto_renew: false })
+      .update({ status: 'cancelled', auto_renew: false, updated_at: new Date().toISOString() })
       .eq('id', sub.id)
     if (updateErr) return json(500, { error: updateErr.message })
 

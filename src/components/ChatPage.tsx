@@ -892,8 +892,8 @@ const ChatPage = ({ currentUser, onUnreadChange, onDetailViewChange }: ChatPageP
       checkExpiredMatches(processedMatches);
     } catch (error) {
       toast({
-        title: 'Error',
-        description: 'Failed to load conversations.',
+        title: 'Connection Problem',
+        description: 'Unable to connect to the network. Please check your internet connection and try again.',
         variant: 'destructive'
       });
     }

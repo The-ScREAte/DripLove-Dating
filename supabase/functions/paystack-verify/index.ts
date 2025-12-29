@@ -37,6 +37,18 @@ interface PaystackVerifyResponse {
     amount?: number
     currency?: string
     customer?: { email?: string }
+    authorization?: {
+      authorization_code?: string
+      reusable?: boolean
+      signature?: string
+      last4?: string
+      exp_month?: string | number
+      exp_year?: string | number
+      card_type?: string
+      bank?: string
+      channel?: string
+      brand?: string
+    }
   }
 }
 
@@ -162,6 +174,52 @@ serve(async (req) => {
       const { error: insertError } = await supabase.from('user_subscriptions').insert([insertPayload])
       if (insertError) {
         return json(500, { ok: false, error: 'Failed to create subscription', details: insertError.message })
+      }
+    }
+
+    // Save Paystack authorization for true recurring billing (no plan codes)
+    // Only for subscription payments (one-time should not be auto-charged).
+    if (paymentType !== 'one-time') {
+      const auth = paystackData?.authorization
+      const authorizationCode = (auth?.authorization_code || '').trim()
+      const amount = paystackData?.amount
+      const currency = (paystackData?.currency || '').trim()
+
+      if (authorizationCode && typeof amount === 'number' && amount > 0 && currency) {
+        const expMonthRaw = auth?.exp_month
+        const expYearRaw = auth?.exp_year
+        const expMonth = typeof expMonthRaw === 'string' ? Number.parseInt(expMonthRaw, 10) : expMonthRaw
+        const expYear = typeof expYearRaw === 'string' ? Number.parseInt(expYearRaw, 10) : expYearRaw
+
+        const insertPayload = {
+          user_id: user.id,
+          email: paystackEmail || userEmail || null,
+          authorization_code: authorizationCode,
+          signature: auth?.signature || null,
+          reusable: typeof auth?.reusable === 'boolean' ? auth.reusable : null,
+          brand: auth?.brand || null,
+          last4: auth?.last4 || null,
+          exp_month: Number.isFinite(expMonth as number) ? expMonth : null,
+          exp_year: Number.isFinite(expYear as number) ? expYear : null,
+          bank: auth?.bank || null,
+          channel: auth?.channel || null,
+          card_type: auth?.card_type || null,
+          default_amount: amount,
+          default_currency: currency,
+          status: 'active',
+          updated_at: new Date().toISOString(),
+        }
+
+        const { error: authUpsertError } = await supabase
+          .from('paystack_authorizations')
+          .upsert([insertPayload], { onConflict: 'user_id,authorization_code' })
+
+        if (authUpsertError) {
+          console.error('[PAYSTACK-VERIFY] Failed to save authorization:', authUpsertError)
+          // Non-fatal: user still gets premium from the verified payment.
+        }
+      } else {
+        console.warn('[PAYSTACK-VERIFY] Missing authorization or amount/currency; skipping auth save')
       }
     }
 
