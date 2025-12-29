@@ -1705,55 +1705,67 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, isPremium, profileComplet
 
     const imageMap: { [key: string]: string[] } = {};
     if (shuffled.length > 0) {
-      // Take first 6 profiles (or fewer if less exist)
+      // Kick off image loading in the background so we can render matches ASAP.
+      // (Large user_images queries can be slow on mobile networks.)
       const firstSix = shuffled.slice(0, 6);
-      const firstSixIds = firstSix.map(p => p.id);
+      const firstSixIds = firstSix.map((p) => p.id).filter(Boolean);
 
-      // Get ALL approved images for the first 6 profiles
-      const { data: imageRows, error: imgError } = await supabase
-        .from('user_images')
-        .select('user_id, image_url, image_order')
-        .in('user_id', firstSixIds)
-        .eq('is_approved', true)
-        .order('user_id', { ascending: true })
-        .order('image_order', { ascending: true });
+      setTimeout(async () => {
+        try {
+          if (firstSixIds.length === 0) return;
 
-      if (!imgError && imageRows) {
-        // Group by user_id
-        const byUser: Record<string, string[]> = {};
-        for (const row of imageRows) {
-          if (!byUser[row.user_id]) byUser[row.user_id] = [];
-          byUser[row.user_id].push(row.image_url);
-        }
+          const { data: imageRows, error: imgError } = await supabase
+            .from('user_images')
+            .select('user_id, image_url, image_order')
+            .in('user_id', firstSixIds)
+            .eq('is_approved', true)
+            .order('user_id', { ascending: true })
+            .order('image_order', { ascending: true });
 
-        // Apply limits:
-        // 1st profile: 3 images
-        // 2nd profile: 2 images
-        // 3rd–6th: 1 image each
-        firstSix.forEach((profile, index) => {
-          const imgs = byUser[profile.id] || [];
-          if (imgs.length === 0) return;
+          if (imgError || !imageRows) return;
 
-          let maxCount = 1;
-          if (index === 0) maxCount = 3;
-          else if (index === 1) maxCount = 2;
-
-          imageMap[profile.id] = imgs.slice(0, maxCount);
-
-          // For the first two, start loading the FULL set in background
-          if (index <= 1) {
-            loadAllImagesForProfile(profile.id).then(fullImgs => {
-              if (fullImgs && fullImgs.length > 0) {
-                setUserImages(prev => ({ ...prev, [profile.id]: fullImgs }));
-              }
-            });
+          const byUser: Record<string, string[]> = {};
+          for (const row of imageRows) {
+            if (!byUser[row.user_id]) byUser[row.user_id] = [];
+            byUser[row.user_id].push(row.image_url);
           }
-        });
-      }
 
-      // If there were fewer than 6 profiles or any without images, it's fine.
-      // The centralized preloader + loadAllImagesForProfile will keep loading the rest as user swipes.
+          // Apply limits:
+          // 1st profile: 3 images
+          // 2nd profile: 2 images
+          // 3rd–6th: 1 image each
+          const initialImages: Record<string, string[]> = {};
+          firstSix.forEach((profile, index) => {
+            const imgs = byUser[profile.id] || [];
+            if (imgs.length === 0) return;
+
+            let maxCount = 1;
+            if (index === 0) maxCount = 3;
+            else if (index === 1) maxCount = 2;
+
+            initialImages[profile.id] = imgs.slice(0, maxCount);
+
+            // For the first two, start loading the FULL set in background
+            if (index <= 1) {
+              void loadAllImagesForProfile(profile.id).then((fullImgs) => {
+                if (fullImgs && fullImgs.length > 0) {
+                  setUserImages((prev) => ({ ...prev, [profile.id]: fullImgs }));
+                }
+              });
+            }
+          });
+
+          if (Object.keys(initialImages).length > 0) {
+            setUserImages((prev) => ({ ...prev, ...initialImages }));
+          }
+        } catch {
+          // Silent: never block matches rendering on image prefetch
+        }
+      }, 0);
     }
+
+    // If there were fewer than 6 profiles or any without images, it's fine.
+    // The centralized preloader + loadAllImagesForProfile will keep loading the rest as user swipes.
 
     return {
       matches: shuffled,
@@ -1789,6 +1801,13 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, isPremium, profileComplet
 
   const fetchPotentialMatches = useCallback(async () => {
     if (!currentUser?.id) return;
+
+    // Ensure local swipe cache is hydrated BEFORE any fetch so refreshes never resurrect swiped profiles.
+    // (On some devices the mount effect can run after this fetch kicks off.)
+    if (locallySwipedProfileIds.current.size === 0) {
+      locallySwipedProfileIds.current = getStoredSwipedIds();
+    }
+
     suppressFetchRef.current = false;
 
     // Latest-wins: if multiple fetches overlap (e.g., free -> premium flip),
@@ -1846,7 +1865,7 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, isPremium, profileComplet
       setHasCompletedInitialFetch(true);
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [currentUser, allowedGenders, toast, fetchPotentialMatchesData, injectAds, batchFetchLanguages]);
+  }, [currentUser, allowedGenders, toast, fetchPotentialMatchesData, injectAds, batchFetchLanguages, getStoredSwipedIds]);
 
   // Premium: if deck is empty, auto-refresh once.
   useEffect(() => {
