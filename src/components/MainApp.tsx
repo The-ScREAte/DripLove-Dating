@@ -179,9 +179,6 @@ const MainApp = ({ user, onLogout }: MainAppProps) => {
         }
       }
 
-      if (matchesWithUnread.length > 0) {
-        console.log('[MainApp] Unread count breakdown:', { userId, total, matchesWithUnread });
-      }
       setUnreadCount(total);
     } catch (err) {
       const message =

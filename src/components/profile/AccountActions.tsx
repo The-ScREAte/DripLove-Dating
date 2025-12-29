@@ -269,7 +269,6 @@ const AccountActions = ({ currentUser, onLogout, onShowTerms, onShowPrivacy, hid
 
       // If re-auth is successful, deactivate all payment methods first
       try {
-        console.log('[ACCOUNT-DELETE] Deactivating payment methods...');
         await supabase.functions.invoke('deactivate-user-payments', {
           body: { user_id: currentUser.id }
         });

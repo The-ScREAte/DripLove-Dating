@@ -101,13 +101,11 @@ export async function getExchangeRate(
     if (cached && cached.baseCurrency === fromCurrency) {
       const rate = cached.rates[toCurrency];
       if (rate) {
-        console.log(`[ExchangeRate] Using cached rate: 1 ${fromCurrency} = ${rate} ${toCurrency}`);
         return rate;
       }
     }
 
     // If not in cache or cache miss, fetch fresh rates
-    console.log(`[ExchangeRate] Fetching fresh rates for ${fromCurrency}`);
     const rates = await fetchExchangeRates(fromCurrency);
     
     // Save to cache
@@ -115,11 +113,9 @@ export async function getExchangeRate(
 
     const rate = rates[toCurrency];
     if (!rate) {
-      console.warn(`[ExchangeRate] Rate not found for ${toCurrency}`);
       return null;
     }
 
-    console.log(`[ExchangeRate] Fresh rate: 1 ${fromCurrency} = ${rate} ${toCurrency}`);
     return rate;
   } catch (error) {
     console.error('[ExchangeRate] Error getting exchange rate:', error);
@@ -193,9 +189,8 @@ export async function convertToGHS(
 export function clearExchangeRateCache(): void {
   try {
     localStorage.removeItem(CACHE_KEY);
-    console.log('[ExchangeRate] Cache cleared');
-  } catch (error) {
-    console.error('[ExchangeRate] Error clearing cache:', error);
+  } catch {
+    // Ignore cache clear errors
   }
 }
 
@@ -209,11 +204,9 @@ export async function preloadExchangeRates(): Promise<void> {
     
     // Only fetch if cache is empty or expired
     if (!cached) {
-      console.log('[ExchangeRate] Preloading exchange rates...');
       await fetchExchangeRates('USD');
     }
-  } catch (error) {
-    console.error('[ExchangeRate] Error preloading rates:', error);
+  } catch {
     // Silently fail - not critical for app functionality
   }
 }

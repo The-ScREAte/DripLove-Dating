@@ -393,14 +393,6 @@ export function useLikeBackInjection({
 
     // Insert into queue
     addToQueue(match, position);
-
-    console.log('[LikeBackInjection] Injected profile:', {
-      id: candidate.id,
-      name: `${candidate.first_name} ${candidate.last_name}`,
-      position,
-      totalInjected: injectedCountRef.current,
-      totalSwipes: swipeCountRef.current,
-    });
   }, [shouldInjectNow, getInjectionCandidate, getInjectionPosition, likerToMatch]);
 
   // Check if a profile ID is a "liked me" profile (for UI hints)
