@@ -5,6 +5,7 @@ import { preloadImageToBlob } from '@/utils/imageCache';
 import { calculateAge, createDeterministicShuffle } from '@/utils/discoverCache';
 import { getStratifiedBatches } from '@/utils/stratifiedSampling';
 import { applyActivityWeighting, getSwipeFatigueRescueCandidates, injectRescueProfiles } from '@/utils/activityWeighting';
+import { useLikeBackInjection } from '@/hooks/useLikeBackInjection';
 import DominantColorImageBg from './discover/DominantColorImageBg';
 
 const AdinkraBar = lazy(() => import('./discover/AdinkraBar'));
@@ -619,6 +620,42 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, isPremium, profileComplet
 
   // Track in-flight image load requests to avoid duplicate DB calls
   const requestedImageProfileIds = useRef<Set<string>>(new Set());
+
+  // ⭐ LIKE-BACK INJECTION: 25% injection of users who liked the current user
+  // Build filter sets for the injection hook
+  const blockedIdsSet = useMemo(() => new Set<string>(), []); // Will be populated from fetch
+  const passedTodayIdsSet = useMemo(() => {
+    const now = Date.now();
+    const oneDayMs = 24 * 60 * 60 * 1000;
+    const passedToday = new Set<string>();
+    for (const [id, data] of locallySwipedProfileIds.current.entries()) {
+      if (data.action === 'pass' && (now - data.timestamp) < oneDayMs) {
+        passedToday.add(id);
+      }
+    }
+    return passedToday;
+  }, []);
+  
+  const inQueueIdsSet = useMemo(() => {
+    const inQueue = new Set<string>();
+    potentialMatches.forEach(m => {
+      if (!isAd(m)) inQueue.add(m.id);
+    });
+    return inQueue;
+  }, [potentialMatches]);
+
+  const {
+    onSwipe: onLikeBackSwipe,
+    isLikedMeProfile,
+    candidateCount: likeBackCandidateCount,
+    refreshCandidates: refreshLikeBackCandidates,
+  } = useLikeBackInjection({
+    userId: currentUser?.id,
+    blockedIds: blockedIdsSet,
+    passedTodayIds: passedTodayIdsSet,
+    inQueueIds: inQueueIdsSet,
+    locallySwipedIds: locallySwipedProfileIds.current,
+  });
 
   // Fetch ads from database - load them BEFORE fetching profiles
   const [adsLoaded, setAdsLoaded] = useState(false);
@@ -3305,6 +3342,37 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, isPremium, profileComplet
     
     // ⭐ REMOVED: Old preload logic that used stale potentialMatches array
     // Now handled inside setPotentialMatches callback with correct newMatches array (3A)
+    
+    // ⭐ 25% LIKE-BACK INJECTION: Inject profiles who liked the current user
+    // This happens AFTER the current profile is removed, inserting at +2 to +4
+    onLikeBackSwipe(potentialMatches, (injectedProfile, position) => {
+      setPotentialMatches(prev => {
+        // Don't inject if profile is already in queue
+        const existingIds = new Set(prev.filter(p => !isAd(p)).map(p => p.id));
+        if (existingIds.has(injectedProfile.id)) return prev;
+        
+        // Insert at calculated position (clamped to valid range)
+        const insertPos = Math.min(position, prev.length);
+        const updated = [...prev];
+        updated.splice(insertPos, 0, injectedProfile);
+        
+        swipeDebug('likeBackInjection: injected', {
+          profileId: injectedProfile.id,
+          name: `${injectedProfile.first_name} ${injectedProfile.last_name}`,
+          position: insertPos,
+          newDeckLen: updated.length,
+        });
+        
+        // Preload images for injected profile
+        loadAllImagesForProfile(injectedProfile.id).then(imgs => {
+          if (imgs) {
+            setUserImages(prevImgs => ({ ...prevImgs, [injectedProfile.id]: imgs }));
+          }
+        });
+        
+        return updated;
+      });
+    });
     
     // Progressive Refill System Integration - load more profiles in background when running low
     checkAndTriggerRefill(currentUser.id, 0);
