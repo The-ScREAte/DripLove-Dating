@@ -415,10 +415,24 @@ const isAd = (match: PotentialMatch | AdData): match is AdData => {
 };
 
 // Dedupe helper (prevent profile duplicates without blocking ad repeats)
-const mergeDecksWithoutProfileDupes = (prev: MatchOrAd[], incoming: MatchOrAd[]) => {
+// Also filters out locally swiped profiles to prevent them from reappearing
+const mergeDecksWithoutProfileDupes = (prev: MatchOrAd[], incoming: MatchOrAd[], localSwipedIds?: Map<string, { action: 'like' | 'pass', timestamp: number }>) => {
   const seenProfileIds = new Set<string>();
   for (const item of prev) {
     if (!isAd(item)) seenProfileIds.add(item.id);
+  }
+
+  // Also track locally swiped profiles to exclude them
+  const swipedIds = new Set<string>();
+  if (localSwipedIds) {
+    const now = Date.now();
+    const eightDaysMs = 8 * 24 * 60 * 60 * 1000;
+    for (const [id, data] of localSwipedIds.entries()) {
+      // Always exclude liked profiles, only exclude passed profiles if less than 8 days old
+      if (data.action === 'like' || (now - data.timestamp) < eightDaysMs) {
+        swipedIds.add(id);
+      }
+    }
   }
 
   const result: MatchOrAd[] = [...prev];
@@ -427,7 +441,8 @@ const mergeDecksWithoutProfileDupes = (prev: MatchOrAd[], incoming: MatchOrAd[])
       result.push(item);
       continue;
     }
-    if (seenProfileIds.has(item.id)) continue;
+    // Skip if already in deck or if locally swiped
+    if (seenProfileIds.has(item.id) || swipedIds.has(item.id)) continue;
     seenProfileIds.add(item.id);
     result.push(item);
   }
@@ -1804,7 +1819,7 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, isPremium, profileComplet
         // ⭐ DE-DUPE: If deck already has items, only add unseen items (prevents dupes)
         setPotentialMatches(prev => {
           if (prev.length === 0) return matchesWithAds;
-          return mergeDecksWithoutProfileDupes(prev, matchesWithAds);
+          return mergeDecksWithoutProfileDupes(prev, matchesWithAds, locallySwipedProfileIds.current);
         });
         setUserImages(images);
         setUserDistances(distances);
@@ -2601,7 +2616,7 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, isPremium, profileComplet
       
       // Add new UNIQUE profiles to the END of the array (with ads injected)
       const newProfilesWithAds = injectAds(uniqueProfiles);
-      setPotentialMatches(prev => mergeDecksWithoutProfileDupes(prev, newProfilesWithAds));
+      setPotentialMatches(prev => mergeDecksWithoutProfileDupes(prev, newProfilesWithAds, locallySwipedProfileIds.current));
       
       // ⭐ FIX #5: Preload IMMEDIATELY (no delay) for instant swipe
       if (profilesWithImages.length > 0) {
@@ -2823,7 +2838,7 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, isPremium, profileComplet
           }
           locallySwipedProfileIds.current.delete(prevMatch.id);
           persistSwipedIds(); // Keep sessionStorage in sync
-          setPotentialMatches(prev => mergeDecksWithoutProfileDupes([prevMatch], prev));
+          setPotentialMatches(prev => mergeDecksWithoutProfileDupes([prevMatch], prev, locallySwipedProfileIds.current));
           setCurrentIndex(0);
           setTodaySwipeCount(prev => Math.max(0, prev - 1));
           setIsOutOfSwipes(true);
@@ -2941,7 +2956,7 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, isPremium, profileComplet
             }
             locallySwipedProfileIds.current.delete(prevMatch.id);
             persistSwipedIds(); // Keep sessionStorage in sync
-            setPotentialMatches(prev => mergeDecksWithoutProfileDupes([prevMatch], prev));
+            setPotentialMatches(prev => mergeDecksWithoutProfileDupes([prevMatch], prev, locallySwipedProfileIds.current));
             setCurrentIndex(0);
             setTodaySwipeCount(prev => Math.max(0, prev - 1));
             toast({ 
@@ -3039,7 +3054,7 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, isPremium, profileComplet
         }
         locallySwipedProfileIds.current.delete(prevMatch.id);
         persistSwipedIds(); // Keep sessionStorage in sync
-        setPotentialMatches(prev => mergeDecksWithoutProfileDupes([prevMatch], prev));
+        setPotentialMatches(prev => mergeDecksWithoutProfileDupes([prevMatch], prev, locallySwipedProfileIds.current));
         setCurrentIndex(0);
         setTodaySwipeCount(prev => Math.max(0, prev - 1));
       } finally {
@@ -3147,7 +3162,7 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, isPremium, profileComplet
           }
           locallySwipedProfileIds.current.delete(prevMatch.id);
           persistSwipedIds(); // Keep sessionStorage in sync
-          setPotentialMatches(prev => mergeDecksWithoutProfileDupes([prevMatch], prev));
+          setPotentialMatches(prev => mergeDecksWithoutProfileDupes([prevMatch], prev, locallySwipedProfileIds.current));
           setCurrentIndex(0);
           setPassedUsers(prev => prev.filter(p => p.user_id !== prevMatch.id));
           setTodaySwipeCount(prev => Math.max(0, prev - 1));
@@ -3212,7 +3227,7 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, isPremium, profileComplet
             }
             locallySwipedProfileIds.current.delete(prevMatch.id);
             persistSwipedIds(); // Keep sessionStorage in sync
-            setPotentialMatches(prev => mergeDecksWithoutProfileDupes([prevMatch], prev));
+            setPotentialMatches(prev => mergeDecksWithoutProfileDupes([prevMatch], prev, locallySwipedProfileIds.current));
             setCurrentIndex(0);
             setPassedUsers(prev => prev.filter(p => p.user_id !== prevMatch.id));
             setTodaySwipeCount(prev => Math.max(0, prev - 1));
@@ -3249,7 +3264,7 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, isPremium, profileComplet
         }
         locallySwipedProfileIds.current.delete(prevMatch.id);
         persistSwipedIds(); // Keep sessionStorage in sync
-        setPotentialMatches(prev => mergeDecksWithoutProfileDupes([prevMatch], prev));
+        setPotentialMatches(prev => mergeDecksWithoutProfileDupes([prevMatch], prev, locallySwipedProfileIds.current));
         setCurrentIndex(0);
         setPassedUsers(prev => prev.filter(p => p.user_id !== prevMatch.id));
         setTodaySwipeCount(prev => Math.max(0, prev - 1));
@@ -3410,12 +3425,41 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, isPremium, profileComplet
       currentImageAbortController = null;
     }
 
-    // ⭐ CRITICAL FIX: Remove the swiped profile from array to prevent duplicates
-    // Use callback to get accurate remaining count AFTER removal
+    // ⭐ CRITICAL FIX: Remove ALL instances of the swiped profile from array to prevent duplicates
+    // This handles cases where the same profile appears multiple times in the deck
     setPotentialMatches(prev => {
       const currentProfile = prev[indexToRemove];
-      const newMatches = prev.filter((_, i) => i !== indexToRemove);
-      const remainingProfiles = newMatches.length;
+      if (!currentProfile) return prev;
+      
+      // If it's an ad, just remove by index
+      if (isAd(currentProfile)) {
+        return prev.filter((_, i) => i !== indexToRemove);
+      }
+      
+      // For profiles, remove ALL instances with the same ID (handles duplicates)
+      // AND filter out any profiles that are in locallySwipedProfileIds
+      const currentProfileId = currentProfile.id;
+      const now = Date.now();
+      const eightDaysMs = 8 * 24 * 60 * 60 * 1000;
+      
+      const newMatches = prev.filter((match, i) => {
+        // Keep ads
+        if (isAd(match)) return true;
+        
+        // Remove if it's the same profile we just swiped
+        if (match.id === currentProfileId) return false;
+        
+        // Also remove if it's in the locally swiped list
+        const swipedData = locallySwipedProfileIds.current.get(match.id);
+        if (swipedData) {
+          // Always filter out liked profiles, only filter passed profiles if less than 8 days old
+          if (swipedData.action === 'like' || (now - swipedData.timestamp) < eightDaysMs) {
+            return false;
+          }
+        }
+        
+        return true;
+      });
       
       // ⭐ Update saved profile order in localStorage (remove swiped profile)
       try {
@@ -3427,20 +3471,18 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, isPremium, profileComplet
         const feedSignature = buildFeedSignature(baseCountryCode, unlockedCountries, !!isPremium, safeUserMaxDistance);
         const savedOrderKey = buildSavedOrderKey(currentUser?.id || '', feedSignature);
         
-        if (currentProfile && 'id' in currentProfile) {
-          const savedOrder = localStorage.getItem(savedOrderKey);
-          if (savedOrder) {
-            const parsed: unknown = JSON.parse(savedOrder);
-            const obj = (parsed && typeof parsed === 'object') ? (parsed as Record<string, unknown>) : null;
-            const orderIds = Array.isArray(obj?.order)
-              ? obj!.order.filter((id): id is string => typeof id === 'string')
-              : (Array.isArray(parsed)
-                  ? parsed.filter((id): id is string => typeof id === 'string')
-                  : []);
-            const updatedOrder = orderIds.filter((id) => id !== currentProfile.id);
-            const next = { premium: !!isPremium, countries: unlockedCountries, order: updatedOrder };
-            localStorage.setItem(savedOrderKey, JSON.stringify(next));
-          }
+        const savedOrder = localStorage.getItem(savedOrderKey);
+        if (savedOrder) {
+          const parsed: unknown = JSON.parse(savedOrder);
+          const obj = (parsed && typeof parsed === 'object') ? (parsed as Record<string, unknown>) : null;
+          const orderIds = Array.isArray(obj?.order)
+            ? obj!.order.filter((id): id is string => typeof id === 'string')
+            : (Array.isArray(parsed)
+                ? parsed.filter((id): id is string => typeof id === 'string')
+                : []);
+          const updatedOrder = orderIds.filter((id) => id !== currentProfileId);
+          const next = { premium: !!isPremium, countries: unlockedCountries, order: updatedOrder };
+          localStorage.setItem(savedOrderKey, JSON.stringify(next));
         }
       } catch (error) {
         // Ignore localStorage errors
