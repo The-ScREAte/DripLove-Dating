@@ -166,16 +166,22 @@ const MainApp = ({ user, onLogout }: MainAppProps) => {
 
       // Only count unread messages FOR the current user (not what they sent)
       let total = 0;
+      const matchesWithUnread: { matchId: string; count: number }[] = [];
       for (const row of rows) {
         const isUser1 = row.user1_id === userId;
         // If user is user1, count user1_unread_count (messages user1 hasn't read)
         // If user is user2, count user2_unread_count (messages user2 hasn't read)
         const unreadForUser = isUser1 ? row.user1_unread_count : row.user2_unread_count;
         const n = Number(unreadForUser) || 0;
-        if (n > 0) total += n;
+        if (n > 0) {
+          total += n;
+          matchesWithUnread.push({ matchId: row.id, count: n });
+        }
       }
 
-      console.log('[MainApp] Unread count calculation:', { userId, matchCount: rows.length, total });
+      if (matchesWithUnread.length > 0) {
+        console.log('[MainApp] Unread count breakdown:', { userId, total, matchesWithUnread });
+      }
       setUnreadCount(total);
     } catch (err) {
       const message =
