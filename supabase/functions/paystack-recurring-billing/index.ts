@@ -8,6 +8,7 @@ import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.45.0'
 const SUPABASE_URL = Deno.env.get('SUPABASE_URL')!
 const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
 const PAYSTACK_SECRET_KEY = Deno.env.get('PAYSTACK_SECRET_KEY')!
+const EXCHANGE_RATE_API = 'https://api.exchangerate-api.com/v4/latest'
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -24,6 +25,80 @@ function json(status: number, body: unknown) {
 
 function generateReference(): string {
   return `RC_${Date.now()}_${Math.random().toString(36).substring(2, 10)}`
+}
+
+// Get current exchange rate from USD to GHS
+async function getExchangeRate(fromCurrency: string, toCurrency: string): Promise<number | null> {
+  try {
+    if (fromCurrency === toCurrency) {
+      return 1
+    }
+
+    const response = await fetch(`${EXCHANGE_RATE_API}/${fromCurrency}`)
+    if (!response.ok) {
+      throw new Error(`Exchange rate API failed: ${response.status}`)
+    }
+
+    const data = await response.json()
+    const rate = data.rates?.[toCurrency]
+
+    if (!rate) {
+      console.error(`[PAYSTACK-RECURRING] Rate not found for ${toCurrency}`)
+      return null
+    }
+
+    console.log(`[PAYSTACK-RECURRING] Exchange rate: 1 ${fromCurrency} = ${rate} ${toCurrency}`)
+    return rate
+  } catch (error) {
+    console.error('[PAYSTACK-RECURRING] Error fetching exchange rate:', error)
+    return null
+  }
+}
+
+// Get current pricing from admin configuration
+async function getCurrentPricing(supabase: any): Promise<{ price: number; currency: string; ghsAmount: number } | null> {
+  try {
+    const { data, error } = await supabase
+      .from('payment_config')
+      .select('default_international_price, default_international_currency')
+      .order('created_at', { ascending: false })
+      .limit(1)
+      .single()
+
+    if (error || !data) {
+      console.error('[PAYSTACK-RECURRING] Error fetching payment config:', error)
+      return null
+    }
+
+    const price = data.default_international_price || 5
+    const currency = data.default_international_currency || 'USD'
+
+    // Convert to GHS using current exchange rate
+    if (currency === 'GHS') {
+      return { price, currency, ghsAmount: price }
+    }
+
+    const rate = await getExchangeRate(currency, 'GHS')
+    if (!rate) {
+      // Fallback rates if API fails
+      const fallbackRates: Record<string, number> = {
+        USD: 16,
+        EUR: 17,
+        GBP: 20,
+      }
+      const fallbackRate = fallbackRates[currency] || 16
+      const ghsAmount = Math.round(price * fallbackRate)
+      console.log(`[PAYSTACK-RECURRING] Using fallback rate: ${price} ${currency} = ${ghsAmount} GHS`)
+      return { price, currency, ghsAmount }
+    }
+
+    const ghsAmount = Math.round(price * rate)
+    console.log(`[PAYSTACK-RECURRING] Current pricing: ${price} ${currency} = ${ghsAmount} GHS`)
+    return { price, currency, ghsAmount }
+  } catch (error) {
+    console.error('[PAYSTACK-RECURRING] Error getting current pricing:', error)
+    return null
+  }
 }
 
 serve(async (req) => {
@@ -117,6 +192,15 @@ serve(async (req) => {
     let charged = 0
     let failed = 0
 
+    // Get current pricing once for all subscriptions
+    const currentPricing = await getCurrentPricing(supabase)
+    if (!currentPricing) {
+      console.error('[PAYSTACK-RECURRING] Failed to get current pricing')
+      return json(500, { error: 'Failed to fetch current pricing' })
+    }
+
+    console.log(`[PAYSTACK-RECURRING] Using current pricing: ${currentPricing.ghsAmount} GHS`)
+
     for (const sub of dueSubscriptions) {
       processed++
       console.log(`[PAYSTACK-RECURRING] Processing subscription for user ${sub.user_id}`)
@@ -152,6 +236,10 @@ serve(async (req) => {
 
       const reference = generateReference()
 
+      // Use current pricing instead of saved authorization amount
+      const chargeAmountGHS = currentPricing.ghsAmount
+      const chargeAmountKobo = chargeAmountGHS * 100 // Convert to kobo (Paystack's smallest unit)
+
       // Create charge attempt record
       const { error: attemptError } = await supabase
         .from('paystack_charge_attempts')
@@ -159,8 +247,8 @@ serve(async (req) => {
           user_id: sub.user_id,
           subscription_id: sub.id,
           reference,
-          amount: authData.default_amount,
-          currency: authData.default_currency,
+          amount: chargeAmountKobo,
+          currency: 'GHS',
           status: 'pending',
         })
 
@@ -181,9 +269,14 @@ serve(async (req) => {
           body: JSON.stringify({
             authorization_code: authData.authorization_code,
             email: profile.email,
-            amount: authData.default_amount, // Already in smallest unit (kobo/pesewas)
-            currency: authData.default_currency,
+            amount: chargeAmountKobo, // Use current pricing in kobo
+            currency: 'GHS',
             reference,
+            metadata: {
+              pricing_source: `${currentPricing.price} ${currentPricing.currency} (current admin pricing)`,
+              ghs_amount: chargeAmountGHS,
+              renewal: true,
+            },
           }),
         })
 
@@ -215,14 +308,14 @@ serve(async (req) => {
             })
             .eq('reference', reference)
 
-          // Record payment
+          // Record payment with current pricing amount
           await supabase
             .from('subscription_payments')
             .insert({
               user_id: sub.user_id,
               subscription_id: sub.id,
-              amount: authData.default_amount / 100, // Convert back to major units
-              currency: authData.default_currency,
+              amount: chargeAmountGHS, // GHS amount (not kobo)
+              currency: 'GHS',
               payment_method: 'paystack',
               transaction_id: reference,
             })
