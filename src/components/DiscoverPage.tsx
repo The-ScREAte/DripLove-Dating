@@ -1799,7 +1799,33 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, isPremium, profileComplet
     }
   }, []);
 
-  const fetchPotentialMatches = useCallback(async () => {
+  const DISCOVER_DECK_CACHE_TTL_MS = 60 * 60 * 1000; // 1 hour
+  const buildDeckCacheKey = (cacheKey: string) => `driplove_discover_deck_${cacheKey}`;
+
+  const readDeckCache = useCallback((cacheKey: string): MatchOrAd[] | null => {
+    try {
+      const raw = localStorage.getItem(buildDeckCacheKey(cacheKey));
+      if (!raw) return null;
+      const parsed = JSON.parse(raw) as { ts: number; deck: MatchOrAd[] };
+      if (!parsed?.ts || !Array.isArray(parsed?.deck)) return null;
+      if (Date.now() - parsed.ts > DISCOVER_DECK_CACHE_TTL_MS) return null;
+      return parsed.deck;
+    } catch {
+      return null;
+    }
+  }, []);
+
+  const writeDeckCache = useCallback((cacheKey: string, deck: MatchOrAd[]) => {
+    try {
+      if (!Array.isArray(deck) || deck.length === 0) return;
+      localStorage.setItem(buildDeckCacheKey(cacheKey), JSON.stringify({ ts: Date.now(), deck }));
+    } catch {
+      // ignore
+    }
+  }, []);
+
+  const fetchPotentialMatches = useCallback(async (opts?: { background?: boolean; cacheKey?: string }) => {
+
     if (!currentUser?.id) return;
 
     // Ensure local swipe cache is hydrated BEFORE any fetch so refreshes never resurrect swiped profiles.
@@ -1814,9 +1840,12 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, isPremium, profileComplet
     // only apply results from the most recent invocation.
     const fetchSeq = ++fetchSequenceRef.current;
   
+    const background = opts?.background ?? false;
+    const cacheKeyForWrite = opts?.cacheKey;
+
     try {
-      // Background loading - don't block UI
-      setIsLoading(true);
+      // Keep UX fast: only show the loading screen on cold start.
+      if (!background) setIsLoading(true);
       setNoMoreProfiles(false); // Reset when fetching new profiles
 
       const result = await fetchPotentialMatchesData(currentUser.id, allowedGenders);
@@ -1842,7 +1871,11 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, isPremium, profileComplet
         setUserDistances(distances);
         setCurrentIndex(0);
         setLastShuffleTime(Date.now());
-        
+
+        if (cacheKeyForWrite) {
+          writeDeckCache(cacheKeyForWrite, initialDeck);
+        }
+
         // Use setTimeout to ensure state updates are processed before marking complete
         setTimeout(() => {
           setIsLoading(false);
@@ -1855,17 +1888,15 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, isPremium, profileComplet
           batchFetchLanguages(profileIds);
         }
       }
-    } catch (error) {
-      toast({
-        title: t('common.error'),
-        description: t('discover.errors.loadFailed'),
-        variant: 'destructive'
-      });
+    } catch {
+      // Silent fail: keep UX quiet and allow UI to fall back to empty/retry states.
+      setPotentialMatches([]);
+      setNoMoreProfiles(true);
       setIsLoading(false);
       setHasCompletedInitialFetch(true);
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [currentUser, allowedGenders, toast, fetchPotentialMatchesData, injectAds, batchFetchLanguages, getStoredSwipedIds]);
+  }, [currentUser, allowedGenders, toast, fetchPotentialMatchesData, injectAds, batchFetchLanguages, getStoredSwipedIds, writeDeckCache]);
 
   // Premium: if deck is empty, auto-refresh once.
   useEffect(() => {
@@ -2017,10 +2048,10 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, isPremium, profileComplet
   // Main effect to fetch data - optimized for fast loading
   useEffect(() => {
     if (!currentUser?.id) return;
-    
-    if (!premiumResolved) {
-      return;
-    }
+
+    // Never block Discover on subscription resolution.
+    // If premium status is still loading, we start with the best-known state now
+    // and the existing premium-change reset logic will refresh the deck once resolved.
 
     // Reset deck when premium context changes so we don't keep a stale single-country deck.
     if (lastPremiumActiveRef.current !== null && lastPremiumActiveRef.current !== premiumActive) {
@@ -2082,12 +2113,25 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, isPremium, profileComplet
       // Ignore localStorage errors
     }
 
-    // Start loading immediately - always fetch fresh to exclude swiped profiles
+    // Start loading immediately - hydrate from cache first, then refresh in background
     const initializeProfiles = async () => {
       initializedUserRef.current = cacheKey;
-      
-      // Fetch fresh profiles excluding already swiped ones
-      await fetchPotentialMatches();
+
+      const cachedDeck = readDeckCache(cacheKey);
+      if (cachedDeck && cachedDeck.length > 0) {
+        setPotentialMatches(cachedDeck);
+        setCurrentIndex(0);
+        setImageIndex(0);
+        setIsLoading(false);
+        setHasCompletedInitialFetch(true);
+
+        // Refresh silently in background to apply new swipes / new users
+        void fetchPotentialMatches({ background: true, cacheKey });
+        return;
+      }
+
+      // Cold start
+      await fetchPotentialMatches({ background: false, cacheKey });
     };
 
     // Start immediately without setTimeout
@@ -2101,6 +2145,7 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, isPremium, profileComplet
     fetchPotentialMatches,
     fetchReverseUsage,
     persistSwipedIds,
+    readDeckCache,
   ]); // Refetch when premium resolves/changes
 
 
