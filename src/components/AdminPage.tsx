@@ -54,7 +54,7 @@ import {
 } from 'lucide-react';
 
 interface AdminPageProps {
-  currentUser: CurrentUser;
+  currentUser: { id: string } | null;
   onLogout: () => void;
 }
 
@@ -2013,14 +2013,14 @@ const AdminPageComponent = ({ currentUser, onLogout }: AdminPageProps) => {
             {/* Debugger Tab */}
             <TabsContent value="debugger" className="space-y-4">
               <UserPoolDebugger 
-                currentUserId={currentUser.id}
+                currentUserId={currentUser?.id || ''}
                 userPreferences={{
-                  min_age: currentUser.min_age,
-                  max_age: currentUser.max_age,
-                  max_distance: currentUser.max_distance,
-                  preference: currentUser.preference,
-                  latitude: currentUser.latitude,
-                  longitude: currentUser.longitude
+                  min_age: 18,
+                  max_age: 99,
+                  max_distance: 100,
+                  preference: 'both',
+                  latitude: null,
+                  longitude: null
                 }}
                 onViewProfile={handleViewProfile}
               />

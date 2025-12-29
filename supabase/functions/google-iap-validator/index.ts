@@ -261,7 +261,28 @@ serve(async (req: Request) => {
       })
     }
 
-    // 4️⃣ Update Supabase subscription ONLY after Google confirms active
+    // 4️⃣ IDEMPOTENCY CHECK: Check if this purchase token was already processed
+    const { data: existingSub } = await supabaseClient
+      .from('user_subscriptions')
+      .select('id, flutterwave_transaction_id, expires_at')
+      .eq('user_id', userData.user.id)
+      .eq('flutterwave_transaction_id', purchaseToken)
+      .single()
+
+    if (existingSub && new Date(existingSub.expires_at) >= new Date(expiresAt)) {
+      console.log('ℹ️ [GOOGLE-IAP-VALIDATOR] Purchase already processed, skipping update')
+      return json(200, {
+        valid: true,
+        active: true,
+        expiresDate: existingSub.expires_at,
+        expires_at: existingSub.expires_at,
+        transaction_id: transactionId || purchaseToken,
+        purchaseToken,
+        already_processed: true,
+      })
+    }
+
+    // 5️⃣ Update Supabase subscription ONLY after Google confirms active
     const { error: upsertError } = await supabaseClient
       .from('user_subscriptions')
       .upsert({

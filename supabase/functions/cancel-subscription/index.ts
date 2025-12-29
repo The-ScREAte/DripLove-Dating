@@ -50,17 +50,7 @@ async function deactivatePaystackAuthorization(authorization_code: string) {
   return await resp.json()
 }
 
-async function deactivatePaystackAuthorization(authorization_code: string) {
-  const resp = await fetch('https://api.paystack.co/customer/deactivate_authorization', {
-    method: 'POST',
-    headers: {
-      Authorization: `Bearer ${PAYSTACK_SECRET_KEY}`,
-      'Content-Type': 'application/json',
-    },
-    body: JSON.stringify({ authorization_code }),
-  })
-  return await resp.json()
-}
+// Duplicate function removed - using the one defined above at line 41
 
 serve(async (req) => {
   if (req.method === 'OPTIONS') {
