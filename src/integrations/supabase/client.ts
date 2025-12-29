@@ -24,7 +24,7 @@ const customFetch: typeof fetch = (input, init) => {
   return fetch(input, init);
 };
 
-// Configure auth options for mobile deep linking
+// Configure auth options for mobile deep linking and persistent sessions
 const authOptions = {
   auth: {
     // Don't set a global redirectTo - let each operation specify its own
@@ -32,12 +32,15 @@ const authOptions = {
     detectSessionInUrl: !isMobileApp(),
     // For mobile apps, we need to handle deep links manually
     persistSession: true,
+    // CRITICAL: Enable auto refresh to keep sessions alive indefinitely
     autoRefreshToken: true,
-    // Storage options
+    // Storage options - use localStorage for persistence across app restarts
     storage: typeof window !== 'undefined' ? window.localStorage : undefined,
     storageKey: 'supabase.auth.token',
     // Disable debug logging to keep console clean
-    debug: false
+    debug: false,
+    // Flow type - use PKCE for better security and reliability
+    flowType: 'pkce' as const,
   },
   global: {
     // Use custom fetch to avoid Android SSL issues

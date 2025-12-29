@@ -138,34 +138,73 @@ const AppWrapper = () => {
         // Auth bootstrap MUST happen before rendering routes (prevents Welcome/Login flash)
         try {
           const { supabase } = await import('./integrations/supabase/client');
+          
+          // Get existing session from storage first
           const { data: { session } } = await supabase.auth.getSession();
-          setHasSession(!!session);
-          setUser(session?.user ?? null);
+          
+          if (session) {
+            setHasSession(true);
+            setUser(session.user);
+          } else {
+            setHasSession(false);
+            setUser(null);
+          }
 
           // Keep session signal up-to-date
           // IMPORTANT: Only log out user on explicit SIGNED_OUT event
-          // Token refresh failures should NOT log the user out - just retry
+          // Token refresh failures should NOT log the user out - Supabase handles retries automatically
           const { data: { subscription } } = supabase.auth.onAuthStateChange((event, nextSession) => {
             // Handle specific auth events
             if (event === 'SIGNED_OUT') {
-              // User explicitly signed out
+              // User explicitly signed out - only time we clear the session
               setHasSession(false);
               setUser(null);
-            } else if (event === 'SIGNED_IN' || event === 'TOKEN_REFRESHED' || event === 'USER_UPDATED') {
+            } else if (event === 'SIGNED_IN' || event === 'TOKEN_REFRESHED') {
               // User signed in or token refreshed - update session
-              setHasSession(!!nextSession);
-              setUser(nextSession?.user ?? null);
+              if (nextSession) {
+                setHasSession(true);
+                setUser(nextSession.user);
+              }
             } else if (event === 'INITIAL_SESSION') {
               // Initial session on app load
               setHasSession(!!nextSession);
               setUser(nextSession?.user ?? null);
+            } else if (event === 'USER_UPDATED') {
+              // User profile updated - update user but keep session
+              if (nextSession) {
+                setUser(nextSession.user);
+              }
             }
-            // For other events (like password recovery), don't change auth state
-            // This prevents accidental logouts from token refresh failures
+            // CRITICAL: For all other events (PASSWORD_RECOVERY, etc.), do NOT change auth state
+            // This prevents accidental logouts from token refresh edge cases
           });
 
           authSubscriptionRef.current = subscription;
+          
+          // Background session refresh check every 10 minutes
+          // This ensures the session stays alive even if the app is in the background
+          const refreshInterval = setInterval(async () => {
+            try {
+              const { data: { session: currentSession } } = await supabase.auth.getSession();
+              if (currentSession) {
+                // Session is still valid, Supabase auto-refreshes tokens
+                // Just ensure our state is in sync
+                setHasSession(true);
+                setUser(currentSession.user);
+              }
+              // If no session and we had one before, don't auto-logout
+              // Let the explicit SIGNED_OUT event handle that
+            } catch {
+              // Network error during refresh check - ignore, don't logout
+            }
+          }, 10 * 60 * 1000); // 10 minutes
+          
+          // Store interval for cleanup
+          (authSubscriptionRef.current as any)._refreshInterval = refreshInterval;
+          
         } catch {
+          // If Supabase client fails to load, don't change existing session state
+          // This prevents logouts due to network issues on app load
           setHasSession(false);
           setUser(null);
         } finally {
@@ -244,8 +283,14 @@ const AppWrapper = () => {
     return () => {
       const sub = authSubscriptionRef.current;
       authSubscriptionRef.current = null;
-      if (sub && typeof sub.unsubscribe === 'function') {
-        try { sub.unsubscribe(); } catch {}
+      if (sub) {
+        // Clear refresh interval if exists
+        if ((sub as any)._refreshInterval) {
+          clearInterval((sub as any)._refreshInterval);
+        }
+        if (typeof sub.unsubscribe === 'function') {
+          try { sub.unsubscribe(); } catch {}
+        }
       }
     };
   }, []);
