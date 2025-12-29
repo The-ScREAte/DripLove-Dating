@@ -74,18 +74,20 @@ export default defineConfig(({ mode }) => ({
   },
   // Build configuration
   build: {
-    chunkSizeWarningLimit: 1000, // Increase from default 500kb to 1000kb
+    chunkSizeWarningLimit: 500, // Reduced from 1000kb for faster Android parsing
     // Optimize for mobile devices (especially Android)
     target: 'es2020',
     minify: 'terser',
     terserOptions: {
       compress: {
-        drop_console: mode === 'production', // Remove console.* in production
+        drop_console: mode === 'production', // Remove ALL console.* in production
         drop_debugger: true,
-        pure_funcs: mode === 'production' ? ['console.log', 'console.info', 'console.debug', 'console.warn'] : [],
-        passes: 2, // Multiple compression passes for smaller output
+        pure_funcs: mode === 'production' ? ['console.log', 'console.info', 'console.debug', 'console.warn', 'console.error', 'console.trace'] : [],
+        passes: 3, // More compression passes for smaller output
         unsafe_arrows: true,
         unsafe_methods: true,
+        unsafe_comps: true,
+        unsafe_math: true,
       },
       format: {
         comments: false
@@ -223,8 +225,8 @@ export default defineConfig(({ mode }) => ({
           }
           return 'chunks/[name]-[hash].js';
         },
-        // Smaller chunks for Android
-        experimentalMinChunkSize: 20000, // 20kb minimum
+        // Smaller chunks for faster Android parsing
+        experimentalMinChunkSize: 10000, // 10kb minimum for optimal mobile performance
       },
     },
     // Enable build reporting to track bundle size

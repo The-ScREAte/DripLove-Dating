@@ -43,12 +43,14 @@ const config: CapacitorConfig = {
     useLegacyBridge: false,
     // Improve scrolling performance
     overscrollHistoryNavigation: false,
-    // Optimize for modern Android
+    // Optimize for modern Android (SDK 26+)
     mixedContentMode: 0,
     // Enhanced Android WebView performance settings
     loggingBehavior: 'none',
     // Enable WebView cache and storage for better performance
-    appendUserAgent: 'DripLove-Android'
+    appendUserAgent: 'DripLove-Android',
+    // Additional performance optimizations
+    minWebViewVersion: '92.0.0.0' // Require modern WebView for better performance
   },
   plugins: {
     GoogleAuth: {
@@ -88,13 +90,16 @@ const config: CapacitorConfig = {
   cordova: {
     preferences: {
       ScrollEnabled: 'false',
-      'android-minSdkVersion': '22',
+      'android-minSdkVersion': '26',
       BackupWebStorage: 'none',
       SplashMaintainAspectRatio: 'true',
       FadeSplashScreenDuration: '300',
       SplashShowOnlyFirstTime: 'false',
       SplashScreen: 'screen',
-      SplashScreenDelay: '0'
+      SplashScreenDelay: '0',
+      // Android performance optimizations
+      'android-hardwareAccelerated': 'true',
+      'android-windowSoftInputMode': 'adjustResize'
     }
   }
 };

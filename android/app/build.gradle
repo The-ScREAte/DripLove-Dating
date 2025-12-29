@@ -48,7 +48,7 @@ android {
     dexOptions {
         preDexLibraries = true
         maxProcessCount 8
-        javaMaxHeapSize "4g"
+        javaMaxHeapSize "2g"
     }
     compileOptions {
         sourceCompatibility JavaVersion.VERSION_21
