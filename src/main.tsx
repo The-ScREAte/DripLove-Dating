@@ -218,6 +218,24 @@ const AppWrapper = () => {
               // ✅ Deep link OAuth handling is done in useMobileOAuth hook (AppRoutes.tsx)
               // ❌ REMOVED duplicate appUrlOpen listener to prevent conflicts
               // Only ONE appUrlOpen listener should exist - it's in useMobileOAuth.ts
+
+              // Keep auth session alive on native by nudging Supabase on resume.
+              // This helps avoid "random" logouts when the app is backgrounded for a while.
+              App.addListener('appStateChange', async ({ isActive }) => {
+                if (!isActive) return;
+                try {
+                  const { supabase } = await import('./integrations/supabase/client');
+                  const { data: { session } } = await supabase.auth.getSession();
+
+                  // If the token is near expiry, try a refresh.
+                  const expiresAtMs = (session?.expires_at ?? 0) * 1000;
+                  if (expiresAtMs && expiresAtMs - Date.now() < 2 * 60 * 1000) {
+                    await supabase.auth.refreshSession();
+                  }
+                } catch {
+                  // Never force sign-out from resume path.
+                }
+              });
               
               // Set up safe area CSS variables (using environment variables)
               document.documentElement.style.setProperty('--safe-area-inset-top', 'env(safe-area-inset-top, 0px)');

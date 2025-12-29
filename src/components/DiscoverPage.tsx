@@ -526,7 +526,9 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, isPremium, profileComplet
   // Stored as: { [userId]: { action: 'like' | 'pass', timestamp } }
   const getStoredSwipedIds = (): Map<string, { action: 'like' | 'pass', timestamp: number }> => {
     try {
-      const stored = sessionStorage.getItem(`swiped_profiles_${currentUser?.id}`);
+      // Prefer durable storage so refresh/app restart doesn't resurrect swiped profiles.
+      const key = `swiped_profiles_${currentUser?.id}`;
+      const stored = localStorage.getItem(key) ?? sessionStorage.getItem(key);
       if (!stored) return new Map();
       
       const data = JSON.parse(stored);
@@ -541,7 +543,9 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, isPremium, profileComplet
   const persistSwipedIds = useCallback(() => {
     try {
       const obj = Object.fromEntries(locallySwipedProfileIds.current);
-      sessionStorage.setItem(`swiped_profiles_${currentUser?.id}`, JSON.stringify(obj));
+      const key = `swiped_profiles_${currentUser?.id}`;
+      sessionStorage.setItem(key, JSON.stringify(obj));
+      localStorage.setItem(key, JSON.stringify(obj));
     } catch (error) {
       // ignore sessionStorage persistence errors
     }
@@ -782,8 +786,12 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, isPremium, profileComplet
     const withAds = injectAds(profilesOnly);
     const nextIndex = withAds.findIndex((m) => !isAd(m) && m.id === current.id);
 
-    setPotentialMatches(withAds);
-    if (nextIndex >= 0) setCurrentIndex(nextIndex);
+    if (nextIndex < 0) return;
+
+    // Keep the current card at index 0 by trimming the deck.
+    const trimmed = withAds.slice(nextIndex);
+    setPotentialMatches(trimmed);
+    setCurrentIndex(0);
   }, [adsLoaded, stableShuffledAds.length, potentialMatches, currentIndex, injectAds]);
 
   // --- BEGIN: Swipe Guide Popup State ---
@@ -1776,13 +1784,20 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, isPremium, profileComplet
         const { matches, images, distances, index } = result;
         
         const matchesWithAds = injectAds(matches);
+
+        // IMPORTANT: Maintain the invariant that the current card is always at index 0.
+        // If we restore a resume index, trim the deck so we don't keep earlier cards around
+        // (otherwise moveToNext() resetting currentIndex to 0 makes old profiles "come back").
+        const safeIndex = Number.isFinite(index) ? Math.max(0, Math.min(index, matchesWithAds.length)) : 0;
+        const initialDeck = safeIndex > 0 ? matchesWithAds.slice(safeIndex) : matchesWithAds;
+
         setPotentialMatches(prev => {
-          if (prev.length === 0) return matchesWithAds;
+          if (prev.length === 0) return initialDeck;
           return mergeDecksWithoutProfileDupes(prev, matchesWithAds, locallySwipedProfileIds.current);
         });
         setUserImages(images);
         setUserDistances(distances);
-        setCurrentIndex(index);
+        setCurrentIndex(0);
         setLastShuffleTime(Date.now());
         
         // Use setTimeout to ensure state updates are processed before marking complete
@@ -2682,11 +2697,6 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, isPremium, profileComplet
       return;
     }
 
-    // Prevent double-swipes: max 2 pending swipes at once
-    if (pendingSwipesRef.current > 2) {
-      return;
-    }
-
 
     // Check profile completion restriction (70% after 8 swipes)
     if (effectiveProfileCompletion < 70 && todaySwipeCount >= 8) {
@@ -2754,38 +2764,8 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, isPremium, profileComplet
         // First, increment usage on server (guard against limits)
         const usageResult = await checkUsageLimit('swipe');
         if (!usageResult.success) {
-          // rollback: restore the card at front and remove from exclusion list
-          // Also restore deterministic daily order so reloads don't reshuffle.
-          try {
-            const baseCountryCode = normalizeCountryCode(String(currentUser?.country_code ?? ''));
-            const unlockedCountries = normalizeCountryCodeList(currentUser?.unlocked_countries, baseCountryCode);
-            const userMaxDistanceRaw = currentUser?.max_distance ?? currentUser?.distance_preference ?? 50;
-            const userMaxDistance = Number(userMaxDistanceRaw);
-            const safeUserMaxDistance = Number.isFinite(userMaxDistance) && userMaxDistance > 0 ? userMaxDistance : 50;
-            const feedSignature = buildFeedSignature(baseCountryCode, unlockedCountries, !!isPremium, safeUserMaxDistance);
-            const savedOrderKey = buildSavedOrderKey(currentUser?.id || '', feedSignature);
-            const savedOrder = localStorage.getItem(savedOrderKey);
-            if (savedOrder) {
-              const parsed: unknown = JSON.parse(savedOrder);
-              const obj = (parsed && typeof parsed === 'object') ? (parsed as Record<string, unknown>) : null;
-              const orderIds = Array.isArray(obj?.order)
-                ? obj!.order.filter((id): id is string => typeof id === 'string')
-                : (Array.isArray(parsed)
-                    ? parsed.filter((id): id is string => typeof id === 'string')
-                    : []);
-              if (!orderIds.includes(prevMatch.id)) {
-                const next = { premium: !!isPremium, countries: unlockedCountries, order: [prevMatch.id, ...orderIds] };
-                localStorage.setItem(savedOrderKey, JSON.stringify(next));
-              }
-            }
-          } catch {
-            // ignore localStorage errors
-          }
-          locallySwipedProfileIds.current.delete(prevMatch.id);
-          persistSwipedIds(); // Keep sessionStorage in sync
-          setPotentialMatches(prev => mergeDecksWithoutProfileDupes([prevMatch], prev, locallySwipedProfileIds.current));
-          setCurrentIndex(0);
-          setTodaySwipeCount(prev => Math.max(0, prev - 1));
+          // Do NOT rollback the deck. If server denies, user likely hit the real limit on another device
+          // (or the RPC is temporarily inconsistent). Rolling back causes the "snap back" bug.
           setIsOutOfSwipes(true);
           
           toast({ 
@@ -2950,11 +2930,6 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, isPremium, profileComplet
   // Optimistic UI: move to next card instantly, then process pass in background
   // Function to execute pass after user confirms (used when "they liked you" popup is shown)
   const executePassLogic = async (matchToPass: PotentialMatch) => {
-    // Prevent double-swipes: max 2 pending swipes at once
-    if (pendingSwipesRef.current > 2) {
-      return;
-    }
-
     swipeDebug('executePassLogic: start', {
       currentIndex,
       deck: summarizeDeck(potentialMatches, 8),
@@ -3034,39 +3009,7 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, isPremium, profileComplet
       try {
         const usageResult = await checkUsageLimit('swipe');
         if (!usageResult.success) {
-          // rollback: restore the card at front and remove from exclusion lists
-          // Also restore deterministic daily order so reloads don't reshuffle.
-          try {
-            const baseCountryCode = normalizeCountryCode(String(currentUser?.country_code ?? ''));
-            const unlockedCountries = normalizeCountryCodeList(currentUser?.unlocked_countries, baseCountryCode);
-            const userMaxDistanceRaw = currentUser?.max_distance ?? currentUser?.distance_preference ?? 50;
-            const userMaxDistance = Number(userMaxDistanceRaw);
-            const safeUserMaxDistance = Number.isFinite(userMaxDistance) && userMaxDistance > 0 ? userMaxDistance : 50;
-            const feedSignature = buildFeedSignature(baseCountryCode, unlockedCountries, !!isPremium, safeUserMaxDistance);
-            const savedOrderKey = buildSavedOrderKey(currentUser?.id || '', feedSignature);
-            const savedOrder = localStorage.getItem(savedOrderKey);
-            if (savedOrder) {
-              const parsed: unknown = JSON.parse(savedOrder);
-              const obj = (parsed && typeof parsed === 'object') ? (parsed as Record<string, unknown>) : null;
-              const orderIds = Array.isArray(obj?.order)
-                ? obj!.order.filter((id): id is string => typeof id === 'string')
-                : (Array.isArray(parsed)
-                    ? parsed.filter((id): id is string => typeof id === 'string')
-                    : []);
-              if (!orderIds.includes(prevMatch.id)) {
-                const next = { premium: !!isPremium, countries: unlockedCountries, order: [prevMatch.id, ...orderIds] };
-                localStorage.setItem(savedOrderKey, JSON.stringify(next));
-              }
-            }
-          } catch {
-            // ignore localStorage errors
-          }
-          locallySwipedProfileIds.current.delete(prevMatch.id);
-          persistSwipedIds(); // Keep sessionStorage in sync
-          setPotentialMatches(prev => mergeDecksWithoutProfileDupes([prevMatch], prev, locallySwipedProfileIds.current));
-          setCurrentIndex(0);
-          setPassedUsers(prev => prev.filter(p => p.user_id !== prevMatch.id));
-          setTodaySwipeCount(prev => Math.max(0, prev - 1));
+          // Do NOT rollback the deck; mark out-of-swipes and stop.
           setIsOutOfSwipes(true);
           
           toast({ 
@@ -3284,8 +3227,18 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, isPremium, profileComplet
       if (isAd(swipedItem)) {
         const idx = prev.findIndex((p) => isAd(p) && p.id === swipedItem.id);
         swipeDebug('moveToNext: removing ad', { adId: swipedItem.id, idx });
-        if (idx >= 0) return prev.filter((_, i) => i !== idx);
-        return prev.slice(1);
+        const newMatches = idx >= 0 ? prev.filter((_, i) => i !== idx) : prev.slice(1);
+        // Persist where the user is in the feed so refresh can resume.
+        try {
+          const nextProfile = newMatches.find((m) => !isAd(m)) as PotentialMatch | undefined;
+          if (nextProfile?.id) {
+            localStorage.setItem('driplove_last_profile_id', nextProfile.id);
+            localStorage.setItem('driplove_last_profile_time', String(Date.now()));
+          }
+        } catch {
+          // ignore localStorage errors
+        }
+        return newMatches;
       }
 
       const swipedProfileId = swipedItem.id;
@@ -3313,6 +3266,18 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, isPremium, profileComplet
         after: summarizeDeck(newMatches, 10),
         locallySwipedSize: locallySwipedProfileIds.current.size,
       });
+
+      // Persist where the user is in the feed so refresh can resume.
+      // Store the next *profile* id (not an ad id) since restore logic keys off profile IDs.
+      try {
+        const nextProfile = newMatches.find((m) => !isAd(m)) as PotentialMatch | undefined;
+        if (nextProfile?.id) {
+          localStorage.setItem('driplove_last_profile_id', nextProfile.id);
+          localStorage.setItem('driplove_last_profile_time', String(Date.now()));
+        }
+      } catch {
+        // ignore localStorage errors
+      }
       
       // ⭐ Update saved profile order in localStorage (remove swiped profile)
       try {

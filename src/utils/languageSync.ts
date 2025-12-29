@@ -8,15 +8,19 @@ import { getLanguageForCountry } from '@/i18n/config';
  * For major international languages (French, German, Chinese, Portuguese, Arabic), auto-detect
  */
 export const detectDeviceLanguage = () => {
+  // Respect explicit user choice (set by GlobalLanguageSelector)
+  const savedLanguage = sessionStorage.getItem('preferredLanguage');
+  if (savedLanguage) return savedLanguage;
+
   // Get device language (e.g., 'en-US', 'fr-FR', 'ar-SA')
   const deviceLanguage = navigator.language || navigator.languages?.[0] || 'en';
   
   // Extract the language code (e.g., 'en' from 'en-US')
   const languageCode = deviceLanguage.split('-')[0].toLowerCase();
   
-  // Languages that auto-detect (major international languages)
-  // Arabic removed - defaults to English like African languages
-  const autoDetectLanguages = ['en', 'fr', 'de', 'zh', 'pt'];
+  // Only these languages auto-detect from device.
+  // Everything else defaults to English.
+  const autoDetectLanguages = ['en', 'fr', 'es', 'zh', 'pt'];
   
   // African languages and Arabic should default to English until user switches
   // Swahili (sw), Arabic (ar), and other languages will default to English

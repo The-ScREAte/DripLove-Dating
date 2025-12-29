@@ -5,6 +5,7 @@ import LanguageDetector from 'i18next-browser-languagedetector';
 // Import translation files
 import en from './locales/en.json';
 import fr from './locales/fr.json';
+import es from './locales/es.json';
 import de from './locales/de.json';
 import zh from './locales/zh.json';
 import sw from './locales/sw.json';
@@ -15,6 +16,7 @@ import ar from './locales/ar.json';
 const resources = {
   en: { translation: en },
   fr: { translation: fr },
+  es: { translation: es },
   de: { translation: de },
   zh: { translation: zh },
   sw: { translation: sw },
@@ -32,11 +34,11 @@ const getDefaultLanguage = (): string => {
   const deviceLanguage = navigator.language || (navigator as any).languages?.[0] || 'en';
   const languageCode = deviceLanguage.split('-')[0].toLowerCase();
   
-  // Languages where we auto-set based on device (non-African languages, excluding Arabic)
-  // Arabic now defaults to English like African languages until user switches
-  const autoSetLanguages = ['fr', 'de', 'zh', 'pt'];
+  // Only these languages auto-set from device.
+  // Everything else defaults to English.
+  const autoSetLanguages = ['fr', 'es', 'zh', 'pt'];
   
-  // For French, German, Chinese, Portuguese - use device language
+  // For French, Spanish, Chinese, Portuguese - use device language
   if (autoSetLanguages.includes(languageCode)) {
     return languageCode;
   }
