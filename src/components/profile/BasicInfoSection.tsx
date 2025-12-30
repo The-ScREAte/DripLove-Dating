@@ -133,6 +133,9 @@ const BasicInfoSection = ({ editedProfile, isEditing, onInputChange }: BasicInfo
               className="w-full min-h-[100px] resize-none"
               placeholder={t('profile.bioPlaceholder')}
             />
+            <p className="text-xs text-muted-foreground mt-1">
+              {t('profile.dobChangeNote', 'Note: Change of Date of Birth: Contact admin and be ready to provide proof of date change.')}
+            </p>
           </div>
         </div>
       </CardContent>
