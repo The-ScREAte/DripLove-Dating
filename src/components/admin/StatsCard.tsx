@@ -75,13 +75,12 @@ const StatsCard: React.FC<StatsCardProps> = ({ stats }) => {
   useEffect(() => {
     const loadCurrentPremiumUsers = async () => {
       try {
-        // Count users with active premium subscriptions that haven't expired
+        // Count users with active premium subscriptions
         const { count, error } = await supabase
           .from('user_subscriptions')
           .select('user_id', { count: 'exact', head: true })
           .eq('plan_name', 'premium')
-          .eq('status', 'active')
-          .or('expires_at.is.null,expires_at.gt.' + new Date().toISOString());
+          .eq('status', 'active');
         
         if (error) {
           console.error('Failed to load current premium users:', error);
@@ -103,11 +102,12 @@ const StatsCard: React.FC<StatsCardProps> = ({ stats }) => {
   useEffect(() => {
     const loadAllTimePremiumCount = async () => {
       try {
-        // Count all unique users who have ever had a premium subscription (active or cancelled)
+        // Count all users who have ever had a premium subscription (any status except free)
         const { count, error } = await supabase
           .from('user_subscriptions')
           .select('user_id', { count: 'exact', head: true })
-          .eq('plan_name', 'premium');
+          .eq('plan_name', 'premium')
+          .in('status', ['active', 'cancelled', 'expired', 'payment_failed']);
         
         if (error) {
           console.error('Failed to load all-time premium count:', error);
