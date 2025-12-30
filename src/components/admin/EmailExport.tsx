@@ -37,6 +37,7 @@ export default function EmailExport() {
   const [intentFilter, setIntentFilter] = useState<string>('all');
   const [statusFilter, setStatusFilter] = useState<string>('active');
   const [includeArchived, setIncludeArchived] = useState<boolean>(false);
+  const [debuggerFilter, setDebuggerFilter] = useState<string>('none');
   const [isLoadingCountries, setIsLoadingCountries] = useState(false);
   const [isLoadingEmails, setIsLoadingEmails] = useState(false);
   const [emails, setEmails] = useState<string[]>([]);
@@ -117,7 +118,7 @@ export default function EmailExport() {
         // Build the query for each batch
         let query = supabase
           .from('profiles')
-          .select('id, email, gender, preference, relationship_intent, account_status, country, is_archived');
+          .select('id, email, gender, preference, relationship_intent, account_status, country, is_archived, bio, city');
 
         // Apply country filter
         if (selectedCountries.size > 0) {
@@ -194,6 +195,77 @@ export default function EmailExport() {
         }
       }
 
+      // Apply debugger category filters
+      if (debuggerFilter !== 'none') {
+        const profileIds = filteredProfiles.map(p => p.id);
+
+        if (debuggerFilter === 'no_photo') {
+          // Fetch all user images to find users without photos
+          const usersWithImages = new Set<string>();
+          for (let page = 0; ; page++) {
+            const { data: images, error } = await supabase
+              .from('user_images')
+              .select('user_id')
+              .in('user_id', profileIds.slice(page * BATCH_SIZE, (page + 1) * BATCH_SIZE));
+            
+            if (error) throw error;
+            if (!images || images.length === 0) break;
+            images.forEach(img => usersWithImages.add(img.user_id));
+            if (profileIds.slice(page * BATCH_SIZE, (page + 1) * BATCH_SIZE).length < BATCH_SIZE) break;
+          }
+          
+          filteredProfiles = filteredProfiles.filter(p => !usersWithImages.has(p.id));
+        } else if (debuggerFilter === 'incomplete') {
+          // Users with missing essential fields
+          filteredProfiles = filteredProfiles.filter(p => 
+            !p.gender || !p.preference || !p.bio || !p.city
+          );
+        } else if (debuggerFilter === 'never_seen') {
+          // Users who have never been liked or passed
+          const seenUsers = new Set<string>();
+          
+          // Get all likes for these users
+          for (let page = 0; ; page++) {
+            const chunk = profileIds.slice(page * BATCH_SIZE, (page + 1) * BATCH_SIZE);
+            if (chunk.length === 0) break;
+            
+            const { data: likes, error } = await supabase
+              .from('likes')
+              .select('liked_id')
+              .in('liked_id', chunk);
+            
+            if (error) throw error;
+            if (!likes || likes.length === 0) {
+              if (chunk.length < BATCH_SIZE) break;
+              continue;
+            }
+            likes.forEach(l => seenUsers.add(l.liked_id));
+            if (chunk.length < BATCH_SIZE) break;
+          }
+          
+          // Get all passes for these users
+          for (let page = 0; ; page++) {
+            const chunk = profileIds.slice(page * BATCH_SIZE, (page + 1) * BATCH_SIZE);
+            if (chunk.length === 0) break;
+            
+            const { data: passes, error } = await supabase
+              .from('passes')
+              .select('passed_id')
+              .in('passed_id', chunk);
+            
+            if (error) throw error;
+            if (!passes || passes.length === 0) {
+              if (chunk.length < BATCH_SIZE) break;
+              continue;
+            }
+            passes.forEach(p => p.passed_id && seenUsers.add(p.passed_id));
+            if (chunk.length < BATCH_SIZE) break;
+          }
+          
+          filteredProfiles = filteredProfiles.filter(p => !seenUsers.has(p.id));
+        }
+      }
+
       // Extract emails
       const emailList = filteredProfiles
         .map(p => p.email)
@@ -203,7 +275,7 @@ export default function EmailExport() {
 
       toast({
         title: 'Emails Fetched',
-        description: `Found ${emailList.length} email addresses (fetched in ${Math.ceil(allProfiles.length / 1000)} batches)`,
+        description: `Found ${emailList.length} email addresses${debuggerFilter !== 'none' ? ` (${debuggerFilter.replace('_', ' ')} filter applied)` : ''}`,
       });
     } catch (error) {
       console.error('Error fetching emails:', error);
@@ -361,6 +433,25 @@ export default function EmailExport() {
                   <SelectItem value="paused">Paused</SelectItem>
                   <SelectItem value="suspended">Suspended</SelectItem>
                   <SelectItem value="deleted">Deleted</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+
+            {/* Debugger Category Filter */}
+            <div className="space-y-2">
+              <Label className="flex items-center gap-2">
+                <Filter className="h-4 w-4 text-orange-500" />
+                Debugger Category
+              </Label>
+              <Select value={debuggerFilter} onValueChange={setDebuggerFilter}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Select category" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="none">No Filter</SelectItem>
+                  <SelectItem value="no_photo">No Photo</SelectItem>
+                  <SelectItem value="incomplete">Incomplete Profile</SelectItem>
+                  <SelectItem value="never_seen">Never Seen</SelectItem>
                 </SelectContent>
               </Select>
             </div>
