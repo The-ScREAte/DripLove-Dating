@@ -2785,7 +2785,7 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, isPremium, profileComplet
       current: isAd(currentMatch) ? `ad:${currentMatch.id}` : currentMatch.id,
       pending: pendingSwipesRef.current,
       todaySwipeCount,
-      swipeLimit: premiumActive ? 100 : 16,
+      swipeLimit: premiumActive ? 200 : 16,
       parentProfileCompletion,
       computedProfileCompletion,
       effectiveProfileCompletion,
@@ -2799,8 +2799,8 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, isPremium, profileComplet
     }
 
 
-    // Check profile completion restriction (70% after 8 swipes)
-    if (effectiveProfileCompletion < 70 && todaySwipeCount >= 8) {
+    // Check profile completion restriction (70% after 5 swipes)
+    if (effectiveProfileCompletion < 70 && todaySwipeCount >= 5) {
       swipeDebug('handleLike: blocked by profile completion', {
         parentProfileCompletion,
         computedProfileCompletion,
@@ -2817,8 +2817,8 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, isPremium, profileComplet
     }
 
     // Check daily limit - MUST be checked BEFORE swipe
-    // Free users: 16 swipes, Premium users: 100 swipes
-    const swipeLimit = premiumActive ? 100 : 16;
+    // Free users: 16 swipes, Premium users: 200 swipes
+    const swipeLimit = premiumActive ? 200 : 16;
     
     
     if (todaySwipeCount >= swipeLimit) {
@@ -3037,14 +3037,14 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, isPremium, profileComplet
       matchToPassId: matchToPass?.id,
       pending: pendingSwipesRef.current,
       todaySwipeCount,
-      swipeLimit: premiumActive ? 100 : 16,
+      swipeLimit: premiumActive ? 200 : 16,
       parentProfileCompletion,
       computedProfileCompletion,
       effectiveProfileCompletion,
     });
 
-    // Check profile completion restriction (70% after 8 swipes)
-    if (effectiveProfileCompletion < 70 && todaySwipeCount >= 8) {
+    // Check profile completion restriction (70% after 5 swipes)
+    if (effectiveProfileCompletion < 70 && todaySwipeCount >= 5) {
       swipeDebug('executePassLogic: blocked by profile completion', {
         parentProfileCompletion,
         computedProfileCompletion,
@@ -3061,8 +3061,8 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, isPremium, profileComplet
     }
 
     // Check daily limit - MUST be checked BEFORE swipe
-    // Free users: 16 swipes, Premium users: 100 swipes
-    const swipeLimit = premiumActive ? 100 : 16;
+    // Free users: 16 swipes, Premium users: 200 swipes
+    const swipeLimit = premiumActive ? 200 : 16;
     
     
     if (todaySwipeCount >= swipeLimit) {
