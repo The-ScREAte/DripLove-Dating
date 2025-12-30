@@ -25,6 +25,7 @@ import AdsManagement from './admin/AdsManagement';
 import RedirectLinkCreator from './admin/RedirectLinkCreator';
 import BroadcastNotifications from './admin/BroadcastNotifications';
 import InfluencerManagement from './admin/InfluencerManagement';
+import SmartMatchSuggestions from './admin/SmartMatchSuggestions';
 import { debounce, userDataCache, createPagination } from '@/utils/performanceOptimizer';
 import { useSupabaseSubscription, useMemoryMonitor } from '@/hooks/usePerformance';
 import { CurrentUser, AdminStats } from '@/types';
@@ -1562,6 +1563,11 @@ const AdminPageComponent = ({ currentUser, onLogout }: AdminPageProps) => {
                   <Button onClick={createManualMatch} className="w-full text-xs h-8" size="sm">
                     Create Match
                   </Button>
+                  
+                  {/* Smart Match Suggestions */}
+                  <div className="pt-3 border-t">
+                    <SmartMatchSuggestions users={users} onMatchCreated={fetchAppStats} />
+                  </div>
                 </CardContent>
               </Card>
 

@@ -868,6 +868,33 @@ export type Database = {
           },
         ]
       }
+      premium_users_history: {
+        Row: {
+          created_at: string
+          first_premium_at: string
+          id: string
+          last_premium_at: string
+          total_subscription_count: number
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          first_premium_at?: string
+          id?: string
+          last_premium_at?: string
+          total_subscription_count?: number
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          first_premium_at?: string
+          id?: string
+          last_premium_at?: string
+          total_subscription_count?: number
+          user_id?: string
+        }
+        Relationships: []
+      }
       profiles: {
         Row: {
           account_status: string | null
@@ -1837,6 +1864,7 @@ export type Database = {
         Returns: number
       }
       get_admin_stats: { Args: never; Returns: Json }
+      get_all_time_premium_count: { Args: never; Returns: number }
       get_app_stats: { Args: never; Returns: Json }
       get_current_subscription_status: {
         Args: { p_user_id: string }
@@ -1916,6 +1944,10 @@ export type Database = {
         Returns: Json
       }
       record_daily_active_count: { Args: never; Returns: undefined }
+      record_premium_subscription: {
+        Args: { p_user_id: string }
+        Returns: undefined
+      }
       reject_image: {
         Args: { admin_notes?: string; image_id: string }
         Returns: boolean

@@ -104,29 +104,102 @@ const UserPoolDebugger: React.FC<Props> = ({ currentUserId, userPreferences, onV
     return ['male', 'female', 'other'];
   };
 
+  // Batch fetch all rows from a table to bypass 1000 row limit
+  const fetchAllRows = async <T extends Record<string, unknown>>(
+    tableName: 'profiles' | 'likes' | 'blocks' | 'passes' | 'user_images',
+    selectFields: string,
+    filters?: { column: string; op: string; value: string | boolean | number }[]
+  ): Promise<T[]> => {
+    const batchSize = 1000;
+    let allRows: T[] = [];
+    let offset = 0;
+    let hasMore = true;
+
+    while (hasMore) {
+      // Build query manually to avoid type issues
+      const baseQuery = supabase.from(tableName).select(selectFields);
+      
+      // We'll build queries for each table type separately
+      let query = baseQuery.range(offset, offset + batchSize - 1);
+
+      // Apply filters using type-safe approach
+      if (filters) {
+        for (const filter of filters) {
+          if (filter.column && filter.op === 'neq') {
+            query = (query as any).neq(filter.column, filter.value);
+          } else if (filter.column && filter.op === 'eq') {
+            query = (query as any).eq(filter.column, filter.value);
+          } else if (filter.column && filter.op === 'gte') {
+            query = (query as any).gte(filter.column, filter.value);
+          } else if (filter.op === 'or') {
+            query = (query as any).or(filter.value);
+          }
+        }
+      }
+
+      const { data, error } = await query;
+      
+      if (error) {
+        console.error(`Error fetching batch from ${tableName}:`, error);
+        break;
+      }
+
+      if (data && data.length > 0) {
+        allRows = [...allRows, ...(data as unknown as T[])];
+        offset += batchSize;
+        hasMore = data.length === batchSize;
+      } else {
+        hasMore = false;
+      }
+    }
+
+    return allRows;
+  };
+
   const analyzeUserPool = async () => {
     if (!currentUserId) return;
     
     setIsLoading(true);
     try {
+      // Use count queries for accurate totals and batch fetch for data that needs processing
       const [
-        { data: allUsers },
-        { data: likedUsers },
-        { data: blockedUsers },
-        { data: recentPasses }
+        { count: totalUsersCount },
+        { count: activeUsersCount },
+        { count: archivedUsersCount },
+        likedUsers,
+        blockedUsers,
+        recentPasses
       ] = await Promise.all([
+        // Get accurate count of all users (excluding current user)
         supabase
           .from('profiles')
-          .select('id, gender, date_of_birth, latitude, longitude, account_status, is_admin, is_archived')
-          .neq('id', currentUserId),
+          .select('*', { count: 'exact', head: true })
+          .neq('id', currentUserId)
+          .eq('is_admin', false),
+        // Get count of active users
         supabase
-          .from('likes')
-          .select('liked_id')
-          .eq('liker_id', currentUserId),
+          .from('profiles')
+          .select('*', { count: 'exact', head: true })
+          .neq('id', currentUserId)
+          .eq('account_status', 'active')
+          .eq('is_admin', false)
+          .eq('is_archived', false),
+        // Get count of archived users
         supabase
-          .from('blocks')
-          .select('blocked_id, blocker_id')
-          .or(`blocker_id.eq.${currentUserId},blocked_id.eq.${currentUserId}`),
+          .from('profiles')
+          .select('*', { count: 'exact', head: true })
+          .neq('id', currentUserId)
+          .eq('is_archived', true)
+          .eq('is_admin', false),
+        // Fetch all liked users (batch)
+        fetchAllRows<{ liked_id: string }>('likes', 'liked_id', [
+          { column: 'liker_id', op: 'eq', value: currentUserId }
+        ]),
+        // Fetch all blocks
+        fetchAllRows<{ blocked_id: string; blocker_id: string }>('blocks', 'blocked_id, blocker_id', [
+          { column: '', op: 'or', value: `blocker_id.eq.${currentUserId},blocked_id.eq.${currentUserId}` }
+        ]),
+        // Fetch recent passes
         supabase
           .from('passes')
           .select('passed_id')
@@ -134,25 +207,34 @@ const UserPoolDebugger: React.FC<Props> = ({ currentUserId, userPreferences, onV
           .gte('passed_at', new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString())
       ]);
 
-      if (!allUsers) {
-        throw new Error('Failed to fetch user data');
-      }
-
       const preferences = userPreferences || {};
       const minAge = preferences.min_age || 18;
       const maxAge = preferences.max_age || 99;
-      const maxDistance = preferences.max_distance || 50;
-      const allowedGenders = getGenderFilter(preferences.preference || 'everyone');
 
       const likedUserIds = likedUsers?.map(like => like.liked_id) || [];
       const blockedUserIds = blockedUsers?.flatMap(block => [block.blocked_id, block.blocker_id]) || [];
-      const recentPassIds = recentPasses?.map(pass => pass.passed_id) || [];
+      const recentPassIds = recentPasses.data?.map(pass => pass.passed_id) || [];
 
-      // Count archived users
-      const archivedUsers = allUsers.filter(user => user.is_archived === true).length;
+      // For detailed filtering analysis, we need to fetch profiles in batches
+      // But for the main counts, use the count queries
+      const allProfiles = await fetchAllRows<{
+        id: string;
+        gender: string;
+        date_of_birth: string;
+        latitude: number;
+        longitude: number;
+        account_status: string;
+        is_admin: boolean;
+        is_archived: boolean;
+      }>('profiles', 'id, gender, date_of_birth, latitude, longitude, account_status, is_admin, is_archived', [
+        { column: 'id', op: 'neq', value: currentUserId },
+        { column: 'is_admin', op: 'eq', value: false }
+      ]);
+
+      const allowedGenders = getGenderFilter(preferences.preference || 'everyone');
 
       // Step 1: Active & not archived users only
-      const activeUsers = allUsers.filter(user => 
+      const activeUsers = allProfiles.filter(user => 
         user.account_status === 'active' && !user.is_admin && !user.is_archived
       );
 
@@ -170,6 +252,7 @@ const UserPoolDebugger: React.FC<Props> = ({ currentUserId, userPreferences, onV
 
       // Step 4: Distance filtering
       let distanceFilteredUsers = ageFilteredUsers;
+      const maxDistance = preferences.max_distance || 50;
       if (preferences.latitude && preferences.longitude) {
         distanceFilteredUsers = ageFilteredUsers.filter(user => {
           if (!user.latitude || !user.longitude) {
@@ -193,9 +276,9 @@ const UserPoolDebugger: React.FC<Props> = ({ currentUserId, userPreferences, onV
       );
 
       const stats: UserPoolStats = {
-        totalUsers: allUsers.length,
-        activeUsers: activeUsers.length,
-        archivedUsers,
+        totalUsers: totalUsersCount || allProfiles.length,
+        activeUsers: activeUsersCount || activeUsers.length,
+        archivedUsers: archivedUsersCount || 0,
         usersWithPreferenceMatch: genderFilteredUsers.length,
         usersInAgeRange: ageFilteredUsers.length,
         usersInDistance: distanceFilteredUsers.length,
@@ -272,35 +355,37 @@ const UserPoolDebugger: React.FC<Props> = ({ currentUserId, userPreferences, onV
   const analyzeProfileHealth = async () => {
     setIsLoading(true);
     try {
-      // Fetch all active profiles
-      const { data: profiles, error: profilesError } = await supabase
-        .from('profiles')
-        .select('id, first_name, last_name, email, gender, preference, date_of_birth, country, city, bio, is_admin, account_status')
-        .eq('account_status', 'active')
-        .eq('is_admin', false);
+      // Batch fetch all active profiles to bypass 1000 row limit
+      const profiles = await fetchAllRows<{
+        id: string;
+        first_name: string;
+        last_name: string;
+        email: string;
+        gender: string;
+        preference: string;
+        date_of_birth: string;
+        country: string;
+        city: string;
+        bio: string;
+        is_admin: boolean;
+        account_status: string;
+      }>('profiles', 'id, first_name, last_name, email, gender, preference, date_of_birth, country, city, bio, is_admin, account_status', [
+        { column: 'account_status', op: 'eq', value: 'active' },
+        { column: 'is_admin', op: 'eq', value: false }
+      ]);
 
-      if (profilesError) throw profilesError;
+      // Batch fetch all user images
+      const allImages = await fetchAllRows<{
+        user_id: string;
+        image_url: string;
+        is_approved: boolean;
+      }>('user_images', 'user_id, image_url, is_approved');
 
-      // Fetch all user images
-      const { data: allImages, error: imagesError } = await supabase
-        .from('user_images')
-        .select('user_id, image_url, is_approved');
+      // Batch fetch all likes to determine users who have never been seen
+      const allLikes = await fetchAllRows<{ liked_id: string }>('likes', 'liked_id');
 
-      if (imagesError) throw imagesError;
-
-      // Fetch all likes to determine users who have never been seen
-      const { data: allLikes, error: likesError } = await supabase
-        .from('likes')
-        .select('liked_id');
-
-      if (likesError) throw likesError;
-
-      // Fetch all passes
-      const { data: allPasses, error: passesError } = await supabase
-        .from('passes')
-        .select('passed_id');
-
-      if (passesError) throw passesError;
+      // Batch fetch all passes
+      const allPasses = await fetchAllRows<{ passed_id: string }>('passes', 'passed_id');
 
       // Create sets for quick lookup
       const usersWithImages = new Set<string>();
