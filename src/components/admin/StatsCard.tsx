@@ -75,15 +75,21 @@ const StatsCard: React.FC<StatsCardProps> = ({ stats }) => {
   useEffect(() => {
     const loadCurrentPremiumUsers = async () => {
       try {
-        const { data, error } = await (supabase as any).rpc('admin_get_current_premium_users_count');
+        // Count users with active premium subscriptions that haven't expired
+        const { count, error } = await supabase
+          .from('user_subscriptions')
+          .select('user_id', { count: 'exact', head: true })
+          .eq('plan_name', 'premium')
+          .eq('status', 'active')
+          .or('expires_at.is.null,expires_at.gt.' + new Date().toISOString());
+        
         if (error) {
           console.error('Failed to load current premium users:', error);
           setCurrentPremiumUsers(0);
           return;
         }
 
-        // RPC returns an integer
-        setCurrentPremiumUsers(typeof data === 'number' ? data : Number(data ?? 0));
+        setCurrentPremiumUsers(count ?? 0);
       } catch (err) {
         console.error('Error loading current premium users:', err);
         setCurrentPremiumUsers(0);
@@ -93,17 +99,22 @@ const StatsCard: React.FC<StatsCardProps> = ({ stats }) => {
     loadCurrentPremiumUsers();
   }, []);
 
-  // Load all-time premium count (historical tracking)
+  // Load all-time premium count (all users who have EVER had premium subscription)
   useEffect(() => {
     const loadAllTimePremiumCount = async () => {
       try {
-        const { data, error } = await (supabase as any).rpc('get_all_time_premium_count');
+        // Count all unique users who have ever had a premium subscription (active or cancelled)
+        const { count, error } = await supabase
+          .from('user_subscriptions')
+          .select('user_id', { count: 'exact', head: true })
+          .eq('plan_name', 'premium');
+        
         if (error) {
           console.error('Failed to load all-time premium count:', error);
           setAllTimePremiumCount(0);
           return;
         }
-        setAllTimePremiumCount(typeof data === 'number' ? data : Number(data ?? 0));
+        setAllTimePremiumCount(count ?? 0);
       } catch (err) {
         console.error('Error loading all-time premium count:', err);
         setAllTimePremiumCount(0);
