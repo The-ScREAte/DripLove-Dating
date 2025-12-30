@@ -83,6 +83,27 @@ export type Database = {
         }
         Relationships: []
       }
+      app_settings: {
+        Row: {
+          created_at: string
+          id: string
+          updated_at: string
+          value: Json
+        }
+        Insert: {
+          created_at?: string
+          id: string
+          updated_at?: string
+          value?: Json
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          updated_at?: string
+          value?: Json
+        }
+        Relationships: []
+      }
       app_update_config: {
         Row: {
           android_version: string | null
