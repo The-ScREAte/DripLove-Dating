@@ -22,6 +22,7 @@ import { useToast } from '@/hooks/use-toast';
 import { useTranslation } from 'react-i18next';
 import { videoPreloader } from '@/utils/videoPreloader';
 import FaceVerification from '@/components/FaceVerification';
+import { usePromoCodeEnabled } from '@/hooks/usePromoCodeEnabled';
 
 interface RegistrationFormProps {
   onSubmit: (data: any) => void;
@@ -50,6 +51,7 @@ const RegistrationForm = ({ onSubmit, onBackToLogin }: RegistrationFormProps) =>
   const [isVerifying, setIsVerifying] = useState(false);
   const { toast } = useToast();
   const { t } = useTranslation();
+  const { isEnabled: promoCodeEnabled } = usePromoCodeEnabled();
 
   // Restore face verification from localStorage on mount
   React.useEffect(() => {
@@ -1066,18 +1068,20 @@ const RegistrationForm = ({ onSubmit, onBackToLogin }: RegistrationFormProps) =>
                   </div>
                 )}
 
-                <div className="animate-scale-in">
-                  <PromoCodeInput
-                    value={formData.promoCode}
-                    onChange={(value, promoCodeId) => {
-                      setFormData(prev => ({
-                        ...prev,
-                        promoCode: value,
-                        promoCodeId: promoCodeId
-                      }));
-                    }}
-                  />
-                </div>
+                {promoCodeEnabled && (
+                  <div className="animate-scale-in">
+                    <PromoCodeInput
+                      value={formData.promoCode}
+                      onChange={(value, promoCodeId) => {
+                        setFormData(prev => ({
+                          ...prev,
+                          promoCode: value,
+                          promoCodeId: promoCodeId
+                        }));
+                      }}
+                    />
+                  </div>
+                )}
 
                 <div className="bg-blue-50 p-4 rounded-lg">
                   <h4 className="font-medium text-blue-900 mb-2">{t('registration.photoGuidelines')}</h4>

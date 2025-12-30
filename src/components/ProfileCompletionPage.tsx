@@ -22,6 +22,7 @@ import { getLanguageForCountry } from '@/i18n/config';
 import { videoPreloader } from '@/utils/videoPreloader';
 import FaceVerification from '@/components/FaceVerification';
 import HoppingLogo from '@/components/HoppingLogo';
+import { usePromoCodeEnabled } from '@/hooks/usePromoCodeEnabled';
 
 interface ImageUpload {
   file: File | null;
@@ -59,6 +60,7 @@ const ProfileCompletionPage = () => {
   const [user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
   const [showTermsAcceptance, setShowTermsAcceptance] = useState(false);
+  const { isEnabled: promoCodeEnabled } = usePromoCodeEnabled();
   
   // Form state
   const [formData, setFormData] = useState(initialFormData);
@@ -1119,16 +1121,18 @@ const ProfileCompletionPage = () => {
                     {errors.images && <p className="text-sm text-red-500">{errors.images}</p>}
                   </div>
 
-                  <PromoCodeInput
-                    value={formData.promoCode}
-                    onChange={(value, promoCodeId) => {
-                      setFormData(prev => ({
-                        ...prev,
-                        promoCode: value,
-                        promoCodeId: promoCodeId
-                      }));
-                    }}
-                  />
+                  {promoCodeEnabled && (
+                    <PromoCodeInput
+                      value={formData.promoCode}
+                      onChange={(value, promoCodeId) => {
+                        setFormData(prev => ({
+                          ...prev,
+                          promoCode: value,
+                          promoCodeId: promoCodeId
+                        }));
+                      }}
+                    />
+                  )}
 
                   <div className="flex flex-col gap-3">
                     <Button

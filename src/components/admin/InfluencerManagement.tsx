@@ -7,7 +7,9 @@ import { Label } from '@/components/ui/label';
 import { Badge } from '@/components/ui/badge';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
+import { Switch } from '@/components/ui/switch';
 import { useToast } from '@/hooks/use-toast';
+import { usePromoCodeEnabled, togglePromoCodeEnabled } from '@/hooks/usePromoCodeEnabled';
 import { 
   Users, 
   DollarSign, 
@@ -23,7 +25,9 @@ import {
   Gift,
   Percent,
   Copy,
-  Link
+  Link,
+  ToggleLeft,
+  AlertCircle
 } from 'lucide-react';
 
 interface PromoCode {
@@ -53,6 +57,9 @@ interface PayoutRequest {
 
 const InfluencerManagement = () => {
   const { toast } = useToast();
+  const { isEnabled: promoCodeEnabled, loading: promoCodeLoading } = usePromoCodeEnabled();
+  const [promoCodeToggle, setPromoCodeToggle] = useState(false);
+  const [togglingPromoCode, setTogglingPromoCode] = useState(false);
   const [promoCodes, setPromoCodes] = useState<PromoCode[]>([]);
   const [payoutRequests, setPayoutRequests] = useState<PayoutRequest[]>([]);
   const [loading, setLoading] = useState(true);
@@ -62,6 +69,31 @@ const InfluencerManagement = () => {
   const [selectedPromoCode, setSelectedPromoCode] = useState<PromoCode | null>(null);
   const [detailStats, setDetailStats] = useState<any>(null);
   const [passwordSetupLink, setPasswordSetupLink] = useState<string | null>(null);
+
+  // Sync local toggle state with fetched value
+  useEffect(() => {
+    if (!promoCodeLoading) {
+      setPromoCodeToggle(promoCodeEnabled);
+    }
+  }, [promoCodeEnabled, promoCodeLoading]);
+
+  const handleTogglePromoCode = async () => {
+    setTogglingPromoCode(true);
+    const newValue = !promoCodeToggle;
+    const success = await togglePromoCodeEnabled(newValue);
+    if (success) {
+      setPromoCodeToggle(newValue);
+      toast({ 
+        title: newValue ? 'Promo Code Enabled' : 'Promo Code Disabled',
+        description: newValue 
+          ? 'Promo code input will now appear on registration and profile completion forms.' 
+          : 'Promo code input is now hidden from all forms (Apple App Store compliant).'
+      });
+    } else {
+      toast({ title: 'Error', description: 'Failed to update setting', variant: 'destructive' });
+    }
+    setTogglingPromoCode(false);
+  };
   
   // Form state
   const [formData, setFormData] = useState({
@@ -417,6 +449,40 @@ const InfluencerManagement = () => {
           <Plus className="w-4 h-4 mr-1" /> New Promo Code
         </Button>
       </div>
+
+      {/* Promo Code Toggle for Apple Compliance */}
+      <Card className={promoCodeToggle ? "border-green-200 bg-green-50" : "border-amber-200 bg-amber-50"}>
+        <CardContent className="py-4">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-3">
+              <div className={`p-2 rounded-full ${promoCodeToggle ? 'bg-green-100' : 'bg-amber-100'}`}>
+                <ToggleLeft className={`w-5 h-5 ${promoCodeToggle ? 'text-green-600' : 'text-amber-600'}`} />
+              </div>
+              <div>
+                <p className={`font-medium ${promoCodeToggle ? 'text-green-800' : 'text-amber-800'}`}>
+                  Promo Code Input on Forms
+                </p>
+                <p className={`text-xs ${promoCodeToggle ? 'text-green-600' : 'text-amber-600'}`}>
+                  {promoCodeToggle 
+                    ? 'Visible on registration & profile completion' 
+                    : 'Hidden for Apple App Store compliance'}
+                </p>
+              </div>
+            </div>
+            <Switch
+              checked={promoCodeToggle}
+              onCheckedChange={handleTogglePromoCode}
+              disabled={togglingPromoCode || promoCodeLoading}
+            />
+          </div>
+          {!promoCodeToggle && (
+            <div className="mt-3 flex items-start gap-2 text-xs text-amber-700 bg-amber-100 p-2 rounded">
+              <AlertCircle className="w-4 h-4 mt-0.5 flex-shrink-0" />
+              <span>Keep disabled when submitting to Apple App Store to comply with Guideline 3.1.1</span>
+            </div>
+          )}
+        </CardContent>
+      </Card>
 
       {/* Pending Payouts Alert */}
       {payoutRequests.length > 0 && (
