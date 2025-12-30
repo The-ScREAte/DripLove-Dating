@@ -1113,7 +1113,9 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, isPremium, profileComplet
       { data: likedUsers },
       { data: blockedUsers },
       { data: recentPasses },
-      { data: usersWhoLikedMe }
+      { data: usersWhoLikedMe },
+      { data: allLikedIds },
+      { data: allPassedIds }
     ] = await Promise.all([
       supabase
         .from('profiles')
@@ -1138,8 +1140,23 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, isPremium, profileComplet
         .select('liker_id, created_at')
         .eq('liked_id', userId)
         .order('created_at', { ascending: false })
-        .limit(50) // Get up to 50 recent likers
+        .limit(50), // Get up to 50 recent likers
+      // Fetch all users who have been liked (for "never seen" detection)
+      supabase
+        .from('likes')
+        .select('liked_id')
+        .limit(5000),
+      // Fetch all users who have been passed (for "never seen" detection)
+      supabase
+        .from('passes')
+        .select('passed_id')
+        .limit(5000)
     ]);
+
+    // Build set of users who have been seen (liked or passed by anyone)
+    const seenUserIds = new Set<string>();
+    (allLikedIds || []).forEach(l => l.liked_id && seenUserIds.add(l.liked_id));
+    (allPassedIds || []).forEach(p => p.passed_id && seenUserIds.add(p.passed_id));
 
     const likedUserIds = uniqUuids(likedUsers?.map(like => like.liked_id) || []);
     const blockedUserIds = uniqUuids(blockedUsers?.flatMap(block => [block.blocked_id, block.blocker_id]) || []);
@@ -1332,13 +1349,19 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, isPremium, profileComplet
       );
 
       // ⭐ ACTIVITY WEIGHTING (Premium): Bias toward recently active users AFTER country mix
+      // Also boost "never seen" users for discovery visibility
       // Soft reorder only: no users removed, premium rules preserved
       // ⭐ ANDROID OPTIMIZATION: Skip on Android for faster processing
+      // Calculate "never seen" IDs for this batch
+      const neverSeenIdsForBatch = new Set(
+        mixedProfiles.filter(p => !seenUserIds.has(p.id)).map(p => p.id)
+      );
       const activityWeightedMixed = isAndroidPlatform() 
         ? mixedProfiles
         : applyActivityWeighting(
             mixedProfiles,
-            `${userId}_${dailySeed}_activity`
+            `${userId}_${dailySeed}_activity`,
+            neverSeenIdsForBatch
           );
 
 
@@ -1512,11 +1535,15 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, isPremium, profileComplet
       filteredProfiles = getStratifiedBatches(filteredProfiles, 15, 4, `${userId}_${dailySeed}`);
 
       // ⭐ ACTIVITY WEIGHTING (Free): Apply AFTER stratification so active users rise to the top
+      // Also boost "never seen" users for discovery visibility
       // Soft reorder only: no filters/premium rules touched
       // ⭐ ANDROID OPTIMIZATION: Skip on Android for faster processing
+      const neverSeenIdsForFree = new Set(
+        filteredProfiles.filter(p => !seenUserIds.has(p.id)).map(p => p.id)
+      );
       filteredProfiles = isAndroidPlatform()
         ? filteredProfiles
-        : applyActivityWeighting(filteredProfiles, `${userId}_${dailySeed}_activity`);
+        : applyActivityWeighting(filteredProfiles, `${userId}_${dailySeed}_activity`, neverSeenIdsForFree);
     }
 
     // Add empty images array and precomputed distance
