@@ -7,9 +7,28 @@ import { initializeGoogleAuth } from "./utils/googleNativeAuth";
 import "./i18n/config"; // Initialize i18n
 import { supabase } from "./integrations/supabase/client";
 
-// Suppress all console output in production (keep the app fully silent)
+// Suppress non-critical console output in production
 if (import.meta.env.PROD) {
-  console.error = () => {};
+  const originalError = console.error;
+  console.error = (...args) => {
+    const errorStr = args.join(' ');
+    // Suppress known non-critical errors
+    if (
+      errorStr.includes('CORS') ||
+      errorStr.includes('net::ERR_FAILED') ||
+      errorStr.includes('net::ERR_ABORTED') ||
+      errorStr.includes('Failed to fetch') ||
+      errorStr.includes('NetworkError') ||
+      errorStr.includes('Canvas2D') ||
+      errorStr.includes('willReadFrequently') ||
+      errorStr.includes('postMessage')
+    ) {
+      return; // Suppress these errors
+    }
+    originalError.apply(console, args);
+  };
+
+  // Suppress all debug logs in production
   console.debug = () => {};
   console.info = () => {};
   console.warn = () => {};
