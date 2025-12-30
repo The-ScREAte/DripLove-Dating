@@ -138,36 +138,21 @@ const SmartMatchSuggestions: React.FC<Props> = ({ users, onMatchCreated }) => {
       const processedPairs = new Set<string>();
       const usersMap = new Map(users.map(u => [u.id, u]));
 
-      // Priority 1: Mutual likes (both liked each other but not matched)
+      // Priority 1: One-way likes (skip mutual likes - they should already be matched by the system)
+      // If both users liked each other, the match trigger should have created the match automatically
+
+      // Priority 1: One-way likes with compatible filters (user1 liked user2 but not matched)
       for (const [likerId, likedIds] of likesMap) {
         for (const likedId of likedIds) {
           const pairKey = [likerId, likedId].sort().join('_');
           if (processedPairs.has(pairKey) || matchedPairs.has(pairKey)) continue;
 
+          // Skip if mutual like exists - they should already be matched
           const reverseLikes = likesMap.get(likedId);
           if (reverseLikes && reverseLikes.has(likerId)) {
-            const user1 = usersMap.get(likerId);
-            const user2 = usersMap.get(likedId);
-            
-            if (user1 && user2) {
-              const compatibility = checkCompatibility(user1, user2);
-              suggestions.push({
-                user1,
-                user2,
-                reason: `💕 MUTUAL LIKE! Both liked each other. ${compatibility.reason}`,
-                score: 100 + compatibility.score
-              });
-              processedPairs.add(pairKey);
-            }
+            processedPairs.add(pairKey);
+            continue;
           }
-        }
-      }
-
-      // Priority 2: One-way likes with compatible filters
-      for (const [likerId, likedIds] of likesMap) {
-        for (const likedId of likedIds) {
-          const pairKey = [likerId, likedId].sort().join('_');
-          if (processedPairs.has(pairKey) || matchedPairs.has(pairKey)) continue;
 
           const user1 = usersMap.get(likerId);
           const user2 = usersMap.get(likedId);
@@ -179,7 +164,7 @@ const SmartMatchSuggestions: React.FC<Props> = ({ users, onMatchCreated }) => {
                 user1,
                 user2,
                 reason: `❤️ ${user1.first_name} liked ${user2.first_name}. ${compatibility.reason}`,
-                score: 50 + compatibility.score
+                score: 80 + compatibility.score
               });
               processedPairs.add(pairKey);
             }
