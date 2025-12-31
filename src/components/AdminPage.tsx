@@ -847,14 +847,16 @@ const AdminPageComponent = ({ currentUser, onLogout }: AdminPageProps) => {
     }
   };
 
-  const fetchAppStats = useCallback(async () => {
+  const fetchAppStats = useCallback(async (forceRefresh = false) => {
     try {
-      // Check cache first for better performance
+      // Check cache first for better performance (skip if force refresh)
       const cacheKey = 'app_stats';
-      const cachedStats = userDataCache.get(cacheKey);
-      if (cachedStats) {
-        setStats(cachedStats);
-        return;
+      if (!forceRefresh) {
+        const cachedStats = userDataCache.get(cacheKey);
+        if (cachedStats) {
+          setStats(cachedStats);
+          return;
+        }
       }
 
       const { data, error } = await supabase.rpc('get_admin_stats');
@@ -962,27 +964,37 @@ const AdminPageComponent = ({ currentUser, onLogout }: AdminPageProps) => {
       const premiumMap = new Map<string, boolean>();
 
       if (userIds.length > 0) {
-        const { data: premiumRowsRaw, error: premiumError } = await (supabase as any).rpc(
-          'admin_get_premium_status_for_users',
-          { target_user_ids: userIds }
-        );
-        if (premiumError) {
-          console.error('Premium status RPC failed:', premiumError);
-          throw premiumError;
+        // IMPORTANT: RPC responses can be truncated when returning large row counts.
+        // Chunk requests to ensure we compute premium status for ALL users.
+        const CHUNK_SIZE = 500;
+        let totalRows = 0;
+
+        for (let i = 0; i < userIds.length; i += CHUNK_SIZE) {
+          const chunk = userIds.slice(i, i + CHUNK_SIZE);
+          const { data: premiumRowsRaw, error: premiumError } = await (supabase as any).rpc(
+            'admin_get_premium_status_for_users',
+            { target_user_ids: chunk }
+          );
+          if (premiumError) {
+            console.error('Premium status RPC failed:', premiumError);
+            throw premiumError;
+          }
+
+          const premiumRows: any[] = Array.isArray(premiumRowsRaw) ? premiumRowsRaw : [];
+          totalRows += premiumRows.length;
+
+          premiumRows.forEach((row: any) => {
+            if (!row?.user_id) return;
+
+            // Be resilient to duplicate rows per user_id (some DB function versions can return
+            // multiple rows due to subscription history). If any row says premium, treat as premium.
+            const current = premiumMap.get(row.user_id) ?? false;
+            premiumMap.set(row.user_id, current || !!row.is_premium);
+          });
         }
 
-        const premiumRows: any[] = Array.isArray(premiumRowsRaw) ? premiumRowsRaw : [];
-        console.log(`🔍 Premium RPC returned ${premiumRows.length} rows for ${userIds.length} users`);
-        
-        premiumRows.forEach((row: any) => {
-          if (!row?.user_id) return;
+        console.log(`🔍 Premium RPC returned ${totalRows} rows for ${userIds.length} users (chunked)`);
 
-          // Be resilient to duplicate rows per user_id (some DB function versions can return
-          // multiple rows due to subscription history). If any row says premium, treat as premium.
-          const current = premiumMap.get(row.user_id) ?? false;
-          premiumMap.set(row.user_id, current || !!row.is_premium);
-        });
-        
         const premiumCount = Array.from(premiumMap.values()).filter(v => v).length;
         console.log(`✅ After mapping: ${premiumCount} premium users out of ${userIds.length} total users`);
       }
@@ -1090,10 +1102,14 @@ const AdminPageComponent = ({ currentUser, onLogout }: AdminPageProps) => {
   useEffect(() => {
     console.log(`🗑️ Clearing cache due to premium filter change: ${premiumFilter}`);
     userDataCache.clear();
-    if (isAdmin && activeTab === 'users') {
-      fetchUsers();
+    if (isAdmin) {
+      // Force refresh stats AND users when premium filter changes
+      fetchAppStats(true);
+      if (activeTab === 'users') {
+        fetchUsers();
+      }
     }
-  }, [premiumFilter, isAdmin, activeTab, fetchUsers]);
+  }, [premiumFilter, isAdmin, activeTab, fetchUsers, fetchAppStats]);
 
   const updateUserStatus = async (userId: string, newStatus: string) => {
     try {
@@ -1288,29 +1304,56 @@ const AdminPageComponent = ({ currentUser, onLogout }: AdminPageProps) => {
 
   const handleLogout = async () => {
     try {
-      // Remove push token before logging out
-      if (currentUser?.id) {
+      const isIgnorableSignOutError = (err: unknown) => {
+        const anyErr = err as any;
+        const message = typeof anyErr?.message === 'string' ? anyErr.message : '';
+        return (
+          anyErr?.name === 'AuthSessionMissingError' ||
+          message.toLowerCase().includes('auth session missing') ||
+          message.toLowerCase().includes('session missing') ||
+          anyErr?.status === 403
+        );
+      };
+
+      // If we don't have a session, do not attempt server-side logout (it 403s).
+      const {
+        data: { session },
+      } = await supabase.auth.getSession();
+
+      // Remove push token before logging out (only if we have a session)
+      if (session?.user?.id) {
         const { removePushToken } = await import('@/services/pushNotifications');
-        await removePushToken(currentUser.id);
+        await removePushToken(session.user.id);
       }
-      
-      const { error } = await supabase.auth.signOut();
-      if (error) throw error;
+
+      // Local sign-out avoids `/auth/v1/logout?scope=global` calls and is safe even if tokens are already gone.
+      const { error } = await supabase.auth.signOut({ scope: 'local' });
+      if (error && !isIgnorableSignOutError(error)) throw error;
       
       // Call parent's onLogout which should redirect to welcome screen
       onLogout();
-      
-      // Additional safety: redirect to root if parent doesn't handle it
-      setTimeout(() => {
-        window.location.href = '/';
-      }, 100);
     } catch (error) {
-      console.error('Error signing out:', error);
-      toast({
-        title: 'Error',
-        description: 'Failed to sign out',
-        variant: 'destructive'
-      });
+      const anyErr = error as any;
+      const message = typeof anyErr?.message === 'string' ? anyErr.message : '';
+      const ignorable =
+        anyErr?.name === 'AuthSessionMissingError' ||
+        message.toLowerCase().includes('auth session missing') ||
+        message.toLowerCase().includes('session missing') ||
+        anyErr?.status === 403;
+
+      if (!ignorable) {
+        console.error('Error signing out:', error);
+        toast({
+          title: 'Error',
+          description: 'Failed to sign out',
+          variant: 'destructive'
+        });
+      } else {
+        console.warn('[AdminPage] Sign-out skipped (no session).');
+      }
+
+      // Even if sign-out fails/missing, still exit admin view.
+      onLogout();
     }
   };
 
@@ -1516,7 +1559,9 @@ const AdminPageComponent = ({ currentUser, onLogout }: AdminPageProps) => {
             <TabsContent value="dashboard" className="space-y-4">
               {/* Stats Overview */}
               {stats && (
-                <StatsCard stats={stats} />
+                <div>
+                  <StatsCard stats={stats} />
+                </div>
               )}
 
               {/* Manual Match Creation */}

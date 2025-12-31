@@ -250,6 +250,11 @@ class SupabasePushNotificationService {
       window.location.href = '/';
       return;
     }
+
+    if (data?.action === 'open_profile_messages') {
+      window.location.href = '/?tab=profile&profileSection=broadcast_messages';
+      return;
+    }
     
     if (data?.type === 'message' && data?.chatId) {
       // Navigate to specific chat conversation
@@ -368,7 +373,11 @@ class SupabasePushNotificationService {
       this.removeToast(toast);
       
       // Handle navigation based on notification type
-      if (payload.data?.chatId) {
+      if (payload.data?.action === 'open_profile_messages') {
+        window.location.href = '/?tab=profile&profileSection=broadcast_messages';
+      } else if (payload.data?.action === 'open_discover') {
+        window.location.href = '/';
+      } else if (payload.data?.chatId) {
         window.location.href = `/?tab=chat&matchId=${payload.data.chatId}`;
       } else if (payload.type === 'match') {
         window.location.href = '/?tab=chat';

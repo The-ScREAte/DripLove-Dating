@@ -129,6 +129,7 @@ export default function BroadcastNotifications() {
   const [selectedUsers, setSelectedUsers] = useState<Set<string>>(new Set());
   const [notificationTitle, setNotificationTitle] = useState('');
   const [notificationMessage, setNotificationMessage] = useState('');
+  const [saveToProfile, setSaveToProfile] = useState(false);
   const [isLoadingCountries, setIsLoadingCountries] = useState(false);
   const [isLoadingUsers, setIsLoadingUsers] = useState(false);
   const [isSending, setIsSending] = useState(false);
@@ -139,6 +140,7 @@ export default function BroadcastNotifications() {
   // Quick filters for debugger categories
   const [activeQuickFilter, setActiveQuickFilter] = useState<'none' | 'no_photo' | 'incomplete' | 'never_seen'>('none');
   const [isLoadingQuickFilter, setIsLoadingQuickFilter] = useState(false);
+  const [quickFilterCandidates, setQuickFilterCandidates] = useState<Set<string> | null>(null);
   
   // Campaign history
   const [campaigns, setCampaigns] = useState<Campaign[]>([]);
@@ -162,8 +164,33 @@ export default function BroadcastNotifications() {
     } else {
       setUsers([]);
       setSelectedUsers(new Set());
+      setActiveQuickFilter('none');
+      setQuickFilterCandidates(null);
     }
   }, [selectedCountries]);
+
+  // Keep selected users aligned with the currently loaded/filtered user list.
+  // This prevents sending to users from a previous filter selection.
+  useEffect(() => {
+    const allowed = new Set(users.map(u => u.id));
+
+    setSelectedUsers(prev => {
+      if (prev.size === 0) return prev;
+      const next = new Set<string>();
+      prev.forEach((id) => {
+        if (allowed.has(id)) next.add(id);
+      });
+      return next;
+    });
+
+    if (activeQuickFilter !== 'none' && quickFilterCandidates) {
+      const nextCandidates = new Set<string>();
+      quickFilterCandidates.forEach((id) => {
+        if (allowed.has(id)) nextCandidates.add(id);
+      });
+      setQuickFilterCandidates(nextCandidates);
+    }
+  }, [users]);
 
   useEffect(() => {
     if (activeTab !== 'history') {
@@ -424,11 +451,18 @@ export default function BroadcastNotifications() {
   };
 
   const toggleAllUsers = () => {
-    if (selectedUsers.size === users.length) {
-      setSelectedUsers(new Set());
+    // IMPORTANT: operate on the currently shown list (after filters/search),
+    // not the entire loaded user list.
+    const shownIds = filteredUsers.map(u => u.id);
+    const allShownSelected = shownIds.length > 0 && shownIds.every(id => selectedUsers.has(id));
+
+    const next = new Set(selectedUsers);
+    if (allShownSelected) {
+      shownIds.forEach((id) => next.delete(id));
     } else {
-      setSelectedUsers(new Set(users.map(u => u.id)));
+      shownIds.forEach((id) => next.add(id));
     }
+    setSelectedUsers(next);
   };
 
   const sendNotifications = async () => {
@@ -461,6 +495,7 @@ export default function BroadcastNotifications() {
           targetCountries: Array.from(selectedCountries),
           userIds: Array.from(selectedUsers),
           notificationType: 'system',
+          saveToProfile,
         },
       });
 
@@ -486,6 +521,7 @@ export default function BroadcastNotifications() {
       // Reset form
       setNotificationTitle('');
       setNotificationMessage('');
+      setSaveToProfile(false);
       setSelectedUsers(new Set());
       
       // Switch to history tab to show progress
@@ -647,6 +683,7 @@ export default function BroadcastNotifications() {
       // Toggle off
       setActiveQuickFilter('none');
       setSelectedUsers(new Set());
+      setQuickFilterCandidates(null);
       return;
     }
 
@@ -736,6 +773,7 @@ export default function BroadcastNotifications() {
         targetUserIds = targetUserIds.filter(id => loadedUserIds.has(id));
       }
 
+      setQuickFilterCandidates(new Set(targetUserIds));
       setSelectedUsers(new Set(targetUserIds));
       toast({
         title: `Quick Filter Applied`,
@@ -749,12 +787,17 @@ export default function BroadcastNotifications() {
         variant: 'destructive',
       });
       setActiveQuickFilter('none');
+      setQuickFilterCandidates(null);
     } finally {
       setIsLoadingQuickFilter(false);
     }
   };
 
-  const filteredUsers = users.filter(u => {
+  const baseUsers = activeQuickFilter !== 'none' && quickFilterCandidates
+    ? users.filter(u => quickFilterCandidates.has(u.id))
+    : users;
+
+  const filteredUsers = baseUsers.filter(u => {
     if (!searchTerm) return true;
     const q = searchTerm.toLowerCase();
     return (
@@ -764,9 +807,9 @@ export default function BroadcastNotifications() {
     );
   });
 
-  const usersWithPushTokens = users.filter(u => u.has_push_token).length;
+  const usersWithPushTokens = baseUsers.filter(u => u.has_push_token).length;
   const filteredUsersWithPushTokens = filteredUsers.filter(u => u.has_push_token).length;
-  const selectedUsersWithTokens = users.filter(u => selectedUsers.has(u.id) && u.has_push_token).length;
+  const selectedUsersWithTokens = baseUsers.filter(u => selectedUsers.has(u.id) && u.has_push_token).length;
 
   return (
     <div className="space-y-4">
@@ -950,7 +993,7 @@ export default function BroadcastNotifications() {
                     disabled={isLoadingUsers || users.length === 0}
                     className="h-7 text-xs"
                   >
-                    {selectedUsers.size === users.length ? 'Deselect All' : 'Select All'}
+                    {filteredUsers.length > 0 && filteredUsers.every(u => selectedUsers.has(u.id)) ? 'Deselect All' : 'Select All'}
                   </Button>
                 </div>
               </CardHeader>
@@ -1063,10 +1106,21 @@ export default function BroadcastNotifications() {
                   <p className="text-[10px] text-gray-500">{notificationMessage.length}/200 characters</p>
                 </div>
 
+                <div className="flex items-center space-x-2">
+                  <Checkbox
+                    id="saveToProfile"
+                    checked={saveToProfile}
+                    onCheckedChange={(checked) => setSaveToProfile(checked === true)}
+                  />
+                  <Label htmlFor="saveToProfile" className="text-xs">Save to their profile</Label>
+                </div>
+
                 <Alert>
                   <AlertCircle className="h-4 w-4" />
                   <AlertDescription>
-                    This notification will open the Discover page when users tap on it.
+                    {saveToProfile
+                      ? 'This notification will open Profile Messages when users tap on it.'
+                      : 'This notification will open the Discover page when users tap on it.'}
                   </AlertDescription>
                 </Alert>
 
@@ -1077,6 +1131,9 @@ export default function BroadcastNotifications() {
                     </p>
                     <p className="text-[10px] text-gray-500">
                       {selectedUsersWithTokens} will receive push notification
+                      {saveToProfile && selectedUsers.size - selectedUsersWithTokens > 0
+                        ? ` • ${selectedUsers.size - selectedUsersWithTokens} saved to profile only`
+                        : ''}
                     </p>
                   </div>
                   <Button
