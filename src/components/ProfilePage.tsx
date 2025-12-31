@@ -106,7 +106,7 @@ const ProfilePage = ({ currentUser, profile, onProfileUpdate, onLogout, onShowTe
   const refreshBroadcastUnreadCount = async () => {
     if (!isOwnProfile) return;
     try {
-      const { data, error } = await supabase.rpc('get_my_profile_broadcast_unread_count');
+      const { data, error } = await supabase.rpc('get_my_profile_broadcast_unread_count' as any);
       if (error) throw error;
       setBroadcastUnreadCount(typeof data === 'number' ? data : Number(data) || 0);
     } catch (err) {
@@ -118,7 +118,7 @@ const ProfilePage = ({ currentUser, profile, onProfileUpdate, onLogout, onShowTe
     if (!isOwnProfile) return;
     setIsLoadingBroadcastMessages(true);
     try {
-      const { data, error } = await supabase.rpc('get_my_profile_broadcast_messages', {
+      const { data, error } = await supabase.rpc('get_my_profile_broadcast_messages' as any, {
         p_limit: 50,
         p_offset: 0,
       });
@@ -134,7 +134,7 @@ const ProfilePage = ({ currentUser, profile, onProfileUpdate, onLogout, onShowTe
   const markBroadcastMessagesRead = async () => {
     if (!isOwnProfile) return;
     try {
-      await supabase.rpc('mark_my_profile_broadcasts_read');
+      await supabase.rpc('mark_my_profile_broadcasts_read' as any);
     } catch (err) {
       console.error('[ProfilePage] Failed to mark broadcasts read:', err);
     }
@@ -143,7 +143,7 @@ const ProfilePage = ({ currentUser, profile, onProfileUpdate, onLogout, onShowTe
   const deleteBroadcastMessage = async (recipientId: string) => {
     if (!isOwnProfile) return;
     try {
-      const { data, error } = await supabase.rpc('delete_my_profile_broadcast_message', {
+      const { data, error } = await supabase.rpc('delete_my_profile_broadcast_message' as any, {
         p_recipient_id: recipientId,
       });
       if (error) throw error;
