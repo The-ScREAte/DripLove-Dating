@@ -30,6 +30,12 @@ import PremiumUpgrade from './PremiumUpgrade';
 import CollapsibleSection from './ui/CollapsibleSection';
 import { getLanguageForCountry } from '@/i18n/config';
 import { Badge } from '@/components/ui/badge';
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog';
 
 type UserImageRow = {
   image_url: string | null
@@ -91,8 +97,7 @@ const ProfilePage = ({ currentUser, profile, onProfileUpdate, onLogout, onShowTe
   const showFunQuestionsSection = openSection === 'funQuestions';
   const showInterestsSection = openSection === 'interests';
   const showAdinkraSection = openSection === 'adinkra';
-  const showBroadcastMessagesSection = openSection === 'broadcastMessages';
-  
+
   const showAccountActionsSection = openSection === 'accountActions';
   
   const { toast } = useToast();
@@ -102,6 +107,7 @@ const ProfilePage = ({ currentUser, profile, onProfileUpdate, onLogout, onShowTe
   const [broadcastUnreadCount, setBroadcastUnreadCount] = useState(0);
   const [broadcastMessages, setBroadcastMessages] = useState<ProfileBroadcastMessage[]>([]);
   const [isLoadingBroadcastMessages, setIsLoadingBroadcastMessages] = useState(false);
+  const [isProfileMessagesOpen, setIsProfileMessagesOpen] = useState(false);
 
   const refreshBroadcastUnreadCount = async () => {
     if (!isOwnProfile) return;
@@ -173,7 +179,9 @@ const ProfilePage = ({ currentUser, profile, onProfileUpdate, onLogout, onShowTe
       const hash = window.location.hash?.startsWith('#') ? window.location.hash.substring(1) : '';
       const params = new URLSearchParams(hash);
       if (params.get('profileSection') === 'broadcast_messages') {
-        setOpenSection('broadcastMessages');
+        setIsProfileMessagesOpen(true);
+        // Clear only our deep-link hash so it doesn't keep re-opening.
+        window.location.hash = '';
       }
     } catch {
       // ignore
@@ -182,24 +190,13 @@ const ProfilePage = ({ currentUser, profile, onProfileUpdate, onLogout, onShowTe
 
   useEffect(() => {
     if (!isOwnProfile) return;
-    if (!showBroadcastMessagesSection) return;
+    if (!isProfileMessagesOpen) return;
     (async () => {
       await markBroadcastMessagesRead();
       await refreshBroadcastUnreadCount();
       await loadBroadcastMessages();
-
-      // Clear only our deep-link hash so it doesn't keep re-opening.
-      try {
-        const hash = window.location.hash?.startsWith('#') ? window.location.hash.substring(1) : '';
-        const params = new URLSearchParams(hash);
-        if (params.get('profileSection') === 'broadcast_messages') {
-          window.location.hash = '';
-        }
-      } catch {
-        // ignore
-      }
     })();
-  }, [isOwnProfile, showBroadcastMessagesSection]);
+  }, [isOwnProfile, isProfileMessagesOpen]);
 
   const [editedProfile, setEditedProfile] = useState({
     first_name: '',
@@ -667,7 +664,7 @@ const ProfilePage = ({ currentUser, profile, onProfileUpdate, onLogout, onShowTe
               {isOwnProfile && (
                 <div className="relative w-full sm:w-auto">
                   <Button
-                    onClick={() => setOpenSection('broadcastMessages')}
+                    onClick={() => setIsProfileMessagesOpen(true)}
                     className="w-full sm:w-auto border-gray-300 text-gray-700 hover:bg-gray-50 disabled:opacity-50 bg-white border"
                     variant="outline"
                     aria-label="Open profile messages"
@@ -802,19 +799,18 @@ const ProfilePage = ({ currentUser, profile, onProfileUpdate, onLogout, onShowTe
           </div>
 
           {isOwnProfile && (
-            <div id="broadcast-messages-section">
-              <CollapsibleSection
-                title="Messages"
-                isOpen={showBroadcastMessagesSection}
-                onToggle={() => toggleSection('broadcastMessages')}
-                className="mt-3"
-              >
+            <Dialog open={isProfileMessagesOpen} onOpenChange={setIsProfileMessagesOpen}>
+              <DialogContent className="max-w-lg">
+                <DialogHeader>
+                  <DialogTitle>Messages</DialogTitle>
+                </DialogHeader>
+
                 {isLoadingBroadcastMessages ? (
-                  <div className="text-sm text-gray-500">Loading...</div>
+                  <div className="text-sm text-muted-foreground">Loading…</div>
                 ) : broadcastMessages.length === 0 ? (
-                  <div className="text-sm text-gray-500">No messages yet.</div>
+                  <div className="text-sm text-muted-foreground">No messages yet.</div>
                 ) : (
-                  <div className="space-y-3">
+                  <div className="space-y-3 max-h-[70vh] overflow-y-auto pr-1">
                     {broadcastMessages.map((m) => {
                       const created = m.created_at ? new Date(m.created_at) : null;
                       const dateLabel = created ? created.toLocaleString() : '';
@@ -823,36 +819,38 @@ const ProfilePage = ({ currentUser, profile, onProfileUpdate, onLogout, onShowTe
                       return (
                         <div
                           key={m.recipient_id}
-                          className="border border-gray-200 rounded-lg p-3 bg-white"
+                          className="border border-border rounded-lg p-3 bg-card"
                         >
                           <div className="flex items-start justify-between gap-3">
                             <div className="min-w-0">
                               <div className="flex items-center gap-2">
-                                <p className="text-sm font-semibold text-gray-900 truncate">{m.title}</p>
+                                <p className="text-sm font-semibold text-foreground truncate">{m.title}</p>
                                 {isUnread && (
-                                  <Badge variant="outline" className="text-[10px] h-4">New</Badge>
+                                  <Badge variant="outline" className="text-[10px] h-4">
+                                    New
+                                  </Badge>
                                 )}
                               </div>
                               {dateLabel && (
-                                <p className="text-[10px] text-gray-500">{dateLabel}</p>
+                                <p className="text-[10px] text-muted-foreground">{dateLabel}</p>
                               )}
                             </div>
                             <Button
                               variant="outline"
-                              className="h-7 px-2 text-xs border-gray-300 text-gray-700 hover:bg-gray-50 bg-white"
+                              className="h-7 px-2 text-xs"
                               onClick={() => deleteBroadcastMessage(m.recipient_id)}
                             >
                               <X className="w-3 h-3" />
                             </Button>
                           </div>
-                          <p className="text-sm text-gray-700 mt-2 whitespace-pre-wrap">{m.message}</p>
+                          <p className="text-sm text-foreground/90 mt-2 whitespace-pre-wrap">{m.message}</p>
                         </div>
                       );
                     })}
                   </div>
                 )}
-              </CollapsibleSection>
-            </div>
+              </DialogContent>
+            </Dialog>
           )}
 
           <CollapsibleSection
