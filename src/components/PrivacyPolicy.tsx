@@ -61,6 +61,27 @@ const PrivacyPolicy = ({ onBack }: PrivacyPolicyProps) => {
                 </ul>
               </div>
               <div>
+                <h3 className="text-lg font-semibold text-gray-700 mb-2">Biometric and Face Data:</h3>
+                <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 space-y-3">
+                  <p className="text-gray-700 font-medium">Face Data Collection</p>
+                  <p className="text-gray-600 leading-relaxed">
+                    We collect a single facial image during account registration for identity verification and fraud prevention. The facial image is processed using Amazon Web Services (AWS Rekognition) to generate a Face ID that helps ensure each individual can create only one account.
+                  </p>
+                  <p className="text-gray-700 font-medium">Use of Face Data</p>
+                  <p className="text-gray-600 leading-relaxed">
+                    Face data is used exclusively to prevent duplicate registrations and protect users from fraudulent activity. It is not used for advertising, analytics, tracking, personalization, or profiling. The app enforces a one user = one account policy.
+                  </p>
+                  <p className="text-gray-700 font-medium">Third-Party Processing</p>
+                  <p className="text-gray-600 leading-relaxed">
+                    Facial recognition processing is performed by AWS Rekognition. The facial image is not stored by the app after processing. AWS Rekognition generates and stores only the Face ID (biometric identifier) securely within AWS infrastructure. Face data is not shared with advertisers, analytics providers, or any other third parties.
+                  </p>
+                  <p className="text-gray-700 font-medium">Retention of Face Data</p>
+                  <p className="text-gray-600 leading-relaxed">
+                    The facial image is not retained by the app after processing. The Face ID stored by AWS Rekognition is retained only while the user account is active. If a user deletes their account, the corresponding Face ID is permanently deleted to prevent further association.
+                  </p>
+                </div>
+              </div>
+              <div>
                 <h3 className="text-lg font-semibold text-gray-700 mb-2">Information We Collect Automatically:</h3>
                 <ul className="list-disc pl-6 space-y-1 text-gray-600">
                   <li>Device information (type, OS, unique identifiers)</li>
@@ -87,10 +108,16 @@ const PrivacyPolicy = ({ onBack }: PrivacyPolicyProps) => {
               <li>Facilitating communication between users</li>
               <li>Personalizing your experience</li>
               <li>Ensuring platform safety and security</li>
+              <li>Verifying identity and preventing duplicate accounts using face data</li>
               <li>Processing payments and subscriptions</li>
               <li>Providing customer support</li>
               <li>Improving our algorithms and features</li>
             </ul>
+            <div className="bg-green-50 border border-green-200 rounded-lg p-3 mt-4">
+              <p className="text-gray-700 text-sm">
+                <strong>Note on Face Data:</strong> Facial recognition is used only for identity verification and fraud prevention. Face data is never used for advertising, analytics, user tracking, personalization, or profiling purposes.
+              </p>
+            </div>
           </section>
 
           <section>
@@ -108,6 +135,12 @@ const PrivacyPolicy = ({ onBack }: PrivacyPolicyProps) => {
               <li>In connection with a business transaction (merger, acquisition)</li>
               <li>With your explicit consent for specific purposes</li>
             </ul>
+            <div className="bg-orange-50 border border-orange-200 rounded-lg p-4 mt-4 space-y-2">
+              <p className="text-gray-700 font-medium">Third-Party Service Providers</p>
+              <p className="text-gray-600 text-sm leading-relaxed">
+                <strong>AWS Rekognition:</strong> We use Amazon Web Services (AWS Rekognition) to process facial images for identity verification. The facial image is submitted to AWS Rekognition solely to generate a Face ID (biometric identifier). The original facial image is not stored by our app after processing. AWS stores only the Face ID securely within AWS infrastructure. Face data is never shared with advertisers, analytics providers, or any other third parties beyond AWS Rekognition.
+              </p>
+            </div>
             <p className="text-gray-600 leading-relaxed mt-3">
               We never sell your personal information to third parties for marketing purposes.
             </p>
@@ -158,9 +191,18 @@ const PrivacyPolicy = ({ onBack }: PrivacyPolicyProps) => {
             <p className="text-gray-600 leading-relaxed mb-4">
               We retain your information only as long as necessary to provide our services and comply with legal obligations. When you delete your account, we will remove your personal information from our active systems within 30 days.
             </p>
-            <p className="text-gray-600 leading-relaxed">
+            <p className="text-gray-600 leading-relaxed mb-4">
               Some information may be retained for longer periods for legal, safety, or business purposes, but will be kept in a secure and restricted manner.
             </p>
+            <div className="bg-cyan-50 border border-cyan-200 rounded-lg p-4 space-y-2">
+              <p className="text-gray-700 font-medium">Face Data Retention</p>
+              <ul className="list-disc pl-6 space-y-1 text-gray-600 text-sm">
+                <li>The facial image is not retained by the app after processing</li>
+                <li>The Face ID stored by AWS Rekognition is retained only while your account is active</li>
+                <li>Upon account deletion, the corresponding Face ID is permanently deleted from AWS Rekognition to prevent further association</li>
+                <li>This ensures complete removal of all biometric data when you choose to leave the platform</li>
+              </ul>
+            </div>
           </section>
 
           <section>

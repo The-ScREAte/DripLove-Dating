@@ -42,8 +42,13 @@ const StatsCard: React.FC<StatsCardProps> = ({ stats }) => {
   const [selectedDate, setSelectedDate] = useState<Date>(new Date());
   const [selectedDateCount, setSelectedDateCount] = useState<number | null>(null);
   const [isLoadingHistory, setIsLoadingHistory] = useState(false);
-  const [currentPremiumUsers, setCurrentPremiumUsers] = useState<number | null>(null);
-  const [allTimePremiumCount, setAllTimePremiumCount] = useState<number | null>(null);
+
+  // IMPORTANT:
+  // Do NOT query `user_subscriptions` directly from the browser for admin-wide counts.
+  // In production, RLS often blocks reading other users' subscriptions, which returns 0.
+  // We rely on `get_admin_stats()` (SECURITY DEFINER) for Premium counts.
+  const premiumNowCount = stats.premium_users ?? 0;
+  const allTimePremiumCount = stats.all_time_premium_users ?? premiumNowCount;
 
   // Load historical data on mount
   useEffect(() => {
@@ -69,59 +74,6 @@ const StatsCard: React.FC<StatsCardProps> = ({ stats }) => {
     };
 
     loadHistoricalData();
-  }, []);
-
-  // Load current premium users count (active subscriptions right now)
-  useEffect(() => {
-    const loadCurrentPremiumUsers = async () => {
-      try {
-        // Count users with active premium subscriptions
-        const { count, error } = await supabase
-          .from('user_subscriptions')
-          .select('user_id', { count: 'exact', head: true })
-          .eq('plan_name', 'premium')
-          .eq('status', 'active');
-        
-        if (error) {
-          console.error('Failed to load current premium users:', error);
-          setCurrentPremiumUsers(0);
-          return;
-        }
-
-        setCurrentPremiumUsers(count ?? 0);
-      } catch (err) {
-        console.error('Error loading current premium users:', err);
-        setCurrentPremiumUsers(0);
-      }
-    };
-
-    loadCurrentPremiumUsers();
-  }, []);
-
-  // Load all-time premium count (all users who have EVER had premium subscription)
-  useEffect(() => {
-    const loadAllTimePremiumCount = async () => {
-      try {
-        // Count all users who have ever had a premium subscription (any status except free)
-        const { count, error } = await supabase
-          .from('user_subscriptions')
-          .select('user_id', { count: 'exact', head: true })
-          .eq('plan_name', 'premium')
-          .in('status', ['active', 'cancelled', 'expired', 'payment_failed']);
-        
-        if (error) {
-          console.error('Failed to load all-time premium count:', error);
-          setAllTimePremiumCount(0);
-          return;
-        }
-        setAllTimePremiumCount(count ?? 0);
-      } catch (err) {
-        console.error('Error loading all-time premium count:', err);
-        setAllTimePremiumCount(0);
-      }
-    };
-
-    loadAllTimePremiumCount();
   }, []);
 
   // When selecting a historical date
@@ -259,13 +211,13 @@ const StatsCard: React.FC<StatsCardProps> = ({ stats }) => {
 
           <div className="flex flex-col items-center p-1.5 bg-orange-50 rounded">
             <Crown className="w-3 h-3 text-orange-600 mb-0.5" />
-            <span className="text-sm font-bold text-orange-600">{allTimePremiumCount ?? 0}</span>
+            <span className="text-sm font-bold text-orange-600">{allTimePremiumCount}</span>
             <span className="text-[10px] text-gray-600">All Time Premium</span>
           </div>
           
           <div className="flex flex-col items-center p-1.5 bg-gray-50 rounded">
             <Crown className="w-3 h-3 text-gray-600 mb-0.5" />
-            <span className="text-sm font-bold text-gray-600">{currentPremiumUsers ?? 0}</span>
+            <span className="text-sm font-bold text-gray-600">{premiumNowCount}</span>
             <span className="text-[10px] text-gray-600">Premium Now</span>
           </div>
           
