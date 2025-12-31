@@ -87,12 +87,27 @@ const Index = ({
       } catch {}
 
       if (!profile) {
-        // Single fast query with retry logic built-in
-        const result = await supabase
-          .from('profiles')
-          .select('is_admin, account_status, first_name, last_name, date_of_birth, country, city, gender, preference, relationship_intent, occupation, industry, education_level, terms_accepted')
-          .eq('id', userId)
-          .maybeSingle();
+        // Single fast query with timeout wrapper
+        const fetchWithTimeout = async () => {
+          const result = await supabase
+            .from('profiles')
+            .select('is_admin, account_status, first_name, last_name, date_of_birth, country, city, gender, preference, relationship_intent, occupation, industry, education_level, terms_accepted')
+            .eq('id', userId)
+            .maybeSingle();
+          return result;
+        };
+        
+        // Race between fetch and 5s timeout
+        const timeoutPromise = new Promise<null>((resolve) => setTimeout(() => resolve(null), 5000));
+        const result = await Promise.race([fetchWithTimeout(), timeoutPromise]);
+        
+        // If timed out, just go to app view
+        if (result === null) {
+          setLoading(false);
+          setViewIfChanged('app');
+          return;
+        }
+        
         profile = result.data;
         
         // If no profile found, check if OAuth user needs profile completion
