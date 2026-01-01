@@ -590,6 +590,74 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, isPremium, profileComplet
     }
   }, [currentUser?.id]);
 
+  // ⭐ SERVER-SIDE SWIPE HYDRATION: Rebuild locallySwipedProfileIds from DB on startup
+  // This ensures swipe history is authoritative even if localStorage is cleared, incognito, or new device
+  const hydrateSwipesFromServer = useCallback(async () => {
+    if (!currentUser?.id) return;
+
+    const now = Date.now();
+    const thirtyDaysAgoIso = new Date(now - 30 * 24 * 60 * 60 * 1000).toISOString();
+
+    try {
+      const [{ data: likes }, { data: passes }] = await Promise.all([
+        supabase
+          .from('likes')
+          .select('liked_id, created_at')
+          .eq('liker_id', currentUser.id),
+        supabase
+          .from('passes')
+          .select('passed_id, passed_at')
+          .eq('passer_id', currentUser.id)
+          .gte('passed_at', thirtyDaysAgoIso),
+      ]);
+
+      // Merge with existing local data (server is authoritative, but keep local if newer)
+      const serverSwipes = new Map<string, { action: 'like' | 'pass', timestamp: number }>();
+
+      (likes || []).forEach((r) => {
+        if (r.liked_id) {
+          serverSwipes.set(r.liked_id, {
+            action: 'like',
+            timestamp: r.created_at ? new Date(r.created_at).getTime() : now,
+          });
+        }
+      });
+
+      (passes || []).forEach((r) => {
+        if (r.passed_id) {
+          serverSwipes.set(r.passed_id, {
+            action: 'pass',
+            timestamp: r.passed_at ? new Date(r.passed_at).getTime() : now,
+          });
+        }
+      });
+
+      // Merge: server wins for conflicts, but keep local-only entries (pending syncs)
+      for (const [id, data] of serverSwipes.entries()) {
+        const local = locallySwipedProfileIds.current.get(id);
+        // Server is authoritative - always use server data
+        if (!local || data.timestamp >= local.timestamp) {
+          locallySwipedProfileIds.current.set(id, data);
+        }
+      }
+
+      // Persist the merged data
+      persistSwipedIds();
+
+      swipeDebug('hydrateSwipesFromServer: hydrated', {
+        likesCount: likes?.length || 0,
+        passesCount: passes?.length || 0,
+        totalSwiped: locallySwipedProfileIds.current.size,
+      });
+    } catch (error) {
+      console.error('[DiscoverPage] Error hydrating swipes from server:', error);
+      // Non-fatal - continue with local data
+    }
+  }, [currentUser?.id, persistSwipedIds]);
+
+  // Track if we've hydrated from server this session
+  const hasHydratedFromServerRef = useRef(false);
+
   // Debug logging (enable with: localStorage.setItem('driplove_debug_swipe','1'))
   const isSwipeDebugEnabled = () => {
     try {
@@ -1148,6 +1216,79 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, isPremium, profileComplet
       return qualifiedProfiles as unknown as ProfileRow[];
     } catch (error) {
       console.error('[DiscoverPage] Error fetching liked-me profiles:', error);
+      return [];
+    }
+  }, []);
+
+  // ⭐ NEVER-SEEN USER INJECTION: Fetch users who have never been swiped by anyone
+  // These users are completely new or have been overlooked - prioritize showing them
+  const fetchNeverSeenProfiles = useCallback(async (
+    userId: string,
+    excludedIds: string[],
+    allowedGenders: string[],
+    baseCountryCode: string,
+    limit: number = 10
+  ): Promise<ProfileRow[]> => {
+    try {
+      const PROFILE_SELECT = 'id, first_name, last_name, bio, city, country, country_code, occupation, education_level, date_of_birth, interests, gender, latitude, longitude, fun_fact, perfect_first_date, last_googled, relationship_intent, smoking, drinking, exercise_level, sleeping_schedule, introvert_extrovert, spontaneous_planner, messy_organized, adinkra_symbols, created_at, last_login_at';
+      
+      // Get all user IDs who have been liked or passed by ANYONE
+      const [{ data: likedIds }, { data: passedIds }] = await Promise.all([
+        supabase.from('likes').select('liked_id'),
+        supabase.from('passes').select('passed_id'),
+      ]);
+
+      const seenIds = new Set<string>();
+      (likedIds || []).forEach(r => r.liked_id && seenIds.add(r.liked_id));
+      (passedIds || []).forEach(r => r.passed_id && seenIds.add(r.passed_id));
+
+      // Fetch all eligible profiles
+      let query = supabase
+        .from('profiles')
+        .select(PROFILE_SELECT)
+        .in('gender', allowedGenders)
+        .eq('account_status', 'active')
+        .eq('is_admin', false)
+        .eq('is_archived', false)
+        .neq('id', userId);
+
+      if (baseCountryCode) {
+        query = query.eq('country_code', baseCountryCode);
+      }
+
+      if (excludedIds.length > 0) {
+        query = query.not('id', 'in', `(${excludedIds.join(',')})`);
+      }
+
+      const { data: profiles, error } = await query.limit(100);
+
+      if (error || !profiles) return [];
+
+      // Filter to only "never seen" profiles
+      const neverSeenProfiles = profiles.filter(p => !seenIds.has(p.id));
+
+      if (neverSeenProfiles.length === 0) return [];
+
+      // Get image counts for quality filter (require at least 1 photo)
+      const { data: imageCounts } = await supabase
+        .from('user_images')
+        .select('user_id')
+        .in('user_id', neverSeenProfiles.map(p => p.id))
+        .eq('is_approved', true);
+
+      const imageCountMap = new Map<string, number>();
+      (imageCounts || []).forEach(row => {
+        imageCountMap.set(row.user_id, (imageCountMap.get(row.user_id) || 0) + 1);
+      });
+
+      // Filter by quality: require at least 1 photo for never-seen
+      const qualifiedProfiles = neverSeenProfiles.filter(p => (imageCountMap.get(p.id) || 0) >= 1);
+
+      // Shuffle and limit
+      const shuffledProfiles = [...qualifiedProfiles].sort(() => Math.random() - 0.5);
+      return shuffledProfiles.slice(0, limit) as unknown as ProfileRow[];
+    } catch (error) {
+      console.error('[DiscoverPage] Error fetching never-seen profiles:', error);
       return [];
     }
   }, []);
@@ -1831,6 +1972,60 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, isPremium, profileComplet
       }
     }
 
+    // ⭐ NEVER-SEEN USER INJECTION: Fetch users who have never been swiped and inject early in feed
+    // This ensures new users get visibility and aren't overlooked
+    const neverSeenRows = await fetchNeverSeenProfiles(userId, excludedIds, allowedGenders, baseCountryCode, 8);
+    
+    if (neverSeenRows.length > 0) {
+      // Convert to PotentialMatch format
+      const neverSeenProfiles: PotentialMatch[] = neverSeenRows.map(profile =>
+        toPotentialMatch(profile, {
+          images: [],
+          distance: distanceMap[profile.id],
+        })
+      );
+
+      // Filter out any that are already in shuffled deck
+      const shuffledIds = new Set(shuffled.map(p => p.id));
+      const uniqueNeverSeen = neverSeenProfiles.filter(p => !shuffledIds.has(p.id));
+
+      // Apply age filtering
+      const userMinAge = currentUserData?.min_age || 18;
+      const userMaxAge = currentUserData?.max_age || 99;
+      const ageFilteredNeverSeen = uniqueNeverSeen.filter(profile => {
+        if (!profile.date_of_birth) return true; // Keep if DOB missing
+        const age = calculateAge(profile.date_of_birth);
+        if (!Number.isFinite(age)) return true;
+        return age >= userMinAge && age <= userMaxAge;
+      });
+
+      // Apply global eligibility gate
+      const eligibleNeverSeen = ageFilteredNeverSeen.filter(isEligibleProfile);
+
+      // Inject never-seen profiles at positions 1, 3, 5, 7... (every other position early in feed)
+      if (eligibleNeverSeen.length > 0) {
+        const injected: PotentialMatch[] = [];
+        let neverSeenIndex = 0;
+        
+        for (let i = 0; i < shuffled.length; i++) {
+          // Inject at odd positions (1, 3, 5, 7...) for the first few cards
+          if (i > 0 && i % 2 === 1 && neverSeenIndex < eligibleNeverSeen.length && i < 10) {
+            injected.push(eligibleNeverSeen[neverSeenIndex]);
+            neverSeenIndex++;
+          }
+          injected.push(shuffled[i]);
+        }
+        
+        // Append any remaining never-seen profiles
+        while (neverSeenIndex < eligibleNeverSeen.length) {
+          injected.push(eligibleNeverSeen[neverSeenIndex]);
+          neverSeenIndex++;
+        }
+        
+        shuffled = injected;
+      }
+    }
+
     // ⭐ PROFILE POSITION PERSISTENCE: Resume from last viewed profile
     // Load last profile ID and time from localStorage
     const savedId = localStorage.getItem(`driplove_last_profile_${userId}`);
@@ -1906,7 +2101,7 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, isPremium, profileComplet
       distances: distanceMap,
       index: startIndex
     };
-  }, [loadAllImagesForProfile, premiumActive, currentUser, fetchUnlockedCountryProfiles, fetchLikedMeProfiles, blendLikedMeProfiles, isEligibleProfile]);
+  }, [loadAllImagesForProfile, premiumActive, currentUser, fetchUnlockedCountryProfiles, fetchLikedMeProfiles, blendLikedMeProfiles, isEligibleProfile, fetchNeverSeenProfiles]);
 
   // Batch language fetch (avoid per-card calls)
   const batchFetchLanguages = useCallback(async (profileIds: string[]) => {
@@ -2254,6 +2449,13 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, isPremium, profileComplet
     const initializeProfiles = async () => {
       initializedUserRef.current = cacheKey;
 
+      // ⭐ SERVER-SIDE SWIPE HYDRATION: Ensure swipe history is loaded from DB before building deck
+      // This prevents repeats even on new device, incognito, or cleared localStorage
+      if (!hasHydratedFromServerRef.current) {
+        hasHydratedFromServerRef.current = true;
+        await hydrateSwipesFromServer();
+      }
+
       const cachedDeck = readDeckCache(cacheKey);
       if (cachedDeck && cachedDeck.length > 0) {
         // ⭐ CRITICAL: Filter cached deck against locally swiped profiles to prevent repetition
@@ -2302,6 +2504,7 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, isPremium, profileComplet
     fetchReverseUsage,
     persistSwipedIds,
     readDeckCache,
+    hydrateSwipesFromServer,
   ]); // Removed premiumResolved and subscriptionLoading - don't block on subscription state
 
 
