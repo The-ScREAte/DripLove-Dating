@@ -1,0 +1,7 @@
+{
+  "version": 3,
+  "sources": ["../../node_modules/capacitor-rate-app/src/index.ts"],
+  "sourcesContent": [null],
+  "mappings": ";;;AAAA,SAAS,sBAAsB;AAI/B,IAAM,UAAU,eAA8B,WAAW;EACvD,KAAK,MAAM,OAAO,mBAAO,EAAE,KAAK,OAAK,IAAI,EAAE,WAAU,CAAE;CACxD;",
+  "names": []
+}

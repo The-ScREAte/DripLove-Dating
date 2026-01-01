@@ -9,7 +9,7 @@ import { useToast } from '@/hooks/use-toast';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { ScrollArea } from '@/components/ui/scroll-area';
-import { Loader2, Send, Users, Globe, CheckCircle2, AlertCircle, Trash2, RotateCw, Eye, EyeOff, History, Copy, Mail, Calendar } from 'lucide-react';
+import { Loader2, Send, Users, Globe, CheckCircle2, AlertCircle, Trash2, RotateCw, Eye, History, Copy, Mail, Calendar } from 'lucide-react';
 import EmailExport from './EmailExport';
 import ScheduledBroadcasts from './ScheduledBroadcasts';
 import { Alert, AlertDescription } from '@/components/ui/alert';
@@ -129,18 +129,12 @@ export default function BroadcastNotifications() {
   const [selectedUsers, setSelectedUsers] = useState<Set<string>>(new Set());
   const [notificationTitle, setNotificationTitle] = useState('');
   const [notificationMessage, setNotificationMessage] = useState('');
-  const [saveToProfile, setSaveToProfile] = useState(false);
   const [isLoadingCountries, setIsLoadingCountries] = useState(false);
   const [isLoadingUsers, setIsLoadingUsers] = useState(false);
   const [isSending, setIsSending] = useState(false);
   const { toast } = useToast();
   const [searchTerm, setSearchTerm] = useState('');
   const [activeTab, setActiveTab] = useState('new');
-  
-  // Quick filters for debugger categories
-  const [activeQuickFilter, setActiveQuickFilter] = useState<'none' | 'no_photo' | 'incomplete' | 'never_seen'>('none');
-  const [isLoadingQuickFilter, setIsLoadingQuickFilter] = useState(false);
-  const [quickFilterCandidates, setQuickFilterCandidates] = useState<Set<string> | null>(null);
   
   // Campaign history
   const [campaigns, setCampaigns] = useState<Campaign[]>([]);
@@ -164,33 +158,8 @@ export default function BroadcastNotifications() {
     } else {
       setUsers([]);
       setSelectedUsers(new Set());
-      setActiveQuickFilter('none');
-      setQuickFilterCandidates(null);
     }
   }, [selectedCountries]);
-
-  // Keep selected users aligned with the currently loaded/filtered user list.
-  // This prevents sending to users from a previous filter selection.
-  useEffect(() => {
-    const allowed = new Set(users.map(u => u.id));
-
-    setSelectedUsers(prev => {
-      if (prev.size === 0) return prev;
-      const next = new Set<string>();
-      prev.forEach((id) => {
-        if (allowed.has(id)) next.add(id);
-      });
-      return next;
-    });
-
-    if (activeQuickFilter !== 'none' && quickFilterCandidates) {
-      const nextCandidates = new Set<string>();
-      quickFilterCandidates.forEach((id) => {
-        if (allowed.has(id)) nextCandidates.add(id);
-      });
-      setQuickFilterCandidates(nextCandidates);
-    }
-  }, [users]);
 
   useEffect(() => {
     if (activeTab !== 'history') {
@@ -451,18 +420,11 @@ export default function BroadcastNotifications() {
   };
 
   const toggleAllUsers = () => {
-    // IMPORTANT: operate on the currently shown list (after filters/search),
-    // not the entire loaded user list.
-    const shownIds = filteredUsers.map(u => u.id);
-    const allShownSelected = shownIds.length > 0 && shownIds.every(id => selectedUsers.has(id));
-
-    const next = new Set(selectedUsers);
-    if (allShownSelected) {
-      shownIds.forEach((id) => next.delete(id));
+    if (selectedUsers.size === users.length) {
+      setSelectedUsers(new Set());
     } else {
-      shownIds.forEach((id) => next.add(id));
+      setSelectedUsers(new Set(users.map(u => u.id)));
     }
-    setSelectedUsers(next);
   };
 
   const sendNotifications = async () => {
@@ -495,7 +457,6 @@ export default function BroadcastNotifications() {
           targetCountries: Array.from(selectedCountries),
           userIds: Array.from(selectedUsers),
           notificationType: 'system',
-          saveToProfile,
         },
       });
 
@@ -521,7 +482,6 @@ export default function BroadcastNotifications() {
       // Reset form
       setNotificationTitle('');
       setNotificationMessage('');
-      setSaveToProfile(false);
       setSelectedUsers(new Set());
       
       // Switch to history tab to show progress
@@ -677,127 +637,7 @@ export default function BroadcastNotifications() {
     setActiveTab('new');
   };
 
-  // Quick filter functions for debugger categories
-  const applyQuickFilter = async (filterType: 'no_photo' | 'incomplete' | 'never_seen') => {
-    if (activeQuickFilter === filterType) {
-      // Toggle off
-      setActiveQuickFilter('none');
-      setSelectedUsers(new Set());
-      setQuickFilterCandidates(null);
-      return;
-    }
-
-    setIsLoadingQuickFilter(true);
-    setActiveQuickFilter(filterType);
-
-    try {
-      const PAGE_SIZE = 1000;
-      
-      // Batch fetch all profiles
-      const allProfiles: Array<{ id: string; gender: string | null; preference: string | null; bio: string | null; city: string | null }> = [];
-      for (let page = 0; ; page++) {
-        const { data: pageRows, error } = await supabase
-          .from('profiles')
-          .select('id, gender, preference, bio, city')
-          .eq('account_status', 'active')
-          .eq('is_admin', false)
-          .order('id')
-          .range(page * PAGE_SIZE, (page + 1) * PAGE_SIZE - 1);
-
-        if (error) throw error;
-        if (!pageRows || pageRows.length === 0) break;
-        allProfiles.push(...pageRows);
-        if (pageRows.length < PAGE_SIZE) break;
-      }
-
-      const profileIds = allProfiles.map(p => p.id);
-      let targetUserIds: string[] = [];
-
-      if (filterType === 'no_photo') {
-        // Get all user images
-        const usersWithImages = new Set<string>();
-        for (let page = 0; ; page++) {
-          const { data: images, error } = await supabase
-            .from('user_images')
-            .select('user_id')
-            .range(page * PAGE_SIZE, (page + 1) * PAGE_SIZE - 1);
-          
-          if (error) throw error;
-          if (!images || images.length === 0) break;
-          images.forEach(img => usersWithImages.add(img.user_id));
-          if (images.length < PAGE_SIZE) break;
-        }
-        
-        targetUserIds = profileIds.filter(id => !usersWithImages.has(id));
-      } else if (filterType === 'incomplete') {
-        // Users with missing essential fields
-        targetUserIds = allProfiles
-          .filter(p => !p.gender || !p.preference || !p.bio || !p.city)
-          .map(p => p.id);
-      } else if (filterType === 'never_seen') {
-        // Users who have never been liked or passed
-        const seenUsers = new Set<string>();
-        
-        // Get all likes
-        for (let page = 0; ; page++) {
-          const { data: likes, error } = await supabase
-            .from('likes')
-            .select('liked_id')
-            .range(page * PAGE_SIZE, (page + 1) * PAGE_SIZE - 1);
-          
-          if (error) throw error;
-          if (!likes || likes.length === 0) break;
-          likes.forEach(l => seenUsers.add(l.liked_id));
-          if (likes.length < PAGE_SIZE) break;
-        }
-        
-        // Get all passes
-        for (let page = 0; ; page++) {
-          const { data: passes, error } = await supabase
-            .from('passes')
-            .select('passed_id')
-            .range(page * PAGE_SIZE, (page + 1) * PAGE_SIZE - 1);
-          
-          if (error) throw error;
-          if (!passes || passes.length === 0) break;
-          passes.forEach(p => p.passed_id && seenUsers.add(p.passed_id));
-          if (passes.length < PAGE_SIZE) break;
-        }
-        
-        targetUserIds = profileIds.filter(id => !seenUsers.has(id));
-      }
-
-      // Intersect with currently loaded users if countries are selected
-      if (selectedCountries.size > 0 && users.length > 0) {
-        const loadedUserIds = new Set(users.map(u => u.id));
-        targetUserIds = targetUserIds.filter(id => loadedUserIds.has(id));
-      }
-
-      setQuickFilterCandidates(new Set(targetUserIds));
-      setSelectedUsers(new Set(targetUserIds));
-      toast({
-        title: `Quick Filter Applied`,
-        description: `Selected ${targetUserIds.length} users with "${filterType.replace('_', ' ')}" criteria.`,
-      });
-    } catch (error) {
-      console.error('Error applying quick filter:', error);
-      toast({
-        title: 'Error',
-        description: 'Failed to apply quick filter',
-        variant: 'destructive',
-      });
-      setActiveQuickFilter('none');
-      setQuickFilterCandidates(null);
-    } finally {
-      setIsLoadingQuickFilter(false);
-    }
-  };
-
-  const baseUsers = activeQuickFilter !== 'none' && quickFilterCandidates
-    ? users.filter(u => quickFilterCandidates.has(u.id))
-    : users;
-
-  const filteredUsers = baseUsers.filter(u => {
+  const filteredUsers = users.filter(u => {
     if (!searchTerm) return true;
     const q = searchTerm.toLowerCase();
     return (
@@ -807,9 +647,9 @@ export default function BroadcastNotifications() {
     );
   });
 
-  const usersWithPushTokens = baseUsers.filter(u => u.has_push_token).length;
+  const usersWithPushTokens = users.filter(u => u.has_push_token).length;
   const filteredUsersWithPushTokens = filteredUsers.filter(u => u.has_push_token).length;
-  const selectedUsersWithTokens = baseUsers.filter(u => selectedUsers.has(u.id) && u.has_push_token).length;
+  const selectedUsersWithTokens = users.filter(u => selectedUsers.has(u.id) && u.has_push_token).length;
 
   return (
     <div className="space-y-4">
@@ -836,83 +676,6 @@ export default function BroadcastNotifications() {
         </TabsList>
 
         <TabsContent value="new" className="space-y-4">
-          {/* Quick Filters for Debugger Categories */}
-          <Card>
-            <CardHeader className="pb-2">
-              <CardTitle className="text-xs flex items-center gap-2">
-                <AlertCircle className="w-3 h-3" />
-                Quick Filters (Debugger Categories)
-              </CardTitle>
-              <CardDescription className="text-[10px]">
-                Target specific user segments from the debugger analysis
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
-              <div className="flex flex-wrap gap-2">
-                <Button
-                  variant={activeQuickFilter === 'no_photo' ? 'default' : 'outline'}
-                  size="sm"
-                  onClick={() => applyQuickFilter('no_photo')}
-                  disabled={isLoadingQuickFilter}
-                  className="h-7 text-[10px]"
-                >
-                  {isLoadingQuickFilter && activeQuickFilter === 'no_photo' ? (
-                    <Loader2 className="w-3 h-3 mr-1 animate-spin" />
-                  ) : (
-                    <Eye className="w-3 h-3 mr-1" />
-                  )}
-                  No Photo
-                </Button>
-                <Button
-                  variant={activeQuickFilter === 'incomplete' ? 'default' : 'outline'}
-                  size="sm"
-                  onClick={() => applyQuickFilter('incomplete')}
-                  disabled={isLoadingQuickFilter}
-                  className="h-7 text-[10px]"
-                >
-                  {isLoadingQuickFilter && activeQuickFilter === 'incomplete' ? (
-                    <Loader2 className="w-3 h-3 mr-1 animate-spin" />
-                  ) : (
-                    <AlertCircle className="w-3 h-3 mr-1" />
-                  )}
-                  Incomplete Profile
-                </Button>
-                <Button
-                  variant={activeQuickFilter === 'never_seen' ? 'default' : 'outline'}
-                  size="sm"
-                  onClick={() => applyQuickFilter('never_seen')}
-                  disabled={isLoadingQuickFilter}
-                  className="h-7 text-[10px]"
-                >
-                  {isLoadingQuickFilter && activeQuickFilter === 'never_seen' ? (
-                    <Loader2 className="w-3 h-3 mr-1 animate-spin" />
-                  ) : (
-                    <EyeOff className="w-3 h-3 mr-1" />
-                  )}
-                  Never Seen
-                </Button>
-                {activeQuickFilter !== 'none' && (
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    onClick={() => {
-                      setActiveQuickFilter('none');
-                      setSelectedUsers(new Set());
-                    }}
-                    className="h-7 text-[10px] text-gray-500"
-                  >
-                    Clear Filter
-                  </Button>
-                )}
-              </div>
-              {activeQuickFilter !== 'none' && (
-                <p className="text-[10px] text-gray-500 mt-2">
-                  Filter active: {selectedUsers.size} users selected
-                </p>
-              )}
-            </CardContent>
-          </Card>
-
           {/* Country Selection */}
           <Card>
             <CardHeader>
@@ -993,7 +756,7 @@ export default function BroadcastNotifications() {
                     disabled={isLoadingUsers || users.length === 0}
                     className="h-7 text-xs"
                   >
-                    {filteredUsers.length > 0 && filteredUsers.every(u => selectedUsers.has(u.id)) ? 'Deselect All' : 'Select All'}
+                    {selectedUsers.size === users.length ? 'Deselect All' : 'Select All'}
                   </Button>
                 </div>
               </CardHeader>
@@ -1106,21 +869,10 @@ export default function BroadcastNotifications() {
                   <p className="text-[10px] text-gray-500">{notificationMessage.length}/200 characters</p>
                 </div>
 
-                <div className="flex items-center space-x-2">
-                  <Checkbox
-                    id="saveToProfile"
-                    checked={saveToProfile}
-                    onCheckedChange={(checked) => setSaveToProfile(checked === true)}
-                  />
-                  <Label htmlFor="saveToProfile" className="text-xs">Save to their profile</Label>
-                </div>
-
                 <Alert>
                   <AlertCircle className="h-4 w-4" />
                   <AlertDescription>
-                    {saveToProfile
-                      ? 'This notification will open Profile Messages when users tap on it.'
-                      : 'This notification will open the Discover page when users tap on it.'}
+                    This notification will open the Discover page when users tap on it.
                   </AlertDescription>
                 </Alert>
 
@@ -1131,9 +883,6 @@ export default function BroadcastNotifications() {
                     </p>
                     <p className="text-[10px] text-gray-500">
                       {selectedUsersWithTokens} will receive push notification
-                      {saveToProfile && selectedUsers.size - selectedUsersWithTokens > 0
-                        ? ` • ${selectedUsers.size - selectedUsersWithTokens} saved to profile only`
-                        : ''}
                     </p>
                   </div>
                   <Button

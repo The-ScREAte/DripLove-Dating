@@ -24,7 +24,6 @@ interface BroadcastRequest {
   targetCountries: string[];
   userIds: string[]; 
   notificationType: string;
-  saveToProfile?: boolean;
 }
  
 const getErrorMessage = (error: unknown): string => {
@@ -85,7 +84,6 @@ serve(async (req: Request) => {
       targetCountries,
       userIds,
       notificationType = 'system',
-      saveToProfile = false,
     } = body;
 
     if (!title || !message || !userIds || userIds.length === 0) {
@@ -121,7 +119,7 @@ serve(async (req: Request) => {
     const usersWithoutTokens = userIds.filter(id => !tokenUserIdSet.has(id));
     console.log(`${deliverableUserIds.length} users have push tokens, ${usersWithoutTokens.length} do not`);
 
-    if (deliverableUserIds.length === 0 && !saveToProfile) {
+    if (deliverableUserIds.length === 0) {
       throw new Error('No selected users have push notifications enabled (no push tokens found).');
     }
 
@@ -134,11 +132,10 @@ serve(async (req: Request) => {
         message,
         notification_type: notificationType,
         target_countries: targetCountries,
-        total_recipients: saveToProfile ? userIds.length : deliverableUserIds.length,
+        total_recipients: deliverableUserIds.length,
         successful_sends: 0,
         failed_sends: 0,
         status: 'queued',
-        save_to_profile: saveToProfile,
       })
       .select()
       .single();
@@ -151,10 +148,6 @@ serve(async (req: Request) => {
     console.log(`Created campaign ${campaign.id} with status: queued`);
 
     // Create recipient records in batches to avoid timeout
-    // - Users with tokens: status 'pending' (queue will push)
-    // - Users without tokens: if saveToProfile enabled, store as inbox-only (status 'sent')
-    const nowIso = new Date().toISOString();
-
     const recipientsToInsert = deliverableUserIds.map(userId => ({
       campaign_id: campaign.id,
       user_id: userId,
@@ -162,23 +155,10 @@ serve(async (req: Request) => {
       retry_count: 0,
     }));
 
-    const savedOnlyRecipientsToInsert = saveToProfile
-      ? usersWithoutTokens.map(userId => ({
-          campaign_id: campaign.id,
-          user_id: userId,
-          status: 'sent',
-          retry_count: 0,
-          sent_at: nowIso,
-          error_message: null,
-        }))
-      : [];
-
-    const allRecipientsToInsert = recipientsToInsert.concat(savedOnlyRecipientsToInsert);
-
     // Insert in chunks of 500 to avoid timeout
     const RECIPIENT_BATCH_SIZE = 500;
-    for (let i = 0; i < allRecipientsToInsert.length; i += RECIPIENT_BATCH_SIZE) {
-      const batch = allRecipientsToInsert.slice(i, i + RECIPIENT_BATCH_SIZE);
+    for (let i = 0; i < recipientsToInsert.length; i += RECIPIENT_BATCH_SIZE) {
+      const batch = recipientsToInsert.slice(i, i + RECIPIENT_BATCH_SIZE);
       const { error: recipientsError } = await supabase
         .from('broadcast_recipients')
         .insert(batch);
@@ -201,7 +181,7 @@ serve(async (req: Request) => {
       JSON.stringify({
         success: true,
         campaignId: campaign.id,
-        totalRecipients: saveToProfile ? userIds.length : deliverableUserIds.length,
+        totalRecipients: deliverableUserIds.length,
         message: 'Broadcast queued successfully. Processing will continue in background.',
       }),
       {

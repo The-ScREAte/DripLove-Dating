@@ -60,7 +60,7 @@ serve(async (req) => {
     // Find campaigns that need processing (queued or processing)
     let campaignsQuery = supabase
       .from('broadcast_campaigns')
-      .select('id, title, message, notification_type, save_to_profile')
+      .select('id, title, message, notification_type')
       .in('status', ['queued', 'processing'])
       .order('created_at', { ascending: true });
 
@@ -177,10 +177,7 @@ serve(async (req) => {
                   body: campaign.message,
                   userId: recipient.user_id,
                   type: campaign.notification_type,
-                  data: {
-                    action: campaign.save_to_profile ? 'open_profile_messages' : 'open_discover',
-                    campaignId: campaign.id,
-                  }
+                  data: { action: 'open_discover' }
                 }
               });
 

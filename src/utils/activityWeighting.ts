@@ -2,7 +2,6 @@
  * Activity-Based Visibility Weighting
  * 
  * Bias feed toward recently active users (within 72 hours) without filtering anyone out.
- * Also boost "never seen" users (those who haven't been liked/passed) for discovery visibility.
  * This is Tinder-style behavior: active users appear earlier and more frequently,
  * but inactive users are still shown (just later in the queue).
  * 
@@ -22,9 +21,6 @@ export interface ProfileWithActivity {
 
 // 72-hour activity window (Tinder's standard)
 const ACTIVE_WINDOW_MS = 72 * 60 * 60 * 1000;
-
-// 7-day new user window for boosting
-const NEW_USER_WINDOW_MS = 7 * 24 * 60 * 60 * 1000;
 
 // Seeded random for deterministic shuffling within activity groups
 function seededRandom(seed: number): () => number {
@@ -58,33 +54,20 @@ function shuffleWithSeed<T>(arr: T[], seed: string): T[] {
  * Categorize profiles by recent activity and reorder for better matching.
  * Active users (logged in within 72h) appear first, shuffled.
  * Less active users appear after, also shuffled.
- * "Never seen" users get a 33% boost (injected into first third of queue).
  * 
  * This is a SOFT weighting - no one is removed, just reordered.
- * 
- * @param profiles - Array of profiles to reorder
- * @param seed - Seed for deterministic shuffling
- * @param neverSeenIds - Optional set of profile IDs that have never been liked/passed
  */
 export function applyActivityWeighting<T extends { id: string; last_login_at?: string | null; created_at?: string | null }>(
   profiles: T[],
-  seed: string = '',
-  neverSeenIds?: Set<string>
+  seed: string = ''
 ): T[] {
   if (profiles.length === 0) return [];
   
   const now = Date.now();
   const activeProfiles: T[] = [];
   const lessActiveProfiles: T[] = [];
-  const neverSeenProfiles: T[] = [];
   
   for (const profile of profiles) {
-    // Check if this is a "never seen" user (priority boost)
-    if (neverSeenIds && neverSeenIds.has(profile.id)) {
-      neverSeenProfiles.push(profile);
-      continue;
-    }
-    
     // Use last_login_at if available, fallback to created_at (account creation = first activity)
     const lastActiveStr = profile.last_login_at || profile.created_at;
     
@@ -103,46 +86,11 @@ export function applyActivityWeighting<T extends { id: string; last_login_at?: s
     }
   }
   
-  // Shuffle each group deterministically for variety
-  const shuffledNeverSeen = shuffleWithSeed(neverSeenProfiles, `${seed}_never_seen`);
+  // Shuffle each group deterministically for variety, then concatenate
+  // Active users come first for higher match probability
   const shuffledActive = shuffleWithSeed(activeProfiles, `${seed}_active`);
   const shuffledLessActive = shuffleWithSeed(lessActiveProfiles, `${seed}_less_active`);
   
-  // If we have never seen profiles, inject them into the first third of the feed
-  // This gives them visibility without dominating the entire feed
-  if (shuffledNeverSeen.length > 0) {
-    const mainFeed = [...shuffledActive, ...shuffledLessActive];
-    const result: T[] = [];
-    
-    // Calculate injection positions (every 3rd slot in first third)
-    const feedThirdSize = Math.ceil(mainFeed.length / 3);
-    const maxNeverSeenToInject = Math.min(shuffledNeverSeen.length, Math.ceil(feedThirdSize / 3));
-    
-    let neverSeenIdx = 0;
-    let mainIdx = 0;
-    let position = 0;
-    
-    while (mainIdx < mainFeed.length || neverSeenIdx < maxNeverSeenToInject) {
-      // Inject never seen at every 3rd position in first third
-      if (position < feedThirdSize && position % 3 === 2 && neverSeenIdx < maxNeverSeenToInject) {
-        result.push(shuffledNeverSeen[neverSeenIdx]);
-        neverSeenIdx++;
-      } else if (mainIdx < mainFeed.length) {
-        result.push(mainFeed[mainIdx]);
-        mainIdx++;
-      }
-      position++;
-    }
-    
-    // Add any remaining never seen profiles at the end (they still get shown)
-    for (let i = maxNeverSeenToInject; i < shuffledNeverSeen.length; i++) {
-      result.push(shuffledNeverSeen[i]);
-    }
-    
-    return result;
-  }
-  
-  // No never seen profiles - just return active first, then less active
   return [...shuffledActive, ...shuffledLessActive];
 }
 

@@ -57,39 +57,33 @@ const AppWrapper = () => {
     const body = document.body;
     const root = document.getElementById('root');
 
-    let rafId: number | null = null;
     const applyFill = () => {
-      // Throttle to one DOM write per frame to avoid layout thrash / "Page Unresponsive"
-      if (rafId != null) return;
-      rafId = window.requestAnimationFrame(() => {
-        rafId = null;
+      // Use fill-available for iOS/modern browsers
+      html.style.height = ' -webkit-fill-available';
+      html.style.minHeight = '-webkit-fill-available';
+      body.style.height = '-webkit-fill-available';
+      body.style.minHeight = '-webkit-fill-available';
+      if (root) {
+        root.style.height = '-webkit-fill-available';
+        root.style.minHeight = '-webkit-fill-available';
+      }
 
-        // Use fill-available for iOS/modern browsers
-        html.style.height = '-webkit-fill-available';
-        html.style.minHeight = '-webkit-fill-available';
-        body.style.height = '-webkit-fill-available';
-        body.style.minHeight = '-webkit-fill-available';
-        if (root) {
-          root.style.height = '-webkit-fill-available';
-          root.style.minHeight = '-webkit-fill-available';
-        }
-
-        // Lock body scroll so only the app container scrolls
-        body.style.overflow = 'hidden';
-        body.style.position = 'fixed';
-        body.style.width = '100%';
-      });
+      // Lock body scroll so only the app container scrolls
+      body.style.overflow = 'hidden';
+      body.style.position = 'fixed';
+      body.style.width = '100%';
     };
 
     applyFill();
 
-    // Re-apply on viewport resize only (avoids infinite loops from visualViewport scroll events)
+    // Re-apply on viewport changes (visualViewport helps with iOS keyboard/resize)
     const vv = (window as any).visualViewport;
-    const onViewportResize = () => applyFill();
+    const onViewportChange = () => applyFill();
     if (vv && vv.addEventListener) {
-      vv.addEventListener('resize', onViewportResize);
+      vv.addEventListener('resize', onViewportChange);
+      vv.addEventListener('scroll', onViewportChange);
     } else {
-      window.addEventListener('resize', onViewportResize);
+      window.addEventListener('resize', onViewportChange);
     }
 
     return () => {
@@ -107,14 +101,10 @@ const AppWrapper = () => {
       body.style.width = '';
 
       if (vv && vv.removeEventListener) {
-        vv.removeEventListener('resize', onViewportResize);
+        vv.removeEventListener('resize', onViewportChange);
+        vv.removeEventListener('scroll', onViewportChange);
       } else {
-        window.removeEventListener('resize', onViewportResize);
-      }
-
-      if (rafId != null) {
-        window.cancelAnimationFrame(rafId);
-        rafId = null;
+        window.removeEventListener('resize', onViewportChange);
       }
     };
   }, []);

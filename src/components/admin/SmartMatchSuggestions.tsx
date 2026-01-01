@@ -32,46 +32,6 @@ interface Props {
   onMatchCreated: () => void;
 }
 
-const interleaveSuggestions = (
-  sortedSuggestions: MatchSuggestion[],
-  limit: number,
-  maxPerSourceUser: number
-): MatchSuggestion[] => {
-  const buckets = new Map<string, MatchSuggestion[]>();
-  for (const suggestion of sortedSuggestions) {
-    const sourceUserId = suggestion.user1.id;
-    const bucket = buckets.get(sourceUserId);
-    if (bucket) {
-      bucket.push(suggestion);
-    } else {
-      buckets.set(sourceUserId, [suggestion]);
-    }
-  }
-
-  const pickedCounts = new Map<string, number>();
-  const results: MatchSuggestion[] = [];
-
-  while (results.length < limit) {
-    let madeProgress = false;
-
-    for (const [sourceUserId, bucket] of buckets) {
-      if (results.length >= limit) break;
-
-      const alreadyPicked = pickedCounts.get(sourceUserId) ?? 0;
-      if (alreadyPicked >= maxPerSourceUser) continue;
-      if (bucket.length === 0) continue;
-
-      results.push(bucket.shift()!);
-      pickedCounts.set(sourceUserId, alreadyPicked + 1);
-      madeProgress = true;
-    }
-
-    if (!madeProgress) break;
-  }
-
-  return results;
-};
-
 const SmartMatchSuggestions: React.FC<Props> = ({ users, onMatchCreated }) => {
   const [suggestions, setSuggestions] = useState<MatchSuggestion[]>([]);
   const [isLoading, setIsLoading] = useState(false);
@@ -237,10 +197,9 @@ const SmartMatchSuggestions: React.FC<Props> = ({ users, onMatchCreated }) => {
 
       // Sort by score descending
       suggestions.sort((a, b) => b.score - a.score);
-
-      // Mix suggestions so we don't show one user dominating the list.
-      // Goal: roughly 2 suggestions per source user, interleaved.
-      setSuggestions(interleaveSuggestions(suggestions, 20, 2));
+      
+      // Limit to top 20
+      setSuggestions(suggestions.slice(0, 20));
 
       toast({
         title: 'Suggestions Generated',

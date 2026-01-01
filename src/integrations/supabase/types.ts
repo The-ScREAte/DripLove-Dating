@@ -196,7 +196,6 @@ export type Database = {
           id: string
           message: string
           notification_type: string | null
-          save_to_profile: boolean
           status: string | null
           successful_sends: number | null
           target_countries: string[] | null
@@ -211,7 +210,6 @@ export type Database = {
           id?: string
           message: string
           notification_type?: string | null
-          save_to_profile?: boolean
           status?: string | null
           successful_sends?: number | null
           target_countries?: string[] | null
@@ -226,7 +224,6 @@ export type Database = {
           id?: string
           message?: string
           notification_type?: string | null
-          save_to_profile?: boolean
           status?: string | null
           successful_sends?: number | null
           target_countries?: string[] | null
@@ -251,8 +248,6 @@ export type Database = {
           error_message: string | null
           id: string
           processing_started_at: string | null
-          profile_deleted_at: string | null
-          profile_read_at: string | null
           retry_count: number | null
           sent_at: string | null
           status: string | null
@@ -264,8 +259,6 @@ export type Database = {
           error_message?: string | null
           id?: string
           processing_started_at?: string | null
-          profile_deleted_at?: string | null
-          profile_read_at?: string | null
           retry_count?: number | null
           sent_at?: string | null
           status?: string | null
@@ -277,8 +270,6 @@ export type Database = {
           error_message?: string | null
           id?: string
           processing_started_at?: string | null
-          profile_deleted_at?: string | null
-          profile_read_at?: string | null
           retry_count?: number | null
           sent_at?: string | null
           status?: string | null
@@ -1777,13 +1768,6 @@ export type Database = {
         Args: { p_user1_id: string; p_user2_id: string }
         Returns: Json
       }
-      admin_force_expire_subscriptions: {
-        Args: never
-        Returns: {
-          expired_count: number
-          message: string
-        }[]
-      }
       admin_get_current_premium_users_count: { Args: never; Returns: number }
       admin_get_premium_status_for_users: {
         Args: { target_user_ids: string[] }
@@ -1851,10 +1835,6 @@ export type Database = {
         Args: { match_id_param: string }
         Returns: undefined
       }
-      delete_my_profile_broadcast_message: {
-        Args: { p_recipient_id: string }
-        Returns: boolean
-      }
       delete_old_messages: { Args: never; Returns: undefined }
       delete_user_and_data: {
         Args: { user_id_to_delete: string }
@@ -1902,19 +1882,6 @@ export type Database = {
           country_name: string
         }[]
       }
-      get_my_profile_broadcast_messages: {
-        Args: { p_limit?: number; p_offset?: number }
-        Returns: {
-          campaign_id: string
-          created_at: string
-          message: string
-          profile_read_at: string
-          recipient_id: string
-          sent_at: string
-          title: string
-        }[]
-      }
-      get_my_profile_broadcast_unread_count: { Args: never; Returns: number }
       get_user_subscription: {
         Args: { user_id_param: string }
         Returns: {
@@ -1960,7 +1927,6 @@ export type Database = {
         }
         Returns: Json
       }
-      mark_my_profile_broadcasts_read: { Args: never; Returns: number }
       pass_and_usage_batched: {
         Args: {
           passed_id_param: string

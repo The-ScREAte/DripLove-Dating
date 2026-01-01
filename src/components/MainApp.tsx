@@ -244,42 +244,6 @@ const MainApp = ({ user, onLogout }: MainAppProps) => {
   }, []);
   // Register device token for push notifications (mobile only) - with error handling
   useEffect(() => {
-    // Support legacy deep-links like `/?tab=chat&matchId=...` (web + some notification flows)
-    // and profile inbox links like `/?tab=profile&profileSection=broadcast_messages`.
-    try {
-      const params = new URLSearchParams(window.location.search);
-      const tab = params.get('tab');
-      const profileSection = params.get('profileSection');
-
-      if (tab === 'chat') {
-        setActiveTab('chat');
-      } else if (tab === 'liked') {
-        setActiveTab('liked');
-      } else if (tab === 'profile') {
-        setActiveTab('profile');
-      }
-
-      if (profileSection === 'broadcast_messages') {
-        setActiveTab('profile');
-        // Use hash so ProfilePage can react without relying on URLSearchParams.
-        window.location.hash = 'profileSection=broadcast_messages';
-      }
-
-      if (tab || profileSection) {
-        params.delete('tab');
-        params.delete('profileSection');
-        const nextSearch = params.toString();
-        const nextUrl = `${window.location.pathname}${nextSearch ? `?${nextSearch}` : ''}${window.location.hash}`;
-        window.history.replaceState({}, '', nextUrl);
-      }
-    } catch {
-      // Ignore URL parsing issues
-    }
-    // Intentionally run once on mount
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
-
-  useEffect(() => {
     const registerDeviceToken = async () => {
       try {
         const { Capacitor } = await import('@capacitor/core');
@@ -302,12 +266,7 @@ const MainApp = ({ user, onLogout }: MainAppProps) => {
           
           // Wait a bit for app to fully load
           setTimeout(() => {
-            if (data?.action === 'open_profile_messages') {
-              setActiveTab('profile');
-              window.location.hash = 'profileSection=broadcast_messages';
-            } else if (data?.action === 'open_discover') {
-              setActiveTab('dripcheck');
-            } else if (data?.type === 'message' && data?.chatId) {
+            if (data?.type === 'message' && data?.chatId) {
               setActiveTab('chat');
               // Use hash navigation to pass matchId to ChatPage
               window.location.hash = `matchId=${data.chatId}`;

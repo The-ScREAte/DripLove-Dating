@@ -5,7 +5,7 @@ import { getPlatformSync } from '@/utils/platformUtils';
 // import { PushNotifications } from '@capacitor/push-notifications'; // Uncomment if you use PushNotifications
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { User, Edit, Save, X, Crown, MessageCircle } from 'lucide-react';
+import { User, Edit, Save, X, Crown } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import { useSubscription } from '@/hooks/useSubscription';
@@ -29,13 +29,6 @@ import { calculateProfileCompletion } from '@/utils/profileCompletion';
 import PremiumUpgrade from './PremiumUpgrade';
 import CollapsibleSection from './ui/CollapsibleSection';
 import { getLanguageForCountry } from '@/i18n/config';
-import { Badge } from '@/components/ui/badge';
-import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-} from '@/components/ui/dialog';
 
 type UserImageRow = {
   image_url: string | null
@@ -48,16 +41,6 @@ type DiscoverCacheWindow = Window & {
     delete: (userId: string) => void
   }
 }
-
-type ProfileBroadcastMessage = {
-  recipient_id: string;
-  campaign_id: string;
-  title: string;
-  message: string;
-  created_at: string;
-  sent_at: string | null;
-  profile_read_at: string | null;
-};
 
 interface ProfilePageProps {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -97,106 +80,11 @@ const ProfilePage = ({ currentUser, profile, onProfileUpdate, onLogout, onShowTe
   const showFunQuestionsSection = openSection === 'funQuestions';
   const showInterestsSection = openSection === 'interests';
   const showAdinkraSection = openSection === 'adinkra';
-
+  
   const showAccountActionsSection = openSection === 'accountActions';
   
   const { toast } = useToast();
   const { subscription, loading: subscriptionLoading } = useSubscription(currentUser?.id);
-
-  const isOwnProfile = !!currentUser?.id && !!profile?.id && currentUser.id === profile.id;
-  const [broadcastUnreadCount, setBroadcastUnreadCount] = useState(0);
-  const [broadcastMessages, setBroadcastMessages] = useState<ProfileBroadcastMessage[]>([]);
-  const [isLoadingBroadcastMessages, setIsLoadingBroadcastMessages] = useState(false);
-  const [isProfileMessagesOpen, setIsProfileMessagesOpen] = useState(false);
-
-  const refreshBroadcastUnreadCount = async () => {
-    if (!isOwnProfile) return;
-    try {
-      const { data, error } = await supabase.rpc('get_my_profile_broadcast_unread_count' as any);
-      if (error) throw error;
-      setBroadcastUnreadCount(typeof data === 'number' ? data : Number(data) || 0);
-    } catch (err) {
-      console.error('[ProfilePage] Failed to fetch broadcast unread count:', err);
-    }
-  };
-
-  const loadBroadcastMessages = async () => {
-    if (!isOwnProfile) return;
-    setIsLoadingBroadcastMessages(true);
-    try {
-      const { data, error } = await supabase.rpc('get_my_profile_broadcast_messages' as any, {
-        p_limit: 50,
-        p_offset: 0,
-      });
-      if (error) throw error;
-      setBroadcastMessages(((data as any) || []) as ProfileBroadcastMessage[]);
-    } catch (err) {
-      console.error('[ProfilePage] Failed to load broadcast messages:', err);
-    } finally {
-      setIsLoadingBroadcastMessages(false);
-    }
-  };
-
-  const markBroadcastMessagesRead = async () => {
-    if (!isOwnProfile) return;
-    try {
-      await supabase.rpc('mark_my_profile_broadcasts_read' as any);
-    } catch (err) {
-      console.error('[ProfilePage] Failed to mark broadcasts read:', err);
-    }
-  };
-
-  const deleteBroadcastMessage = async (recipientId: string) => {
-    if (!isOwnProfile) return;
-    try {
-      const { data, error } = await supabase.rpc('delete_my_profile_broadcast_message' as any, {
-        p_recipient_id: recipientId,
-      });
-      if (error) throw error;
-      if (data !== true) {
-        throw new Error('Delete failed');
-      }
-      await loadBroadcastMessages();
-      await refreshBroadcastUnreadCount();
-    } catch (err) {
-      console.error('[ProfilePage] Failed to delete broadcast message:', err);
-      toast({
-        title: 'Error',
-        description: 'Failed to delete message',
-        variant: 'destructive',
-      });
-    }
-  };
-
-  useEffect(() => {
-    void refreshBroadcastUnreadCount();
-  }, [isOwnProfile]);
-
-  useEffect(() => {
-    // Deep-link support: hash like #profileSection=broadcast_messages
-    if (!isOwnProfile) return;
-    try {
-      const hash = window.location.hash?.startsWith('#') ? window.location.hash.substring(1) : '';
-      const params = new URLSearchParams(hash);
-      if (params.get('profileSection') === 'broadcast_messages') {
-        setIsProfileMessagesOpen(true);
-        // Clear only our deep-link hash so it doesn't keep re-opening.
-        window.location.hash = '';
-      }
-    } catch {
-      // ignore
-    }
-  }, [isOwnProfile]);
-
-  useEffect(() => {
-    if (!isOwnProfile) return;
-    if (!isProfileMessagesOpen) return;
-    (async () => {
-      await markBroadcastMessagesRead();
-      await refreshBroadcastUnreadCount();
-      await loadBroadcastMessages();
-    })();
-  }, [isOwnProfile, isProfileMessagesOpen]);
 
   const [editedProfile, setEditedProfile] = useState({
     first_name: '',
@@ -660,25 +548,6 @@ const ProfilePage = ({ currentUser, profile, onProfileUpdate, onLogout, onShowTe
                   {t('Upgrade')}
                 </Button>
               )}
-
-              {isOwnProfile && (
-                <div className="relative w-full sm:w-auto">
-                  <Button
-                    onClick={() => setIsProfileMessagesOpen(true)}
-                    className="w-full sm:w-auto border-gray-300 text-gray-700 hover:bg-gray-50 disabled:opacity-50 bg-white border"
-                    variant="outline"
-                    aria-label="Open profile messages"
-                  >
-                    <MessageCircle className="w-4 h-4" />
-                  </Button>
-                  {broadcastUnreadCount > 0 && (
-                    <span className="absolute -top-2 -right-2 min-w-[18px] h-[18px] px-1 rounded-full bg-gray-900 text-white text-[10px] flex items-center justify-center">
-                      {broadcastUnreadCount}
-                    </span>
-                  )}
-                </div>
-              )}
-
               {/* Single toggle button - Edit becomes Cancel */}
               <Button 
                 onClick={isEditing ? handleCancel : () => setIsEditing(true)}
@@ -797,62 +666,6 @@ const ProfilePage = ({ currentUser, profile, onProfileUpdate, onLogout, onShowTe
               />
             )}
           </div>
-
-          {isOwnProfile && (
-            <Dialog open={isProfileMessagesOpen} onOpenChange={setIsProfileMessagesOpen}>
-              <DialogContent className="max-w-lg">
-                <DialogHeader>
-                  <DialogTitle>Messages</DialogTitle>
-                </DialogHeader>
-
-                {isLoadingBroadcastMessages ? (
-                  <div className="text-sm text-muted-foreground">Loading…</div>
-                ) : broadcastMessages.length === 0 ? (
-                  <div className="text-sm text-muted-foreground">No messages yet.</div>
-                ) : (
-                  <div className="space-y-3 max-h-[70vh] overflow-y-auto pr-1">
-                    {broadcastMessages.map((m) => {
-                      const created = m.created_at ? new Date(m.created_at) : null;
-                      const dateLabel = created ? created.toLocaleString() : '';
-                      const isUnread = !m.profile_read_at;
-
-                      return (
-                        <div
-                          key={m.recipient_id}
-                          className="border border-border rounded-lg p-3 bg-card"
-                        >
-                          <div className="flex items-start justify-between gap-3">
-                            <div className="min-w-0">
-                              <div className="flex items-center gap-2">
-                                <p className="text-sm font-semibold text-foreground truncate">{m.title}</p>
-                                {isUnread && (
-                                  <Badge variant="outline" className="text-[10px] h-4">
-                                    New
-                                  </Badge>
-                                )}
-                              </div>
-                              {dateLabel && (
-                                <p className="text-[10px] text-muted-foreground">{dateLabel}</p>
-                              )}
-                            </div>
-                            <Button
-                              variant="outline"
-                              className="h-7 px-2 text-xs"
-                              onClick={() => deleteBroadcastMessage(m.recipient_id)}
-                            >
-                              <X className="w-3 h-3" />
-                            </Button>
-                          </div>
-                          <p className="text-sm text-foreground/90 mt-2 whitespace-pre-wrap">{m.message}</p>
-                        </div>
-                      );
-                    })}
-                  </div>
-                )}
-              </DialogContent>
-            </Dialog>
-          )}
-
           <CollapsibleSection
             title={t('profile.basicInfo')}
             isOpen={showBasicInfoSection}

@@ -14,6 +14,8 @@ import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
 import { transformFormDataForSubmission } from '@/utils/formValidation';
 import VideoBackground from '@/components/VideoBackground';
+import { preloadPricingConfig } from '@/hooks/usePricingConfig';
+import { preloadExchangeRates } from '@/services/exchangeRateService';
 
 // Lazy load AdminPage (54KB) - only loads when admin features are accessed
 const LazyAdminPage = lazy(() => import('@/components/AdminPage'));
@@ -60,6 +62,8 @@ const Index = ({
 
     // If user is authenticated, run app-specific profile routing
     setLoading(true);
+    preloadPricingConfig(user.id);
+    preloadExchangeRates(); // Preload exchange rates for currency conversion
     checkUserTypeAndRedirect(user.id);
   }, [isAuthenticated, user?.id]);
 
@@ -83,27 +87,25 @@ const Index = ({
       } catch {}
 
       if (!profile) {
-        // Single query for routing
-        const { data, error } = await supabase
+        // Single fast query with retry logic built-in
+        const result = await supabase
           .from('profiles')
           .select('is_admin, account_status, first_name, last_name, date_of_birth, country, city, gender, preference, relationship_intent, occupation, industry, education_level, terms_accepted')
           .eq('id', userId)
           .maybeSingle();
-
-        if (error) throw error;
-        profile = data;
-
+        profile = result.data;
+        
         // If no profile found, check if OAuth user needs profile completion
         if (!profile) {
           const provider = user?.app_metadata?.provider;
           const isOAuthUser = provider === 'google' || provider === 'apple';
-
+          
           if (isOAuthUser) {
             setLoading(false);
             setViewIfChanged('profile-completion');
             return;
           }
-
+          
           // Non-OAuth users need to register
           await supabase.auth.signOut();
           setLoading(false);
