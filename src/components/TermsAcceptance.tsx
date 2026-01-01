@@ -96,7 +96,7 @@ const TermsAcceptance = ({ user, onAccept }: TermsAcceptanceProps) => {
       ] = await Promise.all([
         supabase.from('likes').select('liked_id').eq('liker_id', userId),
         supabase.from('blocks').select('blocked_id, blocker_id').or(`blocker_id.eq.${userId},blocked_id.eq.${userId}`),
-        supabase.from('passes').select('passed_id').match({ passer_id: userId }).gte('passed_at', new Date(Date.now() - 192 * 60 * 60 * 1000).toISOString())
+        supabase.from('passes').select('passed_id').match({ passer_id: userId }).gte('passed_at', new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString())
       ]);
 
       const likedUserIds = likedUsers?.map(like => like.liked_id) || [];

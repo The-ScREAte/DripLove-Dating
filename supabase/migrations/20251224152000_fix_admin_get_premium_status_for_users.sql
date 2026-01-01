@@ -1,6 +1,6 @@
 -- Fix admin_get_premium_status_for_users: ensure 1 row per user and correct premium evaluation.
 -- The previous implementation could return multiple rows per user (row multiplication) and cause the UI to mark premium users as free.
--- Premium logic: plan_name = 'premium' AND status = 'active' AND (expires_at IS NULL OR expires_at > NOW())
+-- Premium logic: plan_name = 'premium' AND status = 'active'
 
 CREATE OR REPLACE FUNCTION public.admin_get_premium_status_for_users(target_user_ids uuid[])
 RETURNS TABLE(user_id uuid, is_premium boolean)
@@ -29,7 +29,6 @@ BEGIN
       WHERE us.user_id = p.id
         AND us.plan_name = 'premium'
         AND us.status = 'active'
-        AND (us.expires_at IS NULL OR us.expires_at > NOW())
     ) AS is_premium
   FROM public.profiles p
   WHERE p.id = ANY(target_user_ids);

@@ -881,7 +881,7 @@ const AdminPageComponent = ({ currentUser, onLogout }: AdminPageProps) => {
       setLoading(true);
       
       // Check cache first for performance
-      const cacheKey = `users_all_${statusFilter}_${genderFilter}_${interestedInFilter}_${countryFilter}_${relationshipIntentFilter}_${premiumFilter}_${activityFilter}`;
+      const cacheKey = `users_all_${statusFilter}_${genderFilter}_${interestedInFilter}_${countryFilter}_${relationshipIntentFilter}_${activityFilter}`;
       const cachedUsers = userDataCache.get(cacheKey);
       if (cachedUsers) {
         const { regularUsers, admins } = cachedUsers;
@@ -962,27 +962,42 @@ const AdminPageComponent = ({ currentUser, onLogout }: AdminPageProps) => {
       const premiumMap = new Map<string, boolean>();
 
       if (userIds.length > 0) {
-        const { data: premiumRowsRaw, error: premiumError } = await (supabase as any).rpc(
-          'admin_get_premium_status_for_users',
-          { target_user_ids: userIds }
-        );
-        if (premiumError) {
-          console.error('Premium status RPC failed:', premiumError);
-          throw premiumError;
+        // NOTE: Supabase/PostgREST can cap RPC result rows. Chunk requests to ensure we get
+        // premium status for every user id.
+        const RPC_CHUNK_SIZE = 500;
+        const allPremiumRows: any[] = [];
+
+        for (let i = 0; i < userIds.length; i += RPC_CHUNK_SIZE) {
+          const chunk = userIds.slice(i, i + RPC_CHUNK_SIZE);
+          const { data: premiumRowsRaw, error: premiumError } = await (supabase as any).rpc(
+            'admin_get_premium_status_for_users',
+            { target_user_ids: chunk }
+          );
+
+          if (premiumError) {
+            console.error('Premium status RPC failed:', premiumError);
+            throw premiumError;
+          }
+
+          const premiumRows: any[] = Array.isArray(premiumRowsRaw) ? premiumRowsRaw : [];
+          if (premiumRows.length !== chunk.length) {
+            console.warn(
+              `⚠️ Premium RPC returned ${premiumRows.length}/${chunk.length} rows for chunk ${i}-${Math.min(i + RPC_CHUNK_SIZE, userIds.length)}`
+            );
+          }
+          allPremiumRows.push(...premiumRows);
         }
 
-        const premiumRows: any[] = Array.isArray(premiumRowsRaw) ? premiumRowsRaw : [];
-        console.log(`🔍 Premium RPC returned ${premiumRows.length} rows for ${userIds.length} users`);
-        
-        premiumRows.forEach((row: any) => {
+        console.log(`🔍 Premium RPC returned ${allPremiumRows.length} rows for ${userIds.length} users (chunked)`);
+
+        allPremiumRows.forEach((row: any) => {
           if (!row?.user_id) return;
 
-          // Be resilient to duplicate rows per user_id (some DB function versions can return
-          // multiple rows due to subscription history). If any row says premium, treat as premium.
+          // Be resilient to duplicate rows per user_id. If any row says premium, treat as premium.
           const current = premiumMap.get(row.user_id) ?? false;
           premiumMap.set(row.user_id, current || !!row.is_premium);
         });
-        
+
         const premiumCount = Array.from(premiumMap.values()).filter(v => v).length;
         console.log(`✅ After mapping: ${premiumCount} premium users out of ${userIds.length} total users`);
       }
@@ -996,15 +1011,6 @@ const AdminPageComponent = ({ currentUser, onLogout }: AdminPageProps) => {
         login_count: user.login_count
       }));
 
-      // Apply premium filter BEFORE caching (critical fix)
-      let filteredByPremium = usersWithAge;
-      
-      if (premiumFilter === 'premium') {
-        filteredByPremium = usersWithAge.filter(u => u.is_premium);
-      } else if (premiumFilter === 'free') {
-        filteredByPremium = usersWithAge.filter(u => !u.is_premium);
-      }
-
       // Fetch admin users separately
       const { data: adminData } = await supabase
         .from('profiles')
@@ -1017,11 +1023,11 @@ const AdminPageComponent = ({ currentUser, onLogout }: AdminPageProps) => {
         age: calculateAge(user.date_of_birth)
       })) || [];
 
-      setUsers(filteredByPremium);
+      setUsers(usersWithAge);
       setAdminUsers(adminsWithAge);
       
-      // Cache the FILTERED users data for 3 minutes
-      userDataCache.set(cacheKey, { regularUsers: filteredByPremium, admins: adminsWithAge });
+      // Cache users data for 3 minutes
+      userDataCache.set(cacheKey, { regularUsers: usersWithAge, admins: adminsWithAge });
     } catch (error) {
       const errAny = error as any;
       const status = errAny?.status;
@@ -1046,7 +1052,7 @@ const AdminPageComponent = ({ currentUser, onLogout }: AdminPageProps) => {
     } finally {
       setLoading(false);
     }
-  }, 300), [toast, statusFilter, genderFilter, interestedInFilter, countryFilter, relationshipIntentFilter, premiumFilter, activityFilter]);
+  }, 300), [toast, statusFilter, genderFilter, interestedInFilter, countryFilter, relationshipIntentFilter, activityFilter]);
 
   const calculateAge = (dateOfBirth: string) => {
     const today = new Date();
@@ -1086,14 +1092,7 @@ const AdminPageComponent = ({ currentUser, onLogout }: AdminPageProps) => {
     }
   }, [isAdmin, activeTab]);
 
-  // Clear cache when premium filter changes to prevent stale cached data
-  useEffect(() => {
-    console.log(`🗑️ Clearing cache due to premium filter change: ${premiumFilter}`);
-    userDataCache.clear();
-    if (isAdmin && activeTab === 'users') {
-      fetchUsers();
-    }
-  }, [premiumFilter, isAdmin, activeTab, fetchUsers]);
+  // Premium filter is applied client-side (no refetch needed).
 
   const updateUserStatus = async (userId: string, newStatus: string) => {
     try {
@@ -1331,8 +1330,8 @@ const AdminPageComponent = ({ currentUser, onLogout }: AdminPageProps) => {
     const matchesInterestedIn = interestedInFilter === 'all' || user.preference === interestedInFilter;
     const matchesCountry = countryFilter === 'all' || user.country === countryFilter;
     const matchesRelationshipIntent = relationshipIntentFilter === 'all' || user.relationship_intent === relationshipIntentFilter;
-    const matchesPremium = premiumFilter === 'all' || 
-      (premiumFilter === 'premium' && user.is_premium) || 
+    const matchesPremium = premiumFilter === 'all' ||
+      (premiumFilter === 'premium' && user.is_premium) ||
       (premiumFilter === 'free' && !user.is_premium);
     
     // Activity filter logic - use last_login_at or created_at (account creation = first login)

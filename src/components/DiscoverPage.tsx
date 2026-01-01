@@ -47,7 +47,6 @@ import { usePushNotifications } from '@/hooks/usePushNotifications';
 import { useSubscription } from '@/hooks/useSubscription';
 import { useImagePreloader } from '@/hooks/useImagePreloader';
 import { calculateDistance } from '@/constants/locationData';
-import { checkAndTriggerRefill } from '@/utils/performanceOptimizer';
 import { locationService } from '@/services/locationService';
 import { calculateProfileCompletion, getTodaySwipeCount } from '@/utils/profileCompletion';
 import { enqueue } from '@/lib/queue';
@@ -404,10 +403,10 @@ const mergeDecksWithoutProfileDupes = (prev: MatchOrAd[], incoming: MatchOrAd[],
   const swipedIds = new Set<string>();
   if (localSwipedIds) {
     const now = Date.now();
-    const eightDaysMs = 8 * 24 * 60 * 60 * 1000;
+    const thirtyDaysMs = 30 * 24 * 60 * 60 * 1000;
     for (const [id, data] of localSwipedIds.entries()) {
-      // Always exclude liked profiles, only exclude passed profiles if less than 8 days old
-      if (data.action === 'like' || (now - data.timestamp) < eightDaysMs) {
+      // Always exclude liked profiles, only exclude passed profiles if less than 30 days old
+      if (data.action === 'like' || (now - data.timestamp) < thirtyDaysMs) {
         swipedIds.add(id);
       }
     }
@@ -641,6 +640,42 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, isPremium, profileComplet
     }
     return count;
   };
+  
+  // Centralized preload abort controller
+  const preloadAbortControllerRef = useRef<AbortController | null>(null);
+  
+  // Store last passed profile for safe reverse-dislike reinsertion
+  const lastPassedProfileRef = useRef<PotentialMatch | null>(null);
+  
+  // ⭐ P2: Global eligibility gate - single source of truth for profile eligibility
+  const isEligibleProfile = useCallback((profile: unknown): profile is PotentialMatch => {
+    if (!profile || typeof profile !== 'object') return false;
+    const p = profile as Partial<PotentialMatch>;
+    if (!p.id) return false;
+    
+    // Exclude admin profiles
+    if ('is_admin' in p && p.is_admin) return false;
+    
+    // Exclude inactive accounts
+    if ('account_status' in p && p.account_status !== 'active') return false;
+    
+    // Exclude archived profiles (unless in archived fallback mode)
+    if ('is_archived' in p && p.is_archived && !isArchivedFallback) return false;
+    
+    // Exclude locally swiped profiles
+    if (locallySwipedProfileIds.current.has(p.id)) {
+      const swipeData = locallySwipedProfileIds.current.get(p.id);
+      if (swipeData) {
+        // Always exclude liked profiles
+        if (swipeData.action === 'like') return false;
+        // Only exclude passed profiles if less than 30 days old
+        const thirtyDaysMs = 30 * 24 * 60 * 60 * 1000;
+        if (Date.now() - swipeData.timestamp < thirtyDaysMs) return false;
+      }
+    }
+    
+    return true;
+  }, [isArchivedFallback]);
   
   const { toast } = useToast();
   const { sendMatchNotification, sendMultipleLikesNotification, recordUserActivity } = usePushNotifications(currentUser?.id);
@@ -1048,6 +1083,117 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, isPremium, profileComplet
     }
   }, []);
 
+  // Fetch users who liked the current user (for priority blending in feed)
+  const fetchLikedMeProfiles = useCallback(async (
+    userId: string,
+    excludedIds: string[],
+    allowedGenders: string[]
+  ): Promise<ProfileRow[]> => {
+    try {
+      // Get users who liked the current user
+      const { data: likes } = await supabase
+        .from('likes')
+        .select('liker_id, created_at')
+        .eq('liked_id', userId)
+        .order('created_at', { ascending: false })
+        .limit(100);
+
+      if (!likes || likes.length === 0) return [];
+
+      // Get users the current user already liked back (exclude from candidates)
+      const { data: myLikes } = await supabase
+        .from('likes')
+        .select('liked_id')
+        .eq('liker_id', userId);
+
+      const alreadyLikedBack = new Set(myLikes?.map(l => l.liked_id) || []);
+      const excludedSet = new Set(excludedIds);
+
+      // Filter to get unseen candidates
+      const candidateIds = likes
+        .map(l => l.liker_id)
+        .filter(id => !alreadyLikedBack.has(id) && !excludedSet.has(id));
+
+      if (candidateIds.length === 0) return [];
+
+      // Fetch profiles with quality filter (active, not admin, not archived)
+      const PROFILE_SELECT = 'id, first_name, last_name, bio, city, country, country_code, occupation, education_level, date_of_birth, interests, gender, latitude, longitude, fun_fact, perfect_first_date, last_googled, relationship_intent, smoking, drinking, exercise_level, sleeping_schedule, introvert_extrovert, spontaneous_planner, messy_organized, adinkra_symbols, created_at, last_login_at';
+      
+      const { data: profiles } = await supabase
+        .from('profiles')
+        .select(PROFILE_SELECT)
+        .in('id', candidateIds)
+        .in('gender', allowedGenders)
+        .eq('account_status', 'active')
+        .eq('is_admin', false)
+        .eq('is_archived', false);
+
+      if (!profiles || profiles.length === 0) return [];
+
+      // Get image counts for quality filter (require 2+ photos)
+      const { data: imageCounts } = await supabase
+        .from('user_images')
+        .select('user_id')
+        .in('user_id', profiles.map(p => p.id))
+        .eq('is_approved', true);
+
+      const imageCountMap = new Map<string, number>();
+      (imageCounts || []).forEach(row => {
+        imageCountMap.set(row.user_id, (imageCountMap.get(row.user_id) || 0) + 1);
+      });
+
+      // Filter by quality: require 2+ photos
+      const qualifiedProfiles = profiles.filter(p => (imageCountMap.get(p.id) || 0) >= 2);
+
+      return qualifiedProfiles as unknown as ProfileRow[];
+    } catch (error) {
+      console.error('[DiscoverPage] Error fetching liked-me profiles:', error);
+      return [];
+    }
+  }, []);
+
+  // Blend profiles: inject liked-you profiles at strategic positions
+  // Strategy: Every 3-4 regular profiles → 1 liked-you profile (if available)
+  const blendLikedMeProfiles = useCallback((
+    regularProfiles: PotentialMatch[],
+    likedMeProfiles: PotentialMatch[],
+    userId: string
+  ): PotentialMatch[] => {
+    if (likedMeProfiles.length === 0) return regularProfiles;
+    if (regularProfiles.length === 0) return likedMeProfiles;
+
+    const blended: PotentialMatch[] = [];
+    let likedMeIndex = 0;
+    const BLEND_RATIO = 3; // Inject 1 liked-me every 3 regular profiles
+
+    // Deterministic positioning based on user + date
+    const seed = `${userId}_${todayStr()}_likedme`;
+    const hash = hashStringToInt(seed);
+    const firstInjection = 2 + (hash % 3); // First injection at position 2-4
+
+    for (let i = 0; i < regularProfiles.length; i++) {
+      // Check if we should inject a liked-me profile at this position
+      if (
+        likedMeIndex < likedMeProfiles.length &&
+        i >= firstInjection &&
+        (i - firstInjection) % BLEND_RATIO === 0
+      ) {
+        blended.push(likedMeProfiles[likedMeIndex]);
+        likedMeIndex++;
+      }
+      
+      blended.push(regularProfiles[i]);
+    }
+
+    // Append any remaining liked-me profiles at the end
+    while (likedMeIndex < likedMeProfiles.length) {
+      blended.push(likedMeProfiles[likedMeIndex]);
+      likedMeIndex++;
+    }
+
+    return blended;
+  }, []);
+
   // Fetch profiles from unlocked countries (premium)
   const fetchUnlockedCountryProfiles = useCallback(async ({
     unlockedCountries,
@@ -1132,7 +1278,7 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, isPremium, profileComplet
         .from('passes')
         .select('passed_id, passed_at')
         .match({ passer_id: userId })
-        .gte('passed_at', new Date(Date.now() - 192 * 60 * 60 * 1000).toISOString()), // 8 days
+        .gte('passed_at', new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString()), // 30 days
       supabase
         .from('likes')
         .select('liker_id, created_at')
@@ -1165,13 +1311,13 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, isPremium, profileComplet
     });
     
     const now = Date.now();
-    const eightDaysMs = 8 * 24 * 60 * 60 * 1000;
+    const thirtyDaysMs = 30 * 24 * 60 * 60 * 1000;
     const locallySwipedIds = uniqUuids(Array.from(locallySwipedProfileIds.current.entries())
       .filter(([_, data]) => {
         // Always exclude liked profiles
         if (data.action === 'like') return true;
-        // Only exclude passed profiles if less than 8 days old
-        return (now - data.timestamp) < eightDaysMs;
+        // Only exclude passed profiles if less than 30 days old
+        return (now - data.timestamp) < thirtyDaysMs;
       })
       .map(([id, _]) => id));
     const excludedIds = uniqUuids([...likedUserIds, ...blockedUserIds, ...passedUserIds, ...locallySwipedIds, userId]);
@@ -1648,79 +1794,41 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, isPremium, profileComplet
       // Ignore localStorage errors
     }
 
-    // ⭐ PRIORITY LIKERS: Inject users who liked the current user at natural, sparse positions
-    // Uses variable intervals (25-40 profiles) with random positioning for organic discovery
-    if (priorityLikerIds.length > 0) {
-      // Get profile data for priority likers that are in our shuffled list
-      const priorityProfiles = shuffled.filter(p => priorityLikerIds.includes(p.id));
-      
-      // Remove priority profiles from their current positions
-      const nonPriorityProfiles = shuffled.filter(p => !priorityLikerIds.includes(p.id));
-      
-      // Cap priority likers at 15% of total feed to keep it natural
-      const maxPriorityCount = Math.min(
-        priorityProfiles.length,
-        Math.ceil(nonPriorityProfiles.length * 0.15)
+    // ⭐ PROACTIVE LIKED-ME BLENDING: Fetch users who liked the current user and blend into feed
+    // Strategy: Inject 1 liked-me profile every 3-4 regular profiles (Tinder-style priority)
+    // This happens DURING feed build (not reactively on swipe) for guaranteed priority
+    const likedMeRows = await fetchLikedMeProfiles(userId, excludedIds, allowedGenders);
+    
+    if (likedMeRows.length > 0) {
+      // Convert to PotentialMatch format
+      const likedMeProfiles: PotentialMatch[] = likedMeRows.map(profile =>
+        toPotentialMatch(profile, {
+          images: [],
+          distance: distanceMap[profile.id],
+        })
       );
-      const limitedPriorityProfiles = priorityProfiles.slice(0, maxPriorityCount);
-      
-      // Create deterministic but seemingly random injection points
-      const seedUserId = currentUser?.id || userId;
-      const dateSeed = new Date().toISOString().split('T')[0];
-      const injectionSeed = `${seedUserId}_priority_${dateSeed}`;
-      
-      // Simple hash function for deterministic "randomness"
-      const simpleHash = (str: string, index: number) => {
-        let hash = 0;
-        const combined = str + index;
-        for (let i = 0; i < combined.length; i++) {
-          hash = ((hash << 5) - hash) + combined.charCodeAt(i);
-          hash = hash & hash;
-        }
-        return Math.abs(hash);
-      };
-      
-      // Calculate injection positions with variable intervals
-      const injectionPositions: number[] = [];
-      let currentPos = 0;
-      let injectionIndex = 0;
-      
-      while (injectionIndex < limitedPriorityProfiles.length && currentPos < nonPriorityProfiles.length) {
-        // Variable interval: 25-40 profiles for most injections
-        // First injection happens earlier (8-15 profiles) for early engagement
-        const minInterval = injectionIndex === 0 ? 8 : 25;
-        const maxInterval = injectionIndex === 0 ? 15 : 40;
-        
-        // Use deterministic hash to pick interval and offset
-        const intervalRange = maxInterval - minInterval;
-        const interval = minInterval + (simpleHash(injectionSeed, injectionIndex) % intervalRange);
-        const offset = simpleHash(injectionSeed, injectionIndex + 1000) % Math.min(8, interval);
-        
-        currentPos += interval + offset;
-        
-        if (currentPos < nonPriorityProfiles.length) {
-          injectionPositions.push(currentPos);
-          injectionIndex++;
-        }
-      }
 
-      const injectionSet = new Set(injectionPositions);
-      
-      // Build final array with injections at calculated positions
-      const finalProfiles: typeof shuffled = [];
-      let priorityIdx = 0;
-      
-      for (let i = 0; i < nonPriorityProfiles.length; i++) {
-        // Check if we should inject at this position
-        if (injectionSet.has(i) && priorityIdx < limitedPriorityProfiles.length) {
-          finalProfiles.push(limitedPriorityProfiles[priorityIdx]);
-          priorityIdx++;
-        }
-        
-        finalProfiles.push(nonPriorityProfiles[i]);
+      // Filter out any that are already in shuffled deck (shouldn't happen, but safety check)
+      const shuffledIds = new Set(shuffled.map(p => p.id));
+      const uniqueLikedMe = likedMeProfiles.filter(p => !shuffledIds.has(p.id));
+
+      // Apply age filtering to liked-me profiles
+      const userMinAge = currentUserData?.min_age || 18;
+      const userMaxAge = currentUserData?.max_age || 99;
+      const ageFilteredLikedMe = uniqueLikedMe.filter(profile => {
+        if (!profile.date_of_birth) return true; // Keep if DOB missing
+        const age = calculateAge(profile.date_of_birth);
+        if (!Number.isFinite(age)) return true;
+        return age >= userMinAge && age <= userMaxAge;
+      });
+
+      // ⭐ P2: Apply global eligibility gate to liked-me profiles
+      const eligibleLikedMe = ageFilteredLikedMe.filter(isEligibleProfile);
+
+      // Blend liked-me profiles into the feed (every 3-4 profiles)
+      if (eligibleLikedMe.length > 0) {
+        shuffled = blendLikedMeProfiles(shuffled, eligibleLikedMe, userId);
       }
-      
-      shuffled = finalProfiles;
     }
 
     // ⭐ PROFILE POSITION PERSISTENCE: Resume from last viewed profile
@@ -1798,7 +1906,7 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, isPremium, profileComplet
       distances: distanceMap,
       index: startIndex
     };
-  }, [loadAllImagesForProfile, premiumActive, currentUser, fetchUnlockedCountryProfiles]);
+  }, [loadAllImagesForProfile, premiumActive, currentUser, fetchUnlockedCountryProfiles, fetchLikedMeProfiles, blendLikedMeProfiles, isEligibleProfile]);
 
   // Batch language fetch (avoid per-card calls)
   const batchFetchLanguages = useCallback(async (profileIds: string[]) => {
@@ -1887,16 +1995,16 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, isPremium, profileComplet
           // ⭐ CRITICAL: Always filter against locally swiped profiles to prevent repetition
           const swipedIds = locallySwipedProfileIds.current;
           const now = Date.now();
-          const eightDaysMs = 8 * 24 * 60 * 60 * 1000;
+          const thirtyDaysMs = 30 * 24 * 60 * 60 * 1000;
           
           const filterSwiped = (deck: MatchOrAd[]): MatchOrAd[] => {
             return deck.filter(item => {
               if (isAd(item)) return true;
               const swipeData = swipedIds.get(item.id);
               if (!swipeData) return true;
-              // Always exclude liked profiles, exclude passed if < 8 days old
+              // Always exclude liked profiles, exclude passed if < 30 days old
               if (swipeData.action === 'like') return false;
-              return (now - swipeData.timestamp) >= eightDaysMs;
+              return (now - swipeData.timestamp) >= thirtyDaysMs;
             });
           };
           
@@ -2108,13 +2216,13 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, isPremium, profileComplet
 
     // locallySwipedProfileIds.current.clear(); // REMOVED
 
-    // ⭐ EARLY CLEANUP: Remove old passed profiles (8+ days) to keep storage lean
+    // ⭐ EARLY CLEANUP: Remove old passed profiles (30+ days) to keep storage lean
     const now = Date.now();
-    const eightDaysMs = 8 * 24 * 60 * 60 * 1000;
+    const thirtyDaysMs = 30 * 24 * 60 * 60 * 1000;
     let needsUpdate = false;
     
     for (const [id, data] of locallySwipedProfileIds.current.entries()) {
-      if (data.action === 'pass' && (now - data.timestamp) > eightDaysMs) {
+      if (data.action === 'pass' && (now - data.timestamp) > thirtyDaysMs) {
         locallySwipedProfileIds.current.delete(id);
         needsUpdate = true;
       }
@@ -2150,12 +2258,12 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, isPremium, profileComplet
       if (cachedDeck && cachedDeck.length > 0) {
         // ⭐ CRITICAL: Filter cached deck against locally swiped profiles to prevent repetition
         const now = Date.now();
-        const eightDaysMs = 8 * 24 * 60 * 60 * 1000;
+        const thirtyDaysMs = 30 * 24 * 60 * 60 * 1000;
         const swipedToExclude = new Set<string>();
         
         for (const [id, data] of locallySwipedProfileIds.current.entries()) {
-          // Always exclude liked profiles, exclude passed profiles if less than 8 days old
-          if (data.action === 'like' || (now - data.timestamp) < eightDaysMs) {
+          // Always exclude liked profiles, exclude passed profiles if less than 30 days old
+          if (data.action === 'like' || (now - data.timestamp) < thirtyDaysMs) {
             swipedToExclude.add(id);
           }
         }
@@ -2418,13 +2526,13 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, isPremium, profileComplet
       
       // Get additional profiles (exclude current ones AND ones we've already seen)
       const currentIds = potentialMatches.map(match => match.id);
-      // CRITICAL: Include locally swiped profiles, filtering out passed profiles older than 8 days
+      // CRITICAL: Include locally swiped profiles, filtering out passed profiles older than 30 days
       const now = Date.now();
-      const eightDaysMs = 8 * 24 * 60 * 60 * 1000;
+      const thirtyDaysMs = 30 * 24 * 60 * 60 * 1000;
       const locallySwipedIds = uniqUuids(Array.from(locallySwipedProfileIds.current.entries())
         .filter(([_, data]) => {
           if (data.action === 'like') return true;
-          return (now - data.timestamp) < eightDaysMs;
+          return (now - data.timestamp) < thirtyDaysMs;
         })
         .map(([id, _]) => id));
       const excludedIds = uniqUuids([...currentIds, ...locallySwipedIds, currentUser.id]);
@@ -2447,7 +2555,7 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, isPremium, profileComplet
           .from('passes')
           .select('passed_id, passed_at')
           .match({ passer_id: currentUser.id })
-          .gte('passed_at', new Date(Date.now() - 192 * 60 * 60 * 1000).toISOString()) // 8 days - same as main fetch
+          .gte('passed_at', new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString()) // 30 days - same as main fetch
       ]);
 
       const likedUserIds = uniqUuids(likedUsers?.map(like => like.liked_id) || []);
@@ -2687,24 +2795,60 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, isPremium, profileComplet
       const existingProfileIds = new Set(potentialMatches.map(p => !isAd(p) ? p.id : null).filter(Boolean));
       const uniqueProfiles = stratifiedProfiles.filter(profile => !existingProfileIds.has(profile.id));
 
-      if (uniqueProfiles.length > 0) {
+      // ⭐ PROACTIVE LIKED-ME BLENDING: Fetch and blend liked-me profiles during refill
+      let profilesWithLikedMe = uniqueProfiles;
+      const likedMeRows = await fetchLikedMeProfiles(
+        currentUser.id,
+        allExcludedIds,
+        allowedGenders
+      );
+      
+      if (likedMeRows.length > 0) {
+        // Convert to PotentialMatch format
+        const likedMeProfiles: PotentialMatch[] = likedMeRows.map(profile =>
+          toPotentialMatch(profile, {
+            images: [],
+            distance: typeof distanceMap[profile.id] === 'number' ? distanceMap[profile.id] : 999,
+          })
+        );
+
+        // Filter out any that are already in uniqueProfiles or potentialMatches
+        const allExistingIds = new Set([...uniqueProfiles.map(p => p.id), ...existingProfileIds]);
+        const uniqueLikedMe = likedMeProfiles.filter(p => !allExistingIds.has(p.id));
+
+        // Apply age filtering to liked-me profiles
+        const userMinAge = currentUserData?.min_age ?? currentUser.min_age ?? 18;
+        const userMaxAge = currentUserData?.max_age ?? currentUser.max_age ?? 99;
+        const ageFilteredLikedMe = uniqueLikedMe.filter(profile => {
+          if (!profile.date_of_birth) return true;
+          const age = calculateAge(profile.date_of_birth);
+          if (!Number.isFinite(age)) return true;
+          return age >= userMinAge && age <= userMaxAge;
+        });
+
+        // ⭐ P2: Apply global eligibility gate to liked-me profiles
+        const eligibleLikedMe = ageFilteredLikedMe.filter(isEligibleProfile);
+
+        // Blend liked-me profiles (every 3-4 profiles)
+        if (eligibleLikedMe.length > 0) {
+          profilesWithLikedMe = blendLikedMeProfiles(uniqueProfiles, eligibleLikedMe, currentUser.id);
+        }
+      }
+
+      if (profilesWithLikedMe.length > 0) {
         setNoMoreProfiles(false);
         if (premiumTrulyEmptyAfterRetry) setPremiumTrulyEmptyAfterRetry(false);
       }
       
       // Add new UNIQUE profiles to the END of the array (with ads injected)
-      const newProfilesWithAds = injectAds(uniqueProfiles);
+      const newProfilesWithAds = injectAds(profilesWithLikedMe);
       setPotentialMatches(prev => mergeDecksWithoutProfileDupes(prev, newProfilesWithAds, locallySwipedProfileIds.current));
       
-      // ⭐ FIX #5: Preload IMMEDIATELY (no delay) for instant swipe
-      if (profilesWithImages.length > 0) {
-        preloadNextProfileImages(profilesWithImages, userImages, 0);
-        
-        // Batch fetch languages for new profiles
-        const newProfileIds = profilesWithImages.map(p => p.id).filter(Boolean);
-        if (newProfileIds.length > 0) {
-          batchFetchLanguages(newProfileIds);
-        }
+      // ⭐ PRELOADING: Handled by centralized useEffect watching head profile ID
+      // Batch fetch languages for new profiles
+      const newProfileIds = profilesWithImages.map(p => p.id).filter(Boolean);
+      if (newProfileIds.length > 0) {
+        batchFetchLanguages(newProfileIds);
       }
     } catch (error) {
       // ignore load more errors; UI will retry via refill effect
@@ -2716,14 +2860,15 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, isPremium, profileComplet
     allowedGenders,
     potentialMatches,
     isLoadingMore,
-    userImages,
-    preloadNextProfileImages,
     injectAds,
     fetchUnlockedCountryProfiles,
     batchFetchLanguages,
     premiumActive,
     isArchivedFallback,
     premiumTrulyEmptyAfterRetry,
+    fetchLikedMeProfiles,
+    blendLikedMeProfiles,
+    isEligibleProfile,
   ]);
 
   // ⭐ AUTO-REFILL ON SWIPE - Load more profiles as user swipes
@@ -2773,19 +2918,23 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, isPremium, profileComplet
     
     if (rescueCandidates.length === 0) return;
     
+    // ⭐ P2: Apply eligibility gate to rescue candidates
+    const eligibleRescueCandidates = rescueCandidates.filter(isEligibleProfile);
+    if (eligibleRescueCandidates.length === 0) return;
+    
     // ⭐ ANDROID OPTIMIZATION: Skip rescue profile injection on Android for faster performance
     if (isAndroidPlatform()) return;
     
     // Inject rescue profiles near the front of the queue (positions 2-5)
     setPotentialMatches(prev => {
       const currentProfiles = prev.slice(currentIndex);
-      const rescueIds = new Set(rescueCandidates.map(p => p.id));
+      const rescueIds = new Set(eligibleRescueCandidates.map(p => p.id));
       
       // Remove rescue profiles from their current positions
       const withoutRescue = currentProfiles.filter(p => !isAd(p) ? !rescueIds.has(p.id) : true);
       
       // Inject at positions 2, 4, 6 (skip first profile which is current)
-      const injected = injectRescueProfiles(withoutRescue, rescueCandidates, {
+      const injected = injectRescueProfiles(withoutRescue, eligibleRescueCandidates, {
         maxPercent: 0.15,
         spacing: [2, 4],
         startPosition: 1,
@@ -2798,19 +2947,132 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, isPremium, profileComplet
     lastRescueRef.current = now;
     // Reset streak after rescue
     setNoMatchStreak(0);
-  }, [noMatchStreak, potentialMatches, currentIndex, currentUser?.id, usersWhoLikedMeIds, RESCUE_COOLDOWN_MS, isArchivedFallback]);
-  // Automatically preloads upcoming profiles based on current position
+  }, [noMatchStreak, potentialMatches, currentIndex, currentUser?.id, usersWhoLikedMeIds, RESCUE_COOLDOWN_MS, isArchivedFallback, isEligibleProfile]);
+  
+  // ⭐ CENTRALIZED PRELOAD SYSTEM (Single Source of Truth)
+  // Watches head profile ID and preloads head + next 1-2 profiles when it changes
+  // Cancels previous preload operations to avoid duplicate work
   useEffect(() => {
     if (!hasCompletedInitialFetch || potentialMatches.length === 0) return;
 
-    // Filter out ads - only preload real profiles
-    const realMatches = potentialMatches.filter(m => !isAd(m));
-    
-    // Preload images for upcoming profiles (pass full array and current position)
-    if (realMatches.length > 0) {
-      preloadProfileImages(realMatches as PotentialMatch[], currentIndex);
+    // Get head profile (skip ads)
+    const realMatches = potentialMatches.filter(m => !isAd(m)) as PotentialMatch[];
+    const headProfile = realMatches[0];
+    if (!headProfile?.id) return;
+
+    // Extract head ID for dependency array (avoid complex expression)
+    const headProfileId = headProfile.id;
+
+    // Abort any in-flight preload from previous head
+    if (preloadAbortControllerRef.current) {
+      preloadAbortControllerRef.current.abort();
+      preloadAbortControllerRef.current = null;
     }
-  }, [potentialMatches, currentIndex, hasCompletedInitialFetch, preloadProfileImages]);
+
+    // Create new abort controller for this batch
+    const abortController = new AbortController();
+    preloadAbortControllerRef.current = abortController;
+
+    // Preload head + next 1-2 profiles (3 total max)
+    const profilesToPreload = realMatches.slice(0, 3);
+    
+    // Filter out already loaded profiles
+    const needsPreload = profilesToPreload.filter(
+      p => !userImagesRef.current[p.id]?.length && !requestedImageProfileIds.current.has(p.id)
+    );
+
+    if (needsPreload.length === 0) return;
+
+    const idsToLoad = needsPreload.map(p => p.id);
+    idsToLoad.forEach(id => requestedImageProfileIds.current.add(id));
+
+    // Load images in background
+    (async () => {
+      try {
+        if (abortController.signal.aborted) return;
+
+        type UserImageRow = { user_id: string; image_url: string; image_order: number | null };
+        const { data: imageRows } = await supabase
+          .from('user_images')
+          .select('user_id, image_url, image_order')
+          .in('user_id', idsToLoad)
+          .eq('is_approved', true)
+          .order('user_id', { ascending: true })
+          .order('image_order', { ascending: true })
+          .returns<UserImageRow[]>();
+
+        if (abortController.signal.aborted) return;
+
+        const byUser: Record<string, string[]> = {};
+        const allowedUserIds = new Set(idsToLoad);
+        for (const row of imageRows || []) {
+          if (!row?.user_id || !row?.image_url) continue;
+          if (!allowedUserIds.has(row.user_id)) continue;
+          if (!byUser[row.user_id]) byUser[row.user_id] = [];
+          byUser[row.user_id].push(row.image_url);
+        }
+
+        const userImageUpdates: Record<string, string[]> = {};
+        const usersWithImages: PotentialMatch[] = [];
+
+        for (const user of needsPreload) {
+          const imageUrls = byUser[user.id] || [];
+          if (imageUrls.length === 0) {
+            requestedImageProfileIds.current.delete(user.id);
+            continue;
+          }
+          userImageUpdates[user.id] = imageUrls;
+          usersWithImages.push(user);
+        }
+
+        if (abortController.signal.aborted) return;
+
+        if (Object.keys(userImageUpdates).length > 0) {
+          setUserImages(prev => ({ ...prev, ...userImageUpdates }));
+        }
+
+        // iOS/Web: blob preloading; Android: skip
+        const isAndroid = isAndroidPlatform();
+        if (!isAndroid) {
+          for (const user of usersWithImages) {
+            if (abortController.signal.aborted) break;
+            
+            const imageUrls = userImageUpdates[user.id] || [];
+            const blobMap: { [url: string]: string } = {};
+            await Promise.all(
+              imageUrls.map(async (originalUrl) => {
+                try {
+                  if (abortController.signal.aborted) return;
+                  const blobUrl = await preloadImageToBlob(originalUrl);
+                  blobMap[originalUrl] = blobUrl;
+                } catch {
+                  blobMap[originalUrl] = originalUrl;
+                }
+              })
+            );
+            
+            if (!abortController.signal.aborted) {
+              setPreloadedBlobImages(prev => ({ ...prev, [user.id]: blobMap }));
+            }
+            requestedImageProfileIds.current.delete(user.id);
+          }
+        } else {
+          usersWithImages.forEach(user => {
+            requestedImageProfileIds.current.delete(user.id);
+          });
+        }
+      } catch (error) {
+        // Ignore preload errors
+      } finally {
+        idsToLoad.forEach(id => requestedImageProfileIds.current.delete(id));
+      }
+    })();
+
+    // Cleanup on unmount or when head changes
+    return () => {
+      abortController.abort();
+    };
+  }, [potentialMatches, hasCompletedInitialFetch]);
 
   // Optimistic UI: move to next card instantly, then process like in background
   const handleLike = async () => {
@@ -3119,7 +3381,7 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, isPremium, profileComplet
     // ✅ Use the passed parameter, not undefined currentMatch
     const prevMatch = matchToPass;
 
-    // CRITICAL: Add to local exclusion list immediately with 'pass' action (expires after 6 days)
+    // CRITICAL: Add to local exclusion list immediately with 'pass' action (expires after 30 days)
     locallySwipedProfileIds.current.set(prevMatch.id, { action: 'pass', timestamp: Date.now() });
     persistSwipedIds(); // ⭐ Persist to sessionStorage
 
@@ -3208,6 +3470,11 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, isPremium, profileComplet
       return;
     }
 
+    // ⭐ Store snapshot for safe reverse-dislike reinsertion
+    if (!isAd(currentMatch)) {
+      lastPassedProfileRef.current = currentMatch;
+    }
+    
     // ⭐ NEW: Show notification if this user already liked you (but still allow the pass)
     if (usersWhoLikedMeIds.includes(currentMatch.id)) {
       toast({
@@ -3262,30 +3529,44 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, isPremium, profileComplet
         return;
       }
 
-      // Find the passed user data and bring them back to the front
-      const passedUserData = potentialMatches.find(match => match.id === lastPassedUser.user_id);
+      // ⭐ P2 FIX: Use snapshot for safe reinsertion with eligibility check
+      let profileToReinsert: PotentialMatch | null = null;
       
-      if (passedUserData) {
-        // Insert the user at the current index so they appear as the next card
-        const newMatches = [...potentialMatches];
-        newMatches.splice(currentIndex, 0, passedUserData);
-        setPotentialMatches(newMatches);
+      // First, try to use the stored snapshot
+      if (lastPassedProfileRef.current && lastPassedProfileRef.current.id === lastPassedUser.user_id) {
+        profileToReinsert = lastPassedProfileRef.current;
       } else {
-        // If not in current matches, try to fetch their profile data
-        const { data: profileData, error: profileError } = await supabase
-          .from('profiles')
-          .select('id, first_name, last_name, bio, city, country, country_code, occupation, education_level, date_of_birth, interests, gender, latitude, longitude, fun_fact, perfect_first_date, last_googled, relationship_intent, smoking, drinking, exercise_level, sleeping_schedule, introvert_extrovert, spontaneous_planner, messy_organized, adinkra_symbols, is_verified')
-          .eq('id', lastPassedUser.user_id)
-          .eq('account_status', 'active')
-          .single();
+        // Fallback: check if still in current deck
+        const inDeck = potentialMatches.find(match => !isAd(match) && match.id === lastPassedUser.user_id) as PotentialMatch | undefined;
+        if (inDeck) {
+          profileToReinsert = inDeck;
+        } else {
+          // Last resort: fetch from database
+          const { data: profileData, error: profileError } = await supabase
+            .from('profiles')
+            .select('id, first_name, last_name, bio, city, country, country_code, occupation, education_level, date_of_birth, interests, gender, latitude, longitude, fun_fact, perfect_first_date, last_googled, relationship_intent, smoking, drinking, exercise_level, sleeping_schedule, introvert_extrovert, spontaneous_planner, messy_organized, adinkra_symbols, is_verified')
+            .eq('id', lastPassedUser.user_id)
+            .eq('account_status', 'active')
+            .eq('is_admin', false)
+            .eq('is_archived', false)
+            .single();
 
-        if (!profileError && profileData) {
-          // Add the user back with empty images array (will be loaded when needed)
-          const userWithImages = toPotentialMatch(profileData as unknown as ProfileRow, { images: [] });
-          const newMatches = [...potentialMatches];
-          newMatches.splice(currentIndex, 0, userWithImages);
-          setPotentialMatches(newMatches);
+          if (!profileError && profileData) {
+            profileToReinsert = toPotentialMatch(profileData as unknown as ProfileRow, { images: [] });
+          }
         }
+      }
+      
+      // Reinsert with deduplication and eligibility check
+      if (profileToReinsert && isEligibleProfile(profileToReinsert)) {
+        setPotentialMatches(prev => {
+          // Deduplicate: remove if already present
+          const filtered = prev.filter(p => isAd(p) || p.id !== profileToReinsert!.id);
+          // Insert at current index
+          const newMatches = [...filtered];
+          newMatches.splice(currentIndex, 0, profileToReinsert!);
+          return newMatches;
+        });
       }
 
       // Remove from passed users list
@@ -3356,7 +3637,7 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, isPremium, profileComplet
       if (prev.length === 0) return prev;
 
       const now = Date.now();
-      const eightDaysMs = 8 * 24 * 60 * 60 * 1000;
+      const thirtyDaysMs = 30 * 24 * 60 * 60 * 1000;
 
       const fallback = prev[0];
       const swipedItem = swiped ?? fallback;
@@ -3387,10 +3668,10 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, isPremium, profileComplet
         // Remove ALL instances of the swiped profile
         if (item.id === swipedProfileId) return false;
 
-        // Also remove anything already locally swiped (likes always; passes for 8 days)
+        // Also remove anything already locally swiped (likes always; passes for 30 days)
         const swipedData = locallySwipedProfileIds.current.get(item.id);
         if (swipedData) {
-          if (swipedData.action === 'like' || (now - swipedData.timestamp) < eightDaysMs) {
+          if (swipedData.action === 'like' || (now - swipedData.timestamp) < thirtyDaysMs) {
             return false;
           }
         }
@@ -3449,59 +3730,46 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, isPremium, profileComplet
       // The useEffect will detect when remainingReal <= 10 and trigger loadMoreMatches
       // No need for duplicate reload logic here - keeps it simple and predictable
       
-      // ⭐ FIX 3A: Preload NEXT profile using NEW array (after removal)
-      // This ensures we preload the correct profile from the updated deck
-      const nextProfile = newMatches[0]; // After removal, the next card is index 0
-      if (nextProfile && !isAd(nextProfile)) {
-        loadAllImagesForProfile(nextProfile.id).then(imgs => {
-          if (imgs) {
-            setUserImages(prevImgs => ({ ...prevImgs, [nextProfile.id]: imgs }));
-          }
-        });
+      // ⭐ PRELOADING: Removed - handled by centralized useEffect watching head profile ID
+      // This eliminates duplicate fetches and race conditions
+      
+      // ⭐ REACTIVE LIKE-BACK INJECTION (Minimal Fallback - Pure Function):
+      // Handles real-time likes that arrive AFTER feed was built
+      // Reduced rate (10%) since proactive blending already handles most cases
+      // This is atomic (inside same transaction) to avoid stale closure issues
+      let finalMatches = newMatches;
+      
+      // Get injection candidate from hook (if available)
+      const injectionCandidate = onLikeBackSwipe(newMatches);
+      if (injectionCandidate) {
+        const { profile: injectedProfile, position } = injectionCandidate;
+        
+        // Don't inject if profile is already in queue or ineligible
+        const existingIds = new Set(finalMatches.filter(p => !isAd(p)).map(p => p.id));
+        if (!existingIds.has(injectedProfile.id) && isEligibleProfile(injectedProfile)) {
+          // Insert at calculated position (clamped to valid range)
+          const insertPos = Math.min(position, finalMatches.length);
+          const updated = [...finalMatches];
+          updated.splice(insertPos, 0, injectedProfile);
+          finalMatches = updated;
+          
+          swipeDebug('likeBackInjection: reactive fallback injected', {
+            profileId: injectedProfile.id,
+            name: `${injectedProfile.first_name} ${injectedProfile.last_name}`,
+            position: insertPos,
+            newDeckLen: updated.length,
+          });
+        }
       }
       
-      return newMatches;
+      return finalMatches;
     });
     
     // ⭐ RULE 5: Hard-cut instant card removal - always stay at index 0
     setCurrentIndex(0);
     
-    // ⭐ REMOVED: Old preload logic that used stale potentialMatches array
-    // Now handled inside setPotentialMatches callback with correct newMatches array (3A)
-    
-    // ⭐ 25% LIKE-BACK INJECTION: Inject profiles who liked the current user
-    // This happens AFTER the current profile is removed, inserting at +2 to +4
-    onLikeBackSwipe(potentialMatches, (injectedProfile, position) => {
-      setPotentialMatches(prev => {
-        // Don't inject if profile is already in queue
-        const existingIds = new Set(prev.filter(p => !isAd(p)).map(p => p.id));
-        if (existingIds.has(injectedProfile.id)) return prev;
-        
-        // Insert at calculated position (clamped to valid range)
-        const insertPos = Math.min(position, prev.length);
-        const updated = [...prev];
-        updated.splice(insertPos, 0, injectedProfile);
-        
-        swipeDebug('likeBackInjection: injected', {
-          profileId: injectedProfile.id,
-          name: `${injectedProfile.first_name} ${injectedProfile.last_name}`,
-          position: insertPos,
-          newDeckLen: updated.length,
-        });
-        
-        // Preload images for injected profile
-        loadAllImagesForProfile(injectedProfile.id).then(imgs => {
-          if (imgs) {
-            setUserImages(prevImgs => ({ ...prevImgs, [injectedProfile.id]: imgs }));
-          }
-        });
-        
-        return updated;
-      });
-    });
-    
-    // Progressive Refill System Integration - load more profiles in background when running low
-    checkAndTriggerRefill(currentUser.id, 0);
+    // ⭐ REFILL: Handled by centralized useEffect (single source of truth)
+    // No manual trigger needed - effect watches remainingReal and auto-triggers
   };
 
   // Debug: log whenever the “current” card identity changes after a deck update

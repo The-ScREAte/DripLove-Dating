@@ -3,16 +3,21 @@ import { supabase } from '@/integrations/supabase/client';
 import { PotentialMatch } from '@/types';
 
 /**
- * 30% Like-Back Injection Hook
+ * Reactive Like-Back Injection Hook (Fallback Only)
  * 
- * Implements Tinder-style "like-back injection" where profiles that liked the current user
- * are injected into the swipe queue at strategic positions.
+ * Now operates as a FALLBACK for real-time likes that arrive after feed build.
+ * Primary liked-me blending happens proactively during fetchInitialMatches/loadMoreMatches.
+ * 
+ * Reduced injection rate (10%) since most liked-me profiles are already in the feed.
+ * This handles edge cases like:
+ * - New likes arriving while user is actively swiping
+ * - Real-time notification scenarios
  * 
  * Rules:
- * - 30% injection rate = ~1 injected profile every 3-4 cards
+ * - 10% injection rate = ~1 injected profile every 10 swipes (reduced from 30%)
  * - Never inject as "next card" - use positions +2 to +4
- * - Cap: max 30% of cards per session (only after 10+ swipes to avoid early blocking)
- * - Cooldown: at least 3 swipes between injections
+ * - Cap: max 10% of cards per session (reduced from 30%)
+ * - Cooldown: at least 5 swipes between injections (increased from 3)
  * - Quality filter: only inject likers with 2+ photos
  * - Deduplicate: avoid same ID appearing twice
  * - Respect: passed today + blocked profiles excluded
@@ -60,14 +65,14 @@ interface LikerProfile {
   liked_at: number; // Timestamp of when they liked (for recency sorting)
 }
 
-// Configuration
-const NORMAL_INJECT_RATE = 0.30; // 30% normal
-const BOOST_INJECT_RATE = 0.90; // 90% boost mode
-const COOLDOWN_SWIPES = 3; // At least 3 swipes between injections
+// Configuration (Reduced rates since proactive blending handles most cases)
+const NORMAL_INJECT_RATE = 0.10; // 10% fallback rate (reduced from 30%)
+const BOOST_INJECT_RATE = 0.90; // 90% boost mode (unchanged)
+const COOLDOWN_SWIPES = 5; // At least 5 swipes between injections (increased from 3)
 const MIN_PHOTOS_REQUIRED = 2; // Quality filter
 const INJECTION_POSITION_MIN = 2; // Position +2
 const INJECTION_POSITION_MAX = 4; // Position +4
-const MAX_INJECTION_PERCENT = 0.30; // Cap at 30% of session
+const MAX_INJECTION_PERCENT = 0.10; // Cap at 10% of session (reduced from 30%)
 const MIN_SWIPES_FOR_CAP = 10; // Only enforce cap after 10+ swipes
 
 export function useLikeBackInjection({
@@ -368,17 +373,17 @@ export function useLikeBackInjection({
     return minPos + offset;
   }, []);
 
-  // Main injection function - call this after each swipe
+  // Main injection function - pure function that returns data instead of callback
+  // Call this after each swipe, returns profile + position if injection should happen
   const onSwipe = useCallback(<T extends { id: string }>(
-    queue: T[],
-    addToQueue: (profile: PotentialMatch, position: number) => void
-  ) => {
+    queue: T[]
+  ): { profile: PotentialMatch; position: number } | null => {
     swipeCountRef.current += 1;
 
-    if (!shouldInjectNow()) return;
+    if (!shouldInjectNow()) return null;
 
     const candidate = getInjectionCandidate();
-    if (!candidate) return;
+    if (!candidate) return null;
 
     const position = getInjectionPosition(queue.length);
     const match = likerToMatch(candidate);
@@ -391,8 +396,8 @@ export function useLikeBackInjection({
     // Remove from candidates
     setLikedMeIds(prev => prev.filter(id => id !== candidate.id));
 
-    // Insert into queue
-    addToQueue(match, position);
+    // Return profile and position for caller to inject
+    return { profile: match, position };
   }, [shouldInjectNow, getInjectionCandidate, getInjectionPosition, likerToMatch]);
 
   // Check if a profile ID is a "liked me" profile (for UI hints)
