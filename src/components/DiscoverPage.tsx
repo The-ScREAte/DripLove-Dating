@@ -1884,8 +1884,26 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, isPremium, profileComplet
         const initialDeck = safeIndex > 0 ? matchesWithAds.slice(safeIndex) : matchesWithAds;
 
         setPotentialMatches(prev => {
-          if (prev.length === 0) return initialDeck;
-          return mergeDecksWithoutProfileDupes(prev, matchesWithAds, locallySwipedProfileIds.current);
+          // ⭐ CRITICAL: Always filter against locally swiped profiles to prevent repetition
+          const swipedIds = locallySwipedProfileIds.current;
+          const now = Date.now();
+          const eightDaysMs = 8 * 24 * 60 * 60 * 1000;
+          
+          const filterSwiped = (deck: MatchOrAd[]): MatchOrAd[] => {
+            return deck.filter(item => {
+              if (isAd(item)) return true;
+              const swipeData = swipedIds.get(item.id);
+              if (!swipeData) return true;
+              // Always exclude liked profiles, exclude passed if < 8 days old
+              if (swipeData.action === 'like') return false;
+              return (now - swipeData.timestamp) >= eightDaysMs;
+            });
+          };
+          
+          if (prev.length === 0) {
+            return filterSwiped(initialDeck);
+          }
+          return mergeDecksWithoutProfileDupes(prev, matchesWithAds, swipedIds);
         });
         setUserImages(images);
         setUserDistances(distances);
@@ -2130,16 +2148,36 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, isPremium, profileComplet
 
       const cachedDeck = readDeckCache(cacheKey);
       if (cachedDeck && cachedDeck.length > 0) {
-        // ⭐ INSTANT LOAD: Use cached deck for immediate display
-        setPotentialMatches(cachedDeck);
-        setCurrentIndex(0);
-        setImageIndex(0);
-        setIsLoading(false);
-        setHasCompletedInitialFetch(true);
+        // ⭐ CRITICAL: Filter cached deck against locally swiped profiles to prevent repetition
+        const now = Date.now();
+        const eightDaysMs = 8 * 24 * 60 * 60 * 1000;
+        const swipedToExclude = new Set<string>();
+        
+        for (const [id, data] of locallySwipedProfileIds.current.entries()) {
+          // Always exclude liked profiles, exclude passed profiles if less than 8 days old
+          if (data.action === 'like' || (now - data.timestamp) < eightDaysMs) {
+            swipedToExclude.add(id);
+          }
+        }
+        
+        const filteredCachedDeck = cachedDeck.filter(item => {
+          if (isAd(item)) return true; // Keep ads
+          return !swipedToExclude.has(item.id);
+        });
+        
+        if (filteredCachedDeck.length > 0) {
+          // ⭐ INSTANT LOAD: Use filtered cached deck for immediate display
+          setPotentialMatches(filteredCachedDeck);
+          setCurrentIndex(0);
+          setImageIndex(0);
+          setIsLoading(false);
+          setHasCompletedInitialFetch(true);
 
-        // Refresh silently in background to apply new swipes / new users
-        void fetchPotentialMatches({ background: true, cacheKey });
-        return;
+          // Refresh silently in background to apply new swipes / new users
+          void fetchPotentialMatches({ background: true, cacheKey });
+          return;
+        }
+        // If filtered cache is empty, fall through to fresh fetch
       }
 
       // Cold start - fetch fresh profiles
