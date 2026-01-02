@@ -23,6 +23,59 @@ const ProfileSummaryCard = ({ currentUser }: ProfileSummaryCardProps) => {
     }
   }, [currentUser]);
 
+  // ⭐ Realtime subscription to update stats when likes are added
+  useEffect(() => {
+    if (!currentUser?.id) return;
+
+    // Subscribe to likes table changes for this user
+    const likesChannel = supabase
+      .channel(`profile-stats-${currentUser.id}`)
+      .on(
+        'postgres_changes',
+        {
+          event: 'INSERT',
+          schema: 'public',
+          table: 'likes',
+          filter: `liker_id=eq.${currentUser.id}`,
+        },
+        () => {
+          // Refresh stats when a new like is added
+          fetchUserStats();
+        }
+      )
+      .on(
+        'postgres_changes',
+        {
+          event: 'INSERT',
+          schema: 'public',
+          table: 'matches',
+          filter: `user1_id=eq.${currentUser.id}`,
+        },
+        () => {
+          // Refresh stats when a new match is added
+          fetchUserStats();
+        }
+      )
+      .on(
+        'postgres_changes',
+        {
+          event: 'INSERT',
+          schema: 'public',
+          table: 'matches',
+          filter: `user2_id=eq.${currentUser.id}`,
+        },
+        () => {
+          // Refresh stats when a new match is added
+          fetchUserStats();
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(likesChannel);
+    };
+  }, [currentUser?.id]);
+
   const fetchUserStats = async () => {
     if (!currentUser?.id) return;
 

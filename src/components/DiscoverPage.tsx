@@ -817,9 +817,9 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, isPremium, profileComplet
   const [blockedUserIds, setBlockedUserIds] = useState<string[]>([]);
   const blockedIdsSet = useMemo(() => new Set(blockedUserIds), [blockedUserIds]);
   
-  // ⭐ FIX: Compute passedTodayIdsSet fresh each render (no memo)
-  // This ensures useLikeBackInjection always has current pass state
-  const passedTodayIdsSet = (() => {
+  // ⭐ FIX: Memoize passedTodayIdsSet to prevent infinite loop in useLikeBackInjection
+  // Only recreate when locallySwipedProfileIds actually changes content
+  const passedTodayIdsSet = useMemo(() => {
     const now = Date.now();
     const oneDayMs = 24 * 60 * 60 * 1000;
     const passedToday = new Set<string>();
@@ -829,7 +829,7 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, isPremium, profileComplet
       }
     }
     return passedToday;
-  })();
+  }, [locallySwipedProfileIds.current.size]); // Re-compute only when Map size changes
   
   const inQueueIdsSet = useMemo(() => {
     const inQueue = new Set<string>();
@@ -3581,11 +3581,7 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, isPremium, profileComplet
     locallySwipedProfileIds.current.set(prevMatch.id, { action: 'like', timestamp: Date.now() });
     persistSwipedIds(); // ⭐ Persist to sessionStorage
 
-    // Remove from cache to prevent re-showing + revoke blob URLs to free memory
-    const imagesToRevoke = userImages[prevMatch.id] || [];
-    revokeBlobUrlsForProfile(prevMatch.id, imagesToRevoke);
-    cleanupOldBlobUrls(80); // Evict old entries if cache is growing
-    
+    // Remove from cache to prevent re-showing
     setUserImages(prev => {
       const updated = { ...prev };
       delete updated[prevMatch.id];
@@ -3596,6 +3592,12 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, isPremium, profileComplet
       delete updated[prevMatch.id];
       return updated;
     });
+
+    // Revoke blob URLs after animation completes (400ms) to free memory
+    setTimeout(() => {
+      const imagesToRevoke = userImages[prevMatch.id] || [];
+      revokeBlobUrlsForProfile(prevMatch.id, imagesToRevoke);
+    }, 450);
 
     // Increment local/pending counters immediately for a snappy feel
     pendingSwipesRef.current += 1;
@@ -3833,11 +3835,7 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, isPremium, profileComplet
     locallySwipedProfileIds.current.set(prevMatch.id, { action: 'pass', timestamp: Date.now() });
     persistSwipedIds(); // ⭐ Persist to sessionStorage
 
-    // Remove from cache to prevent re-showing + revoke blob URLs to free memory
-    const imagesToRevoke = userImages[prevMatch.id] || [];
-    revokeBlobUrlsForProfile(prevMatch.id, imagesToRevoke);
-    cleanupOldBlobUrls(80); // Evict old entries if cache is growing
-    
+    // Remove from cache to prevent re-showing
     setUserImages(prev => {
       const updated = { ...prev };
       delete updated[prevMatch.id];
@@ -3848,6 +3846,12 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, isPremium, profileComplet
       delete updated[prevMatch.id];
       return updated;
     });
+
+    // Revoke blob URLs after animation completes (400ms) to free memory
+    setTimeout(() => {
+      const imagesToRevoke = userImages[prevMatch.id] || [];
+      revokeBlobUrlsForProfile(prevMatch.id, imagesToRevoke);
+    }, 450);
 
     // Optimistically add to passed list and increment counters
     setPassedUsers(prev => [{ user_id: prevMatch.id, passed_at: new Date() }, ...prev.slice(0, 9)]);
