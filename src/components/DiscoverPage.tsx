@@ -17,7 +17,7 @@
 import { useTranslation } from 'react-i18next';
 import React, { useState, useEffect, useCallback, useMemo, useRef, lazy, Suspense, memo } from 'react';
 import { isAndroidPlatform, isIOSPlatform } from '@/utils/platformUtils';
-import { preloadImageToBlob } from '@/utils/imageCache';
+import { preloadImageToBlob, revokeBlobUrlsForProfile, cleanupOldBlobUrls } from '@/utils/imageCache';
 import { calculateAge, createDeterministicShuffle } from '@/utils/discoverCache';
 import { getStratifiedBatches } from '@/utils/stratifiedSampling';
 import { applyActivityWeighting, getSwipeFatigueRescueCandidates, injectRescueProfiles } from '@/utils/activityWeighting';
@@ -3581,7 +3581,11 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, isPremium, profileComplet
     locallySwipedProfileIds.current.set(prevMatch.id, { action: 'like', timestamp: Date.now() });
     persistSwipedIds(); // ⭐ Persist to sessionStorage
 
-    // Remove from cache to prevent re-showing
+    // Remove from cache to prevent re-showing + revoke blob URLs to free memory
+    const imagesToRevoke = userImages[prevMatch.id] || [];
+    revokeBlobUrlsForProfile(prevMatch.id, imagesToRevoke);
+    cleanupOldBlobUrls(80); // Evict old entries if cache is growing
+    
     setUserImages(prev => {
       const updated = { ...prev };
       delete updated[prevMatch.id];
@@ -3829,7 +3833,11 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, isPremium, profileComplet
     locallySwipedProfileIds.current.set(prevMatch.id, { action: 'pass', timestamp: Date.now() });
     persistSwipedIds(); // ⭐ Persist to sessionStorage
 
-    // Remove from cache to prevent re-showing
+    // Remove from cache to prevent re-showing + revoke blob URLs to free memory
+    const imagesToRevoke = userImages[prevMatch.id] || [];
+    revokeBlobUrlsForProfile(prevMatch.id, imagesToRevoke);
+    cleanupOldBlobUrls(80); // Evict old entries if cache is growing
+    
     setUserImages(prev => {
       const updated = { ...prev };
       delete updated[prevMatch.id];

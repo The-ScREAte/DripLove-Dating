@@ -3,21 +3,16 @@ import { supabase } from '@/integrations/supabase/client';
 import { PotentialMatch } from '@/types';
 
 /**
- * Reactive Like-Back Injection Hook (Fallback Only)
+ * Reactive Like-Back Injection Hook (25% Match Chance)
  * 
- * Now operates as a FALLBACK for real-time likes that arrive after feed build.
- * Primary liked-me blending happens proactively during fetchInitialMatches/loadMoreMatches.
- * 
- * Reduced injection rate (10%) since most liked-me profiles are already in the feed.
- * This handles edge cases like:
- * - New likes arriving while user is actively swiping
- * - Real-time notification scenarios
+ * Implements a 25% injection rate to give users higher match probability.
+ * Users who liked the current user are strategically injected into the feed.
  * 
  * Rules:
- * - 10% injection rate = ~1 injected profile every 10 swipes (reduced from 30%)
+ * - 25% injection rate = ~1 injected profile every 4 swipes
  * - Never inject as "next card" - use positions +2 to +4
- * - Cap: max 10% of cards per session (reduced from 30%)
- * - Cooldown: at least 5 swipes between injections (increased from 3)
+ * - Cap: max 25% of cards per session
+ * - Cooldown: at least 3 swipes between injections
  * - Quality filter: only inject likers with 2+ photos
  * - Deduplicate: avoid same ID appearing twice
  * - Respect: passed today + blocked profiles excluded
@@ -65,14 +60,14 @@ interface LikerProfile {
   liked_at: number; // Timestamp of when they liked (for recency sorting)
 }
 
-// Configuration (Reduced rates since proactive blending handles most cases)
-const NORMAL_INJECT_RATE = 0.10; // 10% fallback rate (reduced from 30%)
+// Configuration (25% match chance as requested)
+const NORMAL_INJECT_RATE = 0.25; // 25% injection rate = ~1 in 4 cards
 const BOOST_INJECT_RATE = 0.90; // 90% boost mode (unchanged)
-const COOLDOWN_SWIPES = 5; // At least 5 swipes between injections (increased from 3)
+const COOLDOWN_SWIPES = 3; // At least 3 swipes between injections
 const MIN_PHOTOS_REQUIRED = 2; // Quality filter
 const INJECTION_POSITION_MIN = 2; // Position +2
 const INJECTION_POSITION_MAX = 4; // Position +4
-const MAX_INJECTION_PERCENT = 0.10; // Cap at 10% of session (reduced from 30%)
+const MAX_INJECTION_PERCENT = 0.25; // Cap at 25% of cards per session
 const MIN_SWIPES_FOR_CAP = 10; // Only enforce cap after 10+ swipes
 
 export function useLikeBackInjection({
