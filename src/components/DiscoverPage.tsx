@@ -404,10 +404,10 @@ const mergeDecksWithoutProfileDupes = (prev: MatchOrAd[], incoming: MatchOrAd[],
   const swipedIds = new Set<string>();
   if (localSwipedIds) {
     const now = Date.now();
-    const eightDaysMs = 8 * 24 * 60 * 60 * 1000;
+    const thirtyDaysMs = 30 * 24 * 60 * 60 * 1000;
     for (const [id, data] of localSwipedIds.entries()) {
-      // Always exclude liked profiles, only exclude passed profiles if less than 8 days old
-      if (data.action === 'like' || (now - data.timestamp) < eightDaysMs) {
+      // Always exclude liked profiles, only exclude passed profiles if less than 30 days old
+      if (data.action === 'like' || (now - data.timestamp) < thirtyDaysMs) {
         swipedIds.add(id);
       }
     }
@@ -641,6 +641,28 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, isPremium, profileComplet
     }
     return count;
   };
+
+  // Helper to revoke blob URLs for a profile to free memory
+  const revokeBlobUrlsForProfile = useCallback((profileId: string, imageUrls: string[]) => {
+    setPreloadedBlobImages(prev => {
+      const profileBlobs = prev[profileId];
+      if (profileBlobs) {
+        // Revoke all blob URLs for this profile
+        for (const blobUrl of Object.values(profileBlobs)) {
+          try {
+            if (blobUrl.startsWith('blob:')) {
+              URL.revokeObjectURL(blobUrl);
+            }
+          } catch {
+            // ignore revoke errors
+          }
+        }
+      }
+      const updated = { ...prev };
+      delete updated[profileId];
+      return updated;
+    });
+  }, []);
   
   const { toast } = useToast();
   const { sendMatchNotification, sendMultipleLikesNotification, recordUserActivity } = usePushNotifications(currentUser?.id);
@@ -669,16 +691,12 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, isPremium, profileComplet
 
   // ⭐ LIKE-BACK INJECTION: 25% injection of users who liked the current user
   // Build filter sets for the injection hook
-<<<<<<< HEAD
   // ⭐ FIX: Store blocked IDs in state (populated from fetchPotentialMatchesData)
   const [blockedUserIds, setBlockedUserIds] = useState<string[]>([]);
   const blockedIdsSet = useMemo(() => new Set(blockedUserIds), [blockedUserIds]);
   
   // ⭐ FIX: Memoize passedTodayIdsSet to prevent infinite loop in useLikeBackInjection
   // Only recreate when locallySwipedProfileIds actually changes content
-=======
-  const blockedIdsSet = useMemo(() => new Set<string>(), []); // Will be populated from fetch
->>>>>>> 959eaf1fab673258bdb88a12daada3b70b629290
   const passedTodayIdsSet = useMemo(() => {
     const now = Date.now();
     const oneDayMs = 24 * 60 * 60 * 1000;
@@ -689,11 +707,7 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, isPremium, profileComplet
       }
     }
     return passedToday;
-<<<<<<< HEAD
   }, [locallySwipedProfileIds.current.size]); // Re-compute only when Map size changes
-=======
-  }, []);
->>>>>>> 959eaf1fab673258bdb88a12daada3b70b629290
   
   const inQueueIdsSet = useMemo(() => {
     const inQueue = new Set<string>();
@@ -1145,7 +1159,7 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, isPremium, profileComplet
         .from('passes')
         .select('passed_id, passed_at')
         .match({ passer_id: userId })
-        .gte('passed_at', new Date(Date.now() - 192 * 60 * 60 * 1000).toISOString()), // 8 days
+        .gte('passed_at', new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString()), // 30 days
       supabase
         .from('likes')
         .select('liker_id, created_at')
@@ -1178,13 +1192,13 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, isPremium, profileComplet
     });
     
     const now = Date.now();
-    const eightDaysMs = 8 * 24 * 60 * 60 * 1000;
+    const thirtyDaysMs = 30 * 24 * 60 * 60 * 1000;
     const locallySwipedIds = uniqUuids(Array.from(locallySwipedProfileIds.current.entries())
       .filter(([_, data]) => {
         // Always exclude liked profiles
         if (data.action === 'like') return true;
-        // Only exclude passed profiles if less than 8 days old
-        return (now - data.timestamp) < eightDaysMs;
+        // Only exclude passed profiles if less than 30 days old
+        return (now - data.timestamp) < thirtyDaysMs;
       })
       .map(([id, _]) => id));
     const excludedIds = uniqUuids([...likedUserIds, ...blockedUserIds, ...passedUserIds, ...locallySwipedIds, userId]);
@@ -1443,12 +1457,8 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, isPremium, profileComplet
         archivedQuery = archivedQuery.eq('country_code', baseCountryCode);
       }
 
-      // Apply age filtering to archived profiles
-      const userMinAge = currentUserData?.min_age || 18;
-      const userMaxAge = currentUserData?.max_age || 99;
-      archivedQuery = archivedQuery
-        .gte('age', userMinAge)
-        .lte('age', userMaxAge);
+      // Age filtering is done client-side using date_of_birth (profiles.age column doesn't exist)
+      // We'll filter after fetching based on calculated age
 
       // Apply distance filtering for local country (use currentUserData for location)
       const userLat = currentUserData?.latitude;
@@ -1900,16 +1910,16 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, isPremium, profileComplet
           // ⭐ CRITICAL: Always filter against locally swiped profiles to prevent repetition
           const swipedIds = locallySwipedProfileIds.current;
           const now = Date.now();
-          const eightDaysMs = 8 * 24 * 60 * 60 * 1000;
+          const thirtyDaysMs = 30 * 24 * 60 * 60 * 1000;
           
           const filterSwiped = (deck: MatchOrAd[]): MatchOrAd[] => {
             return deck.filter(item => {
               if (isAd(item)) return true;
               const swipeData = swipedIds.get(item.id);
               if (!swipeData) return true;
-              // Always exclude liked profiles, exclude passed if < 8 days old
+              // Always exclude liked profiles, exclude passed if < 30 days old
               if (swipeData.action === 'like') return false;
-              return (now - swipeData.timestamp) >= eightDaysMs;
+              return (now - swipeData.timestamp) >= thirtyDaysMs;
             });
           };
           
@@ -2121,13 +2131,13 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, isPremium, profileComplet
 
     // locallySwipedProfileIds.current.clear(); // REMOVED
 
-    // ⭐ EARLY CLEANUP: Remove old passed profiles (8+ days) to keep storage lean
+    // ⭐ EARLY CLEANUP: Remove old passed profiles (30+ days) to keep storage lean
     const now = Date.now();
-    const eightDaysMs = 8 * 24 * 60 * 60 * 1000;
+    const thirtyDaysMs = 30 * 24 * 60 * 60 * 1000;
     let needsUpdate = false;
     
     for (const [id, data] of locallySwipedProfileIds.current.entries()) {
-      if (data.action === 'pass' && (now - data.timestamp) > eightDaysMs) {
+      if (data.action === 'pass' && (now - data.timestamp) > thirtyDaysMs) {
         locallySwipedProfileIds.current.delete(id);
         needsUpdate = true;
       }
@@ -2163,12 +2173,12 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, isPremium, profileComplet
       if (cachedDeck && cachedDeck.length > 0) {
         // ⭐ CRITICAL: Filter cached deck against locally swiped profiles to prevent repetition
         const now = Date.now();
-        const eightDaysMs = 8 * 24 * 60 * 60 * 1000;
+        const thirtyDaysMs = 30 * 24 * 60 * 60 * 1000;
         const swipedToExclude = new Set<string>();
         
         for (const [id, data] of locallySwipedProfileIds.current.entries()) {
-          // Always exclude liked profiles, exclude passed profiles if less than 8 days old
-          if (data.action === 'like' || (now - data.timestamp) < eightDaysMs) {
+          // Always exclude liked profiles, exclude passed profiles if less than 30 days old
+          if (data.action === 'like' || (now - data.timestamp) < thirtyDaysMs) {
             swipedToExclude.add(id);
           }
         }
@@ -2431,13 +2441,13 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, isPremium, profileComplet
       
       // Get additional profiles (exclude current ones AND ones we've already seen)
       const currentIds = potentialMatches.map(match => match.id);
-      // CRITICAL: Include locally swiped profiles, filtering out passed profiles older than 8 days
+      // CRITICAL: Include locally swiped profiles, filtering out passed profiles older than 30 days
       const now = Date.now();
-      const eightDaysMs = 8 * 24 * 60 * 60 * 1000;
+      const thirtyDaysMs = 30 * 24 * 60 * 60 * 1000;
       const locallySwipedIds = uniqUuids(Array.from(locallySwipedProfileIds.current.entries())
         .filter(([_, data]) => {
           if (data.action === 'like') return true;
-          return (now - data.timestamp) < eightDaysMs;
+          return (now - data.timestamp) < thirtyDaysMs;
         })
         .map(([id, _]) => id));
       const excludedIds = uniqUuids([...currentIds, ...locallySwipedIds, currentUser.id]);
@@ -2460,7 +2470,7 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, isPremium, profileComplet
           .from('passes')
           .select('passed_id, passed_at')
           .match({ passer_id: currentUser.id })
-          .gte('passed_at', new Date(Date.now() - 192 * 60 * 60 * 1000).toISOString()) // 8 days - same as main fetch
+          .gte('passed_at', new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString()) // 30 days - same as main fetch
       ]);
 
       const likedUserIds = uniqUuids(likedUsers?.map(like => like.liked_id) || []);
@@ -2610,12 +2620,8 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, isPremium, profileComplet
           archivedQuery = archivedQuery.eq('country_code', baseCountryCode);
         }
 
-        // Apply age filtering to archived profiles
-        const userMinAge = currentUserData?.min_age ?? currentUser.min_age ?? 18;
-        const userMaxAge = currentUserData?.max_age ?? currentUser.max_age ?? 99;
-        archivedQuery = archivedQuery
-          .gte('age', userMinAge)
-          .lte('age', userMaxAge);
+        // Age filtering is done client-side using date_of_birth (profiles.age column doesn't exist)
+        // We'll filter after fetching based on calculated age
 
         // Apply distance filtering for local country (use currentUserData for location)
         const userLat = currentUserSettings?.latitude ?? currentUser.latitude;
