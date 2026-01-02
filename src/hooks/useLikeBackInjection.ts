@@ -3,15 +3,15 @@ import { supabase } from '@/integrations/supabase/client';
 import { PotentialMatch } from '@/types';
 
 /**
- * Reactive Like-Back Injection Hook (25% Match Chance)
+ * 30% Like-Back Injection Hook
  * 
- * Implements a 25% injection rate to give users higher match probability.
- * Users who liked the current user are strategically injected into the feed.
+ * Implements Tinder-style "like-back injection" where profiles that liked the current user
+ * are injected into the swipe queue at strategic positions.
  * 
  * Rules:
- * - 25% injection rate = ~1 injected profile every 4 swipes
+ * - 30% injection rate = ~1 injected profile every 3-4 cards
  * - Never inject as "next card" - use positions +2 to +4
- * - Cap: max 25% of cards per session
+ * - Cap: max 30% of cards per session (only after 10+ swipes to avoid early blocking)
  * - Cooldown: at least 3 swipes between injections
  * - Quality filter: only inject likers with 2+ photos
  * - Deduplicate: avoid same ID appearing twice
@@ -60,14 +60,14 @@ interface LikerProfile {
   liked_at: number; // Timestamp of when they liked (for recency sorting)
 }
 
-// Configuration (25% match chance as requested)
-const NORMAL_INJECT_RATE = 0.25; // 25% injection rate = ~1 in 4 cards
-const BOOST_INJECT_RATE = 0.90; // 90% boost mode (unchanged)
+// Configuration
+const NORMAL_INJECT_RATE = 0.30; // 30% normal
+const BOOST_INJECT_RATE = 0.90; // 90% boost mode
 const COOLDOWN_SWIPES = 3; // At least 3 swipes between injections
 const MIN_PHOTOS_REQUIRED = 2; // Quality filter
 const INJECTION_POSITION_MIN = 2; // Position +2
 const INJECTION_POSITION_MAX = 4; // Position +4
-const MAX_INJECTION_PERCENT = 0.25; // Cap at 25% of cards per session
+const MAX_INJECTION_PERCENT = 0.30; // Cap at 30% of session
 const MIN_SWIPES_FOR_CAP = 10; // Only enforce cap after 10+ swipes
 
 export function useLikeBackInjection({
@@ -368,17 +368,17 @@ export function useLikeBackInjection({
     return minPos + offset;
   }, []);
 
-  // Main injection function - pure function that returns data instead of callback
-  // Call this after each swipe, returns profile + position if injection should happen
+  // Main injection function - call this after each swipe
   const onSwipe = useCallback(<T extends { id: string }>(
-    queue: T[]
-  ): { profile: PotentialMatch; position: number } | null => {
+    queue: T[],
+    addToQueue: (profile: PotentialMatch, position: number) => void
+  ) => {
     swipeCountRef.current += 1;
 
-    if (!shouldInjectNow()) return null;
+    if (!shouldInjectNow()) return;
 
     const candidate = getInjectionCandidate();
-    if (!candidate) return null;
+    if (!candidate) return;
 
     const position = getInjectionPosition(queue.length);
     const match = likerToMatch(candidate);
@@ -391,8 +391,8 @@ export function useLikeBackInjection({
     // Remove from candidates
     setLikedMeIds(prev => prev.filter(id => id !== candidate.id));
 
-    // Return profile and position for caller to inject
-    return { profile: match, position };
+    // Insert into queue
+    addToQueue(match, position);
   }, [shouldInjectNow, getInjectionCandidate, getInjectionPosition, likerToMatch]);
 
   // Check if a profile ID is a "liked me" profile (for UI hints)

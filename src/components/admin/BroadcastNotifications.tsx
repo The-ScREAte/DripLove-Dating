@@ -9,7 +9,7 @@ import { useToast } from '@/hooks/use-toast';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { ScrollArea } from '@/components/ui/scroll-area';
-import { Loader2, Send, Users, Globe, CheckCircle2, AlertCircle, Trash2, RotateCw, Eye, History, Copy, Mail, Calendar, MessageCircle } from 'lucide-react';
+import { Loader2, Send, Users, Globe, CheckCircle2, AlertCircle, Trash2, RotateCw, Eye, History, Copy, Mail, Calendar } from 'lucide-react';
 import EmailExport from './EmailExport';
 import ScheduledBroadcasts from './ScheduledBroadcasts';
 import { Alert, AlertDescription } from '@/components/ui/alert';
@@ -49,7 +49,6 @@ interface Campaign {
   created_at: string;
   admin_id: string;
   status: 'queued' | 'processing' | 'completed' | 'failed';
-  save_to_profile: boolean;
 }
 
 // Collapsible countries badge component
@@ -130,7 +129,6 @@ export default function BroadcastNotifications() {
   const [selectedUsers, setSelectedUsers] = useState<Set<string>>(new Set());
   const [notificationTitle, setNotificationTitle] = useState('');
   const [notificationMessage, setNotificationMessage] = useState('');
-  const [saveToProfile, setSaveToProfile] = useState(true);
   const [isLoadingCountries, setIsLoadingCountries] = useState(false);
   const [isLoadingUsers, setIsLoadingUsers] = useState(false);
   const [isSending, setIsSending] = useState(false);
@@ -459,7 +457,6 @@ export default function BroadcastNotifications() {
           targetCountries: Array.from(selectedCountries),
           userIds: Array.from(selectedUsers),
           notificationType: 'system',
-          saveToProfile: saveToProfile,
         },
       });
 
@@ -872,25 +869,6 @@ export default function BroadcastNotifications() {
                   <p className="text-[10px] text-gray-500">{notificationMessage.length}/200 characters</p>
                 </div>
 
-                <div className="flex items-center space-x-2 p-3 border rounded-md bg-blue-50 border-blue-200">
-                  <Checkbox
-                    id="save-to-profile"
-                    checked={saveToProfile}
-                    onCheckedChange={(checked) => setSaveToProfile(checked as boolean)}
-                  />
-                  <div className="flex-1">
-                    <Label
-                      htmlFor="save-to-profile"
-                      className="text-xs font-medium cursor-pointer"
-                    >
-                      Save to user profiles
-                    </Label>
-                    <p className="text-[10px] text-gray-600">
-                      Users can view this message in their profile inbox
-                    </p>
-                  </div>
-                </div>
-
                 <Alert>
                   <AlertCircle className="h-4 w-4" />
                   <AlertDescription>
@@ -982,12 +960,6 @@ export default function BroadcastNotifications() {
                             <Badge variant="outline" className="text-blue-600 border-blue-600 text-[10px] h-4">
                               <Loader2 className="w-2.5 h-2.5 mr-0.5 animate-spin" />
                               Processing...
-                            </Badge>
-                          )}
-                          {campaign.save_to_profile && (
-                            <Badge variant="outline" className="text-purple-600 border-purple-600 text-[10px] h-4">
-                              <MessageCircle className="w-2.5 h-2.5 mr-0.5" />
-                              Saved to Profile
                             </Badge>
                           )}
                           <CountriesBadge countries={campaign.target_countries} />
