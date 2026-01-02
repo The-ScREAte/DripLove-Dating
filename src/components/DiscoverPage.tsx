@@ -17,20 +17,11 @@
 import { useTranslation } from 'react-i18next';
 import React, { useState, useEffect, useCallback, useMemo, useRef, lazy, Suspense, memo } from 'react';
 import { isAndroidPlatform, isIOSPlatform } from '@/utils/platformUtils';
-import { preloadImageToBlob, revokeBlobUrlsForProfile, cleanupOldBlobUrls } from '@/utils/imageCache';
+import { preloadImageToBlob } from '@/utils/imageCache';
 import { calculateAge, createDeterministicShuffle } from '@/utils/discoverCache';
 import { getStratifiedBatches } from '@/utils/stratifiedSampling';
 import { applyActivityWeighting, getSwipeFatigueRescueCandidates, injectRescueProfiles } from '@/utils/activityWeighting';
 import { useLikeBackInjection } from '@/hooks/useLikeBackInjection';
-import { differenceInYears } from 'date-fns'; // ⭐ FIX: Add missing import
-import { 
-  loadNextFiveCache, 
-  saveNextFiveCache, 
-  clearNextFiveCache, 
-  buildDiscoverSignature,
-  dedupeById,
-  filterOutSwiped 
-} from '@/utils/discoverStrictCache';
 import DominantColorImageBg from './discover/DominantColorImageBg';
 
 const AdinkraBar = lazy(() => import('./discover/AdinkraBar'));
@@ -215,11 +206,6 @@ const buildFeedSignature = (baseCountryCode: string, unlockedCountries: string[]
 
 const buildSavedOrderKey = (userId: string, feedSignature: string) =>
   `driplove_profile_order_${userId}_${todayStr()}_${feedSignature}`;
-
-// ⭐ INSTANT CACHE: Helper to get locally swiped profile IDs as Set
-const getLocallySwipedSet = (locallySwipedMap: Map<string, { action: string; timestamp: number }>): Set<string> => {
-  return new Set(locallySwipedMap.keys());
-};
 
 const normalizeCountryCodeList = (value: unknown, baseCountryCode?: string): string[] => {
   const normalize = (items: unknown[]): string[] => {
@@ -536,18 +522,6 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, isPremium, profileComplet
   const [noMatchStreak, setNoMatchStreak] = useState(0);
   const FATIGUE_RESCUE_THRESHOLD = 8; // Trigger rescue after 8 non-match swipes
 
-  // ⭐ INSTANT CACHE: Track active run ID to ignore stale fetches
-  const [activeRunId, setActiveRunId] = useState<string>(() => crypto.randomUUID());
-  const activeRunIdRef = useRef(activeRunId);
-  useEffect(() => {
-    activeRunIdRef.current = activeRunId;
-  }, [activeRunId]);
-  const [isFetchingMore, setIsFetchingMore] = useState(false);
-  const isFetchingMoreRef = useRef(false);
-  useEffect(() => {
-    isFetchingMoreRef.current = isFetchingMore;
-  }, [isFetchingMore]);
-
   // Cooldown to avoid repeated rescues
   const lastRescueRef = useRef<number>(0);
   const RESCUE_COOLDOWN_MS = 3 * 60 * 1000; // 3 minutes
@@ -563,17 +537,6 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, isPremium, profileComplet
   const suppressFetchRef = useRef(false);
   // Track optimistic/pending swipes to avoid local overshoot while background RPCs complete
   const pendingSwipesRef = useRef(0);
-  
-  // ⭐ INSTANT CACHE: Refs for helpers to read latest state
-  const potentialMatchesRef = useRef<MatchOrAd[]>([]);
-  useEffect(() => {
-    potentialMatchesRef.current = potentialMatches;
-  }, [potentialMatches]);
-  const currentIndexRef = useRef(0);
-  useEffect(() => {
-    currentIndexRef.current = currentIndex;
-  }, [currentIndex]);
-
   // Track locally swiped profile IDs with action type and timestamp
   // Stored as: { [userId]: { action: 'like' | 'pass', timestamp } }
   // CRITICAL: Use a stable ref that gets initialized from storage on mount
@@ -627,36 +590,6 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, isPremium, profileComplet
     }
   }, [currentUser?.id]);
 
-  // Debug logging (enable with: localStorage.setItem('driplove_debug_swipe','1'))
-  const isSwipeDebugEnabled = () => {
-    try {
-      if (typeof window === 'undefined') return false;
-      return window.localStorage.getItem('driplove_debug_swipe') === '1';
-    } catch {
-      return false;
-    }
-  };
-
-  // ⭐ FIX: Wrap swipeDebug in useCallback to prevent dependency churn
-  const swipeDebug = useCallback((...args: unknown[]) => {
-    if (!isSwipeDebugEnabled()) return;
-    try {
-      if (typeof window !== 'undefined') {
-        const w = window as unknown as { __driplove_swipe_debug?: unknown[] };
-        if (!Array.isArray(w.__driplove_swipe_debug)) w.__driplove_swipe_debug = [];
-        w.__driplove_swipe_debug.push({ ts: Date.now(), args });
-        if (w.__driplove_swipe_debug.length > 500) {
-          w.__driplove_swipe_debug = w.__driplove_swipe_debug.slice(-500);
-        }
-      }
-    } catch {
-      // ignore
-    }
-
-    // Use warn level so it shows up even when console hides logs.
-    console.warn('[DiscoverSwipe]', ...args);
-  }, []);
-
   // ⭐ SERVER-SIDE SWIPE HYDRATION: Rebuild locallySwipedProfileIds from DB on startup
   // This ensures swipe history is authoritative even if localStorage is cleared, incognito, or new device
   const hydrateSwipesFromServer = useCallback(async () => {
@@ -666,14 +599,11 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, isPremium, profileComplet
     const thirtyDaysAgoIso = new Date(now - 30 * 24 * 60 * 60 * 1000).toISOString();
 
     try {
-      // ⭐ FIX: Add .limit(1000) to prevent fetching thousands of likes for active users
       const [{ data: likes }, { data: passes }] = await Promise.all([
         supabase
           .from('likes')
           .select('liked_id, created_at')
-          .eq('liker_id', currentUser.id)
-          .gte('created_at', thirtyDaysAgoIso) // ⭐ FIX: Only fetch recent likes (last 30 days)
-          .limit(1000), // ⭐ FIX: Cap at 1000 to prevent performance issues
+          .eq('liker_id', currentUser.id),
         supabase
           .from('passes')
           .select('passed_id, passed_at')
@@ -723,10 +653,39 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, isPremium, profileComplet
       console.error('[DiscoverPage] Error hydrating swipes from server:', error);
       // Non-fatal - continue with local data
     }
-  }, [currentUser?.id, persistSwipedIds, swipeDebug]); // ⭐ FIX: Include swipeDebug
+  }, [currentUser?.id, persistSwipedIds]);
 
   // Track if we've hydrated from server this session
   const hasHydratedFromServerRef = useRef(false);
+
+  // Debug logging (enable with: localStorage.setItem('driplove_debug_swipe','1'))
+  const isSwipeDebugEnabled = () => {
+    try {
+      if (typeof window === 'undefined') return false;
+      return window.localStorage.getItem('driplove_debug_swipe') === '1';
+    } catch {
+      return false;
+    }
+  };
+
+  const swipeDebug = (...args: unknown[]) => {
+    if (!isSwipeDebugEnabled()) return;
+    try {
+      if (typeof window !== 'undefined') {
+        const w = window as unknown as { __driplove_swipe_debug?: unknown[] };
+        if (!Array.isArray(w.__driplove_swipe_debug)) w.__driplove_swipe_debug = [];
+        w.__driplove_swipe_debug.push({ ts: Date.now(), args });
+        if (w.__driplove_swipe_debug.length > 500) {
+          w.__driplove_swipe_debug = w.__driplove_swipe_debug.slice(-500);
+        }
+      }
+    } catch {
+      // ignore
+    }
+
+    // Use warn level so it shows up even when console hides logs.
+    console.warn('[DiscoverSwipe]', ...args);
+  };
 
   useEffect(() => {
     if (!isSwipeDebugEnabled()) return;
@@ -813,13 +772,8 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, isPremium, profileComplet
 
   // ⭐ LIKE-BACK INJECTION: 25% injection of users who liked the current user
   // Build filter sets for the injection hook
-  // ⭐ FIX: Store blocked IDs in state (populated from fetchPotentialMatchesData)
-  const [blockedUserIds, setBlockedUserIds] = useState<string[]>([]);
-  const blockedIdsSet = useMemo(() => new Set(blockedUserIds), [blockedUserIds]);
-  
-  // ⭐ FIX: Compute passedTodayIdsSet fresh each render (no memo)
-  // This ensures useLikeBackInjection always has current pass state
-  const passedTodayIdsSet = (() => {
+  const blockedIdsSet = useMemo(() => new Set<string>(), []); // Will be populated from fetch
+  const passedTodayIdsSet = useMemo(() => {
     const now = Date.now();
     const oneDayMs = 24 * 60 * 60 * 1000;
     const passedToday = new Set<string>();
@@ -829,7 +783,7 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, isPremium, profileComplet
       }
     }
     return passedToday;
-  })();
+  }, []);
   
   const inQueueIdsSet = useMemo(() => {
     const inQueue = new Set<string>();
@@ -1478,9 +1432,6 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, isPremium, profileComplet
     const blockedUserIds = uniqUuids(blockedUsers?.flatMap(block => [block.blocked_id, block.blocker_id]) || []);
     const passedUserIds = uniqUuids(recentPasses?.map(p => p.passed_id) || []);
     
-    // ⭐ FIX: Store blocked IDs in state for useLikeBackInjection
-    setBlockedUserIds(blockedUserIds);
-    
     const usersWhoLikedMeIds = uniqUuids((usersWhoLikedMe || [])
       .map(like => like.liker_id)
       .filter(id => !likedUserIds.includes(id) && !blockedUserIds.includes(id) && !passedUserIds.includes(id)));
@@ -1769,15 +1720,14 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, isPremium, profileComplet
       // Apply age filtering to archived profiles
       const userMinAge = currentUserData?.min_age || 18;
       const userMaxAge = currentUserData?.max_age || 99;
-      
-      // ⭐ FIX: Don't use .gte('age') - profiles table uses date_of_birth, not age column
-      // We'll filter by age in JS after fetching
+      archivedQuery = archivedQuery
+        .gte('age', userMinAge)
+        .lte('age', userMaxAge);
 
-      // ⭐ FIX: Apply distance filtering ONLY for Free users (single country)
-      // Premium users with multi-country should NOT have distance box applied
+      // Apply distance filtering for local country (use currentUserData for location)
       const userLat = currentUserData?.latitude;
       const userLon = currentUserData?.longitude;
-      if (!premiumForFeed && baseCountryCode && userLat && userLon) {
+      if (baseCountryCode && userLat && userLon) {
         const maxDistanceKm = currentUserData?.max_distance || 50;
         const radiusInDegrees = maxDistanceKm / 111.32;
 
@@ -1796,15 +1746,7 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, isPremium, profileComplet
         .limit(50);
 
       if (!archivedError && archivedProfiles && archivedProfiles.length > 0) {
-        // ⭐ FIX: Filter by age in JS using date_of_birth
-        const now = new Date();
-        const ageFiltered = archivedProfiles.filter((p) => {
-          if (!p.date_of_birth) return false;
-          const age = differenceInYears(now, new Date(p.date_of_birth));
-          return age >= userMinAge && age <= userMaxAge;
-        });
-
-        filteredProfiles = Array.isArray(ageFiltered) ? (ageFiltered as unknown as ProfileRow[]) : [];
+        filteredProfiles = Array.isArray(archivedProfiles) ? (archivedProfiles as unknown as ProfileRow[]) : [];
         usingArchivedFallback = true;
         
         // Mix archived profiles the same way (explicit country rotation).
@@ -1824,7 +1766,7 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, isPremium, profileComplet
 
     // ✅ FINAL EMPTY RULE
     // Free users: empty when local is empty
-    // Premium users: empty ONLY when local + intl + archived are empty
+    // Premium users: empty ONLY when local + intl are empty
     const hasLocal = localProfiles.length > 0;
     const hasIntl = intlProfiles.length > 0;
 
@@ -1833,8 +1775,7 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, isPremium, profileComplet
       return { matches: [], images: {}, distances: distanceMap, index: 0 };
     }
 
-    // ⭐ FIX: Check filteredProfiles.length (includes archived) before declaring empty
-    if (premiumForFeed && filteredProfiles.length === 0 && !hasLocal && !hasIntl) {
+    if (premiumForFeed && !hasLocal && !hasIntl) {
       setNoMoreProfiles(true);
       return { matches: [], images: {}, distances: distanceMap, index: 0 };
     }
@@ -1978,7 +1919,21 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, isPremium, profileComplet
 
     }
 
-    // ⭐ NOTE: savedOrderKey will be saved AFTER injections (see below)
+    // Save profile order to localStorage (post-mix)
+    try {
+      const profileIds = shuffled.map(p => p.id);
+
+      localStorage.setItem(
+        savedOrderKey,
+        JSON.stringify({
+          premium: premiumForFeed,
+          countries: allowedCountryCodesForFeed,
+          order: profileIds
+        })
+      );
+    } catch (error) {
+      // Ignore localStorage errors
+    }
 
     // ⭐ PROACTIVE LIKED-ME BLENDING: Fetch users who liked the current user and blend into feed
     // Strategy: Inject 1 liked-me profile every 3-4 regular profiles (Tinder-style priority)
@@ -2017,11 +1972,8 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, isPremium, profileComplet
       }
     }
 
-    // ⭐ NEVER-SEEN USER INJECTION: DISABLED (too expensive at scale)
-    // This was fetching ALL likes + ALL passes globally which becomes massive.
-    // TODO: Replace with server-side efficient method (e.g., profile_stats.seen_count or RPC)
-    
-    /*
+    // ⭐ NEVER-SEEN USER INJECTION: Fetch users who have never been swiped and inject early in feed
+    // This ensures new users get visibility and aren't overlooked
     const neverSeenRows = await fetchNeverSeenProfiles(userId, excludedIds, allowedGenders, baseCountryCode, 8);
     
     if (neverSeenRows.length > 0) {
@@ -2072,24 +2024,6 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, isPremium, profileComplet
         
         shuffled = injected;
       }
-    }
-    */
-
-    // ⭐ FIX: Save profile order AFTER all injections (liked-me + never-seen)
-    // This ensures saved order matches final deck and prevents drift
-    try {
-      const profileIds = shuffled.map(p => p.id);
-
-      localStorage.setItem(
-        savedOrderKey,
-        JSON.stringify({
-          premium: premiumForFeed,
-          countries: allowedCountryCodesForFeed,
-          order: profileIds
-        })
-      );
-    } catch (error) {
-      // Ignore localStorage errors
     }
 
     // ⭐ PROFILE POSITION PERSISTENCE: Resume from last viewed profile
@@ -2167,8 +2101,7 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, isPremium, profileComplet
       distances: distanceMap,
       index: startIndex
     };
-  }, [loadAllImagesForProfile, premiumActive, currentUser, fetchUnlockedCountryProfiles, fetchLikedMeProfiles, blendLikedMeProfiles, isEligibleProfile]);
-  // ⭐ Removed fetchNeverSeenProfiles from deps since it's now disabled
+  }, [loadAllImagesForProfile, premiumActive, currentUser, fetchUnlockedCountryProfiles, fetchLikedMeProfiles, blendLikedMeProfiles, isEligibleProfile, fetchNeverSeenProfiles]);
 
   // Batch language fetch (avoid per-card calls)
   const batchFetchLanguages = useCallback(async (profileIds: string[]) => {
@@ -2308,62 +2241,6 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, isPremium, profileComplet
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [currentUser, allowedGenders, toast, fetchPotentialMatchesData, injectAds, batchFetchLanguages]);
 
-  // ⭐ INSTANT CACHE: Helper to update next 5 cache with current deck state
-  const updateNextFiveCacheNow = useCallback(async () => {
-    if (!currentUser?.id) return;
-    
-    try {
-      const baseCountryCode = normalizeCountryCode(String(currentUser?.country_code ?? ''));
-      const unlockedCountries = normalizeCountryCodeList(currentUser?.unlocked_countries, baseCountryCode);
-      const userMaxDistanceRaw = currentUser?.max_distance ?? currentUser?.distance_preference ?? 50;
-      const userMaxDistance = Number(userMaxDistanceRaw);
-      const safeUserMaxDistance = Number.isFinite(userMaxDistance) && userMaxDistance > 0 ? userMaxDistance : 50;
-      
-      const signature = buildDiscoverSignature({
-        userId: currentUser.id,
-        isPremium: premiumActive, // ⭐ FIX: Use premiumActive (not !!isPremium)
-        selectedCountries: unlockedCountries,
-        distanceKm: safeUserMaxDistance,
-        ageMin: currentUser?.min_age ?? 18,
-        ageMax: currentUser?.max_age ?? 99,
-        genderPref: currentUser?.preference ?? 'any',
-      });
-
-      const swipedSet = getLocallySwipedSet(locallySwipedProfileIds.current);
-      const queue = potentialMatchesRef.current;
-      
-      // ⭐ FIX: Walk queue from currentIndex forward, collecting non-ads until 5 found
-      // Don't filter then slice - that causes index misalignment
-      const start = currentIndexRef.current ?? 0;
-      const nextFive: PotentialMatch[] = [];
-      for (let i = start; i < queue.length && nextFive.length < 5; i++) {
-        const item = queue[i];
-        if (!isAd(item)) {
-          nextFive.push(item);
-        }
-      }
-      
-      // Filter and dedupe
-      const clean = dedupeById(filterOutSwiped(nextFive, swipedSet)).slice(0, 5);
-      
-      // Convert to cached format with images
-      const cachedProfiles = clean.map(p => ({
-        ...p,
-        images: userImagesRef.current[p.id] || [],
-        distance: userDistances[p.id],
-      }));
-
-      await saveNextFiveCache(currentUser.id, {
-        version: 1,
-        signature,
-        savedAt: Date.now(),
-        nextFive: cachedProfiles,
-      });
-    } catch (err) {
-      console.error('[DiscoverPage] Failed to update next 5 cache:', err);
-    }
-  }, [currentUser, premiumActive, userDistances]); // ⭐ FIX: Include premiumActive
-
   // Premium: attempt ONE auto-refill if deck becomes empty (don't loop infinitely)
   useEffect(() => {
     if (!premiumActive) return;
@@ -2380,45 +2257,23 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, isPremium, profileComplet
     if (isLoading || isLoadingMore) return;
     if (!noMoreProfiles) return; // Wait for noMoreProfiles flag
     
-    // ⭐ FIX: Add maximum attempts guard to prevent infinite loops
-    const MAX_REFILL_ATTEMPTS = 2;
-    const attemptKey = `premium_refill_attempts_${currentUser?.id}`;
-    const attemptCount = parseInt(localStorage.getItem(attemptKey) || '0');
-    
-    if (attemptCount >= MAX_REFILL_ATTEMPTS) {
-      console.warn('[DiscoverPage] Max premium refill attempts reached, stopping');
-      setPremiumTrulyEmptyAfterRetry(true);
-      premiumEmptyAutoRetryRef.current = false;
-      return;
-    }
-    
     // Try ONE refill for premium users
     premiumEmptyAutoRetryRef.current = true;
     setNoMoreProfiles(false);
-    
-    // Track attempt
-    localStorage.setItem(attemptKey, String(attemptCount + 1));
-    console.log(`[DiscoverPage] Premium refill attempt ${attemptCount + 1}/${MAX_REFILL_ATTEMPTS}`);
-    
     fetchPotentialMatches();
-  }, [premiumActive, hasCompletedInitialFetch, potentialMatches.length, noMoreProfiles, isLoading, isLoadingMore, premiumTrulyEmptyAfterRetry, fetchPotentialMatches, currentUser?.id]);
+  }, [premiumActive, hasCompletedInitialFetch, potentialMatches.length, noMoreProfiles, isLoading, isLoadingMore, premiumTrulyEmptyAfterRetry, fetchPotentialMatches]);
 
   // Mark truly empty after retry completes (separate effect to avoid loops)
   useEffect(() => {
     if (!premiumActive) return;
-    if (potentialMatches.length > 0) {
-      // ⭐ FIX: Reset attempt counter when profiles are found successfully
-      const attemptKey = `premium_refill_attempts_${currentUser?.id}`;
-      localStorage.removeItem(attemptKey);
-      return;
-    }
+    if (potentialMatches.length > 0) return;
     if (!noMoreProfiles) return;
     if (!premiumEmptyAutoRetryRef.current) return;
     
     // Only mark as truly empty after the retry completed and still found nothing
     setPremiumTrulyEmptyAfterRetry(true);
     premiumEmptyAutoRetryRef.current = false;
-  }, [premiumActive, potentialMatches.length, noMoreProfiles, currentUser?.id]);
+  }, [premiumActive, potentialMatches.length, noMoreProfiles]);
 
   const preloadProfileImages = useCallback((profiles: PotentialMatch[], startIndex: number = 0) => {
     const isAndroid = isAndroidPlatform();
@@ -2531,13 +2386,6 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, isPremium, profileComplet
 
     // Reset deck when premium context changes so we don't keep a stale single-country deck.
     if (lastPremiumActiveRef.current !== null && lastPremiumActiveRef.current !== premiumActive) {
-      // ⭐ INSTANT CACHE: Clear cache on Premium change (hard refresh)
-      if (currentUser?.id) {
-        clearNextFiveCache(currentUser.id).catch(err => {
-          console.error('[DiscoverPage] Failed to clear cache on premium change:', err);
-        });
-      }
-
       // Invalidate any in-flight fetch results so they cannot overwrite the new deck.
       fetchSequenceRef.current += 1;
 
@@ -2549,9 +2397,6 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, isPremium, profileComplet
       setIsArchivedFallback(false);
       setPremiumTrulyEmptyAfterRetry(false);
       premiumEmptyAutoRetryRef.current = false;
-      
-      // Generate new run ID to cancel old fetches
-      setActiveRunId(crypto.randomUUID());
     }
     lastPremiumActiveRef.current = premiumActive;
 
@@ -2611,57 +2456,6 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, isPremium, profileComplet
         await hydrateSwipesFromServer();
       }
 
-      // ⭐ INSTANT CACHE: Try loading next 5 profiles from cache first
-      try {
-        const baseCountryCode = normalizeCountryCode(String(currentUser?.country_code ?? ''));
-        const unlockedCountries = normalizeCountryCodeList(currentUser?.unlocked_countries, baseCountryCode);
-        const userMaxDistanceRaw = currentUser?.max_distance ?? currentUser?.distance_preference ?? 50;
-        const userMaxDistance = Number(userMaxDistanceRaw);
-        const safeUserMaxDistance = Number.isFinite(userMaxDistance) && userMaxDistance > 0 ? userMaxDistance : 50;
-        
-        const signature = buildDiscoverSignature({
-          userId: currentUser.id,
-          isPremium: premiumActive, // ⭐ FIX: Use premiumActive (not !!isPremium)
-          selectedCountries: unlockedCountries,
-          distanceKm: safeUserMaxDistance,
-          ageMin: currentUser?.min_age ?? 18,
-          ageMax: currentUser?.max_age ?? 99,
-          genderPref: currentUser?.preference ?? 'any',
-        });
-
-        const cached = await loadNextFiveCache(currentUser.id);
-        if (cached && cached.signature === signature) {
-          const swipedSet = getLocallySwipedSet(locallySwipedProfileIds.current);
-          const clean = dedupeById(filterOutSwiped(cached.nextFive, swipedSet)).slice(0, 5);
-          
-          if (clean.length > 0) {
-            // Show cached profiles instantly
-            setPotentialMatches(clean);
-            setCurrentIndex(0);
-            setImageIndex(0);
-            setIsLoading(false);
-            setHasCompletedInitialFetch(true);
-            
-            // Set cached images
-            const cachedImages: { [key: string]: string[] } = {};
-            clean.forEach(p => {
-              if (p.images && p.images.length > 0) {
-                cachedImages[p.id] = p.images;
-              }
-            });
-            if (Object.keys(cachedImages).length > 0) {
-              setUserImages(prev => ({ ...prev, ...cachedImages }));
-            }
-            
-            // Fetch fresh profiles in background to refill
-            void fetchPotentialMatches({ background: true, cacheKey });
-            return;
-          }
-        }
-      } catch (err) {
-        console.error('[DiscoverPage] Cache load error:', err);
-      }
-
       const cachedDeck = readDeckCache(cacheKey);
       if (cachedDeck && cachedDeck.length > 0) {
         // ⭐ CRITICAL: Filter cached deck against locally swiped profiles to prevent repetition
@@ -2705,15 +2499,7 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, isPremium, profileComplet
     fetchReverseUsage();
   }, [
     currentUser?.id,
-    currentUser?.country_code,
-    currentUser?.unlocked_countries,
-    currentUser?.max_distance,
-    currentUser?.distance_preference,
-    currentUser?.min_age,
-    currentUser?.max_age,
-    currentUser?.preference,
     premiumActive,
-    isPremium,
     fetchPotentialMatches,
     fetchReverseUsage,
     persistSwipedIds,
@@ -3122,16 +2908,17 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, isPremium, profileComplet
           archivedQuery = archivedQuery.eq('country_code', baseCountryCode);
         }
 
-        // ⭐ FIX: Don't use .gte('age').lte('age') - profiles table uses date_of_birth, not age column
-        // We'll filter by age in JS after fetching
+        // Apply age filtering to archived profiles
         const userMinAge = currentUserData?.min_age ?? currentUser.min_age ?? 18;
         const userMaxAge = currentUserData?.max_age ?? currentUser.max_age ?? 99;
+        archivedQuery = archivedQuery
+          .gte('age', userMinAge)
+          .lte('age', userMaxAge);
 
-        // ⭐ FIX: Apply distance filtering ONLY for Free users (single country)
-        // Premium users with multi-country should NOT have distance box applied
+        // Apply distance filtering for local country (use currentUserData for location)
         const userLat = currentUserSettings?.latitude ?? currentUser.latitude;
         const userLon = currentUserSettings?.longitude ?? currentUser.longitude;
-        if (!premiumForFeed && baseCountryCode && userLat && userLon) {
+        if (baseCountryCode && userLat && userLon) {
           const maxDistanceKm = currentUserData?.max_distance ?? currentUser.max_distance ?? 50;
           const radiusInDegrees = maxDistanceKm / 111.32;
 
@@ -3150,16 +2937,8 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, isPremium, profileComplet
           .limit(50);
 
         if (!archivedError && archivedProfiles && archivedProfiles.length > 0) {
-          // ⭐ FIX: Filter by age in JS using date_of_birth
-          const now = new Date();
-          const ageFiltered = archivedProfiles.filter((p) => {
-            if (!p.date_of_birth) return false;
-            const age = differenceInYears(now, new Date(p.date_of_birth));
-            return age >= userMinAge && age <= userMaxAge;
-          });
-          
-          activeProfiles = Array.isArray(ageFiltered)
-            ? (ageFiltered as unknown as ProfileRow[])
+          activeProfiles = Array.isArray(archivedProfiles)
+            ? (archivedProfiles as unknown as ProfileRow[])
             : [];
           usingArchivedFallback = true;
           if (!isArchivedFallback) {
@@ -3498,25 +3277,8 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, isPremium, profileComplet
     };
   }, [potentialMatches, hasCompletedInitialFetch]);
 
-  // ⭐ CRITICAL: Ensure online before any swipe
-  // Guarantees: every swipe is recorded server-side, so clearing localStorage won't resurrect profiles
-  const ensureOnline = (): boolean => {
-    if (typeof navigator !== 'undefined' && navigator.onLine === false) {
-      toast({
-        title: "No internet",
-        description: "Reconnect to keep swiping (so we can save your swipes).",
-        variant: "destructive",
-      });
-      return false;
-    }
-    return true;
-  };
-
   // Optimistic UI: move to next card instantly, then process like in background
   const handleLike = async () => {
-    // ⭐ GUARD: Ensure online before proceeding (blocks all swipes offline)
-    if (!ensureOnline()) return;
-
     const currentMatch = potentialMatches[currentIndex];
     if (!currentMatch) return;
 
@@ -3581,11 +3343,7 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, isPremium, profileComplet
     locallySwipedProfileIds.current.set(prevMatch.id, { action: 'like', timestamp: Date.now() });
     persistSwipedIds(); // ⭐ Persist to sessionStorage
 
-    // Remove from cache to prevent re-showing + revoke blob URLs to free memory
-    const imagesToRevoke = userImages[prevMatch.id] || [];
-    revokeBlobUrlsForProfile(prevMatch.id, imagesToRevoke);
-    cleanupOldBlobUrls(80); // Evict old entries if cache is growing
-    
+    // Remove from cache to prevent re-showing
     setUserImages(prev => {
       const updated = { ...prev };
       delete updated[prevMatch.id];
@@ -3603,9 +3361,6 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, isPremium, profileComplet
 
     // Immediately advance the UI
     moveToNext(prevMatch);
-
-    // ⭐ INSTANT CACHE: Update next 5 cache after swipe
-    queueMicrotask(() => updateNextFiveCacheNow());
 
     // Background job: persist usage and like, then show match animation if appropriate.
     enqueue(async () => {
@@ -3833,11 +3588,7 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, isPremium, profileComplet
     locallySwipedProfileIds.current.set(prevMatch.id, { action: 'pass', timestamp: Date.now() });
     persistSwipedIds(); // ⭐ Persist to sessionStorage
 
-    // Remove from cache to prevent re-showing + revoke blob URLs to free memory
-    const imagesToRevoke = userImages[prevMatch.id] || [];
-    revokeBlobUrlsForProfile(prevMatch.id, imagesToRevoke);
-    cleanupOldBlobUrls(80); // Evict old entries if cache is growing
-    
+    // Remove from cache to prevent re-showing
     setUserImages(prev => {
       const updated = { ...prev };
       delete updated[prevMatch.id];
@@ -3856,9 +3607,6 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, isPremium, profileComplet
 
     // Immediately advance UI
     moveToNext(prevMatch);
-
-    // ⭐ INSTANT CACHE: Update next 5 cache after swipe
-    queueMicrotask(() => updateNextFiveCacheNow());
 
     // Background job to persist the pass and usage increment
     enqueue(async () => {
@@ -3916,9 +3664,6 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, isPremium, profileComplet
   };
 
   const handlePass = async () => {
-    // ⭐ GUARD: Ensure online before proceeding (blocks all swipes offline)
-    if (!ensureOnline()) return;
-
     const currentMatch = potentialMatches[currentIndex];
     if (!currentMatch) return;
 

@@ -1151,13 +1151,11 @@ const ChatPage = ({ currentUser, onUnreadChange, onDetailViewChange }: ChatPageP
     } catch (error) {
       console.error('[ChatPage] markMessagesAsRead unexpected error:', error);
     } finally {
-      // ⭐ FIX: Refresh nav unread badge with two-phase approach
-      // 1. Immediate call (optimistic, may still see old DB state)
-      // 2. Delayed call (after DB transaction fully commits)
-      onUnreadChange?.();
+      // Always ask the parent to refresh nav unread badge after a short delay
+      // to ensure the DB transaction is fully committed
       setTimeout(() => {
         onUnreadChange?.();
-      }, 250); // Increased delay for DB propagation
+      }, 100);
     }
   };
 
