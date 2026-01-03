@@ -18,6 +18,10 @@ export interface ModerationResult {
     humanConfidence?: number;
     imageQuality?: 'good' | 'poor' | 'blurry';
     requiresReview?: boolean;
+    // Face verification fields
+    faceVerificationFailed?: boolean;
+    faceVerificationReason?: string;
+    noHumanDetected?: boolean;
   };
   message?: string;
 }

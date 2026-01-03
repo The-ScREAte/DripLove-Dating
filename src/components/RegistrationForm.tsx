@@ -19,6 +19,7 @@ import { occupationOptions, industryOptions } from '@/constants/professionOption
 import { moderateImage, ModerationResult } from '@/utils/photoModeration';
 import { compressImage } from '@/utils/imageCompression';
 import { useToast } from '@/hooks/use-toast';
+import { verifyUploadedImage, detectHumanFace } from '@/utils/faceVerificationUtils';
 import { useTranslation } from 'react-i18next';
 import { videoPreloader } from '@/utils/videoPreloader';
 import FaceVerification from '@/components/FaceVerification';
@@ -295,9 +296,58 @@ const RegistrationForm = ({ onSubmit, onBackToLogin }: RegistrationFormProps) =>
 
       setImages(prev => [...prev, newImage]);
 
+      // Determine the position of this new image (0-indexed)
+      const imagePosition = images.length;
+      
       // AI Moderation
       try {
         const moderationResult = await moderateImage(compressedFile);
+        
+        // For first 2 images (positions 0 and 1), also verify face matches
+        let requiresFaceReview = false;
+        if (imagePosition < 2 && faceImageData) {
+          // Compare with verified face
+          const faceResult = await verifyUploadedImage(
+            compressedFile,
+            faceImageData,
+            imagePosition,
+            faceVerified
+          );
+          
+          if (faceResult.requiresReview) {
+            requiresFaceReview = true;
+            // Update moderation result to reflect face verification failure
+            moderationResult.details = {
+              ...moderationResult.details,
+              requiresReview: true,
+              faceVerificationFailed: true,
+              faceVerificationReason: faceResult.reason
+            };
+          }
+        } else if (imagePosition < 2 && !faceImageData) {
+          // Face verification not completed but trying to upload first 2 images
+          requiresFaceReview = true;
+          moderationResult.details = {
+            ...moderationResult.details,
+            requiresReview: true,
+            faceVerificationFailed: true,
+            faceVerificationReason: 'Face verification not completed'
+          };
+        }
+        
+        // For images at positions 2+ (3rd image onwards), just check for human figure
+        if (imagePosition >= 2 && moderationResult.isApproved) {
+          const faceDetection = await detectHumanFace(compressedFile);
+          if (!faceDetection.hasFace) {
+            // No human face detected - send to review
+            moderationResult.details = {
+              ...moderationResult.details,
+              requiresReview: true,
+              noHumanDetected: true
+            };
+          }
+        }
+
         setImages(prev => prev.map(img => 
           img.preview === preview 
             ? { 
@@ -305,7 +355,7 @@ const RegistrationForm = ({ onSubmit, onBackToLogin }: RegistrationFormProps) =>
                 moderationResult,
                 status: !moderationResult.isApproved 
                   ? 'rejected' 
-                  : moderationResult.details?.requiresReview 
+                  : (moderationResult.details?.requiresReview || requiresFaceReview)
                     ? 'pending' 
                     : 'approved'
               }
@@ -328,10 +378,13 @@ const RegistrationForm = ({ onSubmit, onBackToLogin }: RegistrationFormProps) =>
             description: moderationResult.message || "This image violates our community guidelines.",
             variant: "destructive"
           });
-        } else if (moderationResult.details?.requiresReview) {
+        } else if (moderationResult.details?.requiresReview || requiresFaceReview) {
+          const reviewReason = moderationResult.details?.faceVerificationReason 
+            || (moderationResult.details?.noHumanDetected ? "No human figure detected" : null)
+            || "Image requires additional verification";
           toast({
             title: "Image needs review",
-            description: "This image will be reviewed by our team before approval.",
+            description: `${reviewReason}. Our team will review this image.`,
             variant: "default"
           });
         } else {
