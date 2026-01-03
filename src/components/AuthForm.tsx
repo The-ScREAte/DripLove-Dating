@@ -522,6 +522,7 @@ const AuthForm = ({ isLogin, onToggle, onBack }: AuthFormProps) => {
                   id="email"
                   name="email"
                   type="email"
+                  autoComplete="email"
                   value={formData.email}
                   onChange={handleInputChange}
                   onFocus={handleInputFocus}
@@ -561,7 +562,12 @@ const AuthForm = ({ isLogin, onToggle, onBack }: AuthFormProps) => {
           </div>
         ) : (
           <div>
-            <form onSubmit={handleSubmit} className="space-y-4">
+            <form 
+              onSubmit={handleSubmit} 
+              className="space-y-4"
+              action="#"
+              method="post"
+            >
               <div className="space-y-3">
                 <Label htmlFor="email" className="text-sm font-semibold text-gray-700">{t('auth.email')}</Label>
                 <div className="relative">
@@ -569,6 +575,7 @@ const AuthForm = ({ isLogin, onToggle, onBack }: AuthFormProps) => {
                     id="email"
                     name="email"
                     type="email"
+                    autoComplete={isLogin ? "username" : "email"}
                     value={formData.email}
                     onChange={handleInputChange}
                     onFocus={handleInputFocus}
@@ -604,6 +611,7 @@ const AuthForm = ({ isLogin, onToggle, onBack }: AuthFormProps) => {
                     id="password"
                     name="password"
                     type={showPassword ? "text" : "password"}
+                    autoComplete={isLogin ? "current-password" : "new-password"}
                     value={formData.password}
                     onChange={handleInputChange}
                     onFocus={handleInputFocus}
@@ -637,6 +645,7 @@ const AuthForm = ({ isLogin, onToggle, onBack }: AuthFormProps) => {
                       id="confirmPassword"
                       name="confirmPassword"
                       type={showConfirmPassword ? "text" : "password"}
+                      autoComplete="new-password"
                       value={formData.confirmPassword}
                       onChange={handleInputChange}
                       onFocus={handleInputFocus}

@@ -67,6 +67,11 @@ const uniqUuids = (values: unknown[]): string[] => Array.from(new Set(values.fil
 
 const todayStr = () => new Date().toISOString().split('T')[0];
 
+// PostgREST `in.(...)` filters need string values quoted. UUIDs contain hyphens and
+// must be treated as strings, otherwise exclusions can silently fail and previously
+// liked/passed/matched users can reappear.
+const formatUuidInFilter = (ids: string[]) => `(${ids.map(id => `"${id}"`).join(',')})`;
+
 const hashStringToInt = (str: string): number => {
   let hash = 0;
   for (let i = 0; i < str.length; i++) {
@@ -1109,7 +1114,7 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, isPremium, profileComplet
           .limit(perCountryLimit);
 
         if (excludedIds.length > 0) {
-          query = query.not('id', 'in', `(${excludedIds.join(',')})`);
+          query = query.not('id', 'in', formatUuidInFilter(excludedIds));
         }
 
         const { data, error } = await query;
@@ -1256,7 +1261,7 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, isPremium, profileComplet
             }
 
             if (excludedIds.length > 0) {
-              query = query.not('id', 'in', `(${excludedIds.join(',')})`);
+              query = query.not('id', 'in', formatUuidInFilter(excludedIds));
             }
 
             const { data: profiles, error } = await query
@@ -1285,7 +1290,7 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, isPremium, profileComplet
             .limit(80);
 
           if (excludedIds.length > 0) {
-            fallbackQuery = fallbackQuery.not('id', 'in', `(${excludedIds.join(',')})`);
+            fallbackQuery = fallbackQuery.not('id', 'in', formatUuidInFilter(excludedIds));
           }
 
           const { data: fallbackLocal, error: fallbackError } = await fallbackQuery;
@@ -1394,7 +1399,7 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, isPremium, profileComplet
         }
 
         if (excludedIds.length > 0) {
-          query = query.not('id', 'in', `(${excludedIds.join(',')})`);
+          query = query.not('id', 'in', formatUuidInFilter(excludedIds));
         }
 
         const { data: profiles, error } = await query
@@ -1410,7 +1415,7 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, isPremium, profileComplet
         let query = supabase.from('profiles').select(PROFILE_SELECT);
 
         if (excludedIds.length > 0) {
-          query = query.not('id', 'in', `(${excludedIds.join(',')})`);
+          query = query.not('id', 'in', formatUuidInFilter(excludedIds));
         }
 
         const { data: profiles, error } = await query
@@ -1447,7 +1452,7 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, isPremium, profileComplet
       let archivedQuery = supabase.from('profiles').select(PROFILE_SELECT);
       
       if (excludedIds.length > 0) {
-        archivedQuery = archivedQuery.not('id', 'in', `(${excludedIds.join(',')})`);
+        archivedQuery = archivedQuery.not('id', 'in', formatUuidInFilter(excludedIds));
       }
       
       // Build country filter based on user type
@@ -2543,7 +2548,7 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, isPremium, profileComplet
             }
 
             if (allExcludedIds.length > 0) {
-              localQuery = localQuery.not('id', 'in', `(${allExcludedIds.join(',')})`);
+              localQuery = localQuery.not('id', 'in', formatUuidInFilter(allExcludedIds));
             }
 
             const { data: localData, error: localError } = await localQuery
@@ -2573,7 +2578,7 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, isPremium, profileComplet
             .limit(80);
 
           if (allExcludedIds.length > 0) {
-            fallbackQuery = fallbackQuery.not('id', 'in', `(${allExcludedIds.join(',')})`);
+            fallbackQuery = fallbackQuery.not('id', 'in', formatUuidInFilter(allExcludedIds));
           }
 
           const { data: fallbackLocal, error: fallbackError } = await fallbackQuery;
@@ -2611,7 +2616,7 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, isPremium, profileComplet
         let archivedQuery = supabase.from('profiles').select(PROFILE_SELECT);
 
         if (allExcludedIds.length > 0) {
-          archivedQuery = archivedQuery.not('id', 'in', `(${allExcludedIds.join(',')})`);
+          archivedQuery = archivedQuery.not('id', 'in', formatUuidInFilter(allExcludedIds));
         }
 
         if (premiumForFeed && allowedCountryCodes.length > 0) {
@@ -2915,53 +2920,59 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, isPremium, profileComplet
       revokeBlobUrlsForProfile(prevMatch.id, imagesToRevoke);
     }, 450);
 
-    // Increment local/pending counters immediately for a snappy feel
+    // Track pending swipe (will be decremented in finally block)
     pendingSwipesRef.current += 1;
-    setTodaySwipeCount(prev => prev + 1);
+
+    // Capture values now to avoid stale closures inside the queue job
+    const likerId = currentUser.id;
+    const likedId = prevMatch.id;
+    const premiumParam = !!isPremium;
 
     // Immediately advance the UI
     moveToNext(prevMatch);
 
     // Background job: persist usage and like, then show match animation if appropriate.
+    // IMPORTANT: Swipe count is incremented AFTER successful DB write to ensure accuracy.
     enqueue(async () => {
       try {
-        // First, increment usage on server (guard against limits)
-        const usageResult = await checkUsageLimit('swipe');
-        if (!usageResult.success) {
-          // Do NOT rollback the deck. If server denies, user likely hit the real limit on another device
-          // (or the RPC is temporarily inconsistent). Rolling back causes the "snap back" bug.
-          setIsOutOfSwipes(true);
-          
-          toast({ 
-            title: t('discover.errors.dailyLimitReached'), 
-            description: usageResult.message || t('discover.errors.dailyLimitMessage'), 
-            variant: 'destructive' 
-          });
-          return;
-        }
-
-        // Then attempt the batched RPC to record the like and detect mutual
+        // Attempt the batched RPC to record the like and detect mutual
         const rpcName = 'like_and_usage_batched';
-        const rpc = (supabase as unknown as {
+        const { data: rpcData, error: rpcError } = await (supabase as unknown as {
           rpc: (fn: string, args?: Record<string, unknown>) => Promise<{ data: unknown; error: unknown }>;
-        }).rpc;
-        const { data: rpcData, error: rpcError } = await rpc(rpcName, {
-          liker_id_param: currentUser.id,
-          liked_id_param: prevMatch.id,
-          premium_param: !!isPremium,
+        }).rpc(rpcName, {
+          liker_id_param: likerId,
+          liked_id_param: likedId,
+          premium_param: premiumParam,
         });
 
         if (rpcError) {
+          swipeDebug('handleLike: RPC failed, attempting fallback', { rpcError });
           // Fallback: attempt to insert like and check mutual
           try {
             const { data: existingLike } = await supabase
               .from('likes')
               .select('id')
-              .match({ liker_id: currentUser.id, liked_id: prevMatch.id })
+              .match({ liker_id: likerId, liked_id: likedId })
               .maybeSingle();
 
             if (!existingLike) {
-              await supabase.from('likes').insert({ liker_id: currentUser.id, liked_id: prevMatch.id });
+              const { error: insertError } = await supabase
+                .from('likes')
+                .insert({ liker_id: likerId, liked_id: likedId });
+
+              if (insertError) {
+                throw insertError;
+              }
+              
+              // ✅ Increment swipe count after successful DB write
+              setTodaySwipeCount(prev => prev + 1);
+
+              // Notify other parts of the app (e.g., Profile stats) immediately
+              if (typeof window !== 'undefined') {
+                window.dispatchEvent(
+                  new CustomEvent('swipePersisted', { detail: { type: 'like', delta: 1 } })
+                );
+              }
               
               // Check how many likes the target user has received and send notification
               try {
@@ -2984,7 +2995,7 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, isPremium, profileComplet
             const { data: mutualLike } = await supabase
               .from('likes')
               .select('id')
-              .match({ liker_id: prevMatch.id, liked_id: currentUser.id })
+              .match({ liker_id: likedId, liked_id: likerId })
               .maybeSingle();
 
             if (mutualLike) {
@@ -3023,7 +3034,17 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, isPremium, profileComplet
             return;
           }
         } else {
-          // RPC succeeded — if server reports a match, show animation
+          // RPC succeeded — increment swipe count after successful DB write
+          setTodaySwipeCount(prev => prev + 1);
+
+          // Notify other parts of the app (e.g., Profile stats) immediately
+          if (typeof window !== 'undefined') {
+            window.dispatchEvent(
+              new CustomEvent('swipePersisted', { detail: { type: 'like', delta: 1 } })
+            );
+          }
+          
+          // If server reports a match, show animation
           const hasMatch =
             !!rpcData &&
             typeof rpcData === 'object' &&
@@ -3085,6 +3106,7 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, isPremium, profileComplet
         // ✅ DO NOT rollback on unexpected network/RPC failures.
         // Keep UX moving; we'll retry sync later.
         swipeDebug('handleLike: persist failed (job), not rolling back', { err: jobErr });
+        console.error('[Swipe Persist] LIKE job failed:', jobErr);
       } finally {
         pendingSwipesRef.current = Math.max(0, pendingSwipesRef.current - 1);
       }
@@ -3166,51 +3188,59 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, isPremium, profileComplet
       revokeBlobUrlsForProfile(prevMatch.id, imagesToRevoke);
     }, 450);
 
-    // Optimistically add to passed list and increment counters
+    // Optimistically add to passed list
     setPassedUsers(prev => [{ user_id: prevMatch.id, passed_at: new Date() }, ...prev.slice(0, 9)]);
     pendingSwipesRef.current += 1;
-    setTodaySwipeCount(prev => prev + 1);
+
+    // Capture values now to avoid stale closures inside the queue job
+    const passerId = currentUser.id;
+    const passedId = prevMatch.id;
+    const premiumParam = !!isPremium;
 
     // Immediately advance UI
     moveToNext(prevMatch);
 
-    // Background job to persist the pass and usage increment
+    // Background job to persist the pass.
+    // IMPORTANT: Swipe count is incremented AFTER successful DB write to ensure accuracy.
     enqueue(async () => {
       try {
-        const usageResult = await checkUsageLimit('swipe');
-        if (!usageResult.success) {
-          // Do NOT rollback the deck; mark out-of-swipes and stop.
-          setIsOutOfSwipes(true);
-          
-          toast({ 
-            title: t('discover.errors.dailyLimitReached'), 
-            description: usageResult.message || t('discover.errors.dailyLimitMessage'), 
-            variant: 'destructive' 
-          });
-          return;
-        }
-
         const rpcName = 'pass_and_usage_batched';
-        const rpc = (supabase as unknown as {
+        const { error: rpcError } = await (supabase as unknown as {
           rpc: (fn: string, args?: Record<string, unknown>) => Promise<{ data: unknown; error: unknown }>;
-        }).rpc;
-        const { error: rpcError } = await rpc(rpcName, {
-          passer_id_param: currentUser.id,
-          passed_id_param: prevMatch.id,
-          premium_param: !!isPremium,
+        }).rpc(rpcName, {
+          passer_id_param: passerId,
+          passed_id_param: passedId,
+          premium_param: premiumParam,
         });
 
         if (rpcError) {
+          swipeDebug('executePassLogic: RPC failed, attempting fallback', { rpcError });
           // Fallback: insert pass directly
           try {
             const { data: existingPass } = await supabase
               .from('passes')
               .select('id')
-              .match({ passer_id: currentUser.id, passed_id: prevMatch.id })
+              .match({ passer_id: passerId, passed_id: passedId })
               .maybeSingle();
 
             if (!existingPass) {
-              await supabase.from('passes').insert({ passer_id: currentUser.id, passed_id: prevMatch.id });
+              const { error: insertError } = await supabase
+                .from('passes')
+                .insert({ passer_id: passerId, passed_id: passedId });
+
+              if (insertError) {
+                throw insertError;
+              }
+              
+              // ✅ Increment swipe count after successful DB write
+              setTodaySwipeCount(prev => prev + 1);
+
+              // Notify other parts of the app (for debugging/telemetry)
+              if (typeof window !== 'undefined') {
+                window.dispatchEvent(
+                  new CustomEvent('swipePersisted', { detail: { type: 'pass', delta: 1 } })
+                );
+              }
             }
           } catch (fallbackErr) {
             // ✅ DO NOT rollback on network/RPC failures.
@@ -3218,11 +3248,22 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, isPremium, profileComplet
             swipeDebug('executePassLogic: persist failed (fallback), not rolling back', { err: fallbackErr });
             return;
           }
+        } else {
+          // RPC succeeded — increment swipe count after successful DB write
+          setTodaySwipeCount(prev => prev + 1);
+
+          // Notify other parts of the app (for debugging/telemetry)
+          if (typeof window !== 'undefined') {
+            window.dispatchEvent(
+              new CustomEvent('swipePersisted', { detail: { type: 'pass', delta: 1 } })
+            );
+          }
         }
       } catch (jobErr) {
         // ✅ DO NOT rollback on unexpected network/RPC failures.
         // Keep UX moving; we'll retry sync later.
         swipeDebug('executePassLogic: persist failed (job), not rolling back', { err: jobErr });
+        console.error('[Swipe Persist] PASS job failed:', jobErr);
       } finally {
         pendingSwipesRef.current = Math.max(0, pendingSwipesRef.current - 1);
       }

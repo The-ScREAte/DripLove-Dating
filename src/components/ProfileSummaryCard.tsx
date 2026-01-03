@@ -5,6 +5,8 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Heart, MessageCircle, Users } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 
+type SwipePersistedEventDetail = { type: 'like' | 'pass'; delta?: number };
+
 interface ProfileSummaryCardProps {
   currentUser: any;
 }
@@ -76,45 +78,100 @@ const ProfileSummaryCard = ({ currentUser }: ProfileSummaryCardProps) => {
     };
   }, [currentUser?.id]);
 
+  // Local event-based updates so stats change immediately even if Realtime WS is down
+  useEffect(() => {
+    if (!currentUser?.id) return;
+
+    const onSwipePersisted = (event: Event) => {
+      const custom = event as CustomEvent<SwipePersistedEventDetail>;
+      const detail = custom?.detail;
+      if (!detail) return;
+
+      if (detail.type === 'like') {
+        const delta = typeof detail.delta === 'number' ? detail.delta : 1;
+        setStats(prev => ({ ...prev, totalLikes: prev.totalLikes + delta }));
+      }
+    };
+
+    window.addEventListener('swipePersisted', onSwipePersisted);
+    return () => window.removeEventListener('swipePersisted', onSwipePersisted);
+  }, [currentUser?.id]);
+
   const fetchUserStats = async () => {
     if (!currentUser?.id) return;
 
+    console.log('[ProfileSummaryCard] Fetching stats for user:', currentUser.id);
+
     try {
-      // Fetch total matches
-      const { data: matches, error: matchesError } = await supabase
+      // Fetch total matches using count
+      const { count: matchesCount, error: matchesError } = await supabase
+        .from('matches')
+        .select('id', { count: 'exact', head: true })
+        .or(`user1_id.eq.${currentUser.id},user2_id.eq.${currentUser.id}`);
+
+      if (matchesError && !matchesError.message.includes('does not exist')) {
+        console.error('[ProfileSummaryCard] Error fetching matches:', matchesError);
+      } else {
+        console.log('[ProfileSummaryCard] Matches count:', matchesCount);
+      }
+
+      // Fetch active chats (matches with recent messages in last 7 days)
+      const sevenDaysAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString();
+      const { data: matchesData, error: matchesDataError } = await supabase
         .from('matches')
         .select('id')
         .or(`user1_id.eq.${currentUser.id},user2_id.eq.${currentUser.id}`);
 
-      if (matchesError) throw matchesError;
+      if (matchesDataError && !matchesDataError.message.includes('does not exist')) {
+        console.error('Error fetching matches data:', matchesDataError);
+      }
 
-      // Fetch active chats (matches with recent messages)
-      const { data: activeChats, error: chatsError } = await supabase
-        .from('matches')
-        .select(`
-          id,
-          chats!inner(id, created_at)
-        `)
-        .or(`user1_id.eq.${currentUser.id},user2_id.eq.${currentUser.id}`)
-        .gte('chats.created_at', new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString());
+      // Count active chats by checking which matches have recent messages
+      let activeChatsCount = 0;
+      if (matchesData && matchesData.length > 0) {
+        const { data: recentChats, error: chatsError } = await supabase
+          .from('chats')
+          .select('match_id')
+          .in('match_id', matchesData.map(m => m.id))
+          .gte('created_at', sevenDaysAgo);
 
-      if (chatsError) throw chatsError;
+        if (chatsError && !chatsError.message.includes('does not exist')) {
+          console.error('Error fetching chats:', chatsError);
+        } else if (recentChats) {
+          // Count unique match IDs with recent messages
+          activeChatsCount = new Set(recentChats.map(c => c.match_id)).size;
+        }
+      }
 
-      // Fetch total likes given
-      const { data: likes, error: likesError } = await supabase
+      // Fetch total likes given using count
+      const { count: likesCount, error: likesError } = await supabase
         .from('likes')
-        .select('id')
+        .select('id', { count: 'exact', head: true })
         .eq('liker_id', currentUser.id);
 
-      if (likesError) throw likesError;
+      if (likesError && !likesError.message.includes('does not exist')) {
+        console.error('[ProfileSummaryCard] Error fetching likes:', likesError);
+      } else {
+        console.log('[ProfileSummaryCard] Likes count:', likesCount);
+      }
 
-      setStats({
-        totalMatches: matches?.length || 0,
-        activeChats: activeChats?.length || 0,
-        totalLikes: likes?.length || 0
-      });
+      const finalStats = {
+        totalMatches: matchesCount || 0,
+        activeChats: activeChatsCount,
+        totalLikes: likesCount || 0
+      };
+
+      console.log('[ProfileSummaryCard] Final stats:', finalStats);
+
+      setStats(finalStats);
     } catch (error) {
-      console.error('Error fetching stats:', error);
+      console.error('[ProfileSummaryCard] Error fetching stats:', error);
+      // Set stats to 0 on error to avoid showing stale data
+      setStats({
+        totalMatches: 0,
+        activeChats: 0,
+        totalLikes: 0
+      });
     }
   };
 
