@@ -100,6 +100,7 @@ export interface AdminStats {
   users_on_hold: number;
   total_admins: number;
   premium_users: number;
+  all_time_premium_users: number;
 }
 
 export interface AdminUser {

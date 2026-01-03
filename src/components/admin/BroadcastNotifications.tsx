@@ -9,7 +9,7 @@ import { useToast } from '@/hooks/use-toast';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { ScrollArea } from '@/components/ui/scroll-area';
-import { Loader2, Send, Users, Globe, CheckCircle2, AlertCircle, Trash2, RotateCw, Eye, History, Copy, Mail, Calendar } from 'lucide-react';
+import { Loader2, Send, Users, Globe, CheckCircle2, AlertCircle, Trash2, RotateCw, Eye, History, Copy, Mail, Calendar, MessageCircle } from 'lucide-react';
 import EmailExport from './EmailExport';
 import ScheduledBroadcasts from './ScheduledBroadcasts';
 import { Alert, AlertDescription } from '@/components/ui/alert';
@@ -52,6 +52,7 @@ interface Campaign {
   created_at: string;
   admin_id: string;
   status: 'queued' | 'processing' | 'completed' | 'failed';
+  save_to_profile: boolean;
 }
 
 // Collapsible countries badge component
@@ -132,6 +133,7 @@ export default function BroadcastNotifications() {
   const [selectedUsers, setSelectedUsers] = useState<Set<string>>(new Set());
   const [notificationTitle, setNotificationTitle] = useState('');
   const [notificationMessage, setNotificationMessage] = useState('');
+  const [saveToProfile, setSaveToProfile] = useState(true);
   const [isLoadingCountries, setIsLoadingCountries] = useState(false);
   const [isLoadingUsers, setIsLoadingUsers] = useState(false);
   const [isSending, setIsSending] = useState(false);
@@ -527,6 +529,7 @@ export default function BroadcastNotifications() {
           targetCountries: Array.from(selectedCountries),
           userIds: Array.from(selectedUsers),
           notificationType: 'system',
+          saveToProfile: saveToProfile,
         },
       });
 
@@ -552,6 +555,7 @@ export default function BroadcastNotifications() {
       // Reset form
       setNotificationTitle('');
       setNotificationMessage('');
+      setSaveToProfile(true);
       setSelectedUsers(new Set());
       
       // Switch to history tab to show progress
@@ -960,6 +964,23 @@ export default function BroadcastNotifications() {
                     This notification will open the Discover page when users tap on it.
                   </AlertDescription>
                 </Alert>
+
+                <div className="flex items-center space-x-2 pt-2">
+                  <Checkbox
+                    id="saveToProfile"
+                    checked={saveToProfile}
+                    onCheckedChange={(checked) => setSaveToProfile(checked as boolean)}
+                  />
+                  <label
+                    htmlFor="saveToProfile"
+                    className="text-xs font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70 cursor-pointer"
+                  >
+                    Save to Profile Messages
+                  </label>
+                </div>
+                <p className="text-[10px] text-gray-500 ml-6">
+                  When enabled, this notification will also be saved as a profile message for each recipient
+                </p>
 
                 <div className="flex items-center justify-between pt-4 border-t gap-2">
                   <div>

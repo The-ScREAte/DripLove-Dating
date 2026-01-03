@@ -881,7 +881,8 @@ const AdminPageComponent = ({ currentUser, onLogout }: AdminPageProps) => {
       setLoading(true);
       
       // Check cache first for performance
-      const cacheKey = `users_all_${statusFilter}_${genderFilter}_${interestedInFilter}_${countryFilter}_${relationshipIntentFilter}_${premiumFilter}_${activityFilter}`;
+      // Note: Cache key does NOT include premiumFilter since we store all users and filter client-side
+      const cacheKey = `users_all_${statusFilter}_${genderFilter}_${interestedInFilter}_${countryFilter}_${relationshipIntentFilter}_${activityFilter}`;
       const cachedUsers = userDataCache.get(cacheKey);
       if (cachedUsers) {
         const { regularUsers, admins } = cachedUsers;
@@ -962,30 +963,36 @@ const AdminPageComponent = ({ currentUser, onLogout }: AdminPageProps) => {
       const premiumMap = new Map<string, boolean>();
 
       if (userIds.length > 0) {
-        const { data: premiumRowsRaw, error: premiumError } = await (supabase as any).rpc(
-          'admin_get_premium_status_for_users',
-          { target_user_ids: userIds }
-        );
-        if (premiumError) {
-          console.error('Premium status RPC failed:', premiumError);
-          throw premiumError;
+        // Batch the RPC call to avoid payload/response limits on large user lists.
+        // Premium logic is enforced inside the DB function:
+        // plan_name = 'premium' AND status = 'active' AND (expires_at IS NULL OR expires_at > NOW())
+        const CHUNK_SIZE = 500;
+        for (let i = 0; i < userIds.length; i += CHUNK_SIZE) {
+          const chunk = userIds.slice(i, i + CHUNK_SIZE);
+          const { data: premiumRowsRaw, error: premiumError } = await (supabase as any).rpc(
+            'admin_get_premium_status_for_users',
+            { target_user_ids: chunk }
+          );
+          if (premiumError) {
+            console.error('Premium status RPC failed:', premiumError);
+            throw premiumError;
+          }
+
+          const premiumRows: any[] = Array.isArray(premiumRowsRaw) ? premiumRowsRaw : [];
+          premiumRows.forEach((row: any) => {
+            if (!row?.user_id) return;
+
+            // Be resilient to duplicate rows per user_id. If any row says premium, treat as premium.
+            const current = premiumMap.get(row.user_id) ?? false;
+            premiumMap.set(row.user_id, current || !!row.is_premium);
+          });
         }
-
-        const premiumRows: any[] = Array.isArray(premiumRowsRaw) ? premiumRowsRaw : [];
-        void 0;
-        
-        premiumRows.forEach((row: any) => {
-          if (!row?.user_id) return;
-
-          // Be resilient to duplicate rows per user_id (some DB function versions can return
-          // multiple rows due to subscription history). If any row says premium, treat as premium.
-          const current = premiumMap.get(row.user_id) ?? false;
-          premiumMap.set(row.user_id, current || !!row.is_premium);
-        });
-        
-        const premiumCount = Array.from(premiumMap.values()).filter(v => v).length;
-        void 0;
       }
+
+      // Ensure every user gets an explicit boolean (default false)
+      userIds.forEach((id) => {
+        if (!premiumMap.has(id)) premiumMap.set(id, false);
+      });
 
       // Map users and attach premium flag
       const usersWithAge = (data || []).map(user => ({
@@ -996,14 +1003,8 @@ const AdminPageComponent = ({ currentUser, onLogout }: AdminPageProps) => {
         login_count: user.login_count
       }));
 
-      // Apply premium filter BEFORE caching (critical fix)
-      let filteredByPremium = usersWithAge;
-      
-      if (premiumFilter === 'premium') {
-        filteredByPremium = usersWithAge.filter(u => u.is_premium);
-      } else if (premiumFilter === 'free') {
-        filteredByPremium = usersWithAge.filter(u => !u.is_premium);
-      }
+      // DO NOT filter by premium here - let filteredUsers handle ALL filtering
+      // This ensures all users are loaded and filters work dynamically
 
       // Fetch admin users separately
       const { data: adminData } = await supabase
@@ -1017,11 +1018,12 @@ const AdminPageComponent = ({ currentUser, onLogout }: AdminPageProps) => {
         age: calculateAge(user.date_of_birth)
       })) || [];
 
-      setUsers(filteredByPremium);
+      // Store ALL users in state - filtering happens in filteredUsers computed property
+      setUsers(usersWithAge);
       setAdminUsers(adminsWithAge);
       
-      // Cache the FILTERED users data for 3 minutes
-      userDataCache.set(cacheKey, { regularUsers: filteredByPremium, admins: adminsWithAge });
+      // Cache ALL users data for 3 minutes (not pre-filtered)
+      userDataCache.set(cacheKey, { regularUsers: usersWithAge, admins: adminsWithAge });
     } catch (error) {
       const errAny = error as any;
       const status = errAny?.status;
@@ -1046,7 +1048,7 @@ const AdminPageComponent = ({ currentUser, onLogout }: AdminPageProps) => {
     } finally {
       setLoading(false);
     }
-  }, 300), [toast, statusFilter, genderFilter, interestedInFilter, countryFilter, relationshipIntentFilter, premiumFilter, activityFilter]);
+  }, 300), [toast, statusFilter, genderFilter, interestedInFilter, countryFilter, relationshipIntentFilter, activityFilter]);
 
   const calculateAge = (dateOfBirth: string) => {
     const today = new Date();
@@ -1085,14 +1087,6 @@ const AdminPageComponent = ({ currentUser, onLogout }: AdminPageProps) => {
       if (reportedChats.length === 0) fetchReportedChats();
     }
   }, [isAdmin, activeTab]);
-
-  // Clear cache when premium filter changes to prevent stale cached data
-  useEffect(() => {
-    userDataCache.clear();
-    if (isAdmin && activeTab === 'users') {
-      fetchUsers();
-    }
-  }, [premiumFilter, isAdmin, activeTab, fetchUsers]);
 
   const updateUserStatus = async (userId: string, newStatus: string) => {
     try {
