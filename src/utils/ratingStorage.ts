@@ -78,7 +78,7 @@ const getWaitingPeriod = (dismissCount: number): number => {
 
 /**
  * Check if we should show the rating pop-up based on match count
- * Shows on 2nd or 3rd match, then again after 3+ weeks
+ * Shows on 3rd match, then again after 3+ weeks
  */
 export const shouldShowRatingPopup = (): boolean => {
   const data = getRatingData();
@@ -90,9 +90,9 @@ export const shouldShowRatingPopup = (): boolean => {
   
   const now = Date.now();
   
-  // First time - check if we have 2+ matches (positive moment)
+  // First time - check if we have 3+ matches (positive moment)
   if (data.lastShown === null) {
-    return data.matchCount >= 2;
+    return data.matchCount >= 3;
   }
   
   // If user dismissed, use increased waiting period based on dismiss count
@@ -130,8 +130,8 @@ export const incrementMatchCount = (): boolean => {
     return false;
   }
   
-  // Show on exactly 2nd or 3rd match if never shown before
-  if (data.lastShown === null && (newCount === 2 || newCount === 3)) {
+  // Show on exactly 3rd match if never shown before
+  if (data.lastShown === null && newCount === 3) {
     return true;
   }
   
@@ -154,6 +154,21 @@ export const incrementMatchCount = (): boolean => {
   }
   
   return false;
+};
+
+/**
+ * Get current match count
+ */
+export const getMatchCount = (): number => {
+  return getRatingData().matchCount;
+};
+
+/**
+ * Check if approaching rating threshold (for preloading)
+ */
+export const isApproachingThreshold = (): boolean => {
+  const count = getMatchCount();
+  return count >= 2 && count < 3;
 };
 
 /**
