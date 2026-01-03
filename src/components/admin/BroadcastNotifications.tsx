@@ -14,6 +14,7 @@ import EmailExport from './EmailExport';
 import ScheduledBroadcasts from './ScheduledBroadcasts';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import {
   Dialog,
   DialogContent,
@@ -36,6 +37,8 @@ interface User {
   city: string;
   has_push_token: boolean;
 }
+
+type RecipientFilter = 'all' | 'no_images' | 'never_seen' | 'incomplete_profile';
 
 interface Campaign {
   id: string;
@@ -135,6 +138,7 @@ export default function BroadcastNotifications() {
   const { toast } = useToast();
   const [searchTerm, setSearchTerm] = useState('');
   const [activeTab, setActiveTab] = useState('new');
+  const [recipientFilter, setRecipientFilter] = useState<RecipientFilter>('all');
   
   // Campaign history
   const [campaigns, setCampaigns] = useState<Campaign[]>([]);
@@ -159,7 +163,13 @@ export default function BroadcastNotifications() {
       setUsers([]);
       setSelectedUsers(new Set());
     }
-  }, [selectedCountries]);
+  }, [selectedCountries, recipientFilter]);
+
+  useEffect(() => {
+    // Changing the audience should reset selection to prevent accidental sending
+    // to previously-selected users from a different filter.
+    setSelectedUsers(new Set());
+  }, [selectedCountries, recipientFilter]);
 
   useEffect(() => {
     if (activeTab !== 'history') {
@@ -197,7 +207,6 @@ export default function BroadcastNotifications() {
         .from('profiles')
         .select('country, id')
         .not('country', 'is', null)
-        .eq('account_status', 'active')
         .eq('is_admin', false);
 
       if (error) throw error;
@@ -237,16 +246,24 @@ export default function BroadcastNotifications() {
       // Supabase/PostgREST commonly applies a default max rows per request.
       // Page through results so large countries (>1000 users) are fully included.
       const PAGE_SIZE = 1000;
-      const profiles: Array<{ id: string; first_name: string | null; last_name: string | null; country: string | null; city: string | null }> = [];
+      const profiles: Array<{
+        id: string;
+        first_name: string | null;
+        last_name: string | null;
+        country: string | null;
+        city: string | null;
+        gender?: string | null;
+        preference?: string | null;
+        bio?: string | null;
+      }> = [];
       for (let page = 0; ; page++) {
         const from = page * PAGE_SIZE;
         const to = from + PAGE_SIZE - 1;
 
         const { data: pageRows, error: profileError } = await supabase
           .from('profiles')
-          .select('id, first_name, last_name, country, city')
+          .select('id, first_name, last_name, country, city, gender, preference, bio')
           .in('country', countryArray)
-          .eq('account_status', 'active')
           .eq('is_admin', false)
           .order('id')
           .range(from, to);
@@ -279,7 +296,60 @@ export default function BroadcastNotifications() {
         });
       }
 
-      const userList: User[] = profiles.map(p => ({
+      let filteredProfiles = profiles;
+
+      if (recipientFilter === 'no_images') {
+        const usersWithImages = new Set<string>();
+        for (let i = 0; i < userIds.length; i += CHUNK_SIZE) {
+          const chunk = userIds.slice(i, i + CHUNK_SIZE);
+          if (chunk.length === 0) continue;
+
+          const { data: imagesChunk, error: imagesError } = await supabase
+            .from('user_images')
+            .select('user_id')
+            .in('user_id', chunk);
+
+          if (imagesError) throw imagesError;
+          (imagesChunk || []).forEach((img) => {
+            if (img.user_id) usersWithImages.add(img.user_id);
+          });
+        }
+
+        filteredProfiles = profiles.filter((p) => !usersWithImages.has(p.id));
+      } else if (recipientFilter === 'never_seen') {
+        const seenUsers = new Set<string>();
+        for (let i = 0; i < userIds.length; i += CHUNK_SIZE) {
+          const chunk = userIds.slice(i, i + CHUNK_SIZE);
+          if (chunk.length === 0) continue;
+
+          const [{ data: likesChunk, error: likesError }, { data: passesChunk, error: passesError }] = await Promise.all([
+            supabase.from('likes').select('liked_id').in('liked_id', chunk),
+            supabase.from('passes').select('passed_id').in('passed_id', chunk),
+          ]);
+
+          if (likesError) throw likesError;
+          if (passesError) throw passesError;
+
+          (likesChunk || []).forEach((r: any) => {
+            if (r.liked_id) seenUsers.add(r.liked_id);
+          });
+          (passesChunk || []).forEach((r: any) => {
+            if (r.passed_id) seenUsers.add(r.passed_id);
+          });
+        }
+
+        filteredProfiles = profiles.filter((p) => !seenUsers.has(p.id));
+      } else if (recipientFilter === 'incomplete_profile') {
+        filteredProfiles = profiles.filter((p) => {
+          const gender = (p.gender || '').trim();
+          const preference = (p.preference || '').trim();
+          const bio = (p.bio || '').trim();
+          const city = (p.city || '').trim();
+          return !(gender && preference && bio && city);
+        });
+      }
+
+      const userList: User[] = filteredProfiles.map(p => ({
         id: p.id,
         first_name: p.first_name || '',
         last_name: p.last_name || '',
@@ -761,6 +831,21 @@ export default function BroadcastNotifications() {
                 </div>
               </CardHeader>
               <CardContent>
+                <div className="mb-3 flex items-center gap-2">
+                  <div className="flex-1">
+                    <Select value={recipientFilter} onValueChange={(v) => setRecipientFilter(v as RecipientFilter)}>
+                      <SelectTrigger className="h-8 text-xs">
+                        <SelectValue placeholder="Audience filter" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="all">All users</SelectItem>
+                        <SelectItem value="no_images">Debug: No images</SelectItem>
+                        <SelectItem value="never_seen">Debug: Never seen</SelectItem>
+                        <SelectItem value="incomplete_profile">Debug: Incomplete profiles</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                </div>
                 <div className="mb-3">
                   <Input
                     placeholder="Search users by name, city or country..."

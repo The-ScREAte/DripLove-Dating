@@ -36,6 +36,9 @@ interface ChatPageProps {
 
 // Dormant conversations constants
 const DORMANT_DAYS = 30;
+// Auto-delete chats that have remained dormant (in "Earlier conversations") for this many additional days.
+// Earlier conversations = DORMANT_DAYS; deletion happens after DORMANT_DAYS + DORMANT_DELETE_AFTER_DAYS_IN_EARLIER.
+const DORMANT_DELETE_AFTER_DAYS_IN_EARLIER = 15;
 const MS_PER_DAY = 24 * 60 * 60 * 1000;
 
 const isDormantChat = (match: ChatMatch) => {
@@ -43,6 +46,15 @@ const isDormantChat = (match: ChatMatch) => {
 
   const lastActivity = new Date(match.last_message_time).getTime();
   return Date.now() - lastActivity > DORMANT_DAYS * MS_PER_DAY;
+};
+
+const isAutoDeletableDormantChat = (match: ChatMatch) => {
+  // Only delete chats that have actually had messages (i.e., they can enter "Earlier conversations").
+  if (!match.last_message) return false;
+  if (!match.last_message_time) return false;
+
+  const lastActivity = new Date(match.last_message_time).getTime();
+  return Date.now() - lastActivity > (DORMANT_DAYS + DORMANT_DELETE_AFTER_DAYS_IN_EARLIER) * MS_PER_DAY;
 };
 
 // Global cache for chat matches - persists across component mounts
@@ -105,6 +117,7 @@ const ChatPage = ({ currentUser, onUnreadChange, onDetailViewChange }: ChatPageP
   const [isReportDialogOpen, setIsReportDialogOpen] = useState(false);
   const [reportMessageId, setReportMessageId] = useState<string | undefined>(undefined);
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
+  const autoDeletingDormantMatchIdsRef = useRef<Set<string>>(new Set());
   const { toast } = useToast();
   const { sendMessageNotification, isInitialized, isSupported } = usePushNotifications(currentUser?.id);
   const messagesEndRef = useRef<HTMLDivElement>(null);
@@ -832,18 +845,53 @@ const ChatPage = ({ currentUser, onUnreadChange, onDetailViewChange }: ChatPageP
 
       const processedMatches = processMatchesData((matches || []) as unknown as MatchRow[]);
 
+      const autoDeleteCandidates = processedMatches
+        .filter(isAutoDeletableDormantChat)
+        .map((m) => m.id)
+        .filter((id) => !autoDeletingDormantMatchIdsRef.current.has(id));
+
+      for (const id of autoDeleteCandidates) {
+        autoDeletingDormantMatchIdsRef.current.add(id);
+      }
+
+      const visibleMatches = processedMatches.filter(
+        (m) => !autoDeletingDormantMatchIdsRef.current.has(m.id)
+      );
+
       // Unread counts come from match-level counters (user1_unread_count/user2_unread_count).
       
       // ⭐ OPTIMIZED: Fast shallow comparison instead of expensive JSON.stringify
-      const listChanged = processedMatches.length !== chatCache.chats.length ||
-        processedMatches.some((m, i) => 
-          m.id !== chatCache.chats[i]?.id || 
+      const listChanged = visibleMatches.length !== chatCache.chats.length ||
+        visibleMatches.some((m, i) =>
+          m.id !== chatCache.chats[i]?.id ||
           m.last_message_time !== chatCache.chats[i]?.last_message_time
         );
       
       if (listChanged) {
-        updateChatCache(processedMatches as unknown as CachedChat[]);
-        setMatches(processedMatches);
+        updateChatCache(visibleMatches as unknown as CachedChat[]);
+        setMatches(visibleMatches);
+      }
+
+      if (autoDeleteCandidates.length > 0) {
+        void (async () => {
+          for (const matchId of autoDeleteCandidates) {
+            try {
+              const { error: deleteError } = await supabase.rpc('delete_match_with_chats', {
+                match_id_param: matchId,
+              });
+
+              if (deleteError) throw deleteError;
+
+              chatMessagesCache.delete(matchId);
+              autoDeletingDormantMatchIdsRef.current.delete(matchId);
+            } catch {
+              // If delete fails, allow it to reappear on a future refresh.
+              autoDeletingDormantMatchIdsRef.current.delete(matchId);
+            }
+          }
+          // Ensure we don't rehydrate deleted items from the in-memory cache.
+          chatMatchesCache.delete(currentUser.id);
+        })();
       }
       
       // We've refreshed matches in the background; clear the "needs refresh" flag
@@ -878,17 +926,58 @@ const ChatPage = ({ currentUser, onUnreadChange, onDetailViewChange }: ChatPageP
 
       const processedMatches = processMatchesData((matches || []) as unknown as MatchRow[]);
 
+      const autoDeleteCandidates = processedMatches
+        .filter(isAutoDeletableDormantChat)
+        .map((m) => m.id)
+        .filter((id) => !autoDeletingDormantMatchIdsRef.current.has(id));
+
+      for (const id of autoDeleteCandidates) {
+        autoDeletingDormantMatchIdsRef.current.add(id);
+      }
+
+      const visibleMatches = processedMatches.filter(
+        (m) => !autoDeletingDormantMatchIdsRef.current.has(m.id)
+      );
+
       // Unread counts come from match-level counters (user1_unread_count/user2_unread_count).
       
       // ⭐ Update global cache (survives route changes like Instagram)
-      updateChatCache(processedMatches as unknown as CachedChat[]);
+      updateChatCache(visibleMatches as unknown as CachedChat[]);
 
-      setMatches(processedMatches);
+      setMatches(visibleMatches);
       // Clear the refresh flag when we've just fetched
       matchesNeedsRefreshRef.current = false;
+
+      if (autoDeleteCandidates.length > 0) {
+        void (async () => {
+          // If the currently-open chat is being auto-deleted, leave detail view.
+          if (selectedMatch?.id && autoDeleteCandidates.includes(selectedMatch.id)) {
+            setSelectedMatch(null);
+            setMessages([]);
+          }
+
+          for (const matchId of autoDeleteCandidates) {
+            try {
+              const { error: deleteError } = await supabase.rpc('delete_match_with_chats', {
+                match_id_param: matchId,
+              });
+
+              if (deleteError) throw deleteError;
+
+              chatMessagesCache.delete(matchId);
+              autoDeletingDormantMatchIdsRef.current.delete(matchId);
+            } catch {
+              // If delete fails, allow it to reappear on a future refresh.
+              autoDeletingDormantMatchIdsRef.current.delete(matchId);
+            }
+          }
+          // Ensure we don't rehydrate deleted items from the in-memory cache.
+          chatMatchesCache.delete(currentUser.id);
+        })();
+      }
       
       // Check for expired matches and send notifications
-      checkExpiredMatches(processedMatches);
+      checkExpiredMatches(visibleMatches);
     } catch (error) {
       toast({
         title: 'Error',

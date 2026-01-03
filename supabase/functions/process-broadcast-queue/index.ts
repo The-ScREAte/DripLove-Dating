@@ -6,10 +6,12 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
 
-const BATCH_SIZE = 50; // Process 50 recipients per execution (increased from 25)
+// Process up to 500 recipients per run (claimed atomically); send with limited concurrency.
+const BATCH_SIZE = 500;
+const SEND_CONCURRENCY = 50;
 const MAX_RETRIES = 3; // Maximum retry attempts per recipient
 const STALE_PROCESSING_MINUTES = 10; // Self-heal processing recipients stuck longer than this
-const MAX_CHAIN_DEPTH = 100; // Safety to prevent infinite self-invocation (increased from 20)
+const MAX_CHAIN_DEPTH = 1000; // Safety to prevent infinite self-invocation
 
 serve(async (req) => {
   if (req.method === 'OPTIONS') {
@@ -166,82 +168,85 @@ serve(async (req) => {
 
         console.log(`Processing ${recipients.length} recipients for campaign ${campaign.id}`);
 
-        // Process recipients in parallel
-        const sendResults = await Promise.allSettled(
-          recipients.map(async (recipient: { id: string; user_id: string; retry_count?: number }) => {
-            try {
-              // Call send-push-notification function
-              const { data, error } = await supabase.functions.invoke('send-push-notification', {
-                body: {
-                  title: campaign.title,
-                  body: campaign.message,
-                  userId: recipient.user_id,
-                  type: campaign.notification_type,
-                  data: { action: 'open_discover' }
+        let successCount = 0;
+        for (let i = 0; i < recipients.length; i += SEND_CONCURRENCY) {
+          const batch = recipients.slice(i, i + SEND_CONCURRENCY);
+
+          const sendResults = await Promise.allSettled(
+            batch.map(async (recipient: { id: string; user_id: string; retry_count?: number }) => {
+              try {
+                // Call send-push-notification function
+                const { data, error } = await supabase.functions.invoke('send-push-notification', {
+                  body: {
+                    title: campaign.title,
+                    body: campaign.message,
+                    userId: recipient.user_id,
+                    type: campaign.notification_type,
+                    data: { action: 'open_discover' },
+                  },
+                });
+
+                if (error) throw error;
+
+                const success = data?.success || false;
+                const attemptedAt = new Date().toISOString();
+
+                // Update recipient status and release processing lock
+                if (success) {
+                  await supabase
+                    .from('broadcast_recipients')
+                    .update({
+                      status: 'sent',
+                      error_message: null,
+                      sent_at: attemptedAt,
+                      processing_started_at: null,
+                    })
+                    .eq('id', recipient.id);
+
+                  return { success: true, recipientId: recipient.id };
                 }
-              });
 
-              if (error) throw error;
+                const newRetryCount = (recipient.retry_count ?? 0) + 1;
+                const shouldMarkFailed = newRetryCount >= MAX_RETRIES;
 
-              const success = data?.success || false;
-
-              const attemptedAt = new Date().toISOString();
-
-              // Update recipient status and release processing lock
-              if (success) {
                 await supabase
                   .from('broadcast_recipients')
                   .update({
-                    status: 'sent',
-                    error_message: null,
-                    sent_at: attemptedAt,
+                    status: shouldMarkFailed ? 'failed' : 'pending',
+                    error_message: 'Push notification failed',
+                    sent_at: null,
+                    retry_count: newRetryCount,
                     processing_started_at: null,
                   })
                   .eq('id', recipient.id);
 
-                return { success: true, recipientId: recipient.id };
+                return { success: false, recipientId: recipient.id };
+              } catch (error) {
+                console.error(`Failed to send to recipient ${recipient.id}:`, error);
+
+                // Increment retry count
+                const newRetryCount = (recipient.retry_count ?? 0) + 1;
+                const shouldMarkFailed = newRetryCount >= MAX_RETRIES;
+
+                await supabase
+                  .from('broadcast_recipients')
+                  .update({
+                    status: shouldMarkFailed ? 'failed' : 'pending',
+                    error_message: error instanceof Error ? error.message : 'Unknown error',
+                    retry_count: newRetryCount,
+                    processing_started_at: null,
+                  })
+                  .eq('id', recipient.id);
+
+                return { success: false, recipientId: recipient.id };
               }
+            })
+          );
 
-              const newRetryCount = (recipient.retry_count ?? 0) + 1;
-              const shouldMarkFailed = newRetryCount >= MAX_RETRIES;
-
-              await supabase
-                .from('broadcast_recipients')
-                .update({
-                  status: shouldMarkFailed ? 'failed' : 'pending',
-                  error_message: 'Push notification failed',
-                  sent_at: null,
-                  retry_count: newRetryCount,
-                  processing_started_at: null,
-                })
-                .eq('id', recipient.id);
-
-              return { success: false, recipientId: recipient.id };
-            } catch (error) {
-              console.error(`Failed to send to recipient ${recipient.id}:`, error);
-
-              // Increment retry count
-              const newRetryCount = (recipient.retry_count ?? 0) + 1;
-              const shouldMarkFailed = newRetryCount >= MAX_RETRIES;
-
-              await supabase
-                .from('broadcast_recipients')
-                .update({
-                  status: shouldMarkFailed ? 'failed' : 'pending',
-                  error_message: error instanceof Error ? error.message : 'Unknown error',
-                  retry_count: newRetryCount,
-                  processing_started_at: null,
-                })
-                .eq('id', recipient.id);
-
-              return { success: false, recipientId: recipient.id };
-            }
-          })
-        );
-
-        const successCount = sendResults.filter(
-          r => r.status === 'fulfilled' && r.value.success
-        ).length;
+          successCount += sendResults.filter(
+            (r) => r.status === 'fulfilled' && r.value.success
+          ).length;
+        }
 
         // Sync campaign stats after each batch so UI progress updates immediately.
         const { count: sentCount, error: sentCountError } = await supabase
