@@ -291,6 +291,68 @@ serve(async (req: Request) => {
       }
     }
 
+    // Handle detect_face action - check if an image contains a human face
+    if (body.action === 'detect_face') {
+      const { image } = body;
+      
+      console.log('👤 Detecting face in image...');
+      
+      if (!image) {
+        return new Response(JSON.stringify({
+          success: false,
+          error: 'Image is required',
+          code: 'MISSING_IMAGE'
+        }), {
+          status: 400,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+        });
+      }
+
+      if (!AWS_ACCESS_KEY_ID || !AWS_SECRET_ACCESS_KEY) {
+        return new Response(JSON.stringify({
+          success: false,
+          error: 'AWS credentials not configured'
+        }), {
+          status: 500,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+        });
+      }
+
+      try {
+        const imageBytes = base64ToBytes(image);
+        const imageBase64 = bytesToBase64(imageBytes);
+        
+        const detectResult = await rekognitionRequest('RekognitionService.DetectFaces', {
+          Image: { Bytes: imageBase64 },
+          Attributes: ['DEFAULT'],
+        });
+        
+        const hasFace = detectResult.FaceDetails && detectResult.FaceDetails.length > 0;
+        const confidence = hasFace ? detectResult.FaceDetails[0].Confidence : 0;
+        
+        console.log(`Face detection result: ${hasFace ? 'Face found' : 'No face'} (confidence: ${confidence}%)`);
+        
+        return new Response(JSON.stringify({
+          success: true,
+          hasFace: hasFace,
+          confidence: confidence,
+          faceCount: detectResult.FaceDetails?.length || 0
+        }), {
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+        });
+      } catch (detectError: any) {
+        console.error('Face detection error:', detectError);
+        return new Response(JSON.stringify({
+          success: false,
+          error: 'Face detection failed',
+          hasFace: false
+        }), {
+          status: 500,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+        });
+      }
+    }
+
     // Handle validate_only action - check for duplicates WITHOUT indexing
     if (body.action === 'validate_only') {
       const { front } = body;

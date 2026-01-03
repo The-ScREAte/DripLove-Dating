@@ -17,6 +17,7 @@ import AdinkraSymbolSelector from '@/components/forms/AdinkraSymbolSelector';
 import PromoCodeInput from '@/components/forms/PromoCodeInput';
 import { moderateImage, ModerationResult } from '@/utils/photoModeration';
 import { compressImage } from '@/utils/imageCompression';
+import { verifyUploadedImage, detectHumanFace } from '@/utils/faceVerificationUtils';
 import TermsAcceptance from './TermsAcceptance';
 import { getLanguageForCountry } from '@/i18n/config';
 import { videoPreloader } from '@/utils/videoPreloader';
@@ -385,9 +386,74 @@ const ProfileCompletionPage = () => {
 
       setImages(prev => [...prev, newImage]);
 
+      // Determine the position of this new image (0-indexed)
+      const imagePosition = images.length;
+
       // AI Moderation
       try {
         const moderationResult = await moderateImage(compressedFile);
+        
+        // For first 2 images (positions 0 and 1), also verify face matches
+        let requiresFaceReview = false;
+        if (imagePosition < 2 && faceImageData) {
+          // Compare with verified face
+          const faceResult = await verifyUploadedImage(
+            compressedFile,
+            faceImageData,
+            imagePosition,
+            faceVerified
+          );
+          
+          if (faceResult.requiresReview) {
+            requiresFaceReview = true;
+            // Update moderation result to reflect face verification failure
+            moderationResult.details = {
+              ...moderationResult.details,
+              requiresReview: true,
+              faceVerificationFailed: true,
+              faceVerificationReason: faceResult.reason
+            };
+          }
+        } else if (imagePosition < 2 && !faceImageData) {
+          // User already has face_descriptor from profile - use faceVerified state
+          if (faceVerified) {
+            // User has verified face but no faceImageData in state
+            // The face descriptor is stored in DB, not the image
+            // For this case, we'll do a human face detection instead
+            const faceDetection = await detectHumanFace(compressedFile);
+            if (!faceDetection.hasFace) {
+              requiresFaceReview = true;
+              moderationResult.details = {
+                ...moderationResult.details,
+                requiresReview: true,
+                faceVerificationFailed: true,
+                faceVerificationReason: 'No face detected in uploaded image'
+              };
+            }
+          } else {
+            // Face verification not completed - send to review
+            requiresFaceReview = true;
+            moderationResult.details = {
+              ...moderationResult.details,
+              requiresReview: true,
+              faceVerificationFailed: true,
+              faceVerificationReason: 'Face verification not completed'
+            };
+          }
+        }
+        
+        // For images at positions 2+ (3rd image onwards), just check for human figure
+        if (imagePosition >= 2 && moderationResult.isApproved) {
+          const faceDetection = await detectHumanFace(compressedFile);
+          if (!faceDetection.hasFace) {
+            // No human face detected - send to review
+            moderationResult.details = {
+              ...moderationResult.details,
+              requiresReview: true,
+              noHumanDetected: true
+            };
+          }
+        }
         
         setImages(prev => prev.map(img => 
           img.preview === preview 
@@ -396,7 +462,7 @@ const ProfileCompletionPage = () => {
                 moderationResult,
                 status: !moderationResult.isApproved 
                   ? 'rejected' 
-                  : moderationResult.details?.requiresReview 
+                  : (moderationResult.details?.requiresReview || requiresFaceReview)
                     ? 'pending' 
                     : 'approved'
               }
@@ -409,10 +475,13 @@ const ProfileCompletionPage = () => {
             description: moderationResult.message || t('profileCompletion.violatesGuidelines'),
             variant: "destructive"
           });
-        } else if (moderationResult.details?.requiresReview) {
+        } else if (moderationResult.details?.requiresReview || requiresFaceReview) {
+          const reviewReason = moderationResult.details?.faceVerificationReason 
+            || (moderationResult.details?.noHumanDetected ? "No human figure detected" : null)
+            || t('profileCompletion.willBeReviewed');
           toast({
             title: t('profileCompletion.imageNeedsReview'),
-            description: t('profileCompletion.willBeReviewed'),
+            description: reviewReason,
             variant: "default"
           });
         } else {

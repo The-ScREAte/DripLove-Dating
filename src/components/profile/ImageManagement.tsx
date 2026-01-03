@@ -15,6 +15,7 @@ import { useToast } from '@/hooks/use-toast';
 import { moderateImage, saveModerationResult, ModerationResult } from '@/utils/photoModeration';
 import { compressImage } from '@/utils/imageCompression';
 import FaceVerification from '@/components/FaceVerification';
+import { detectHumanFace } from '@/utils/faceVerificationUtils';
 
 interface ImageManagementProps {
   currentUser: {
@@ -220,9 +221,65 @@ const ImageManagement = ({ currentUser, profile, onProfileUpdate }: ImageManagem
     }
 
     let moderationResult: ModerationResult | null = null;
+    
+    // Determine if this image requires face verification
+    // Face verification is required for:
+    // 1. Replacing images at positions 1 or 2 (imageOrder 1 or 2)
+    // 2. Adding new images when total count is < 2
+    let targetImageOrder = 0;
+    let requiresFaceVerification = false;
+    
+    if (replacingImageUrl) {
+      // Find the order of the image being replaced
+      const existingImage = userImages.findIndex(img => img.image_url === replacingImageUrl);
+      targetImageOrder = existingImage + 1; // Convert to 1-indexed
+      requiresFaceVerification = targetImageOrder <= 2;
+    } else {
+      // New image - check if we're adding to first 2 positions
+      targetImageOrder = userImages.length + 1;
+      requiresFaceVerification = targetImageOrder <= 2;
+    }
 
     try {
       moderationResult = await moderateImage(compressedFile);
+      
+      // For first 2 image positions, verify face is present
+      if (requiresFaceVerification && moderationResult.isApproved) {
+        const faceDetection = await detectHumanFace(compressedFile);
+        if (!faceDetection.hasFace) {
+          // No face detected in first 2 images - send to review
+          moderationResult.details = {
+            ...moderationResult.details,
+            requiresReview: true,
+            faceVerificationFailed: true,
+            faceVerificationReason: 'First 2 photos must show your face clearly'
+          };
+          toast({ 
+            title: "Image needs review", 
+            description: "Your first 2 photos must show your face. This image will be reviewed by our team.", 
+            variant: "default" 
+          });
+        }
+      }
+      
+      // For images at position 3+, check if it's a human figure
+      if (!requiresFaceVerification && moderationResult.isApproved) {
+        const faceDetection = await detectHumanFace(compressedFile);
+        if (!faceDetection.hasFace) {
+          // No human figure detected - send to review
+          moderationResult.details = {
+            ...moderationResult.details,
+            requiresReview: true,
+            noHumanDetected: true
+          };
+          toast({ 
+            title: "Image uploaded", 
+            description: "No human figure detected. This image will be reviewed by our team.", 
+            variant: "default" 
+          });
+        }
+      }
+      
       setModerationResult(moderationResult);
       
       // Only block if image is completely rejected (not approved)
@@ -237,8 +294,10 @@ const ImageManagement = ({ currentUser, profile, onProfileUpdate }: ImageManagem
         return;
       }
       
-      // Show info toast if image requires review
-      if (moderationResult.details?.requiresReview) {
+      // Show info toast if image requires review (and we haven't already shown a toast)
+      if (moderationResult.details?.requiresReview && 
+          !moderationResult.details?.faceVerificationFailed &&
+          !moderationResult.details?.noHumanDetected) {
         toast({ 
           title: "Image uploaded", 
           description: "Your image has been uploaded but requires admin approval before being visible to others.", 
