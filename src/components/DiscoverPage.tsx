@@ -2104,6 +2104,40 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, isPremium, profileComplet
     preloadProfileImages(matches, startIdx);
   }, [preloadProfileImages]);
 
+  // Force refresh function for preference changes
+  const forceRefresh = useCallback(() => {
+    if (!currentUser?.id) return;
+    
+    // Reset the initialized ref to force re-initialization
+    initializedUserRef.current = null;
+    
+    // Reset deck state
+    fetchSequenceRef.current += 1;
+    setPotentialMatches([]);
+    setCurrentIndex(0);
+    setImageIndex(0);
+    setNoMoreProfiles(false);
+    setHasCompletedInitialFetch(false);
+    setIsArchivedFallback(false);
+    setPremiumTrulyEmptyAfterRetry(false);
+    premiumEmptyAutoRetryRef.current = false;
+    
+    // Trigger re-initialization by updating a state that's in the dependency array
+    // The main useEffect will pick this up and re-run
+    setIsLoading(true);
+  }, [currentUser?.id]);
+
+  // Expose force refresh to window for ProfilePage to trigger
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      const win = window as Window & { discoverForceRefresh?: () => void };
+      win.discoverForceRefresh = forceRefresh;
+      return () => {
+        delete win.discoverForceRefresh;
+      };
+    }
+  }, [forceRefresh]);
+
   // Main effect to fetch data - optimized for fast loading
   useEffect(() => {
     if (!currentUser?.id) return;
@@ -2124,13 +2158,23 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, isPremium, profileComplet
     }
     lastPremiumActiveRef.current = premiumActive;
 
+    // Create preference hash from key fields that affect matching
+    const prefHash = [
+      currentUser.gender || '',
+      currentUser.preference || '',
+      currentUser.min_age || '',
+      currentUser.max_age || '',
+      currentUser.max_distance || '',
+      currentUser.country_code || '',
+      (currentUser.unlocked_countries || []).sort().join(','),
+    ].join('_');
 
-    // Create cache key that includes date AND premium status
+    // Create cache key that includes date, premium status, AND preferences
     const today = new Date().toISOString().split('T')[0];
-    const cacheKey = `${currentUser.id}_${today}_${premiumActive ? 'premium' : 'free'}`;
+    const cacheKey = `${currentUser.id}_${today}_${premiumActive ? 'premium' : 'free'}_${prefHash}`;
 
     if (initializedUserRef.current === cacheKey) {
-      return; // Already initialized for this user today
+      return; // Already initialized for this user today with these preferences
     }
 
     // locallySwipedProfileIds.current.clear(); // REMOVED
@@ -2151,16 +2195,22 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, isPremium, profileComplet
       persistSwipedIds();
     }
     
-    // ⭐ BACKGROUND CLEANUP: Remove old profile orders (non-blocking)
+    // ⭐ BACKGROUND CLEANUP: Remove old profile orders and cached decks (non-blocking)
     setTimeout(() => {
       try {
         const today = todayStr();
         const prefix = `driplove_profile_order_${currentUser.id}_`;
+        const deckPrefix = `driplove_discover_deck_${currentUser.id}_`;
 
-        // Remove old profile orders (not today's)
+        // Remove old profile orders (not today's) and old cached decks (different preferences)
         const keys = Object.keys(localStorage);
         keys.forEach(key => {
+          // Remove old profile orders
           if (key.startsWith(prefix) && !key.includes(`_${today}_`)) {
+            localStorage.removeItem(key);
+          }
+          // Remove cached decks that don't match current cache key
+          if (key.startsWith(deckPrefix) && key !== `driplove_discover_deck_${cacheKey}`) {
             localStorage.removeItem(key);
           }
         });
@@ -2221,7 +2271,7 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, isPremium, profileComplet
     fetchReverseUsage,
     persistSwipedIds,
     readDeckCache,
-  ]); // Removed premiumResolved and subscriptionLoading - don't block on subscription state
+  ]); // Removed preference dependencies - refresh only happens on explicit save
 
 
   // Cleanup on unmount (minimal now that continuous loader is removed)
