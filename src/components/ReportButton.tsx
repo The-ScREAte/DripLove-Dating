@@ -64,7 +64,7 @@ const ReportButton: React.FC<ReportButtonProps> = ({
         reason,
         description
       });
-      console.debug('reported_chats insert response:', res);
+      void 0;
       error = res.error;
     } else {
       const res = await supabase.from('admin_actions').insert({
@@ -78,7 +78,7 @@ const ReportButton: React.FC<ReportButtonProps> = ({
           description,
         }
       });
-      console.debug('admin_actions insert response:', res);
+      void 0;
       error = res.error;
     }
     setLoading(false);

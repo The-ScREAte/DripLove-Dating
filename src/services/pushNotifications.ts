@@ -513,14 +513,14 @@ class SupabasePushNotificationService {
 
       if (error) {
         // Silently handle errors - user is logging out anyway
-        console.debug('Push token removal skipped:', error.message);
+        void 0;
       }
       
       // Clear the stored device token
       this.deviceToken = null;
     } catch (error) {
       // Silently handle errors during logout - don't block user
-      console.debug('Error removing push token:', error);
+      void 0;
     }
   }
 

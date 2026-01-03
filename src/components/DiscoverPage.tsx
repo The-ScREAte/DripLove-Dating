@@ -1944,7 +1944,6 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, isPremium, profileComplet
         }
 
         // Mark as complete immediately
-        console.log('[DiscoverPage] Fetch complete, setting', initialDeck.length, 'profiles');
         setIsLoading(false);
         setHasCompletedInitialFetch(true);
 
@@ -3106,7 +3105,6 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, isPremium, profileComplet
         // ✅ DO NOT rollback on unexpected network/RPC failures.
         // Keep UX moving; we'll retry sync later.
         swipeDebug('handleLike: persist failed (job), not rolling back', { err: jobErr });
-        console.error('[Swipe Persist] LIKE job failed:', jobErr);
       } finally {
         pendingSwipesRef.current = Math.max(0, pendingSwipesRef.current - 1);
       }
@@ -3263,7 +3261,6 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, isPremium, profileComplet
         // ✅ DO NOT rollback on unexpected network/RPC failures.
         // Keep UX moving; we'll retry sync later.
         swipeDebug('executePassLogic: persist failed (job), not rolling back', { err: jobErr });
-        console.error('[Swipe Persist] PASS job failed:', jobErr);
       } finally {
         pendingSwipesRef.current = Math.max(0, pendingSwipesRef.current - 1);
       }

@@ -62,7 +62,7 @@ export const getQueueData = (): NotificationQueueData => {
       return JSON.parse(stored);
     }
   } catch (error) {
-    console.debug('[NotificationQueue] Error reading queue data');
+    void 0;
   }
   return { ...defaultQueueData };
 };
@@ -74,7 +74,7 @@ const saveQueueData = (data: NotificationQueueData): void => {
   try {
     localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
   } catch (error) {
-    console.debug('[NotificationQueue] Error saving queue data');
+    void 0;
   }
 };
 
@@ -88,7 +88,7 @@ const getCooldownData = (): CooldownData => {
       return JSON.parse(stored);
     }
   } catch (error) {
-    console.debug('[NotificationQueue] Error reading cooldown data');
+    void 0;
   }
   return { ...defaultCooldownData };
 };
@@ -100,7 +100,7 @@ const saveCooldownData = (data: CooldownData): void => {
   try {
     localStorage.setItem(COOLDOWN_KEY, JSON.stringify(data));
   } catch (error) {
-    console.debug('[NotificationQueue] Error saving cooldown data');
+    void 0;
   }
 };
 
@@ -111,7 +111,7 @@ export const recordUserActivity = (): void => {
   try {
     localStorage.setItem(ACTIVITY_KEY, Date.now().toString());
   } catch (error) {
-    console.debug('[NotificationQueue] Error recording activity');
+    void 0;
   }
 };
 
@@ -338,6 +338,6 @@ export const clearNotificationQueue = (): void => {
     localStorage.removeItem(STORAGE_KEY);
     localStorage.removeItem(COOLDOWN_KEY);
   } catch (error) {
-    console.debug('[NotificationQueue] Error clearing queue');
+    void 0;
   }
 };

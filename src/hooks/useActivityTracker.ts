@@ -34,7 +34,7 @@ export const useActivityTracker = (userId: string | undefined) => {
           .eq('id', userId);
       } catch (error) {
         // Silently fail - activity tracking is not critical
-        console.debug('[ActivityTracker] Failed to update activity:', error);
+        void 0;
       }
     };
 

@@ -203,7 +203,7 @@ const ImageModerationPanel = ({ onViewProfile }: ImageModerationPanelProps) => {
             'Your images have been approved! Keep swiping and have fun finding someone made just for you.',
             imageToApprove.user_id
           );
-          console.log('📤 Image approval notification sent to:', imageToApprove.user_id);
+          void 0;
         } catch (notifError) {
           console.error('📤 Failed to send approval notification:', notifError);
           // Don't fail the approval if notification fails
@@ -259,7 +259,7 @@ const ImageModerationPanel = ({ onViewProfile }: ImageModerationPanelProps) => {
             'Your image has been rejected because it\'s either inappropriate or not a real representation of yourself. This violates our terms and conditions and if it continues will result in deletion of your account.',
             imageToReject.user_id
           );
-          console.log('📤 Image rejection notification sent to:', imageToReject.user_id);
+          void 0;
         } catch (notifError) {
           console.error('📤 Failed to send rejection notification:', notifError);
           // Don't fail the rejection if notification fails
@@ -372,7 +372,7 @@ const ImageModerationPanel = ({ onViewProfile }: ImageModerationPanelProps) => {
           'Your image has been rejected because it\'s either inappropriate or not a real representation of yourself. This violates our terms and conditions and if it continues will result in deletion of your account.',
           reportedUserId
         );
-        console.log('📤 Image deletion notification sent to:', reportedUserId);
+        void 0;
       } catch (notifError) {
         console.error('📤 Failed to send deletion notification:', notifError);
         // Don't fail the deletion if notification fails

@@ -972,7 +972,7 @@ const AdminPageComponent = ({ currentUser, onLogout }: AdminPageProps) => {
         }
 
         const premiumRows: any[] = Array.isArray(premiumRowsRaw) ? premiumRowsRaw : [];
-        console.log(`🔍 Premium RPC returned ${premiumRows.length} rows for ${userIds.length} users`);
+        void 0;
         
         premiumRows.forEach((row: any) => {
           if (!row?.user_id) return;
@@ -984,7 +984,7 @@ const AdminPageComponent = ({ currentUser, onLogout }: AdminPageProps) => {
         });
         
         const premiumCount = Array.from(premiumMap.values()).filter(v => v).length;
-        console.log(`✅ After mapping: ${premiumCount} premium users out of ${userIds.length} total users`);
+        void 0;
       }
 
       // Map users and attach premium flag
@@ -1088,7 +1088,6 @@ const AdminPageComponent = ({ currentUser, onLogout }: AdminPageProps) => {
 
   // Clear cache when premium filter changes to prevent stale cached data
   useEffect(() => {
-    console.log(`🗑️ Clearing cache due to premium filter change: ${premiumFilter}`);
     userDataCache.clear();
     if (isAdmin && activeTab === 'users') {
       fetchUsers();

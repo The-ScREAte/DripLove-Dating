@@ -100,8 +100,6 @@ const ProfileSummaryCard = ({ currentUser }: ProfileSummaryCardProps) => {
   const fetchUserStats = async () => {
     if (!currentUser?.id) return;
 
-    console.log('[ProfileSummaryCard] Fetching stats for user:', currentUser.id);
-
     try {
       // Fetch total matches using count
       const { count: matchesCount, error: matchesError } = await supabase
@@ -109,11 +107,7 @@ const ProfileSummaryCard = ({ currentUser }: ProfileSummaryCardProps) => {
         .select('id', { count: 'exact', head: true })
         .or(`user1_id.eq.${currentUser.id},user2_id.eq.${currentUser.id}`);
 
-      if (matchesError && !matchesError.message.includes('does not exist')) {
-        console.error('[ProfileSummaryCard] Error fetching matches:', matchesError);
-      } else {
-        console.log('[ProfileSummaryCard] Matches count:', matchesCount);
-      }
+      // Ignore errors; stats will default to 0 if needed
 
       // Fetch active chats (matches with recent messages in last 7 days)
       const sevenDaysAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString();
@@ -122,9 +116,7 @@ const ProfileSummaryCard = ({ currentUser }: ProfileSummaryCardProps) => {
         .select('id')
         .or(`user1_id.eq.${currentUser.id},user2_id.eq.${currentUser.id}`);
 
-      if (matchesDataError && !matchesDataError.message.includes('does not exist')) {
-        console.error('Error fetching matches data:', matchesDataError);
-      }
+      // Ignore errors; stats will default to 0 if needed
 
       // Count active chats by checking which matches have recent messages
       let activeChatsCount = 0;
@@ -135,9 +127,7 @@ const ProfileSummaryCard = ({ currentUser }: ProfileSummaryCardProps) => {
           .in('match_id', matchesData.map(m => m.id))
           .gte('created_at', sevenDaysAgo);
 
-        if (chatsError && !chatsError.message.includes('does not exist')) {
-          console.error('Error fetching chats:', chatsError);
-        } else if (recentChats) {
+        if (recentChats) {
           // Count unique match IDs with recent messages
           activeChatsCount = new Set(recentChats.map(c => c.match_id)).size;
         }
@@ -149,11 +139,7 @@ const ProfileSummaryCard = ({ currentUser }: ProfileSummaryCardProps) => {
         .select('id', { count: 'exact', head: true })
         .eq('liker_id', currentUser.id);
 
-      if (likesError && !likesError.message.includes('does not exist')) {
-        console.error('[ProfileSummaryCard] Error fetching likes:', likesError);
-      } else {
-        console.log('[ProfileSummaryCard] Likes count:', likesCount);
-      }
+      // Ignore errors; stats will default to 0 if needed
 
       const finalStats = {
         totalMatches: matchesCount || 0,
@@ -161,11 +147,8 @@ const ProfileSummaryCard = ({ currentUser }: ProfileSummaryCardProps) => {
         totalLikes: likesCount || 0
       };
 
-      console.log('[ProfileSummaryCard] Final stats:', finalStats);
-
       setStats(finalStats);
     } catch (error) {
-      console.error('[ProfileSummaryCard] Error fetching stats:', error);
       // Set stats to 0 on error to avoid showing stale data
       setStats({
         totalMatches: 0,
