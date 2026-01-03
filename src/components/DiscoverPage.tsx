@@ -58,7 +58,7 @@ import MatchCard from './discover/MatchCard';
 import SwipeButtons from './discover/SwipeButtons';
 import AdCard from './discover/AdCard';
 import RatingDialog from './RatingDialog';
-import { incrementMatchCount } from '@/utils/ratingStorage';
+import { handleMatchForRating, preloadNativeRating } from '@/services/appRatingService';
 import { CurrentUser, PotentialMatch } from '@/types';
 
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
@@ -3056,10 +3056,12 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, isPremium, profileComplet
               setMatchedUser(prevMatch);
               setShowMatchAnimation(true);
               
-              // Check if rating dialog should be shown (on 2nd match)
-              if (incrementMatchCount()) {
-                setTimeout(() => setShowRatingDialog(true), 2000); // Show after match animation
-              }
+              // Check if rating dialog should be shown (on 3rd match)
+              handleMatchForRating().then(shouldShow => {
+                if (shouldShow) {
+                  setTimeout(() => setShowRatingDialog(true), 2000); // Show after match animation
+                }
+              });
               
               // Clear chat cache to force refresh when user opens ChatPage
               if (typeof window !== 'undefined') {
@@ -3110,10 +3112,12 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, isPremium, profileComplet
             setMatchedUser(prevMatch);
             setShowMatchAnimation(true);
             
-            // Check if rating dialog should be shown (on 2nd match)
-            if (incrementMatchCount()) {
-              setTimeout(() => setShowRatingDialog(true), 2000); // Show after match animation
-            }
+            // Check if rating dialog should be shown (on 3rd match)
+            handleMatchForRating().then(shouldShow => {
+              if (shouldShow) {
+                setTimeout(() => setShowRatingDialog(true), 2000); // Show after match animation
+              }
+            });
             
             // Clear chat cache to force refresh when user opens ChatPage
             if (typeof window !== 'undefined') {

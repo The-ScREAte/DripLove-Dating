@@ -1,9 +1,10 @@
 /**
  * Dynamic Rating Dialog Component
- * Shows platform-specific rating interface - triggered on second match
+ * Shows platform-specific rating interface - triggered on third match
+ * Preloads native rating modal for instant display
  */
 
-import React, { useEffect, useMemo, useRef, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState, useCallback } from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Star } from 'lucide-react';
@@ -20,6 +21,7 @@ import {
   isRatingAvailable,
   type PlatformType 
 } from '@/utils/ratingPlatform';
+import { preloadNativeRating, isRatingPreloaded } from '@/services/appRatingService';
 
 interface RatingDialogProps {
   /** Force show the dialog (for testing or when triggered by match) */
@@ -39,19 +41,30 @@ const RatingDialog: React.FC<RatingDialogProps> = ({
   const [selectedRating, setSelectedRating] = useState(0);
   const [hoveredRating, setHoveredRating] = useState(0);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [isNativeReady, setIsNativeReady] = useState(false);
   const { toast } = useToast();
   const platform = useMemo(() => detectPlatform(), []);
   const ratingDataRef = useRef(getRatingData());
   const isWeb = platform === 'web';
 
+  // Preload native rating as soon as dialog is about to show
+  const doPreload = useCallback(async () => {
+    if (!isWeb && !isRatingPreloaded()) {
+      await preloadNativeRating();
+    }
+    setIsNativeReady(true);
+  }, [isWeb]);
+
   useEffect(() => {
     if (show && isRatingAvailable()) {
       if (!ratingDataRef.current.hasRated) {
+        // Start preloading immediately before opening dialog
+        doPreload();
         setIsOpen(true);
         markRatingShown();
       }
     }
-  }, [show]);
+  }, [show, doPreload]);
 
   const handleClose = () => {
     setIsOpen(false);
@@ -76,16 +89,22 @@ const RatingDialog: React.FC<RatingDialogProps> = ({
 
     try {
       // For native platforms (iOS/Android), close dialog first then request review
-      // This ensures the native review modal can appear on top
+      // Native modal is already preloaded for instant display
       if (!isWeb) {
-        // Close our dialog
+        // Close our dialog first
         setIsOpen(false);
         onClose?.();
 
-        // Ensure the Dialog close/unmount is committed before the native modal
-        await new Promise<void>((resolve, reject) => {
-          requestAnimationFrame(() => {
-            openRatingInterface().then(resolve).catch(reject);
+        // Small delay to ensure dialog is fully closed, then show native modal
+        // Native modal is preloaded so it will appear instantly
+        await new Promise<void>((resolve) => {
+          requestAnimationFrame(async () => {
+            try {
+              await openRatingInterface();
+              resolve();
+            } catch (e) {
+              resolve(); // Resolve even on error to continue flow
+            }
           });
         });
 
