@@ -24,6 +24,7 @@ interface BroadcastRequest {
   targetCountries: string[];
   userIds: string[]; 
   notificationType: string;
+  saveToProfile?: boolean; // Whether to save message to user's profile inbox
 }
  
 const getErrorMessage = (error: unknown): string => {
@@ -84,13 +85,15 @@ serve(async (req: Request) => {
       targetCountries,
       userIds,
       notificationType = 'system',
+      saveToProfile = true, // Default to saving to profile inbox
     } = body;
 
     if (!title || !message || !userIds || userIds.length === 0) {
       throw new Error('Missing required fields: title, message, or userIds');
     }
 
-    console.log(`Queueing broadcast campaign for ${userIds.length} selected users`);
+    console.log(`Queueing broadcast campaign for ${userIds.length} selected users (saveToProfile: ${saveToProfile})`);
+
 
     // Only enqueue users who currently have push tokens.
     // Chunk the lookup to avoid URL limits
@@ -136,6 +139,7 @@ serve(async (req: Request) => {
         successful_sends: 0,
         failed_sends: 0,
         status: 'queued',
+        save_to_profile: saveToProfile, // Save this flag so processor knows to create profile messages
       })
       .select()
       .single();

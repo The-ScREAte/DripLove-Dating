@@ -26,6 +26,12 @@ interface UseLikeBackInjectionOptions {
   inQueueIds: Set<string>;
   locallySwipedIds: Map<string, { action: 'like' | 'pass'; timestamp: number }>;
   boostMode?: boolean; // Optional: 90% injection rate for turbo mode
+  // Location-based filtering for free users
+  isPremium?: boolean;
+  userCountryCode?: string;
+  userLatitude?: number;
+  userLongitude?: number;
+  maxDistance?: number; // Max distance in km (free users max 500km)
 }
 
 interface LikerProfile {
@@ -70,6 +76,25 @@ const INJECTION_POSITION_MAX = 4; // Position +4
 const MAX_INJECTION_PERCENT = 0.30; // Cap at 30% of session
 const MIN_SWIPES_FOR_CAP = 10; // Only enforce cap after 10+ swipes
 
+// Helper to calculate distance between two coordinates (Haversine formula)
+const calculateDistanceKm = (lat1: number, lon1: number, lat2: number, lon2: number): number => {
+  const R = 6371; // Earth's radius in km
+  const dLat = (lat2 - lat1) * Math.PI / 180;
+  const dLon = (lon2 - lon1) * Math.PI / 180;
+  const a = 
+    Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+    Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) *
+    Math.sin(dLon / 2) * Math.sin(dLon / 2);
+  const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+  return R * c;
+};
+
+// Normalize country code to uppercase 2-letter ISO
+const normalizeCountryCode = (c: string | null | undefined): string => {
+  if (!c) return '';
+  return c.trim().toUpperCase().slice(0, 2);
+};
+
 export function useLikeBackInjection({
   userId,
   blockedIds,
@@ -77,6 +102,11 @@ export function useLikeBackInjection({
   inQueueIds,
   locallySwipedIds,
   boostMode = false,
+  isPremium = false,
+  userCountryCode,
+  userLatitude,
+  userLongitude,
+  maxDistance = 500,
 }: UseLikeBackInjectionOptions) {
   // Users who liked the current user (candidates for injection) - sorted by recency
   const [likedMeIds, setLikedMeIds] = useState<string[]>([]);
@@ -359,8 +389,10 @@ export function useLikeBackInjection({
     return swipes > 0 && swipes % everyNSwipes === 0;
   }, [likedMeIds.length, everyNSwipes]);
 
-  // Get injection candidate
+  // Get injection candidate - respects location filtering for free users
   const getInjectionCandidate = useCallback((): LikerProfile | null => {
+    const userCC = normalizeCountryCode(userCountryCode);
+    
     for (const id of likedMeIds) {
       if (
         !blockedIds.has(id) &&
@@ -370,11 +402,41 @@ export function useLikeBackInjection({
         !injectedIdsRef.current.has(id)
       ) {
         const profile = likerProfiles.get(id);
-        if (profile) return profile;
+        if (!profile) continue;
+        
+        // For FREE users: enforce same country AND distance filtering
+        if (!isPremium) {
+          const profileCC = normalizeCountryCode(profile.country_code);
+          
+          // Must be same country
+          if (userCC && profileCC && userCC !== profileCC) {
+            continue;
+          }
+          
+          // Must be within max distance (if coordinates available)
+          if (
+            userLatitude != null && 
+            userLongitude != null && 
+            profile.latitude != null && 
+            profile.longitude != null
+          ) {
+            const distance = calculateDistanceKm(
+              userLatitude, 
+              userLongitude, 
+              profile.latitude, 
+              profile.longitude
+            );
+            if (distance > maxDistance) {
+              continue;
+            }
+          }
+        }
+        
+        return profile;
       }
     }
     return null;
-  }, [likedMeIds, likerProfiles, blockedIds, passedTodayIds, inQueueIds, locallySwipedIds]);
+  }, [likedMeIds, likerProfiles, blockedIds, passedTodayIds, inQueueIds, locallySwipedIds, isPremium, userCountryCode, userLatitude, userLongitude, maxDistance]);
 
   // Convert liker profile to PotentialMatch format
   const likerToMatch = useCallback((liker: LikerProfile): PotentialMatch => {

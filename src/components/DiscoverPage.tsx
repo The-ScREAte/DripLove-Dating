@@ -733,6 +733,12 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, isPremium, profileComplet
     passedTodayIds: passedTodayIdsSet,
     inQueueIds: inQueueIdsSet,
     locallySwipedIds: locallySwipedProfileIds.current,
+    // Location-based filtering for free users - only inject from same country/within distance
+    isPremium: premiumActive,
+    userCountryCode: currentUser?.country_code || currentUser?.country,
+    userLatitude: currentUser?.latitude,
+    userLongitude: currentUser?.longitude,
+    maxDistance: currentUser?.max_distance || 500, // Free users max 500km
   });
 
   // Fetch ads from database - load them BEFORE fetching profiles
