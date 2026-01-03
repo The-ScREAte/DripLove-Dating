@@ -81,6 +81,30 @@ export function useLikeBackInjection({
   // Users who liked the current user (candidates for injection) - sorted by recency
   const [likedMeIds, setLikedMeIds] = useState<string[]>([]);
   const [likerProfiles, setLikerProfiles] = useState<Map<string, LikerProfile>>(new Map());
+
+  // Keep latest dynamic filter sets/maps in refs so we don't recreate callbacks/effects
+  // (Set/Map identity changes frequently and can cause runaway refetch/subscription loops)
+  const blockedIdsRef = useRef(blockedIds);
+  const passedTodayIdsRef = useRef(passedTodayIds);
+  const inQueueIdsRef = useRef(inQueueIds);
+  const locallySwipedIdsRef = useRef(locallySwipedIds);
+  const likedMeIdsRef = useRef(likedMeIds);
+  const likerProfilesRef = useRef(likerProfiles);
+
+  useEffect(() => {
+    blockedIdsRef.current = blockedIds;
+    passedTodayIdsRef.current = passedTodayIds;
+    inQueueIdsRef.current = inQueueIds;
+    locallySwipedIdsRef.current = locallySwipedIds;
+  }, [blockedIds, passedTodayIds, inQueueIds, locallySwipedIds]);
+
+  useEffect(() => {
+    likedMeIdsRef.current = likedMeIds;
+  }, [likedMeIds]);
+
+  useEffect(() => {
+    likerProfilesRef.current = likerProfiles;
+  }, [likerProfiles]);
   
   // Track injection state (single counter, no double counting)
   const swipeCountRef = useRef(0);
@@ -88,9 +112,20 @@ export function useLikeBackInjection({
   const lastInjectionSwipeRef = useRef(0);
   const injectedIdsRef = useRef<Set<string>>(new Set());
 
+  // Guard against overlapping/thrashing fetches (can exhaust browser resources)
+  const fetchInFlightRef = useRef(false);
+  const lastFetchAtRef = useRef(0);
+
   // Fetch users who liked the current user
   const fetchLikedMeUsers = useCallback(async () => {
     if (!userId) return;
+
+    const now = Date.now();
+    // Avoid hammering the backend due to rapidly changing Set/Map identities in parent
+    if (fetchInFlightRef.current) return;
+    if (now - lastFetchAtRef.current < 8000) return; // 8s minimum interval
+    fetchInFlightRef.current = true;
+    lastFetchAtRef.current = now;
 
     try {
       // Get users who liked the current user (excluding already matched/liked back)
@@ -106,11 +141,24 @@ export function useLikeBackInjection({
         return;
       }
 
-      // Get users I've already liked back
-      const { data: myLikes } = await supabase
+      const likerIds = (likedUsers || []).map(l => l.liker_id).filter(Boolean);
+      if (likerIds.length === 0) {
+        setLikedMeIds([]);
+        return;
+      }
+
+      // Get only the subset of users I've already liked back (bounded to current likers)
+      // This prevents huge downloads for accounts with lots of historical likes.
+      const { data: myLikes, error: myLikesError } = await supabase
         .from('likes')
         .select('liked_id')
-        .eq('liker_id', userId);
+        .eq('liker_id', userId)
+        .in('liked_id', likerIds);
+
+      if (myLikesError) {
+        console.error('[LikeBackInjection] Error fetching my like-backs:', myLikesError);
+        // Continue; worst case we may over-include candidates, but will still filter later.
+      }
 
       const myLikedIds = new Set(myLikes?.map(l => l.liked_id) || []);
 
@@ -125,10 +173,10 @@ export function useLikeBackInjection({
         .map(l => l.liker_id)
         .filter(id => 
           !myLikedIds.has(id) &&
-          !blockedIds.has(id) &&
-          !passedTodayIds.has(id) &&
-          !inQueueIds.has(id) &&
-          !locallySwipedIds.has(id) &&
+          !blockedIdsRef.current.has(id) &&
+          !passedTodayIdsRef.current.has(id) &&
+          !inQueueIdsRef.current.has(id) &&
+          !locallySwipedIdsRef.current.has(id) &&
           !injectedIdsRef.current.has(id)
         );
 
@@ -195,8 +243,10 @@ export function useLikeBackInjection({
       setLikedMeIds(qualifiedIds);
     } catch (error) {
       console.error('[LikeBackInjection] Unexpected error:', error);
+    } finally {
+      fetchInFlightRef.current = false;
     }
-  }, [userId, blockedIds, passedTodayIds, inQueueIds, locallySwipedIds]);
+  }, [userId]);
 
   // Initial fetch
   useEffect(() => {
@@ -221,13 +271,15 @@ export function useLikeBackInjection({
           const newLikerId = payload.new?.liker_id;
           if (!newLikerId) return;
 
+          const currentLikedMeIds = likedMeIdsRef.current;
+
           // Skip if already known, blocked, passed, or in queue
           if (
-            likedMeIds.includes(newLikerId) ||
-            blockedIds.has(newLikerId) ||
-            passedTodayIds.has(newLikerId) ||
-            inQueueIds.has(newLikerId) ||
-            locallySwipedIds.has(newLikerId) ||
+            currentLikedMeIds.includes(newLikerId) ||
+            blockedIdsRef.current.has(newLikerId) ||
+            passedTodayIdsRef.current.has(newLikerId) ||
+            inQueueIdsRef.current.has(newLikerId) ||
+            locallySwipedIdsRef.current.has(newLikerId) ||
             injectedIdsRef.current.has(newLikerId)
           ) {
             return;
@@ -263,11 +315,14 @@ export function useLikeBackInjection({
             const imgCount = count || 0;
             if (imgCount < MIN_PHOTOS_REQUIRED) return;
 
+            const createdAt = payload.new?.created_at;
+            const likedAt = createdAt ? new Date(createdAt).getTime() : Date.now();
+
             // Add to candidates (at front for priority)
             setLikedMeIds(prev => [newLikerId, ...prev]);
             setLikerProfiles(prev => {
               const updated = new Map(prev);
-              updated.set(newLikerId, { ...profile, image_count: imgCount } as LikerProfile);
+              updated.set(newLikerId, { ...profile, image_count: imgCount, liked_at: likedAt } as LikerProfile);
               return updated;
             });
           } catch (error) {
@@ -280,7 +335,7 @@ export function useLikeBackInjection({
     return () => {
       supabase.removeChannel(channel);
     };
-  }, [userId, likedMeIds, blockedIds, passedTodayIds, inQueueIds, locallySwipedIds]);
+  }, [userId]);
 
   // Get effective injection rate based on mode
   const injectRate = boostMode ? BOOST_INJECT_RATE : NORMAL_INJECT_RATE;

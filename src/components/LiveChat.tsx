@@ -110,7 +110,7 @@ const LiveChat: React.FC<LiveChatProps> = ({ open, onOpenChange }) => {
 
     // Daily swipes
     if (msg.includes('swipe') || msg.includes('daily limit') || msg.includes('how many') || msg.includes('swipes left') || msg.includes('out of swipes')) {
-      return "👆 DAILY SWIPES\n\n🆓 FREE USERS:\n• 12 swipes per day\n• Resets at midnight (your local time)\n\n💎 PREMIUM MEMBERS:\n• Unlimited swipes - swipe all day!\n• No waiting, no limits\n\n💡 TIP: Make each swipe count! Read profiles carefully for better matches.\n\n👉 Upgrade to Premium for unlimited swipes!";
+      return "👆 DAILY SWIPES\n\n🆓 FREE USERS:\n• 20 swipes per day\n• Resets at midnight (your local time)\n\n💎 PREMIUM MEMBERS:\n• Unlimited swipes - swipe all day!\n• No waiting, no limits\n\n💡 TIP: Make each swipe count! Read profiles carefully for better matches.\n\n👉 Upgrade to Premium for unlimited swipes!";
     }
 
     // Reporting users / safety
@@ -140,7 +140,7 @@ const LiveChat: React.FC<LiveChatProps> = ({ open, onOpenChange }) => {
 
     // Features
     if (msg.includes('feature') || msg.includes('can i') || msg.includes('what can') || msg.includes('how does') || msg.includes('app work')) {
-      return "📱 DRIPLOVE FEATURES\n\n🆓 FREE ACCOUNT:\n• Create stunning profile\n• 12 daily swipes\n• Match and chat\n• Video & voice calls\n• Face verification\n• See who liked you (location only)\n\n💎 PREMIUM ACCOUNT:\n• Everything in Free +\n• Unlimited swipes\n• See full profiles of admirers\n• Explore all countries\n• Reverse passes (undo)\n• Priority placement\n• No ads\n• VIP support\n\n👉 Ready to upgrade? Profile → Upgrade to Premium";
+      return "📱 DRIPLOVE FEATURES\n\n🆓 FREE ACCOUNT:\n• Create stunning profile\n• 20 daily swipes\n• Match and chat\n• Video & voice calls\n• Face verification\n• See who liked you (location only)\n\n💎 PREMIUM ACCOUNT:\n• Everything in Free +\n• Unlimited swipes\n• See full profiles of admirers\n• Explore all countries\n• Reverse passes (undo)\n• Priority placement\n• No ads\n• VIP support\n\n👉 Ready to upgrade? Profile → Upgrade to Premium";
     }
 
     // Match/Dating help

@@ -2840,13 +2840,17 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, isPremium, profileComplet
     const currentMatch = potentialMatches[currentIndex];
     if (!currentMatch) return;
 
+    // Include in-flight swipes so fast swiping can't bypass daily limit before state updates.
+    const effectiveSwipeCount = todaySwipeCount + pendingSwipesRef.current;
+
     swipeDebug('handleLike: start', {
       currentIndex,
       deck: summarizeDeck(potentialMatches, 8),
       current: isAd(currentMatch) ? `ad:${currentMatch.id}` : currentMatch.id,
       pending: pendingSwipesRef.current,
       todaySwipeCount,
-      swipeLimit: premiumActive ? 200 : 16,
+      effectiveSwipeCount,
+      swipeLimit: premiumActive ? 200 : 20,
       parentProfileCompletion,
       computedProfileCompletion,
       effectiveProfileCompletion,
@@ -2861,12 +2865,13 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, isPremium, profileComplet
 
 
     // Check profile completion restriction (70% after 5 swipes)
-    if (effectiveProfileCompletion < 70 && todaySwipeCount >= 5) {
+    if (effectiveProfileCompletion < 70 && effectiveSwipeCount >= 5) {
       swipeDebug('handleLike: blocked by profile completion', {
         parentProfileCompletion,
         computedProfileCompletion,
         effectiveProfileCompletion,
         todaySwipeCount,
+        effectiveSwipeCount,
       });
       toast({
         title: t('discover.errors.profileCompletionRequired'),
@@ -2878,11 +2883,11 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, isPremium, profileComplet
     }
 
     // Check daily limit - MUST be checked BEFORE swipe
-    // Free users: 16 swipes, Premium users: 200 swipes
-    const swipeLimit = premiumActive ? 200 : 16;
+    // Free users: 20 swipes, Premium users: 200 swipes
+    const swipeLimit = premiumActive ? 200 : 20;
     
     
-    if (todaySwipeCount >= swipeLimit) {
+    if (effectiveSwipeCount >= swipeLimit) {
       setIsOutOfSwipes(true);
       toast({
         title: t('discover.errors.dailyLimitReached'),
@@ -3114,25 +3119,30 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, isPremium, profileComplet
   // Optimistic UI: move to next card instantly, then process pass in background
   // Function to execute pass after user confirms (used when "they liked you" popup is shown)
   const executePassLogic = async (matchToPass: PotentialMatch) => {
+    // Include in-flight swipes so fast swiping can't bypass daily limit before state updates.
+    const effectiveSwipeCount = todaySwipeCount + pendingSwipesRef.current;
+
     swipeDebug('executePassLogic: start', {
       currentIndex,
       deck: summarizeDeck(potentialMatches, 8),
       matchToPassId: matchToPass?.id,
       pending: pendingSwipesRef.current,
       todaySwipeCount,
-      swipeLimit: premiumActive ? 200 : 16,
+      effectiveSwipeCount,
+      swipeLimit: premiumActive ? 200 : 20,
       parentProfileCompletion,
       computedProfileCompletion,
       effectiveProfileCompletion,
     });
 
     // Check profile completion restriction (70% after 5 swipes)
-    if (effectiveProfileCompletion < 70 && todaySwipeCount >= 5) {
+    if (effectiveProfileCompletion < 70 && effectiveSwipeCount >= 5) {
       swipeDebug('executePassLogic: blocked by profile completion', {
         parentProfileCompletion,
         computedProfileCompletion,
         effectiveProfileCompletion,
         todaySwipeCount,
+        effectiveSwipeCount,
       });
       toast({
         title: t('discover.errors.profileCompletionRequired'),
@@ -3144,11 +3154,11 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, isPremium, profileComplet
     }
 
     // Check daily limit - MUST be checked BEFORE swipe
-    // Free users: 16 swipes, Premium users: 200 swipes
-    const swipeLimit = premiumActive ? 200 : 16;
+    // Free users: 20 swipes, Premium users: 200 swipes
+    const swipeLimit = premiumActive ? 200 : 20;
     
     
-    if (todaySwipeCount >= swipeLimit) {
+    if (effectiveSwipeCount >= swipeLimit) {
       setIsOutOfSwipes(true);
       toast({
         title: t('discover.errors.dailyLimitReached'),

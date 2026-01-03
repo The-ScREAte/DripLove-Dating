@@ -211,8 +211,8 @@ export const checkSwipeRestrictions = async (
       };
     }
 
-    // Daily limit check (free users: 16, premium users: 55)
-    const swipeLimit = isPremium ? 55 : 16;
+    // Daily limit check (free users: 20, premium users: 55)
+    const swipeLimit = isPremium ? 55 : 20;
     if (swipesUsedToday >= swipeLimit) {
       return {
         canSwipe: false,
