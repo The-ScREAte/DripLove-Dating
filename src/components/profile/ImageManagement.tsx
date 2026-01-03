@@ -15,7 +15,7 @@ import { useToast } from '@/hooks/use-toast';
 import { moderateImage, saveModerationResult, ModerationResult } from '@/utils/photoModeration';
 import { compressImage } from '@/utils/imageCompression';
 import FaceVerification from '@/components/FaceVerification';
-import { detectHumanFace } from '@/utils/faceVerificationUtils';
+import { detectHumanFace, verifyUploadedImage } from '@/utils/faceVerificationUtils';
 
 interface ImageManagementProps {
   currentUser: {
@@ -42,6 +42,7 @@ const ImageManagement = ({ currentUser, profile, onProfileUpdate }: ImageManagem
   const [replacingImageUrl, setReplacingImageUrl] = useState<string | null>(null);
   const [showFaceVerification, setShowFaceVerification] = useState(false);
   const [isVerifying, setIsVerifying] = useState(false);
+  const [referenceFaceData, setReferenceFaceData] = useState<string | null>(null);
   const { toast } = useToast();
 
   // Check if user is verified (has face_descriptor)
@@ -137,11 +138,30 @@ const ImageManagement = ({ currentUser, profile, onProfileUpdate }: ImageManagem
           is_approved: img.is_approved ?? true,
           moderation_status: img.moderation_status ?? 'approved'
         })));
+        
+        // Load reference face from first approved image for face verification
+        if (isVerified && typedImages.length > 0) {
+          const firstImage = typedImages[0];
+          if ((firstImage.is_approved ?? true) && firstImage.image_url) {
+            try {
+              const response = await fetch(firstImage.image_url);
+              const blob = await response.blob();
+              const reader = new FileReader();
+              reader.onloadend = () => {
+                const base64 = (reader.result as string).replace(/^data:image\/\w+;base64,/, '');
+                setReferenceFaceData(base64);
+              };
+              reader.readAsDataURL(blob);
+            } catch (err) {
+              console.error('Failed to load reference face:', err);
+            }
+          }
+        }
       }
     } catch (error) {
       console.error('Error fetching user images:', error);
     }
-  }, [currentUser?.id]);
+  }, [currentUser?.id, isVerified]);
 
   useEffect(() => {
     fetchUserImages();
@@ -243,22 +263,63 @@ const ImageManagement = ({ currentUser, profile, onProfileUpdate }: ImageManagem
     try {
       moderationResult = await moderateImage(compressedFile);
       
-      // For first 2 image positions, verify face is present
+      // For first 2 image positions, verify face matches the user's verified face
       if (requiresFaceVerification && moderationResult.isApproved) {
-        const faceDetection = await detectHumanFace(compressedFile);
-        if (!faceDetection.hasFace) {
-          // No face detected in first 2 images - send to review
-          moderationResult.details = {
-            ...moderationResult.details,
-            requiresReview: true,
-            faceVerificationFailed: true,
-            faceVerificationReason: 'First 2 photos must show your face clearly'
-          };
-          toast({ 
-            title: "Image needs review", 
-            description: "Your first 2 photos must show your face. This image will be reviewed by our team.", 
-            variant: "default" 
-          });
+        if (isVerified && referenceFaceData) {
+          // User is verified - compare with their verified face
+          const faceResult = await verifyUploadedImage(
+            compressedFile,
+            referenceFaceData,
+            targetImageOrder - 1, // Convert to 0-indexed
+            true // User is verified
+          );
+          
+          if (faceResult.requiresReview) {
+            // Face doesn't match or no face detected - send to review
+            moderationResult.details = {
+              ...moderationResult.details,
+              requiresReview: true,
+              faceVerificationFailed: true,
+              faceVerificationReason: faceResult.reason || 'Face does not match your verified face'
+            };
+            toast({ 
+              title: "Image needs review", 
+              description: "First 2 photos must show your verified face. This image will be reviewed by our team.", 
+              variant: "default" 
+            });
+          }
+        } else if (isVerified && !referenceFaceData) {
+          // User is verified but we couldn't load reference face - fallback to face detection
+          const faceDetection = await detectHumanFace(compressedFile);
+          if (!faceDetection.hasFace) {
+            moderationResult.details = {
+              ...moderationResult.details,
+              requiresReview: true,
+              faceVerificationFailed: true,
+              faceVerificationReason: 'First 2 photos must show your face clearly'
+            };
+            toast({ 
+              title: "Image needs review", 
+              description: "Your first 2 photos must show your face. This image will be reviewed by our team.", 
+              variant: "default" 
+            });
+          }
+        } else {
+          // User is not verified - shouldn't happen but handle gracefully
+          const faceDetection = await detectHumanFace(compressedFile);
+          if (!faceDetection.hasFace) {
+            moderationResult.details = {
+              ...moderationResult.details,
+              requiresReview: true,
+              faceVerificationFailed: true,
+              faceVerificationReason: 'Face verification required'
+            };
+            toast({ 
+              title: "Image needs review", 
+              description: "Please complete face verification first.", 
+              variant: "default" 
+            });
+          }
         }
       }
       
@@ -700,6 +761,10 @@ const ImageManagement = ({ currentUser, profile, onProfileUpdate }: ImageManagem
                 }
               }}
             />
+            <p className="text-xs text-gray-500 flex items-center gap-1 mt-2">
+              <Shield className="w-3 h-3" />
+              Pending images will be reviewed and approved within 24 hours or less for security.
+            </p>
             {moderating && (
               <div className="text-sm text-purple-600 mt-2 flex items-center">
                 <Shield className="animate-pulse w-4 h-4 mr-2" />

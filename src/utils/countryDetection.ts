@@ -29,6 +29,7 @@ function withTimeout<T>(promise: Promise<T>, ms: number, label: string): Promise
 interface GeolocationResult {
   countryCode: string;
   countryName: string;
+  city?: string;
   latitude?: number;
   longitude?: number;
   method: 'gps' | 'ip' | 'failed';
@@ -107,9 +108,9 @@ const countryCodeMap: Record<string, string> = {
 };
 
 /**
- * Reverse geocode coordinates to get country
+ * Reverse geocode coordinates to get country and city
  */
-async function reverseGeocode(latitude: number, longitude: number): Promise<string | null> {
+async function reverseGeocode(latitude: number, longitude: number): Promise<{ countryCode: string; city?: string } | null> {
   try {
     // Using OpenStreetMap Nominatim (free, no API key needed)
     // NOTE: Browsers/WKWebView forbid setting some headers (like User-Agent),
@@ -117,7 +118,7 @@ async function reverseGeocode(latitude: number, longitude: number): Promise<stri
     const controller = new AbortController();
     const timeoutId = setTimeout(() => controller.abort(), 7000);
     const response = await fetch(
-      `https://nominatim.openstreetmap.org/reverse?format=json&lat=${latitude}&lon=${longitude}&zoom=3&addressdetails=1`,
+      `https://nominatim.openstreetmap.org/reverse?format=json&lat=${latitude}&lon=${longitude}&zoom=10&addressdetails=1`,
       {
         signal: controller.signal,
         headers: { 'Accept': 'application/json' }
@@ -130,7 +131,18 @@ async function reverseGeocode(latitude: number, longitude: number): Promise<stri
     const data = await response.json();
     const countryCode = data.address?.country_code?.toUpperCase();
     
-    return countryCode || null;
+    // Try to get city from various address fields (different regions use different fields)
+    const city = data.address?.city || 
+                 data.address?.town || 
+                 data.address?.village || 
+                 data.address?.municipality || 
+                 data.address?.county ||
+                 data.address?.state_district;
+    
+    return { 
+      countryCode: countryCode || '', 
+      city: city || undefined 
+    };
   } catch (error) {
     console.error('Reverse geocoding error:', error);
     return null;
@@ -216,12 +228,13 @@ export async function autoDetectCountry(): Promise<GeolocationResult> {
       );
 
       const { latitude, longitude } = position.coords;
-      const countryCode = await withTimeout(reverseGeocode(latitude, longitude), 8000, 'reverseGeocode');
+      const geocodeResult = await withTimeout(reverseGeocode(latitude, longitude), 8000, 'reverseGeocode');
 
-      if (countryCode && countryCodeMap[countryCode]) {
+      if (geocodeResult?.countryCode && countryCodeMap[geocodeResult.countryCode]) {
         return {
-          countryCode,
-          countryName: countryCodeMap[countryCode],
+          countryCode: geocodeResult.countryCode,
+          countryName: countryCodeMap[geocodeResult.countryCode],
+          city: geocodeResult.city,
           latitude,
           longitude,
           method: 'gps',

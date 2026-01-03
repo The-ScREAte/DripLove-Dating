@@ -236,17 +236,48 @@ const LocationInput = ({
       setSelectedCountryCode(result.countryCode);
       setIsCountryLocked(true);
       setDetectionMethod(result.method);
-      setShowCitySuggestions(true);
       
-      onLocationChange({
-        country: result.countryName,
-        countryCode: result.countryCode,
-        city: '',
-        zipCode,
-        latitude: result.latitude,
-        longitude: result.longitude,
-        isCustomCity: false
-      });
+      // If city was detected, auto-populate it (user can change it later)
+      if (result.city) {
+        setCityInput(result.city);
+        setIsCustomCity(false);
+        setShowCitySuggestions(false);
+        
+        onLocationChange({
+          country: result.countryName,
+          countryCode: result.countryCode,
+          city: result.city,
+          zipCode,
+          latitude: result.latitude,
+          longitude: result.longitude,
+          isCustomCity: false
+        });
+        
+        toast({
+          title: "Location detected",
+          description: `${result.countryName}, ${result.city}. You can change the city if needed.`,
+          variant: "default"
+        });
+      } else {
+        // No city detected, show suggestions so user can select
+        setShowCitySuggestions(true);
+        
+        onLocationChange({
+          country: result.countryName,
+          countryCode: result.countryCode,
+          city: '',
+          zipCode,
+          latitude: result.latitude,
+          longitude: result.longitude,
+          isCustomCity: false
+        });
+        
+        toast({
+          title: "Country detected",
+          description: `${result.countryName}. Please select your city.`,
+          variant: "default"
+        });
+      }
     } catch (error) {
       console.error('Auto-detection error:', error);
       // Detection failed - allow manual selection as fallback
@@ -684,12 +715,12 @@ const LocationInput = ({
                   <Check className="w-3 h-3" />
                   Exact location found
                 </span>
-              ) : (
+              ) : isCustomCity ? (
                 <span className="text-orange-600 flex items-center gap-1">
                   <MapPin className="w-3 h-3" />
                   Custom location (may affect matching accuracy)
                 </span>
-              )}
+              ) : null}
             </div>
           )}
 

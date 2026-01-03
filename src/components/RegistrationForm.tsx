@@ -1095,6 +1095,10 @@ const RegistrationForm = ({ onSubmit, onBackToLogin }: RegistrationFormProps) =>
                   onChange={handleImageUpload}
                   className="cursor-pointer"
                 />
+                <p className="text-xs text-gray-500 flex items-center gap-1">
+                  <Shield className="w-3 h-3" />
+                  Pending images will be reviewed and approved within 24 hours or less for security.
+                </p>
                 
                 {images.length > 0 && (
                   <div className="grid grid-cols-2 sm:grid-cols-3 gap-4">

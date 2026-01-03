@@ -587,7 +587,7 @@ serve(async (req: Request) => {
           const compareResult = await rekognitionRequest('RekognitionService.CompareFaces', {
             SourceImage: { Bytes: sourceBase64 },
             TargetImage: { Bytes: targetBase64 },
-            SimilarityThreshold: 80, // 80% similarity threshold
+            SimilarityThreshold: 70, // 70% similarity threshold for real-world photos
           });
           
           if (compareResult.FaceMatches && compareResult.FaceMatches.length > 0) {

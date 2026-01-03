@@ -58,6 +58,7 @@ export async function compareFaceWithVerified(
     }
 
     if (!data?.success) {
+      console.warn('Face comparison returned unsuccessful:', data);
       return {
         matchFound: false,
         requiresReview: true,
@@ -65,11 +66,14 @@ export async function compareFaceWithVerified(
       };
     }
 
-    return {
+    const matchResult = {
       matchFound: data.matchFound === true,
       similarity: data.similarity,
       requiresReview: !data.matchFound // Require review if no match
     };
+    
+    console.log('Face comparison result:', matchResult);
+    return matchResult;
   } catch (err) {
     console.error('Face comparison error:', err);
     return {
@@ -177,8 +181,10 @@ export async function verifyUploadedImage(
   const comparison = await compareFaceWithVerified(file, faceImageData);
   
   if (comparison.matchFound) {
+    console.log(`Face verified for position ${imagePosition}, similarity: ${comparison.similarity}%`);
     return { approved: true, requiresReview: false };
   } else {
+    console.warn(`Face verification failed for position ${imagePosition}:`, comparison.error);
     return {
       approved: false,
       requiresReview: true,

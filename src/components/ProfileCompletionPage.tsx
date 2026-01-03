@@ -1162,6 +1162,10 @@ const ProfileCompletionPage = () => {
                         <p className="text-xs text-gray-500">{t('profileCompletion.jpgPngUpTo10MB')}</p>
                       </Label>
                     </div>
+                    <p className="text-xs text-gray-500 text-center flex items-center justify-center gap-1">
+                      <Shield className="w-3 h-3" />
+                      Pending images will be reviewed and approved within 24 hours or less for security.
+                    </p>
 
                     {images.length > 0 && (
                       <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
