@@ -833,8 +833,8 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, isPremium, profileComplet
     const result: (PotentialMatch | AdData)[] = [];
     let adIndex = 0;
     
-    // Premium users see ads every 10 swipes, free users every 5 swipes
-    const adFrequency = premiumActive ? 10 : 5;
+    // Premium users see ads every 15 swipes, free users every 7 swipes
+    const adFrequency = premiumActive ? 15 : 7;
     
     for (let i = 0; i < matches.length; i++) {
       result.push(matches[i]);
