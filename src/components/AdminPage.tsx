@@ -26,6 +26,7 @@ import RedirectLinkCreator from './admin/RedirectLinkCreator';
 import BroadcastNotifications from './admin/BroadcastNotifications';
 import InfluencerManagement from './admin/InfluencerManagement';
 import SmartMatchSuggestions from './admin/SmartMatchSuggestions';
+import SmartLikeGiving from './admin/SmartLikeGiving';
 import { debounce, userDataCache, createPagination } from '@/utils/performanceOptimizer';
 import { useSupabaseSubscription, useMemoryMonitor } from '@/hooks/usePerformance';
 import { CurrentUser, AdminStats } from '@/types';
@@ -1560,6 +1561,15 @@ const AdminPageComponent = ({ currentUser, onLogout }: AdminPageProps) => {
                   {/* Smart Match Suggestions */}
                   <div className="pt-3 border-t">
                     <SmartMatchSuggestions users={users} onMatchCreated={fetchAppStats} />
+                  </div>
+                  
+                  {/* Smart Like Giving */}
+                  <div className="pt-3 border-t">
+                    <h4 className="text-xs font-semibold mb-2 flex items-center gap-1">
+                      <Heart className="w-3 h-3 text-pink-500" />
+                      Smart Like Giving
+                    </h4>
+                    <SmartLikeGiving users={users} onLikesCreated={fetchAppStats} />
                   </div>
                 </CardContent>
               </Card>

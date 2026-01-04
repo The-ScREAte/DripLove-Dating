@@ -231,9 +231,17 @@ export const useMobileOAuth = () => {
             const { data, error } = await supabase.auth.exchangeCodeForSession(code);
             if (error) {
               console.error('[useMobileOAuth] ❌ Code exchange error:', error);
+              
+              // Handle PKCE code_verifier lost error gracefully
+              // This happens when the app is killed during OAuth flow or Safari session expires
+              const isCodeVerifierError = error.message?.toLowerCase().includes('code') && 
+                                          error.message?.toLowerCase().includes('verifier');
+              
               toast({
-                title: "Authentication Error",
-                description: error.message,
+                title: isCodeVerifierError ? "Session Expired" : "Authentication Error",
+                description: isCodeVerifierError 
+                  ? "Please try signing in again." 
+                  : error.message,
                 variant: "destructive",
               });
               navigate('/');
@@ -244,7 +252,7 @@ export const useMobileOAuth = () => {
               console.error('[useMobileOAuth] ❌ No user after code exchange');
               toast({
                 title: "Authentication Error",
-                description: "Session creation failed.",
+                description: "Session creation failed. Please try again.",
                 variant: "destructive",
               });
               navigate('/');
