@@ -321,9 +321,22 @@ const SmartLikeGiving: React.FC<Props> = ({ users, onLikesCreated }) => {
                 
                 <div className="flex items-center gap-2">
                   <Filter className="w-3 h-3 text-gray-500" />
+                  
+                  <Select value={genderFilter} onValueChange={setGenderFilter}>
+                    <SelectTrigger className="h-8 w-[120px] text-xs">
+                      <SelectValue placeholder="Gender" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">All Genders</SelectItem>
+                      <SelectItem value="male">Male</SelectItem>
+                      <SelectItem value="female">Female</SelectItem>
+                      <SelectItem value="other">Other</SelectItem>
+                    </SelectContent>
+                  </Select>
+
                   <Select value={countryFilter} onValueChange={setCountryFilter}>
                     <SelectTrigger className="h-8 w-[160px] text-xs">
-                      <SelectValue placeholder="Filter by country" />
+                      <SelectValue placeholder="Country" />
                     </SelectTrigger>
                     <SelectContent>
                       <SelectItem value="all">All Countries</SelectItem>
@@ -384,6 +397,11 @@ const SmartLikeGiving: React.FC<Props> = ({ users, onLikesCreated }) => {
                             </div>
                             <div className="text-gray-500 truncate">{user.email}</div>
                           </div>
+                          {user.gender && (
+                            <Badge variant="secondary" className="text-[10px]">
+                              {user.gender}
+                            </Badge>
+                          )}
                           {user.country && (
                             <Badge variant="outline" className="text-[10px]">
                               {user.country}
