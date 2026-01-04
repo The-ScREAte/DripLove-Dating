@@ -3,10 +3,10 @@
 
 import { serve } from 'https://deno.land/std@0.177.0/http/server.ts'
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.45.0'
+import { getPaystackSecretKey } from '../_shared/paystack-utils.ts'
 
 const SUPABASE_URL = Deno.env.get('SUPABASE_URL')
 const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')
-const PAYSTACK_SECRET_KEY = Deno.env.get('PAYSTACK_SECRET_KEY')
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -68,9 +68,9 @@ serve(async (req) => {
     if (!SUPABASE_URL || !SUPABASE_SERVICE_ROLE_KEY) {
       return json(500, { ok: false, error: 'Missing Supabase env' })
     }
-    if (!PAYSTACK_SECRET_KEY) {
-      return json(500, { ok: false, error: 'Missing PAYSTACK_SECRET_KEY' })
-    }
+
+    // Get the appropriate secret key based on mode in database
+    const PAYSTACK_SECRET_KEY = await getPaystackSecretKey()
 
     const authHeader = req.headers.get('Authorization') || ''
 

@@ -265,6 +265,34 @@ const ProfilePage = ({ currentUser, profile, onProfileUpdate, onLogout, onShowTe
     })();
   }, [isOwnProfile, isProfileMessagesOpen]);
 
+  // Real-time subscription for broadcast messages
+  useEffect(() => {
+    if (!isOwnProfile || !currentUser?.id) return;
+
+    const channel = supabase
+      .channel(`profile-broadcasts-${currentUser.id}`)
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'broadcast_recipients',
+          filter: `user_id=eq.${currentUser.id}`,
+        },
+        () => {
+          void refreshBroadcastUnreadCount();
+          if (isProfileMessagesOpen) {
+            void loadBroadcastMessages();
+          }
+        }
+      )
+      .subscribe();
+
+    return () => {
+      void supabase.removeChannel(channel);
+    };
+  }, [isOwnProfile, currentUser?.id, isProfileMessagesOpen]);
+
   useEffect(() => {
     if (profile) {
       try {

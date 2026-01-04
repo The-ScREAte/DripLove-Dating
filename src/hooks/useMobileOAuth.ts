@@ -20,6 +20,60 @@ export const useMobileOAuth = () => {
 
     logPlatformInfo();
 
+    // iOS can deliver the same deep link multiple times (e.g., via getLaunchUrl() and appUrlOpen).
+    // For PKCE, repeating the same callback will fail because Supabase removes the code_verifier
+    // after the first successful exchange.
+    const handledKeys = new Set<string>();
+
+    const BROWSER_OPEN_FLAG_KEY = 'driplove:inapp_browser_open';
+    const BROWSER_LAST_CLOSE_KEY = 'driplove:inapp_browser_last_close_key';
+
+    const getStorage = () => {
+      try {
+        return localStorage;
+      } catch {
+        return null;
+      }
+    };
+
+    const safeCloseBrowser = async (dedupeKey: string) => {
+      // Capacitor iOS can deliver the same deep link multiple times.
+      // Only attempt to close the in-app browser once per deep-link event.
+      if (handledKeys.has(dedupeKey)) return;
+      handledKeys.add(dedupeKey);
+
+      const storage = getStorage();
+      const lastCloseKey = storage?.getItem(BROWSER_LAST_CLOSE_KEY) || '';
+      if (lastCloseKey === dedupeKey) return;
+
+      // Only attempt Browser.close() if we previously opened it.
+      // This prevents Capacitor from emitting noisy "No active window to close!" errors.
+      const browserWasOpened = (storage?.getItem(BROWSER_OPEN_FLAG_KEY) || '') === '1';
+      if (!browserWasOpened) {
+        storage?.setItem(BROWSER_LAST_CLOSE_KEY, dedupeKey);
+        return;
+      }
+
+      try {
+        await Browser.close();
+
+        storage?.setItem(BROWSER_OPEN_FLAG_KEY, '0');
+        storage?.setItem(BROWSER_LAST_CLOSE_KEY, dedupeKey);
+      } catch (e: any) {
+        const message =
+          (typeof e === 'string' ? e : e?.message || e?.errorMessage || '')?.toString?.() || '';
+        // Capacitor Browser can throw this when there is nothing to close; treat as a no-op.
+        if (message.toLowerCase().includes('no active window to close')) {
+          storage?.setItem(BROWSER_OPEN_FLAG_KEY, '0');
+          storage?.setItem(BROWSER_LAST_CLOSE_KEY, dedupeKey);
+          return;
+        }
+        // Swallow any other close errors as well; closing the browser is a best-effort cleanup.
+        storage?.setItem(BROWSER_OPEN_FLAG_KEY, '0');
+        storage?.setItem(BROWSER_LAST_CLOSE_KEY, dedupeKey);
+      }
+    };
+
     const handleAppUrlOpen = async (event: { url: string }) => {
       try {
         // Persist for post-mortem debugging (iOS external Safari handoff can be flaky)
@@ -31,12 +85,18 @@ export const useMobileOAuth = () => {
       
       // ✅ Ignore non-app URLs
       if (!event.url.startsWith('driplove://')) return;
+
+      // Normalize to make URL parsing more reliable (some iOS flows can return `driplove://#...`)
+      let normalizedUrl = event.url;
+      if (normalizedUrl.startsWith('driplove://#') || normalizedUrl.startsWith('driplove://?')) {
+        normalizedUrl = normalizedUrl.replace('driplove://', 'driplove:///');
+      }
       
       // ✅ Handle password reset deep link first (specific path)
       if (event.url.startsWith('driplove://reset-password')) {
         try {
           // Extract the URL parameters for password reset
-          const url = new URL(event.url);
+          const url = new URL(normalizedUrl);
           const fragment = url.hash || url.search;
           
           
@@ -110,36 +170,63 @@ export const useMobileOAuth = () => {
         }
         return; // Exit after handling reset
       }
+
+      // ✅ Handle Paystack deep link callback
+      // Supabase Edge Function paystack-redirect uses: driplove://payment/callback?status=...&reference=...&payment_type=...
+      try {
+        const url = new URL(normalizedUrl);
+        const route = url.host
+          ? `/${url.host}${url.pathname || ''}`
+          : url.pathname;
+
+        if (route === '/payment/callback') {
+          const params = new URLSearchParams(url.search);
+          const status = params.get('status') || 'unknown';
+          const reference = params.get('reference') || params.get('trxref') || params.get('tx_ref') || '';
+          const payment_type = params.get('payment_type') || 'subscription';
+
+          // Route into the existing payment success page; it handles successful/failed/cancelled.
+          navigate(
+            `/payment-success?status=${encodeURIComponent(status)}` +
+              `&reference=${encodeURIComponent(reference)}` +
+              `&payment_type=${encodeURIComponent(payment_type)}`
+          );
+          return;
+        }
+      } catch {
+        // ignore parse errors and continue
+      }
       
       // ✅ Handle OAuth callback (Accept BOTH patterns)
       //    driplove://auth/callback (preferred/explicit)
       //    driplove:// (fallback - iOS strips path sometimes)
-      
-      // Close Safari View Controller if it's open
-        try {
-          if (Browser) {
-            await Browser.close();
-          }
-        } catch (e) {
-          // ignore
-        }
-        
+
         try {
           // Extract params from the callback URL.
           // Some iOS flows can return `driplove://#...` (no host/path) which may not parse.
           // Normalize to `driplove:///#...` when needed.
-          let callbackUrl = event.url;
-          if (callbackUrl.startsWith('driplove://#') || callbackUrl.startsWith('driplove://?')) {
-            callbackUrl = callbackUrl.replace('driplove://', 'driplove:///');
-          }
-
-          const url = new URL(callbackUrl);
+          const url = new URL(normalizedUrl);
           const raw = url.hash || url.search || '';
 
           const params = new URLSearchParams(raw.replace(/^#|\?/, ''));
 
           // ✅ PKCE/code flow callback
           const code = params.get('code');
+          const state = params.get('state');
+
+          // Determine which deep link route we are on.
+          // Note: custom scheme uses host as the first path segment (e.g. driplove://auth/callback => host=auth, pathname=/callback)
+          const route = url.host
+            ? `/${url.host}${url.pathname || ''}`
+            : url.pathname;
+
+          const isAuthCallbackRoute = route === '/auth/callback' || event.url.startsWith('driplove://auth/callback');
+
+          // Close Safari View Controller if it's open (best-effort).
+          // Dedupe is important because iOS can deliver the same callback twice.
+          if (isAuthCallbackRoute) {
+            await safeCloseBrowser(`browser:close:${event.url}`);
+          }
 
           // ✅ Implicit token flow callback
           const access_token = params.get('access_token');
@@ -227,22 +314,57 @@ export const useMobileOAuth = () => {
             return;
           }
 
-          if (code) {
+          // Only attempt PKCE code exchange if this looks like a real OAuth callback.
+          // This prevents false positives from other deep links (e.g. payment providers using a `code` query param).
+          if (code && (state || isAuthCallbackRoute)) {
+            const oauthKey = `oauth:pkce:${code}`;
+
+            // Dedupe: iOS can trigger the same callback multiple times.
+            if (handledKeys.has(oauthKey)) {
+              return;
+            }
+            handledKeys.add(oauthKey);
+
+            // If we already have a session, don't try to exchange again.
+            // (This also covers the case where the first handler already completed the exchange.)
+            try {
+              const { data: sessionData } = await supabase.auth.getSession();
+              if (sessionData.session?.user) {
+                navigate('/');
+                return;
+              }
+            } catch {
+              // ignore; proceed with exchange
+            }
+
             const { data, error } = await supabase.auth.exchangeCodeForSession(code);
             if (error) {
               console.error('[useMobileOAuth] ❌ Code exchange error:', error);
-              
-              // Handle PKCE code_verifier lost error gracefully
-              // This happens when the app is killed during OAuth flow or Safari session expires
-              const isCodeVerifierError = error.message?.toLowerCase().includes('code') && 
-                                          error.message?.toLowerCase().includes('verifier');
-              
+
+              const message = (error as any)?.message?.toString?.() || '';
+              const lower = message.toLowerCase();
+              const isCodeVerifierError =
+                (lower.includes('code') && lower.includes('verifier')) ||
+                lower.includes('both auth code and code verifier');
+
+              // If the exchange fails due to a missing verifier but a session exists anyway,
+              // treat it as a duplicate callback and continue silently.
+              if (isCodeVerifierError) {
+                try {
+                  const { data: sessionData } = await supabase.auth.getSession();
+                  if (sessionData.session?.user) {
+                    navigate('/');
+                    return;
+                  }
+                } catch {
+                  // ignore
+                }
+              }
+
               toast({
-                title: isCodeVerifierError ? "Session Expired" : "Authentication Error",
-                description: isCodeVerifierError 
-                  ? "Please try signing in again." 
-                  : error.message,
-                variant: "destructive",
+                title: isCodeVerifierError ? 'Session Expired' : 'Authentication Error',
+                description: isCodeVerifierError ? 'Please try signing in again.' : message,
+                variant: 'destructive',
               });
               navigate('/');
               return;
@@ -307,6 +429,18 @@ export const useMobileOAuth = () => {
               description: "You've been successfully logged in.",
             });
             navigate('/');
+            return;
+          }
+
+          // If we have a `code` parameter but it does NOT look like an OAuth callback, ignore it.
+          // This avoids showing OAuth errors during payment/cancel flows.
+          if (code && !(state || isAuthCallbackRoute)) {
+            // Try to route the deep link into the SPA if it points to a known page.
+            // Example: driplove://payment-success?... or other app routes.
+            if (route && route !== '/') {
+              const target = `${route}${url.search || ''}${url.hash || ''}`;
+              navigate(target);
+            }
             return;
           }
 

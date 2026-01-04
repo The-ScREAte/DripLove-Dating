@@ -7,6 +7,11 @@ export async function openInAppBrowser(url: string) {
     const browserMod = await import('@capacitor/browser').catch(() => null);
     const Browser = browserMod?.Browser;
     if (Browser && typeof Browser.open === 'function') {
+      try {
+        localStorage.setItem('driplove:inapp_browser_open', '1');
+      } catch {
+        // ignore storage failures
+      }
       await Browser.open({ url });
       return true;
     }

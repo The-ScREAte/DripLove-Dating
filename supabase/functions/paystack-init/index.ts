@@ -1,6 +1,7 @@
 // Supabase Edge Function: paystack-init
 // Initializes Paystack transaction server-side using secret key and returns authorization_url/reference
 import { serve } from 'https://deno.land/std@0.177.0/http/server.ts'
+import { getPaystackSecretKey } from '../_shared/paystack-utils.ts'
 
 interface InitRequest {
   email: string
@@ -39,8 +40,8 @@ serve(async (req) => {
     if (req.method === 'OPTIONS') return new Response('ok', { headers: corsHeaders })
     if (req.method !== 'POST') return json(405, { error: 'Method not allowed' })
     
-    const secret = Deno.env.get('PAYSTACK_SECRET_KEY')
-    if (!secret) return json(500, { error: 'Missing PAYSTACK_SECRET_KEY' })
+    // Get the appropriate secret key based on mode in database
+    const secret = await getPaystackSecretKey()
 
     const body = (await req.json()) as Record<string, unknown>
     const { email, amount, currency, channels, metadata, callback_url } = body as unknown as InitRequest

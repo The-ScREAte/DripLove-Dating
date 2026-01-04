@@ -1,12 +1,14 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Checkbox } from '@/components/ui/checkbox';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/components/ui/use-toast';
-import { Heart, Users, Search, Check, X, Loader2, UserPlus } from 'lucide-react';
+import { getCountriesList } from '@/constants/locationData';
+import { Heart, Users, Search, Check, X, Loader2, UserPlus, Filter } from 'lucide-react';
 
 interface UserProfile {
   id: string;
@@ -28,12 +30,18 @@ const SmartLikeGiving: React.FC<Props> = ({ users, onLikesCreated }) => {
   const [selectedReceivers, setSelectedReceivers] = useState<Set<string>>(new Set());
   const [giverSearch, setGiverSearch] = useState('');
   const [receiverSearch, setReceiverSearch] = useState('');
+  const [countryFilter, setCountryFilter] = useState<string>('all');
+  const [genderFilter, setGenderFilter] = useState<string>('all');
   const [isLoading, setIsLoading] = useState(false);
   const [existingLikes, setExistingLikes] = useState<Set<string>>(new Set());
   const [loadingLikes, setLoadingLikes] = useState(false);
+  const [allReceivers, setAllReceivers] = useState<UserProfile[]>([]);
+  const [loadingReceivers, setLoadingReceivers] = useState(false);
   const { toast } = useToast();
 
-  // Filter users based on search
+  const countries = useMemo(() => getCountriesList(), []);
+
+  // Filter users based on search for givers
   const filteredGivers = useMemo(() => {
     const search = giverSearch.toLowerCase().trim();
     if (!search) return users.slice(0, 50);
@@ -45,9 +53,18 @@ const SmartLikeGiving: React.FC<Props> = ({ users, onLikesCreated }) => {
     ).slice(0, 50);
   }, [users, giverSearch]);
 
+  // Filter receivers with country and search filters, excluding already liked
   const filteredReceivers = useMemo(() => {
     const search = receiverSearch.toLowerCase().trim();
-    let filtered = users.filter(u => u.id !== selectedGiver);
+    let filtered = allReceivers.filter(u => !existingLikes.has(u.id));
+    
+    if (countryFilter !== 'all') {
+      filtered = filtered.filter(u => u.country === countryFilter);
+    }
+
+    if (genderFilter !== 'all') {
+      filtered = filtered.filter(u => u.gender === genderFilter);
+    }
     
     if (search) {
       filtered = filtered.filter(u => 
@@ -55,13 +72,12 @@ const SmartLikeGiving: React.FC<Props> = ({ users, onLikesCreated }) => {
         u.last_name?.toLowerCase().includes(search) ||
         u.email?.toLowerCase().includes(search) ||
         u.id.toLowerCase().includes(search) ||
-        u.country?.toLowerCase().includes(search) ||
         u.city?.toLowerCase().includes(search)
       );
     }
     
-    return filtered.slice(0, 200);
-  }, [users, receiverSearch, selectedGiver]);
+    return filtered;
+  }, [allReceivers, receiverSearch, countryFilter, genderFilter, existingLikes]);
 
   // Load existing likes when giver is selected
   const loadExistingLikes = async (giverId: string) => {
@@ -88,15 +104,45 @@ const SmartLikeGiving: React.FC<Props> = ({ users, onLikesCreated }) => {
     }
   };
 
+  // Load all potential receivers from database
+  const loadReceivers = async (giverId: string) => {
+    setLoadingReceivers(true);
+    try {
+      const { data, error } = await supabase
+        .from('profiles')
+        .select('id, first_name, last_name, email, gender, country, city')
+        .eq('is_admin', false)
+        .neq('id', giverId)
+        .order('first_name', { ascending: true });
+
+      if (error) throw error;
+
+      setAllReceivers(data || []);
+    } catch (err) {
+      console.error('Error loading receivers:', err);
+      toast({
+        title: 'Error',
+        description: 'Failed to load users',
+        variant: 'destructive'
+      });
+    } finally {
+      setLoadingReceivers(false);
+    }
+  };
+
   const handleSelectGiver = async (userId: string) => {
     setSelectedGiver(userId);
     setSelectedReceivers(new Set());
-    await loadExistingLikes(userId);
+    setCountryFilter('all');
+    setGenderFilter('all');
+    setReceiverSearch('');
+    await Promise.all([
+      loadExistingLikes(userId),
+      loadReceivers(userId)
+    ]);
   };
 
   const handleToggleReceiver = (userId: string) => {
-    if (existingLikes.has(userId)) return; // Can't select already-liked users
-    
     setSelectedReceivers(prev => {
       const next = new Set(prev);
       if (next.has(userId)) {
@@ -109,8 +155,7 @@ const SmartLikeGiving: React.FC<Props> = ({ users, onLikesCreated }) => {
   };
 
   const handleSelectAll = () => {
-    const eligibleReceivers = filteredReceivers.filter(u => !existingLikes.has(u.id));
-    const allIds = new Set(eligibleReceivers.map(u => u.id));
+    const allIds = new Set(filteredReceivers.map(u => u.id));
     setSelectedReceivers(allIds);
   };
 
@@ -255,23 +300,42 @@ const SmartLikeGiving: React.FC<Props> = ({ users, onLikesCreated }) => {
             Step 2: Select Receivers ({selectedReceivers.size} selected)
           </label>
 
-          {loadingLikes ? (
-            <div className="flex items-center justify-center py-4">
-              <Loader2 className="w-4 h-4 animate-spin mr-2" />
-              <span className="text-xs text-gray-500">Loading existing likes...</span>
+          {(loadingLikes || loadingReceivers) ? (
+            <div className="flex items-center justify-center py-8">
+              <Loader2 className="w-5 h-5 animate-spin mr-2" />
+              <span className="text-xs text-gray-500">Loading users...</span>
             </div>
           ) : (
             <>
-              <div className="flex items-center gap-2">
-                <div className="relative flex-1">
+              {/* Filters */}
+              <div className="flex items-center gap-2 flex-wrap">
+                <div className="relative flex-1 min-w-[200px]">
                   <Search className="absolute left-2 top-1/2 -translate-y-1/2 w-3 h-3 text-gray-400" />
                   <Input
-                    placeholder="Search receivers by name, email, country..."
+                    placeholder="Search by name, email, city..."
                     value={receiverSearch}
                     onChange={(e) => setReceiverSearch(e.target.value)}
                     className="pl-7 h-8 text-xs"
                   />
                 </div>
+                
+                <div className="flex items-center gap-2">
+                  <Filter className="w-3 h-3 text-gray-500" />
+                  <Select value={countryFilter} onValueChange={setCountryFilter}>
+                    <SelectTrigger className="h-8 w-[160px] text-xs">
+                      <SelectValue placeholder="Filter by country" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">All Countries</SelectItem>
+                      {countries.map(country => (
+                        <SelectItem key={country.code} value={country.code}>
+                          {country.name}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+
                 <Button
                   size="sm"
                   variant="outline"
@@ -290,53 +354,54 @@ const SmartLikeGiving: React.FC<Props> = ({ users, onLikesCreated }) => {
                 </Button>
               </div>
 
-              <ScrollArea className="h-48 border rounded-lg">
+              <ScrollArea className="h-[400px] border rounded-lg">
                 <div className="p-1 space-y-1">
-                  {filteredReceivers.map(user => {
-                    const alreadyLiked = existingLikes.has(user.id);
-                    const isSelected = selectedReceivers.has(user.id);
+                  {filteredReceivers.length === 0 ? (
+                    <div className="text-center py-8 text-sm text-gray-500">
+                      No users found matching your criteria
+                    </div>
+                  ) : (
+                    filteredReceivers.map(user => {
+                      const isSelected = selectedReceivers.has(user.id);
 
-                    return (
-                      <div
-                        key={user.id}
-                        onClick={() => handleToggleReceiver(user.id)}
-                        className={`p-2 rounded flex items-center gap-2 text-xs ${
-                          alreadyLiked 
-                            ? 'bg-gray-100 text-gray-400 cursor-not-allowed' 
-                            : isSelected 
-                              ? 'bg-green-50 border border-green-200 cursor-pointer' 
-                              : 'hover:bg-gray-50 cursor-pointer'
-                        }`}
-                      >
-                        <Checkbox
-                          checked={isSelected}
-                          disabled={alreadyLiked}
-                          className="pointer-events-none"
-                        />
-                        <div className="flex-1 min-w-0">
-                          <div className="font-medium truncate">
-                            {user.first_name} {user.last_name}
+                      return (
+                        <div
+                          key={user.id}
+                          onClick={() => handleToggleReceiver(user.id)}
+                          className={`p-2 rounded flex items-center gap-2 text-xs cursor-pointer ${
+                            isSelected 
+                              ? 'bg-green-50 border border-green-200' 
+                              : 'hover:bg-gray-50'
+                          }`}
+                        >
+                          <Checkbox
+                            checked={isSelected}
+                            className="pointer-events-none"
+                          />
+                          <div className="flex-1 min-w-0">
+                            <div className="font-medium truncate">
+                              {user.first_name} {user.last_name}
+                            </div>
+                            <div className="text-gray-500 truncate">{user.email}</div>
                           </div>
-                          <div className="text-gray-500 truncate">{user.email}</div>
+                          {user.country && (
+                            <Badge variant="outline" className="text-[10px]">
+                              {user.country}
+                            </Badge>
+                          )}
+                          {user.city && (
+                            <span className="text-[10px] text-gray-400">{user.city}</span>
+                          )}
                         </div>
-                        {alreadyLiked && (
-                          <Badge variant="secondary" className="text-[10px] bg-pink-100 text-pink-600">
-                            Already Liked
-                          </Badge>
-                        )}
-                        {user.country && (
-                          <Badge variant="outline" className="text-[10px]">
-                            {user.country}
-                          </Badge>
-                        )}
-                      </div>
-                    );
-                  })}
+                      );
+                    })
+                  )}
                 </div>
               </ScrollArea>
 
-              <div className="text-xs text-gray-500">
-                Showing {filteredReceivers.length} users • {existingLikes.size} already liked
+              <div className="text-xs text-gray-500 flex items-center justify-between">
+                <span>Showing {filteredReceivers.length} of {allReceivers.length} users</span>
+                <span className="text-pink-600">{existingLikes.size} already liked by this user</span>
               </div>
             </>
           )}

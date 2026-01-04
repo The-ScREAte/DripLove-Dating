@@ -54,6 +54,11 @@ export const useOAuth = () => {
           }
 
           const { Browser } = await import('@capacitor/browser');
+          try {
+            localStorage.setItem('driplove:inapp_browser_open', '1');
+          } catch {
+            // ignore storage failures
+          }
           await Browser.open({ 
             url: oauthData.url,
             presentationStyle: 'popover',

@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { isIOS, buyIAPProduct } from '@/utils/iap';
 
@@ -15,7 +15,52 @@ interface PaystackPaymentModalProps {
   isOneTime?: boolean; // New prop to distinguish one-time vs subscription
 }
 
-const PAYSTACK_PUBLIC_KEY = import.meta.env.VITE_PAYSTACK_PUBLIC_KEY as string;
+// Helper to get Paystack public key based on mode
+const getPaystackPublicKey = async (): Promise<string> => {
+  try {
+    // Fetch mode from database
+    const { data, error } = await supabase
+      .from('app_settings')
+      .select('value')
+      .eq('id', 'paystack_mode')
+      .single();
+
+    if (error || !data) {
+      console.warn('Failed to fetch paystack_mode, using env fallback');
+      return getEnvPublicKey();
+    }
+
+    const mode = data.value?.mode || 'test';
+    
+    // Return the appropriate key based on mode
+    const key = mode === 'live' 
+      ? (import.meta.env.VITE_PAYSTACK_PUBLIC_KEY_LIVE as string | undefined)
+      : (import.meta.env.VITE_PAYSTACK_PUBLIC_KEY_TEST as string | undefined);
+    
+    if (!key) {
+      console.warn(`Missing VITE_PAYSTACK_PUBLIC_KEY_${mode.toUpperCase()}, using env fallback`);
+      return getEnvPublicKey();
+    }
+
+    console.log(`[Paystack] Using ${mode} mode with public key`);
+    return key;
+  } catch (err) {
+    console.error('Error fetching Paystack mode:', err);
+    return getEnvPublicKey();
+  }
+};
+
+// Fallback: use legacy env var or explicit mode-based env var
+const getEnvPublicKey = (): string => {
+  const mode = ((import.meta.env.VITE_PAYSTACK_MODE as string | undefined) || 'test').toLowerCase();
+  return (
+    (mode === 'test'
+      ? (import.meta.env.VITE_PAYSTACK_PUBLIC_KEY_TEST as string | undefined)
+      : (import.meta.env.VITE_PAYSTACK_PUBLIC_KEY_LIVE as string | undefined)) ||
+    (import.meta.env.VITE_PAYSTACK_PUBLIC_KEY as string | undefined) ||
+    ''
+  );
+};
 
 const loadPaystackScript = () => {
   return new Promise((resolve, reject) => {
@@ -64,15 +109,18 @@ const PaystackPaymentModal: React.FC<PaystackPaymentModalProps> = ({
   paymentMethod = 'card', 
   isOneTime = false 
 }) => {
-  const [isLoading, setIsLoading] = React.useState(false);
-  const [selectedPaymentMethod, setSelectedPaymentMethod] = React.useState<'card' | 'momo' | 'iap'>(paymentMethod);
+  const [isLoading, setIsLoading] = useState(false);
+  const [selectedPaymentMethod, setSelectedPaymentMethod] = useState<'card' | 'momo' | 'iap'>(paymentMethod);
+  const [paystackPublicKey, setPaystackPublicKey] = useState<string>('');
 
-  React.useEffect(() => {
+  useEffect(() => {
     if (isOpen) {
       loadPaystackScript()
         .then(() => undefined)
         .catch(err => console.error('[PaystackModal] Failed to load Paystack script:', err));
-      // Allow user to choose payment method for both one-time and subscriptions
+      
+      // Fetch the appropriate public key based on database mode
+      getPaystackPublicKey().then(setPaystackPublicKey);
     }
   }, [isOpen, isOneTime]);
 
@@ -94,12 +142,14 @@ const PaystackPaymentModal: React.FC<PaystackPaymentModalProps> = ({
     setIsLoading(true);
     // ...existing code for Paystack/MoMo...
     // Validate Paystack configuration
-    if (!PAYSTACK_PUBLIC_KEY) {
-      alert('Paystack is not configured. Please set VITE_PAYSTACK_PUBLIC_KEY in your environment variables.');
+    if (!paystackPublicKey) {
+      alert(
+        'Paystack is not configured. Please contact support.'
+      );
       setIsLoading(false);
       return;
     }
-    if (!PAYSTACK_PUBLIC_KEY.startsWith('pk_')) {
+    if (!paystackPublicKey.startsWith('pk_')) {
       alert('Invalid Paystack public key format. It should start with "pk_".');
       setIsLoading(false);
       return;
@@ -153,7 +203,7 @@ const PaystackPaymentModal: React.FC<PaystackPaymentModalProps> = ({
       // This still works for subscriptions because renewal is handled via saved authorization_code.
       try {
         const ref = 'DRIPLOVE-' + Date.now() + '-' + Math.random().toString(36).substring(2, 8);
-        const trimmedKey = PAYSTACK_PUBLIC_KEY.trim();
+        const trimmedKey = paystackPublicKey.trim();
         const paymentConfig: any = {
           key: trimmedKey,
           publicKey: trimmedKey,

@@ -19,6 +19,7 @@ import CountryManagement from './admin/CountryManagement';
 import ImageModerationPanel from './admin/ImageModerationPanel';
 import FaceManagement from './admin/FaceManagement';
 import AppUpdateSettings from './admin/AppUpdateSettings';
+import PaystackSettings from './admin/PaystackSettings';
 
 import ManualPremiumManager from './admin/ManualPremiumManager';
 import AdsManagement from './admin/AdsManagement';
@@ -2049,6 +2050,9 @@ const AdminPageComponent = ({ currentUser, onLogout }: AdminPageProps) => {
             <TabsContent value="settings" className="space-y-4">
               {/* App Update Settings */}
               <AppUpdateSettings />
+
+              {/* Paystack Settings */}
+              <PaystackSettings />
 
               {/* Payment Configuration */}
               <Card>

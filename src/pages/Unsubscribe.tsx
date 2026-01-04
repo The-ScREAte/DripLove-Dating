@@ -6,6 +6,7 @@ import { useNavigate } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import { Capacitor } from '@capacitor/core';
+import { Browser } from '@capacitor/browser';
 
 const REQUIRED_PHRASE = 'i want to unsubscribe';
 
@@ -20,21 +21,54 @@ const Unsubscribe: React.FC = () => {
   const openNativeSubscriptionManagement = async (platform: 'ios' | 'android') => {
     try {
       if (platform === 'ios') {
-        // iOS 15+: Direct link to subscription management in Settings
-        const url = 'itms-apps://apps.apple.com/account/subscriptions';
-        
-        if (window.open) {
-          window.open(url, '_system');
-        } else {
-          setShowManageInstructions(true);
+        if (Capacitor.isNativePlatform()) {
+          try {
+            await Browser.open({ 
+              url: 'itms-apps://apps.apple.com/account/subscriptions',
+              windowName: '_system',
+              toolbarColor: '#FF1493'
+            });
+            return;
+          } catch (browserErr) {
+            try {
+              await Browser.open({ 
+                url: 'App-prefs:root=SUBSCRIPTIONS',
+                windowName: '_system'
+              });
+              return;
+            } catch (settingsErr) {
+              // Continue to fallback
+            }
+          }
         }
+        
+        try {
+          window.location.href = 'itms-apps://apps.apple.com/account/subscriptions';
+          return;
+        } catch (locationErr) {
+          // Continue to manual instructions
+        }
+        
+        setShowManageInstructions(true);
+        
       } else if (platform === 'android') {
-        // Android: Open Google Play subscriptions
         const url = 'https://play.google.com/store/account/subscriptions';
         
-        if (window.open) {
-          window.open(url, '_system');
-        } else {
+        if (Capacitor.isNativePlatform()) {
+          try {
+            await Browser.open({ 
+              url, 
+              windowName: '_system',
+              toolbarColor: '#FF1493'
+            });
+            return;
+          } catch (browserErr) {
+            // Continue to fallback
+          }
+        }
+        
+        const opened = window.open(url, '_system');
+        if (!opened) {
           setShowManageInstructions(true);
         }
       }
@@ -72,14 +106,19 @@ const Unsubscribe: React.FC = () => {
       if (isNativeApp() && (subscription.payment_method === 'apple' || subscription.payment_method === 'google' || subscription.payment_method === 'iap')) {
         const platform = Capacitor.getPlatform() as 'ios' | 'android';
         
-        // Open native subscription management
+        // Open native subscription management (don't show toast yet)
         await openNativeSubscriptionManagement(platform);
         
-        toast({
-          title: `Cancel in ${platform === 'ios' ? 'Apple' : 'Google Play'} Settings`,
-          description: `You will be redirected to manage your subscription. Cancel there and it will show as cancelled in the app.`,
-        });
+        // Only show instructions if redirect failed
+        if (showManageInstructions) {
+          toast({
+            title: 'Manual Cancellation Required',
+            description: `Please cancel your subscription in ${platform === 'ios' ? 'Apple' : 'Google Play'} Settings.`,
+            variant: 'destructive'
+          });
+        }
         
+        setLoading(false);
         return;
       }
 

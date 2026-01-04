@@ -5,8 +5,8 @@
 
 import { serve } from 'https://deno.land/std@0.177.0/http/server.ts'
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.45.0'
+import { getPaystackSecretKey } from '../_shared/paystack-utils.ts'
 
-const PAYSTACK_SECRET_KEY = Deno.env.get('PAYSTACK_SECRET_KEY')
 const SUPABASE_URL = Deno.env.get('SUPABASE_URL')
 const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')
 
@@ -23,11 +23,11 @@ function json(status: number, body: unknown) {
   })
 }
 
-async function disablePaystackSubscription(subscription_code: string) {
+async function disablePaystackSubscription(subscription_code: string, secretKey: string) {
   const resp = await fetch('https://api.paystack.co/subscription/disable', {
     method: 'POST',
     headers: {
-      Authorization: `Bearer ${PAYSTACK_SECRET_KEY}`,
+      Authorization: `Bearer ${secretKey}`,
       'Content-Type': 'application/json',
     },
     body: JSON.stringify({
@@ -38,11 +38,11 @@ async function disablePaystackSubscription(subscription_code: string) {
   return await resp.json()
 }
 
-async function deactivatePaystackAuthorization(authorization_code: string) {
+async function deactivatePaystackAuthorization(authorization_code: string, secretKey: string) {
   const resp = await fetch('https://api.paystack.co/customer/deactivate_authorization', {
     method: 'POST',
     headers: {
-      Authorization: `Bearer ${PAYSTACK_SECRET_KEY}`,
+      Authorization: `Bearer ${secretKey}`,
       'Content-Type': 'application/json',
     },
     body: JSON.stringify({ authorization_code }),
@@ -60,6 +60,9 @@ serve(async (req) => {
   try {
     const { user_id } = await req.json()
     if (!user_id) return json(400, { error: 'Missing user_id' })
+
+    // Get the appropriate secret key based on mode in database
+    const PAYSTACK_SECRET_KEY = await getPaystackSecretKey()
 
     const supabase = createClient(SUPABASE_URL!, SUPABASE_SERVICE_ROLE_KEY!)
     // Get active subscription from user_subscriptions
@@ -83,7 +86,7 @@ serve(async (req) => {
       if (authRows && authRows.length > 0) {
         for (const authRow of authRows) {
           try {
-            await deactivatePaystackAuthorization(authRow.authorization_code)
+            await deactivatePaystackAuthorization(authRow.authorization_code, PAYSTACK_SECRET_KEY)
           } catch (err) {
             console.error('Failed to deactivate Paystack auth:', err)
             // Non-fatal: we still disable locally
@@ -101,7 +104,7 @@ serve(async (req) => {
       // Legacy: if subscription_code exists, try to disable it too
       if (sub.flutterwave_transaction_id) {
         try {
-          await disablePaystackSubscription(sub.flutterwave_transaction_id)
+          await disablePaystackSubscription(sub.flutterwave_transaction_id, PAYSTACK_SECRET_KEY)
         } catch (err) {
           // Non-fatal
         }
