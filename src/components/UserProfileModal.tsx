@@ -43,6 +43,7 @@ const UserProfileModal = ({ isOpen, onClose, userId, isAdmin = false }: UserProf
   const [editedMaxDistance, setEditedMaxDistance] = useState('');
   const [editedRelationshipIntent, setEditedRelationshipIntent] = useState('');
   const [editedUnlockedCountries, setEditedUnlockedCountries] = useState<string[]>([]);
+  const [editedDateOfBirth, setEditedDateOfBirth] = useState('');
   const [savingPreferences, setSavingPreferences] = useState(false);
 
   // Delete image from DB and storage
@@ -95,6 +96,7 @@ const UserProfileModal = ({ isOpen, onClose, userId, isAdmin = false }: UserProf
       setEditedMaxDistance(profile.max_distance?.toString() || '250');
       setEditedRelationshipIntent(profile.relationship_intent || '');
       setEditedUnlockedCountries(profile.unlocked_countries || []);
+      setEditedDateOfBirth(profile.date_of_birth || '');
     }
   }, [profile]);
 
@@ -160,6 +162,7 @@ const UserProfileModal = ({ isOpen, onClose, userId, isAdmin = false }: UserProf
           max_distance: parseInt(editedMaxDistance) || 250,
           relationship_intent: editedRelationshipIntent || null,
           unlocked_countries: editedUnlockedCountries,
+          date_of_birth: editedDateOfBirth || null,
         })
         .eq('id', userId);
 
@@ -177,6 +180,7 @@ const UserProfileModal = ({ isOpen, onClose, userId, isAdmin = false }: UserProf
         max_distance: parseInt(editedMaxDistance) || 250,
         relationship_intent: editedRelationshipIntent,
         unlocked_countries: editedUnlockedCountries,
+        date_of_birth: editedDateOfBirth,
       }));
 
       setIsEditingPreferences(false);
@@ -368,6 +372,7 @@ const UserProfileModal = ({ isOpen, onClose, userId, isAdmin = false }: UserProf
                               setEditedMaxDistance(profile?.max_distance?.toString() || '250');
                               setEditedRelationshipIntent(profile?.relationship_intent || '');
                               setEditedUnlockedCountries(profile?.unlocked_countries || []);
+                              setEditedDateOfBirth(profile?.date_of_birth || '');
                             }}
                             className="h-7 text-xs"
                           >
@@ -431,6 +436,22 @@ const UserProfileModal = ({ isOpen, onClose, userId, isAdmin = false }: UserProf
                               <SelectItem value="not-sure" className="text-xs">Not Sure</SelectItem>
                             </SelectContent>
                           </Select>
+                        </div>
+
+                        {/* Date of Birth */}
+                        <div>
+                          <label className="text-xs font-medium text-gray-600 mb-1 block">Date of Birth</label>
+                          <Input
+                            type="date"
+                            value={editedDateOfBirth}
+                            onChange={(e) => setEditedDateOfBirth(e.target.value)}
+                            className="h-8 text-xs"
+                          />
+                          {editedDateOfBirth && (
+                            <p className="text-[10px] text-gray-500 mt-1">
+                              Age: {calculateAge(editedDateOfBirth)} years old
+                            </p>
+                          )}
                         </div>
                         
                         <div className="grid grid-cols-2 gap-3">

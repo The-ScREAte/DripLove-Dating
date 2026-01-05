@@ -30,7 +30,7 @@ const getPaystackPublicKey = async (): Promise<string> => {
       return getEnvPublicKey();
     }
 
-    const mode = data.value?.mode || 'test';
+    const mode = (data.value as { mode?: string })?.mode || 'test';
     
     // Return the appropriate key based on mode
     const key = mode === 'live' 

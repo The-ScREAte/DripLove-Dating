@@ -26,8 +26,9 @@ const PaystackSettings = () => {
 
       if (error) throw error;
 
-      if (data?.value?.mode) {
-        setPaystackMode(data.value.mode);
+      const valueObj = data?.value as { mode?: 'test' | 'live' } | null;
+      if (valueObj?.mode) {
+        setPaystackMode(valueObj.mode);
       }
     } catch (error) {
       console.error('Failed to load Paystack mode:', error);
