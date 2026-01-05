@@ -322,9 +322,9 @@ const UserProfileModal = ({ isOpen, onClose, userId, isAdmin = false }: UserProf
                   {profile?.first_name} {profile?.last_name}
                 </h2>
                 
-                {profile?.date_of_birth && (
+                {(isEditingPreferences ? editedDateOfBirth : profile?.date_of_birth) && (
                   <p className="text-gray-600 mb-2">
-                    {t('userProfileModal.yearsOld', { age: calculateAge(profile.date_of_birth) })}
+                    {t('userProfileModal.yearsOld', { age: calculateAge(isEditingPreferences ? editedDateOfBirth : profile.date_of_birth) })}
                   </p>
                 )}
                 

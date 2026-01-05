@@ -37,7 +37,7 @@ export default function EmailExport() {
   const [intentFilter, setIntentFilter] = useState<string>('all');
   const [statusFilter, setStatusFilter] = useState<string>('active');
   const [debugFilter, setDebugFilter] = useState<string>('all');
-  const [includeArchived, setIncludeArchived] = useState<boolean>(false);
+  const [archiveFilter, setArchiveFilter] = useState<string>('not_archived');
   const [isLoadingCountries, setIsLoadingCountries] = useState(false);
   const [isLoadingEmails, setIsLoadingEmails] = useState(false);
   const [emails, setEmails] = useState<string[]>([]);
@@ -145,10 +145,13 @@ export default function EmailExport() {
           query = query.eq('account_status', statusFilter);
         }
 
-        // Apply archive filter (only if NOT including archived)
-        if (!includeArchived) {
+        // Apply archive filter
+        if (archiveFilter === 'not_archived') {
           query = query.or('is_archived.is.null,is_archived.eq.false');
+        } else if (archiveFilter === 'archived_only') {
+          query = query.eq('is_archived', true);
         }
+        // 'all' means no filter on archive status
 
         // Safety: exclude deleted/suspended users (even if archived is checked)
         query = query.neq('account_status', 'deleted')
@@ -196,11 +199,12 @@ export default function EmailExport() {
       }
 
       // Apply debug filter (no_photo, never_seen, incomplete, active)
+      // These filters SHOW ONLY users matching the selected criteria
       if (debugFilter !== 'all') {
         const userIds = filteredProfiles.map(p => p.id);
         
         if (debugFilter === 'no_photo') {
-          // Fetch users with images
+          // Show only users WITHOUT photos
           const allImages: any[] = [];
           let imgOffset = 0;
           let hasMoreImages = true;
@@ -218,9 +222,10 @@ export default function EmailExport() {
             }
           }
           const usersWithImages = new Set(allImages.map(img => img.user_id));
+          // Keep only users who do NOT have images
           filteredProfiles = filteredProfiles.filter(p => !usersWithImages.has(p.id));
         } else if (debugFilter === 'never_seen') {
-          // Fetch users who have been liked or passed
+          // Show only users who have NEVER been liked or passed by anyone
           const [likesData, passesData] = await Promise.all([
             supabase.from('likes').select('liked_id'),
             supabase.from('passes').select('passed_id')
@@ -228,14 +233,15 @@ export default function EmailExport() {
           const seenUsers = new Set<string>();
           (likesData.data || []).forEach(l => seenUsers.add(l.liked_id));
           (passesData.data || []).forEach(p => seenUsers.add(p.passed_id));
+          // Keep only users who have NOT been seen
           filteredProfiles = filteredProfiles.filter(p => !seenUsers.has(p.id));
         } else if (debugFilter === 'incomplete') {
-          // Filter profiles missing key fields
+          // Show only users with INCOMPLETE profiles (missing key fields)
           filteredProfiles = filteredProfiles.filter(p => 
             !p.gender || !p.preference || !p.bio || !p.city
           );
         } else if (debugFilter === 'active') {
-          // Only active accounts (already filtered by statusFilter, but be explicit)
+          // Show only ACTIVE accounts
           filteredProfiles = filteredProfiles.filter(p => p.account_status === 'active');
         }
       }
@@ -432,19 +438,22 @@ export default function EmailExport() {
             </div>
           </div>
 
-          {/* Include Archived Checkbox */}
-          <div className="flex items-center space-x-2 p-3 border rounded-lg bg-blue-50">
-            <Checkbox
-              id="include-archived"
-              checked={includeArchived}
-              onCheckedChange={(checked) => setIncludeArchived(checked as boolean)}
-            />
-            <label
-              htmlFor="include-archived"
-              className="text-sm font-medium cursor-pointer"
-            >
-              Include archived users (for re-engagement emails)
-            </label>
+          {/* Archive Filter */}
+          <div className="space-y-2">
+            <Label className="flex items-center gap-2">
+              <Filter className="h-4 w-4" />
+              Archive Status
+            </Label>
+            <Select value={archiveFilter} onValueChange={setArchiveFilter}>
+              <SelectTrigger>
+                <SelectValue placeholder="Select archive status" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="not_archived">Not Archived (Default)</SelectItem>
+                <SelectItem value="archived_only">Archived Only</SelectItem>
+                <SelectItem value="all">All (Include Archived)</SelectItem>
+              </SelectContent>
+            </Select>
           </div>
 
           {/* Country Selection */}
