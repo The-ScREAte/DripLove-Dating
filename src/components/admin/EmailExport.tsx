@@ -36,6 +36,7 @@ export default function EmailExport() {
   const [premiumFilter, setPremiumFilter] = useState<string>('all');
   const [intentFilter, setIntentFilter] = useState<string>('all');
   const [statusFilter, setStatusFilter] = useState<string>('active');
+  const [debugFilter, setDebugFilter] = useState<string>('all');
   const [includeArchived, setIncludeArchived] = useState<boolean>(false);
   const [isLoadingCountries, setIsLoadingCountries] = useState(false);
   const [isLoadingEmails, setIsLoadingEmails] = useState(false);
@@ -117,7 +118,7 @@ export default function EmailExport() {
         // Build the query for each batch
         let query = supabase
           .from('profiles')
-          .select('id, email, gender, preference, relationship_intent, account_status, country, is_archived');
+          .select('id, email, gender, preference, relationship_intent, account_status, country, is_archived, bio, city');
 
         // Apply country filter
         if (selectedCountries.size > 0) {
@@ -191,6 +192,51 @@ export default function EmailExport() {
           filteredProfiles = filteredProfiles.filter(p => premiumUserIds.has(p.id));
         } else if (premiumFilter === 'free') {
           filteredProfiles = filteredProfiles.filter(p => !premiumUserIds.has(p.id));
+        }
+      }
+
+      // Apply debug filter (no_photo, never_seen, incomplete, active)
+      if (debugFilter !== 'all') {
+        const userIds = filteredProfiles.map(p => p.id);
+        
+        if (debugFilter === 'no_photo') {
+          // Fetch users with images
+          const allImages: any[] = [];
+          let imgOffset = 0;
+          let hasMoreImages = true;
+          while (hasMoreImages) {
+            const { data: images } = await supabase
+              .from('user_images')
+              .select('user_id')
+              .in('user_id', userIds.slice(imgOffset, imgOffset + 1000));
+            if (images && images.length > 0) {
+              allImages.push(...images);
+              imgOffset += 1000;
+              hasMoreImages = imgOffset < userIds.length;
+            } else {
+              hasMoreImages = false;
+            }
+          }
+          const usersWithImages = new Set(allImages.map(img => img.user_id));
+          filteredProfiles = filteredProfiles.filter(p => !usersWithImages.has(p.id));
+        } else if (debugFilter === 'never_seen') {
+          // Fetch users who have been liked or passed
+          const [likesData, passesData] = await Promise.all([
+            supabase.from('likes').select('liked_id'),
+            supabase.from('passes').select('passed_id')
+          ]);
+          const seenUsers = new Set<string>();
+          (likesData.data || []).forEach(l => seenUsers.add(l.liked_id));
+          (passesData.data || []).forEach(p => seenUsers.add(p.passed_id));
+          filteredProfiles = filteredProfiles.filter(p => !seenUsers.has(p.id));
+        } else if (debugFilter === 'incomplete') {
+          // Filter profiles missing key fields
+          filteredProfiles = filteredProfiles.filter(p => 
+            !p.gender || !p.preference || !p.bio || !p.city
+          );
+        } else if (debugFilter === 'active') {
+          // Only active accounts (already filtered by statusFilter, but be explicit)
+          filteredProfiles = filteredProfiles.filter(p => p.account_status === 'active');
         }
       }
 
@@ -361,6 +407,26 @@ export default function EmailExport() {
                   <SelectItem value="paused">Paused</SelectItem>
                   <SelectItem value="suspended">Suspended</SelectItem>
                   <SelectItem value="deleted">Deleted</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+
+            {/* Debug Filter */}
+            <div className="space-y-2">
+              <Label className="flex items-center gap-2">
+                <Filter className="h-4 w-4" />
+                Debug Filter
+              </Label>
+              <Select value={debugFilter} onValueChange={setDebugFilter}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Select debug filter" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">No Debug Filter</SelectItem>
+                  <SelectItem value="no_photo">No Photo</SelectItem>
+                  <SelectItem value="never_seen">Never Seen</SelectItem>
+                  <SelectItem value="incomplete">Incomplete Profile</SelectItem>
+                  <SelectItem value="active">Active Accounts Only</SelectItem>
                 </SelectContent>
               </Select>
             </div>
