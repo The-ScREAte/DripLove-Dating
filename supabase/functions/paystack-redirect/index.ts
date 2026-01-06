@@ -17,6 +17,7 @@ serve(async (req) => {
     const reference = url.searchParams.get('reference') || url.searchParams.get('trxref') || ''
     const paymentType = url.searchParams.get('payment_type') || 'subscription'
     const originParam = url.searchParams.get('origin') || '' // Origin where payment was initiated
+    const nativeFlag = url.searchParams.get('native') === '1'
 
     // Build redirect URLs
     const params = `status=${encodeURIComponent(status)}&reference=${encodeURIComponent(reference)}&payment_type=${encodeURIComponent(paymentType)}`
@@ -26,8 +27,24 @@ serve(async (req) => {
 
     // Check User-Agent to determine platform
     const userAgent = req.headers.get('User-Agent') || ''
-    const isMobileApp = userAgent.toLowerCase().includes('capacitor') || 
-                       userAgent.toLowerCase().includes('driplove')
+    const ua = userAgent.toLowerCase()
+
+    // Origin can tell us this was initiated from a native shell even when the callback is handled
+    // by an external browser (Paystack -> redirect).
+    const originIsNative =
+      originParam.startsWith('capacitor://') ||
+      originParam.startsWith('ionic://') ||
+      originParam.startsWith('file://')
+
+    // Mobile app detection:
+    // - Explicit native flag (sent by our app)
+    // - Capacitor/DripLove UA
+    // - Android UA + native-origin hint (covers external browser return from app flow)
+    const isMobileApp =
+      nativeFlag ||
+      ua.includes('capacitor') ||
+      ua.includes('driplove') ||
+      (ua.includes('android') && originIsNative)
 
     // Determine web redirect destination
     let webRedirect: string

@@ -215,7 +215,7 @@ const PaystackPaymentModal: React.FC<PaystackPaymentModalProps> = ({
       const callbackUrl = shouldUseEdgeRedirect
         ? `${SUPABASE_URL}/functions/v1/paystack-redirect?payment_type=${encodeURIComponent(
             isOneTime ? 'one-time' : 'subscription'
-          )}&origin=${encodeURIComponent(origin)}`
+          )}&origin=${encodeURIComponent(origin)}${isNative ? '&native=1' : ''}`
         : `${origin}/payment-success`;
 
       const payload: any = {
