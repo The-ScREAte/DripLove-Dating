@@ -104,6 +104,19 @@ const PaymentSuccess: React.FC = () => {
     }
     if (!payment_type) payment_type = 'subscription';
 
+    // If Paystack returns without query params (common production issue), fall back to the reference
+    // we stored during initialization. Only trust it if it's recent.
+    let fallbackReference: string | null = null;
+    try {
+      const storedRef = window.localStorage.getItem('driplove_last_paystack_reference');
+      const storedTsRaw = window.localStorage.getItem('driplove_last_payment_ts');
+      const storedTs = storedTsRaw ? Number(storedTsRaw) : 0;
+      const isRecent = Number.isFinite(storedTs) && storedTs > 0 && Date.now() - storedTs < 30 * 60 * 1000;
+      if (storedRef && isRecent) fallbackReference = storedRef;
+    } catch {
+      // ignore
+    }
+
     // If IAP (Apple or Google), just show success - the validator/verified handler already updated the DB
     if (payment_type === 'iap' && status === 'successful') {
       // Database was already updated by the IAP validator (Apple or Google)
@@ -113,8 +126,9 @@ const PaymentSuccess: React.FC = () => {
       return;
     }
 
-    // If no payment parameters, redirect to discover page
-    if (!status && !tx_ref && !transaction_id) {
+    // If no payment parameters, but we have a recent stored reference, try verifying anyway.
+    // Otherwise, redirect home.
+    if (!status && !tx_ref && !transaction_id && !txnId && !fallbackReference) {
       toast({
         title: 'Invalid Access',
         description: 'Please initiate payment to access this page.',
@@ -145,7 +159,11 @@ const PaymentSuccess: React.FC = () => {
       return;
     }
 
-    if (status !== 'successful' || !txnId) {
+    // If status is missing but we have a reference, treat as "pending" and attempt verification.
+    const effectiveTxnId = txnId || fallbackReference;
+    const effectiveStatus = status || (effectiveTxnId ? 'successful' : '');
+
+    if (effectiveStatus !== 'successful' || !effectiveTxnId) {
       setError('Payment verification failed. Please contact support if money was deducted.');
       setRedirectCountdown(10);
       const timer = setTimeout(() => {
@@ -179,7 +197,7 @@ const PaymentSuccess: React.FC = () => {
       }
 
       try {
-        const referenceToVerify = reference || txnId;
+        const referenceToVerify = reference || txnId || fallbackReference;
         const { data: verifyData, error: verifyError } = await supabase.functions.invoke('paystack-verify', {
           body: {
             reference: referenceToVerify,
@@ -196,6 +214,13 @@ const PaymentSuccess: React.FC = () => {
         }
 
         setUpgradeSuccess(true);
+
+        // Clear stored reference on success to avoid stale replays.
+        try {
+          window.localStorage.removeItem('driplove_last_paystack_reference');
+        } catch {
+          // ignore
+        }
       } catch (err: unknown) {
         console.error('Payment processing error:', err);
         setError(`Payment processing failed: ${getErrorMessage(err) || 'Unknown error'}`);

@@ -238,6 +238,21 @@ const PaystackPaymentModal: React.FC<PaystackPaymentModalProps> = ({
         const errorDetails = data?.details || error?.details || '';
         throw new Error(`${errorMessage}${errorDetails ? ` - Details: ${JSON.stringify(errorDetails)}` : ''}`);
       }
+
+      // Persist reference as a fallback for web callbacks.
+      // Some hosting/CDN setups or Paystack callback behaviors can result in missing query params
+      // on the return URL. We can still verify payment by using the init reference.
+      try {
+        if (typeof window !== 'undefined' && window?.localStorage) {
+          if (typeof data?.reference === 'string' && data.reference) {
+            window.localStorage.setItem('driplove_last_paystack_reference', data.reference);
+          }
+          window.localStorage.setItem('driplove_last_payment_ts', String(Date.now()));
+        }
+      } catch {
+        // ignore
+      }
+
       window.location.href = data.authorization_url as string;
       return;
     } catch (serverErr) {
