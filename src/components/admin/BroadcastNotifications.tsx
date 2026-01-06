@@ -38,7 +38,7 @@ interface User {
   has_push_token: boolean;
 }
 
-type RecipientFilter = 'all' | 'no_images' | 'never_seen' | 'incomplete_profile';
+type RecipientFilter = 'all' | 'no_images' | 'never_seen' | 'incomplete_profile' | 'active_accounts' | 'premium_users';
 
 interface Campaign {
   id: string;
@@ -349,6 +349,30 @@ export default function BroadcastNotifications() {
           const city = (p.city || '').trim();
           return !(gender && preference && bio && city);
         });
+      } else if (recipientFilter === 'active_accounts') {
+        // Show only users with active account status (non-archived, non-suspended)
+        // Since we're already querying active profiles by default, just show all
+        filteredProfiles = profiles;
+      } else if (recipientFilter === 'premium_users') {
+        // Get all premium users (those with active subscriptions)
+        const premiumUserIds = new Set<string>();
+        for (let i = 0; i < userIds.length; i += CHUNK_SIZE) {
+          const chunk = userIds.slice(i, i + CHUNK_SIZE);
+          if (chunk.length === 0) continue;
+
+          const { data: subsChunk, error: subsError } = await supabase
+            .from('user_subscriptions')
+            .select('user_id')
+            .in('user_id', chunk)
+            .eq('status', 'active');
+
+          if (subsError) throw subsError;
+          (subsChunk || []).forEach((sub: any) => {
+            if (sub.user_id) premiumUserIds.add(sub.user_id);
+          });
+        }
+
+        filteredProfiles = profiles.filter((p) => premiumUserIds.has(p.id));
       }
 
       const userList: User[] = filteredProfiles.map(p => ({
@@ -843,9 +867,11 @@ export default function BroadcastNotifications() {
                       </SelectTrigger>
                       <SelectContent>
                         <SelectItem value="all">All users</SelectItem>
-                        <SelectItem value="no_images">Debug: No images</SelectItem>
-                        <SelectItem value="never_seen">Debug: Never seen</SelectItem>
-                        <SelectItem value="incomplete_profile">Debug: Incomplete profiles</SelectItem>
+                        <SelectItem value="no_images">No images (users without photos)</SelectItem>
+                        <SelectItem value="never_seen">Never seen (no likes/passes)</SelectItem>
+                        <SelectItem value="incomplete_profile">Incomplete profiles</SelectItem>
+                        <SelectItem value="active_accounts">Active accounts only</SelectItem>
+                        <SelectItem value="premium_users">Premium users only</SelectItem>
                       </SelectContent>
                     </Select>
                   </div>

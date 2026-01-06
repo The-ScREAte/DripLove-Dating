@@ -1855,7 +1855,15 @@ const ChatPage = ({ currentUser, onUnreadChange, onDetailViewChange }: ChatPageP
   };
 
   if (!selectedMatch) {
-    const newMatchList = matches.filter(m => !m.last_message);
+    // Dedupe new matches by partner ID to prevent duplicate profiles
+    const seenPartnerIds = new Set<string>();
+    const newMatchList = matches.filter(m => {
+      if (m.last_message) return false; // Only show matches without messages
+      const partnerId = m.partner?.id || (m.user1_id === currentUser.id ? m.user2_id : m.user1_id);
+      if (seenPartnerIds.has(partnerId)) return false; // Skip duplicates
+      seenPartnerIds.add(partnerId);
+      return true;
+    });
     
     // NOTE: Dormancy applies only to active (non-archived) users.
     // Archived users are filtered earlier in processMatchesData.
