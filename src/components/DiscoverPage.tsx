@@ -1168,6 +1168,7 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, isPremium, profileComplet
     const [
       { data: currentUserData },
       { data: likedUsers },
+      { data: matches },
       { data: blockedUsers },
       { data: recentPasses },
       { data: usersWhoLikedMe }
@@ -1181,6 +1182,10 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, isPremium, profileComplet
         .from('likes')
         .select('liked_id')
         .eq('liker_id', userId),
+      supabase
+        .from('matches')
+        .select('user1_id, user2_id')
+        .or(`user1_id.eq.${userId},user2_id.eq.${userId}`),
       supabase
         .from('blocks')
         .select('blocked_id, blocker_id')
@@ -1199,12 +1204,15 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, isPremium, profileComplet
     ]);
 
     const likedUserIds = uniqUuids(likedUsers?.map(like => like.liked_id) || []);
+    const matchedUserIds = uniqUuids((matches || [])
+      .map((m) => (m.user1_id === userId ? m.user2_id : m.user1_id))
+      .filter(Boolean));
     const blockedUserIds = uniqUuids(blockedUsers?.flatMap(block => [block.blocked_id, block.blocker_id]) || []);
     const passedUserIds = uniqUuids(recentPasses?.map(p => p.passed_id) || []);
     
     const usersWhoLikedMeIds = uniqUuids((usersWhoLikedMe || [])
       .map(like => like.liker_id)
-      .filter(id => !likedUserIds.includes(id) && !blockedUserIds.includes(id) && !passedUserIds.includes(id)));
+      .filter(id => !likedUserIds.includes(id) && !blockedUserIds.includes(id) && !passedUserIds.includes(id) && !matchedUserIds.includes(id)));
 
     setUsersWhoLikedMeIds(prev => {
       if (prev.length === usersWhoLikedMeIds.length) {
@@ -1231,7 +1239,7 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, isPremium, profileComplet
         return (now - data.timestamp) < thirtyDaysMs;
       })
       .map(([id, _]) => id));
-    const excludedIds = uniqUuids([...likedUserIds, ...blockedUserIds, ...passedUserIds, ...locallySwipedIds, userId]);
+    const excludedIds = uniqUuids([...likedUserIds, ...matchedUserIds, ...blockedUserIds, ...passedUserIds, ...locallySwipedIds, userId]);
     
     const priorityLikerIds = usersWhoLikedMeIds.filter(id => !locallySwipedIds.includes(id));
     

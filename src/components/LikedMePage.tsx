@@ -298,41 +298,25 @@ const LikedMePage = ({ currentUser, isPremium = false }: LikedMePageProps) => {
       return { likers: [], userImages: {} };
     }
 
-    // 2. Get all matches, blocks, and passes in one go
-    const [matchesRes, blocksRes, passesRes] = await Promise.all([
-      supabase
-        .from('matches')
-        .select('user1_id, user2_id')
-        .or(`user1_id.eq.${userId},user2_id.eq.${userId}`),
-      supabase
-        .from('blocks')
-        .select('blocked_id, blocker_id')
-        .or(`blocker_id.eq.${userId},blocked_id.eq.${userId}`),
-      supabase
-        .from('passes')
-        .select('passed_id')
-        .eq('passer_id', userId)
-    ]);
+    // 2. Get block relationships (both directions)
+    const blocksRes = await supabase
+      .from('blocks')
+      .select('blocked_id, blocker_id')
+      .or(`blocker_id.eq.${userId},blocked_id.eq.${userId}`);
 
-    if (matchesRes.error) throw matchesRes.error;
     if (blocksRes.error) throw blocksRes.error;
-    if (passesRes.error) throw passesRes.error;
 
-    const matches = matchesRes.data || [];
     const blockedUsers = blocksRes.data || [];
-    const passes = passesRes.data || [];
-    const matchedIds = matches.map(match =>
-      match.user1_id === userId ? match.user2_id : match.user1_id
+    const blockedIds = new Set(
+      blockedUsers
+        .map((block) => (block.blocker_id === userId ? block.blocked_id : block.blocker_id))
+        .filter(Boolean)
     );
-    const blockedIds = blockedUsers.map(block =>
-      block.blocker_id === userId ? block.blocked_id : block.blocker_id
-    );
-    const passedIds = passes.map(pass => pass.passed_id);
 
-    // 3. Filter likerIds - exclude matched, blocked, and passed profiles
-    const likerIds = likes
-      .map(like => like.liker_id)
-      .filter(id => !matchedIds.includes(id) && !blockedIds.includes(id) && !passedIds.includes(id));
+    // 3. Build likerIds (do NOT exclude matched/passed; user requested to see everyone who liked them)
+    const likerIds = uniqUuids(likes.map((like) => like.liker_id).filter(Boolean))
+      .filter((id) => id !== userId)
+      .filter((id) => !blockedIds.has(id));
 
     if (likerIds.length === 0) {
       return { likers: [], userImages: {} };
@@ -347,7 +331,22 @@ const LikedMePage = ({ currentUser, isPremium = false }: LikedMePageProps) => {
 
     if (profileError) throw profileError;
 
-    const likers = (profiles || []) as unknown as LikerProfile[];
+    // Preserve "most recent like" ordering as best-effort
+    const latestLikeAtByLiker = new Map<string, number>();
+    for (const like of likes) {
+      const likerId = like?.liker_id;
+      if (!likerId) continue;
+      const ts = Date.parse(String((like as any).created_at || ''));
+      const t = Number.isFinite(ts) ? ts : 0;
+      const prev = latestLikeAtByLiker.get(likerId) ?? 0;
+      if (t > prev) latestLikeAtByLiker.set(likerId, t);
+    }
+
+    const likers = ((profiles || []) as unknown as LikerProfile[]).sort((a, b) => {
+      const ta = latestLikeAtByLiker.get(a.id) ?? 0;
+      const tb = latestLikeAtByLiker.get(b.id) ?? 0;
+      return tb - ta;
+    });
 
     // 5. Fetch all first images for these profiles in one query
     let imagesData = null;
