@@ -300,7 +300,9 @@ export default function BroadcastNotifications() {
 
       let filteredProfiles = profiles;
 
+      // Apply debug filters - these SHOW ONLY users matching the selected criteria
       if (recipientFilter === 'no_images') {
+        // Show ONLY users WITHOUT any images
         const usersWithImages = new Set<string>();
         for (let i = 0; i < userIds.length; i += CHUNK_SIZE) {
           const chunk = userIds.slice(i, i + CHUNK_SIZE);
@@ -317,8 +319,11 @@ export default function BroadcastNotifications() {
           });
         }
 
+        // FILTER: Keep only users who have NO images (not in usersWithImages set)
         filteredProfiles = profiles.filter((p) => !usersWithImages.has(p.id));
+        console.log(`[Broadcast] no_images filter: ${usersWithImages.size} users have images, ${filteredProfiles.length} users without images`);
       } else if (recipientFilter === 'never_seen') {
+        // Show ONLY users who have never been liked or passed
         const seenUsers = new Set<string>();
         for (let i = 0; i < userIds.length; i += CHUNK_SIZE) {
           const chunk = userIds.slice(i, i + CHUNK_SIZE);
@@ -340,21 +345,27 @@ export default function BroadcastNotifications() {
           });
         }
 
+        // FILTER: Keep only users who have NOT been seen (not in seenUsers set)
         filteredProfiles = profiles.filter((p) => !seenUsers.has(p.id));
+        console.log(`[Broadcast] never_seen filter: ${seenUsers.size} users have been seen, ${filteredProfiles.length} never seen`);
       } else if (recipientFilter === 'incomplete_profile') {
+        // Show ONLY users with incomplete profiles
         filteredProfiles = profiles.filter((p) => {
           const gender = (p.gender || '').trim();
           const preference = (p.preference || '').trim();
           const bio = (p.bio || '').trim();
           const city = (p.city || '').trim();
+          // Incomplete means missing at least one key field
           return !(gender && preference && bio && city);
         });
+        console.log(`[Broadcast] incomplete_profile filter: ${filteredProfiles.length} incomplete profiles`);
       } else if (recipientFilter === 'active_accounts') {
         // Show only users with active account status (non-archived, non-suspended)
         // Since we're already querying active profiles by default, just show all
         filteredProfiles = profiles;
+        console.log(`[Broadcast] active_accounts filter: ${filteredProfiles.length} active accounts`);
       } else if (recipientFilter === 'premium_users') {
-        // Get all premium users (those with active subscriptions)
+        // Show ONLY premium users with active subscriptions
         const premiumUserIds = new Set<string>();
         for (let i = 0; i < userIds.length; i += CHUNK_SIZE) {
           const chunk = userIds.slice(i, i + CHUNK_SIZE);
@@ -372,7 +383,9 @@ export default function BroadcastNotifications() {
           });
         }
 
+        // FILTER: Keep only users who ARE premium (in premiumUserIds set)
         filteredProfiles = profiles.filter((p) => premiumUserIds.has(p.id));
+        console.log(`[Broadcast] premium_users filter: ${premiumUserIds.size} premium users found`);
       }
 
       const userList: User[] = filteredProfiles.map(p => ({
@@ -844,7 +857,16 @@ export default function BroadcastNotifications() {
                       <span className="text-xs">Select Users</span>
                     </CardTitle>
                     <CardDescription className="text-[10px]">
-                      {filteredUsers.length} users shown ({filteredUsersWithPushTokens} with push notifications enabled)
+                      {recipientFilter !== 'all' ? (
+                        <span className="text-purple-600 font-medium">
+                          Filtered: {recipientFilter === 'no_images' ? 'Users without photos' : 
+                                    recipientFilter === 'never_seen' ? 'Users never seen' :
+                                    recipientFilter === 'incomplete_profile' ? 'Incomplete profiles' :
+                                    recipientFilter === 'active_accounts' ? 'Active accounts' :
+                                    recipientFilter === 'premium_users' ? 'Premium users' : 'All users'} • 
+                        </span>
+                      ) : null}
+                      {' '}{filteredUsers.length} users shown ({filteredUsersWithPushTokens} with push notifications enabled)
                     </CardDescription>
                   </div>
                   <Button
@@ -1046,130 +1068,156 @@ export default function BroadcastNotifications() {
 
         <TabsContent value="history" className="space-y-4">
           <Card>
-            <CardHeader>
-              <CardTitle className="text-xs">Campaign History</CardTitle>
-              <CardDescription className="text-[10px]">
-                View past broadcast campaigns and their delivery status
-              </CardDescription>
+            <CardHeader className="pb-3">
+              <div className="flex items-center justify-between">
+                <div>
+                  <CardTitle className="text-sm flex items-center gap-2">
+                    <History className="w-4 h-4" />
+                    Campaign History
+                  </CardTitle>
+                  <CardDescription className="text-[10px]">
+                    {campaigns.length} campaigns • Click any campaign for details
+                  </CardDescription>
+                </div>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => loadCampaigns({ silent: false })}
+                  disabled={isLoadingCampaigns}
+                  className="h-7 text-xs"
+                >
+                  <RotateCw className={`w-3 h-3 mr-1 ${isLoadingCampaigns ? 'animate-spin' : ''}`} />
+                  Refresh
+                </Button>
+              </div>
             </CardHeader>
-            <CardContent>
+            <CardContent className="pt-0">
               {isLoadingCampaigns ? (
-                <div className="flex items-center justify-center py-8">
-                  <Loader2 className="w-6 h-6 animate-spin" />
+                <div className="flex items-center justify-center py-12">
+                  <Loader2 className="w-6 h-6 animate-spin text-purple-600" />
                 </div>
               ) : campaigns.length === 0 ? (
-                <p className="text-center text-gray-500 py-8">No campaigns found</p>
+                <div className="text-center py-12">
+                  <MessageCircle className="w-10 h-10 mx-auto text-gray-300 mb-3" />
+                  <p className="text-gray-500 text-sm">No campaigns yet</p>
+                  <p className="text-gray-400 text-xs mt-1">Create your first broadcast in the New tab</p>
+                </div>
               ) : (
-                <ScrollArea className="h-[500px] pr-4">
-                  <div className="space-y-3">
-                    {campaigns.map((campaign) => (
-                      <div
-                        key={campaign.id}
-                        className="p-3 border rounded-md hover:border-purple-300 transition-colors"
-                      >
-                        <div className="flex items-start justify-between mb-2">
-                          <div className="flex-1">
-                            <h4 className="font-semibold text-xs">{campaign.title}</h4>
-                            <p className="text-[10px] text-gray-600 mt-1">{campaign.message}</p>
-                          </div>
-                        </div>
-                        
-                        <div className="flex items-center gap-2 mb-2 flex-wrap">
-                          <Badge variant="outline" className="text-[10px] h-4">
-                            {campaign.total_recipients} recipients
-                          </Badge>
-                          <Badge variant="outline" className="text-green-600 border-green-600 text-[10px] h-4">
-                            <CheckCircle2 className="w-2.5 h-2.5 mr-0.5" />
-                            {campaign.successful_sends} sent
-                          </Badge>
-                          {campaign.failed_sends > 0 && (
-                            <Badge variant="outline" className="text-red-600 border-red-600 text-[10px] h-4">
-                              <AlertCircle className="w-2.5 h-2.5 mr-0.5" />
-                              {campaign.failed_sends} failed
-                            </Badge>
-                          )}
-                          {(campaign.status === 'queued' || campaign.status === 'processing') && (
-                            <Badge variant="outline" className="text-blue-600 border-blue-600 text-[10px] h-4">
-                              <Loader2 className="w-2.5 h-2.5 mr-0.5 animate-spin" />
-                              Processing...
-                            </Badge>
-                          )}
-                          <CountriesBadge countries={campaign.target_countries} />
-                        </div>
-
-                        {/* Progress bar for active campaigns */}
-                        {(campaign.status === 'queued' || campaign.status === 'processing') && campaign.total_recipients > 0 && (
-                          <div className="mb-2">
-                            <div className="w-full bg-gray-200 rounded-full h-2 overflow-hidden">
-                              <div 
-                                className="bg-purple-600 h-2 transition-all duration-300"
-                                style={{ 
-                                  width: `${Math.min(100, ((campaign.successful_sends + campaign.failed_sends) / campaign.total_recipients) * 100)}%` 
-                                }}
-                              />
+                <ScrollArea className="h-[480px]">
+                  <div className="space-y-2 pr-3">
+                    {campaigns.map((campaign) => {
+                      const isActive = campaign.status === 'queued' || campaign.status === 'processing';
+                      const progress = campaign.total_recipients > 0 
+                        ? ((campaign.successful_sends + campaign.failed_sends) / campaign.total_recipients) * 100 
+                        : 0;
+                      
+                      return (
+                        <div
+                          key={campaign.id}
+                          className={`p-3 border rounded-lg transition-all hover:shadow-sm ${
+                            isActive ? 'border-purple-200 bg-purple-50/50' : 'hover:border-gray-300'
+                          }`}
+                        >
+                          {/* Header row */}
+                          <div className="flex items-start justify-between gap-2 mb-2">
+                            <div className="flex-1 min-w-0">
+                              <div className="flex items-center gap-2">
+                                <h4 className="font-medium text-xs truncate">{campaign.title}</h4>
+                                {isActive && (
+                                  <Badge className="bg-purple-100 text-purple-700 text-[9px] h-4 px-1.5 shrink-0">
+                                    <Loader2 className="w-2 h-2 mr-0.5 animate-spin" />
+                                    Live
+                                  </Badge>
+                                )}
+                                {campaign.status === 'completed' && (
+                                  <Badge className="bg-green-100 text-green-700 text-[9px] h-4 px-1.5 shrink-0">
+                                    <CheckCircle2 className="w-2 h-2 mr-0.5" />
+                                    Done
+                                  </Badge>
+                                )}
+                              </div>
+                              <p className="text-[10px] text-gray-500 mt-0.5 line-clamp-1">{campaign.message}</p>
                             </div>
-                            <p className="text-[9px] text-gray-500 mt-0.5">
-                              {campaign.successful_sends + campaign.failed_sends} / {campaign.total_recipients} processed
-                            </p>
+                            <span className="text-[9px] text-gray-400 whitespace-nowrap shrink-0">
+                              {new Date(campaign.created_at).toLocaleDateString()}
+                            </span>
                           </div>
-                        )}
 
-                        <div className="space-y-2">
-                          <div className="text-[10px] text-gray-500">
-                            {new Date(campaign.created_at).toLocaleString()}
+                          {/* Progress bar for active campaigns */}
+                          {isActive && campaign.total_recipients > 0 && (
+                            <div className="mb-2">
+                              <div className="w-full bg-gray-200 rounded-full h-1.5 overflow-hidden">
+                                <div 
+                                  className="bg-purple-600 h-1.5 transition-all duration-300"
+                                  style={{ width: `${Math.min(100, progress)}%` }}
+                                />
+                              </div>
+                              <p className="text-[9px] text-gray-500 mt-0.5">
+                                {campaign.successful_sends + campaign.failed_sends} / {campaign.total_recipients} processed
+                              </p>
+                            </div>
+                          )}
+
+                          {/* Stats row */}
+                          <div className="flex items-center gap-1.5 flex-wrap">
+                            <span className="text-[10px] text-gray-500 bg-gray-100 px-1.5 py-0.5 rounded">
+                              {campaign.total_recipients} recipients
+                            </span>
+                            <span className="text-[10px] text-green-600 bg-green-50 px-1.5 py-0.5 rounded">
+                              ✓ {campaign.successful_sends}
+                            </span>
+                            {campaign.failed_sends > 0 && (
+                              <span className="text-[10px] text-red-600 bg-red-50 px-1.5 py-0.5 rounded">
+                                ✗ {campaign.failed_sends}
+                              </span>
+                            )}
+                            <CountriesBadge countries={campaign.target_countries} />
                           </div>
-                          <div className="flex gap-1 flex-wrap">
+
+                          {/* Actions row */}
+                          <div className="flex items-center gap-1 mt-2 pt-2 border-t border-gray-100">
                             <Button
                               variant="ghost"
                               size="sm"
                               onClick={() => viewCampaignDetails(campaign)}
-                              className="h-6 text-[10px] px-2"
+                              className="h-6 text-[10px] px-2 hover:bg-gray-100"
                             >
                               <Eye className="w-2.5 h-2.5 mr-1" />
-                              Details
+                              View
                             </Button>
                             {campaign.failed_sends > 0 && (
                               <Button
                                 variant="ghost"
                                 size="sm"
                                 onClick={() => retryFailedNotifications(campaign)}
-                                className="h-6 text-[10px] px-2"
+                                className="h-6 text-[10px] px-2 text-orange-600 hover:bg-orange-50"
                               >
                                 <RotateCw className="w-2.5 h-2.5 mr-1" />
-                                Retry
+                                Retry Failed
                               </Button>
                             )}
                             <Button
                               variant="ghost"
                               size="sm"
                               onClick={() => resendCampaign(campaign, true)}
-                              className="h-6 text-[10px] px-2 text-purple-600 hover:text-purple-700"
+                              className="h-6 text-[10px] px-2 text-purple-600 hover:bg-purple-50"
                             >
                               <Copy className="w-2.5 h-2.5 mr-1" />
-                              Same
+                              Clone
                             </Button>
-                            <Button
-                              variant="ghost"
-                              size="sm"
-                              onClick={() => resendCampaign(campaign, false)}
-                              className="h-6 text-[10px] px-2 text-blue-600 hover:text-blue-700"
-                            >
-                              <Send className="w-2.5 h-2.5 mr-1" />
-                              New
-                            </Button>
+                            <div className="flex-1" />
                             <Button
                               variant="ghost"
                               size="sm"
                               onClick={() => deleteCampaign(campaign.id)}
-                              className="h-6 text-[10px] px-2 text-red-600 hover:text-red-700"
+                              className="h-6 text-[10px] px-2 text-red-500 hover:bg-red-50 hover:text-red-600"
                             >
-                              <Trash2 className="w-2.5 h-2.5 mr-1" />
-                              Delete
+                              <Trash2 className="w-2.5 h-2.5" />
                             </Button>
                           </div>
                         </div>
-                      </div>
-                    ))}
+                      );
+                    })}
                   </div>
                 </ScrollArea>
               )}
