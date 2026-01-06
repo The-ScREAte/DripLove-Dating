@@ -1107,6 +1107,12 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, isPremium, profileComplet
 
     const perCountryLimit = Math.max(40, Math.ceil(limit / Math.max(1, countryCodes.length)));
 
+    const excludedIdSet = new Set(excludedIds);
+    const MAX_EXCLUDED_IDS_IN_QUERY = 120;
+    const excludedIdsForQuery = excludedIds.length > MAX_EXCLUDED_IDS_IN_QUERY
+      ? excludedIds.slice(0, MAX_EXCLUDED_IDS_IN_QUERY)
+      : excludedIds;
+
     const results = await Promise.all(
       countryCodes.map(async (countryCode) => {
         let query = supabase
@@ -1119,8 +1125,8 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, isPremium, profileComplet
           .eq('is_archived', false)
           .limit(perCountryLimit);
 
-        if (excludedIds.length > 0) {
-          query = query.not('id', 'in', formatUuidInFilter(excludedIds));
+        if (excludedIdsForQuery.length > 0) {
+          query = query.not('id', 'in', formatUuidInFilter(excludedIdsForQuery));
         }
 
         const { data, error } = await query;
@@ -1133,7 +1139,10 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, isPremium, profileComplet
     );
 
     const flat: ProfileRow[] = results.flat();
-    const unique: ProfileRow[] = Array.from(new Map(flat.map((p) => [p.id, p])).values());
+    let unique: ProfileRow[] = Array.from(new Map(flat.map((p) => [p.id, p])).values());
+
+    // Enforce full exclusions client-side (the query only uses a capped subset).
+    unique = unique.filter((p) => !excludedIdSet.has(p.id));
 
     unique.forEach((p) => {
       p.country_code = normalizeCountryCode(String(p.country_code || ''));
@@ -1213,6 +1222,15 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, isPremium, profileComplet
       })
       .map(([id, _]) => id));
     const excludedIds = uniqUuids([...likedUserIds, ...blockedUserIds, ...passedUserIds, ...locallySwipedIds, userId]);
+
+    // PostgREST encodes filters into the URL. Large `not.in.(...)` lists can exceed URL limits
+    // and cause repeated 400 (Bad Request) failures. We cap what we send to the server and
+    // then enforce the full exclusion set client-side after fetching.
+    const excludedIdSet = new Set(excludedIds);
+    const MAX_EXCLUDED_IDS_IN_QUERY = 120;
+    const excludedIdsForQuery = excludedIds.length > MAX_EXCLUDED_IDS_IN_QUERY
+      ? excludedIds.slice(0, MAX_EXCLUDED_IDS_IN_QUERY)
+      : excludedIds;
     
     const priorityLikerIds = usersWhoLikedMeIds.filter(id => !locallySwipedIds.includes(id));
     
@@ -1266,8 +1284,8 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, isPremium, profileComplet
               query = query.eq('country_code', baseCountryCode);
             }
 
-            if (excludedIds.length > 0) {
-              query = query.not('id', 'in', formatUuidInFilter(excludedIds));
+            if (excludedIdsForQuery.length > 0) {
+              query = query.not('id', 'in', formatUuidInFilter(excludedIdsForQuery));
             }
 
             const { data: profiles, error } = await query
@@ -1295,8 +1313,8 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, isPremium, profileComplet
             .in('gender', allowedGenders)
             .limit(80);
 
-          if (excludedIds.length > 0) {
-            fallbackQuery = fallbackQuery.not('id', 'in', formatUuidInFilter(excludedIds));
+          if (excludedIdsForQuery.length > 0) {
+            fallbackQuery = fallbackQuery.not('id', 'in', formatUuidInFilter(excludedIdsForQuery));
           }
 
           const { data: fallbackLocal, error: fallbackError } = await fallbackQuery;
@@ -1404,8 +1422,8 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, isPremium, profileComplet
           query = query.eq('country_code', baseCountryCode);
         }
 
-        if (excludedIds.length > 0) {
-          query = query.not('id', 'in', formatUuidInFilter(excludedIds));
+        if (excludedIdsForQuery.length > 0) {
+          query = query.not('id', 'in', formatUuidInFilter(excludedIdsForQuery));
         }
 
         const { data: profiles, error } = await query
@@ -1427,9 +1445,9 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, isPremium, profileComplet
         let query = supabase.from('profiles').select(PROFILE_SELECT);
 
         // Only add exclusion filter if we have valid excluded IDs
-        if (excludedIds.length > 0 && excludedIds.length < 1000) { // Sanity check: don't exclude too many
+          if (excludedIdsForQuery.length > 0) {
           try {
-            query = query.not('id', 'in', formatUuidInFilter(excludedIds));
+            query = query.not('id', 'in', formatUuidInFilter(excludedIdsForQuery));
           } catch (e) {
             console.error('[DiscoverPage] Error adding exclusion filter:', e);
             // Continue without exclusion filter rather than failing completely
@@ -1481,8 +1499,8 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, isPremium, profileComplet
       
       let archivedQuery = supabase.from('profiles').select(PROFILE_SELECT);
       
-      if (excludedIds.length > 0) {
-        archivedQuery = archivedQuery.not('id', 'in', formatUuidInFilter(excludedIds));
+      if (excludedIdsForQuery.length > 0) {
+        archivedQuery = archivedQuery.not('id', 'in', formatUuidInFilter(excludedIdsForQuery));
       }
       
       // Build country filter based on user type
@@ -1535,11 +1553,14 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, isPremium, profileComplet
     // Update the fallback state
     setIsArchivedFallback(usingArchivedFallback);
 
+    // Enforce the full exclusion set client-side (server query uses a capped subset).
+    filteredProfiles = filteredProfiles.filter((p) => !excludedIdSet.has(p.id));
+
     // ✅ FINAL EMPTY RULE
     // Free users: empty when local is empty
     // Premium users: empty ONLY when local + intl are empty
-    const hasLocal = localProfiles.length > 0;
-    const hasIntl = intlProfiles.length > 0;
+    const hasLocal = localProfiles.some((p) => !excludedIdSet.has(p.id));
+    const hasIntl = intlProfiles.some((p) => !excludedIdSet.has(p.id));
 
     if (!premiumForFeed && filteredProfiles.length === 0) {
       setNoMoreProfiles(true);
@@ -1575,6 +1596,11 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, isPremium, profileComplet
       filteredProfiles = isAndroidPlatform()
         ? filteredProfiles
         : applyActivityWeighting(filteredProfiles, `${userId}_${dailySeed}_activity`);
+
+      if (filteredProfiles.length === 0) {
+        setNoMoreProfiles(true);
+        return { matches: [], images: {}, distances: distanceMap, index: 0 };
+      }
     }
 
     // Add empty images array and precomputed distance
