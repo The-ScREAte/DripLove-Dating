@@ -205,6 +205,14 @@ const PaystackPaymentModal: React.FC<PaystackPaymentModalProps> = ({
           )}&origin=${encodeURIComponent(origin)}`
         : `${origin}/payment-success?payment_type=${encodeURIComponent(isOneTime ? 'one-time' : 'subscription')}`;
 
+      console.log('[PAYSTACK] Payment initialization:', {
+        isNative,
+        origin,
+        isLocalhost,
+        shouldUseEdgeRedirect,
+        callbackUrl
+      });
+
       const payload: any = {
         email: emailToUse,
         metadata,

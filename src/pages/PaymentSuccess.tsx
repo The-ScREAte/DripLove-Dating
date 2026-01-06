@@ -79,6 +79,17 @@ const PaymentSuccess: React.FC = () => {
     const txnId = transaction_id || reference || null;
     const payment_type = params.get('payment_type') || 'subscription';
 
+    console.log('[PAYMENT-SUCCESS] Query params:', {
+      fullUrl: location.search,
+      status,
+      tx_ref,
+      transaction_id,
+      reference,
+      txnId,
+      payment_type,
+      allParams: Object.fromEntries(params.entries())
+    });
+
     // If IAP (Apple or Google), just show success - the validator/verified handler already updated the DB
     if (payment_type === 'iap' && status === 'successful') {
       // Database was already updated by the IAP validator (Apple or Google)
