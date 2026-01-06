@@ -1417,7 +1417,11 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, isPremium, profileComplet
 
         if (error) throw error;
         filteredProfiles = Array.isArray(profiles) ? (profiles as unknown as ProfileRow[]) : [];
-      } else if (baseCountryCode) {
+      }
+      
+      // CRITICAL FIX: Always fallback to country-based query if location-based returned 0 results
+      // This ensures users see profiles even if no one is within their distance preference
+      if (filteredProfiles.length === 0 && baseCountryCode) {
         let query = supabase.from('profiles').select(PROFILE_SELECT);
 
         if (excludedIds.length > 0) {
@@ -1434,6 +1438,13 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, isPremium, profileComplet
 
         if (error) throw error;
         filteredProfiles = Array.isArray(profiles) ? (profiles as unknown as ProfileRow[]) : [];
+        
+        // Assign default distance for country-based matches
+        filteredProfiles.forEach(p => {
+          if (!distanceMap[p.id]) {
+            distanceMap[p.id] = 999; // Default distance for same-country matches
+          }
+        });
         
         // Reset archived fallback flag if we found active profiles
         if (filteredProfiles.length > 0) {
