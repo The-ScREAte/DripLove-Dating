@@ -11,6 +11,7 @@ import { Badge } from '@/components/ui/badge';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Loader2, Send, Users, Globe, CheckCircle2, AlertCircle, Trash2, RotateCw, Eye, History, Copy, Mail, Calendar, MessageCircle } from 'lucide-react';
 import EmailExport from './EmailExport';
+import EmailBroadcast from './EmailBroadcast';
 import ScheduledBroadcasts from './ScheduledBroadcasts';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
@@ -1226,7 +1227,22 @@ export default function BroadcastNotifications() {
         </TabsContent>
 
         <TabsContent value="emailing">
-          <EmailExport />
+          <div className="space-y-4">
+            <div>
+              <h3 className="text-sm font-semibold mb-2">Send Email Broadcast</h3>
+              <p className="text-xs text-gray-600 mb-4">
+                Send custom emails to selected users using Supabase email service
+              </p>
+            </div>
+            <EmailBroadcast />
+            <div className="border-t pt-4 mt-6">
+              <h3 className="text-sm font-semibold mb-2">Export Email List</h3>
+              <p className="text-xs text-gray-600 mb-4">
+                Export user emails for external email campaigns
+              </p>
+              <EmailExport />
+            </div>
+          </div>
         </TabsContent>
       </Tabs>
 
