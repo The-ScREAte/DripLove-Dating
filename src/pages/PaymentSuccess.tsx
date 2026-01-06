@@ -68,27 +68,41 @@ const PaymentSuccess: React.FC = () => {
     if (!isAuthenticated) return;
 
     // Check for payment status in query params
+    // Note: Some Paystack callback implementations may not append params with '&' when callback_url already
+    // contains a query string. To be resilient, we also regex-scan the raw query.
     const params = new URLSearchParams(location.search);
-    const statusRaw = params.get('status')?.toLowerCase() || '';
+    const rawQuery = location.search || '';
+    const findFromRaw = (key: string): string | null => {
+      const match = rawQuery.match(new RegExp(`[?&]${key}=([^&]+)`, 'i'));
+      return match?.[1] ? decodeURIComponent(match[1]) : null;
+    };
+
+    const statusRaw = (params.get('status') || findFromRaw('status') || '').toLowerCase();
     // Normalize status (Paystack may return 'success' or 'successful')
     const status = statusRaw === 'success' ? 'successful' : statusRaw;
-    const tx_ref = params.get('tx_ref');
-    const transaction_id = params.get('transaction_id');
-    const reference = params.get('reference') || params.get('trxref') || params.get('txref') || params.get('tx_ref');
+    const tx_ref = params.get('tx_ref') || findFromRaw('tx_ref');
+    const transaction_id = params.get('transaction_id') || findFromRaw('transaction_id');
+    const reference =
+      params.get('reference') ||
+      params.get('trxref') ||
+      params.get('txref') ||
+      params.get('tx_ref') ||
+      findFromRaw('reference') ||
+      findFromRaw('trxref') ||
+      findFromRaw('txref');
     // Use transaction_id first, then reference - Paystack redirect uses reference
     const txnId = transaction_id || reference || null;
-    const payment_type = params.get('payment_type') || 'subscription';
 
-    console.log('[PAYMENT-SUCCESS] Query params:', {
-      fullUrl: location.search,
-      status,
-      tx_ref,
-      transaction_id,
-      reference,
-      txnId,
-      payment_type,
-      allParams: Object.fromEntries(params.entries())
-    });
+    // payment_type may be missing on web callback; fall back to localStorage from payment initiation.
+    let payment_type = params.get('payment_type') || findFromRaw('payment_type') || '';
+    if (!payment_type) {
+      try {
+        payment_type = window.localStorage.getItem('driplove_last_payment_type') || '';
+      } catch {
+        // ignore
+      }
+    }
+    if (!payment_type) payment_type = 'subscription';
 
     // If IAP (Apple or Google), just show success - the validator/verified handler already updated the DB
     if (payment_type === 'iap' && status === 'successful') {
@@ -106,7 +120,7 @@ const PaymentSuccess: React.FC = () => {
         description: 'Please initiate payment to access this page.',
         variant: 'default',
       });
-      navigate('/discover');
+      navigate('/');
       return;
     }
 
@@ -117,7 +131,7 @@ const PaymentSuccess: React.FC = () => {
         description: 'Your payment was cancelled. No charges were made.',
         variant: 'default',
       });
-      setTimeout(() => navigate('/discover'), 2000);
+      setTimeout(() => navigate('/'), 2000);
       return;
     }
 
@@ -127,7 +141,7 @@ const PaymentSuccess: React.FC = () => {
         description: 'Your payment could not be processed. Please try again.',
         variant: 'destructive',
       });
-      setTimeout(() => navigate('/discover'), 2000);
+      setTimeout(() => navigate('/'), 2000);
       return;
     }
 
@@ -135,7 +149,7 @@ const PaymentSuccess: React.FC = () => {
       setError('Payment verification failed. Please contact support if money was deducted.');
       setRedirectCountdown(10);
       const timer = setTimeout(() => {
-        navigate('/discover');
+        navigate('/');
       }, 10000);
       setRedirectTimer(timer);
 
@@ -228,14 +242,13 @@ const PaymentSuccess: React.FC = () => {
           <div className="space-y-3">
             <Button
               className="w-full bg-gradient-to-r from-blue-500 to-blue-600 text-white font-bold py-3 px-8 rounded-full text-lg shadow-lg hover:scale-105 transition-all duration-200"
-              onClick={() => navigate('/discover')}
+              onClick={() => navigate('/')}
             >
               <ArrowLeft className="w-5 h-5 mr-2" />
               Try Payment Again
             </Button>
             <Button
               variant="outline"
-              className="w-full border-2 border-gray-300 text-gray-700 font-semibold py-3 px-8 rounded-full text-lg hover:bg-gray-50 transition-all duration-200"
               onClick={() => navigate('/')}
             >
               Go to Home

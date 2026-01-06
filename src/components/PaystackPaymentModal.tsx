@@ -199,19 +199,24 @@ const PaystackPaymentModal: React.FC<PaystackPaymentModalProps> = ({
         origin.startsWith('file://');
 
       const shouldUseEdgeRedirect = isNative || originLooksLocal;
+
+      // Persist payment type locally as a fallback.
+      // Some Paystack callback implementations can mangle existing query strings on callback_url.
+      // Avoid relying on query params for payment_type on the web callback.
+      try {
+        if (typeof window !== 'undefined' && window?.localStorage) {
+          window.localStorage.setItem('driplove_last_payment_type', isOneTime ? 'one-time' : 'subscription');
+          window.localStorage.setItem('driplove_last_payment_ts', String(Date.now()));
+        }
+      } catch {
+        // ignore
+      }
+
       const callbackUrl = shouldUseEdgeRedirect
         ? `${SUPABASE_URL}/functions/v1/paystack-redirect?payment_type=${encodeURIComponent(
             isOneTime ? 'one-time' : 'subscription'
           )}&origin=${encodeURIComponent(origin)}`
-        : `${origin}/payment-success?payment_type=${encodeURIComponent(isOneTime ? 'one-time' : 'subscription')}`;
-
-      console.log('[PAYSTACK] Payment initialization:', {
-        isNative,
-        origin,
-        isLocalhost,
-        shouldUseEdgeRedirect,
-        callbackUrl
-      });
+        : `${origin}/payment-success`;
 
       const payload: any = {
         email: emailToUse,
