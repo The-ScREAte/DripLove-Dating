@@ -868,12 +868,31 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, isPremium, profileComplet
 
     const profilesOnly = potentialMatches.filter((m): m is PotentialMatch => !isAd(m));
     const withAds = injectAds(profilesOnly);
+
+    // If we didn't actually inject any ads (e.g. deck shorter than adFrequency),
+    // do nothing to avoid an infinite setState loop.
+    if (!withAds.some((m) => isAd(m))) return;
+
     const nextIndex = withAds.findIndex((m) => !isAd(m) && m.id === current.id);
 
     if (nextIndex < 0) return;
 
     // Keep the current card at index 0 by trimming the deck.
     const trimmed = withAds.slice(nextIndex);
+
+    // Avoid setting an equivalent deck (prevents unnecessary rerenders/loops).
+    if (
+      trimmed.length === potentialMatches.length &&
+      trimmed.every((m, i) => {
+        const cur = potentialMatches[i];
+        return isAd(m)
+          ? isAd(cur) && (m as AdData).id === (cur as AdData).id
+          : !isAd(cur) && (m as PotentialMatch).id === (cur as PotentialMatch).id;
+      })
+    ) {
+      return;
+    }
+
     setPotentialMatches(trimmed);
     setCurrentIndex(0);
   }, [adsLoaded, stableShuffledAds.length, potentialMatches, currentIndex, injectAds]);
