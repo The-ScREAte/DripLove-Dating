@@ -3855,7 +3855,12 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, isPremium, profileComplet
               disabled={isLoading || isLoadingMore}
               className="w-full"
             >
-              {(isLoading || isLoadingMore) ? t('discover.findingMatches') : t('discover.refresh')}
+              {isLoading || isLoadingMore ? (
+                <span className="flex items-center gap-2">
+                  <span className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                  {t('discover.refresh')}
+                </span>
+              ) : t('discover.refresh')}
             </Button>
           </CardContent>
         </Card>
