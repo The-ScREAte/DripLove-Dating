@@ -185,14 +185,15 @@ const PaystackPaymentModal: React.FC<PaystackPaymentModalProps> = ({
       };
 
       // IMPORTANT:
-      // - On web, we can use the app origin callback directly.
-      // - On Capacitor/native, the app origin is typically `capacitor://localhost` / `http://localhost`
-      //   which Paystack cannot redirect to. Use the Edge Function redirect that deep-links back into the app.
+      // - Web production (driplove.love): Use direct callback to origin - Paystack can reach it
+      // - Localhost/dev: Use Edge Function redirect (Paystack can't reach localhost)
+      // - Capacitor/native: Use Edge Function redirect with deep link back to app
       const isNative = Capacitor.isNativePlatform();
       const origin = typeof window !== 'undefined' ? window.location.origin : '';
+      const isLocalhost = origin.includes('localhost') || origin.includes('127.0.0.1');
       const originLooksLocal =
         !origin ||
-        origin.includes('localhost') ||
+        isLocalhost ||
         origin.startsWith('capacitor://') ||
         origin.startsWith('ionic://') ||
         origin.startsWith('file://');
@@ -201,7 +202,7 @@ const PaystackPaymentModal: React.FC<PaystackPaymentModalProps> = ({
       const callbackUrl = shouldUseEdgeRedirect
         ? `${SUPABASE_URL}/functions/v1/paystack-redirect?payment_type=${encodeURIComponent(
             isOneTime ? 'one-time' : 'subscription'
-          )}`
+          )}&origin=${encodeURIComponent(origin)}`
         : `${origin}/payment-success?payment_type=${encodeURIComponent(isOneTime ? 'one-time' : 'subscription')}`;
 
       const payload: any = {

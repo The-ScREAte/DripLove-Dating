@@ -16,29 +16,42 @@ serve(async (req) => {
     const status = url.searchParams.get('status') || 'successful'
     const reference = url.searchParams.get('reference') || url.searchParams.get('trxref') || ''
     const paymentType = url.searchParams.get('payment_type') || 'subscription'
+    const originParam = url.searchParams.get('origin') || '' // Origin where payment was initiated
 
-    // Use the same redirect technique as OAuth callback (apple-oauth-callback)
+    // Build redirect URLs
+    const params = `status=${encodeURIComponent(status)}&reference=${encodeURIComponent(reference)}&payment_type=${encodeURIComponent(paymentType)}`
+    
     // Deep link for mobile app
-    const deepLink = `driplove://payment/callback?status=${encodeURIComponent(status)}&reference=${encodeURIComponent(reference)}&payment_type=${encodeURIComponent(paymentType)}`
+    const deepLink = `driplove://payment/callback?${params}`
 
-    // Web fallback
-    const webOriginRaw = Deno.env.get('APP_WEB_ORIGIN') || Deno.env.get('SITE_URL') || 'https://driplove.love'
-    const webOrigin = webOriginRaw.replace(/\/$/, '')
-    const webRedirect = `${webOrigin}/payment-success?status=${encodeURIComponent(status)}&reference=${encodeURIComponent(reference)}&payment_type=${encodeURIComponent(paymentType)}`
-
-    // Check User-Agent to determine if this is a mobile app request
+    // Check User-Agent to determine platform
     const userAgent = req.headers.get('User-Agent') || ''
     const isMobileApp = userAgent.toLowerCase().includes('capacitor') || 
-                       userAgent.toLowerCase().includes('driplove') ||
-                       userAgent.toLowerCase().includes('android')
+                       userAgent.toLowerCase().includes('driplove')
+
+    // Determine web redirect destination
+    let webRedirect: string
+    if (originParam && (originParam.includes('localhost') || originParam.includes('127.0.0.1'))) {
+      // Localhost: redirect back to localhost
+      webRedirect = `${originParam}/payment-success?${params}`
+    } else if (originParam && originParam.startsWith('http')) {
+      // Custom origin provided: use it
+      webRedirect = `${originParam}/payment-success?${params}`
+    } else {
+      // Default: production web
+      const webOriginRaw = Deno.env.get('APP_WEB_ORIGIN') || 'https://driplove.love'
+      const webOrigin = webOriginRaw.replace(/\/$/, '')
+      webRedirect = `${webOrigin}/payment-success?${params}`
+    }
 
     // For mobile app: redirect to deep link (it will open the app)
-    // For web: redirect to web URL
+    // For web: redirect to appropriate web URL
     const redirectUrl = isMobileApp ? deepLink : webRedirect
 
     console.log('[PAYSTACK-REDIRECT] Redirecting:', {
       userAgent: userAgent.substring(0, 50),
       isMobileApp,
+      originParam,
       redirectUrl: redirectUrl.substring(0, 100)
     })
 
