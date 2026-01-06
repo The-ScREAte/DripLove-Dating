@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react';
-import { supabase } from '@/integrations/supabase/client';
+import { supabase, SUPABASE_URL } from '@/integrations/supabase/client';
 import { isIOS, buyIAPProduct } from '@/utils/iap';
+import { Capacitor } from '@capacitor/core';
 
 interface PaystackPaymentModalProps {
   isOpen: boolean;
@@ -154,8 +155,13 @@ const PaystackPaymentModal: React.FC<PaystackPaymentModalProps> = ({
       setIsLoading(false);
       return;
     }
-    // Validate email
-    if (!email || !email.includes('@')) {
+    // Prefer the authenticated Supabase email (matches server-side verify anti-abuse check)
+    const { data: sessionData } = await supabase.auth.getSession();
+    const authUser = sessionData?.session?.user || null;
+    const emailToUse = (authUser?.email || email || '').trim();
+
+    // Validate email (Paystack requires an email)
+    if (!emailToUse || !emailToUse.includes('@')) {
       alert('Please provide a valid email address.');
       setIsLoading(false);
       return;
@@ -171,15 +177,37 @@ const PaystackPaymentModal: React.FC<PaystackPaymentModalProps> = ({
     try {
       const metadata = {
         custom_fields: [
-          { display_name: 'DripLove User', variable_name: 'driplove_user', value: email },
+          { display_name: 'DripLove User', variable_name: 'driplove_user', value: emailToUse },
+          { display_name: 'DripLove User ID', variable_name: 'user_id', value: authUser?.id || '' },
           { display_name: 'Payment Method', variable_name: 'payment_method', value: selectedPaymentMethod },
           { display_name: 'Payment Type', variable_name: 'payment_type', value: isOneTime ? 'one-time' : 'subscription' },
         ],
       };
+
+      // IMPORTANT:
+      // - On web, we can use the app origin callback directly.
+      // - On Capacitor/native, the app origin is typically `capacitor://localhost` / `http://localhost`
+      //   which Paystack cannot redirect to. Use the Edge Function redirect that deep-links back into the app.
+      const isNative = Capacitor.isNativePlatform();
+      const origin = typeof window !== 'undefined' ? window.location.origin : '';
+      const originLooksLocal =
+        !origin ||
+        origin.includes('localhost') ||
+        origin.startsWith('capacitor://') ||
+        origin.startsWith('ionic://') ||
+        origin.startsWith('file://');
+
+      const shouldUseEdgeRedirect = isNative || originLooksLocal;
+      const callbackUrl = shouldUseEdgeRedirect
+        ? `${SUPABASE_URL}/functions/v1/paystack-redirect?payment_type=${encodeURIComponent(
+            isOneTime ? 'one-time' : 'subscription'
+          )}`
+        : `${origin}/payment-success?payment_type=${encodeURIComponent(isOneTime ? 'one-time' : 'subscription')}`;
+
       const payload: any = {
-        email: email.trim(),
+        email: emailToUse,
         metadata,
-        callback_url: `${window.location.origin}/payment-success?status=successful&payment_type=${isOneTime ? 'one-time' : 'subscription'}`,
+        callback_url: callbackUrl,
       };
       // IMPORTANT: For recurring subscriptions we intentionally initialize an amount-based transaction
       // (not a Paystack plan subscription). We store the authorization_code from the first payment
@@ -207,7 +235,7 @@ const PaystackPaymentModal: React.FC<PaystackPaymentModalProps> = ({
         const paymentConfig: any = {
           key: trimmedKey,
           publicKey: trimmedKey,
-          email: email.trim(),
+          email: emailToUse,
           ref,
           callback: (response: any) => {
             try {
@@ -221,7 +249,8 @@ const PaystackPaymentModal: React.FC<PaystackPaymentModalProps> = ({
           onClose: () => setIsLoading(false),
           metadata: {
             custom_fields: [
-              { display_name: 'DripLove User', variable_name: 'driplove_user', value: email },
+              { display_name: 'DripLove User', variable_name: 'driplove_user', value: emailToUse },
+              { display_name: 'DripLove User ID', variable_name: 'user_id', value: authUser?.id || '' },
               { display_name: 'Payment Method', variable_name: 'payment_method', value: selectedPaymentMethod },
               { display_name: 'Payment Type', variable_name: 'payment_type', value: isOneTime ? 'one-time' : 'subscription' },
             ],

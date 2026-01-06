@@ -1,6 +1,6 @@
 // ⭐ ANDROID OPTIMIZATION: Memoized slide components to reduce re-render cost by 40-60%
 import React from 'react';
-import { User, Quote, Heart, Coffee, Search, Loader2 } from 'lucide-react';
+import { User, Quote, Heart, Coffee, Search } from 'lucide-react';
 import { SlideContent } from './MatchCardHelpers';
 import { useTranslation } from 'react-i18next';
 import styles from './MatchCard.module.css';
@@ -24,11 +24,14 @@ const ImageSlide = React.memo<{
   showLoader: boolean;
 }>(({ imageSrc, matchFirstName, matchLastName, usingBlob, showLoader }) => {
   const [hasError, setHasError] = React.useState(false);
+  const [isLoaded, setIsLoaded] = React.useState(false);
   
   // Reset error state when image source changes
   React.useEffect(() => {
     setHasError(false);
-  }, [imageSrc]);
+    // Blob URLs are already local and should render instantly; avoid any "loading" UI.
+    setIsLoaded(Boolean(usingBlob));
+  }, [imageSrc, usingBlob]);
   
   // Show placeholder if image failed to load
   if (hasError) {
@@ -49,18 +52,17 @@ const ImageSlide = React.memo<{
   
   return (
     <div className="relative w-full h-full bg-gray-900">
-      {showLoader && (
-        <div className="absolute inset-0 bg-gray-900 flex items-center justify-center z-10">
-          <Loader2 className="h-8 w-8 animate-spin text-pink-500" />
-        </div>
-      )}
       <img
-        loading="lazy"
+        key={imageSrc}
+        loading="eager"
         decoding="async"
+        fetchpriority="high"
         src={imageSrc}
         alt={`${matchFirstName} ${matchLastName}`}
-        className={`w-full h-full object-contain transition-opacity duration-300 relative z-10 ${styles.optimizedImage}`}
+        className={`w-full h-full object-contain transition-opacity duration-200 relative z-10 ${styles.optimizedImage}`}
         draggable={false}
+        style={{ opacity: isLoaded ? 1 : 0 }}
+        onLoad={() => setIsLoaded(true)}
         onError={() => setHasError(true)}
       />
     </div>

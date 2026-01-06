@@ -4,8 +4,8 @@ import { serve } from 'https://deno.land/std@0.177.0/http/server.ts'
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.45.0'
 import type { SupabaseClient } from 'https://esm.sh/@supabase/supabase-js@2.45.0'
 import { crypto } from 'https://deno.land/std@0.177.0/crypto/mod.ts'
+import { getPaystackSecretKey } from '../_shared/paystack-utils.ts'
 
-const PAYSTACK_SECRET_KEY = Deno.env.get('PAYSTACK_SECRET_KEY')
 const SUPABASE_URL = Deno.env.get('SUPABASE_URL')
 const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')
 
@@ -22,13 +22,11 @@ function json(status: number, body: unknown) {
   })
 }
 
-async function verifyPaystackSignature(body: string, signature: string): Promise<boolean> {
+async function verifyPaystackSignature(body: string, signature: string, secretKey: string): Promise<boolean> {
   try {
-    if (!PAYSTACK_SECRET_KEY) return false
-    
     const key = await crypto.subtle.importKey(
       'raw',
-      new TextEncoder().encode(PAYSTACK_SECRET_KEY),
+      new TextEncoder().encode(secretKey),
       { name: 'HMAC', hash: 'SHA-512' },
       false,
       ['sign']
@@ -69,6 +67,21 @@ async function findUserByEmail(supabase: SupabaseClient, email: string) {
     console.error('Error finding user:', error)
     return null
   }
+}
+
+function extractUserIdFromMetadata(eventData: unknown): string | null {
+  const data = eventData as { metadata?: { custom_fields?: unknown } } | null
+  const customFields = (data?.metadata as any)?.custom_fields
+  if (!Array.isArray(customFields)) return null
+  for (const f of customFields) {
+    const field = f as { variable_name?: unknown; value?: unknown } | null
+    const variableName = typeof field?.variable_name === 'string' ? field.variable_name : ''
+    if (variableName === 'user_id' || variableName === 'driplove_user_id') {
+      const val = field?.value
+      if (typeof val === 'string' && val.length > 0) return val
+    }
+  }
+  return null
 }
 
 function addDays(date: Date, days: number) {
@@ -178,8 +191,11 @@ serve(async (req) => {
     // Verify signature
     const signature = req.headers.get('x-paystack-signature')
     const body = await req.text()
+
+    // Get the appropriate Paystack secret key based on mode in database
+    const PAYSTACK_SECRET_KEY = await getPaystackSecretKey()
     
-    if (!signature || !await verifyPaystackSignature(body, signature)) {
+    if (!signature || !await verifyPaystackSignature(body, signature, PAYSTACK_SECRET_KEY)) {
       console.log('[PAYSTACK-WEBHOOK] Invalid signature')
       return json(401, { error: 'Invalid signature' })
     }
@@ -188,7 +204,11 @@ serve(async (req) => {
     console.log('[PAYSTACK-WEBHOOK] Event type:', event.event)
     console.log('[PAYSTACK-WEBHOOK] Event data:', JSON.stringify(event.data, null, 2))
     
-    const supabase = createClient(SUPABASE_URL!, SUPABASE_SERVICE_ROLE_KEY!)
+    if (!SUPABASE_URL || !SUPABASE_SERVICE_ROLE_KEY) {
+      return json(500, { error: 'Missing Supabase env' })
+    }
+
+    const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY)
     
     const eventType = event.event
     const eventData = event.data
@@ -289,11 +309,21 @@ serve(async (req) => {
     if (eventType === 'charge.success' || eventType === 'subscription.create') {
       console.log('[PAYSTACK-WEBHOOK] Processing payment success/renewal event')
 
+      const userIdFromMeta = extractUserIdFromMetadata(eventData)
       const email = extractCustomerEmail(eventData)
-      if (!email) return json(400, { error: 'No customer email found' })
 
-      const user = await findUserByEmail(supabase, email)
-      if (!user) return json(404, { error: 'User not found' })
+      let userId: string | null = userIdFromMeta
+      let resolvedEmail: string | null = email
+
+      if (!userId) {
+        if (!email) return json(400, { error: 'No customer email found' })
+        const user = await findUserByEmail(supabase, email)
+        if (!user) return json(404, { error: 'User not found' })
+        userId = user.id
+        resolvedEmail = email
+      }
+
+      if (!userId) return json(400, { error: 'Unable to resolve user' })
 
       // Extract and save authorization for future recurring charges
       const authorization = extractAuthorization(eventData)
@@ -301,22 +331,17 @@ serve(async (req) => {
       const currency = eventData?.currency || 'GHS'
 
       if (authorization) {
-        await saveAuthorization(supabase, user.id, email, authorization, amount, currency)
+        await saveAuthorization(supabase, userId, resolvedEmail || '', authorization, amount, currency)
       }
 
       const { data: currentSub } = await supabase
         .from('user_subscriptions')
         .select('id, expires_at, payment_method, auto_renew, flutterwave_transaction_id')
-        .eq('user_id', user.id)
+        .eq('user_id', userId)
         .eq('payment_method', 'paystack')
         .order('created_at', { ascending: false })
         .limit(1)
         .maybeSingle()
-
-      if (!currentSub?.id) {
-        console.log('[PAYSTACK-WEBHOOK] No subscription row found for user:', user.id)
-        return json(404, { error: 'No subscription row found' })
-      }
 
       const nextExpiry =
         currentSub.expires_at && new Date(currentSub.expires_at) > new Date()
@@ -339,15 +364,45 @@ serve(async (req) => {
         updatePayload.flutterwave_transaction_id = subscriptionCode
       }
 
-      const { error: updateError } = await supabase
-        .from('user_subscriptions')
-        .update(updatePayload)
-        .eq('user_id', user.id)
-        .eq('payment_method', 'paystack')
+      if (currentSub?.id) {
+        const { error: updateError } = await supabase
+          .from('user_subscriptions')
+          .update(updatePayload)
+          .eq('user_id', userId)
+          .eq('payment_method', 'paystack')
 
-      if (updateError) {
-        console.error('[PAYSTACK-WEBHOOK] Error updating subscription:', updateError)
-        return json(500, { error: 'Failed to update subscription' })
+        if (updateError) {
+          console.error('[PAYSTACK-WEBHOOK] Error updating subscription:', updateError)
+          return json(500, { error: 'Failed to update subscription' })
+        }
+      } else {
+        console.log('[PAYSTACK-WEBHOOK] No subscription row found; creating one for user:', userId)
+        const insertPayload = {
+          user_id: userId,
+          starts_at: new Date().toISOString(),
+          ...updatePayload,
+        }
+        const { error: insertError } = await supabase.from('user_subscriptions').insert([insertPayload])
+        if (insertError) {
+          console.error('[PAYSTACK-WEBHOOK] Error creating subscription:', insertError)
+          return json(500, { error: 'Failed to create subscription' })
+        }
+      }
+
+      // Record payment (best-effort)
+      try {
+        const reference = (eventData as any)?.reference || subscriptionCode || ''
+        await supabase
+          .from('subscription_payments')
+          .insert({
+            user_id: userId,
+            amount: Number(amount) / 100,
+            currency: currency || 'GHS',
+            payment_method: 'paystack',
+            transaction_id: reference,
+          })
+      } catch (e) {
+        console.error('[PAYSTACK-WEBHOOK] Error recording payment:', e)
       }
 
       return json(200, { message: 'Success processed' })
