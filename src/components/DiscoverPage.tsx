@@ -3848,19 +3848,27 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, isPremium, profileComplet
             <p className="text-gray-600 mb-4">{t('discover.noProfilesDescription')}</p>
             <Button
               onClick={() => {
+                // Clear all caches and force a complete refresh
+                setPotentialMatches([]);
+                setUserImages({});
+                setUserDistances({});
+                setCurrentIndex(0);
                 setNoMoreProfiles(false);
                 setIsLoading(true);
-                fetchPotentialMatches();
+                setIsLoadingMore(false);
+                setHasCompletedInitialFetch(false);
+                
+                // Clear image cache
+                clearCache();
+                
+                // Fetch fresh profiles
+                setTimeout(() => {
+                  fetchPotentialMatches();
+                }, 100);
               }}
-              disabled={isLoading || isLoadingMore}
               className="w-full"
             >
-              {isLoading || isLoadingMore ? (
-                <span className="flex items-center gap-2">
-                  <span className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
-                  {t('discover.refresh')}
-                </span>
-              ) : t('discover.refresh')}
+              {t('discover.refresh')}
             </Button>
           </CardContent>
         </Card>
