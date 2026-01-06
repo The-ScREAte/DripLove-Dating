@@ -3834,68 +3834,33 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, isPremium, profileComplet
     );
   }
 
-  // When the deck is empty after initial fetch completed
+  // When the deck is empty after initial fetch completed - show empty state immediately
+  // Do NOT show loading spinner when deck is empty - this prevents infinite reload loop
   if (potentialMatches.length === 0 && hasCompletedInitialFetch) {
-    // Still fetching more - show loading
-    if ((isLoading || isLoadingMore) && !noMoreProfiles) {
-      return (
-        <>
-          <style>
-            {`
-              @keyframes float {
-                0%, 100% {
-                  transform: translateY(0px);
-                }
-                50% {
-                  transform: translateY(-12px);
-                }
-              }
-              .float-animation {
-                animation: float 1.8s ease-in-out infinite;
-              }
-            `}
-          </style>
-          <div className="min-h-screen w-full flex items-center justify-center" style={{ minHeight: 'calc(100vh - 152px)' }}>
-            <div className="flex flex-col items-center">
-              <div className="mb-4 float-animation">
-                <img
-                  src="/driplove-logo.webp"
-                  loading="lazy"
-                  decoding="async"
-                  alt="DripLove"
-                  className="w-20 h-20"
-                />
-              </div>
-              <p className="text-gray-600">{t('discover.findingMatches')}</p>
-            </div>
-          </div>
-        </>
-      );
-    }
-
-    // Truly out of profiles - show empty state
-    if (noMoreProfiles) {
-      return (
-        <div className="min-h-screen w-full flex items-center justify-center" style={{ minHeight: 'calc(100vh - 152px)' }}>
-          <Card className="max-w-md w-full mx-4">
-            <CardContent className="p-8 text-center">
-              <Heart className="w-16 h-16 mx-auto mb-4 text-gray-300" />
-              <h2 className="text-xl font-semibold mb-2">{t('discover.noMoreProfiles')}</h2>
-              <p className="text-gray-600 mb-4">{t('discover.noProfilesDescription')}</p>
-              <Button
-                onClick={() => {
-                  setNoMoreProfiles(false);
-                  fetchPotentialMatches();
-                }}
-                className="w-full"
-              >
-                {t('discover.refresh')}
-              </Button>
-            </CardContent>
-          </Card>
-        </div>
-      );
-    }
+    // Show empty state - user can manually refresh
+    // Background loading will continue silently without showing spinner
+    return (
+      <div className="min-h-screen w-full flex items-center justify-center" style={{ minHeight: 'calc(100vh - 152px)' }}>
+        <Card className="max-w-md w-full mx-4">
+          <CardContent className="p-8 text-center">
+            <Heart className="w-16 h-16 mx-auto mb-4 text-gray-300" />
+            <h2 className="text-xl font-semibold mb-2">{t('discover.noMoreProfiles')}</h2>
+            <p className="text-gray-600 mb-4">{t('discover.noProfilesDescription')}</p>
+            <Button
+              onClick={() => {
+                setNoMoreProfiles(false);
+                setIsLoading(true);
+                fetchPotentialMatches();
+              }}
+              disabled={isLoading || isLoadingMore}
+              className="w-full"
+            >
+              {(isLoading || isLoadingMore) ? t('discover.findingMatches') : t('discover.refresh')}
+            </Button>
+          </CardContent>
+        </Card>
+      </div>
+    );
   }
 
   // Calculate swipe overlay opacity and transform
