@@ -1184,7 +1184,11 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, isPremium, profileComplet
         .eq('liker_id', userId),
       supabase
         .from('matches')
-        .select('user1_id, user2_id')
+        .select(`
+          *,
+          user1:profiles!matches_user1_id_fkey(id),
+          user2:profiles!matches_user2_id_fkey(id)
+        `)
         .or(`user1_id.eq.${userId},user2_id.eq.${userId}`),
       supabase
         .from('blocks')
@@ -2709,6 +2713,48 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, isPremium, profileComplet
     }
   }, [potentialMatches, currentIndex, hasCompletedInitialFetch, preloadProfileImages]);
 
+  // Helper to persist swipe count to database
+  const persistSwipeCount = async (userId: string) => {
+    try {
+      const today = new Date().toISOString().split('T')[0];
+      
+      // Upsert to user_usage table: increment if exists, insert if not
+      const { error } = await supabase
+        .from('user_usage')
+        .upsert(
+          {
+            user_id: userId,
+            date: today,
+            swipes_used: 1
+          },
+          {
+            onConflict: 'user_id,date',
+            ignoreDuplicates: false
+          }
+        )
+        .select()
+        .then(async ({ data, error }) => {
+          if (error) return { error };
+          
+          // If record exists, we need to increment it
+          if (data && data.length > 0) {
+            const currentCount = data[0].swipes_used || 0;
+            return await supabase
+              .from('user_usage')
+              .update({ swipes_used: currentCount + 1 })
+              .match({ user_id: userId, date: today });
+          }
+          return { error: null };
+        });
+
+      if (error) {
+        console.error('Failed to persist swipe count:', error);
+      }
+    } catch (err) {
+      console.error('Error persisting swipe count:', err);
+    }
+  };
+
   // Optimistic UI: move to next card instantly, then process like in background
   const handleLike = async () => {
     const currentMatch = potentialMatches[currentIndex];
@@ -2844,6 +2890,7 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, isPremium, profileComplet
               
               // ✅ Increment swipe count after successful DB write
               setTodaySwipeCount(prev => prev + 1);
+              await persistSwipeCount(currentUser.id);
 
               // Notify other parts of the app (e.g., Profile stats) immediately
               if (typeof window !== 'undefined') {
@@ -2916,6 +2963,7 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, isPremium, profileComplet
         } else {
           // RPC succeeded — increment swipe count after successful DB write
           setTodaySwipeCount(prev => prev + 1);
+          await persistSwipeCount(currentUser.id);
 
           // Notify other parts of the app (e.g., Profile stats) immediately
           if (typeof window !== 'undefined') {
@@ -3120,6 +3168,7 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, isPremium, profileComplet
               
               // ✅ Increment swipe count after successful DB write
               setTodaySwipeCount(prev => prev + 1);
+              await persistSwipeCount(currentUser.id);
 
               // Notify other parts of the app (for debugging/telemetry)
               if (typeof window !== 'undefined') {
@@ -3137,6 +3186,7 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, isPremium, profileComplet
         } else {
           // RPC succeeded — increment swipe count after successful DB write
           setTodaySwipeCount(prev => prev + 1);
+          await persistSwipeCount(currentUser.id);
 
           // Notify other parts of the app (for debugging/telemetry)
           if (typeof window !== 'undefined') {
