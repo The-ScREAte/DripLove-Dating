@@ -1422,10 +1422,18 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, isPremium, profileComplet
       // CRITICAL FIX: Always fallback to country-based query if location-based returned 0 results
       // This ensures users see profiles even if no one is within their distance preference
       if (filteredProfiles.length === 0 && baseCountryCode) {
+        console.log('[DiscoverPage] Location-based query returned 0 results, falling back to country-based query');
+        
         let query = supabase.from('profiles').select(PROFILE_SELECT);
 
-        if (excludedIds.length > 0) {
-          query = query.not('id', 'in', formatUuidInFilter(excludedIds));
+        // Only add exclusion filter if we have valid excluded IDs
+        if (excludedIds.length > 0 && excludedIds.length < 1000) { // Sanity check: don't exclude too many
+          try {
+            query = query.not('id', 'in', formatUuidInFilter(excludedIds));
+          } catch (e) {
+            console.error('[DiscoverPage] Error adding exclusion filter:', e);
+            // Continue without exclusion filter rather than failing completely
+          }
         }
 
         const { data: profiles, error } = await query
@@ -1436,8 +1444,13 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, isPremium, profileComplet
           .eq('country_code', baseCountryCode)
           .limit(100);
 
-        if (error) throw error;
+        if (error) {
+          console.error('[DiscoverPage] Country-based fallback error:', error);
+          throw error;
+        }
+        
         filteredProfiles = Array.isArray(profiles) ? (profiles as unknown as ProfileRow[]) : [];
+        console.log(`[DiscoverPage] Country-based fallback found ${filteredProfiles.length} profiles`);
         
         // Assign default distance for country-based matches
         filteredProfiles.forEach(p => {
