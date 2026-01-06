@@ -438,6 +438,11 @@ type WindowWithIntervals = Window & {
   chatMatchesCache?: Map<string, unknown>;
 };
 
+type WindowWithDiscoverDebug = Window & {
+  __driplove_discover_diag_last?: unknown;
+  __driplove_discover_diag?: () => void;
+};
+
 const DiscoverPage = ({ currentUser, onNavigateToChat, isPremium, profileCompletion: parentProfileCompletion }: DiscoverPageProps) => {
   const { t } = useTranslation();
 
@@ -606,6 +611,50 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, isPremium, profileComplet
     }
   };
 
+  // Discover diagnostics (enable with: localStorage.setItem('driplove_debug_discover','1'))
+  const isDiscoverDebugEnabled = () => {
+    try {
+      if (typeof window === 'undefined') return false;
+      if (!import.meta.env.DEV) return false;
+      const v = window.localStorage.getItem('driplove_debug_discover');
+      return v === '1' || v === 'true';
+    } catch {
+      return false;
+    }
+  };
+
+  const [authEmail, setAuthEmail] = useState<string | null>(null);
+  const discoverDiagLastRef = useRef<unknown>(null);
+  const updateDiscoverDiagLast = useCallback((snapshot: unknown) => {
+    discoverDiagLastRef.current = snapshot;
+    try {
+      if (typeof window !== 'undefined') {
+        (window as WindowWithDiscoverDebug).__driplove_discover_diag_last = snapshot;
+        (window as WindowWithDiscoverDebug).__driplove_discover_diag = () => {
+          // Print the last snapshot in a readable way
+          // eslint-disable-next-line no-console
+          console.log('[DiscoverDiagnostics] last snapshot', snapshot);
+        };
+      }
+    } catch {
+      // ignore
+    }
+  }, []);
+
+  const discoverDebug = useCallback((title: string, snapshot: unknown) => {
+    if (!isDiscoverDebugEnabled()) return;
+    updateDiscoverDiagLast(snapshot);
+    try {
+      // Use warn so it shows even when logs are filtered.
+      console.groupCollapsed(`[DiscoverDiagnostics] ${title}`);
+      // eslint-disable-next-line no-console
+      console.warn(snapshot);
+      console.groupEnd();
+    } catch {
+      // ignore
+    }
+  }, [updateDiscoverDiagLast]);
+
   const swipeDebug = (...args: unknown[]) => {
     if (!isSwipeDebugEnabled()) return;
     try {
@@ -633,6 +682,36 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, isPremium, profileComplet
     });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  // Resolve auth email for diagnostics.
+  useEffect(() => {
+    if (!isDiscoverDebugEnabled()) return;
+    let cancelled = false;
+    (async () => {
+      try {
+        const { data, error } = await supabase.auth.getUser();
+        if (cancelled) return;
+        if (error) {
+          setAuthEmail(null);
+          discoverDebug('auth.getUser error', { error });
+          return;
+        }
+        const email = data?.user?.email ?? null;
+        setAuthEmail(email);
+        discoverDebug('auth snapshot', {
+          authUserId: data?.user?.id ?? null,
+          email,
+        });
+      } catch (e) {
+        if (!cancelled) setAuthEmail(null);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+    // We intentionally only run when debug is enabled and user changes.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [currentUser?.id]);
 
   const summarizeDeck = (deck: MatchOrAd[], take: number = 10) => {
     const head = deck.slice(0, take).map((item) => (isAd(item) ? `ad:${item.id}` : item.id));
@@ -1266,6 +1345,54 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, isPremium, profileComplet
       ? normalizeCountryCodeList(unlockedCountriesRaw, baseCountryCode)
       : [];
 
+    // Diagnostics: snapshot the user's effective feed configuration.
+    discoverDebug('fetchPotentialMatchesData: inputs', {
+      nowIso: new Date().toISOString(),
+      user: {
+        profileId: userId,
+        authEmail,
+        preference: currentUserData?.preference ?? currentUser?.preference ?? null,
+        allowedGenders,
+        min_age: currentUserData?.min_age ?? null,
+        max_age: currentUserData?.max_age ?? null,
+        max_distance: safeUserMaxDistance,
+        baseCountryCode,
+        unlockedCountries,
+        hasUnlockedCountries: premiumForFeed && unlockedCountries.length > 0,
+        premiumActive,
+        premiumProp: !!isPremium,
+        subscription: subscription ?? null,
+        dailySwipeLimitConfigured: premiumActive ? 200 : 20,
+        todaySwipeCount,
+        pendingSwipes: pendingSwipesRef.current,
+        effectiveSwipeCount: todaySwipeCount + pendingSwipesRef.current,
+        reverseUsageToday,
+        profileCompletion: {
+          parentProfileCompletion,
+          computedProfileCompletion,
+          effectiveProfileCompletion,
+        },
+      },
+      excluded: {
+        liked: likedUserIds.length,
+        blocked: blockedUserIds.length,
+        passed30d: passedUserIds.length,
+        locallySwiped30dOrLiked: locallySwipedIds.length,
+        totalExcluded: excludedIds.length,
+        excludedIdsForQuery: excludedIdsForQuery.length,
+        capped: excludedIds.length > excludedIdsForQuery.length,
+      },
+      state: {
+        isLoading,
+        isLoadingMore,
+        hasCompletedInitialFetch,
+        noMoreProfiles,
+        potentialMatchesLen: potentialMatches.length,
+        currentIndex,
+        isArchivedFallback,
+      },
+    });
+
 
     const locationMatches = await locationService.getLocationBasedMatches(userId, safeUserMaxDistance);
 
@@ -1276,6 +1403,13 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, isPremium, profileComplet
         distanceMap[match.profile_id] = match.distance_km;
         return match.profile_id;
       }));
+
+    discoverDebug('location snapshot', {
+      maxDistanceKm: safeUserMaxDistance,
+      locationMatchesTotal: locationMatches.length,
+      locationIdsLocalCountry: locationProfileIds.length,
+      baseCountryCode,
+    });
 
     const PROFILE_SELECT = 'id, first_name, last_name, bio, city, country, country_code, occupation, education_level, date_of_birth, interests, gender, latitude, longitude, fun_fact, perfect_first_date, last_googled, relationship_intent, smoking, drinking, exercise_level, sleeping_schedule, introvert_extrovert, spontaneous_planner, messy_organized, adinkra_symbols, created_at, last_login_at';
 
@@ -1575,6 +1709,34 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, isPremium, profileComplet
     // Enforce the full exclusion set client-side (server query uses a capped subset).
     filteredProfiles = filteredProfiles.filter((p) => !excludedIdSet.has(p.id));
 
+    // Diagnostics: report results before deck shaping.
+    const countryCounts = (rows: Array<{ country_code?: string | null }>) => {
+      const out: Record<string, number> = {};
+      for (const r of rows) {
+        const cc = normalizeCountryCode(String(r.country_code || ''));
+        if (!cc) continue;
+        out[cc] = (out[cc] || 0) + 1;
+      }
+      return out;
+    };
+
+    discoverDebug('results snapshot (pre-deck)', {
+      premiumForFeed,
+      usingArchivedFallback,
+      counts: {
+        localProfilesFetched: localProfiles.length,
+        intlProfilesFetched: intlProfiles.length,
+        filteredProfilesAfterExclusions: filteredProfiles.length,
+      },
+      countries: {
+        baseCountryCode,
+        unlockedCountries,
+        localCountryCounts: countryCounts(localProfiles),
+        intlCountryCounts: countryCounts(intlProfiles),
+        filteredCountryCounts: countryCounts(filteredProfiles),
+      },
+    });
+
     // ✅ FINAL EMPTY RULE
     // Free users: empty when local is empty
     // Premium users: empty ONLY when local + intl are empty
@@ -1634,6 +1796,12 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, isPremium, profileComplet
     const uniqueProfiles: PotentialMatch[] = Array.from(
       new Map(profilesWithImages.map(p => [p.id, p])).values()
     );
+
+    discoverDebug('dedupe snapshot', {
+      before: profilesWithImages.length,
+      after: uniqueProfiles.length,
+      removed: profilesWithImages.length - uniqueProfiles.length,
+    });
 
     // ⭐ STRATIFIED SAMPLING: Fair distribution by account age
     // Bucket A (≤7 days): 3/15 (20%), Bucket B (8-30 days): 4/15 (27%)
@@ -1749,6 +1917,35 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, isPremium, profileComplet
       );
     } catch (error) {
       // Ignore localStorage errors
+    }
+
+    // Diagnostics: evaluate country mixing quality.
+    try {
+      const seq = shuffled
+        .filter((p) => p && typeof p === 'object')
+        .slice(0, 40)
+        .map((p: any) => normalizeCountryCode(p.country_code || ''))
+        .filter(Boolean);
+
+      let consecutiveSame = 0;
+      for (let i = 1; i < seq.length; i++) {
+        if (seq[i] && seq[i] === seq[i - 1]) consecutiveSame++;
+      }
+
+      discoverDebug('mix snapshot', {
+        premiumForFeed,
+        baseCountryCode,
+        unlockedCountries,
+        sequenceFirst40: seq,
+        consecutiveSameCountryCount: consecutiveSame,
+        sequenceLen: seq.length,
+        note:
+          premiumForFeed && unlockedCountries.length > 0
+            ? 'Premium should be round-robin mixed across base + unlocked (when available).'
+            : 'Free should be local country only; mixing not expected.',
+      });
+    } catch {
+      // ignore
     }
 
     // ⭐ PRIORITY LIKERS: Inject users who liked the current user at natural, sparse positions
@@ -1963,6 +2160,28 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, isPremium, profileComplet
     // Latest-wins: if multiple fetches overlap (e.g., free -> premium flip),
     // only apply results from the most recent invocation.
     const fetchSeq = ++fetchSequenceRef.current;
+
+    discoverDebug('fetchPotentialMatches: start', {
+      fetchSeq,
+      userId: currentUser.id,
+      authEmail,
+      premiumActive,
+      premiumProp: !!isPremium,
+      subscriptionLoading,
+      subscription: subscription ?? null,
+      opts: opts ?? null,
+      state: {
+        potentialMatchesLen: potentialMatches.length,
+        currentIndex,
+        isLoading,
+        isLoadingMore,
+        hasCompletedInitialFetch,
+        noMoreProfiles,
+        todaySwipeCount,
+        reverseUsageToday,
+        effectiveProfileCompletion,
+      },
+    });
   
     try {
       // Background loading - don't block UI
@@ -1985,6 +2204,23 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, isPremium, profileComplet
         // (otherwise moveToNext() resetting currentIndex to 0 makes old profiles "come back").
         const safeIndex = Number.isFinite(index) ? Math.max(0, Math.min(index, matchesWithAds.length)) : 0;
         const initialDeck = safeIndex > 0 ? matchesWithAds.slice(safeIndex) : matchesWithAds;
+
+        discoverDebug('fetchPotentialMatches: success', {
+          fetchSeq,
+          counts: {
+            matches: matches.length,
+            matchesWithAds: matchesWithAds.length,
+            initialDeck: initialDeck.length,
+            imagesForFirstSix: Object.keys(images || {}).length,
+          },
+          resume: { index, safeIndex },
+          premiumActive,
+          cacheKeyWrite: opts?.cacheKey ?? null,
+          firstIds: {
+            matches: matches.slice(0, 8).map((m) => m.id),
+            deck: summarizeDeck(initialDeck, 12),
+          },
+        });
 
         setPotentialMatches(prev => {
           // ⭐ CRITICAL: Always filter against locally swiped profiles to prevent repetition
@@ -2032,6 +2268,15 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, isPremium, profileComplet
     } catch (error) {
       // Silent fail: keep UX quiet and allow UI to fall back to empty/retry states.
       console.error('[DiscoverPage] Fetch error:', error);
+
+      discoverDebug('fetchPotentialMatches: error', {
+        fetchSeq,
+        userId: currentUser?.id,
+        authEmail,
+        premiumActive,
+        premiumProp: !!isPremium,
+        error,
+      });
       setPotentialMatches([]);
       setNoMoreProfiles(true);
       setIsLoading(false);
