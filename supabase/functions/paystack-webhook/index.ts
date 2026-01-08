@@ -344,7 +344,7 @@ serve(async (req) => {
         .maybeSingle()
 
       const nextExpiry =
-        currentSub.expires_at && new Date(currentSub.expires_at) > new Date()
+        currentSub?.expires_at && new Date(currentSub.expires_at) > new Date()
           ? addDays(new Date(currentSub.expires_at), 30)
           : addDays(new Date(), 30)
       const subscriptionCode = extractSubscriptionCode(eventData)
@@ -360,7 +360,7 @@ serve(async (req) => {
         updated_at: new Date().toISOString(),
       }
 
-      if (subscriptionCode && currentSub.flutterwave_transaction_id !== subscriptionCode) {
+      if (subscriptionCode && currentSub?.flutterwave_transaction_id !== subscriptionCode) {
         updatePayload.flutterwave_transaction_id = subscriptionCode
       }
 

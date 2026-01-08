@@ -17,6 +17,7 @@ interface UserProfile {
   email: string;
   gender?: string | null;
   country?: string;
+  country_code?: string | null;
   city?: string;
 }
 
@@ -59,7 +60,18 @@ const SmartLikeGiving: React.FC<Props> = ({ users, onLikesCreated }) => {
     let filtered = allReceivers.filter(u => !existingLikes.has(u.id));
     
     if (countryFilter !== 'all') {
-      filtered = filtered.filter(u => u.country === countryFilter);
+      // Match against country_code (preferred), country name, or the filter code itself
+      const selectedCountry = countries.find(c => c.code === countryFilter);
+      filtered = filtered.filter(u => {
+        const userCountryCode = u.country_code?.toUpperCase() || '';
+        const userCountry = u.country?.toUpperCase() || '';
+        const filterCode = countryFilter.toUpperCase();
+        const countryName = selectedCountry?.name?.toUpperCase() || '';
+        
+        return userCountryCode === filterCode || 
+               userCountry === filterCode ||
+               userCountry === countryName;
+      });
     }
 
     if (genderFilter !== 'all') {
@@ -77,7 +89,7 @@ const SmartLikeGiving: React.FC<Props> = ({ users, onLikesCreated }) => {
     }
     
     return filtered;
-  }, [allReceivers, receiverSearch, countryFilter, genderFilter, existingLikes]);
+  }, [allReceivers, receiverSearch, countryFilter, genderFilter, existingLikes, countries]);
 
   // Load existing likes when giver is selected
   const loadExistingLikes = async (giverId: string) => {
@@ -110,10 +122,10 @@ const SmartLikeGiving: React.FC<Props> = ({ users, onLikesCreated }) => {
     try {
       const { data, error } = await supabase
         .from('profiles')
-        .select('id, first_name, last_name, email, gender, country, city')
+        .select('id, first_name, last_name, email, gender, country, country_code, city')
         .eq('is_admin', false)
         .neq('id', giverId)
-        .order('first_name', { ascending: true });
+        .order('created_at', { ascending: false }); // Order by newest first to see more recent users
 
       if (error) throw error;
 

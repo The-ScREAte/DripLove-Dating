@@ -63,6 +63,11 @@ const writeCacheToStorage = (userId: string, value: LikedMeCacheValue) => {
 
 const likedMeCache = new Map<string, LikedMeCacheValue>();
 
+// UUID helper for deduplicating UUIDs
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+const isUuid = (value: unknown): value is string => typeof value === 'string' && UUID_RE.test(value);
+const uniqUuids = (values: unknown[]): string[] => Array.from(new Set(values.filter(isUuid)));
+
 const likedMePollIntervals = new Map<string, ReturnType<typeof setInterval>>();
 
 const hasListChanged = (previous: LikerProfile[], next: LikerProfile[]) => {

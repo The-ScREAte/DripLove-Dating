@@ -985,9 +985,17 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, onNavigateToProfile, isPr
           setProfileMissingFields(completionResult.missingFields);
         }
 
-        // Get today's swipe count
+        // Get today's swipe count and check if user is already at limit
         const swipeCount = await getTodaySwipeCount(currentUser.id);
         setTodaySwipeCount(swipeCount);
+        
+        // Check if user has already reached their daily limit
+        // Note: premiumActive may not be resolved yet, so we also need an effect below
+        // to recheck when subscription status is confirmed
+        const currentSwipeLimit = isPremiumFromSubscription() ? 200 : (isPremium ? 200 : 20);
+        if (swipeCount >= currentSwipeLimit) {
+          setIsOutOfSwipes(true);
+        }
       } catch (error) {
         // ignore profile completion fetch error
       }
@@ -998,7 +1006,16 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, onNavigateToProfile, isPr
 
     return () => clearTimeout(timer);
     // NOTE: Removed premiumActive from dependencies - profile completion doesn't depend on premium status
-  }, [currentUser?.id]);
+  }, [currentUser?.id, isPremium, isPremiumFromSubscription]);
+
+  // Re-check swipe limit when premium status is resolved (may load after initial swipe count)
+  useEffect(() => {
+    if (!premiumResolved || todaySwipeCount === 0) return;
+    const swipeLimit = premiumActive ? 200 : 20;
+    if (todaySwipeCount >= swipeLimit) {
+      setIsOutOfSwipes(true);
+    }
+  }, [premiumResolved, premiumActive, todaySwipeCount]);
 
   // Single source of truth for completion checks in Discover:
   // 1) Parent-provided completion (Profile page) if present
@@ -2702,42 +2719,49 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, onNavigateToProfile, isPr
     }
   }, [potentialMatches, currentIndex, hasCompletedInitialFetch, preloadProfileImages]);
 
-  // Helper to persist swipe count to database
+  // Helper to persist swipe count to database using the proper RPC
   const persistSwipeCount = async (userId: string) => {
     try {
-      const today = new Date().toISOString().split('T')[0];
-      
-      // Upsert to user_usage table: increment if exists, insert if not
-      const { error } = await supabase
-        .from('user_usage')
-        .upsert(
-          {
-            user_id: userId,
-            date: today,
-            swipes_used: 1
-          },
-          {
-            onConflict: 'user_id,date',
-            ignoreDuplicates: false
-          }
-        )
-        .select()
-        .then(async ({ data, error }) => {
-          if (error) return { error };
-          
-          // If record exists, we need to increment it
-          if (data && data.length > 0) {
-            const currentCount = data[0].swipes_used || 0;
-            return await supabase
-              .from('user_usage')
-              .update({ swipes_used: currentCount + 1 })
-              .match({ user_id: userId, date: today });
-          }
-          return { error: null };
-        });
+      // Use the update_user_usage RPC which correctly handles upsert + increment
+      const { error } = await (supabase as unknown as {
+        rpc: (fn: string, args?: Record<string, unknown>) => Promise<{ data: unknown; error: unknown }>;
+      }).rpc('update_user_usage', {
+        user_id_param: userId,
+        usage_type: 'swipe',
+        increment_by: 1,
+      });
 
       if (error) {
-        console.error('Failed to persist swipe count:', error);
+        console.error('Failed to persist swipe count via RPC:', error);
+        // Fallback: Direct SQL upsert with proper increment
+        const today = new Date().toISOString().split('T')[0];
+        
+        // First check if record exists
+        const { data: existing } = await supabase
+          .from('user_usage')
+          .select('swipes_used')
+          .eq('user_id', userId)
+          .eq('date', today)
+          .maybeSingle();
+        
+        if (existing) {
+          // Update existing record
+          await supabase
+            .from('user_usage')
+            .update({ swipes_used: (existing.swipes_used || 0) + 1 })
+            .eq('user_id', userId)
+            .eq('date', today);
+        } else {
+          // Insert new record
+          await supabase
+            .from('user_usage')
+            .insert({
+              user_id: userId,
+              date: today,
+              swipes_used: 1,
+              reverse_dislikes_used: 0,
+            });
+        }
       }
     } catch (err) {
       console.error('Error persisting swipe count:', err);
