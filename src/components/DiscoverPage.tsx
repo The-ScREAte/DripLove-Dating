@@ -16,6 +16,7 @@
 
 import { useTranslation } from 'react-i18next';
 import React, { useState, useEffect, useCallback, useMemo, useRef, lazy, Suspense, memo } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { isAndroidPlatform, isIOSPlatform } from '@/utils/platformUtils';
 import { preloadImageToBlob } from '@/utils/imageCache';
 import { calculateAge, createDeterministicShuffle } from '@/utils/discoverCache';
@@ -288,6 +289,7 @@ type MatchOrAd = PotentialMatch | AdData;
 interface DiscoverPageProps {
   currentUser: CurrentUser;
   onNavigateToChat?: (userId: string) => void;
+  onNavigateToProfile?: () => void;
   isPremium?: boolean;
   profileCompletion?: number; // Pass from parent (Profile page calculates it)
 }
@@ -457,8 +459,9 @@ type WindowWithIntervals = Window & {
   chatMatchesCache?: Map<string, unknown>;
 };
 
-const DiscoverPage = ({ currentUser, onNavigateToChat, isPremium, profileCompletion: parentProfileCompletion }: DiscoverPageProps) => {
+const DiscoverPage = ({ currentUser, onNavigateToChat, onNavigateToProfile, isPremium, profileCompletion: parentProfileCompletion }: DiscoverPageProps) => {
   const { t } = useTranslation();
+  const navigate = useNavigate();
 
   
   // Track viewport height safely (no SSR crash)
@@ -2021,25 +2024,9 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, isPremium, profileComplet
 
   // Premium: attempt ONE auto-refill if deck becomes empty (don't loop infinitely)
   useEffect(() => {
-    if (!premiumActive) return;
-    if (!hasCompletedInitialFetch) return;
-    if (potentialMatches.length > 0) {
-      // We have profiles - clear empty state
-      if (premiumTrulyEmptyAfterRetry) setPremiumTrulyEmptyAfterRetry(false);
-      premiumEmptyAutoRetryRef.current = false;
-      return;
-    }
-    
-    // Don't auto-retry if already attempted or if actively loading
-    if (premiumEmptyAutoRetryRef.current) return;
-    if (isLoading || isLoadingMore) return;
-    if (!noMoreProfiles) return; // Wait for noMoreProfiles flag
-    
-    // Try ONE refill for premium users
-    premiumEmptyAutoRetryRef.current = true;
-    setNoMoreProfiles(false);
-    fetchPotentialMatches();
-  }, [premiumActive, hasCompletedInitialFetch, potentialMatches.length, noMoreProfiles, isLoading, isLoadingMore, premiumTrulyEmptyAfterRetry, fetchPotentialMatches]);
+    // UX: when the user hits the empty state, keep it stable until they tap Refresh.
+    // This prevents new profiles popping in unexpectedly while the empty card is shown.
+  }, []);
 
   // Mark truly empty after retry completes (separate effect to avoid loops)
   useEffect(() => {
@@ -2633,6 +2620,8 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, isPremium, profileComplet
 
     if (!hasCompletedInitialFetch) return;
     if (isLoadingMore) return;
+    // When the empty state is shown, keep it stable until the user manually refreshes.
+    if (potentialMatches.length === 0 || noMoreProfiles) return;
     if (remainingReal > REFILL_THRESHOLD) return;
 
     // Avoid tight loops when the deck is empty. Retry occasionally so new profiles
@@ -2643,7 +2632,7 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, isPremium, profileComplet
     lastAutoRefillAttemptAtRef.current = now;
 
     loadMoreMatches();
-  }, [potentialMatches, currentIndex, isLoadingMore, hasCompletedInitialFetch, loadMoreMatches]);
+  }, [potentialMatches, currentIndex, isLoadingMore, hasCompletedInitialFetch, noMoreProfiles, loadMoreMatches]);
 
   // ⭐ SWIPE FATIGUE RESCUE: Inject active profiles after long no-match streaks
   // This prevents user fatigue and increases retention (Tinder-style behavior)
@@ -2795,7 +2784,22 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, isPremium, profileComplet
       });
       toast({
         title: t('discover.errors.profileCompletionRequired'),
-        description: t('discover.errors.profileCompletionMessage', { percentage: 70 - effectiveProfileCompletion }),
+        description: (
+          <div className="flex items-center justify-between gap-3">
+            <span className="flex-1">
+              {t('discover.errors.profileCompletionMessage', { percentage: 70 - effectiveProfileCompletion })}
+            </span>
+            {onNavigateToProfile && (
+              <button
+                type="button"
+                className="shrink-0 underline font-semibold"
+                onClick={onNavigateToProfile}
+              >
+                Profile
+              </button>
+            )}
+          </div>
+        ),
         variant: 'destructive'
       });
       setShowProfileCompletionModal(true);
@@ -2811,9 +2815,24 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, isPremium, profileComplet
       setIsOutOfSwipes(true);
       toast({
         title: t('discover.errors.dailyLimitReached'),
-        description: isPremium 
-          ? t('discover.errors.premiumDailyLimitMessage')
-          : t('discover.errors.dailyLimitMessage'),
+        description: (
+          <div className="flex items-center justify-between gap-3">
+            <span className="flex-1">
+              {isPremium
+                ? t('discover.errors.premiumDailyLimitMessage')
+                : t('discover.errors.dailyLimitMessage')}
+            </span>
+            {onNavigateToProfile && (
+              <button
+                type="button"
+                className="shrink-0 underline font-semibold"
+                onClick={onNavigateToProfile}
+              >
+                Profile
+              </button>
+            )}
+          </div>
+        ),
         variant: 'destructive'
       });
       return;
@@ -3072,7 +3091,22 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, isPremium, profileComplet
       });
       toast({
         title: t('discover.errors.profileCompletionRequired'),
-        description: t('discover.errors.profileCompletionMessage', { percentage: 70 - effectiveProfileCompletion }),
+        description: (
+          <div className="flex items-center justify-between gap-3">
+            <span className="flex-1">
+              {t('discover.errors.profileCompletionMessage', { percentage: 70 - effectiveProfileCompletion })}
+            </span>
+            {onNavigateToProfile && (
+              <button
+                type="button"
+                className="shrink-0 underline font-semibold"
+                onClick={onNavigateToProfile}
+              >
+                Profile
+              </button>
+            )}
+          </div>
+        ),
         variant: 'destructive'
       });
       setShowProfileCompletionModal(true);
@@ -3088,9 +3122,24 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, isPremium, profileComplet
       setIsOutOfSwipes(true);
       toast({
         title: t('discover.errors.dailyLimitReached'),
-        description: isPremium 
-          ? t('discover.errors.premiumDailyLimitMessage')
-          : t('discover.errors.dailyLimitMessage'),
+        description: (
+          <div className="flex items-center justify-between gap-3">
+            <span className="flex-1">
+              {isPremium
+                ? t('discover.errors.premiumDailyLimitMessage')
+                : t('discover.errors.dailyLimitMessage')}
+            </span>
+            {onNavigateToProfile && (
+              <button
+                type="button"
+                className="shrink-0 underline font-semibold"
+                onClick={onNavigateToProfile}
+              >
+                Profile
+              </button>
+            )}
+          </div>
+        ),
         variant: 'destructive'
       });
       return;
@@ -3594,6 +3643,14 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, isPremium, profileComplet
               >
                 {t('discover.outOfSwipes.okButton')}
               </Button>
+
+              <Button
+                onClick={() => navigate('/games')}
+                variant="outline"
+                className="w-full"
+              >
+                dont get bored, test your brain
+              </Button>
             </div>
           </CardContent>
         </Card>
@@ -3737,6 +3794,14 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, isPremium, profileComplet
               className="w-full"
             >
               {t('discover.refresh')}
+            </Button>
+
+            <Button
+              onClick={() => navigate('/games')}
+              variant="outline"
+              className="w-full mt-3"
+            >
+              dont get bored, test your brain
             </Button>
           </CardContent>
         </Card>

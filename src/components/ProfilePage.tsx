@@ -1,11 +1,12 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { Capacitor } from '@capacitor/core';
 import { useTranslation } from 'react-i18next';
+import { useNavigate } from 'react-router-dom';
 import { getPlatformSync } from '@/utils/platformUtils';
 // import { PushNotifications } from '@capacitor/push-notifications'; // Uncomment if you use PushNotifications
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { User, Edit, Save, X, Crown, MessageCircle, ChevronDown, Trash2 } from 'lucide-react';
+import { User, Edit, Save, X, Crown, MessageCircle, ChevronDown, Trash2, Gamepad2 } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import { useSubscription } from '@/hooks/useSubscription';
@@ -74,6 +75,7 @@ interface ProfilePageProps {
 
 const ProfilePage = ({ currentUser, profile, onProfileUpdate, onLogout, onShowTerms, onShowPrivacy, isPremium }: ProfilePageProps) => {
   const { t, i18n } = useTranslation();
+  const navigate = useNavigate();
   const platform = useMemo(() => getPlatformSync(), []);
   const [isEditing, setIsEditing] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
@@ -762,6 +764,18 @@ const ProfilePage = ({ currentUser, profile, onProfileUpdate, onLogout, onShowTe
                     </span>
                   )}
                 </div>
+              )}
+
+              {/* Games button (own profile only) */}
+              {isOwnProfile && (
+                <Button
+                  onClick={() => navigate('/games')}
+                  className="w-full sm:w-auto border-purple-300 text-purple-700 hover:bg-purple-50 bg-white border"
+                  variant="outline"
+                  aria-label="Play games"
+                >
+                  <Gamepad2 className="w-4 h-4" />
+                </Button>
               )}
 
               {/* Single toggle button - Edit becomes Cancel */}

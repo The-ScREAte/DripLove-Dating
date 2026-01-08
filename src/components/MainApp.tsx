@@ -788,7 +788,7 @@ const MainApp = ({ user, onLogout }: MainAppProps) => {
     
     switch (activeTab) {
       case 'dripcheck':
-        return <DiscoverPage currentUser={profile} onNavigateToChat={handleNavigateToChat} isPremium={isPremium} profileCompletion={profileCompletion} />;
+        return <DiscoverPage currentUser={profile} onNavigateToChat={handleNavigateToChat} onNavigateToProfile={() => setActiveTab('profile')} isPremium={isPremium} profileCompletion={profileCompletion} />;
       case 'chat':
         return <ChatPage currentUser={profile} onUnreadChange={forceRefreshUnreadCount} onDetailViewChange={setIsChatDetailOpen} />;
       case 'liked':
@@ -806,7 +806,7 @@ const MainApp = ({ user, onLogout }: MainAppProps) => {
           />
         );
       default:
-        return <DiscoverPage currentUser={profile} onNavigateToChat={handleNavigateToChat} isPremium={isPremium} profileCompletion={profileCompletion} />;
+        return <DiscoverPage currentUser={profile} onNavigateToChat={handleNavigateToChat} onNavigateToProfile={() => setActiveTab('profile')} isPremium={isPremium} profileCompletion={profileCompletion} />;
     }
   }, [activeTab, profile, isPremium, profileCompletion, handleNavigateToChat, forceRefreshUnreadCount, setIsChatDetailOpen, fetchUserProfile, onLogout, handleShowTerms, handleShowPrivacy]);
 
@@ -881,7 +881,7 @@ const MainApp = ({ user, onLogout }: MainAppProps) => {
               className="w-full h-full" 
               style={{ display: activeTab === 'dripcheck' ? 'block' : 'none' }}
             > 
-              <DiscoverPage currentUser={profile} onNavigateToChat={handleNavigateToChat} isPremium={isPremium} profileCompletion={profileCompletion} />
+              <DiscoverPage currentUser={profile} onNavigateToChat={handleNavigateToChat} onNavigateToProfile={() => setActiveTab('profile')} isPremium={isPremium} profileCompletion={profileCompletion} />
             </div>
           </Suspense>
 

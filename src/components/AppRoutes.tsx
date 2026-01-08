@@ -25,6 +25,10 @@ const TermsOfService = lazy(() => import('./TermsOfService'));
 const PrivacyPolicy = lazy(() => import('./PrivacyPolicy'));
 const InfluencerPortal = lazy(() => import('../pages/InfluencerPortal'));
 const InfluencerSetPassword = lazy(() => import('../pages/InfluencerSetPassword'));
+const Games = lazy(() => import('../pages/Games'));
+const TestYourToast = lazy(() => import('../pages/TestYourToast'));
+const ShootYourShot = lazy(() => import('../pages/ShootYourShot'));
+const RedFlagGreenFlag = lazy(() => import('../pages/RedFlagGreenFlag'));
 
 // Minimal fallback - just blank screen
 const PageLoader = () => null;
@@ -65,6 +69,10 @@ const AppRoutes = ({
       <Route path="/privacy-policy" element={<PrivacyPolicy onBack={() => navigate(-1)} />} />
       <Route path="/influencer" element={<InfluencerPortal />} />
       <Route path="/influencer/set-password" element={<InfluencerSetPassword />} />
+      <Route path="/games" element={<Games />} />
+      <Route path="/games/test-your-toast" element={<TestYourToast />} />
+      <Route path="/games/shoot-your-shot" element={<ShootYourShot />} />
+      <Route path="/games/red-flag-green-flag" element={<RedFlagGreenFlag />} />
       <Route path="/r/:id" element={<RedirectHandler />} />
       {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
       <Route path="*" element={<NotFound />} />
