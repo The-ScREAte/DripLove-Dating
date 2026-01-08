@@ -42,16 +42,16 @@ const SmartLikeGiving: React.FC<Props> = ({ users, onLikesCreated }) => {
 
   const countries = useMemo(() => getCountriesList(), []);
 
-  // Filter users based on search for givers
+  // Filter users based on search for givers - show up to 200 for better selection
   const filteredGivers = useMemo(() => {
     const search = giverSearch.toLowerCase().trim();
-    if (!search) return users.slice(0, 50);
+    if (!search) return users.slice(0, 200);
     return users.filter(u => 
       u.first_name?.toLowerCase().includes(search) ||
       u.last_name?.toLowerCase().includes(search) ||
       u.email?.toLowerCase().includes(search) ||
       u.id.toLowerCase().includes(search)
-    ).slice(0, 50);
+    ).slice(0, 200);
   }, [users, giverSearch]);
 
   // Filter receivers with country and search filters, excluding already liked

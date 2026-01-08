@@ -995,6 +995,9 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, onNavigateToProfile, isPr
         const currentSwipeLimit = isPremiumFromSubscription() ? 200 : (isPremium ? 200 : 20);
         if (swipeCount >= currentSwipeLimit) {
           setIsOutOfSwipes(true);
+        } else {
+          // New day or swipes available - clear the viewing mode flag
+          sessionStorage.removeItem('driplove_out_of_swipes_viewing');
         }
       } catch (error) {
         // ignore profile completion fetch error
@@ -1010,7 +1013,16 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, onNavigateToProfile, isPr
 
   // Re-check swipe limit when premium status is resolved (may load after initial swipe count)
   useEffect(() => {
-    if (!premiumResolved || todaySwipeCount === 0) return;
+    if (!premiumResolved) return;
+    
+    // Clear viewing mode flag when premium is active (user upgraded)
+    if (premiumActive) {
+      sessionStorage.removeItem('driplove_out_of_swipes_viewing');
+      setIsOutOfSwipes(false);
+      return;
+    }
+    
+    if (todaySwipeCount === 0) return;
     const swipeLimit = premiumActive ? 200 : 20;
     if (todaySwipeCount >= swipeLimit) {
       setIsOutOfSwipes(true);
@@ -2834,8 +2846,10 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, onNavigateToProfile, isPr
     // Free users: 20 swipes, Premium users: 200 swipes
     const swipeLimit = premiumActive ? 200 : 20;
     
+    // Check if user is in "viewing mode" after hitting limit (they clicked OK)
+    const wasOutOfSwipes = sessionStorage.getItem('driplove_out_of_swipes_viewing') === 'true';
     
-    if (effectiveSwipeCount >= swipeLimit) {
+    if (effectiveSwipeCount >= swipeLimit || wasOutOfSwipes) {
       setIsOutOfSwipes(true);
       return;
     }
@@ -3119,8 +3133,10 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, onNavigateToProfile, isPr
     // Free users: 20 swipes, Premium users: 200 swipes
     const swipeLimit = premiumActive ? 200 : 20;
     
+    // Check if user is in "viewing mode" after hitting limit (they clicked OK)
+    const wasOutOfSwipes = sessionStorage.getItem('driplove_out_of_swipes_viewing') === 'true';
     
-    if (effectiveSwipeCount >= swipeLimit) {
+    if (effectiveSwipeCount >= swipeLimit || wasOutOfSwipes) {
       setIsOutOfSwipes(true);
       return;
     }
@@ -3614,9 +3630,12 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, onNavigateToProfile, isPr
             )}
               <Button 
                 onClick={() => {
-                  // Just close the modal - don't fetch new profiles
-                  // This keeps the user on the same profile they tried to swipe
+                  // Close the modal and show the last profile they were viewing
+                  // They can see the profile but if they try to swipe, the limit will be checked again
                   setIsOutOfSwipes(false);
+                  // Store in session that we're in "out of swipes" viewing mode
+                  // This ensures immediate re-trigger on next swipe attempt
+                  sessionStorage.setItem('driplove_out_of_swipes_viewing', 'true');
                 }} 
                 variant="outline" 
                 className="w-full"
