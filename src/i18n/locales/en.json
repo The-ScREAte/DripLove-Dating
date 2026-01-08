@@ -304,7 +304,7 @@
     "nopeOverlay": "NOPE",
     "outOfSwipes": {
       "title": "You're out of swipes for today!",
-      "freeUserMessage": "Free users get 20 swipes per day. Come back tomorrow or upgrade to Premium for more swipes!",
+      "freeUserMessage": "Free users get limited swipes per day. Come back tomorrow or upgrade to Premium for more swipes!",
       "premiumUserMessage": "You've reached your max swipes for today! Check back later as DripLove puts together a new set of people based on your past swipes.",
       "upgradeButton": "Upgrade to Premium",
       "okButton": "OK"

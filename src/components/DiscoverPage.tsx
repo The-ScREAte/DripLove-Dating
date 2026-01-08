@@ -41,7 +41,7 @@ LazyAdinkraBar.displayName = 'LazyAdinkraBar';
 
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Heart, X, Crown } from 'lucide-react';
+import { Heart, X, Crown, Gamepad2 } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import { usePushNotifications } from '@/hooks/usePushNotifications';
@@ -2813,28 +2813,6 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, onNavigateToProfile, isPr
     
     if (effectiveSwipeCount >= swipeLimit) {
       setIsOutOfSwipes(true);
-      toast({
-        title: t('discover.errors.dailyLimitReached'),
-        description: (
-          <div className="flex items-center justify-between gap-3">
-            <span className="flex-1">
-              {isPremium
-                ? t('discover.errors.premiumDailyLimitMessage')
-                : t('discover.errors.dailyLimitMessage')}
-            </span>
-            {onNavigateToProfile && (
-              <button
-                type="button"
-                className="shrink-0 underline font-semibold"
-                onClick={onNavigateToProfile}
-              >
-                Profile
-              </button>
-            )}
-          </div>
-        ),
-        variant: 'destructive'
-      });
       return;
     }
 
@@ -3120,28 +3098,6 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, onNavigateToProfile, isPr
     
     if (effectiveSwipeCount >= swipeLimit) {
       setIsOutOfSwipes(true);
-      toast({
-        title: t('discover.errors.dailyLimitReached'),
-        description: (
-          <div className="flex items-center justify-between gap-3">
-            <span className="flex-1">
-              {isPremium
-                ? t('discover.errors.premiumDailyLimitMessage')
-                : t('discover.errors.dailyLimitMessage')}
-            </span>
-            {onNavigateToProfile && (
-              <button
-                type="button"
-                className="shrink-0 underline font-semibold"
-                onClick={onNavigateToProfile}
-              >
-                Profile
-              </button>
-            )}
-          </div>
-        ),
-        variant: 'destructive'
-      });
       return;
     }
 
@@ -3647,9 +3603,11 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, onNavigateToProfile, isPr
               <Button
                 onClick={() => navigate('/games')}
                 variant="outline"
-                className="w-full"
+                className="w-full border-purple-300 text-purple-700 hover:bg-purple-50 bg-white flex items-center justify-center gap-2"
+                aria-label="Play games"
               >
-                dont get bored, test your brain
+                <Gamepad2 className="w-4 h-4" />
+                Test Your Dating Skills
               </Button>
             </div>
           </CardContent>
@@ -3799,9 +3757,11 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, onNavigateToProfile, isPr
             <Button
               onClick={() => navigate('/games')}
               variant="outline"
-              className="w-full mt-3"
+              className="w-full mt-3 border-purple-300 text-purple-700 hover:bg-purple-50 bg-white flex items-center justify-center gap-2"
+              aria-label="Play games"
             >
-              dont get bored, test your brain
+              <Gamepad2 className="w-4 h-4" />
+              Test Your Dating Skills
             </Button>
           </CardContent>
         </Card>
