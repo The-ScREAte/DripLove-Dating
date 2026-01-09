@@ -8,6 +8,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { Eye, Trash2, CheckCircle, XCircle, Clock, AlertTriangle, User } from 'lucide-react';
 import { usePushNotifications } from '@/hooks/usePushNotifications';
 import ImageViewer from '@/components/ImageViewer';
+import { optimizeImageUrl } from '@/utils/imageOptimizer';
 
 interface PendingImage {
   id: string;
@@ -499,7 +500,7 @@ const ImageModerationPanel = ({ onViewProfile }: ImageModerationPanelProps) => {
                           <img
                             loading="lazy"
                             decoding="async"
-                            src={image.image_url}
+                            src={image.image_url.includes('supabase') ? `${image.image_url}?width=500&quality=60&format=webp` : image.image_url}
                             alt="Pending approval"
                             className="w-full h-32 object-cover rounded-md cursor-pointer hover:opacity-90 transition-opacity"
                             onClick={() => handleImageClick(image.image_url)}
@@ -587,7 +588,7 @@ const ImageModerationPanel = ({ onViewProfile }: ImageModerationPanelProps) => {
                           <img
                             loading="lazy"
                             decoding="async"
-                            src={report.image_url}
+                            src={report.image_url.includes('supabase') ? `${report.image_url}?width=500&quality=60&format=webp` : report.image_url}
                             alt="Reported content"
                             className="w-full h-40 object-cover rounded-lg cursor-pointer hover:opacity-90 transition-opacity"
                             onClick={() => handleImageClick(report.image_url)}

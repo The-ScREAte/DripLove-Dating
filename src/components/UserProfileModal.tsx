@@ -290,7 +290,7 @@ const UserProfileModal = ({ isOpen, onClose, userId, isAdmin = false }: UserProf
               {userImages.length > 0 ? (
                 <div className="relative w-32 h-32 mx-auto mb-4">
                   <img loading="lazy" decoding="async"
-                    src={userImages[0]} 
+                    src={userImages[0].includes('supabase') ? `${userImages[0]}?width=500&quality=60&format=webp` : userImages[0]} 
                     alt={`${profile?.first_name} ${profile?.last_name}`}
                     className="w-32 h-32 rounded-full object-cover cursor-pointer hover:opacity-90 transition-opacity border-4 border-blue-100"
                     onClick={() => handleImageClick(0)}
@@ -634,7 +634,7 @@ const UserProfileModal = ({ isOpen, onClose, userId, isAdmin = false }: UserProf
                           <img
                             loading="lazy"
                             decoding="async"
-                            src={image}
+                            src={image.includes('supabase') ? `${image}?width=300&quality=60&format=webp` : image}
                             alt={`Photo ${index + 1}`}
                             className="w-full h-24 object-cover rounded-lg cursor-pointer hover:opacity-90 transition-opacity"
                             onClick={() => handleImageClick(index)}

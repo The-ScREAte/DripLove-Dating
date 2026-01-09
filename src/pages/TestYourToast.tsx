@@ -2,7 +2,7 @@ import React, { useMemo, useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { ArrowLeft, Trophy, TrendingUp, Star, Trash2, Loader2 } from 'lucide-react';
+import { ArrowLeft, Trophy, TrendingUp, Star, Trash2, Loader2, Home } from 'lucide-react';
 import {
   addResult,
   clearResults,
@@ -461,17 +461,20 @@ const TestYourToast = () => {
 
   if (!selectedLevel) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-yellow-50 to-orange-50 pb-20">
-        <div className="bg-white border-b shadow-sm">
+      <div className="h-screen bg-gradient-to-br from-yellow-50 to-orange-50 flex flex-col">
+        <div className="pt-safe pt-10 bg-white border-b shadow-sm sticky top-0 z-10">
           <div className="max-w-2xl mx-auto px-4 py-4">
             <div className="flex items-center justify-between gap-3">
               <div className="flex items-center gap-3">
-                <Button variant="ghost" size="sm" onClick={() => navigate('/games')}>
+                <Button variant="ghost" size="sm" onClick={() => navigate(-1)} title="Home">
+                  <Home className="w-5 h-5" />
+                </Button>
+                <Button variant="ghost" size="sm" onClick={() => navigate('/games')} title="Back to Games">
                   <ArrowLeft className="w-5 h-5" />
                 </Button>
                 <div>
-                  <h1 className="text-xl font-bold text-gray-900">Test Your Toast 🥂</h1>
-                  <p className="text-xs text-gray-600">Pick a level to play</p>
+                  <h1 className="text-lg font-bold bg-gradient-to-r from-pink-500 to-purple-600 bg-clip-text text-transparent">DripLove</h1>
+                  <p className="text-xs text-gray-600">Test Your Toast 🥂</p>
                 </div>
               </div>
               <Button
@@ -486,7 +489,8 @@ const TestYourToast = () => {
           </div>
         </div>
 
-        <div className="max-w-2xl mx-auto px-4 py-6 space-y-4">
+        <div className="flex-1 overflow-y-auto overflow-x-hidden pb-safe-offset-32 pt-6 pb-8">
+          <div className="max-w-2xl mx-auto px-4 py-6 space-y-4">
           <Card>
             <CardHeader>
               <CardTitle>Select a level</CardTitle>
@@ -540,6 +544,7 @@ const TestYourToast = () => {
             </Card>
           )}
         </div>
+        </div>
       </div>
     );
   }
@@ -551,19 +556,26 @@ const TestYourToast = () => {
     const bestPct = bestByLevel[selectedLevel ?? -1]?.percentage;
     const isNewBest = bestPct === undefined || percentage >= bestPct;
     return (
-      <div className="min-h-screen bg-gradient-to-br from-yellow-50 to-orange-50 pb-20">
-        <div className="bg-white border-b shadow-sm">
+      <div className="h-screen bg-gradient-to-br from-yellow-50 to-orange-50 flex flex-col pt-safe">
+        <div className="bg-white border-b shadow-sm sticky top-0 z-10">
           <div className="max-w-2xl mx-auto px-4 py-4">
             <div className="flex items-center gap-3">
-              <Button variant="ghost" size="sm" onClick={() => navigate('/games')}>
+            <Button variant="ghost" size="sm" onClick={() => navigate('/')} title="Home">
+                <Home className="w-5 h-5" />
+              </Button>
+              <Button variant="ghost" size="sm" onClick={() => navigate('/games')} title="Back to Games">
                 <ArrowLeft className="w-5 h-5" />
               </Button>
-              <h1 className="text-xl font-bold text-gray-900">Test Your Toast 🥂</h1>
+              <div>
+                <h1 className="text-lg font-bold bg-gradient-to-r from-pink-500 to-purple-600 bg-clip-text text-transparent">DripLove</h1>
+                <p className="text-xs text-gray-600">Test Your Toast 🥂</p>
+              </div>
             </div>
           </div>
         </div>
 
-        <div className="max-w-2xl mx-auto px-4 py-8">
+        <div className="flex-1 overflow-y-auto overflow-x-hidden pb-safe-offset-32 pt-6 pb-8">
+          <div className="max-w-2xl mx-auto px-4 py-8">
           <Card className="text-center">
             <CardContent className="pt-8 pb-8">
               <Trophy className="w-20 h-20 mx-auto mb-6 text-yellow-500" />
@@ -596,33 +608,36 @@ const TestYourToast = () => {
             </CardContent>
           </Card>
         </div>
+        </div>
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-yellow-50 to-orange-50 pb-20">
+    <div className="h-screen bg-gradient-to-br from-yellow-50 to-orange-50 flex flex-col pt-safe">
       {/* Header */}
-      <div className="bg-white border-b shadow-sm">
+      <div className="bg-white border-b shadow-sm sticky top-0 z-10">
         <div className="max-w-2xl mx-auto px-4 py-4">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-3">
-              <Button variant="ghost" size="sm" onClick={() => navigate('/games')}>
+              <Button variant="ghost" size="sm" onClick={() => navigate(-1)} title="Home">
+                <Home className="w-5 h-5" />
+              </Button>
+              <Button variant="ghost" size="sm" onClick={() => navigate('/games')} title="Back to Games">
                 <ArrowLeft className="w-5 h-5" />
               </Button>
               <div>
-                <h1 className="text-xl font-bold text-gray-900">Test Your Toast 🥂</h1>
-                <p className="text-xs text-gray-600">Level {selectedLevel} • Question {questionIndex + 1} of {scenarios.length}</p>
+                <h1 className="text-sm font-bold bg-gradient-to-r from-pink-500 to-purple-600 bg-clip-text text-transparent">DripLove</h1>
+                <p className="text-xs text-gray-600">Test Your Toast • Q{questionIndex + 1}/{scenarios.length}</p>
               </div>
             </div>
             <div className="text-right">
-              <div className="text-xs text-gray-500 mb-1">Best on this device</div>
+              <div className="text-xs text-gray-500 mb-1">Best</div>
               <div className="text-lg font-bold text-gray-900">
                 {bestByLevel[selectedLevel ?? -1]?.percentage !== undefined
                   ? `${bestByLevel[selectedLevel ?? -1]?.percentage.toFixed(0)}%`
                   : '—'}
               </div>
-              <div className="text-[11px] text-gray-500">Level {selectedLevel}</div>
               {streak > 1 && (
                 <div className="text-[11px] text-orange-600 font-semibold flex items-center gap-1 justify-end mt-1">
                   <TrendingUp className="w-3 h-3" />
@@ -646,8 +661,9 @@ const TestYourToast = () => {
         </div>
       </div>
 
-      {/* Game Content */}
-      <div className="max-w-2xl mx-auto px-4 py-6">
+      {/* Scrollable Game Content */}
+      <div className="flex-1 overflow-y-auto overflow-x-hidden pb-safe-offset-32 pt-6 pb-8">
+        <div className="max-w-2xl mx-auto px-4 py-6">
         {loadingScenarios ? (
           <Card className="mb-6">
             <CardContent className="flex items-center justify-center py-12">
@@ -733,6 +749,7 @@ const TestYourToast = () => {
         )}
         </>
         )}
+        </div>
       </div>
     </div>
   );

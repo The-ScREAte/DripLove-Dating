@@ -69,7 +69,15 @@ const MainApp = ({ user, onLogout }: MainAppProps) => {
   const userId = user?.id;
   
   // ⭐ CRITICAL FIX: Move ALL hooks BEFORE any conditional returns
-  const [activeTab, setActiveTab] = useState('dripcheck');
+  // ⭐ STATE PRESERVATION: Restore active tab from sessionStorage when returning from games
+  const [activeTab, setActiveTab] = useState(() => {
+    try {
+      const saved = sessionStorage.getItem('mainapp_active_tab');
+      return saved || 'dripcheck';
+    } catch {
+      return 'dripcheck';
+    }
+  });
   const [isChatDetailOpen, setIsChatDetailOpen] = useState(false);
   const [isKeyboardOpen, setIsKeyboardOpen] = useState(false);
   const [showTerms, setShowTerms] = useState(false);
@@ -80,6 +88,15 @@ const MainApp = ({ user, onLogout }: MainAppProps) => {
   const [profileCompletion, setProfileCompletion] = useState(0);
   const [userImages, setUserImages] = useState<any[]>([]);
   const { toast } = useToast();
+
+  // ⭐ STATE PRESERVATION: Save active tab to sessionStorage whenever it changes
+  useEffect(() => {
+    try {
+      sessionStorage.setItem('mainapp_active_tab', activeTab);
+    } catch {
+      // Ignore storage errors
+    }
+  }, [activeTab]);
 
   // Cached set of match IDs for this user (used to cheaply filter realtime chat events)
   const userMatchIdSetRef = useRef<Set<string>>(new Set());

@@ -57,7 +57,7 @@ const MatchCard: React.FC<MatchCardProps> = ({
   swipeDistance,
   isSwipeAreaOnly = false,
   isDetailsAreaOnly = false,
-  getOptimizedUrl = (url: string) => url.includes('supabase') ? `${url}?width=800&quality=85&format=webp` : url,
+  getOptimizedUrl = (url: string) => url.includes('supabase') ? `${url}?width=500&quality=60&format=webp` : url,
   preCalculatedDistance
   , imageStatus
 }) => {

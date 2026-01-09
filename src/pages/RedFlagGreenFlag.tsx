@@ -2,7 +2,7 @@ import React, { useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { ArrowLeft, ThumbsUp, ThumbsDown, Star, Trash2 } from 'lucide-react';
+import { ArrowLeft, ThumbsUp, ThumbsDown, Star, Trash2, Home } from 'lucide-react';
 import { addResult, clearResults, getBestResults, type GameType } from '@/utils/gameStorage';
 import { saveFinalGameResultToDb, clearGameResultsFromDb } from '@/utils/gameResultsDb';
 import { useToast } from '@/hooks/use-toast';
@@ -120,6 +120,321 @@ const scenarios: Scenario[] = [
     content: "Their friends say good things about them and they have long-term friendships",
     isRedFlag: false,
     explanation: "💚 Strong green flag! Long-term friendships show they can maintain healthy relationships and are trustworthy."
+  },
+  {
+    id: 16,
+    type: 'text',
+    content: '"You\'re too pretty to be on here. What\'s wrong with you?"',
+    isRedFlag: true,
+    explanation: "🚩 Backhanded compliment! Implying something is wrong with you is manipulative and disrespectful."
+  },
+  {
+    id: 17,
+    type: 'behavior',
+    content: "Listens actively during conversation and asks follow-up questions",
+    isRedFlag: false,
+    explanation: "💚 Shows genuine interest! People who listen and engage make the best partners."
+  },
+  {
+    id: 18,
+    type: 'profile',
+    content: 'Bio: "My ex was crazy" or similar complaints about past relationships',
+    isRedFlag: true,
+    explanation: "🚩 Talks badly about exes = red flag. Shows they might not take accountability and could do the same to you."
+  },
+  {
+    id: 19,
+    type: 'text',
+    content: '"I noticed you\'re into photography. Do you have any favorite shots you\'ve taken recently?"',
+    isRedFlag: false,
+    explanation: "💚 Thoughtful opener! References your interests and invites you to share something you're passionate about."
+  },
+  {
+    id: 20,
+    type: 'behavior',
+    content: "Pressures you to send photos or move to WhatsApp/text immediately",
+    isRedFlag: true,
+    explanation: "🚩 Rushing off the app quickly is suspicious. Genuine people are fine taking things at your pace."
+  },
+  {
+    id: 21,
+    type: 'profile',
+    content: 'Shows verification badge and recent activity',
+    isRedFlag: false,
+    explanation: "💚 Verified profiles show they're real and serious about dating safely."
+  },
+  {
+    id: 22,
+    type: 'text',
+    content: '"Not really looking for anything serious right now, just keeping it casual"',
+    isRedFlag: false,
+    explanation: "💚 Honest communication about intentions! It's a green flag when someone is upfront, even if their goals don't match yours."
+  },
+  {
+    id: 23,
+    type: 'behavior',
+    content: "Love bombs you with excessive compliments and talks about the future after one date",
+    isRedFlag: true,
+    explanation: "🚩 Love bombing is a manipulation tactic! Healthy relationships build gradually, not overnight."
+  },
+  {
+    id: 24,
+    type: 'profile',
+    content: 'Has multiple photos doing different activities and hobbies',
+    isRedFlag: false,
+    explanation: "💚 Shows they have a full life and interests! You want someone who's well-rounded and active."
+  },
+  {
+    id: 25,
+    type: 'text',
+    content: '"I can\'t stand when people [insert complaint about entire gender]"',
+    isRedFlag: true,
+    explanation: "🚩 Generalizing and complaining about an entire gender shows bitterness and unresolved issues."
+  },
+  {
+    id: 26,
+    type: 'behavior',
+    content: "Respects when you say you need time to think or want to take things slow",
+    isRedFlag: false,
+    explanation: "💚 Respecting boundaries is essential! Someone who pressures you doesn't respect you."
+  },
+  {
+    id: 27,
+    type: 'profile',
+    content: 'Bio mentions height requirement: "Must be 6ft+" or similar',
+    isRedFlag: true,
+    explanation: "🚩 Overly focused on physical requirements shows shallow priorities. Real connections go deeper than measurements."
+  },
+  {
+    id: 28,
+    type: 'text',
+    content: '"Hey! 👋 How was your weekend?"',
+    isRedFlag: false,
+    explanation: "💚 Simple, friendly, and open-ended. Sometimes the best openers are the straightforward ones!"
+  },
+  {
+    id: 29,
+    type: 'behavior',
+    content: "Flakes on plans multiple times without rescheduling",
+    isRedFlag: true,
+    explanation: "🚩 If someone keeps canceling and doesn't make effort to reschedule, they're not that interested. Move on!"
+  },
+  {
+    id: 30,
+    type: 'profile',
+    content: 'Profile shows them volunteering, with pets, or doing community activities',
+    isRedFlag: false,
+    explanation: "💚 Shows compassion and values! People who care about others make great partners."
+  },
+  {
+    id: 31,
+    type: 'text',
+    content: '"Why are you still single? You seem perfect"',
+    isRedFlag: true,
+    explanation: "🚩 Seems like a compliment but implies something must be wrong with you. It's a subtle put-down."
+  },
+  {
+    id: 32,
+    type: 'behavior',
+    content: "Shares memes and jokes that match your humor",
+    isRedFlag: false,
+    explanation: "💚 Humor compatibility matters! Someone who gets your jokes makes everything more fun."
+  },
+  {
+    id: 33,
+    type: 'profile',
+    content: 'All selfies from the same angle with heavy filters',
+    isRedFlag: true,
+    explanation: "🚩 Heavily filtered photos can be misleading. You want someone who's comfortable showing their real self."
+  },
+  {
+    id: 34,
+    type: 'text',
+    content: '"I saw your profile and we have so much in common! Tell me more about your art"',
+    isRedFlag: false,
+    explanation: "💚 Shows they paid attention and want to learn more about you. Genuine interest is attractive!"
+  },
+  {
+    id: 35,
+    type: 'behavior',
+    content: "Becomes jealous or possessive before you're even in a relationship",
+    isRedFlag: true,
+    explanation: "🚩 Early jealousy is a major warning sign! Healthy relationships are built on trust, not control."
+  },
+  {
+    id: 36,
+    type: 'profile',
+    content: 'Bio: "Swipe left if you can\'t handle me at my worst"',
+    isRedFlag: true,
+    explanation: "🚩 This phrase is often used to excuse bad behavior. You deserve someone at their best!"
+  },
+  {
+    id: 37,
+    type: 'text',
+    content: '"I really enjoyed talking with you today. Let me know when you\'re free to continue this conversation!"',
+    isRedFlag: false,
+    explanation: "💚 Expresses interest while respecting your schedule. This is considerate and mature!"
+  },
+  {
+    id: 38,
+    type: 'behavior',
+    content: "Checks in during the day with sweet messages without being overwhelming",
+    isRedFlag: false,
+    explanation: "💚 Thoughtful check-ins show they're thinking of you! The key is balance - not too much, not too little."
+  },
+  {
+    id: 39,
+    type: 'profile',
+    content: 'Profile picture is clearly cropped to remove someone else',
+    isRedFlag: true,
+    explanation: "🚩 Poorly cropped ex photos suggest they're not over the relationship or just lazy with their profile."
+  },
+  {
+    id: 40,
+    type: 'text',
+    content: '"You up?" at 2 AM as the first message ever',
+    isRedFlag: true,
+    explanation: "🚩 Late night first messages are never about getting to know you. They want one thing."
+  },
+  {
+    id: 41,
+    type: 'behavior',
+    content: "Remembers small details you mentioned in passing",
+    isRedFlag: false,
+    explanation: "💚 Paying attention to details shows they truly care and value what you say!"
+  },
+  {
+    id: 42,
+    type: 'profile',
+    content: 'Bio: "Entrepreneur" but profile looks fake or too perfect',
+    isRedFlag: true,
+    explanation: "🚩 'Entrepreneur' with model photos is often a scam profile. Trust your instincts if something feels off."
+  },
+  {
+    id: 43,
+    type: 'text',
+    content: '"I\'m not really the texting type, prefer to meet in person"',
+    isRedFlag: true,
+    explanation: "🚩 While some people prefer calls, refusing to text at all before meeting is suspicious and unsafe."
+  },
+  {
+    id: 44,
+    type: 'behavior',
+    content: "Introduces you to their friends early on without pressure",
+    isRedFlag: false,
+    explanation: "💚 Meeting friends shows they're serious and proud to have you in their life!"
+  },
+  {
+    id: 45,
+    type: 'profile',
+    content: 'Multiple photos with different hairstyles, outfits, and settings showing personality',
+    isRedFlag: false,
+    explanation: "💚 Variety shows authenticity! You get a real sense of who they are and what they enjoy."
+  },
+  {
+    id: 46,
+    type: 'text',
+    content: '"I don\'t usually use these apps but there\'s something about you..."',
+    isRedFlag: true,
+    explanation: "🚩 This line is used to make you feel special but it's usually manipulation. Everyone on the app uses the app!"
+  },
+  {
+    id: 47,
+    type: 'behavior',
+    content: "Asks about your day and genuinely listens to the answer",
+    isRedFlag: false,
+    explanation: "💚 Simple but important! Caring about your daily life shows they want to be part of it."
+  },
+  {
+    id: 48,
+    type: 'profile',
+    content: 'Bio: "If you can\'t keep up with me, swipe left" or similar challenge',
+    isRedFlag: true,
+    explanation: "🚩 Challenging people to 'keep up' is arrogant and off-putting. Relationships are partnerships, not competitions."
+  },
+  {
+    id: 49,
+    type: 'text',
+    content: '"I\'m so tired of all the fake people on here. You seem different though"',
+    isRedFlag: true,
+    explanation: "🚩 Complaining about others while complimenting you is a manipulation tactic to make you feel special."
+  },
+  {
+    id: 50,
+    type: 'behavior',
+    content: "Shows up on time and follows through on what they say they'll do",
+    isRedFlag: false,
+    explanation: "💚 Reliability is so attractive! Someone who keeps their word is someone you can trust."
+  },
+  {
+    id: 51,
+    type: 'profile',
+    content: 'Bio lists specific interests and what they\'re looking for in a partner',
+    isRedFlag: false,
+    explanation: "💚 Clear about who they are and what they want. No games, no guessing!"
+  },
+  {
+    id: 52,
+    type: 'text',
+    content: '"Send me a pic so I know you\'re real"',
+    isRedFlag: true,
+    explanation: "🚩 Demanding photos is pushy and controlling. Your profile photos are enough to start a conversation."
+  },
+  {
+    id: 53,
+    type: 'behavior',
+    content: "Constantly on their phone during your date",
+    isRedFlag: true,
+    explanation: "🚩 Not giving you attention on a date shows lack of respect and interest. You deserve someone present!"
+  },
+  {
+    id: 54,
+    type: 'profile',
+    content: 'Profile mentions they just got out of a serious relationship',
+    isRedFlag: true,
+    explanation: "🚩 Fresh out of a relationship usually means they're not ready for something new. You might be a rebound."
+  },
+  {
+    id: 55,
+    type: 'text',
+    content: '"Your smile in that third pic is amazing! What were you doing there?"',
+    isRedFlag: false,
+    explanation: "💚 Compliments a specific photo and asks about the story behind it. Great conversation starter!"
+  },
+  {
+    id: 56,
+    type: 'behavior',
+    content: "Offers to video chat before meeting in person",
+    isRedFlag: false,
+    explanation: "💚 Video chatting first is smart! It helps verify they're real and builds comfort before meeting."
+  },
+  {
+    id: 57,
+    type: 'profile',
+    content: 'Bio: "Venmo me $5 and see what happens 😉"',
+    isRedFlag: true,
+    explanation: "🚩 Anyone asking for money on a dating app is either a scammer or not serious. Block immediately!"
+  },
+  {
+    id: 58,
+    type: 'text',
+    content: '"I\'m actually not looking for hookups. I\'d love to get to know you properly"',
+    isRedFlag: false,
+    explanation: "💚 Being upfront about wanting something genuine shows maturity and saves everyone time!"
+  },
+  {
+    id: 59,
+    type: 'behavior',
+    content: "Defensive and argues when you express a concern or boundary",
+    isRedFlag: true,
+    explanation: "🚩 Can't handle feedback or respect boundaries = big problem. Healthy people communicate, they don't fight you."
+  },
+  {
+    id: 60,
+    type: 'profile',
+    content: 'Photos show them with family, at events, and living a balanced life',
+    isRedFlag: false,
+    explanation: "💚 Family connections and balance are positive signs of someone emotionally healthy!"
   }
 ];
 
@@ -239,17 +554,20 @@ const RedFlagGreenFlag = () => {
 
   if (!selectedLevel) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-red-50 via-pink-50 to-green-50 pb-20">
-        <div className="bg-white border-b shadow-sm">
+      <div className="h-screen bg-gradient-to-br from-red-50 via-pink-50 to-green-50 flex flex-col">
+        <div className="pt-safe pt-10 bg-white border-b shadow-sm sticky top-0 z-10">
           <div className="max-w-2xl mx-auto px-4 py-4">
             <div className="flex items-center justify-between gap-3">
               <div className="flex items-center gap-3">
-                <Button variant="ghost" size="sm" onClick={() => navigate('/games')}>
+                <Button variant="ghost" size="sm" onClick={() => navigate(-1)} title="Home">
+                  <Home className="w-5 h-5" />
+                </Button>
+                <Button variant="ghost" size="sm" onClick={() => navigate('/games')} title="Back to Games">
                   <ArrowLeft className="w-5 h-5" />
                 </Button>
                 <div>
-                  <h1 className="text-xl font-bold text-gray-900">Red Flag or Green Flag</h1>
-                  <p className="text-xs text-gray-600">Pick a level to play</p>
+                  <h1 className="text-lg font-bold bg-gradient-to-r from-pink-500 to-purple-600 bg-clip-text text-transparent">DripLove</h1>
+                  <p className="text-xs text-gray-600">Red Flag or Green Flag</p>
                 </div>
               </div>
               <Button
@@ -264,7 +582,8 @@ const RedFlagGreenFlag = () => {
           </div>
         </div>
 
-        <div className="max-w-2xl mx-auto px-4 py-6 space-y-4">
+        <div className="flex-1 overflow-y-auto overflow-x-hidden pb-safe-offset-32 pt-6 pb-8">
+          <div className="max-w-2xl mx-auto px-4 py-6 space-y-4">
           <Card>
             <CardContent className="pt-6 space-y-3">
               {Object.entries(levelConfig).map(([levelStr, cfg]) => {
@@ -308,6 +627,7 @@ const RedFlagGreenFlag = () => {
             </Card>
           )}
         </div>
+        </div>
       </div>
     );
   }
@@ -315,20 +635,27 @@ const RedFlagGreenFlag = () => {
   if (gameComplete) {
     const rating = getScoreRating();
     return (
-      <div className="min-h-screen bg-gradient-to-br from-red-50 via-pink-50 to-green-50 pb-20">
-        <div className="bg-white border-b shadow-sm">
+      <div className="h-screen bg-gradient-to-br from-red-50 via-pink-50 to-green-50 flex flex-col pt-safe">
+        <div className="bg-white border-b shadow-sm sticky top-0 z-10">
           <div className="max-w-2xl mx-auto px-4 py-4">
             <div className="flex items-center gap-3">
-              <Button variant="ghost" size="sm" onClick={() => navigate('/games')}>
+            <Button variant="ghost" size="sm" onClick={() => navigate('/')} title="Home">
+                <Home className="w-5 h-5" />
+              </Button>
+              <Button variant="ghost" size="sm" onClick={() => navigate('/games')} title="Back to Games">
                 <ArrowLeft className="w-5 h-5" />
               </Button>
-              <h1 className="text-xl font-bold text-gray-900">Red Flag or Green Flag</h1>
+              <div>
+                <h1 className="text-lg font-bold bg-gradient-to-r from-pink-500 to-purple-600 bg-clip-text text-transparent">DripLove</h1>
+                <p className="text-xs text-gray-600">Red Flag or Green Flag</p>
+              </div>
             </div>
           </div>
         </div>
 
-        <div className="max-w-2xl mx-auto px-4 py-8">
-          <Card className="text-center">
+        <div className="flex-1 overflow-y-auto overflow-x-hidden pb-safe-offset-32 pt-6 pb-8">
+          <div className="max-w-2xl mx-auto px-4 py-8">
+          <Card>
             <CardContent className="pt-8 pb-8">
               <div className="text-6xl mb-6">🎯</div>
               <h2 className="text-3xl font-bold mb-2">{rating.title}</h2>
@@ -362,6 +689,7 @@ const RedFlagGreenFlag = () => {
               </div>
             </CardContent>
           </Card>
+          </div>
         </div>
       </div>
     );
@@ -370,21 +698,24 @@ const RedFlagGreenFlag = () => {
   const isCorrect = selectedAnswer === currentScenario.isRedFlag;
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-red-50 via-pink-50 to-green-50 pb-20">
+    <div className="h-screen bg-gradient-to-br from-red-50 via-pink-50 to-green-50 flex flex-col pt-safe">
       {/* Header */}
-      <div className="bg-white border-b shadow-sm">
+      <div className="bg-white border-b shadow-sm sticky top-0 z-10">
         <div className="max-w-2xl mx-auto px-4 py-4">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-3">
-              <Button variant="ghost" size="sm" onClick={() => navigate('/games')}>
+              <Button variant="ghost" size="sm" onClick={() => navigate('/')} title="Home">
+                <Home className="w-5 h-5" />
+              </Button>
+              <Button variant="ghost" size="sm" onClick={() => navigate('/games')} title="Back to Games">
                 <ArrowLeft className="w-5 h-5" />
               </Button>
               <div>
-                <h1 className="text-xl font-bold text-gray-900">Red Flag or Green Flag</h1>
-                <p className="text-xs text-gray-600">Level {selectedLevel} • Scenario {currentIndex + 1} of {levelScenarios.length}</p>
+                <h1 className="text-sm font-bold bg-gradient-to-r from-pink-500 to-purple-600 bg-clip-text text-transparent">DripLove</h1>
+                <p className="text-xs text-gray-600">Red Flag or Green Flag • {currentIndex + 1}/{levelScenarios.length}</p>
               </div>
             </div>
-            <div className="text-right text-xs text-gray-500">No score shown until end</div>
+            <div className="text-right text-xs text-gray-500">Lvl {selectedLevel}</div>
           </div>
         </div>
       </div>
@@ -401,8 +732,9 @@ const RedFlagGreenFlag = () => {
         </div>
       </div>
 
-      {/* Game Content */}
-      <div className="max-w-2xl mx-auto px-4 py-6">
+      {/* Scrollable Game Content */}
+      <div className="flex-1 overflow-y-auto overflow-x-hidden pb-safe-offset-32 pt-6 pb-8">
+        <div className="max-w-2xl mx-auto px-4 py-6">
         {!showExplanation ? (
           <Card className="mb-6">
             <CardContent className="pt-8 pb-8">
@@ -492,6 +824,7 @@ const RedFlagGreenFlag = () => {
             </CardContent>
           </Card>
         )}
+        </div>
       </div>
     </div>
   );

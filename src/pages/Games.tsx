@@ -2,7 +2,7 @@ import React from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Gamepad2, Target, Flag, Home } from 'lucide-react';
+import { Gamepad2, Target, Flag, Home, ArrowLeft } from 'lucide-react';
 
 const Games = () => {
   const navigate = useNavigate();
@@ -41,30 +41,33 @@ const Games = () => {
   ];
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-gray-50 to-gray-100 flex flex-col">
+    <div className="h-screen bg-gradient-to-br from-gray-50 to-gray-100 flex flex-col">
       {/* Header */}
-      <div className="bg-white border-b shadow-sm sticky top-0 z-10">
+      <div className="pt-safe pt-10 bg-white border-b shadow-sm sticky top-0 z-10">
         <div className="max-w-4xl mx-auto px-4 py-4">
-          <div className="flex items-center gap-3">
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={() => navigate(-1)}
-              className="hover:bg-gray-100"
-            >
-              <Home className="w-5 h-5" />
-            </Button>
-            <div>
-              <h1 className="text-2xl font-bold text-gray-900">Games</h1>
-              <p className="text-sm text-gray-600">Have fun, practice, and learn</p>
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-3">
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => navigate('/')}
+                className="hover:bg-gray-100"
+                title="Home"
+              >
+                <Home className="w-5 h-5" />
+              </Button>
+              <div>
+                <h1 className="text-xl font-bold bg-gradient-to-r from-pink-500 to-purple-600 bg-clip-text text-transparent">DripLove</h1>
+                <p className="text-sm text-gray-600">Games</p>
+              </div>
             </div>
           </div>
         </div>
       </div>
 
       {/* Scrollable body */}
-      <div className="flex-1 overflow-y-auto overflow-x-hidden">
-        <div className="max-w-4xl mx-auto px-4 py-6 space-y-4 pb-32">
+      <div className="flex-1 overflow-y-auto overflow-x-hidden pt-6 pb-8">
+        <div className="max-w-4xl mx-auto px-4 py-6 space-y-4 pb-32 pb-safe-offset-32">
           {games.map((game) => {
             const IconComponent = game.icon;
             return (

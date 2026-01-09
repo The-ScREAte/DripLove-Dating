@@ -18,6 +18,7 @@ import { useVirtualizer } from '@tanstack/react-virtual';
 
 // FIX #1: Import blob cache for instant Android image loading
 import { preloadImageToBlob } from '@/utils/imageCache';
+import { optimizeImageUrl } from '@/utils/imageOptimizer';
 
 import type { AppUser, LikedMeCacheValue, LikerProfile } from '@/types/cacheTypes';
 
@@ -130,13 +131,18 @@ const LikedMePage = ({ currentUser, isPremium = false }: LikedMePageProps) => {
   // SAFE IMAGE RESOLVER (stable, never creates hooks)
   // ------------------
   const getSafeImageSrc = useCallback(
-    (urlOrBlob?: string): string | undefined => {
+    (urlOrBlob?: string, isGridThumbnail = false): string | undefined => {
       if (!urlOrBlob) return undefined;
 
       // Blob URLs always safe
       if (urlOrBlob.startsWith("blob:")) return urlOrBlob;
 
-      // Android: allow remote URL fallback (blob is an optimization)
+      // Optimize remote URLs for faster loading
+      // Grid thumbnails: 400x400 quality 70, Profile images: 520x520 quality 70
+      if (urlOrBlob.includes('supabase')) {
+        const width = isGridThumbnail ? 400 : 520;
+        return `${urlOrBlob}?width=${width}&quality=60&format=webp`;
+      }
       return urlOrBlob;
     },
     []
@@ -548,10 +554,10 @@ const LikedMePage = ({ currentUser, isPremium = false }: LikedMePageProps) => {
       }
     } catch (error) {
       console.error('Error fetching likers:', error);
-      if (showLoading) {
+      if (showLoading && !navigator.onLine) {
         toast({
           title: t('matches.error'),
-          description: t('matches.failedToRefresh'),
+          description: "You appear to be offline. Please check your connection.",
           variant: "destructive",
         });
       }
@@ -1611,7 +1617,7 @@ const LikedMePage = ({ currentUser, isPremium = false }: LikedMePageProps) => {
                             <img
                               loading={isFirstThree ? "eager" : "lazy"}
                               decoding="async"
-                              src={getSafeImageSrc(profileImages[0])}
+                              src={getSafeImageSrc(profileImages[0], true)}
                               alt={`${liker.first_name}'s photo`}
                               className={`w-full h-full object-cover ${isLocked ? 'blur-md' : ''}`}
                               style={{

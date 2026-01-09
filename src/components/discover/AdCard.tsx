@@ -70,7 +70,7 @@ const AdCard: React.FC<AdCardProps> = ({ ad, onSwipe }) => {
           <img 
             loading="lazy" 
             decoding="async"
-            src={ad.image_url}
+            src={ad.image_url.includes('supabase') ? `${ad.image_url}?width=500&quality=60&format=webp` : ad.image_url}
             alt={ad.name}
             className="w-full h-full object-cover"
           />

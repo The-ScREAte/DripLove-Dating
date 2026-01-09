@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
-import { ArrowLeft, Target, Zap, Star, Trash2, Trophy } from 'lucide-react';
+import { ArrowLeft, Target, Zap, Star, Trash2, Trophy, Home } from 'lucide-react';
 import { addResult, clearResults, getBestResults, type GameType } from '@/utils/gameStorage';
 import { saveFinalGameResultToDb, clearGameResultsFromDb } from '@/utils/gameResultsDb';
 import { useToast } from '@/hooks/use-toast';
@@ -57,6 +57,246 @@ const challenges: Challenge[] = [
     prompt: "Found a vintage record store today and I'm LIVING",
     image: "🎵",
     mood: 'busy'
+  },
+  {
+    id: 6,
+    name: "Morgan",
+    bio: "Plant parent 🌱 | Yoga instructor | Sunset chaser 🌅",
+    prompt: "My apartment is basically a jungle now... send help",
+    image: "🌱",
+    mood: 'curious'
+  },
+  {
+    id: 7,
+    name: "Taylor",
+    bio: "Entrepreneur 💼 | Podcast enthusiast | Weekend warrior",
+    prompt: "Just launched my side project! Nervous and excited",
+    image: "💼",
+    mood: 'neutral'
+  },
+  {
+    id: 8,
+    name: "Drew",
+    bio: "Beach lover 🏖️ | Surfing newbie | Sunset photographer",
+    prompt: "Caught my first real wave today! Progress!",
+    image: "🏄",
+    mood: 'curious'
+  },
+  {
+    id: 9,
+    name: "Skylar",
+    bio: "Artist 🎨 | Gallery hopper | Coffee snob ☕",
+    prompt: "Working on a new collection. Creative block is real...",
+    image: "🎨",
+    mood: 'guarded'
+  },
+  {
+    id: 10,
+    name: "Avery",
+    bio: "Runner 🏃 | Meal prepper | Early bird 🌄",
+    prompt: "Training for a half marathon. Who needs sleep anyway?",
+    image: "🏃",
+    mood: 'busy'
+  },
+  {
+    id: 11,
+    name: "River",
+    bio: "Gamer 🎮 | Tech geek | Pizza connoisseur 🍕",
+    prompt: "Just beat the final boss! Only took me 47 tries...",
+    image: "🎮",
+    mood: 'neutral'
+  },
+  {
+    id: 12,
+    name: "Phoenix",
+    bio: "Dancer 💃 | Salsa lover | Night owl 🌙",
+    prompt: "Found an amazing salsa club. My feet are killing me!",
+    image: "💃",
+    mood: 'curious'
+  },
+  {
+    id: 13,
+    name: "Dakota",
+    bio: "Chef 👨‍🍳 | Foodie explorer | Wine enthusiast 🍷",
+    prompt: "Experimenting with fusion cuisine today. Pray for me",
+    image: "👨‍🍳",
+    mood: 'curious'
+  },
+  {
+    id: 14,
+    name: "Quinn",
+    bio: "Writer ✍️ | Bookstore browser | Tea addict 🍵",
+    prompt: "Writer's block is hitting hard. Need inspiration!",
+    image: "✍️",
+    mood: 'guarded'
+  },
+  {
+    id: 15,
+    name: "Blake",
+    bio: "Rock climber 🧗 | Adventure seeker | Nature lover 🏔️",
+    prompt: "Conquered a V5 today! Hands are destroyed but worth it",
+    image: "🧗",
+    mood: 'neutral'
+  },
+  {
+    id: 16,
+    name: "Sage",
+    bio: "Meditation teacher 🧘 | Wellness coach | Green smoothie fan",
+    prompt: "Teaching my first workshop tomorrow! Zen but nervous",
+    image: "🧘",
+    mood: 'curious'
+  },
+  {
+    id: 17,
+    name: "Rowan",
+    bio: "Architect 🏗️ | Design nerd | Espresso dependent ☕",
+    prompt: "Finally got approval on my project! Celebration time",
+    image: "🏗️",
+    mood: 'neutral'
+  },
+  {
+    id: 18,
+    name: "Eden",
+    bio: "Fashion blogger 👗 | Thrift shop hunter | Vintage lover",
+    prompt: "Found the perfect vintage jacket today! Score!",
+    image: "👗",
+    mood: 'curious'
+  },
+  {
+    id: 19,
+    name: "Ash",
+    bio: "Musician 🎸 | Open mic regular | Songwriting enthusiast",
+    prompt: "Performing my original song tonight. Wish me luck!",
+    image: "🎸",
+    mood: 'busy'
+  },
+  {
+    id: 20,
+    name: "Winter",
+    bio: "Ski instructor ⛷️ | Mountain lover | Hot cocoa expert",
+    prompt: "First snow of the season! Season starts soon!",
+    image: "⛷️",
+    mood: 'curious'
+  },
+  {
+    id: 21,
+    name: "Cedar",
+    bio: "Marine biologist 🐠 | Ocean advocate | Scuba diver",
+    prompt: "Saw a sea turtle today! Never gets old",
+    image: "🐠",
+    mood: 'curious'
+  },
+  {
+    id: 22,
+    name: "Indigo",
+    bio: "Barista ☕ | Latte art master | Coffee roaster",
+    prompt: "Perfected my rosetta today! Only took 1000 tries",
+    image: "☕",
+    mood: 'neutral'
+  },
+  {
+    id: 23,
+    name: "Storm",
+    bio: "Photographer 📸 | Golden hour chaser | Travel junkie ✈️",
+    prompt: "Caught the perfect sunrise today! Worth waking up at 5am",
+    image: "📸",
+    mood: 'curious'
+  },
+  {
+    id: 24,
+    name: "Sage",
+    bio: "Baker 🥐 | Sourdough starter parent | Pastry perfectionist",
+    prompt: "My croissants finally turned out flaky! Third time's the charm",
+    image: "🥐",
+    mood: 'neutral'
+  },
+  {
+    id: 25,
+    name: "Atlas",
+    bio: "Personal trainer 💪 | Fitness motivator | Smoothie bowl creator",
+    prompt: "Hit a new PR today! Progress never stops",
+    image: "💪",
+    mood: 'busy'
+  },
+  {
+    id: 26,
+    name: "Nova",
+    bio: "Astronomy nerd 🔭 | Stargazer | Science communicator",
+    prompt: "Clear skies tonight! Perfect for meteor watching",
+    image: "🔭",
+    mood: 'curious'
+  },
+  {
+    id: 27,
+    name: "Ember",
+    bio: "Candle maker 🕯️ | Scent enthusiast | Small biz owner",
+    prompt: "Just launched my new fall collection! Pumpkin spice who?",
+    image: "🕯️",
+    mood: 'neutral'
+  },
+  {
+    id: 28,
+    name: "Ocean",
+    bio: "Marine conservationist 🌊 | Beach cleaner | Paddle boarder",
+    prompt: "Organized a beach cleanup today! Made a real difference",
+    image: "🌊",
+    mood: 'curious'
+  },
+  {
+    id: 29,
+    name: "Jasper",
+    bio: "Sommelier 🍷 | Wine taster | Cheese board curator",
+    prompt: "Discovered an amazing natural wine today. Game changer!",
+    image: "🍷",
+    mood: 'guarded'
+  },
+  {
+    id: 30,
+    name: "Willow",
+    bio: "Florist 💐 | Garden lover | Butterfly whisperer 🦋",
+    prompt: "Creating bouquets for a wedding this weekend! So excited",
+    image: "💐",
+    mood: 'curious'
+  },
+  {
+    id: 31,
+    name: "Scout",
+    bio: "Dog walker 🐕 | Animal lover | Park explorer",
+    prompt: "Walked 12 dogs today! Living my best life",
+    image: "🐕",
+    mood: 'neutral'
+  },
+  {
+    id: 32,
+    name: "Onyx",
+    bio: "Tattoo artist 🎨 | Ink enthusiast | Sketch book carrier",
+    prompt: "Finished an amazing sleeve today! My best work yet",
+    image: "🎨",
+    mood: 'busy'
+  },
+  {
+    id: 33,
+    name: "Luna",
+    bio: "Astrologer 🌙 | Crystal collector | Tarot reader",
+    prompt: "Mercury retrograde is over! Finally can breathe",
+    image: "🌙",
+    mood: 'curious'
+  },
+  {
+    id: 34,
+    name: "Fox",
+    bio: "Mixologist 🍸 | Cocktail creator | Speakeasy hunter",
+    prompt: "Created a new signature drink today! Taste testers needed",
+    image: "🍸",
+    mood: 'neutral'
+  },
+  {
+    id: 35,
+    name: "Raven",
+    bio: "Poet ✨ | Open mic performer | Coffee shop dweller ☕",
+    prompt: "Wrote a piece I'm actually proud of. Rare moment!",
+    image: "✨",
+    mood: 'guarded'
   }
 ];
 
@@ -125,7 +365,7 @@ const ShootYourShot = () => {
       return 'airball';
     }
     
-    if (!text.includes(challenge.name.toLowerCase()) && !/(coffee|hiking|dog|gym|workout|book|cat|food|ramen|music|concert|record)/i.test(text)) {
+    if (!text.includes(challenge.name.toLowerCase()) && !/(coffee|hiking|dog|gym|workout|book|cat|food|ramen|music|concert|vinyl|record)/i.test(text)) {
       // Guarded mood requires bio/prompt reference
       if (mood === 'guarded') return 'airball';
       return 'brick';
@@ -356,17 +596,20 @@ const ShootYourShot = () => {
 
   if (!selectedLevel) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-blue-50 to-purple-50 pb-20">
-        <div className="bg-white border-b shadow-sm">
+      <div className="h-screen bg-gradient-to-br from-blue-50 to-purple-50 flex flex-col">
+        <div className="pt-safe pt-10 bg-white border-b shadow-sm sticky top-0 z-10">
           <div className="max-w-2xl mx-auto px-4 py-4">
             <div className="flex items-center justify-between gap-3">
               <div className="flex items-center gap-3">
-                <Button variant="ghost" size="sm" onClick={() => navigate('/games')}>
+                <Button variant="ghost" size="sm" onClick={() => navigate(-1)} title="Home">
+                  <Home className="w-5 h-5" />
+                </Button>
+                <Button variant="ghost" size="sm" onClick={() => navigate('/games')} title="Back to Games">
                   <ArrowLeft className="w-5 h-5" />
                 </Button>
                 <div>
-                  <h1 className="text-xl font-bold text-gray-900">Shoot Your Shot 🎯</h1>
-                  <p className="text-xs text-gray-600">Pick a level to play</p>
+                  <h1 className="text-lg font-bold bg-gradient-to-r from-pink-500 to-purple-600 bg-clip-text text-transparent">DripLove</h1>
+                  <p className="text-xs text-gray-600">Shoot Your Shot 🎯</p>
                 </div>
               </div>
               <Button
@@ -381,7 +624,8 @@ const ShootYourShot = () => {
           </div>
         </div>
 
-        <div className="max-w-2xl mx-auto px-4 py-6 space-y-4">
+        <div className="flex-1 overflow-y-auto overflow-x-hidden pb-safe-offset-32 pt-6 pb-8">
+          <div className="max-w-2xl mx-auto px-4 py-6 space-y-4">
           <Card>
             <CardContent className="pt-6 space-y-3">
               {Object.entries(levelConfig).map(([levelStr, cfg]) => {
@@ -425,6 +669,7 @@ const ShootYourShot = () => {
             </Card>
           )}
         </div>
+        </div>
       </div>
     );
   }
@@ -432,27 +677,26 @@ const ShootYourShot = () => {
   if (levelComplete) {
     const copy = getLevelSummaryCopy(levelComplete.percentage);
     return (
-      <div className="min-h-screen bg-gradient-to-br from-blue-50 to-purple-50 pb-20">
-        <div className="bg-white border-b shadow-sm">
+      <div className="h-screen bg-gradient-to-br from-blue-50 to-purple-50 flex flex-col pt-safe">
+        <div className="bg-white border-b shadow-sm sticky top-0 z-10">
           <div className="max-w-2xl mx-auto px-4 py-4">
-            <div className="flex items-center justify-between gap-3">
-              <div className="flex items-center gap-3">
-                <Button variant="ghost" size="sm" onClick={backToLevelSelect}>
-                  <ArrowLeft className="w-5 h-5" />
-                </Button>
-                <div>
-                  <h1 className="text-xl font-bold text-gray-900">Shoot Your Shot 🎯</h1>
-                  <p className="text-xs text-gray-600">Level {levelComplete.level} complete</p>
-                </div>
-              </div>
-              <Button variant="outline" size="sm" onClick={() => navigate('/games')} className="border-gray-300 text-gray-700">
-                Back to Games
+            <div className="flex items-center gap-3">
+            <Button variant="ghost" size="sm" onClick={() => navigate('/')} title="Home">
+                <Home className="w-5 h-5" />
               </Button>
+              <Button variant="ghost" size="sm" onClick={() => navigate('/games')} title="Back to Games">
+                <ArrowLeft className="w-5 h-5" />
+              </Button>
+              <div>
+                <h1 className="text-lg font-bold bg-gradient-to-r from-pink-500 to-purple-600 bg-clip-text text-transparent">DripLove</h1>
+                <p className="text-xs text-gray-600">Shoot Your Shot 🎯</p>
+              </div>
             </div>
           </div>
         </div>
 
-        <div className="max-w-2xl mx-auto px-4 py-6 space-y-4">
+        <div className="flex-1 overflow-y-auto overflow-x-hidden pb-safe-offset-32">
+          <div className="max-w-2xl mx-auto px-4 py-6 space-y-4">
           <Card>
             <CardContent className="pt-6">
               <div className="text-center space-y-2">
@@ -513,22 +757,26 @@ const ShootYourShot = () => {
           )}
         </div>
       </div>
+    </div>
     );
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-blue-50 to-purple-50 pb-20">
+    <div className="h-screen bg-gradient-to-br from-blue-50 to-purple-50 flex flex-col pt-safe">
       {/* Header */}
-      <div className="bg-white border-b shadow-sm">
+      <div className="bg-white border-b shadow-sm sticky top-0 z-10">
         <div className="max-w-2xl mx-auto px-4 py-4">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-3">
-              <Button variant="ghost" size="sm" onClick={() => navigate('/games')}>
+              <Button variant="ghost" size="sm" onClick={() => navigate('/')} title="Home">
+                <Home className="w-5 h-5" />
+              </Button>
+              <Button variant="ghost" size="sm" onClick={() => navigate('/games')} title="Back to Games">
                 <ArrowLeft className="w-5 h-5" />
               </Button>
               <div>
-                <h1 className="text-xl font-bold text-gray-900">Shoot Your Shot 🎯</h1>
-                <p className="text-xs text-gray-600">Level {selectedLevel} • Shot {currentChallenge + 1} of {levelChallenges.length}</p>
+                <h1 className="text-sm font-bold bg-gradient-to-r from-pink-500 to-purple-600 bg-clip-text text-transparent">DripLove</h1>
+                <p className="text-xs text-gray-600">Shoot Your Shot 🎯 • {currentChallenge + 1}/{levelChallenges.length}</p>
               </div>
             </div>
             <div className="text-right text-xs text-gray-500">Timer-based</div>
@@ -561,8 +809,9 @@ const ShootYourShot = () => {
         </div>
       )}
 
-      {/* Challenge Card */}
-      <div className="max-w-2xl mx-auto px-4 py-6">
+      {/* Scrollable Challenge Card */}
+      <div className="flex-1 overflow-y-auto overflow-x-hidden pb-safe-offset-32 pt-6 pb-8">
+        <div className="max-w-2xl mx-auto px-4 py-6">
         {!result ? (
           <Card className="mb-6">
             <CardContent className="pt-6">
@@ -658,6 +907,7 @@ const ShootYourShot = () => {
             </CardContent>
           </Card>
         )}
+        </div>
       </div>
     </div>
   );

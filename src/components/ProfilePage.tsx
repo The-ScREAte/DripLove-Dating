@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { Capacitor } from '@capacitor/core';
 import { useTranslation } from 'react-i18next';
 import { useNavigate } from 'react-router-dom';
@@ -150,6 +150,13 @@ const ProfilePage = ({ currentUser, profile, onProfileUpdate, onLogout, onShowTe
     }
   };
 
+  const openProfileMessages = useCallback(() => {
+    if (!isOwnProfile) return;
+    // Open immediately for responsiveness
+    setIsProfileMessagesOpen(true);
+    // Don't mark as read here - badge drops only when user expands each message
+  }, [isOwnProfile]);
+
   const deleteBroadcastMessage = async (recipientId: string) => {
     if (!isOwnProfile) return;
     try {
@@ -189,28 +196,52 @@ const ProfilePage = ({ currentUser, profile, onProfileUpdate, onLogout, onShowTe
       // Mark this specific message as read
       const message = broadcastMessages.find(m => m.recipient_id === recipientId);
       if (message && !message.profile_read_at) {
+        const nowIso = new Date().toISOString();
+        // Optimistic UI: mark read instantly + drop badge
+        setBroadcastMessages(prev =>
+          prev.map(m =>
+            m.recipient_id === recipientId
+              ? { ...m, profile_read_at: nowIso }
+              : m
+          )
+        );
+        setBroadcastUnreadCount(prev => Math.max(0, (Number(prev) || 0) - 1));
+
         try {
-          // Update the specific recipient's profile_read_at timestamp
-          const { error } = await supabase
-            .from('broadcast_recipients')
-            .update({ profile_read_at: new Date().toISOString() })
-            .eq('id', recipientId);
-          
-          if (error) throw error;
-          
-          // Update local state
-          setBroadcastMessages(prev => 
-            prev.map(m => 
-              m.recipient_id === recipientId 
-                ? { ...m, profile_read_at: new Date().toISOString() }
-                : m
-            )
+          // Prefer a single-message RPC (handles RLS safely) and fall back to direct update.
+          let persisted = false;
+
+          const { data: rpcData, error: rpcError } = await supabase.rpc(
+            'mark_my_profile_broadcast_message_read',
+            { p_recipient_id: recipientId }
           );
-          
-          // Refresh unread count
+
+          if (!rpcError && rpcData === true) {
+            persisted = true;
+          } else {
+            // Direct update fallback: request returned rows so we can detect 0-row "no-op" updates.
+            const { data: updatedRows, error: updateError } = await supabase
+              .from('broadcast_recipients')
+              .update({ profile_read_at: nowIso })
+              .eq('id', recipientId)
+              .is('profile_read_at', null)
+              .select('id');
+
+            if (updateError) throw updateError;
+            persisted = Array.isArray(updatedRows) && updatedRows.length > 0;
+          }
+
+          // If we couldn't persist, re-sync from server (badge may come back).
+          if (!persisted) {
+            await loadBroadcastMessages();
+          }
+
           await refreshBroadcastUnreadCount();
         } catch (err) {
           console.error('[ProfilePage] Failed to mark message as read:', err);
+          // Re-sync from server (optimistic UI already updated)
+          await refreshBroadcastUnreadCount();
+          await loadBroadcastMessages();
         }
       }
     }
@@ -263,6 +294,7 @@ const ProfilePage = ({ currentUser, profile, onProfileUpdate, onLogout, onShowTe
     if (!isOwnProfile) return;
     if (!isProfileMessagesOpen) return;
     (async () => {
+      // Load messages when dialog opens
       await loadBroadcastMessages();
     })();
   }, [isOwnProfile, isProfileMessagesOpen]);
@@ -751,7 +783,7 @@ const ProfilePage = ({ currentUser, profile, onProfileUpdate, onLogout, onShowTe
               {isOwnProfile && (
                 <div className="relative">
                   <Button
-                    onClick={() => setIsProfileMessagesOpen(true)}
+                    onClick={openProfileMessages}
                     className="w-full sm:w-auto border-gray-300 text-gray-700 hover:bg-gray-50 disabled:opacity-50 bg-white border"
                     variant="outline"
                     aria-label="Open profile messages"
@@ -772,6 +804,7 @@ const ProfilePage = ({ currentUser, profile, onProfileUpdate, onLogout, onShowTe
                   onClick={() => navigate('/games')}
                   className="w-full sm:w-auto border-purple-300 text-purple-700 hover:bg-purple-50 bg-white border"
                   variant="outline"
+                  size="sm"
                   aria-label="Play games"
                 >
                   <Gamepad2 className="w-4 h-4" />
@@ -782,18 +815,16 @@ const ProfilePage = ({ currentUser, profile, onProfileUpdate, onLogout, onShowTe
               <Button 
                 onClick={isEditing ? handleCancel : () => setIsEditing(true)}
                 disabled={isSaving}
+                size="sm"
                 className={`w-full sm:w-auto font-medium transition-all duration-200 ${
                   isEditing 
-                    ? 'border-gray-300 text-gray-700 hover:bg-gray-50 disabled:opacity-50 bg-white border' 
+                    ? 'border-red-300 text-red-700 hover:bg-red-50 disabled:opacity-50 bg-white border' 
                     : 'bg-gray-900 hover:bg-gray-800 text-white'
                 }`}
                 variant={isEditing ? 'outline' : 'default'}
               >
                 {isEditing ? (
-                  <>
-                    <X className="w-4 h-4 mr-2" /> 
-                    {t('common.cancel')}
-                  </>
+                  <X className="w-4 h-4" />
                 ) : (
                   <>
                     <Edit className="w-4 h-4 mr-2" /> 

@@ -56,7 +56,6 @@ const ImageSlide = React.memo<{
         key={imageSrc}
         loading="eager"
         decoding="async"
-        fetchPriority="high"
         src={imageSrc}
         alt={`${matchFirstName} ${matchLastName}`}
         className={`w-full h-full object-contain transition-opacity duration-200 relative z-10 ${styles.optimizedImage}`}

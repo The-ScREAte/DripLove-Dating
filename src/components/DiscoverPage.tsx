@@ -734,8 +734,8 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, onNavigateToProfile, isPr
   
   const { preloadImages, getOptimizedUrl, isImageLoaded, isImageLoading, clearCache } = useImagePreloader({
     maxConcurrent: 6, // Slightly higher concurrency for faster swipe experience
-    quality: 50,
-    width: 280
+    quality: 60,
+    width: 500
   });
 
   // Track in-flight image load requests to avoid duplicate DB calls
@@ -1000,8 +1000,11 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, onNavigateToProfile, isPr
       try {
         const swipeCount = await getTodaySwipeCount(currentUser.id);
         if (cancelled) return;
-        setTodaySwipeCount(swipeCount);
-        writeCachedSwipeCount(currentUser.id, swipeCount);
+        setTodaySwipeCount(prev => {
+          const next = Math.max(prev ?? 0, swipeCount);
+          writeCachedSwipeCount(currentUser.id, next);
+          return next;
+        });
         loadedFromDb = true;
       } catch {
         // If DB fetch fails, keep cached value (if any). If none, user stays blocked.
@@ -1087,15 +1090,23 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, onNavigateToProfile, isPr
     // Always check and update the out of swipes state based on current premium status
     if (todaySwipeCount >= swipeLimit) {
       setIsOutOfSwipes(true);
-      // CRITICAL FIX: Set the session flag immediately when limit is reached
-      // This ensures the limit persists across page refresh/navigation
-      sessionStorage.setItem('driplove_out_of_swipes_viewing', 'true');
     } else {
-      // User has swipes available - clear the flag
-      sessionStorage.removeItem('driplove_out_of_swipes_viewing');
       setIsOutOfSwipes(false);
     }
   }, [premiumResolved, premiumActive, todaySwipeCount]);
+
+  const bumpLocalSwipeCount = useCallback((delta: number) => {
+    if (!currentUser?.id) return;
+    // Track optimistic swipes via ref so ultra-fast swipes are enforced immediately,
+    // then transfer the count into state+cache (and remove from ref) when React flushes.
+    pendingSwipesRef.current += delta;
+    setTodaySwipeCount(prev => {
+      const next = (prev ?? 0) + delta;
+      writeCachedSwipeCount(currentUser.id, next);
+      pendingSwipesRef.current = Math.max(0, pendingSwipesRef.current - delta);
+      return next;
+    });
+  }, [currentUser?.id]);
 
   // Single source of truth for completion checks in Discover:
   // 1) Parent-provided completion (Profile page) if present
@@ -1265,6 +1276,16 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, onNavigateToProfile, isPr
 
   // Shared data fetching logic - optimized for speed
   const fetchPotentialMatchesData = useCallback(async (userId: string, allowedGenders: string[]) => {
+    // Create timeout wrapper for all database queries (15 second timeout)
+    const queryTimeout = <T,>(promise: Promise<T>, timeoutMs = 15000): Promise<T> => {
+      return Promise.race([
+        promise,
+        new Promise<T>((_, reject) => 
+          setTimeout(() => reject(new Error('Database query timeout')), timeoutMs)
+        )
+      ]);
+    };
+
     const [
       { data: currentUserData },
       { data: likedUsers },
@@ -1272,7 +1293,7 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, onNavigateToProfile, isPr
       { data: blockedUsers },
       { data: recentPasses },
       { data: usersWhoLikedMe }
-    ] = await Promise.all([
+    ] = await queryTimeout(Promise.all([
       supabase
         .from('profiles')
         .select('max_distance, distance_preference, country, country_code, min_age, max_age, preference, unlocked_countries, profile_completion, latitude, longitude')
@@ -1305,7 +1326,7 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, onNavigateToProfile, isPr
         .eq('liked_id', userId)
         .order('created_at', { ascending: false })
         .limit(50) // Get up to 50 recent likers
-    ]);
+    ]));
 
     const likedUserIds = uniqUuids(likedUsers?.map(like => like.liked_id) || []);
     const matchedUserIds = uniqUuids((matches || [])
@@ -2097,7 +2118,6 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, onNavigateToProfile, isPr
         }
       }
     } catch (error) {
-      // Silent fail: keep UX quiet and allow UI to fall back to empty/retry states.
       const err = error as {
         message?: unknown;
         details?: unknown;
@@ -2111,6 +2131,16 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, onNavigateToProfile, isPr
         code: err?.code,
         raw: error,
       });
+
+      // Only show message if user is offline
+      if (!navigator.onLine) {
+        toast({
+          title: "Connection Issue",
+          description: "You appear to be offline. Please check your connection.",
+          variant: "destructive",
+        });
+      }
+
       setPotentialMatches([]);
       setNoMoreProfiles(true);
       setIsLoading(false);
@@ -2140,7 +2170,7 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, onNavigateToProfile, isPr
   const preloadProfileImages = useCallback((profiles: PotentialMatch[], startIndex: number = 0) => {
     const isAndroid = isAndroidPlatform();
     // ⭐ ANDROID OPTIMIZATION: Load only current profile for instant display
-    const batchSize = isAndroid ? 1 : 10;
+    const batchSize = isAndroid ? 3 : 10;
     const profilesToLoad = profiles.slice(startIndex, startIndex + batchSize);
     
     // Filter out profiles that are already loaded or currently loading
@@ -2322,18 +2352,24 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, onNavigateToProfile, isPr
     // BUT: Only sync recent likes (last 30 days) to avoid over-excluding and showing "no profiles"
     const syncDbLikesToLocalStorage = async () => {
       try {
-        // Only fetch likes from the last 30 days to avoid over-filtering
+        // Fetch both likes AND matches to ensure complete exclusion
         const thirtyDaysAgo = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString();
         
-        const { data: dbLikes } = await supabase
-          .from('likes')
-          .select('liked_id, created_at')
-          .eq('liker_id', currentUser.id)
-          .gte('created_at', thirtyDaysAgo);
+        const [likesResult, matchesResult] = await Promise.all([
+          supabase
+            .from('likes')
+            .select('liked_id, created_at')
+            .eq('liker_id', currentUser.id)
+            .gte('created_at', thirtyDaysAgo),
+          supabase
+            .from('matches')
+            .select('user1_id, user2_id, created_at')
+            .or(`user1_id.eq.${currentUser.id},user2_id.eq.${currentUser.id}`)
+        ]);
         
-        if (dbLikes && dbLikes.length > 0) {
-          // Merge DB likes into local swipe tracking
-          for (const like of dbLikes) {
+        // Merge likes into local swipe tracking
+        if (likesResult.data && likesResult.data.length > 0) {
+          for (const like of likesResult.data) {
             const likedId = like.liked_id;
             // Only add if not already tracked (don't overwrite newer local data)
             if (!locallySwipedProfileIds.current.has(likedId)) {
@@ -2341,12 +2377,27 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, onNavigateToProfile, isPr
               locallySwipedProfileIds.current.set(likedId, { action: 'like', timestamp });
             }
           }
-          // Persist the merged data
+        }
+        
+        // Merge matches into local swipe tracking (these should NEVER reappear)
+        if (matchesResult.data && matchesResult.data.length > 0) {
+          for (const match of matchesResult.data) {
+            const matchedId = match.user1_id === currentUser.id ? match.user2_id : match.user1_id;
+            // Always mark matches as 'liked' to permanently exclude them
+            if (!locallySwipedProfileIds.current.has(matchedId)) {
+              const timestamp = match.created_at ? new Date(match.created_at).getTime() : Date.now();
+              locallySwipedProfileIds.current.set(matchedId, { action: 'like', timestamp });
+            }
+          }
+        }
+        
+        // Persist the merged data if anything was added
+        if ((likesResult.data && likesResult.data.length > 0) || (matchesResult.data && matchesResult.data.length > 0)) {
           persistSwipedIds();
         }
       } catch (error) {
         // Silently fail - app will still work with localStorage data
-        console.warn('[DiscoverPage] Failed to sync DB likes:', error);
+        console.warn('[DiscoverPage] Failed to sync DB likes/matches:', error);
       }
     };
 
@@ -2358,33 +2409,35 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, onNavigateToProfile, isPr
         locallySwipedProfileIds.current = stored;
       }
     } catch {
-      // ignore storage errors
+      // ignore storage errors 
     }
 
-    // Sync DB likes into local storage (non-blocking, but runs before cache read)
-    syncDbLikesToLocalStorage();
+    // CRITICAL: Sync DB likes/matches into local storage (MUST complete before fetching profiles)
+    // This blocks the fetch until exclusions are ready, preventing matched/liked profiles from reappearing
+    (async () => {
+      await syncDbLikesToLocalStorage();
 
-    // ⭐ EARLY CLEANUP: Remove old passed profiles (30+ days) to keep storage lean
-    const now = Date.now();
-    const thirtyDaysMs = 30 * 24 * 60 * 60 * 1000;
-    let needsUpdate = false;
-    
-    for (const [id, data] of locallySwipedProfileIds.current.entries()) {
-      if (data.action === 'pass' && (now - data.timestamp) > thirtyDaysMs) {
-        locallySwipedProfileIds.current.delete(id);
-        needsUpdate = true;
+      // ⭐ EARLY CLEANUP: Remove old passed profiles (30+ days) to keep storage lean
+      const now = Date.now();
+      const thirtyDaysMs = 30 * 24 * 60 * 60 * 1000;
+      let needsUpdate = false;
+      
+      for (const [id, data] of locallySwipedProfileIds.current.entries()) {
+        if (data.action === 'pass' && (now - data.timestamp) > thirtyDaysMs) {
+          locallySwipedProfileIds.current.delete(id);
+          needsUpdate = true;
+        }
       }
-    }
-    
-    if (needsUpdate) {
-      persistSwipedIds();
-    }
-    
-    // ⭐ BACKGROUND CLEANUP: Remove old profile orders and cached decks (non-blocking)
-    setTimeout(() => {
-      try {
-        const today = todayStr();
-        const prefix = `driplove_profile_order_${currentUser.id}_`;
+      
+      if (needsUpdate) {
+        persistSwipedIds();
+      }
+      
+      // ⭐ BACKGROUND CLEANUP: Remove old profile orders and cached decks (non-blocking)
+      setTimeout(() => {
+        try {
+          const today = todayStr();
+          const prefix = `driplove_profile_order_${currentUser.id}_`;
         const deckPrefix = `driplove_discover_deck_${currentUser.id}_`;
 
         // Remove old profile orders (not today's) and old cached decks (different preferences)
@@ -2403,6 +2456,7 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, onNavigateToProfile, isPr
         // Ignore localStorage errors
       }
     }, 1000); // Defer cleanup to not block initialization
+    })(); // Close async IIFE
 
     // Start loading immediately - always fetch fresh to exclude swiped profiles
     const initializeProfiles = async () => {
@@ -2932,7 +2986,7 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, onNavigateToProfile, isPr
       return;
     }
 
-    // Include in-flight swipes so fast swiping can't bypass daily limit before state updates.
+    // Include optimistic swipes so ultra-fast swiping can't bypass daily limit.
     const effectiveSwipeCount = todaySwipeCount + pendingSwipesRef.current;
 
     swipeDebug('handleLike: start', {
@@ -2992,19 +3046,18 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, onNavigateToProfile, isPr
     // Check daily limit - MUST be checked BEFORE swipe
     // Free users: 20 swipes, Premium users: 200 swipes
     const swipeLimit = premiumActive ? 200 : 20;
-    
-    // CRITICAL FIX: Check session flag FIRST - this persists across refresh
-    // Even if todaySwipeCount hasn't loaded yet from DB, the flag tells us they're blocked
-    const wasOutOfSwipes = sessionStorage.getItem('driplove_out_of_swipes_viewing') === 'true';
-    
-    // Block if EITHER the flag is set OR they've reached the limit
-    if (wasOutOfSwipes || effectiveSwipeCount >= swipeLimit) {
+
+    // Block purely based on the authoritative swipe count.
+    if (effectiveSwipeCount >= swipeLimit) {
       setIsOutOfSwipes(true);
       return;
     }
 
     // Optimistic path: advance UI immediately, then persist the action in background.
     const prevMatch = currentMatch;
+
+    // ✅ Increment local swipe count immediately (persists across refresh/app close).
+    bumpLocalSwipeCount(1);
 
     // CRITICAL: Add to local exclusion list immediately with 'like' action (permanent)
     locallySwipedProfileIds.current.set(prevMatch.id, { action: 'like', timestamp: Date.now() });
@@ -3027,9 +3080,6 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, onNavigateToProfile, isPr
       const imagesToRevoke = userImages[prevMatch.id] || [];
       revokeBlobUrlsForProfile(prevMatch.id, imagesToRevoke);
     }, 450);
-
-    // Track pending swipe (will be decremented in finally block)
-    pendingSwipesRef.current += 1;
 
     // Capture values now to avoid stale closures inside the queue job
     const likerId = currentUser.id;
@@ -3080,13 +3130,6 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, onNavigateToProfile, isPr
               }
               
               swipeDebug('handleLike: Fallback like inserted successfully');
-              
-              // ✅ Increment swipe count after successful DB write
-              setTodaySwipeCount(prev => {
-                const next = (prev ?? 0) + 1;
-                writeCachedSwipeCount(currentUser.id, next);
-                return next;
-              });
               await persistSwipeCount(currentUser.id);
 
               // Notify other parts of the app (e.g., Profile stats) immediately
@@ -3159,12 +3202,7 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, onNavigateToProfile, isPr
           }
         } else {
           // RPC succeeded — increment swipe count after successful DB write
-          swipeDebug('handleLike: RPC succeeded, incrementing swipe count');
-          setTodaySwipeCount(prev => {
-            const next = (prev ?? 0) + 1;
-            writeCachedSwipeCount(currentUser.id, next);
-            return next;
-          });
+          swipeDebug('handleLike: RPC succeeded');
           await persistSwipeCount(currentUser.id);
 
           // Notify other parts of the app (e.g., Profile stats) immediately
@@ -3239,7 +3277,7 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, onNavigateToProfile, isPr
         // Keep UX moving; we'll retry sync later.
         swipeDebug('handleLike: persist failed (job), not rolling back', { err: jobErr });
       } finally {
-        pendingSwipesRef.current = Math.max(0, pendingSwipesRef.current - 1);
+        // No-op: local swipe count is bumped immediately and is authoritative.
       }
     })();
   };
@@ -3257,7 +3295,7 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, onNavigateToProfile, isPr
       return;
     }
 
-    // Include in-flight swipes so fast swiping can't bypass daily limit before state updates.
+    // Include optimistic swipes so ultra-fast swiping can't bypass daily limit.
     const effectiveSwipeCount = todaySwipeCount + pendingSwipesRef.current;
 
     swipeDebug('executePassLogic: start', {
@@ -3309,13 +3347,9 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, onNavigateToProfile, isPr
     // Check daily limit - MUST be checked BEFORE swipe
     // Free users: 20 swipes, Premium users: 200 swipes
     const swipeLimit = premiumActive ? 200 : 20;
-    
-    // CRITICAL FIX: Check session flag FIRST - this persists across refresh
-    // Even if todaySwipeCount hasn't loaded yet from DB, the flag tells us they're blocked
-    const wasOutOfSwipes = sessionStorage.getItem('driplove_out_of_swipes_viewing') === 'true';
-    
-    // Block if EITHER the flag is set OR they've reached the limit
-    if (wasOutOfSwipes || effectiveSwipeCount >= swipeLimit) {
+
+    // Block purely based on the authoritative swipe count.
+    if (effectiveSwipeCount >= swipeLimit) {
       setIsOutOfSwipes(true);
       return;
     }
@@ -3323,6 +3357,9 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, onNavigateToProfile, isPr
     // Optimistic path for pass: add to passed list locally, advance UI, persist in background and rollback on error
     // ✅ Use the passed parameter, not undefined currentMatch
     const prevMatch = matchToPass;
+
+    // ✅ Increment local swipe count immediately (persists across refresh/app close).
+    bumpLocalSwipeCount(1);
 
     // CRITICAL: Add to local exclusion list immediately with 'pass' action (expires after 6 days)
     locallySwipedProfileIds.current.set(prevMatch.id, { action: 'pass', timestamp: Date.now() });
@@ -3348,7 +3385,6 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, onNavigateToProfile, isPr
 
     // Optimistically add to passed list
     setPassedUsers(prev => [{ user_id: prevMatch.id, passed_at: new Date() }, ...prev.slice(0, 9)]);
-    pendingSwipesRef.current += 1;
 
     // Capture values now to avoid stale closures inside the queue job
     const passerId = currentUser.id;
@@ -3390,12 +3426,6 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, onNavigateToProfile, isPr
                 throw insertError;
               }
               
-              // ✅ Increment swipe count after successful DB write
-              setTodaySwipeCount(prev => {
-                const next = (prev ?? 0) + 1;
-                writeCachedSwipeCount(currentUser.id, next);
-                return next;
-              });
               await persistSwipeCount(currentUser.id);
 
               // Notify other parts of the app (for debugging/telemetry)
@@ -3412,12 +3442,7 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, onNavigateToProfile, isPr
             return;
           }
         } else {
-          // RPC succeeded — increment swipe count after successful DB write
-          setTodaySwipeCount(prev => {
-            const next = (prev ?? 0) + 1;
-            writeCachedSwipeCount(currentUser.id, next);
-            return next;
-          });
+          // RPC succeeded — persist server usage
           await persistSwipeCount(currentUser.id);
 
           // Notify other parts of the app (for debugging/telemetry)
@@ -3432,7 +3457,7 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, onNavigateToProfile, isPr
         // Keep UX moving; we'll retry sync later.
         swipeDebug('executePassLogic: persist failed (job), not rolling back', { err: jobErr });
       } finally {
-        pendingSwipesRef.current = Math.max(0, pendingSwipesRef.current - 1);
+        // No-op: local swipe count is bumped immediately and is authoritative.
       }
     })();
   };
@@ -3820,9 +3845,6 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, onNavigateToProfile, isPr
                   // Close the modal and show the last profile they were viewing
                   // They can see the profile but if they try to swipe, the limit will be checked again
                   setIsOutOfSwipes(false);
-                  // Store in session that we're in "out of swipes" viewing mode
-                  // This ensures immediate re-trigger on next swipe attempt
-                  sessionStorage.setItem('driplove_out_of_swipes_viewing', 'true');
                 }} 
                 variant="outline" 
                 className="w-full"
@@ -4171,6 +4193,7 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, onNavigateToProfile, isPr
                 style={{ borderRadius: '1.25rem', position: 'relative', zIndex: 1 }}
                 draggable={false}
                 loading="eager"
+                decoding="async"
               />
             ) : nextMatch && !isAd(nextMatch) ? (
               <div className="w-full h-full bg-gradient-to-br from-pink-200 to-purple-200 flex items-center justify-center">
