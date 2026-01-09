@@ -1085,7 +1085,7 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, onNavigateToProfile, isPr
     if (todaySwipeCount === null) return;
     
     // Determine the correct swipe limit based on premium status
-    const swipeLimit = premiumActive ? 200 : 20;
+    const swipeLimit = premiumActive ? 200 : 25;
     
     // Always check and update the out of swipes state based on current premium status
     if (todaySwipeCount >= swipeLimit) {
@@ -2996,7 +2996,7 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, onNavigateToProfile, isPr
       pending: pendingSwipesRef.current,
       todaySwipeCount,
       effectiveSwipeCount,
-      swipeLimit: premiumActive ? 200 : 20,
+      swipeLimit: premiumActive ? 200 : 25,
       parentProfileCompletion,
       computedProfileCompletion,
       effectiveProfileCompletion,
@@ -3045,7 +3045,7 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, onNavigateToProfile, isPr
 
     // Check daily limit - MUST be checked BEFORE swipe
     // Free users: 20 swipes, Premium users: 200 swipes
-    const swipeLimit = premiumActive ? 200 : 20;
+    const swipeLimit = premiumActive ? 200 : 25;
 
     // Block purely based on the authoritative swipe count.
     if (effectiveSwipeCount >= swipeLimit) {
@@ -3305,7 +3305,7 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, onNavigateToProfile, isPr
       pending: pendingSwipesRef.current,
       todaySwipeCount,
       effectiveSwipeCount,
-      swipeLimit: premiumActive ? 200 : 20,
+      swipeLimit: premiumActive ? 200 : 25,
       parentProfileCompletion,
       computedProfileCompletion,
       effectiveProfileCompletion,
@@ -3346,7 +3346,7 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, onNavigateToProfile, isPr
 
     // Check daily limit - MUST be checked BEFORE swipe
     // Free users: 20 swipes, Premium users: 200 swipes
-    const swipeLimit = premiumActive ? 200 : 20;
+    const swipeLimit = premiumActive ? 200 : 25;
 
     // Block purely based on the authoritative swipe count.
     if (effectiveSwipeCount >= swipeLimit) {
