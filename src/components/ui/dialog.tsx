@@ -4,6 +4,31 @@ import { X } from "lucide-react"
 
 import { cn } from "@/lib/utils"
 
+const hasDialogDescription = (node: React.ReactNode): boolean => {
+  const stack: React.ReactNode[] = [node];
+  while (stack.length > 0) {
+    const current = stack.pop();
+    if (current === null || current === undefined || typeof current === "boolean") continue;
+
+    if (Array.isArray(current)) {
+      for (const child of current) stack.push(child);
+      continue;
+    }
+
+    if (React.isValidElement(current)) {
+      // Detect Radix or wrapped Description components.
+      if (current.type === DialogPrimitive.Description) return true;
+      const typeAny = current.type as any;
+      if (typeAny?.displayName === DialogPrimitive.Description.displayName || typeAny?.displayName === "DialogDescription") {
+        return true;
+      }
+
+      if (current.props?.children) stack.push(current.props.children);
+    }
+  }
+  return false;
+};
+
 const Dialog = DialogPrimitive.Root
 
 const DialogTrigger = DialogPrimitive.Trigger
@@ -42,6 +67,9 @@ const DialogContent = React.forwardRef<
         className
       )}
       {...props}
+      {...(props["aria-describedby"] === undefined && !hasDialogDescription(children)
+        ? { "aria-describedby": undefined }
+        : {})}
     >
       {children}
     </DialogPrimitive.Content>

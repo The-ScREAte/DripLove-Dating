@@ -49,7 +49,7 @@ const Games = () => {
             <Button
               variant="ghost"
               size="sm"
-              onClick={() => navigate('/')}
+              onClick={() => navigate(-1)}
               className="hover:bg-gray-100"
             >
               <Home className="w-5 h-5" />

@@ -318,16 +318,31 @@ const LikedMePage = ({ currentUser, isPremium = false }: LikedMePageProps) => {
         .filter(Boolean)
     );
 
-    // 3. Build likerIds (do NOT exclude matched/passed; user requested to see everyone who liked them)
+    // 3. Get existing matches - we should NOT show matched users in "liked me" page
+    const { data: matches, error: matchesError } = await supabase
+      .from('matches')
+      .select('user1_id, user2_id')
+      .or(`user1_id.eq.${userId},user2_id.eq.${userId}`);
+
+    if (matchesError) throw matchesError;
+
+    const matchedIds = new Set(
+      (matches || [])
+        .map((m) => (m.user1_id === userId ? m.user2_id : m.user1_id))
+        .filter(Boolean)
+    );
+
+    // 4. Build likerIds - exclude blocked users and matched users
     const likerIds = uniqUuids(likes.map((like) => like.liker_id).filter(Boolean))
       .filter((id) => id !== userId)
-      .filter((id) => !blockedIds.has(id));
+      .filter((id) => !blockedIds.has(id))
+      .filter((id) => !matchedIds.has(id));
 
     if (likerIds.length === 0) {
       return { likers: [], userImages: {} };
     }
 
-    // 4. Fetch all profiles in one go
+    // 5. Fetch all profiles in one go
     const { data: profiles, error: profileError } = await supabase
       .from('profiles')
       .select('*')
@@ -353,7 +368,7 @@ const LikedMePage = ({ currentUser, isPremium = false }: LikedMePageProps) => {
       return tb - ta;
     });
 
-    // 5. Fetch all first images for these profiles in one query
+    // 6. Fetch all first images for these profiles in one query
     let imagesData = null;
     if (likerIds.length > 0) {
       const { data: approvedImages, error: imagesError } = await supabase

@@ -68,6 +68,29 @@ const uniqUuids = (values: unknown[]): string[] => Array.from(new Set(values.fil
 
 const todayStr = () => new Date().toISOString().split('T')[0];
 
+const swipeCountCacheKey = (userId: string) => `driplove_swipe_count_${userId}_${todayStr()}`;
+
+const readCachedSwipeCount = (userId: string): number | null => {
+  try {
+    const raw = localStorage.getItem(swipeCountCacheKey(userId));
+    if (!raw) return null;
+    const parsed = Number(JSON.parse(raw));
+    if (!Number.isFinite(parsed) || parsed < 0) return null;
+    return Math.floor(parsed);
+  } catch {
+    return null;
+  }
+};
+
+const writeCachedSwipeCount = (userId: string, count: number) => {
+  try {
+    if (!Number.isFinite(count) || count < 0) return;
+    localStorage.setItem(swipeCountCacheKey(userId), JSON.stringify(Math.floor(count)));
+  } catch {
+    // ignore
+  }
+};
+
 // PostgREST `in.(...)` / `not.in.(...)` expects a comma-separated list inside parentheses.
 // Since we validate UUID format, we can safely emit raw UUIDs (no extra quoting), which
 // avoids 400 "Bad Request" errors caused by invalid quoting.
@@ -543,7 +566,10 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, onNavigateToProfile, isPr
   const [profileMissingFields, setProfileMissingFields] = useState<string[]>([]);
   const [userProfileImages, setUserProfileImages] = useState<UserImageRow[]>([]);
   const [showProfileCompletionModal, setShowProfileCompletionModal] = useState(false);
-  const [todaySwipeCount, setTodaySwipeCount] = useState(0);
+  // DB is the source of truth; keep a local cache for refresh/app restarts.
+  // Do NOT default to 0; unknown count must block swiping until DB fetch completes.
+  const [todaySwipeCount, setTodaySwipeCount] = useState<number | null>(null);
+  const [hasLoadedSwipeCountFromDb, setHasLoadedSwipeCountFromDb] = useState(false);
   const [isArchivedFallback, setIsArchivedFallback] = useState(false); // Two-phase: true when showing archived profiles
   
   // Track consecutive non-match swipes (used for fatigue rescue)
@@ -890,15 +916,37 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, onNavigateToProfile, isPr
 
     const profilesOnly = potentialMatches.filter((m): m is PotentialMatch => !isAd(m));
     const withAds = injectAds(profilesOnly);
+
+    // If the injection didn't actually add any ads (e.g., deck shorter than ad frequency),
+    // do not set state with an equivalent array — that can cause a render loop.
+    if (withAds.length === profilesOnly.length) return;
+
     const nextIndex = withAds.findIndex((m) => !isAd(m) && m.id === current.id);
 
     if (nextIndex < 0) return;
 
     // Keep the current card at index 0 by trimming the deck.
     const trimmed = withAds.slice(nextIndex);
+
+    // Avoid setting state if the resulting deck is identical by id order.
+    if (trimmed.length === potentialMatches.length) {
+      let same = true;
+      for (let i = 0; i < trimmed.length; i++) {
+        const a = trimmed[i];
+        const b = potentialMatches[i];
+        const aKey = isAd(a) ? `ad:${a.id}` : a.id;
+        const bKey = isAd(b) ? `ad:${b.id}` : b.id;
+        if (aKey !== bKey) {
+          same = false;
+          break;
+        }
+      }
+      if (same) return;
+    }
+
     setPotentialMatches(trimmed);
     setCurrentIndex(0);
-  }, [adsLoaded, stableShuffledAds.length, potentialMatches, currentIndex, injectAds]);
+  }, [adsLoaded, stableShuffledAds.length, potentialMatches.length, currentIndex, injectAds]);
 
   // --- BEGIN: Swipe Guide Popup State ---
   const [showSwipeGuide, setShowSwipeGuide] = useState(false);
@@ -936,6 +984,37 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, onNavigateToProfile, isPr
       window.history.replaceState({}, '', newUrl);
     }
   }, [refetchSubscription, t, toast]);
+
+  // Swipe count bootstrap: cache-first for instant state, then DB in parallel.
+  // Swiping is blocked until the DB count has been fetched (prevents refresh from “resetting” swipes).
+  useEffect(() => {
+    if (!currentUser?.id) return;
+
+    let cancelled = false;
+    setHasLoadedSwipeCountFromDb(false);
+
+    const cached = readCachedSwipeCount(currentUser.id);
+    setTodaySwipeCount(typeof cached === 'number' ? cached : null);
+
+    (async () => {
+      let loadedFromDb = false;
+      try {
+        const swipeCount = await getTodaySwipeCount(currentUser.id);
+        if (cancelled) return;
+        setTodaySwipeCount(swipeCount);
+        writeCachedSwipeCount(currentUser.id, swipeCount);
+        loadedFromDb = true;
+      } catch {
+        // If DB fetch fails, keep cached value (if any). If none, user stays blocked.
+      } finally {
+        if (!cancelled) setHasLoadedSwipeCountFromDb(loadedFromDb);
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [currentUser?.id]);
 
   // Fetch current reverse usage for today
   // Fetch user profile and calculate completion on mount
@@ -985,20 +1064,7 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, onNavigateToProfile, isPr
           setProfileMissingFields(completionResult.missingFields);
         }
 
-        // Get today's swipe count and check if user is already at limit
-        const swipeCount = await getTodaySwipeCount(currentUser.id);
-        setTodaySwipeCount(swipeCount);
-        
-        // Check if user has already reached their daily limit
-        // Note: premiumActive may not be resolved yet, so we also need an effect below
-        // to recheck when subscription status is confirmed
-        const currentSwipeLimit = isPremiumFromSubscription() ? 200 : (isPremium ? 200 : 20);
-        if (swipeCount >= currentSwipeLimit) {
-          setIsOutOfSwipes(true);
-        } else {
-          // New day or swipes available - clear the viewing mode flag
-          sessionStorage.removeItem('driplove_out_of_swipes_viewing');
-        }
+        // Swipe count is fetched in a dedicated effect (cache-first + DB in parallel).
       } catch (error) {
         // ignore profile completion fetch error
       }
@@ -1009,23 +1075,26 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, onNavigateToProfile, isPr
 
     return () => clearTimeout(timer);
     // NOTE: Removed premiumActive from dependencies - profile completion doesn't depend on premium status
-  }, [currentUser?.id, isPremium, isPremiumFromSubscription]);
+  }, [currentUser?.id, isPremium]);
 
-  // Re-check swipe limit when premium status is resolved (may load after initial swipe count)
+  // Check swipe limit when premium status is resolved (may load after initial swipe count)
   useEffect(() => {
     if (!premiumResolved) return;
+    if (todaySwipeCount === null) return;
     
-    // Clear viewing mode flag when premium is active (user upgraded)
-    if (premiumActive) {
-      sessionStorage.removeItem('driplove_out_of_swipes_viewing');
-      setIsOutOfSwipes(false);
-      return;
-    }
-    
-    if (todaySwipeCount === 0) return;
+    // Determine the correct swipe limit based on premium status
     const swipeLimit = premiumActive ? 200 : 20;
+    
+    // Always check and update the out of swipes state based on current premium status
     if (todaySwipeCount >= swipeLimit) {
       setIsOutOfSwipes(true);
+      // CRITICAL FIX: Set the session flag immediately when limit is reached
+      // This ensures the limit persists across page refresh/navigation
+      sessionStorage.setItem('driplove_out_of_swipes_viewing', 'true');
+    } else {
+      // User has swipes available - clear the flag
+      sessionStorage.removeItem('driplove_out_of_swipes_viewing');
+      setIsOutOfSwipes(false);
     }
   }, [premiumResolved, premiumActive, todaySwipeCount]);
 
@@ -2249,6 +2318,53 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, onNavigateToProfile, isPr
 
     // locallySwipedProfileIds.current.clear(); // REMOVED
 
+    // ⭐ CRITICAL FIX: Sync DB likes into local storage on page load
+    // This ensures already-liked profiles stay excluded even after localStorage is cleared
+    // BUT: Only sync recent likes (last 30 days) to avoid over-excluding and showing "no profiles"
+    const syncDbLikesToLocalStorage = async () => {
+      try {
+        // Only fetch likes from the last 30 days to avoid over-filtering
+        const thirtyDaysAgo = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString();
+        
+        const { data: dbLikes } = await supabase
+          .from('likes')
+          .select('liked_id, created_at')
+          .eq('liker_id', currentUser.id)
+          .gte('created_at', thirtyDaysAgo);
+        
+        if (dbLikes && dbLikes.length > 0) {
+          // Merge DB likes into local swipe tracking
+          for (const like of dbLikes) {
+            const likedId = like.liked_id;
+            // Only add if not already tracked (don't overwrite newer local data)
+            if (!locallySwipedProfileIds.current.has(likedId)) {
+              const timestamp = like.created_at ? new Date(like.created_at).getTime() : Date.now();
+              locallySwipedProfileIds.current.set(likedId, { action: 'like', timestamp });
+            }
+          }
+          // Persist the merged data
+          persistSwipedIds();
+        }
+      } catch (error) {
+        // Silently fail - app will still work with localStorage data
+        console.warn('[DiscoverPage] Failed to sync DB likes:', error);
+      }
+    };
+
+    // Ensure local swipe history is hydrated before we read cached decks or build exclusions.
+    // This prevents already-liked/passed profiles from resurrecting after refresh.
+    try {
+      const stored = getStoredSwipedIds();
+      if (stored.size > 0 || locallySwipedProfileIds.current.size === 0) {
+        locallySwipedProfileIds.current = stored;
+      }
+    } catch {
+      // ignore storage errors
+    }
+
+    // Sync DB likes into local storage (non-blocking, but runs before cache read)
+    syncDbLikesToLocalStorage();
+
     // ⭐ EARLY CLEANUP: Remove old passed profiles (30+ days) to keep storage lean
     const now = Date.now();
     const thirtyDaysMs = 30 * 24 * 60 * 60 * 1000;
@@ -2292,6 +2408,17 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, onNavigateToProfile, isPr
     // Start loading immediately - always fetch fresh to exclude swiped profiles
     const initializeProfiles = async () => {
       initializedUserRef.current = cacheKey;
+
+      // Final safety net: hydrate again right before using cache.
+      // (Helps during fast mount/unmount cycles or storage races.)
+      try {
+        const stored = getStoredSwipedIds();
+        if (stored.size > 0 || locallySwipedProfileIds.current.size === 0) {
+          locallySwipedProfileIds.current = stored;
+        }
+      } catch {
+        // ignore
+      }
 
       const cachedDeck = readDeckCache(cacheKey);
       if (cachedDeck && cachedDeck.length > 0) {
@@ -2340,6 +2467,7 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, onNavigateToProfile, isPr
     fetchPotentialMatches,
     fetchReverseUsage,
     persistSwipedIds,
+    getStoredSwipedIds,
     readDeckCache,
   ]); // Removed preference dependencies - refresh only happens on explicit save
 
@@ -2570,6 +2698,15 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, onNavigateToProfile, isPr
 
       const { matches, images, distances } = result;
 
+      // CRITICAL FIX: Don't set noMoreProfiles if we got results but they're duplicates
+      // This happens when the query returns profiles we already have
+      // Instead, only set noMoreProfiles if the DB returned 0 profiles at all
+      if (matches.length === 0) {
+        // Truly no profiles available from DB
+        setNoMoreProfiles(true);
+        return;
+      }
+
       const existingProfileIds = new Set(
         potentialMatches
           .filter((p): p is PotentialMatch => !isAd(p))
@@ -2580,8 +2717,9 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, onNavigateToProfile, isPr
       const refillChunk = newProfiles.slice(0, 25);
 
       if (refillChunk.length === 0) {
-        // No new candidates under the exact same rules.
-        setNoMoreProfiles(true);
+        // Got profiles from DB but they're all duplicates
+        // Don't show "no more profiles" - just skip this refill attempt
+        // The next auto-refill will try again
         return;
       }
 
@@ -2785,6 +2923,16 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, onNavigateToProfile, isPr
     const currentMatch = potentialMatches[currentIndex];
     if (!currentMatch) return;
 
+    // Prevent refresh from “resetting” swipes: don’t allow swiping until the DB swipe count is loaded.
+    if (!hasLoadedSwipeCountFromDb || todaySwipeCount === null) {
+      toast({
+        title: 'Loading…',
+        description: 'Checking your daily swipes.',
+        duration: 1500,
+      });
+      return;
+    }
+
     // Include in-flight swipes so fast swiping can't bypass daily limit before state updates.
     const effectiveSwipeCount = todaySwipeCount + pendingSwipesRef.current;
 
@@ -2846,10 +2994,12 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, onNavigateToProfile, isPr
     // Free users: 20 swipes, Premium users: 200 swipes
     const swipeLimit = premiumActive ? 200 : 20;
     
-    // Check if user is in "viewing mode" after hitting limit (they clicked OK)
+    // CRITICAL FIX: Check session flag FIRST - this persists across refresh
+    // Even if todaySwipeCount hasn't loaded yet from DB, the flag tells us they're blocked
     const wasOutOfSwipes = sessionStorage.getItem('driplove_out_of_swipes_viewing') === 'true';
     
-    if (effectiveSwipeCount >= swipeLimit || wasOutOfSwipes) {
+    // Block if EITHER the flag is set OR they've reached the limit
+    if (wasOutOfSwipes || effectiveSwipeCount >= swipeLimit) {
       setIsOutOfSwipes(true);
       return;
     }
@@ -2892,8 +3042,12 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, onNavigateToProfile, isPr
 
     // Background job: persist usage and like, then show match animation if appropriate.
     // IMPORTANT: Swipe count is incremented AFTER successful DB write to ensure accuracy.
+    console.log('[DiscoverPage] Enqueuing like persistence job for:', { likerId, likedId, premiumParam });
     enqueue(async () => {
+      console.log('[DiscoverPage] Like persistence job EXECUTING for:', { likerId, likedId });
       try {
+        swipeDebug('handleLike: DB persist starting', { likerId, likedId, premiumParam });
+        
         // Attempt the batched RPC to record the like and detect mutual
         const rpcName = 'like_and_usage_batched';
         const { data: rpcData, error: rpcError } = await (supabase as unknown as {
@@ -2903,6 +3057,8 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, onNavigateToProfile, isPr
           liked_id_param: likedId,
           premium_param: premiumParam,
         });
+
+        swipeDebug('handleLike: RPC completed', { rpcData, rpcError });
 
         if (rpcError) {
           swipeDebug('handleLike: RPC failed, attempting fallback', { rpcError });
@@ -2920,11 +3076,18 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, onNavigateToProfile, isPr
                 .insert({ liker_id: likerId, liked_id: likedId });
 
               if (insertError) {
+                swipeDebug('handleLike: Fallback insert failed', { insertError });
                 throw insertError;
               }
               
+              swipeDebug('handleLike: Fallback like inserted successfully');
+              
               // ✅ Increment swipe count after successful DB write
-              setTodaySwipeCount(prev => prev + 1);
+              setTodaySwipeCount(prev => {
+                const next = (prev ?? 0) + 1;
+                writeCachedSwipeCount(currentUser.id, next);
+                return next;
+              });
               await persistSwipeCount(currentUser.id);
 
               // Notify other parts of the app (e.g., Profile stats) immediately
@@ -2997,7 +3160,12 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, onNavigateToProfile, isPr
           }
         } else {
           // RPC succeeded — increment swipe count after successful DB write
-          setTodaySwipeCount(prev => prev + 1);
+          swipeDebug('handleLike: RPC succeeded, incrementing swipe count');
+          setTodaySwipeCount(prev => {
+            const next = (prev ?? 0) + 1;
+            writeCachedSwipeCount(currentUser.id, next);
+            return next;
+          });
           await persistSwipeCount(currentUser.id);
 
           // Notify other parts of the app (e.g., Profile stats) immediately
@@ -3080,6 +3248,16 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, onNavigateToProfile, isPr
   // Optimistic UI: move to next card instantly, then process pass in background
   // Function to execute pass after user confirms (used when "they liked you" popup is shown)
   const executePassLogic = async (matchToPass: PotentialMatch) => {
+    // Prevent refresh from “resetting” swipes: don’t allow swiping until the DB swipe count is loaded.
+    if (!hasLoadedSwipeCountFromDb || todaySwipeCount === null) {
+      toast({
+        title: 'Loading…',
+        description: 'Checking your daily swipes.',
+        duration: 1500,
+      });
+      return;
+    }
+
     // Include in-flight swipes so fast swiping can't bypass daily limit before state updates.
     const effectiveSwipeCount = todaySwipeCount + pendingSwipesRef.current;
 
@@ -3133,10 +3311,12 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, onNavigateToProfile, isPr
     // Free users: 20 swipes, Premium users: 200 swipes
     const swipeLimit = premiumActive ? 200 : 20;
     
-    // Check if user is in "viewing mode" after hitting limit (they clicked OK)
+    // CRITICAL FIX: Check session flag FIRST - this persists across refresh
+    // Even if todaySwipeCount hasn't loaded yet from DB, the flag tells us they're blocked
     const wasOutOfSwipes = sessionStorage.getItem('driplove_out_of_swipes_viewing') === 'true';
     
-    if (effectiveSwipeCount >= swipeLimit || wasOutOfSwipes) {
+    // Block if EITHER the flag is set OR they've reached the limit
+    if (wasOutOfSwipes || effectiveSwipeCount >= swipeLimit) {
       setIsOutOfSwipes(true);
       return;
     }
@@ -3212,7 +3392,11 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, onNavigateToProfile, isPr
               }
               
               // ✅ Increment swipe count after successful DB write
-              setTodaySwipeCount(prev => prev + 1);
+              setTodaySwipeCount(prev => {
+                const next = (prev ?? 0) + 1;
+                writeCachedSwipeCount(currentUser.id, next);
+                return next;
+              });
               await persistSwipeCount(currentUser.id);
 
               // Notify other parts of the app (for debugging/telemetry)
@@ -3230,7 +3414,11 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, onNavigateToProfile, isPr
           }
         } else {
           // RPC succeeded — increment swipe count after successful DB write
-          setTodaySwipeCount(prev => prev + 1);
+          setTodaySwipeCount(prev => {
+            const next = (prev ?? 0) + 1;
+            writeCachedSwipeCount(currentUser.id, next);
+            return next;
+          });
           await persistSwipeCount(currentUser.id);
 
           // Notify other parts of the app (for debugging/telemetry)
@@ -3408,7 +3596,7 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, onNavigateToProfile, isPr
       if (prev.length === 0) return prev;
 
       const now = Date.now();
-      const eightDaysMs = 8 * 24 * 60 * 60 * 1000;
+      const thirtyDaysMs = 30 * 24 * 60 * 60 * 1000;
 
       const fallback = prev[0];
       const swipedItem = swiped ?? fallback;
@@ -3442,7 +3630,7 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, onNavigateToProfile, isPr
         // Also remove anything already locally swiped (likes always; passes for 8 days)
         const swipedData = locallySwipedProfileIds.current.get(item.id);
         if (swipedData) {
-          if (swipedData.action === 'like' || (now - swipedData.timestamp) < eightDaysMs) {
+          if (swipedData.action === 'like' || (now - swipedData.timestamp) < thirtyDaysMs) {
             return false;
           }
         }
