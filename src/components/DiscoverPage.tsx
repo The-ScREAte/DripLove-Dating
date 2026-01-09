@@ -51,7 +51,6 @@ import { calculateDistance } from '@/constants/locationData';
 import { checkAndTriggerRefill } from '@/utils/performanceOptimizer';
 import { locationService } from '@/services/locationService';
 import { calculateProfileCompletion, getTodaySwipeCount } from '@/utils/profileCompletion';
-import { enqueue } from '@/lib/queue';
 import { getLanguageName } from '@/utils/languageNames';
 import PremiumUpgrade from './PremiumUpgrade';
 import MatchAnimation from './MatchAnimation';
@@ -3040,11 +3039,11 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, onNavigateToProfile, isPr
     // Immediately advance the UI
     moveToNext(prevMatch);
 
-    // Background job: persist usage and like, then show match animation if appropriate.
-    // IMPORTANT: Swipe count is incremented AFTER successful DB write to ensure accuracy.
-    console.log('[DiscoverPage] Enqueuing like persistence job for:', { likerId, likedId, premiumParam });
-    enqueue(async () => {
-      console.log('[DiscoverPage] Like persistence job EXECUTING for:', { likerId, likedId });
+    // Persist the like in background immediately (NOT queued).
+    // Rationale: queued tasks can lag behind fast swiping; if the app is refreshed/closed,
+    // the queued jobs may never run and the DB swipe count under-reports, letting users
+    // swipe again after a refresh. Running immediately makes the daily limit persist.
+    void (async () => {
       try {
         swipeDebug('handleLike: DB persist starting', { likerId, likedId, premiumParam });
         
@@ -3242,7 +3241,7 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, onNavigateToProfile, isPr
       } finally {
         pendingSwipesRef.current = Math.max(0, pendingSwipesRef.current - 1);
       }
-    });
+    })();
   };
 
   // Optimistic UI: move to next card instantly, then process pass in background
@@ -3359,9 +3358,9 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, onNavigateToProfile, isPr
     // Immediately advance UI
     moveToNext(prevMatch);
 
-    // Background job to persist the pass.
-    // IMPORTANT: Swipe count is incremented AFTER successful DB write to ensure accuracy.
-    enqueue(async () => {
+    // Persist the pass in background immediately (NOT queued).
+    // This keeps DB usage in sync even if the user refreshes/closes quickly after swiping.
+    void (async () => {
       try {
         const rpcName = 'pass_and_usage_batched';
         const { error: rpcError } = await (supabase as unknown as {
@@ -3435,7 +3434,7 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, onNavigateToProfile, isPr
       } finally {
         pendingSwipesRef.current = Math.max(0, pendingSwipesRef.current - 1);
       }
-    });
+    })();
   };
 
   const handlePass = async () => {
