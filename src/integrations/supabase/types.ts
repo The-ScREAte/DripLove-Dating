@@ -1648,6 +1648,7 @@ export type Database = {
           payment_attempts: number | null
           payment_method: string | null
           plan_name: string
+          provider_transaction_id: string | null
           starts_at: string
           status: string
           updated_at: string
@@ -1664,6 +1665,7 @@ export type Database = {
           payment_attempts?: number | null
           payment_method?: string | null
           plan_name: string
+          provider_transaction_id?: string | null
           starts_at?: string
           status?: string
           updated_at?: string
@@ -1680,6 +1682,7 @@ export type Database = {
           payment_attempts?: number | null
           payment_method?: string | null
           plan_name?: string
+          provider_transaction_id?: string | null
           starts_at?: string
           status?: string
           updated_at?: string

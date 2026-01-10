@@ -74,11 +74,15 @@ serve(async (req) => {
 
     const authHeader = req.headers.get('Authorization') || ''
 
-    const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY, {
+    // Create an auth client to verify the user's token
+    const authClient = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY, {
       global: { headers: { Authorization: authHeader } },
     })
 
-    const { data: authData, error: authError } = await supabase.auth.getUser()
+    // Create an admin client with service role for database writes (bypasses RLS)
+    const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY)
+
+    const { data: authData, error: authError } = await authClient.auth.getUser()
     if (authError || !authData?.user) {
       return json(401, { ok: false, error: 'Unauthorized' })
     }
