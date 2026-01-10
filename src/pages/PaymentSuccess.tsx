@@ -1,7 +1,7 @@
 
 import React, { useCallback, useEffect, useState } from 'react';
 import { Button } from '@/components/ui/button';
-import { Crown, Heart, RotateCcw, Users, Check, AlertCircle, ArrowLeft } from 'lucide-react';
+import { Crown, Heart, RotateCcw, Users, Check, AlertCircle, ArrowLeft, Globe } from 'lucide-react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
@@ -10,6 +10,7 @@ const premiumFeatures = [
   { name: 'Unlimited Daily Swipes', icon: Heart },
   { name: 'Reverse Dislikes', icon: RotateCcw },
   { name: 'See All Who Liked You', icon: Users },
+  { name: 'Unlock Global Matches', icon: Globe },
   { name: 'Priority Support', icon: Crown },
   { name: 'All future premium features included!', icon: Check },
 ];
@@ -361,31 +362,31 @@ const PaymentSuccess: React.FC = () => {
 
   // Show success state
   return (
-  <div className="min-h-fill flex flex-col items-center justify-center bg-gradient-to-br from-pink-400 via-purple-500 to-indigo-600 p-4">
-      <div className="bg-white rounded-3xl shadow-2xl p-8 max-w-md w-full text-center border-4 border-yellow-300/60 relative animate-fade-in">
-        <div className="absolute -top-10 left-1/2 -translate-x-1/2 bg-gradient-to-br from-yellow-300 to-yellow-500 rounded-full p-3 shadow-lg animate-bounce">
-          <Crown className="w-14 h-14 text-yellow-600" />
+  <div className="min-h-fill flex flex-col items-center justify-center bg-gradient-to-br from-pink-400 via-purple-500 to-indigo-600 p-3">
+      <div className="bg-white rounded-3xl shadow-2xl p-4 max-w-md w-full text-center border-4 border-yellow-300/60 relative animate-fade-in">
+        <div className="absolute -top-6 left-1/2 -translate-x-1/2 bg-gradient-to-br from-yellow-300 to-yellow-500 rounded-full p-1.5 shadow-lg animate-bounce">
+          <Crown className="w-8 h-8 text-yellow-600" />
         </div>
-        <h1 className="text-4xl font-extrabold mb-3 mt-8 text-gray-900 tracking-tight drop-shadow-lg">Welcome to Premium!</h1>
-        <p className="mb-6 text-lg text-gray-700 font-medium">Your payment was successful.<br/>You now have access to:</p>
-        <ul className="mb-8 text-left space-y-3">
+        <h1 className="text-xl font-extrabold mb-1 mt-4 text-gray-900 tracking-tight drop-shadow-lg">Welcome to Premium!</h1>
+        <p className="mb-3 text-xs text-gray-700 font-medium">Your payment was successful.<br/>You now have access to:</p>
+        <ul className="mb-3 text-left space-y-1.5">
           {premiumFeatures.map((feature, idx) => (
-            <li key={feature.name} className="flex items-center gap-3 bg-gradient-to-r from-pink-100 to-yellow-100 rounded-xl px-4 py-2 shadow-sm">
-              <span className="inline-flex items-center justify-center bg-pink-200 rounded-full p-2"><feature.icon className="w-6 h-6 text-pink-500" /></span>
-              <span className="text-gray-900 font-semibold text-base">{feature.name}</span>
+            <li key={feature.name} className="flex items-center gap-1.5 bg-gradient-to-r from-pink-100 to-yellow-100 rounded-lg px-2.5 py-1 shadow-sm">
+              <span className="inline-flex items-center justify-center bg-pink-200 rounded-full p-1"><feature.icon className="w-3.5 h-3.5 text-pink-500" /></span>
+              <span className="text-gray-900 font-semibold text-xs">{feature.name}</span>
             </li>
           ))}
         </ul>
-        {upgrading && <div className="mb-4 text-pink-600 font-semibold animate-pulse">Activating premium...</div>}
-        {error && <div className="mb-4 text-red-600 font-semibold animate-shake">{error}</div>}
+        {upgrading && <div className="mb-2 text-xs text-pink-600 font-semibold animate-pulse">Activating premium...</div>}
+        {error && <div className="mb-2 text-xs text-red-600 font-semibold animate-shake">{error}</div>}
         <Button
-          className="w-full bg-gradient-to-r from-yellow-400 to-yellow-600 text-black font-extrabold py-3 px-8 rounded-full text-xl shadow-xl hover:scale-105 hover:shadow-2xl transition-all duration-200 mt-2"
+          className="w-full bg-gradient-to-r from-yellow-400 to-yellow-600 text-black font-extrabold py-2 px-4 rounded-full text-sm shadow-xl hover:scale-105 hover:shadow-2xl transition-all duration-200 mt-1"
           onClick={() => navigate('/?premium=activated')}
           disabled={upgrading || !upgradeSuccess}
         >
           Start Discovering Now
         </Button>
-        <div className="mt-6 text-xs text-gray-400">Enjoy your premium experience! 🎉</div>
+        <div className="mt-3 text-[10px] text-gray-400">Enjoy your premium experience! 🎉</div>
       </div>
     </div>
   );
