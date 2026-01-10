@@ -153,7 +153,8 @@ serve(async (req: Request) => {
 
     // 1️⃣ Parse request body FIRST to get user_id fallback
     const requestBody = await req.json()
-    const { productId, purchaseToken, transactionId, user_id: bodyUserId } = requestBody
+    const { productId, purchaseToken, transactionId } = requestBody
+    const bodyUserId = (requestBody?.user_id || requestBody?.userId) as string | undefined
     
     console.log('🧾 [GOOGLE-IAP-VALIDATOR] Validating purchase:', {
       productId,
