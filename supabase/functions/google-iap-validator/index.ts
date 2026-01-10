@@ -1,6 +1,7 @@
 // Supabase Edge Function: google-iap-validator
 // Handles Google Play IAP receipt validation
-// by Henry Dean Bondah
+// BULLETPROOF: Works with or without user session - uses user_id from request body as fallback
+// by Henry Dean Bondah, updated for session-independent activation
 
 import { serve } from 'https://deno.land/std@0.177.0/http/server.ts'
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.45.0'
@@ -150,22 +151,49 @@ serve(async (req: Request) => {
 
     const supabaseClient = createClient(SUPABASE_URL ?? '', SUPABASE_SERVICE_ROLE_KEY ?? '')
 
-    // 1️⃣ Auth check
-    const authHeader = req.headers.get('Authorization')
-    if (!authHeader) return json(401, { error: 'Missing authorization header' })
-
-    const token = authHeader.replace('Bearer ', '')
-    const { data: userData, error: userError } = await supabaseClient.auth.getUser(token)
-    if (userError || !userData.user) return json(401, { error: 'Invalid user token' })
-
-    // 2️⃣ Parse request body
-    const { productId, purchaseToken, transactionId } = await req.json()
+    // 1️⃣ Parse request body FIRST to get user_id fallback
+    const requestBody = await req.json()
+    const { productId, purchaseToken, transactionId, user_id: bodyUserId } = requestBody
     
     console.log('🧾 [GOOGLE-IAP-VALIDATOR] Validating purchase:', {
       productId,
       hasPurchaseToken: !!purchaseToken,
       hasTransactionId: !!transactionId,
+      hasBodyUserId: !!bodyUserId,
     })
+
+    // 2️⃣ Try to get user from auth header, but DON'T FAIL if missing - use bodyUserId as fallback
+    let userId: string | null = null
+    const authHeader = req.headers.get('Authorization')
+    
+    if (authHeader) {
+      const token = authHeader.replace('Bearer ', '')
+      const { data: userData, error: userError } = await supabaseClient.auth.getUser(token)
+      if (!userError && userData.user) {
+        userId = userData.user.id
+        console.log('[GOOGLE-IAP-VALIDATOR] User authenticated via token:', userId)
+      }
+    }
+
+    // 3️⃣ Fallback to user_id from request body (for session-expired scenarios)
+    if (!userId && bodyUserId && typeof bodyUserId === 'string') {
+      // Verify the user exists in our database before accepting
+      const { data: profileData, error: profileError } = await supabaseClient
+        .from('profiles')
+        .select('id')
+        .eq('id', bodyUserId)
+        .single()
+      
+      if (!profileError && profileData) {
+        userId = bodyUserId
+        console.log('[GOOGLE-IAP-VALIDATOR] User identified via body user_id:', userId)
+      }
+    }
+
+    if (!userId) {
+      console.error('[GOOGLE-IAP-VALIDATOR] No valid user identification found')
+      return json(401, { error: 'User identification required (auth token or valid user_id)' })
+    }
 
     // Accept all possible product IDs (Apple and Google formats)
     const VALID_PRODUCT_IDS = [
@@ -190,7 +218,7 @@ serve(async (req: Request) => {
       return json(400, { valid: false, error: 'Missing purchaseToken' })
     }
 
-    // 3️⃣ Verify with Google Play Developer API
+    // 4️⃣ Verify with Google Play Developer API
     const packageName = Deno.env.get('GOOGLE_PACKAGE_NAME') || 'com.driplove.dating'
     const subscriptionIds = candidateSubscriptionIds(productId)
 
@@ -261,11 +289,11 @@ serve(async (req: Request) => {
       })
     }
 
-    // 4️⃣ IDEMPOTENCY CHECK: Check if this purchase token was already processed
+    // 5️⃣ IDEMPOTENCY CHECK: Check if this purchase token was already processed
     const { data: existingSub } = await supabaseClient
       .from('user_subscriptions')
       .select('id, provider_transaction_id, expires_at')
-      .eq('user_id', userData.user.id)
+      .eq('user_id', userId)
       .eq('provider_transaction_id', purchaseToken)
       .single()
 
@@ -282,11 +310,11 @@ serve(async (req: Request) => {
       })
     }
 
-    // 5️⃣ Update Supabase subscription ONLY after Google confirms active
+    // 6️⃣ Update Supabase subscription ONLY after Google confirms active
     const { error: upsertError } = await supabaseClient
       .from('user_subscriptions')
       .upsert({
-        user_id: userData.user.id,
+        user_id: userId,
         plan_name: 'premium',
         status: 'active',
         starts_at: startsAt,
@@ -304,7 +332,7 @@ serve(async (req: Request) => {
       return json(500, { error: 'Failed to update subscription', details: upsertError.message })
     }
 
-    console.log('✅ [GOOGLE-IAP-VALIDATOR] Subscription activated for user:', userData.user.id)
+    console.log('✅ [GOOGLE-IAP-VALIDATOR] Subscription activated for user:', userId)
 
     return json(200, {
       valid: true,

@@ -149,18 +149,34 @@ export function initIAP() {
           // Validate receipt with server-side function for security
           try {
             const { supabase } = await import('@/integrations/supabase/client');
+            
+            // Get user - but also try to use stored user_id as fallback
             const { data: { user } } = await supabase.auth.getUser();
             
             // Determine payment method based on platform
             const paymentMethod = isAndroid() ? 'google' : 'apple';
             
-            if (!user) {
-              console.error('[IAP] No authenticated user found');
+            // Try to get stored user_id from localStorage (set before purchase)
+            let userId = user?.id;
+            if (!userId) {
+              try {
+                const storedUserId = localStorage.getItem('driplove_iap_user_id');
+                if (storedUserId) {
+                  userId = storedUserId;
+                  noopLog('[IAP] Using stored user_id:', userId);
+                }
+              } catch (e) {
+                // localStorage not available
+              }
+            }
+            
+            if (!userId) {
+              console.error('[IAP] No user identification available');
               alert('Please log in to complete your purchase.');
               return;
             }
             
-            noopLog('[IAP] Processing verified receipt for user:', user.id);
+            noopLog('[IAP] Processing verified receipt for user:', userId);
             noopLog('[IAP] Receipt object:', {
               productId: r.productId,
               transactionId: r.transactionId,
@@ -174,7 +190,7 @@ export function initIAP() {
               const expiry = expiryDate || new Date(Date.now() + 30 * 24 * 60 * 60 * 1000);
 
               const subscriptionData = {
-                user_id: user.id,
+                user_id: userId,
                 plan_name: 'premium',
                 status: 'active',
                 provider_transaction_id: transactionId,
@@ -189,7 +205,7 @@ export function initIAP() {
 
               // Idempotent activation: one row per user (unique user_id)
               // Use upsert to avoid race conditions and unique constraint insert failures.
-              noopLog('[IAP] Upserting subscription for user:', user.id);
+              noopLog('[IAP] Upserting subscription for user:', userId);
               const { error: upsertError } = await supabase
                 .from('user_subscriptions')
                 .upsert(subscriptionData, { onConflict: 'user_id' });
@@ -198,6 +214,9 @@ export function initIAP() {
                 console.error('[IAP] ❌ Database operation failed:', upsertError);
                 throw new Error(`Database update failed: ${upsertError.message}`);
               }
+              
+              // Clear stored user_id on success
+              try { localStorage.removeItem('driplove_iap_user_id'); } catch (e) {}
               
               noopLog('[IAP] ✅ Subscription activated successfully!');
               return true;
@@ -219,12 +238,12 @@ export function initIAP() {
               const validatorFunction = isAndroid() ? 'google-iap-validator' : 'iap-receipt-validator';
               noopLog('[IAP] Using validator function:', validatorFunction);
               
-              // Race between validation and timeout
+              // CRITICAL: Always include user_id in body for session-independent activation
               const validationPromise = supabase.functions.invoke(validatorFunction, {
                 body: {
                   receiptData: receiptData,
                   productId: r.productId,
-                  userId: user.id,
+                  user_id: userId, // Fallback for session-expired scenarios
                   purchaseToken: r.purchaseToken || r.transactionId,
                   transactionId: transactionId
                 }
@@ -425,6 +444,18 @@ export const buyMonthly = async () => {
   if (!store) {
     console.error('[IAP] Store not available');
     throw new Error('Store not initialized');
+  }
+  
+  // Store current user_id BEFORE purchase for session-independent activation
+  try {
+    const { supabase } = await import('@/integrations/supabase/client');
+    const { data: { user } } = await supabase.auth.getUser();
+    if (user?.id) {
+      localStorage.setItem('driplove_iap_user_id', user.id);
+      noopLog('[IAP] Stored user_id for purchase:', user.id);
+    }
+  } catch (e) {
+    console.warn('[IAP] Could not store user_id:', e);
   }
   
   window.iapPurchaseInitiated = true;
