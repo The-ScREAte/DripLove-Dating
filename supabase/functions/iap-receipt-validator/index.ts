@@ -240,6 +240,69 @@ serve(async (req) => {
 
       console.log('✅ [IAP-RECEIPT-VALIDATOR] Premium activated for user:', userId)
 
+      // 🔟 Record payment and process referral commission for IAP
+      try {
+        // Get premium price from payment_config for the user's country
+        const { data: profile } = await supabaseClient
+          .from('profiles')
+          .select('country_code')
+          .eq('id', userId)
+          .single()
+        
+        const userCountry = profile?.country_code || 'GH'
+        
+        // Get payment config to determine price
+        const { data: paymentConfig } = await supabaseClient
+          .from('payment_config')
+          .select('premium_price_monthly, currency, country_prices')
+          .single()
+        
+        // Determine price based on country (default to GHS price)
+        let paymentAmount = paymentConfig?.premium_price_monthly || 56
+        let paymentCurrency = paymentConfig?.currency || 'GHS'
+        
+        // Check for country-specific pricing
+        if (paymentConfig?.country_prices && typeof paymentConfig.country_prices === 'object') {
+          const countryPrices = paymentConfig.country_prices as Record<string, { price: number; currency: string }>
+          if (countryPrices[userCountry]) {
+            paymentAmount = countryPrices[userCountry].price
+            paymentCurrency = countryPrices[userCountry].currency
+          }
+        }
+        
+        // Record the payment
+        const { data: paymentRecord, error: paymentError } = await supabaseClient
+          .from('subscription_payments')
+          .insert({
+            user_id: userId,
+            amount: paymentAmount,
+            currency: paymentCurrency,
+            payment_method: 'apple',
+            transaction_id: `iap_${latest.transaction_id}`,
+          })
+          .select('id')
+          .single()
+
+        if (paymentError) {
+          console.error('[IAP-RECEIPT-VALIDATOR] Error recording payment:', paymentError)
+        } else if (paymentRecord?.id) {
+          // Process referral commission
+          const { data: commissionResult, error: commissionError } = await supabaseClient.rpc('process_referral_commission', {
+            p_user_id: userId,
+            p_payment_amount: paymentAmount,
+            p_payment_id: paymentRecord.id
+          })
+          
+          if (commissionError) {
+            console.error('[IAP-RECEIPT-VALIDATOR] Error processing commission:', commissionError)
+          } else {
+            console.log('[IAP-RECEIPT-VALIDATOR] Commission result:', commissionResult)
+          }
+        }
+      } catch (commErr) {
+        console.error('[IAP-RECEIPT-VALIDATOR] Payment/commission processing failed:', commErr)
+      }
+
       return json(200, {
         valid: true,
         active: true,
