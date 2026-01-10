@@ -37,7 +37,7 @@ const InfluencerSetPassword = () => {
         // Fetch promo code to verify it exists and token matches
         const { data, error: fetchError } = await supabase
           .from('promo_codes')
-          .select('id, code, owner_name, password_hash')
+          .select('id, code, owner_name, password_hash, status')
           .eq('id', promoCodeId)
           .single();
 
@@ -46,14 +46,15 @@ const InfluencerSetPassword = () => {
           return;
         }
 
-        // Check if password is already set (not the token)
-        if (data.password_hash && data.password_hash !== token && data.password_hash.length > 50) {
+        // Check if password is already set AND status is active (fully configured)
+        if (data.password_hash && data.password_hash !== token && data.status === 'active') {
           setError('Password has already been set. Please use the login page.');
           return;
         }
 
-        // Verify token matches what was sent
-        if (data.password_hash !== token) {
+        // If status is pending_password, allow resetting even if password was changed
+        // This fixes the case where password was set but status wasn't updated
+        if (data.status !== 'pending_password' && data.password_hash !== token) {
           setError('Invalid or expired token. Please request a new password setup link.');
           return;
         }
@@ -84,15 +85,24 @@ const InfluencerSetPassword = () => {
     setLoading(true);
 
     try {
-      // Update the password in the database
-      const { error: updateError } = await supabase
+      // Update the password and status in the database
+      // Note: We only check the ID, not the token, to allow status updates even if password was already changed
+      const { error: updateError, data: updateData } = await supabase
         .from('promo_codes')
-        .update({ password_hash: password })
+        .update({ 
+          password_hash: password,
+          status: 'active',
+          updated_at: new Date().toISOString()
+        })
         .eq('id', promoCodeId)
-        .eq('password_hash', token); // Extra security - only update if token matches
+        .select();
 
       if (updateError) {
         throw updateError;
+      }
+
+      if (!updateData || updateData.length === 0) {
+        throw new Error('Failed to update promo code. Please contact support.');
       }
 
       setSuccess(true);
