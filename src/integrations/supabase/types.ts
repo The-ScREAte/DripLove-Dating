@@ -1969,6 +1969,10 @@ export type Database = {
         }
         Returns: Json
       }
+      mark_my_profile_broadcast_message_read: {
+        Args: { p_recipient_id: string }
+        Returns: boolean
+      }
       mark_my_profile_broadcasts_read: { Args: never; Returns: number }
       pass_and_usage_batched: {
         Args: {
