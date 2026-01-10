@@ -137,7 +137,7 @@ const InfluencerManagement = () => {
             .select('*', { count: 'exact', head: true })
             .in('user_id', userIds)
             .eq('plan_name', 'premium')
-            .eq('status', 'active');
+            .in('status', ['active', 'cancelled']); // Include cancelled (still premium until expires)
           subscriberCount = count || 0;
         }
         
