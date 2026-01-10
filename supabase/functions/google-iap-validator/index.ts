@@ -264,9 +264,9 @@ serve(async (req: Request) => {
     // 4️⃣ IDEMPOTENCY CHECK: Check if this purchase token was already processed
     const { data: existingSub } = await supabaseClient
       .from('user_subscriptions')
-      .select('id, flutterwave_transaction_id, expires_at')
+      .select('id, provider_transaction_id, expires_at')
       .eq('user_id', userData.user.id)
-      .eq('flutterwave_transaction_id', purchaseToken)
+      .eq('provider_transaction_id', purchaseToken)
       .single()
 
     if (existingSub && new Date(existingSub.expires_at) >= new Date(expiresAt)) {
@@ -292,7 +292,7 @@ serve(async (req: Request) => {
         starts_at: startsAt,
         expires_at: expiresAt,
         next_billing_date: expiresAt,
-        flutterwave_transaction_id: purchaseToken,
+        provider_transaction_id: purchaseToken,
         auto_renew: autoRenew,
         payment_method: 'google',
         payment_attempts: 0,

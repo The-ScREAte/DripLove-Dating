@@ -1,5 +1,5 @@
 
-import React, { useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Crown, Heart, RotateCcw, Users, Check, AlertCircle, ArrowLeft } from 'lucide-react';
 import { useNavigate, useLocation } from 'react-router-dom';
@@ -13,6 +13,13 @@ const premiumFeatures = [
   { name: 'Priority Support', icon: Crown },
   { name: 'All future premium features included!', icon: Check },
 ];
+
+function isPremiumActive(row: { plan_name?: string; status?: string; expires_at?: string | null } | null) {
+  if (!row) return false;
+  if (row.plan_name !== 'premium' || row.status !== 'active') return false;
+  if (!row.expires_at) return true;
+  return new Date(row.expires_at) > new Date();
+}
 
 const PaymentSuccess: React.FC = () => {
   const navigate = useNavigate();
@@ -34,6 +41,26 @@ const PaymentSuccess: React.FC = () => {
     return typeof msg === 'string' ? msg : undefined
   }
 
+  const waitForPremiumActivation = useCallback(async (userId: string, timeoutMs = 25000, intervalMs = 1500) => {
+    const start = Date.now();
+    while (Date.now() - start < timeoutMs) {
+      const { data, error } = await supabase
+        .from('user_subscriptions')
+        .select('plan_name, status, expires_at')
+        .eq('user_id', userId)
+        .order('created_at', { ascending: false })
+        .limit(1)
+        .maybeSingle();
+
+      if (!error && isPremiumActive(data)) {
+        return true;
+      }
+
+      await new Promise((r) => setTimeout(r, intervalMs));
+    }
+    return false;
+  }, []);
+
   // Cleanup timer on unmount
   useEffect(() => {
     return () => {
@@ -48,12 +75,12 @@ const PaymentSuccess: React.FC = () => {
     const checkAuth = async () => {
       const { data: { session } } = await supabase.auth.getSession();
       if (!session?.user) {
-        toast({
-          title: 'Authentication Required',
-          description: 'Please log in to view payment status.',
-          variant: 'destructive',
-        });
-        navigate('/auth');
+        // NOTE: There is no dedicated /auth route in this app (auth runs on '/').
+        // If the user completes payment while their session expires, the webhook should still
+        // activate premium server-side. We just need the user to log back in to see it.
+        setIsAuthenticated(false);
+        setIsLoading(false);
+        setError('Your session expired while you were paying. Please go back home and log in again to confirm your premium status. If you already paid, premium should activate automatically within a few minutes.');
         return;
       }
       setIsAuthenticated(true);
@@ -117,12 +144,30 @@ const PaymentSuccess: React.FC = () => {
       // ignore
     }
 
-    // If IAP (Apple or Google), just show success - the validator/verified handler already updated the DB
+    // If IAP (Apple or Google), do not assume DB is updated yet.
+    // Wait briefly for the validator/verified handler to activate premium in DB.
     if (payment_type === 'iap' && status === 'successful') {
-      // Database was already updated by the IAP validator (Apple or Google)
-      // Just show the success message
-      setUpgradeSuccess(true);
-      setUpgrading(false);
+      setError(null);
+      setUpgradeSuccess(false);
+      setUpgrading(true);
+      (async () => {
+        const { data: { session } } = await supabase.auth.getSession();
+        const user = session?.user;
+        if (!user) {
+          setError('Your session expired while processing this payment. Please go back home and log in again to confirm your premium status.');
+          setUpgrading(false);
+          setTimeout(() => navigate('/'), 2000);
+          return;
+        }
+
+        const activated = await waitForPremiumActivation(user.id);
+        if (activated) {
+          setUpgradeSuccess(true);
+        } else {
+          setError('Payment was successful, but premium activation is taking longer than expected. Please wait a moment and try Restore Purchases (mobile) or contact support if it does not activate.');
+        }
+        setUpgrading(false);
+      })();
       return;
     }
 
@@ -190,9 +235,9 @@ const PaymentSuccess: React.FC = () => {
       const { data: { session } } = await supabase.auth.getSession();
       const user = session?.user;
       if (!user) {
-        setError('User session expired. Please log in again.');
+        setError('Your session expired while processing this payment. Please go back home and log in again to confirm your premium status.');
         setUpgrading(false);
-        setTimeout(() => navigate('/auth'), 3000);
+        setTimeout(() => navigate('/'), 2000);
         return;
       }
 
@@ -213,6 +258,15 @@ const PaymentSuccess: React.FC = () => {
           return;
         }
 
+        // Wait for DB to reflect premium before showing activation as complete.
+        const activated = await waitForPremiumActivation(user.id);
+        if (!activated) {
+          setError(
+            `Payment verified, but premium activation is taking longer than expected. If it doesn't activate soon, contact support with reference: ${referenceToVerify}`
+          );
+          return;
+        }
+
         setUpgradeSuccess(true);
 
         // Clear stored reference on success to avoid stale replays.
@@ -228,7 +282,7 @@ const PaymentSuccess: React.FC = () => {
         setUpgrading(false);
       }
     })();
-  }, [location.search, toast, navigate, isAuthenticated]);
+  }, [location.search, toast, navigate, isAuthenticated, waitForPremiumActivation]);
 
   // Show loading while checking authentication
   if (isLoading) {
@@ -244,7 +298,25 @@ const PaymentSuccess: React.FC = () => {
 
   // Don't render anything if not authenticated (will redirect)
   if (!isAuthenticated) {
-    return null;
+    return (
+      <div className="min-h-fill flex flex-col items-center justify-center bg-gradient-to-br from-pink-400 via-purple-500 to-indigo-600 p-4">
+        <div className="bg-white rounded-3xl shadow-2xl p-8 max-w-md w-full text-center border-4 border-yellow-300/60 relative">
+          <div className="absolute -top-10 left-1/2 -translate-x-1/2 bg-gradient-to-br from-yellow-300 to-yellow-500 rounded-full p-3 shadow-lg">
+            <AlertCircle className="w-14 h-14 text-white" />
+          </div>
+          <h1 className="text-3xl font-extrabold mb-3 mt-8 text-gray-900 tracking-tight">Login Required</h1>
+          <div className="mb-6 text-gray-700 bg-yellow-50 p-4 rounded-lg border border-yellow-200">
+            {error || 'Please log in to view and confirm your payment status.'}
+          </div>
+          <Button
+            className="w-full bg-gradient-to-r from-yellow-400 to-yellow-600 text-black font-extrabold py-3 px-8 rounded-full text-lg shadow-xl hover:scale-105 hover:shadow-2xl transition-all duration-200"
+            onClick={() => navigate('/')}
+          >
+            Go to Home
+          </Button>
+        </div>
+      </div>
+    );
   }
 
   // Show error state with option to go back
@@ -309,7 +381,7 @@ const PaymentSuccess: React.FC = () => {
         <Button
           className="w-full bg-gradient-to-r from-yellow-400 to-yellow-600 text-black font-extrabold py-3 px-8 rounded-full text-xl shadow-xl hover:scale-105 hover:shadow-2xl transition-all duration-200 mt-2"
           onClick={() => navigate('/?premium=activated')}
-          disabled={upgrading}
+          disabled={upgrading || !upgradeSuccess}
         >
           Start Discovering Now
         </Button>

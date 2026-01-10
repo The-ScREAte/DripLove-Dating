@@ -41,12 +41,12 @@ const NOTIFICATION_TYPES = {
 
 async function findUserByPurchaseToken(supabase: any, purchaseToken: string) {
   try {
-    // Try to find user by purchase token stored in flutterwave_transaction_id
+    // Try to find user by purchase token stored in provider_transaction_id
     // Google stores purchaseToken or transactionId in this field
     const { data, error } = await supabase
       .from('user_subscriptions')
       .select('user_id, status, plan_name, expires_at, payment_attempts')
-      .eq('flutterwave_transaction_id', purchaseToken)
+      .eq('provider_transaction_id', purchaseToken)
       .eq('payment_method', 'google')
       .single()
     

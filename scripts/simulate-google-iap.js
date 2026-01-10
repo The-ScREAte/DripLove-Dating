@@ -65,7 +65,7 @@ async function simulateApproved({ initiated, userId = 'user_123', productId = 'p
           user_id: user.id,
           plan_name: 'premium',
           status: 'active',
-          flutterwave_transaction_id: purchaseToken,
+          provider_transaction_id: purchaseToken,
           starts_at: new Date().toISOString(),
           expires_at: expiryDate.toISOString(),
           next_billing_date: expiryDate.toISOString(),

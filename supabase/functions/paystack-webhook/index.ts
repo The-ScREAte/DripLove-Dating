@@ -211,7 +211,7 @@ serve(async (req) => {
     const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY)
     
     const eventType = event.event
-    const eventData = event.data
+    const eventData = event.data as any
 
     // Cancellation-type events: disable authorization and update subscription
     if (eventType === 'subscription.disable' || eventType === 'subscription.not_renew') {
@@ -334,11 +334,11 @@ serve(async (req) => {
         await saveAuthorization(supabase, userId, resolvedEmail || '', authorization, amount, currency)
       }
 
+      // Get current expiry to extend from it if still active
       const { data: currentSub } = await supabase
         .from('user_subscriptions')
-        .select('id, expires_at, payment_method, auto_renew, flutterwave_transaction_id')
+        .select('expires_at, provider_transaction_id')
         .eq('user_id', userId)
-        .eq('payment_method', 'paystack')
         .order('created_at', { ascending: false })
         .limit(1)
         .maybeSingle()
@@ -349,7 +349,8 @@ serve(async (req) => {
           : addDays(new Date(), 30)
       const subscriptionCode = extractSubscriptionCode(eventData)
 
-      const updatePayload: Record<string, unknown> = {
+      const upsertPayload: Record<string, unknown> = {
+        user_id: userId,
         status: 'active',
         plan_name: 'premium',
         payment_method: 'paystack',
@@ -357,41 +358,26 @@ serve(async (req) => {
         payment_attempts: 0,
         expires_at: nextExpiry.toISOString(),
         next_billing_date: nextExpiry.toISOString(),
+        starts_at: new Date().toISOString(),
         updated_at: new Date().toISOString(),
       }
 
-      if (subscriptionCode && currentSub?.flutterwave_transaction_id !== subscriptionCode) {
-        updatePayload.flutterwave_transaction_id = subscriptionCode
+      if (subscriptionCode && currentSub?.provider_transaction_id !== subscriptionCode) {
+        upsertPayload.provider_transaction_id = subscriptionCode
       }
 
-      if (currentSub?.id) {
-        const { error: updateError } = await supabase
-          .from('user_subscriptions')
-          .update(updatePayload)
-          .eq('user_id', userId)
-          .eq('payment_method', 'paystack')
+      const { error: upsertError } = await supabase
+        .from('user_subscriptions')
+        .upsert(upsertPayload, { onConflict: 'user_id' })
 
-        if (updateError) {
-          console.error('[PAYSTACK-WEBHOOK] Error updating subscription:', updateError)
-          return json(500, { error: 'Failed to update subscription' })
-        }
-      } else {
-        console.log('[PAYSTACK-WEBHOOK] No subscription row found; creating one for user:', userId)
-        const insertPayload = {
-          user_id: userId,
-          starts_at: new Date().toISOString(),
-          ...updatePayload,
-        }
-        const { error: insertError } = await supabase.from('user_subscriptions').insert([insertPayload])
-        if (insertError) {
-          console.error('[PAYSTACK-WEBHOOK] Error creating subscription:', insertError)
-          return json(500, { error: 'Failed to create subscription' })
-        }
+      if (upsertError) {
+        console.error('[PAYSTACK-WEBHOOK] Error upserting subscription:', upsertError)
+        return json(500, { error: 'Failed to activate subscription' })
       }
 
       // Record payment (best-effort)
       try {
-        const reference = (eventData as any)?.reference || subscriptionCode || ''
+        const reference = eventData?.reference || subscriptionCode || ''
         await supabase
           .from('subscription_payments')
           .insert({

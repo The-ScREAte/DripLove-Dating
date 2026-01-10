@@ -172,9 +172,9 @@ serve(async (req) => {
     // 7️⃣ IDEMPOTENCY CHECK: Check if this transaction was already processed
     const { data: existingSub } = await supabaseClient
       .from('user_subscriptions')
-      .select('id, flutterwave_transaction_id, expires_at')
+      .select('id, provider_transaction_id, expires_at')
       .eq('user_id', userData.user.id)
-      .eq('flutterwave_transaction_id', latest.transaction_id)
+      .eq('provider_transaction_id', latest.transaction_id)
       .single()
 
     if (existingSub && new Date(existingSub.expires_at) >= expiresDate) {
@@ -199,7 +199,7 @@ serve(async (req) => {
           starts_at: new Date().toISOString(),
           expires_at: expiresDate.toISOString(),
           next_billing_date: expiresDate.toISOString(),
-          flutterwave_transaction_id: latest.transaction_id,
+          provider_transaction_id: latest.transaction_id,
           auto_renew: true,
           payment_method: 'apple',
           updated_at: new Date().toISOString(),

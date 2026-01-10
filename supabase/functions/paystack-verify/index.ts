@@ -174,7 +174,7 @@ serve(async (req) => {
     // Find existing subscription row
     const { data: existing } = await supabase
       .from('user_subscriptions')
-      .select('id, flutterwave_transaction_id, payment_method')
+      .select('id, provider_transaction_id, payment_method')
       .eq('user_id', user.id)
       .order('created_at', { ascending: false })
       .limit(1)
@@ -192,8 +192,8 @@ serve(async (req) => {
     }
 
     // Store the transaction reference if we don't already have a value
-    if (!existing?.flutterwave_transaction_id) {
-      updateBase.flutterwave_transaction_id = reference
+    if (!existing?.provider_transaction_id) {
+      updateBase.provider_transaction_id = reference
     }
 
     if (existing?.id) {

@@ -172,23 +172,12 @@ export function initIAP() {
             // Helper function to activate subscription in database
             const activateSubscription = async (transactionId: string | null, expiryDate?: Date) => {
               const expiry = expiryDate || new Date(Date.now() + 30 * 24 * 60 * 60 * 1000);
-              
-              // First, check if subscription exists
-              const { data: existingSub, error: fetchError } = await supabase
-                .from('user_subscriptions')
-                .select('id')
-                .eq('user_id', user.id)
-                .maybeSingle();
-              
-              if (fetchError) {
-                console.error('[IAP] Error fetching existing subscription:', fetchError);
-              }
-              
+
               const subscriptionData = {
                 user_id: user.id,
                 plan_name: 'premium',
                 status: 'active',
-                flutterwave_transaction_id: transactionId,
+                provider_transaction_id: transactionId,
                 starts_at: new Date().toISOString(),
                 expires_at: expiry.toISOString(),
                 next_billing_date: expiry.toISOString(),
@@ -197,26 +186,17 @@ export function initIAP() {
                 payment_attempts: 0,
                 updated_at: new Date().toISOString(),
               };
-              
-              let result;
-              if (existingSub?.id) {
-                // Update existing subscription
-                noopLog('[IAP] Updating existing subscription:', existingSub.id);
-                result = await supabase
-                  .from('user_subscriptions')
-                  .update(subscriptionData)
-                  .eq('user_id', user.id);
-              } else {
-                // Insert new subscription
-                noopLog('[IAP] Creating new subscription for user:', user.id);
-                result = await supabase
-                  .from('user_subscriptions')
-                  .insert(subscriptionData);
-              }
-              
-              if (result.error) {
-                console.error('[IAP] ❌ Database operation failed:', result.error);
-                throw new Error(`Database update failed: ${result.error.message}`);
+
+              // Idempotent activation: one row per user (unique user_id)
+              // Use upsert to avoid race conditions and unique constraint insert failures.
+              noopLog('[IAP] Upserting subscription for user:', user.id);
+              const { error: upsertError } = await supabase
+                .from('user_subscriptions')
+                .upsert(subscriptionData, { onConflict: 'user_id' });
+
+              if (upsertError) {
+                console.error('[IAP] ❌ Database operation failed:', upsertError);
+                throw new Error(`Database update failed: ${upsertError.message}`);
               }
               
               noopLog('[IAP] ✅ Subscription activated successfully!');
@@ -603,7 +583,7 @@ export function restorePurchases(): Promise<{ restored: boolean; message: string
           user_id: user.id,
           plan_name: 'premium',
           status: 'active',
-          flutterwave_transaction_id: transactionId || productId,
+          provider_transaction_id: transactionId || productId,
           starts_at: new Date().toISOString(),
           expires_at: expiryDate.toISOString(),
           next_billing_date: expiryDate.toISOString(),

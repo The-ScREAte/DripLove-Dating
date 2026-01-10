@@ -51,9 +51,104 @@ const processScheduledBroadcasts = async () => {
   }
 };
 
+const getInternalSecret = async (key) => {
+  try {
+    const url = `${SUPABASE_URL}/rest/v1/internal_secrets?key=eq.${encodeURIComponent(key)}&select=value`;
+    const response = await fetch(url, {
+      method: 'GET',
+      headers: {
+        'Authorization': `Bearer ${SUPABASE_SERVICE_KEY}`,
+        'apikey': SUPABASE_SERVICE_KEY,
+        'Accept': 'application/json',
+      },
+    });
+
+    if (!response.ok) {
+      const text = await response.text();
+      console.error(`[${new Date().toISOString()}] ❌ Failed to fetch internal secret ${key}:`, text);
+      return null;
+    }
+
+    const rows = await response.json();
+    return rows?.[0]?.value || null;
+  } catch (error) {
+    console.error(`[${new Date().toISOString()}] ❌ Failed to fetch internal secret ${key}:`, error.message);
+    return null;
+  }
+};
+
+const processPaystackRecurringBilling = async () => {
+  try {
+    console.log(`[${new Date().toISOString()}] Processing Paystack recurring billing...`);
+
+    const cronSecret = await getInternalSecret('paystack_billing_cron_secret');
+    if (!cronSecret) {
+      console.error(`[${new Date().toISOString()}] ❌ Missing paystack_billing_cron_secret (internal_secrets)`);
+      return;
+    }
+
+    const response = await fetch(
+      `${SUPABASE_URL}/functions/v1/paystack-recurring-billing`,
+      {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'x-cron-secret': cronSecret,
+        },
+        body: JSON.stringify({}),
+      }
+    );
+
+    const data = await response.json().catch(() => ({}));
+    if (response.ok) {
+      console.log('✅ Paystack billing success:', data.message || data);
+      if (typeof data.processed === 'number') {
+        console.log(`  processed=${data.processed} charged=${data.charged} failed=${data.failed}`);
+      }
+    } else {
+      console.error('❌ Paystack billing error:', data);
+    }
+  } catch (error) {
+    console.error('❌ Failed to process Paystack recurring billing:', error.message);
+  }
+};
+
+const processSubscriptionChecker = async () => {
+  try {
+    console.log(`[${new Date().toISOString()}] Running subscription checker...`);
+
+    const response = await fetch(
+      `${SUPABASE_URL}/functions/v1/subscription-checker`,
+      {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${SUPABASE_SERVICE_KEY}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({}),
+      }
+    );
+
+    const data = await response.json().catch(() => ({}));
+    if (response.ok) {
+      console.log('✅ Subscription checker success:', data.message || data);
+    } else {
+      console.error('❌ Subscription checker error:', data);
+    }
+  } catch (error) {
+    console.error('❌ Failed to run subscription checker:', error.message);
+  }
+};
+
 // Run every 15 minutes: */15 * * * *
 // For testing every minute: * * * * *
 cron.schedule('*/15 * * * *', processScheduledBroadcasts);
+
+// Paystack recurring billing (every hour at :05)
+cron.schedule('5 * * * *', processPaystackRecurringBilling);
+
+// Subscription status check (every hour at :10)
+cron.schedule('10 * * * *', processSubscriptionChecker);
 
 console.log('🚀 Scheduled broadcasts cron job started');
 console.log('📅 Running every 15 minutes');

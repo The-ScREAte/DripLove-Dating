@@ -102,9 +102,9 @@ serve(async (req) => {
       }
 
       // Legacy: if subscription_code exists, try to disable it too
-      if (sub.flutterwave_transaction_id) {
+      if (sub.provider_transaction_id) {
         try {
-          await disablePaystackSubscription(sub.flutterwave_transaction_id, PAYSTACK_SECRET_KEY)
+          await disablePaystackSubscription(sub.provider_transaction_id, PAYSTACK_SECRET_KEY)
         } catch (err) {
           // Non-fatal
         }
