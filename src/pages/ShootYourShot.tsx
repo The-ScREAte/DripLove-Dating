@@ -297,6 +297,286 @@ const challenges: Challenge[] = [
     prompt: "Wrote a piece I'm actually proud of. Rare moment!",
     image: "✨",
     mood: 'guarded'
+  },
+  {
+    id: 36,
+    name: "Kai",
+    bio: "Therapist 🧠 | Yoga enthusiast | Emotional intelligence advocate",
+    prompt: "Today's session reminded me why I love this work.",
+    image: "🧠",
+    mood: 'neutral'
+  },
+  {
+    id: 37,
+    name: "Jasmine",
+    bio: "Single parent 👶 | Graphic designer | Weekend warrior",
+    prompt: "Finally got a kid-free Saturday. What's adulting again?",
+    image: "👶",
+    mood: 'curious'
+  },
+  {
+    id: 38,
+    name: "Phoenix",
+    bio: "Recovering workaholic 💼 | Learning to say no | Self-care advocate",
+    prompt: "Left work at 5pm today. Small wins!",
+    image: "💼",
+    mood: 'neutral'
+  },
+  {
+    id: 39,
+    name: "Blair",
+    bio: "Fashion blogger 👗 | Thrift store queen | Sustainable style",
+    prompt: "Found the most incredible vintage jacket today!",
+    image: "👗",
+    mood: 'curious'
+  },
+  {
+    id: 40,
+    name: "River",
+    bio: "Environmental scientist 🌍 | Climate activist | Nature lover",
+    prompt: "Another frustrating day of data vs. denial.",
+    image: "🌍",
+    mood: 'guarded'
+  },
+  {
+    id: 41,
+    name: "Indie",
+    bio: "Indie game developer 🎮 | Pixel art enthusiast | Coffee addict",
+    prompt: "Just fixed a bug that's haunted me for weeks!",
+    image: "🎮",
+    mood: 'curious'
+  },
+  {
+    id: 42,
+    name: "Sage",
+    bio: "Herbalist 🌿 | Tea ceremony host | Slow living advocate",
+    prompt: "Made the perfect blend today. Took 47 tries.",
+    image: "🌿",
+    mood: 'neutral'
+  },
+  {
+    id: 43,
+    name: "Dakota",
+    bio: "Emergency vet 🐾 | Night shift survivor | Animal rescuer",
+    prompt: "Saved a puppy tonight. Best feeling ever.",
+    image: "🐾",
+    mood: 'curious'
+  },
+  {
+    id: 44,
+    name: "Quinn",
+    bio: "Podcast host 🎙️ | True crime obsessed | Amateur detective",
+    prompt: "Recording tomorrow's episode. Nervous and excited!",
+    image: "🎙️",
+    mood: 'busy'
+  },
+  {
+    id: 45,
+    name: "Rowan",
+    bio: "Woodworker 🪵 | Custom furniture maker | Sawdust everywhere",
+    prompt: "Finally finished that live-edge table. 3 months!",
+    image: "🪵",
+    mood: 'neutral'
+  },
+  {
+    id: 46,
+    name: "Marley",
+    bio: "Reggae DJ 🎶 | Vinyl collector | Good vibes only",
+    prompt: "Found a rare Bob Marley pressing today!",
+    image: "🎶",
+    mood: 'curious'
+  },
+  {
+    id: 47,
+    name: "Sage",
+    bio: "Meditation teacher 🧘 | Mindfulness coach | Tea lover",
+    prompt: "Hosted my first online retreat. Grateful.",
+    image: "🧘",
+    mood: 'neutral'
+  },
+  {
+    id: 48,
+    name: "Ember",
+    bio: "Fire dancer 🔥 | Circus performer | Living on the edge",
+    prompt: "Show tonight. Pre-performance jitters are real.",
+    image: "🔥",
+    mood: 'busy'
+  },
+  {
+    id: 49,
+    name: "Zara",
+    bio: "Language nerd 📖 | Speaks 5 languages | World traveler",
+    prompt: "Started learning language #6. Challenge accepted!",
+    image: "📖",
+    mood: 'curious'
+  },
+  {
+    id: 50,
+    name: "Atlas",
+    bio: "Rock climber 🧗 | Adventure seeker | Fear crusher",
+    prompt: "Conquered my first V7 today. Next level!",
+    image: "🧗",
+    mood: 'curious'
+  },
+  {
+    id: 51,
+    name: "Luna",
+    bio: "Astrology enthusiast ✨ | Tarot reader | Moon ritual host",
+    prompt: "Mercury retrograde is finally over. Thank goodness.",
+    image: "✨",
+    mood: 'neutral'
+  },
+  {
+    id: 52,
+    name: "Cedar",
+    bio: "Urban gardener 🌱 | Rooftop farm builder | Green thumb",
+    prompt: "First tomatoes of the season! Nature is magic.",
+    image: "🌱",
+    mood: 'curious'
+  },
+  {
+    id: 53,
+    name: "Storm",
+    bio: "Storm chaser ⛈️ | Weather photographer | Adrenaline junkie",
+    prompt: "Caught an incredible supercell today!",
+    image: "⛈️",
+    mood: 'curious'
+  },
+  {
+    id: 54,
+    name: "Jules",
+    bio: "Bartender 🍸 | Cocktail innovator | Night owl",
+    prompt: "Created a new drink tonight. Customers loved it!",
+    image: "🍸",
+    mood: 'neutral'
+  },
+  {
+    id: 55,
+    name: "Remy",
+    bio: "Chef 👨‍🍳 | Food truck owner | Flavor experimenter",
+    prompt: "Sold out in 2 hours today. Best problem ever.",
+    image: "👨‍🍳",
+    mood: 'curious'
+  },
+  {
+    id: 56,
+    name: "Willow",
+    bio: "Florist 🌸 | Event designer | Color enthusiast",
+    prompt: "Working on a wedding tomorrow. Wish me luck!",
+    image: "🌸",
+    mood: 'busy'
+  },
+  {
+    id: 57,
+    name: "Jett",
+    bio: "Skateboarder 🛹 | Street photographer | City explorer",
+    prompt: "Found an amazing new spot today!",
+    image: "🛹",
+    mood: 'curious'
+  },
+  {
+    id: 58,
+    name: "Aria",
+    bio: "Opera singer 🎭 | Voice coach | Performance artist",
+    prompt: "Opening night tomorrow. Nerves and excitement!",
+    image: "🎭",
+    mood: 'busy'
+  },
+  {
+    id: 59,
+    name: "Fox",
+    bio: "Wildlife photographer 📷 | Nature documentarian | Patient observer",
+    prompt: "Waited 6 hours for this shot. Worth it.",
+    image: "📷",
+    mood: 'neutral'
+  },
+  {
+    id: 60,
+    name: "Indigo",
+    bio: "Textile artist 🧵 | Natural dye enthusiast | Slow fashion advocate",
+    prompt: "Finally perfected my indigo dye technique!",
+    image: "🧵",
+    mood: 'curious'
+  },
+  {
+    id: 61,
+    name: "Blaze",
+    bio: "Firefighter 🚒 | CrossFit athlete | Community volunteer",
+    prompt: "Tough shift but everyone's safe. That's what matters.",
+    image: "🚒",
+    mood: 'neutral'
+  },
+  {
+    id: 62,
+    name: "Pearl",
+    bio: "Vintage jewelry restorer 💎 | Estate sale hunter | History lover",
+    prompt: "Found a 1920s Art Deco piece today!",
+    image: "💎",
+    mood: 'curious'
+  },
+  {
+    id: 63,
+    name: "Soren",
+    bio: "Philosophy major 📚 | Coffee shop debater | Deep thinker",
+    prompt: "Finally defended my thesis. Exhausted and relieved!",
+    image: "📚",
+    mood: 'guarded'
+  },
+  {
+    id: 64,
+    name: "Wren",
+    bio: "Bird watcher 🦜 | Nature guide | Early riser",
+    prompt: "Spotted a rare species this morning!",
+    image: "🦜",
+    mood: 'curious'
+  },
+  {
+    id: 65,
+    name: "Bodhi",
+    bio: "Surf instructor 🏄 | Ocean advocate | Sunrise chaser",
+    prompt: "Perfect waves this morning. Best start to the day!",
+    image: "🏄",
+    mood: 'curious'
+  },
+  {
+    id: 66,
+    name: "Nova",
+    bio: "Astrophysics student 🔭 | Stargazer | Science communicator",
+    prompt: "Just witnessed a meteor shower. Universe is incredible.",
+    image: "🔭",
+    mood: 'neutral'
+  },
+  {
+    id: 67,
+    name: "Ash",
+    bio: "Tattoo artist 🎨 | Custom design specialist | Ink enthusiast",
+    prompt: "Finished a massive back piece today. 40 hours total!",
+    image: "🎨",
+    mood: 'neutral'
+  },
+  {
+    id: 68,
+    name: "Echo",
+    bio: "Sound engineer 🎚️ | Music producer | Studio rat",
+    prompt: "Mixed an album I'm really proud of today.",
+    image: "🎚️",
+    mood: 'guarded'
+  },
+  {
+    id: 69,
+    name: "Sage",
+    bio: "Beekeeper 🐝 | Honey maker | Pollinator advocate",
+    prompt: "First honey harvest of the season. Sweet success!",
+    image: "🐝",
+    mood: 'curious'
+  },
+  {
+    id: 70,
+    name: "Crimson",
+    bio: "Makeup artist 💄 | Special effects creator | Fantasy enthusiast",
+    prompt: "Working on a film set tomorrow. Hollywood dreams!",
+    image: "💄",
+    mood: 'busy'
   }
 ];
 
@@ -677,8 +957,8 @@ const ShootYourShot = () => {
   if (levelComplete) {
     const copy = getLevelSummaryCopy(levelComplete.percentage);
     return (
-      <div className="h-screen bg-gradient-to-br from-blue-50 to-purple-50 flex flex-col pt-safe">
-        <div className="bg-white border-b shadow-sm sticky top-0 z-10">
+      <div className="h-screen bg-gradient-to-br from-blue-50 to-purple-50 flex flex-col">
+        <div className="pt-safe pt-10 bg-white border-b shadow-sm sticky top-0 z-10">
           <div className="max-w-2xl mx-auto px-4 py-4">
             <div className="flex items-center gap-3">
             <Button variant="ghost" size="sm" onClick={() => navigate('/')} title="Home">
@@ -762,9 +1042,9 @@ const ShootYourShot = () => {
   }
 
   return (
-    <div className="h-screen bg-gradient-to-br from-blue-50 to-purple-50 flex flex-col pt-safe">
+    <div className="h-screen bg-gradient-to-br from-blue-50 to-purple-50 flex flex-col">
       {/* Header */}
-      <div className="bg-white border-b shadow-sm sticky top-0 z-10">
+      <div className="pt-safe pt-10 bg-white border-b shadow-sm sticky top-0 z-10">
         <div className="max-w-2xl mx-auto px-4 py-4">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-3">

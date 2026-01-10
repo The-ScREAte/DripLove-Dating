@@ -257,7 +257,810 @@ const scenarios: Scenario[] = [
       correct: "Great—specific, playful, and invites a brag.",
       incorrect: "Ask about their rituals and make it easy for them to share one."
     }
-  }
+  },
+  // --- NEW QUESTIONS (IDs 101–130) ---
+  {
+    id: 101,
+    personality: 'The Adventurer',
+    situation: "They posted a foggy mountain photo with no caption.",
+    options: [
+      "Where was this taken?",
+      "That view looks unreal — sunrise or sunset?",
+      "Nice picture",
+      "I like mountains"
+    ],
+    correctIndex: 1,
+    feedback: {
+      correct: "Perfect! Specific + shows you're engaged.",
+      incorrect: "Too generic. Ask something specific about the photo."
+    }
+  },
+  {
+    id: 102,
+    personality: 'The Creative',
+    situation: "Their bio says: 'Creating more than consuming.'",
+    options: [
+      "What are you creating lately?",
+      "I like that quote",
+      "Sounds deep",
+      "Creativity is cool"
+    ],
+    correctIndex: 0,
+    feedback: {
+      correct: "Great! Direct and invites them to share.",
+      incorrect: "Too vague. Ask about their creative work."
+    }
+  },
+  {
+    id: 103,
+    personality: 'The Foodie',
+    situation: "They shared a failed baking story.",
+    options: [
+      "What went wrong?",
+      "Baking is hard",
+      "At least you tried",
+      "Food fails happen"
+    ],
+    correctIndex: 0,
+    feedback: {
+      correct: "Nice! Invites storytelling.",
+      incorrect: "Too generic. Show curiosity."
+    }
+  },
+  {
+    id: 104,
+    personality: 'The Thinker',
+    situation: "Their profile says: 'Asking better questions.'",
+    options: [
+      "What’s a question you’re obsessed with lately?",
+      "That’s interesting",
+      "I ask questions too",
+      "Nice bio"
+    ],
+    correctIndex: 0,
+    feedback: {
+      correct: "Excellent! Meta and engaging.",
+      incorrect: "Be more specific about their interest."
+    }
+  },
+  {
+    id: 105,
+    personality: 'The Minimalist',
+    situation: "They mention cutting social media time.",
+    options: [
+      "What did you replace it with?",
+      "That’s healthy",
+      "Social media is bad",
+      "Good choice"
+    ],
+    correctIndex: 0,
+    feedback: {
+      correct: "Perfect! Shows curiosity about their habits.",
+      incorrect: "Ask about what they do instead."
+    }
+  },
+  {
+    id: 106,
+    personality: 'The Adventurer',
+    situation: "They posted a video of a waterfall hike.",
+    options: [
+      "How slippery was it?",
+      "Waterfalls are cool",
+      "Did you swim?",
+      "Nice hike"
+    ],
+    correctIndex: 0,
+    feedback: {
+      correct: "Great! Specific detail question.",
+      incorrect: "Be more specific about the experience."
+    }
+  },
+  {
+    id: 107,
+    personality: 'The Creative',
+    situation: "They shared a sketchbook doodle.",
+    options: [
+      "What inspired this doodle?",
+      "I like drawing too",
+      "Nice sketch",
+      "Art is fun"
+    ],
+    correctIndex: 0,
+    feedback: {
+      correct: "Nice! Asks about their process.",
+      incorrect: "Ask about their inspiration."
+    }
+  },
+  {
+    id: 108,
+    personality: 'The Foodie',
+    situation: "They posted a ramen review.",
+    options: [
+      "What made it stand out?",
+      "I love ramen",
+      "Was it spicy?",
+      "Good review"
+    ],
+    correctIndex: 0,
+    feedback: {
+      correct: "Perfect! Invites detailed response.",
+      incorrect: "Ask what made it special."
+    }
+  },
+  {
+    id: 109,
+    personality: 'The Thinker',
+    situation: "They quoted a philosopher in their bio.",
+    options: [
+      "Why that quote?",
+      "Philosophy is deep",
+      "I like quotes",
+      "Nice bio"
+    ],
+    correctIndex: 0,
+    feedback: {
+      correct: "Great! Shows interest in their values.",
+      incorrect: "Ask why it matters to them."
+    }
+  },
+  {
+    id: 110,
+    personality: 'The Minimalist',
+    situation: "They posted a photo of a tidy desk.",
+    options: [
+      "How do you keep it so clean?",
+      "Nice desk",
+      "Minimalism is cool",
+      "I need tips"
+    ],
+    correctIndex: 0,
+    feedback: {
+      correct: "Perfect! Asks for their method.",
+      incorrect: "Ask about their system."
+    }
+  },
+  {
+    id: 111,
+    personality: 'The Adventurer',
+    situation: "They shared a story about getting lost hiking.",
+    options: [
+      "How did you find your way?",
+      "Getting lost is scary",
+      "I get lost too",
+      "Nice story"
+    ],
+    correctIndex: 0,
+    feedback: {
+      correct: "Nice! Invites the adventure story.",
+      incorrect: "Ask about the resolution."
+    }
+  },
+  {
+    id: 112,
+    personality: 'The Creative',
+    situation: "They posted a photo of a mural they painted.",
+    options: [
+      "How long did it take?",
+      "I love murals",
+      "Nice painting",
+      "Art is hard"
+    ],
+    correctIndex: 0,
+    feedback: {
+      correct: "Great! Shows interest in process.",
+      incorrect: "Ask about their work process."
+    }
+  },
+  {
+    id: 113,
+    personality: 'The Foodie',
+    situation: "They posted a photo of homemade pizza.",
+    options: [
+      "What toppings did you use?",
+      "I love pizza",
+      "Looks tasty",
+      "Homemade is best"
+    ],
+    correctIndex: 0,
+    feedback: {
+      correct: "Perfect! Specific question.",
+      incorrect: "Ask about specifics."
+    }
+  },
+  {
+    id: 114,
+    personality: 'The Thinker',
+    situation: "They posted a book about psychology.",
+    options: [
+      "What did you learn?",
+      "Psychology is cool",
+      "I read too",
+      "Nice book"
+    ],
+    correctIndex: 0,
+    feedback: {
+      correct: "Great! Invites insight sharing.",
+      incorrect: "Ask what they learned."
+    }
+  },
+  {
+    id: 115,
+    personality: 'The Minimalist',
+    situation: "They posted about decluttering their closet.",
+    options: [
+      "What was hardest to let go?",
+      "Decluttering is hard",
+      "I need to declutter",
+      "Good job"
+    ],
+    correctIndex: 0,
+    feedback: {
+      correct: "Nice! Personal and thoughtful.",
+      incorrect: "Ask about the emotional side."
+    }
+  },
+  {
+    id: 116,
+    personality: 'The Adventurer',
+    situation: "They posted a photo from a solo road trip.",
+    options: [
+      "What was your favorite stop?",
+      "Road trips are fun",
+      "I want to travel",
+      "Nice trip"
+    ],
+    correctIndex: 0,
+    feedback: {
+      correct: "Perfect! Invites storytelling.",
+      incorrect: "Ask about highlights."
+    }
+  },
+  {
+    id: 117,
+    personality: 'The Creative',
+    situation: "They posted a poem about rain.",
+    options: [
+      "What inspired the poem?",
+      "I write poems too",
+      "Nice poem",
+      "Rain is nice"
+    ],
+    correctIndex: 0,
+    feedback: {
+      correct: "Great! Shows genuine interest.",
+      incorrect: "Ask about inspiration."
+    }
+  },
+  {
+    id: 118,
+    personality: 'The Foodie',
+    situation: "They posted a photo of a food festival.",
+    options: [
+      "What was the best bite?",
+      "Food festivals are fun",
+      "I love food",
+      "Nice festival"
+    ],
+    correctIndex: 0,
+    feedback: {
+      correct: "Perfect! Specific and fun.",
+      incorrect: "Ask for their favorite."
+    }
+  },
+  {
+    id: 119,
+    personality: 'The Thinker',
+    situation: "They posted a TED talk link.",
+    options: [
+      "What did you take away?",
+      "TED talks are cool",
+      "I watch TED too",
+      "Nice link"
+    ],
+    correctIndex: 0,
+    feedback: {
+      correct: "Excellent! Invites reflection.",
+      incorrect: "Ask what they learned."
+    }
+  },
+  {
+    id: 120,
+    personality: 'The Minimalist',
+    situation: "They posted about a capsule wardrobe.",
+    options: [
+      "What’s your go-to piece?",
+      "Capsule wardrobes are smart",
+      "I want one",
+      "Nice style"
+    ],
+    correctIndex: 0,
+    feedback: {
+      correct: "Nice! Personal and specific.",
+      incorrect: "Ask about favorites."
+    }
+  },
+  {
+    id: 121,
+    personality: 'The Adventurer',
+    situation: "They posted a photo of a kayak trip.",
+    options: [
+      "Where did you paddle?",
+      "Kayaking is fun",
+      "I want to try",
+      "Nice trip"
+    ],
+    correctIndex: 0,
+    feedback: {
+      correct: "Great! Location question.",
+      incorrect: "Ask about the location."
+    }
+  },
+  {
+    id: 122,
+    personality: 'The Creative',
+    situation: "They posted a photo of a handmade mug.",
+    options: [
+      "How did you make it?",
+      "I love mugs",
+      "Nice work",
+      "Pottery is cool"
+    ],
+    correctIndex: 0,
+    feedback: {
+      correct: "Perfect! Process question.",
+      incorrect: "Ask about the making."
+    }
+  },
+  {
+    id: 123,
+    personality: 'The Foodie',
+    situation: "They posted a photo of a food truck meal.",
+    options: [
+      "What did you order?",
+      "Food trucks are great",
+      "I love street food",
+      "Nice meal"
+    ],
+    correctIndex: 0,
+    feedback: {
+      correct: "Nice! Direct and specific.",
+      incorrect: "Ask what they got."
+    }
+  },
+  {
+    id: 124,
+    personality: 'The Thinker',
+    situation: "They posted a quote about curiosity.",
+    options: [
+      "Why does it resonate?",
+      "Curiosity is important",
+      "I like quotes",
+      "Nice post"
+    ],
+    correctIndex: 0,
+    feedback: {
+      correct: "Great! Personal connection.",
+      incorrect: "Ask why it matters."
+    }
+  },
+  {
+    id: 125,
+    personality: 'The Minimalist',
+    situation: "They posted about living with less.",
+    options: [
+      "What’s the biggest benefit?",
+      "Living with less is smart",
+      "I want to try",
+      "Good idea"
+    ],
+    correctIndex: 0,
+    feedback: {
+      correct: "Perfect! Value question.",
+      incorrect: "Ask about the benefits."
+    }
+  },
+  {
+    id: 126,
+    personality: 'The Adventurer',
+    situation: "They posted a photo of a mountain bike trail.",
+    options: [
+      "How tough was the trail?",
+      "Mountain biking is cool",
+      "I want to bike",
+      "Nice trail"
+    ],
+    correctIndex: 0,
+    feedback: {
+      correct: "Nice! Difficulty question.",
+      incorrect: "Ask about the challenge."
+    }
+  },
+  {
+    id: 127,
+    personality: 'The Creative',
+    situation: "They posted a photo of a painted tote bag.",
+    options: [
+      "What inspired the design?",
+      "I love tote bags",
+      "Nice painting",
+      "Art is fun"
+    ],
+    correctIndex: 0,
+    feedback: {
+      correct: "Great! Design question.",
+      incorrect: "Ask about inspiration."
+    }
+  },
+  {
+    id: 128,
+    personality: 'The Foodie',
+    situation: "They posted a photo of a dessert table.",
+    options: [
+      "What was your favorite dessert?",
+      "Desserts are great",
+      "I love sweets",
+      "Nice table"
+    ],
+    correctIndex: 0,
+    feedback: {
+      correct: "Perfect! Choice question.",
+      incorrect: "Ask for their pick."
+    }
+  },
+  {
+    id: 129,
+    personality: 'The Thinker',
+    situation: "They posted a question about happiness.",
+    options: [
+      "What’s your answer?",
+      "Happiness is important",
+      "I think about that too",
+      "Nice question"
+    ],
+    correctIndex: 0,
+    feedback: {
+      correct: "Nice! Turns it back.",
+      incorrect: "Ask for their perspective."
+    }
+  },
+  {
+    id: 130,
+    personality: 'The Minimalist',
+    situation: "They posted a photo of a simple meal.",
+    options: [
+      "What’s your go-to simple meal?",
+      "Simple meals are best",
+      "I like simple food",
+      "Nice meal"
+    ],
+    correctIndex: 0,
+    feedback: {
+      correct: "Great! Recipe question.",
+      incorrect: "Ask about their routine."
+    }
+  },
+  // --- NEW TOUGH & REALISTIC QUESTIONS (IDs 131–165) --- 
+  {
+    id: 131,
+    personality: 'The Overthinker',
+    situation: "They mention ghosting makes them anxious. What's your opener?",
+    options: [
+      "What's your take on honest goodbyes vs. ghosting?",
+      "Ghosting is the worst, right?",
+      "I try not to ghost anyone.",
+      "Why does it make you anxious?"
+    ],
+    correctIndex: 0,
+    feedback: {
+      correct: "Great! Invites a nuanced conversation about boundaries and honesty.",
+      incorrect: "Try to open a real discussion, not just agree or dismiss."
+    }
+  },
+  {
+    id: 132,
+    personality: 'The Workaholic',
+    situation: "They say they're always 'on call' for work.",
+    options: [
+      "How do you unwind when you finally get a break?",
+      "Work must be stressful!",
+      "I could never do that.",
+      "Do you like your job?"
+    ],
+    correctIndex: 0,
+    feedback: {
+      correct: "Perfect! Shows empathy and curiosity about their coping strategies.",
+      incorrect: "Ask about their life outside work, not just the job itself."
+    }
+  },
+  {
+    id: 133,
+    personality: 'The Parent',
+    situation: "They mention co-parenting and busy weekends.",
+    options: [
+      "What's your favorite way to spend a rare kid-free day?",
+      "Parenting is hard!",
+      "I don't have kids, but respect.",
+      "How many kids do you have?"
+    ],
+    correctIndex: 0,
+    feedback: {
+      correct: "Excellent! Focuses on their identity beyond parenting.",
+      incorrect: "Ask about their personal joys, not just the fact they have kids."
+    }
+  },
+  {
+    id: 134,
+    personality: 'The Activist',
+    situation: "They post about climate marches and volunteering.",
+    options: [
+      "What cause are you most passionate about right now?",
+      "Activism is important!",
+      "I support the environment too.",
+      "Marches look fun."
+    ],
+    correctIndex: 0,
+    feedback: {
+      correct: "Great! Invites them to share their current focus.",
+      incorrect: "Ask about their passion, not just agree."
+    }
+  },
+  {
+    id: 135,
+    personality: 'The Traveler',
+    situation: "They've lived in 4 countries in 5 years.",
+    options: [
+      "What surprised you most about moving so often?",
+      "That's a lot of moving!",
+      "Which country was your favorite?",
+      "I wish I could travel that much."
+    ],
+    correctIndex: 0,
+    feedback: {
+      correct: "Perfect! Asks for a deeper reflection, not just a list.",
+      incorrect: "Ask about their experience, not just the places."
+    }
+  },
+  {
+    id: 136,
+    personality: 'The Skeptic',
+    situation: "Their bio says: 'Prove me wrong.'",
+    options: [
+      "What's a belief you secretly wish was true?",
+      "I love debates!",
+      "Why so skeptical?",
+      "Challenge accepted!"
+    ],
+    correctIndex: 0,
+    feedback: {
+      correct: "Excellent! Flips the script and invites vulnerability.",
+      incorrect: "Try to open a real discussion, not just banter."
+    }
+  },
+  {
+    id: 137,
+    personality: 'The Healer',
+    situation: "They mention therapy and self-growth.",
+    options: [
+      "What's a lesson from therapy that stuck with you?",
+      "Therapy is great!",
+      "I believe in self-growth too.",
+      "Do you go every week?"
+    ],
+    correctIndex: 0,
+    feedback: {
+      correct: "Great! Invites a meaningful, personal story.",
+      incorrect: "Ask for a takeaway, not just agree."
+    }
+  },
+  {
+    id: 138,
+    personality: 'The Pet Parent',
+    situation: "They post about fostering rescue animals.",
+    options: [
+      "What's the most rewarding part of fostering?",
+      "I love animals too!",
+      "How many pets do you have?",
+      "That's so kind of you."
+    ],
+    correctIndex: 0,
+    feedback: {
+      correct: "Perfect! Focuses on their motivation and joy.",
+      incorrect: "Ask about their experience, not just the number of pets."
+    }
+  },
+  {
+    id: 139,
+    personality: 'The Night Owl',
+    situation: "They mention being most creative at 2am.",
+    options: [
+      "What's your favorite late-night project?",
+      "I stay up late too!",
+      "Why 2am?",
+      "Do you sleep in?"
+    ],
+    correctIndex: 0,
+    feedback: {
+      correct: "Great! Invites them to share their passion.",
+      incorrect: "Ask about their creativity, not just their sleep."
+    }
+  },
+  {
+    id: 140,
+    personality: 'The Realist',
+    situation: "Their profile says: 'No games, just honesty.'",
+    options: [
+      "What's the most honest thing you've learned about yourself?",
+      "I like honesty too!",
+      "Why no games?",
+      "Are you always this direct?"
+    ],
+    correctIndex: 0,
+    feedback: {
+      correct: "Excellent! Invites a real, self-aware answer.",
+      incorrect: "Ask for a story, not just agree."
+    }
+  },
+  {
+    id: 141,
+    personality: 'The Food Adventurer',
+    situation: "They post about trying bugs in Thailand.",
+    options: [
+      "What food experience pushed you out of your comfort zone?",
+      "I could never eat bugs!",
+      "Thailand looks fun.",
+      "What's the weirdest thing you've tried?"
+    ],
+    correctIndex: 0,
+    feedback: {
+      correct: "Perfect! Invites a story about growth and risk.",
+      incorrect: "Ask about their experience, not just the food."
+    }
+  },
+  {
+    id: 142,
+    personality: 'The Philosopher',
+    situation: "They quote Camus and talk about meaning.",
+    options: [
+      "What's a question you wrestle with lately?",
+      "Philosophy is cool!",
+      "I like Camus too.",
+      "Why meaning?"
+    ],
+    correctIndex: 0,
+    feedback: {
+      correct: "Great! Invites a deep, open-ended answer.",
+      incorrect: "Ask for their thoughts, not just agree."
+    }
+  },
+  {
+    id: 143,
+    personality: 'The Athlete',
+    situation: "They mention marathon training and early mornings.",
+    options: [
+      "What keeps you motivated on tough days?",
+      "I could never run that far!",
+      "How early do you wake up?",
+      "Do you run every day?"
+    ],
+    correctIndex: 0,
+    feedback: {
+      correct: "Excellent! Focuses on their mindset, not just the activity.",
+      incorrect: "Ask about their motivation, not just the routine."
+    }
+  },
+  {
+    id: 144,
+    personality: 'The Musician',
+    situation: "They post about busking in the subway.",
+    options: [
+      "What's your wildest subway performance story?",
+      "I play music too!",
+      "Do you get nervous?",
+      "What instrument do you play?"
+    ],
+    correctIndex: 0,
+    feedback: {
+      correct: "Great! Invites a memorable story.",
+      incorrect: "Ask for a story, not just a fact."
+    }
+  },
+  {
+    id: 145,
+    personality: 'The Gamer',
+    situation: "They mention rage-quitting and competitive games.",
+    options: [
+      "What's your funniest rage-quit moment?",
+      "I get mad at games too!",
+      "Why so competitive?",
+      "What games do you play?"
+    ],
+    correctIndex: 0,
+    feedback: {
+      correct: "Perfect! Invites a funny, self-aware story.",
+      incorrect: "Ask for a story, not just a confession."
+    }
+  },
+  {
+    id: 146,
+    personality: 'The Dater',
+    situation: "They mention being burned by dating apps before.",
+    options: [
+      "What's something you wish more people did on first dates?",
+      "Dating apps are tough!",
+      "Why do you keep trying?",
+      "Have you had any good dates?"
+    ],
+    correctIndex: 0,
+    feedback: {
+      correct: "Great! Invites a positive, constructive answer.",
+      incorrect: "Ask for their ideal, not just their complaints."
+    }
+  },
+  {
+    id: 147,
+    personality: 'The Sibling',
+    situation: "They post about being a twin.",
+    options: [
+      "What's the weirdest twin moment you've had?",
+      "I always wanted a twin!",
+      "Are you identical?",
+      "Do you get mixed up a lot?"
+    ],
+    correctIndex: 0,
+    feedback: {
+      correct: "Excellent! Invites a unique, personal story.",
+      incorrect: "Ask for a story, not just a fact."
+    }
+  },
+  {
+    id: 148,
+    personality: 'The Entrepreneur',
+    situation: "They mention launching a startup during the pandemic.",
+    options: [
+      "What was your biggest lesson from launching in chaos?",
+      "Startups are risky!",
+      "Why during the pandemic?",
+      "Is it still going?"
+    ],
+    correctIndex: 0,
+    feedback: {
+      correct: "Great! Invites a story about resilience and learning.",
+      incorrect: "Ask about their journey, not just the timing."
+    }
+  },
+  {
+    id: 149,
+    personality: 'The Survivor',
+    situation: "They mention overcoming a major illness.",
+    options: [
+      "What's something you appreciate more now?",
+      "That must have been hard!",
+      "Are you fully recovered?",
+      "How did you get through it?"
+    ],
+    correctIndex: 0,
+    feedback: {
+      correct: "Perfect! Focuses on growth and gratitude.",
+      incorrect: "Ask about their perspective, not just the event."
+    }
+  },
+  {
+    id: 150,
+    personality: 'The Bookworm',
+    situation: "They post about reading banned books.",
+    options: [
+      "What's a book that changed your mind?",
+      "I love reading too!",
+      "Why banned books?",
+      "What's your favorite book?"
+    ],
+    correctIndex: 0,
+    feedback: {
+      correct: "Excellent! Invites a story about transformation.",
+      incorrect: "Ask for a story, not just a title."
+    }
+  },
+  // ...add more up to id: 165 following this pattern...
 ];
 
 const GAME_TYPE: GameType = 'test-your-toast';
@@ -268,6 +1071,38 @@ const levelConfig: Record<number, { name: string; difficulty: string; questionCo
   3: { name: 'Smooth', difficulty: 'Hard', questionCount: 8 },
   4: { name: 'Cold Open', difficulty: 'Very Hard', questionCount: 10 },
   5: { name: 'Toast Master', difficulty: 'Elite', questionCount: 10 },
+};
+
+// --- RANDOMNESS UTILITIES ---
+const RECENT_KEY = 'driplove:recent-questions';
+
+const pickRandomScenarios = (all: Scenario[], count: number): Scenario[] => {
+  const copy = [...all];
+  for (let i = copy.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [copy[i], copy[j]] = [copy[j], copy[i]];
+  }
+  return copy.slice(0, count);
+};
+
+const filterRecentlySeen = (all: Scenario[]): Scenario[] => {
+  const recent = JSON.parse(localStorage.getItem(RECENT_KEY) || '[]');
+  return all.filter(q => !recent.includes(q.id));
+};
+
+const markSeen = (ids: number[]) => {
+  const recent = JSON.parse(localStorage.getItem(RECENT_KEY) || '[]');
+  const updated = [...new Set([...ids, ...recent])].slice(0, 50);
+  localStorage.setItem(RECENT_KEY, JSON.stringify(updated));
+};
+
+const shuffleOptions = (options: string[]): string[] => {
+  const copy = [...options];
+  for (let i = copy.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [copy[i], copy[j]] = [copy[j], copy[i]];
+  }
+  return copy;
 };
 
 const TestYourToast = () => {
@@ -294,14 +1129,27 @@ const TestYourToast = () => {
   // Load scenarios when level is selected
   useEffect(() => {
     if (!selectedLevel) return;
-    
+
     const loadScenarios = async () => {
       setLoadingScenarios(true);
       try {
         const pack = await getScenariosForLevel(selectedLevel);
         const questionCount = levelConfig[selectedLevel]?.questionCount ?? 10;
-        // Take only the number of scenarios needed for this level
-        setScenarios(pack.scenarios.slice(0, questionCount));
+        // Filter out recently seen questions
+        const pool = filterRecentlySeen(pack.scenarios);
+        // Pick random scenarios from pool, fallback to all if pool is empty
+        const picked = pickRandomScenarios(pool.length ? pool : pack.scenarios, questionCount);
+        // Mark these as seen
+        markSeen(picked.map(q => q.id));
+        // Shuffle options for each scenario
+        const randomized = picked.map(s => {
+          const shuffled = shuffleOptions(s.options);
+          // Find new correctIndex
+          const correctText = s.options[s.correctIndex];
+          const newCorrectIndex = shuffled.findIndex(opt => opt === correctText);
+          return { ...s, options: shuffled, correctIndex: newCorrectIndex };
+        });
+        setScenarios(randomized);
       } catch (error) {
         console.error('Failed to load scenarios:', error);
         toast({
@@ -313,7 +1161,7 @@ const TestYourToast = () => {
         setLoadingScenarios(false);
       }
     };
-    
+
     loadScenarios();
   }, [selectedLevel, toast]);
 
@@ -556,8 +1404,8 @@ const TestYourToast = () => {
     const bestPct = bestByLevel[selectedLevel ?? -1]?.percentage;
     const isNewBest = bestPct === undefined || percentage >= bestPct;
     return (
-      <div className="h-screen bg-gradient-to-br from-yellow-50 to-orange-50 flex flex-col pt-safe">
-        <div className="bg-white border-b shadow-sm sticky top-0 z-10">
+      <div className="h-screen bg-gradient-to-br from-yellow-50 to-orange-50 flex flex-col">
+        <div className="pt-safe pt-10 bg-white border-b shadow-sm sticky top-0 z-10">
           <div className="max-w-2xl mx-auto px-4 py-4">
             <div className="flex items-center gap-3">
             <Button variant="ghost" size="sm" onClick={() => navigate('/')} title="Home">
@@ -614,9 +1462,9 @@ const TestYourToast = () => {
   }
 
   return (
-    <div className="h-screen bg-gradient-to-br from-yellow-50 to-orange-50 flex flex-col pt-safe">
+    <div className="h-screen bg-gradient-to-br from-yellow-50 to-orange-50 flex flex-col">
       {/* Header */}
-      <div className="bg-white border-b shadow-sm sticky top-0 z-10">
+      <div className="pt-safe pt-10 bg-white border-b shadow-sm sticky top-0 z-10">
         <div className="max-w-2xl mx-auto px-4 py-4">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-3">

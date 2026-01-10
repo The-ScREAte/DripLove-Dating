@@ -435,6 +435,286 @@ const scenarios: Scenario[] = [
     content: 'Photos show them with family, at events, and living a balanced life',
     isRedFlag: false,
     explanation: "💚 Family connections and balance are positive signs of someone emotionally healthy!"
+  },
+  {
+    id: 61,
+    type: 'text',
+    content: '"Sorry, just saw this!" after 3 days... for the 5th time',
+    isRedFlag: true,
+    explanation: "🚩 Pattern of slow responses shows lack of interest or poor communication habits."
+  },
+  {
+    id: 62,
+    type: 'behavior',
+    content: 'Asks about your boundaries and respects them when you set them',
+    isRedFlag: false,
+    explanation: "💚 Respecting boundaries is fundamental to healthy relationships!"
+  },
+  {
+    id: 63,
+    type: 'profile',
+    content: 'Bio says: \'Not here for games\' but profile is full of shirtless mirror selfies',
+    isRedFlag: true,
+    explanation: "🚩 Actions don\'t match words. Mixed signals are a red flag."
+  },
+  {
+    id: 64,
+    type: 'text',
+    content: '"I\'m really bad at texting, sorry!" but their Instagram story is updated hourly',
+    isRedFlag: true,
+    explanation: "🚩 They have time for social media but not you? That\'s selective availability."
+  },
+  {
+    id: 65,
+    type: 'behavior',
+    content: 'Checks in during the day with a simple \"Hope you\'re having a good day!\"',
+    isRedFlag: false,
+    explanation: "💚 Thoughtful gestures show they\'re thinking about you. Sweet and genuine!"
+  },
+  {
+    id: 66,
+    type: 'profile',
+    content: 'Every photo has their ex cropped out (you can still see their arm/hand)',
+    isRedFlag: true,
+    explanation: "🚩 Not moving on from their ex. Take new photos!"
+  },
+  {
+    id: 67,
+    type: 'text',
+    content: '"What are you looking for?" as their opening message',
+    isRedFlag: false,
+    explanation: "💚 Direct communication about intentions is mature and saves time!"
+  },
+  {
+    id: 68,
+    type: 'behavior',
+    content: 'Introduces you to their friends after a few dates',
+    isRedFlag: false,
+    explanation: "💚 Including you in their social circle shows they\'re serious and proud to know you!"
+  },
+  {
+    id: 69,
+    type: 'profile',
+    content: 'Bio: \'Brutally honest\' and lists everything they hate',
+    isRedFlag: true,
+    explanation: "🚩 \'Brutally honest\' usually means \'I\'m rude and call it honesty.\' Negativity is a red flag."
+  },
+  {
+    id: 70,
+    type: 'text',
+    content: '"I\'m not really a phone person, prefer meeting in person!"',
+    isRedFlag: false,
+    explanation: "💚 Preferring real connection over endless texting is actually healthy!"
+  },
+  {
+    id: 71,
+    type: 'behavior',
+    content: 'Cancels plans last minute without rescheduling',
+    isRedFlag: true,
+    explanation: "🚩 Not rescheduling shows they don\'t value your time or aren\'t that interested."
+  },
+  {
+    id: 72,
+    type: 'profile',
+    content: 'Has a mix of solo photos, group photos, and hobby photos',
+    isRedFlag: false,
+    explanation: "💚 Variety shows a well-rounded life and gives you conversation starters!"
+  },
+  {
+    id: 73,
+    type: 'text',
+    content: '"You\'re not like other girls/guys"',
+    isRedFlag: true,
+    explanation: "🚩 This line puts others down to compliment you. Not a good look."
+  },
+  {
+    id: 74,
+    type: 'behavior',
+    content: 'Asks follow-up questions about things you mentioned before',
+    isRedFlag: false,
+    explanation: "💚 Remembering details and following up shows they actually listen and care!"
+  },
+  {
+    id: 75,
+    type: 'profile',
+    content: 'Mentions being \'drama-free\' multiple times in bio',
+    isRedFlag: true,
+    explanation: "🚩 People who claim to be drama-free are often the source of drama."
+  },
+  {
+    id: 76,
+    type: 'text',
+    content: '"I had a great time! Want to do this again?" after your first date',
+    isRedFlag: false,
+    explanation: "💚 Clear communication about interest is always a green flag!"
+  },
+  {
+    id: 77,
+    type: 'behavior',
+    content: 'Only wants to hang out late at night at their place',
+    isRedFlag: true,
+    explanation: "🚩 No daytime dates? They\'re not interested in actually getting to know you."
+  },
+  {
+    id: 78,
+    type: 'profile',
+    content: 'Profile shows genuine smiles and natural moments',
+    isRedFlag: false,
+    explanation: "💚 Authentic photos show confidence and comfort with themselves!"
+  },
+  {
+    id: 79,
+    type: 'text',
+    content: '"My ex was crazy" without any self-reflection',
+    isRedFlag: true,
+    explanation: "🚩 If all their exes were \'crazy,\' they\'re probably the common denominator."
+  },
+  {
+    id: 80,
+    type: 'behavior',
+    content: 'Suggests splitting the check or taking turns paying',
+    isRedFlag: false,
+    explanation: "💚 Fair dating dynamics show mutual respect and modern values!"
+  },
+  {
+    id: 81,
+    type: 'profile',
+    content: 'Lists their actual interests instead of \'adventure\' and \'travel\'',
+    isRedFlag: false,
+    explanation: "💚 Specific interests give you real conversation topics!"
+  },
+  {
+    id: 82,
+    type: 'text',
+    content: '"What\'s your body count?" early in conversation',
+    isRedFlag: true,
+    explanation: "🚩 Inappropriate and invasive question this early. Respect boundaries!"
+  },
+  {
+    id: 83,
+    type: 'behavior',
+    content: 'Offers to pick you up but also says \"or I can meet you there if you\'re more comfortable\"',
+    isRedFlag: false,
+    explanation: "💚 Considerate of your comfort and safety. Excellent awareness!"
+  },
+  {
+    id: 84,
+    type: 'profile',
+    content: 'Height requirement in bio: \'Must be over 6ft\' or \'Under 120lbs only\'',
+    isRedFlag: true,
+    explanation: "🚩 Superficial requirements show they\'re focused on the wrong things."
+  },
+  {
+    id: 85,
+    type: 'text',
+    content: '"I\'m really busy with work but I\'ll make time for the right person"',
+    isRedFlag: false,
+    explanation: "💚 Honest about their schedule while showing they\'ll prioritize what matters!"
+  },
+  {
+    id: 86,
+    type: 'behavior',
+    content: 'Love-bombs you with constant compliments and \'I miss you\' after one date',
+    isRedFlag: true,
+    explanation: "🚩 Love-bombing is a manipulation tactic. Healthy feelings develop gradually."
+  },
+  {
+    id: 87,
+    type: 'profile',
+    content: 'Photos include activities, travels, and normal everyday moments',
+    isRedFlag: false,
+    explanation: "💚 Shows a full, authentic life. This is what you want to see!"
+  },
+  {
+    id: 88,
+    type: 'text',
+    content: '"I deleted the app! Here\'s my number" after matching',
+    isRedFlag: true,
+    explanation: "🚩 Too fast. This pressures you to move off-app before you\'re comfortable."
+  },
+  {
+    id: 89,
+    type: 'behavior',
+    content: 'Apologizes sincerely when they mess up and changes their behavior',
+    isRedFlag: false,
+    explanation: "💚 Real accountability and change? That\'s relationship gold!"
+  },
+  {
+    id: 90,
+    type: 'profile',
+    content: 'Bio says \'Fluent in sarcasm\' and nothing else',
+    isRedFlag: true,
+    explanation: "🚩 Sarcasm as a personality trait? Low effort and tells you nothing about them."
+  },
+  {
+    id: 91,
+    type: 'text',
+    content: '"I\'m not looking for anything serious" when that\'s what your profile says you want',
+    isRedFlag: false,
+    explanation: "💚 Honest communication about mismatched intentions saves time for both of you!"
+  },
+  {
+    id: 92,
+    type: 'behavior',
+    content: 'Talks about future plans that include you after 2-3 dates',
+    isRedFlag: true,
+    explanation: "🚩 Moving too fast. Healthy relationships take time to develop."
+  },
+  {
+    id: 93,
+    type: 'profile',
+    content: 'Mentions co-parenting and has photos with their kids (faces hidden)',
+    isRedFlag: false,
+    explanation: "💚 Transparent about parenting while protecting kids\' privacy. Responsible!"
+  },
+  {
+    id: 94,
+    type: 'text',
+    content: '"Send me a pic" as their second message',
+    isRedFlag: true,
+    explanation: "🚩 Focused on looks, not connection. You\'re more than a photo!"
+  },
+  {
+    id: 95,
+    type: 'behavior',
+    content: 'Has healthy friendships with people of all genders',
+    isRedFlag: false,
+    explanation: "💚 Secure people have diverse friendships. Shows emotional maturity!"
+  },
+  {
+    id: 96,
+    type: 'profile',
+    content: 'Every photo is a professional photoshoot with perfect lighting',
+    isRedFlag: true,
+    explanation: "🚩 Overly curated. You want to see the real person, not a model portfolio."
+  },
+  {
+    id: 97,
+    type: 'text',
+    content: '"I\'m better in person than over text! Want to grab coffee?"',
+    isRedFlag: false,
+    explanation: "💚 Self-aware and suggesting a real date. Perfect!"
+  },
+  {
+    id: 98,
+    type: 'behavior',
+    content: 'Shares their location with a friend when meeting you the first time',
+    isRedFlag: false,
+    explanation: "💚 Safety-conscious and smart. This is responsible dating!"
+  },
+  {
+    id: 99,
+    type: 'profile',
+    content: 'Only photos with alcohol/partying, mentions clubbing in every caption',
+    isRedFlag: true,
+    explanation: "🚩 If that\'s their entire identity, you might have incompatible lifestyles."
+  },
+  {
+    id: 100,
+    type: 'text',
+    content: '"I\'m going through a lot right now but you seem great!"',
+    isRedFlag: true,
+    explanation: "🚩 Not ready to date. You deserve someone emotionally available!"
   }
 ];
 
@@ -635,8 +915,8 @@ const RedFlagGreenFlag = () => {
   if (gameComplete) {
     const rating = getScoreRating();
     return (
-      <div className="h-screen bg-gradient-to-br from-red-50 via-pink-50 to-green-50 flex flex-col pt-safe">
-        <div className="bg-white border-b shadow-sm sticky top-0 z-10">
+      <div className="h-screen bg-gradient-to-br from-red-50 via-pink-50 to-green-50 flex flex-col">
+        <div className="pt-safe pt-10 bg-white border-b shadow-sm sticky top-0 z-10">
           <div className="max-w-2xl mx-auto px-4 py-4">
             <div className="flex items-center gap-3">
             <Button variant="ghost" size="sm" onClick={() => navigate('/')} title="Home">
@@ -698,9 +978,9 @@ const RedFlagGreenFlag = () => {
   const isCorrect = selectedAnswer === currentScenario.isRedFlag;
 
   return (
-    <div className="h-screen bg-gradient-to-br from-red-50 via-pink-50 to-green-50 flex flex-col pt-safe">
+    <div className="h-screen bg-gradient-to-br from-red-50 via-pink-50 to-green-50 flex flex-col">
       {/* Header */}
-      <div className="bg-white border-b shadow-sm sticky top-0 z-10">
+      <div className="pt-safe pt-10 bg-white border-b shadow-sm sticky top-0 z-10">
         <div className="max-w-2xl mx-auto px-4 py-4">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-3">
