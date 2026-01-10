@@ -579,6 +579,10 @@ const InfluencerManagement = () => {
                     <Button size="sm" variant="outline" className="text-xs h-7" onClick={() => handleStatusChange(promo, 'active')}>
                       <CheckCircle className="w-3 h-3" />
                     </Button>
+                  ) : promo.status === 'blocked' ? (
+                    <Button size="sm" variant="outline" className="text-xs h-7 text-green-600" onClick={() => handleStatusChange(promo, 'active')}>
+                      <CheckCircle className="w-3 h-3" />
+                    </Button>
                   ) : null}
                   <Button size="sm" variant="outline" className="text-xs h-7 text-orange-600" onClick={() => handleStatusChange(promo, 'blocked')}>
                     <Ban className="w-3 h-3" />

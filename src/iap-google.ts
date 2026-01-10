@@ -481,7 +481,7 @@ export function restoreGooglePurchases(): Promise<{ restored: boolean; message: 
           body: {
             receiptData,
             productId,
-            userId: user.id,
+            user_id: user.id, // ✅ must match edge function body parsing
             purchaseToken: token,
             transactionId,
           },
