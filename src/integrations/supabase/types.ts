@@ -1905,6 +1905,10 @@ export type Database = {
           country_name: string
         }[]
       }
+      get_influencer_stats_usd: {
+        Args: { p_promo_code_id: string }
+        Returns: Json
+      }
       get_my_profile_broadcast_messages: {
         Args: { p_limit?: number; p_offset?: number }
         Returns: {

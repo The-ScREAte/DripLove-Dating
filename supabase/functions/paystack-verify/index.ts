@@ -223,7 +223,7 @@ serve(async (req) => {
     }
 
     // Record the payment
-    const { error: paymentError } = await supabase
+    const { data: paymentRecord, error: paymentError } = await supabase
       .from('subscription_payments')
       .insert({
         user_id: user.id,
@@ -232,10 +232,31 @@ serve(async (req) => {
         payment_method: 'paystack',
         transaction_id: reference,
       })
+      .select('id')
+      .single()
 
     if (paymentError) {
       console.error('[PAYSTACK-VERIFY] Error recording payment:', paymentError)
       // Don't fail, subscription is already activated
+    }
+
+    // Process referral commission if user signed up with a promo code
+    if (paymentRecord?.id) {
+      try {
+        const { data: commissionResult, error: commissionError } = await supabase.rpc('process_referral_commission', {
+          p_user_id: user.id,
+          p_payment_amount: (paystackData?.amount || 0) / 100,
+          p_payment_id: paymentRecord.id
+        })
+        
+        if (commissionError) {
+          console.error('[PAYSTACK-VERIFY] Error processing commission:', commissionError)
+        } else {
+          console.log('[PAYSTACK-VERIFY] Commission result:', commissionResult)
+        }
+      } catch (commErr) {
+        console.error('[PAYSTACK-VERIFY] Commission processing failed:', commErr)
+      }
     }
 
     console.log(`[PAYSTACK-VERIFY] Successfully verified and activated premium for user ${user.id}`)

@@ -33,6 +33,7 @@ interface InfluencerSession {
   total_signups: number;
   total_subscribers: number;
   total_commission: number;
+  total_commission_usd: number;
   has_pending_payout: boolean;
 }
 
@@ -87,7 +88,8 @@ const InfluencerPortal = () => {
           status: result.status,
           total_signups: result.total_signups,
           total_subscribers: result.total_subscribers,
-          total_commission: result.total_commission,
+          total_commission: result.total_commission || 0,
+          total_commission_usd: result.total_commission_usd || 0,
           has_pending_payout: result.has_pending_payout
         };
         
@@ -139,7 +141,8 @@ const InfluencerPortal = () => {
           status: result.status,
           total_signups: result.total_signups,
           total_subscribers: result.total_subscribers,
-          total_commission: result.total_commission,
+          total_commission: result.total_commission || 0,
+          total_commission_usd: result.total_commission_usd || 0,
           has_pending_payout: result.has_pending_payout
         };
         
@@ -368,7 +371,7 @@ const InfluencerPortal = () => {
         </div>
 
         {/* Earnings */}
-        <Card className="border-green-200">
+        <Card className="border-green-200 bg-gradient-to-br from-green-50 to-emerald-50">
           <CardHeader className="pb-2">
             <CardTitle className="text-sm flex items-center gap-2">
               <DollarSign className="w-4 h-4 text-green-500" />
@@ -376,12 +379,22 @@ const InfluencerPortal = () => {
             </CardTitle>
           </CardHeader>
           <CardContent>
-            <p className="text-3xl font-bold text-green-600">
-              GHS {session.total_commission.toFixed(2)}
-            </p>
+            <div className="flex items-baseline gap-3">
+              <p className="text-3xl font-bold text-green-600">
+                ${session.total_commission_usd.toFixed(2)}
+              </p>
+              <p className="text-sm text-gray-500">
+                (GHS {session.total_commission.toFixed(2)})
+              </p>
+            </div>
             <p className="text-xs text-gray-500 mt-1">
               Earned from {session.total_subscribers} premium subscribers
             </p>
+            <div className="mt-3 p-2 bg-white/60 rounded-lg border border-green-200">
+              <p className="text-xs text-green-700">
+                💰 You earn <span className="font-bold">{session.percentage_cut}%</span> of each payment for up to <span className="font-bold">{session.commission_duration}</span> months per user
+              </p>
+            </div>
           </CardContent>
         </Card>
 
@@ -422,7 +435,7 @@ const InfluencerPortal = () => {
                   </Button>
                 </div>
                 <p className="text-xs text-gray-500">
-                  Available balance: GHS {session.total_commission.toFixed(2)}
+                  Available balance: ${session.total_commission_usd.toFixed(2)} (GHS {session.total_commission.toFixed(2)})
                 </p>
               </>
             ) : (

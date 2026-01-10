@@ -376,9 +376,10 @@ serve(async (req) => {
       }
 
       // Record payment (best-effort)
+      let paymentRecordId: string | null = null
       try {
         const reference = eventData?.reference || subscriptionCode || ''
-        await supabase
+        const { data: paymentRecord, error: paymentError } = await supabase
           .from('subscription_payments')
           .insert({
             user_id: userId,
@@ -387,8 +388,33 @@ serve(async (req) => {
             payment_method: 'paystack',
             transaction_id: reference,
           })
+          .select('id')
+          .single()
+        
+        if (!paymentError && paymentRecord) {
+          paymentRecordId = paymentRecord.id
+        }
       } catch (e) {
         console.error('[PAYSTACK-WEBHOOK] Error recording payment:', e)
+      }
+
+      // Process referral commission if payment was recorded
+      if (paymentRecordId) {
+        try {
+          const { data: commissionResult, error: commissionError } = await supabase.rpc('process_referral_commission', {
+            p_user_id: userId,
+            p_payment_amount: Number(amount) / 100,
+            p_payment_id: paymentRecordId
+          })
+          
+          if (commissionError) {
+            console.error('[PAYSTACK-WEBHOOK] Error processing commission:', commissionError)
+          } else {
+            console.log('[PAYSTACK-WEBHOOK] Commission result:', commissionResult)
+          }
+        } catch (commErr) {
+          console.error('[PAYSTACK-WEBHOOK] Commission processing failed:', commErr)
+        }
       }
 
       return json(200, { message: 'Success processed' })
