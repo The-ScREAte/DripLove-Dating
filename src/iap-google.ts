@@ -159,9 +159,26 @@ export function initGoogleIAP() {
 
             try {
               const { supabase } = await import('@/integrations/supabase/client');
+              
+              // Get user - but also try to use stored user_id as fallback
               const { data: { user } } = await supabase.auth.getUser();
-
-              if (!user) {
+              
+              // Try to get stored user_id from localStorage (set before purchase)
+              let userId = user?.id;
+              if (!userId) {
+                try {
+                  const storedUserId = localStorage.getItem('driplove_iap_user_id');
+                  if (storedUserId) {
+                    userId = storedUserId;
+                    noopLog('[Google IAP] Using stored user_id:', userId);
+                  }
+                } catch (e) {
+                  // localStorage not available
+                }
+              }
+              
+              if (!userId) {
+                console.error('[Google IAP] No user identification available');
                 alert('Please log in to complete your purchase.');
                 return;
               }
@@ -177,12 +194,14 @@ export function initGoogleIAP() {
                 return;
               }
 
+              // CRITICAL: Always include user_id in body for session-independent activation
               const { data: validation, error: validationError } = await supabase.functions.invoke('google-iap-validator', {
                 body: {
                   receiptData,
                   productId,
                   purchaseToken,
                   transactionId,
+                  user_id: userId, // Fallback for session-expired scenarios
                 },
               });
 
@@ -191,6 +210,9 @@ export function initGoogleIAP() {
                 alert('Subscription could not be verified. Please try again.');
                 return;
               }
+
+              // Clear stored user_id on success
+              try { localStorage.removeItem('driplove_iap_user_id'); } catch (e) {}
 
               window.location.href = '/payment-success?status=successful&payment_type=iap';
             } catch (error) {
@@ -327,6 +349,18 @@ export const buyGoogleMonthly = async () => {
   if (!store) {
     console.error('[Google IAP] Store not available');
     throw new Error('Store not initialized');
+  }
+
+  // Store current user_id BEFORE purchase for session-independent activation
+  try {
+    const { supabase } = await import('@/integrations/supabase/client');
+    const { data: { user } } = await supabase.auth.getUser();
+    if (user?.id) {
+      localStorage.setItem('driplove_iap_user_id', user.id);
+      noopLog('[Google IAP] Stored user_id for purchase:', user.id);
+    }
+  } catch (e) {
+    console.warn('[Google IAP] Could not store user_id:', e);
   }
 
   window.googleIapPurchaseInitiated = true;

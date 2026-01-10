@@ -1,6 +1,7 @@
 // Supabase Edge Function: iap-receipt-validator
 // Handles Apple IAP receipt validation (sandbox + production)
-// by Henry Dean Bondah, updated with smart environment handling
+// BULLETPROOF: Works with or without user session - uses user_id from request body as fallback
+// by Henry Dean Bondah, updated for session-independent activation
 
 import { serve } from 'https://deno.land/std@0.177.0/http/server.ts'
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.45.0'
@@ -77,29 +78,56 @@ serve(async (req) => {
 
     const supabaseClient = createClient(SUPABASE_URL ?? '', SUPABASE_SERVICE_ROLE_KEY ?? '')
 
-    // 1️⃣ Auth check
-    const authHeader = req.headers.get('Authorization')
-    if (!authHeader) return json(401, { error: 'Missing authorization header' })
-
-    const token = authHeader.replace('Bearer ', '')
-    const { data: userData, error: userError } = await supabaseClient.auth.getUser(token)
-    if (userError || !userData.user) return json(401, { error: 'Invalid user token' })
-
-    // 2️⃣ Parse request body
-    const { receiptData, productId } = await req.json()
+    // 1️⃣ Parse request body FIRST to get user_id fallback
+    const requestBody = await req.json()
+    const { receiptData, productId, user_id: bodyUserId } = requestBody
+    
     if (!receiptData) return json(400, { error: 'Receipt data required' })
 
-    console.log('🧾 Validating receipt for product:', productId)
+    // 2️⃣ Try to get user from auth header, but DON'T FAIL if missing - use bodyUserId as fallback
+    let userId: string | null = null
+    const authHeader = req.headers.get('Authorization')
+    
+    if (authHeader) {
+      const token = authHeader.replace('Bearer ', '')
+      const { data: userData, error: userError } = await supabaseClient.auth.getUser(token)
+      if (!userError && userData.user) {
+        userId = userData.user.id
+        console.log('[IAP-RECEIPT-VALIDATOR] User authenticated via token:', userId)
+      }
+    }
 
-    // 3️⃣ Decide initial environment
+    // 3️⃣ Fallback to user_id from request body (for session-expired scenarios)
+    if (!userId && bodyUserId && typeof bodyUserId === 'string') {
+      // Verify the user exists in our database before accepting
+      const { data: profileData, error: profileError } = await supabaseClient
+        .from('profiles')
+        .select('id')
+        .eq('id', bodyUserId)
+        .single()
+      
+      if (!profileError && profileData) {
+        userId = bodyUserId
+        console.log('[IAP-RECEIPT-VALIDATOR] User identified via body user_id:', userId)
+      }
+    }
+
+    if (!userId) {
+      console.error('[IAP-RECEIPT-VALIDATOR] No valid user identification found')
+      return json(401, { error: 'User identification required (auth token or valid user_id)' })
+    }
+
+    console.log('🧾 Validating receipt for product:', productId, 'user:', userId)
+
+    // 4️⃣ Decide initial environment
     let isProductionStart = true
     if (APPLE_ENVIRONMENT === 'sandbox') isProductionStart = false
     else if (APPLE_ENVIRONMENT === 'production') isProductionStart = true
 
-    // 4️⃣ Validate with Apple
+    // 5️⃣ Validate with Apple
     let appleResponse = await validateReceiptWithApple(receiptData, isProductionStart)
 
-    // 5️⃣ Handle sandbox/production mismatch
+    // 6️⃣ Handle sandbox/production mismatch
     if (appleResponse.status === 21007) {
       console.log('↩️ Sandbox receipt detected (21007) → retrying SANDBOX')
       appleResponse = await validateReceiptWithApple(receiptData, false)
@@ -117,14 +145,14 @@ serve(async (req) => {
       console.error('[❌] Receipt validation failed:', appleResponse.status)
 
       await supabaseClient.rpc('handle_payment_failure', {
-        p_user_id: userData.user.id,
+        p_user_id: userId,
         p_reason: `IAP validation failed: status ${appleResponse.status}`,
       })
 
       return json(400, { valid: false, status: appleResponse.status, error: 'Invalid receipt' })
     }
 
-    // 6️⃣ Process valid receipt
+    // 7️⃣ Process valid receipt
     const receipt = appleResponse.receipt
     const allTransactions = [
       ...(receipt?.in_app || []),
@@ -169,11 +197,11 @@ serve(async (req) => {
       isActive,
     })
 
-    // 7️⃣ IDEMPOTENCY CHECK: Check if this transaction was already processed
+    // 8️⃣ IDEMPOTENCY CHECK: Check if this transaction was already processed
     const { data: existingSub } = await supabaseClient
       .from('user_subscriptions')
       .select('id, provider_transaction_id, expires_at')
-      .eq('user_id', userData.user.id)
+      .eq('user_id', userId)
       .eq('provider_transaction_id', latest.transaction_id)
       .single()
 
@@ -188,12 +216,12 @@ serve(async (req) => {
       })
     }
 
-    // 8️⃣ Update Supabase
+    // 9️⃣ Update Supabase
     if (isActive) {
       const { error } = await supabaseClient
         .from('user_subscriptions')
         .upsert({
-          user_id: userData.user.id,
+          user_id: userId,
           plan_name: 'premium',
           status: 'active',
           starts_at: new Date().toISOString(),
@@ -210,6 +238,8 @@ serve(async (req) => {
         return json(500, { error: 'Failed to update subscription' })
       }
 
+      console.log('✅ [IAP-RECEIPT-VALIDATOR] Premium activated for user:', userId)
+
       return json(200, {
         valid: true,
         active: true,
@@ -219,7 +249,7 @@ serve(async (req) => {
     } else {
       // Expired
       await supabaseClient.rpc('handle_payment_failure', {
-        p_user_id: userData.user.id,
+        p_user_id: userId,
         p_reason: 'IAP subscription expired',
       })
 
