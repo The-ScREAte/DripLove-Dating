@@ -4,10 +4,10 @@
 // @ts-nocheck
 import { serve } from 'https://deno.land/std@0.177.0/http/server.ts'
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.45.0'
+import { getPaystackSecretKey } from '../_shared/paystack-utils.ts'
 
 const SUPABASE_URL = Deno.env.get('SUPABASE_URL')!
 const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
-const PAYSTACK_SECRET_KEY = Deno.env.get('PAYSTACK_SECRET_KEY')!
 const EXCHANGE_RATE_API = 'https://api.exchangerate-api.com/v4/latest'
 
 const corsHeaders = {
@@ -110,6 +110,10 @@ serve(async (req) => {
 
   try {
     const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY)
+    
+    // Get the appropriate Paystack secret key based on mode in database
+    const PAYSTACK_SECRET_KEY = await getPaystackSecretKey()
+    console.log('[PAYSTACK-RECURRING] Paystack key loaded based on app_settings mode')
 
     // Verify cron secret
     const cronSecret = req.headers.get('x-cron-secret')
