@@ -145,30 +145,11 @@ const PaymentSuccess: React.FC = () => {
       // ignore
     }
 
-    // If IAP (Apple or Google), do not assume DB is updated yet.
-    // Wait briefly for the validator/verified handler to activate premium in DB.
+    // If IAP (Apple or Google), edge function has already validated and activated.
     if (payment_type === 'iap' && status === 'successful') {
       setError(null);
-      setUpgradeSuccess(false);
-      setUpgrading(true);
-      (async () => {
-        const { data: { session } } = await supabase.auth.getSession();
-        const user = session?.user;
-        if (!user) {
-          setError('Your session expired while processing this payment. Please go back home and log in again to confirm your premium status.');
-          setUpgrading(false);
-          setTimeout(() => navigate('/'), 2000);
-          return;
-        }
-
-        const activated = await waitForPremiumActivation(user.id);
-        if (activated) {
-          setUpgradeSuccess(true);
-        } else {
-          setError('Payment was successful, but premium activation is taking longer than expected. Please wait a moment and try Restore Purchases (mobile) or contact support if it does not activate.');
-        }
-        setUpgrading(false);
-      })();
+      setUpgradeSuccess(true);
+      setUpgrading(false);
       return;
     }
 
@@ -384,7 +365,7 @@ const PaymentSuccess: React.FC = () => {
           onClick={() => navigate('/?premium=activated')}
           disabled={upgrading || !upgradeSuccess}
         >
-          Start Discovering Now
+          Start Dripcheck Now
         </Button>
         <div className="mt-3 text-[10px] text-gray-400">Enjoy your premium experience! 🎉</div>
       </div>
