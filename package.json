@@ -12,6 +12,8 @@
     "postinstall": "patch-package",
     "start": "serve -s dist -l 10000",
     "test": "echo \"(tests removed)\"",
+    "test:google:iap": "node scripts/test-google-iap-validator.mjs",
+    "get:user:id": "node scripts/get-user-id.mjs",
     "lint": "eslint .",
     "preview": "vite preview",
     "android:build": "npm run build:android && cap sync android",

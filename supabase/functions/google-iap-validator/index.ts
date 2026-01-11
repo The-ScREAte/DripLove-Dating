@@ -137,7 +137,26 @@ function candidateSubscriptionIds(productId: string): string[] {
   if (raw) candidates.push(raw)
 
   // Legacy mapping (some clients may still send the fully-qualified string)
-  if (raw === 'com.driplove.dating.premium.monthly') candidates.push('premium_monthly')
+  if (raw === 'com.driplove.dating.premium.monthly') {
+    candidates.push('premium_monthly')
+  }
+  
+  // Google Play Billing v5+ mapping: base plan ID -> subscription ID
+  if (raw === 'monthly') {
+    candidates.push('premium_monthly')  // Try the full subscription ID
+  }
+  
+  // Also try the reverse: subscription ID -> base plan ID
+  if (raw === 'premium_monthly') {
+    candidates.push('monthly')  // Try the base plan ID
+  }
+  
+  // Handle composite format: subscriptionId:basePlanId
+  if (raw.includes(':')) {
+    const [subId, planId] = raw.split(':')
+    if (subId) candidates.push(subId)
+    if (planId) candidates.push(planId)
+  }
 
   // Dedupe while preserving order
   return Array.from(new Set(candidates))
@@ -203,7 +222,9 @@ serve(async (req: Request) => {
       'com.driplove.dating.premium.monthlysub3',
       // Google Play product IDs
       'premium_monthly',
+      'monthly',  // Base plan ID (Google Play Billing v5+)
       'com.driplove.dating.premium.monthly',
+      'premium_monthly:monthly',  // Composite format
     ]
 
     const isValidProduct = VALID_PRODUCT_IDS.includes(productId) || 
@@ -257,11 +278,15 @@ serve(async (req: Request) => {
 
     if (!googleJson) {
       console.error('❌ [GOOGLE-IAP-VALIDATOR] Google API error:', lastError)
+      console.error('❌ [GOOGLE-IAP-VALIDATOR] Tried subscription IDs:', subscriptionIds)
+      console.error('❌ [GOOGLE-IAP-VALIDATOR] Original productId:', productId)
       return json(200, {
         valid: false,
         active: false,
         error: 'Google verification failed',
         details: lastError,
+        triedSubscriptionIds: subscriptionIds,
+        originalProductId: productId,
       })
     }
 

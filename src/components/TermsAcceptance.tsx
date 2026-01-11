@@ -280,7 +280,7 @@ const TermsAcceptance = ({ user, onAccept }: TermsAcceptanceProps) => {
   };
 
   return (
-    <div className="terms-container min-h-screen bg-gradient-to-br from-pink-50 via-purple-50 to-blue-50 p-3 flex items-center justify-center">
+    <div className="terms-container min-h-screen bg-white p-3 flex items-center justify-center">
       <Card className="w-full max-w-md mx-auto bg-white shadow-xl border-0 rounded-xl">
         <CardHeader className="text-center pb-2 pt-4">
           <div className="mx-auto w-12 h-12 mb-2">
