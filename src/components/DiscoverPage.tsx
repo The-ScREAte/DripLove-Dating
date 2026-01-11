@@ -4366,8 +4366,8 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, onNavigateToProfile, isPr
                 paddingBottom: showMoreInfo 
                   ? `calc(${
                       isIOSPlatform() 
-                        ? (vh < 700 ? '190px' : '180px')
-                        : (vh < 700 ? '190px' : '180px')
+                        ? (vh < 700 ? '190px' : '160px')
+                        : (vh < 700 ? '190px' : '160px')
                     } + env(safe-area-inset-bottom, 0px))` 
                   : '0px'
               }}
