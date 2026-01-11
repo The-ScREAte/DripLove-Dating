@@ -945,7 +945,7 @@ const MainApp = ({ user, onLogout }: MainAppProps) => {
             style={{ 
               paddingBottom: getPlatformSync() === 'android' 
                 ? '24px' 
-                : 'clamp(4px, env(safe-area-inset-bottom, 0px), 6px)' 
+                : 'clamp(4px, env(safe-area-inset-bottom, 0px), 8px)' 
             }}
           >
             <div className={`flex justify-around items-center ${getPlatformSync() === 'ios' ? 'pb-5' : ''}`}>
