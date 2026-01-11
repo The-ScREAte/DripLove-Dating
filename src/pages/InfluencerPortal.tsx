@@ -436,14 +436,13 @@ const InfluencerPortal = () => {
           </CardContent>
         </Card>
 
-        {/* Refresh Button */}
+        {/* Re-login Button - since we no longer cache passwords */}
         <Button 
           variant="outline" 
           className="w-full"
-          onClick={() => refreshSession(session.code)}
-          disabled={loading}
+          onClick={handleLogout}
         >
-          {loading ? 'Refreshing...' : 'Refresh Stats'}
+          Re-login to Refresh Stats
         </Button>
       </div>
     </div>
