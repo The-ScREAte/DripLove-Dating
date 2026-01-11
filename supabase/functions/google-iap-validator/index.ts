@@ -242,38 +242,80 @@ serve(async (req: Request) => {
 
     // 4️⃣ Verify with Google Play Developer API
     const packageName = Deno.env.get('GOOGLE_PACKAGE_NAME') || 'com.driplove.dating'
-    const subscriptionIds = candidateSubscriptionIds(productId)
 
     console.log('🔐 [GOOGLE-IAP-VALIDATOR] Fetching Android Publisher access token')
     const accessToken = await getAndroidPublisherAccessToken()
 
-    let googleJson: any = null
-    let lastError: { status: number; body: any; subscriptionId: string } | null = null
+    // Google has 2 subscription verification endpoints:
+    // - v3 purchases.subscriptions.get (needs subscriptionId)
+    // - v3 purchases.subscriptionsv2.get (token-only; best for new base-plan / offer configs)
 
-    for (const subscriptionId of subscriptionIds) {
+    const subscriptionIds = candidateSubscriptionIds(productId)
+
+    const fetchV3 = async (subscriptionId: string) => {
       const url = `https://androidpublisher.googleapis.com/androidpublisher/v3/applications/${encodeURIComponent(packageName)}/purchases/subscriptions/${encodeURIComponent(subscriptionId)}/tokens/${encodeURIComponent(purchaseToken)}`
-      console.log('🌐 [GOOGLE-IAP-VALIDATOR] Calling Google API:', { packageName, subscriptionId })
-
-      const googleResp = await fetch(url, {
+      const resp = await fetch(url, {
         method: 'GET',
-        headers: {
-          Authorization: `Bearer ${accessToken}`,
-        },
+        headers: { Authorization: `Bearer ${accessToken}` },
       })
+      const body = await resp.json().catch(() => null)
+      return { resp, body, url }
+    }
 
-      const body = await googleResp.json().catch(() => null)
+    const fetchV2 = async () => {
+      const url = `https://androidpublisher.googleapis.com/androidpublisher/v3/applications/${encodeURIComponent(packageName)}/purchases/subscriptionsv2/tokens/${encodeURIComponent(purchaseToken)}`
+      const resp = await fetch(url, {
+        method: 'GET',
+        headers: { Authorization: `Bearer ${accessToken}` },
+      })
+      const body = await resp.json().catch(() => null)
+      return { resp, body, url }
+    }
 
-      if (googleResp.ok) {
+    let googleJson: any = null
+    let source: 'v3' | 'v2' | null = null
+    let lastError: { status: number; body: any; hint?: string; subscriptionId?: string; url?: string } | null = null
+
+    // 4a) Try v3 endpoint with multiple candidate subscription IDs
+    for (const subscriptionId of subscriptionIds) {
+      console.log('🌐 [GOOGLE-IAP-VALIDATOR] Calling Google API (v3 subscriptions):', { packageName, subscriptionId })
+      const { resp, body, url } = await fetchV3(subscriptionId)
+
+      if (resp.ok) {
         googleJson = body
+        source = 'v3'
         lastError = null
         break
       }
 
-      console.warn('⚠️ [GOOGLE-IAP-VALIDATOR] Google API attempt failed:', {
+      console.warn('⚠️ [GOOGLE-IAP-VALIDATOR] Google API v3 attempt failed:', {
         subscriptionId,
-        status: googleResp.status,
+        status: resp.status,
       })
-      lastError = { status: googleResp.status, body, subscriptionId }
+      lastError = { status: resp.status, body, subscriptionId, url }
+
+      // If token-only endpoint is required, v3 often returns 404/400.
+      // Don’t keep looping forever; we’ll fall back to v2 afterwards.
+    }
+
+    // 4b) Fallback to v2 token-only endpoint
+    if (!googleJson) {
+      console.log('🔁 [GOOGLE-IAP-VALIDATOR] Falling back to Google API (v2 token-only)')
+      const { resp, body, url } = await fetchV2()
+
+      if (resp.ok) {
+        googleJson = body
+        source = 'v2'
+        lastError = null
+      } else {
+        lastError = {
+          status: resp.status,
+          body,
+          url,
+          hint:
+            'If this is consistently 401/403, confirm the service account has access to the Play Console app and has Android Publisher permissions.',
+        }
+      }
     }
 
     if (!googleJson) {
@@ -290,28 +332,52 @@ serve(async (req: Request) => {
       })
     }
 
-    const expiryTimeMillis = Number(googleJson?.expiryTimeMillis)
-    const startTimeMillis = Number(googleJson?.startTimeMillis)
+    // Normalize into { expiryTimeMillis, startTimeMillis, autoRenewing }
+    let expiryTimeMillis: number | null = null
+    let startTimeMillis: number | null = null
+    let autoRenew: boolean = true
 
-    if (!Number.isFinite(expiryTimeMillis)) {
-      console.error('❌ [GOOGLE-IAP-VALIDATOR] Missing expiryTimeMillis:', googleJson)
+    if (source === 'v3') {
+      expiryTimeMillis = Number(googleJson?.expiryTimeMillis)
+      startTimeMillis = Number(googleJson?.startTimeMillis)
+      autoRenew = typeof googleJson?.autoRenewing === 'boolean' ? googleJson.autoRenewing : true
+    } else {
+      // SubscriptionPurchaseV2
+      const firstLineItem = Array.isArray(googleJson?.lineItems) ? googleJson.lineItems[0] : null
+      const expiryTime = firstLineItem?.expiryTime
+      const startTime = firstLineItem?.startTime
+
+      const expiryMs = expiryTime ? Date.parse(expiryTime) : NaN
+      const startMs = startTime ? Date.parse(startTime) : NaN
+
+      expiryTimeMillis = Number.isFinite(expiryMs) ? expiryMs : null
+      startTimeMillis = Number.isFinite(startMs) ? startMs : null
+
+      // Heuristic: if there is an autoRenewingPlan present, treat it as auto-renewing.
+      autoRenew = !!firstLineItem?.autoRenewingPlan
+    }
+
+    if (!expiryTimeMillis || !Number.isFinite(expiryTimeMillis)) {
+      console.error('❌ [GOOGLE-IAP-VALIDATOR] Missing/invalid expiry time:', { source, googleJson })
       return json(200, { valid: false, active: false, error: 'Invalid Google response' })
     }
 
     const now = Date.now()
     const isActive = expiryTimeMillis > now
     const expiresAt = new Date(expiryTimeMillis).toISOString()
-    const startsAt = Number.isFinite(startTimeMillis) ? new Date(startTimeMillis).toISOString() : new Date().toISOString()
-    const autoRenew = typeof googleJson?.autoRenewing === 'boolean' ? googleJson.autoRenewing : true
+    const startsAt = startTimeMillis && Number.isFinite(startTimeMillis)
+      ? new Date(startTimeMillis).toISOString()
+      : new Date().toISOString()
 
     if (!isActive) {
-      console.log('ℹ️ [GOOGLE-IAP-VALIDATOR] Subscription not active per Google:', { expiresAt })
+      console.log('ℹ️ [GOOGLE-IAP-VALIDATOR] Subscription not active per Google:', { expiresAt, source })
       return json(200, {
         valid: true,
         active: false,
         expiresDate: expiresAt,
         expires_at: expiresAt,
         transaction_id: transactionId || purchaseToken,
+        purchaseToken,
       })
     }
 
