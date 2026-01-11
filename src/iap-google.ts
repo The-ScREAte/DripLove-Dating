@@ -9,6 +9,8 @@ declare global {
     googleIapInitialized?: boolean;
     googleIapInitializationFailed?: boolean;
     googleIapPurchaseInitiated?: boolean;
+    googleIapRedirecting?: boolean; // Prevent duplicate redirects
+    googleIapValidationInProgress?: boolean; // Prevent duplicate validations
   }
 }
 
@@ -164,8 +166,16 @@ export function initGoogleIAP() {
           .approved((t: any) => {
             noopLog('[Google IAP] Transaction approved:', t?.productId);
 
-            // Don’t rely on `t.verify()` / `.verified()` — they may not fire if the plugin
-            // validator isn’t configured, or if the WebView reloads while returning from
+            // GUARD: Prevent duplicate validations/redirects
+            if (window.googleIapRedirecting || window.googleIapValidationInProgress) {
+              noopLog('[Google IAP] Already processing, skipping duplicate approved event');
+              if (t?.finish && typeof t.finish === 'function') t.finish();
+              return;
+            }
+            window.googleIapValidationInProgress = true;
+
+            // Don't rely on `t.verify()` / `.verified()` — they may not fire if the plugin
+            // validator isn't configured, or if the WebView reloads while returning from
             // the Google Play UI. Instead, validate directly with our Supabase Edge Function.
             (async () => {
               try {
@@ -177,6 +187,7 @@ export function initGoogleIAP() {
 
                 if (!userId) {
                   console.error('[Google IAP] No user identification available (approved)');
+                  window.googleIapValidationInProgress = false;
                   alert('Please log in to complete your purchase.');
                   return;
                 }
@@ -198,6 +209,7 @@ export function initGoogleIAP() {
                     hasProductId: !!productId,
                     hasPurchaseToken: !!purchaseToken,
                   });
+                  window.googleIapValidationInProgress = false;
                   alert('Subscription could not be verified. Please try again.');
                   return;
                 }
@@ -215,6 +227,7 @@ export function initGoogleIAP() {
 
                 if (validationError || !validation?.valid || !validation?.active) {
                   console.error('[Google IAP] Server validation failed (approved):', validationError || validation);
+                  window.googleIapValidationInProgress = false;
                   alert('Subscription could not be verified. Please try again.');
                   return;
                 }
@@ -222,10 +235,14 @@ export function initGoogleIAP() {
                 clearGoogleIapPending();
                 try { localStorage.removeItem('driplove_iap_user_id'); } catch {}
 
-                // Success: redirect to success page.
-                window.location.href = '/payment-success?status=successful&payment_type=iap';
+                // Success: redirect to success page (only once)
+                if (!window.googleIapRedirecting) {
+                  window.googleIapRedirecting = true;
+                  window.location.href = '/payment-success?status=successful&payment_type=iap';
+                }
               } catch (err) {
                 console.error('[Google IAP] Error during approved validation:', err);
+                window.googleIapValidationInProgress = false;
                 alert('Subscription could not be verified. Please try again.');
               } finally {
                 window.googleIapPurchaseInitiated = false;
@@ -235,6 +252,14 @@ export function initGoogleIAP() {
           })
           .verified(async (r: any) => {
             noopLog('[Google IAP] Purchase verified:', r?.productId);
+
+            // GUARD: Prevent duplicate validations/redirects
+            if (window.googleIapRedirecting || window.googleIapValidationInProgress) {
+              noopLog('[Google IAP] Already processing, skipping duplicate verified event');
+              if (r?.finish && typeof r.finish === 'function') r.finish();
+              return;
+            }
+            window.googleIapValidationInProgress = true;
 
             try {
               const { supabase } = await import('@/integrations/supabase/client');
@@ -258,6 +283,7 @@ export function initGoogleIAP() {
               
               if (!userId) {
                 console.error('[Google IAP] No user identification available');
+                window.googleIapValidationInProgress = false;
                 alert('Please log in to complete your purchase.');
                 return;
               }
@@ -269,6 +295,7 @@ export function initGoogleIAP() {
 
               if (!productId || !purchaseToken) {
                 console.error('[Google IAP] Missing productId/purchaseToken for server validation');
+                window.googleIapValidationInProgress = false;
                 alert('Subscription could not be verified. Please try again.');
                 return;
               }
@@ -286,6 +313,7 @@ export function initGoogleIAP() {
 
               if (validationError || !validation?.valid) {
                 console.error('[Google IAP] Server validation failed:', validationError || validation);
+                window.googleIapValidationInProgress = false;
                 alert('Subscription could not be verified. Please try again.');
                 return;
               }
@@ -294,9 +322,14 @@ export function initGoogleIAP() {
               clearGoogleIapPending();
               try { localStorage.removeItem('driplove_iap_user_id'); } catch (e) {}
 
-              window.location.href = '/payment-success?status=successful&payment_type=iap';
+              // Success: redirect to success page (only once)
+              if (!window.googleIapRedirecting) {
+                window.googleIapRedirecting = true;
+                window.location.href = '/payment-success?status=successful&payment_type=iap';
+              }
             } catch (error) {
               console.error('[Google IAP] Error during server validation:', error);
+              window.googleIapValidationInProgress = false;
               alert('Subscription could not be verified. Please try again.');
             } finally {
               if (r?.finish && typeof r.finish === 'function') r.finish();
@@ -430,6 +463,10 @@ export const buyGoogleMonthly = async () => {
     console.error('[Google IAP] Store not available');
     throw new Error('Store not initialized');
   }
+
+  // Reset validation/redirect guards for new purchase
+  window.googleIapValidationInProgress = false;
+  window.googleIapRedirecting = false;
 
   // Store current user_id BEFORE purchase for session-independent activation
   try {
