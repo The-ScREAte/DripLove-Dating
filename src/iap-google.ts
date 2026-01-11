@@ -8,7 +8,16 @@ declare global {
   interface Window {
     googleIapInitialized?: boolean;
     googleIapInitializationFailed?: boolean;
+    /**
+     * Tracks whether an IAP flow was explicitly initiated by the user.
+     * - 'purchase' => user tapped "Upgrade" and started checkout
+     * - 'restore'  => user tapped "Restore purchases"
+     */
+    googleIapFlow?: 'purchase' | 'restore';
+
+    /** Legacy boolean kept for backwards-compat with existing code paths */
     googleIapPurchaseInitiated?: boolean;
+
     googleIapRedirecting?: boolean; // Prevent duplicate redirects
     googleIapValidationInProgress?: boolean; // Prevent duplicate validations
   }
@@ -97,13 +106,14 @@ export function clearAllIapState() {
     localStorage.removeItem('driplove_google_iap_pending_ts');
     localStorage.removeItem('driplove_google_iap_completed');
     localStorage.removeItem('driplove_google_iap_completed_ts');
-    
+
     // iOS IAP flags (from iap.ts)
     localStorage.removeItem('driplove_iap_completed');
     localStorage.removeItem('driplove_iap_completed_ts');
-    
+
     // Clear window flags
     if (typeof window !== 'undefined') {
+      window.googleIapFlow = undefined;
       window.googleIapPurchaseInitiated = false;
       window.googleIapRedirecting = false;
       window.googleIapValidationInProgress = false;
@@ -240,6 +250,31 @@ export function initGoogleIAP() {
           .approved((t: any) => {
             noopLog('[Google IAP] Transaction approved:', t?.productId);
 
+            // ✅ CRITICAL: Never auto-activate premium on Android from "owned" transactions.
+            // Only proceed if the user explicitly started a purchase flow, OR we are returning
+            // from the Google Play UI (pending flag set).
+            const hasPending = (() => {
+              try {
+                const pending = localStorage.getItem('driplove_google_iap_pending') === '1';
+                const tsRaw = localStorage.getItem('driplove_google_iap_pending_ts');
+                const ts = tsRaw ? Number(tsRaw) : 0;
+                const isRecent = pending && Number.isFinite(ts) && ts > 0 && Date.now() - ts < 15 * 60 * 1000;
+                // Auto-clear stale pending state
+                if (pending && !isRecent) clearGoogleIapPending();
+                return isRecent;
+              } catch {
+                return false;
+              }
+            })();
+
+            const userInitiatedPurchase = window.googleIapFlow === 'purchase' || window.googleIapPurchaseInitiated === true;
+
+            if (!userInitiatedPurchase && !hasPending) {
+              noopLog('[Google IAP] Ignoring approved event (not user-initiated)');
+              if (t?.finish && typeof t.finish === 'function') t.finish();
+              return;
+            }
+
             // GUARD: Prevent redirect if already on payment-success page or recently completed
             if (isOnPaymentSuccessPage() || wasPaymentRecentlyCompleted()) {
               noopLog('[Google IAP] Already on success page or recently completed, just finishing transaction');
@@ -262,14 +297,15 @@ export function initGoogleIAP() {
               try {
                 const { supabase } = await import('@/integrations/supabase/client');
 
-                // Prefer current session user, but fall back to stored user_id.
+                // Only allow activation for the CURRENT authenticated user.
+                // (This prevents a device-level Google subscription from upgrading arbitrary app accounts.)
                 const { data: { user } } = await supabase.auth.getUser();
-                const userId = user?.id || getStoredIapUserId();
+                const userId = user?.id || null;
 
                 if (!userId) {
-                  console.error('[Google IAP] No user identification available (approved)');
+                  // No alert here — just stop. User must log in and explicitly tap upgrade/restore.
+                  console.warn('[Google IAP] Approved event while not authenticated; skipping');
                   window.googleIapValidationInProgress = false;
-                  alert('Please log in to complete your purchase.');
                   return;
                 }
 
@@ -291,7 +327,6 @@ export function initGoogleIAP() {
                     hasPurchaseToken: !!purchaseToken,
                   });
                   window.googleIapValidationInProgress = false;
-                  alert('Subscription could not be verified. Please try again.');
                   return;
                 }
 
@@ -309,7 +344,22 @@ export function initGoogleIAP() {
                 if (validationError || !validation?.valid || !validation?.active) {
                   console.error('[Google IAP] Server validation failed (approved):', validationError || validation);
                   window.googleIapValidationInProgress = false;
-                  alert('Subscription could not be verified. Please try again.');
+                  return;
+                }
+
+                // Double-check entitlement was applied to THIS user before redirecting.
+                const { data: subRow } = await supabase
+                  .from('user_subscriptions')
+                  .select('plan_name, status, expires_at')
+                  .eq('user_id', userId)
+                  .order('created_at', { ascending: false })
+                  .limit(1)
+                  .maybeSingle();
+
+                const isPremiumNow = !!subRow && subRow.plan_name === 'premium' && subRow.status === 'active' && (!subRow.expires_at || new Date(subRow.expires_at) > new Date());
+                if (!isPremiumNow) {
+                  console.warn('[Google IAP] Validation ok but subscription not applied to current user; skipping redirect');
+                  window.googleIapValidationInProgress = false;
                   return;
                 }
 
@@ -325,15 +375,35 @@ export function initGoogleIAP() {
               } catch (err) {
                 console.error('[Google IAP] Error during approved validation:', err);
                 window.googleIapValidationInProgress = false;
-                alert('Subscription could not be verified. Please try again.');
               } finally {
                 window.googleIapPurchaseInitiated = false;
+                window.googleIapFlow = undefined;
                 if (t?.finish && typeof t.finish === 'function') t.finish();
               }
             })();
           })
           .verified(async (r: any) => {
             noopLog('[Google IAP] Purchase verified:', r?.productId);
+
+            const hasPending = (() => {
+              try {
+                const pending = localStorage.getItem('driplove_google_iap_pending') === '1';
+                const tsRaw = localStorage.getItem('driplove_google_iap_pending_ts');
+                const ts = tsRaw ? Number(tsRaw) : 0;
+                const isRecent = pending && Number.isFinite(ts) && ts > 0 && Date.now() - ts < 15 * 60 * 1000;
+                if (pending && !isRecent) clearGoogleIapPending();
+                return isRecent;
+              } catch {
+                return false;
+              }
+            })();
+
+            const userInitiatedPurchase = window.googleIapFlow === 'purchase' || window.googleIapPurchaseInitiated === true;
+            if (!userInitiatedPurchase && !hasPending) {
+              noopLog('[Google IAP] Ignoring verified event (not user-initiated)');
+              if (r?.finish && typeof r.finish === 'function') r.finish();
+              return;
+            }
 
             // GUARD: Prevent redirect if already on payment-success page or recently completed
             if (isOnPaymentSuccessPage() || wasPaymentRecentlyCompleted()) {
@@ -352,28 +422,14 @@ export function initGoogleIAP() {
 
             try {
               const { supabase } = await import('@/integrations/supabase/client');
-              
-              // Get user - but also try to use stored user_id as fallback
+
+              // Only allow activation for the CURRENT authenticated user.
               const { data: { user } } = await supabase.auth.getUser();
-              
-              // Try to get stored user_id from localStorage (set before purchase)
-              let userId = user?.id;
+              const userId = user?.id || null;
+
               if (!userId) {
-                try {
-                  const storedUserId = localStorage.getItem('driplove_iap_user_id');
-                  if (storedUserId) {
-                    userId = storedUserId;
-                    noopLog('[Google IAP] Using stored user_id:', userId);
-                  }
-                } catch (e) {
-                  // localStorage not available
-                }
-              }
-              
-              if (!userId) {
-                console.error('[Google IAP] No user identification available');
+                console.warn('[Google IAP] Verified event while not authenticated; skipping');
                 window.googleIapValidationInProgress = false;
-                alert('Please log in to complete your purchase.');
                 return;
               }
 
@@ -385,33 +441,44 @@ export function initGoogleIAP() {
               if (!productId || !purchaseToken) {
                 console.error('[Google IAP] Missing productId/purchaseToken for server validation');
                 window.googleIapValidationInProgress = false;
-                alert('Subscription could not be verified. Please try again.');
                 return;
               }
 
-              // CRITICAL: Always include user_id in body for session-independent activation
               const { data: validation, error: validationError } = await supabase.functions.invoke('google-iap-validator', {
                 body: {
                   receiptData,
                   productId,
                   purchaseToken,
                   transactionId,
-                  user_id: userId, // Fallback for session-expired scenarios
+                  user_id: userId,
                 },
               });
 
-              if (validationError || !validation?.valid) {
+              if (validationError || !validation?.valid || !validation?.active) {
                 console.error('[Google IAP] Server validation failed:', validationError || validation);
                 window.googleIapValidationInProgress = false;
-                alert('Subscription could not be verified. Please try again.');
                 return;
               }
 
-              // Clear stored state on success
-              clearGoogleIapPending();
-              try { localStorage.removeItem('driplove_iap_user_id'); } catch (e) {}
+              // Double-check entitlement was applied to THIS user before redirecting.
+              const { data: subRow } = await supabase
+                .from('user_subscriptions')
+                .select('plan_name, status, expires_at')
+                .eq('user_id', userId)
+                .order('created_at', { ascending: false })
+                .limit(1)
+                .maybeSingle();
 
-              // Success: redirect to success page (only once)
+              const isPremiumNow = !!subRow && subRow.plan_name === 'premium' && subRow.status === 'active' && (!subRow.expires_at || new Date(subRow.expires_at) > new Date());
+              if (!isPremiumNow) {
+                console.warn('[Google IAP] Validation ok but subscription not applied to current user; skipping redirect');
+                window.googleIapValidationInProgress = false;
+                return;
+              }
+
+              clearGoogleIapPending();
+              try { localStorage.removeItem('driplove_iap_user_id'); } catch {}
+
               if (!window.googleIapRedirecting) {
                 window.googleIapRedirecting = true;
                 markPaymentCompleted();
@@ -420,14 +487,15 @@ export function initGoogleIAP() {
             } catch (error) {
               console.error('[Google IAP] Error during server validation:', error);
               window.googleIapValidationInProgress = false;
-              alert('Subscription could not be verified. Please try again.');
             } finally {
+              window.googleIapFlow = undefined;
               if (r?.finish && typeof r.finish === 'function') r.finish();
             }
           })
           .unverified((r: any, err: any) => {
             console.warn('[Google IAP] unverified:', r?.productId, err?.message);
             window.googleIapPurchaseInitiated = false;
+            window.googleIapFlow = undefined;
           });
       }
 
