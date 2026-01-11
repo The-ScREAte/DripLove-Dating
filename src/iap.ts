@@ -7,6 +7,41 @@ const noopLog = (..._args: unknown[]) => {};
 const isAndroid = () => Capacitor.isNativePlatform() && Capacitor.getPlatform() === 'android';
 const isIOS = () => Capacitor.isNativePlatform() && Capacitor.getPlatform() === 'ios';
 
+// Check if we're already on the payment success page (prevents redirect loops)
+function isOnPaymentSuccessPage(): boolean {
+  try {
+    return window.location.pathname === '/payment-success';
+  } catch {
+    return false;
+  }
+}
+
+// Mark that we've completed a payment successfully (prevents re-redirect on page reload)
+function markPaymentCompleted() {
+  try {
+    localStorage.setItem('driplove_iap_completed', '1');
+    localStorage.setItem('driplove_iap_completed_ts', String(Date.now()));
+  } catch {
+    // ignore
+  }
+}
+
+// Check if payment was recently completed (within 5 minutes)
+function wasPaymentRecentlyCompleted(): boolean {
+  try {
+    const completed = localStorage.getItem('driplove_iap_completed');
+    const ts = localStorage.getItem('driplove_iap_completed_ts');
+    if (completed === '1' && ts) {
+      const elapsed = Date.now() - Number(ts);
+      // Consider completed if within 5 minutes
+      return elapsed < 5 * 60 * 1000;
+    }
+  } catch {
+    // ignore
+  }
+  return false;
+}
+
 export function initIAP() {
   return new Promise<void>((resolve, reject) => {
     
@@ -143,6 +178,13 @@ export function initIAP() {
         })
         .verified(async (r) => {
           
+          // GUARD: Prevent redirect if already on payment-success page or recently completed
+          if (isOnPaymentSuccessPage() || wasPaymentRecentlyCompleted()) {
+            noopLog('[IAP] Already on success page or recently completed, just finishing transaction');
+            if (r?.finish && typeof r.finish === 'function') r.finish();
+            return;
+          }
+          
           // Reset the purchase flag
           window.iapPurchaseInitiated = false;
           
@@ -266,6 +308,7 @@ export function initIAP() {
                 
                 try {
                   await activateSubscription(transactionId);
+                  markPaymentCompleted();
                   window.location.href = '/payment-success?status=successful&payment_type=iap';
                 } catch (dbError) {
                   console.error('[IAP] Fallback activation failed:', dbError);
@@ -284,6 +327,7 @@ export function initIAP() {
                 
                 try {
                   await activateSubscription(validation.transaction_id || transactionId, expiryDate);
+                  markPaymentCompleted();
                   window.location.href = '/payment-success?status=successful&payment_type=iap';
                 } catch (dbError) {
                   console.error('[IAP] Server-validated activation failed:', dbError);
@@ -299,6 +343,7 @@ export function initIAP() {
               
               try {
                 await activateSubscription(transactionId);
+                markPaymentCompleted();
                 window.location.href = '/payment-success?status=successful&payment_type=iap';
               } catch (dbError) {
                 console.error('[IAP] Direct activation failed:', dbError);

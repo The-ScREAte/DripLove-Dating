@@ -1289,6 +1289,10 @@ const AdminPageComponent = ({ currentUser, onLogout }: AdminPageProps) => {
         await removePushToken(currentUser.id);
       }
       
+      // Clear all IAP state to prevent it leaking to next logged-in user
+      const { clearAllIapState } = await import('@/iap-google');
+      clearAllIapState();
+      
       const { error } = await supabase.auth.signOut();
       if (error) throw error;
       

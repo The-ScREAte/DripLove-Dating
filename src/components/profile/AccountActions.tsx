@@ -79,6 +79,10 @@ const AccountActions = ({ currentUser, onLogout, onShowTerms, onShowPrivacy, hid
         await removePushToken(currentUser.id);
       }
       
+      // Clear all IAP state to prevent it leaking to next logged-in user
+      const { clearAllIapState } = await import('@/iap-google');
+      clearAllIapState();
+      
       await supabase.auth.signOut();
       onLogout();
       toast({

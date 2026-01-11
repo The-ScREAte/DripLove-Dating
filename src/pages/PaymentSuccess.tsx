@@ -47,6 +47,8 @@ function clearPaymentCompletedFlag() {
   try {
     localStorage.removeItem('driplove_google_iap_completed');
     localStorage.removeItem('driplove_google_iap_completed_ts');
+    localStorage.removeItem('driplove_iap_completed');
+    localStorage.removeItem('driplove_iap_completed_ts');
   } catch {
     // Ignore errors
   }

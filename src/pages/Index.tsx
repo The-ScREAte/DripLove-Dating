@@ -267,6 +267,10 @@ const Index = ({
       await removePushToken(user.id);
     }
     
+    // Clear all IAP state to prevent it leaking to next logged-in user
+    const { clearAllIapState } = await import('@/iap-google');
+    clearAllIapState();
+    
     await supabase.auth.signOut();
     // Reset the routing ref so re-auth can properly route again
     didRouteRef.current = false;

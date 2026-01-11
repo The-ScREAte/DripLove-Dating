@@ -85,6 +85,35 @@ function clearGoogleIapPending() {
   }
 }
 
+/**
+ * Clear all IAP-related localStorage flags. 
+ * MUST be called on user logout to prevent IAP state leaking to next logged-in user.
+ */
+export function clearAllIapState() {
+  try {
+    // Google IAP flags
+    localStorage.removeItem('driplove_iap_user_id');
+    localStorage.removeItem('driplove_google_iap_pending');
+    localStorage.removeItem('driplove_google_iap_pending_ts');
+    localStorage.removeItem('driplove_google_iap_completed');
+    localStorage.removeItem('driplove_google_iap_completed_ts');
+    
+    // iOS IAP flags (from iap.ts)
+    localStorage.removeItem('driplove_iap_completed');
+    localStorage.removeItem('driplove_iap_completed_ts');
+    
+    // Clear window flags
+    if (typeof window !== 'undefined') {
+      window.googleIapPurchaseInitiated = false;
+      window.googleIapRedirecting = false;
+      window.googleIapValidationInProgress = false;
+      window.iapPurchaseInitiated = false;
+    }
+  } catch (error) {
+    console.error('[IAP] Error clearing IAP state:', error);
+  }
+}
+
 // Check if we're already on the payment success page (prevents redirect loops)
 function isOnPaymentSuccessPage(): boolean {
   try {
