@@ -22,6 +22,36 @@ function isPremiumActive(row: { plan_name?: string; status?: string; expires_at?
   return new Date(row.expires_at) > new Date();
 }
 
+// Clear any IAP redirect flags to prevent loops
+function clearIapRedirectFlags() {
+  try {
+    // Clear Google IAP flags
+    if (typeof window !== 'undefined') {
+      (window as any).googleIapRedirecting = false;
+      (window as any).googleIapValidationInProgress = false;
+      (window as any).googleIapPurchaseInitiated = false;
+      // Clear Apple IAP flags
+      (window as any).iapPurchaseInitiated = false;
+    }
+    // Clear localStorage pending flags
+    localStorage.removeItem('driplove_google_iap_pending');
+    localStorage.removeItem('driplove_google_iap_pending_ts');
+    localStorage.removeItem('driplove_iap_user_id');
+  } catch {
+    // Ignore errors
+  }
+}
+
+// Clear payment completed flag when leaving the success page
+function clearPaymentCompletedFlag() {
+  try {
+    localStorage.removeItem('driplove_google_iap_completed');
+    localStorage.removeItem('driplove_google_iap_completed_ts');
+  } catch {
+    // Ignore errors
+  }
+}
+
 const PaymentSuccess: React.FC = () => {
   const navigate = useNavigate();
   const location = useLocation();
@@ -33,6 +63,11 @@ const PaymentSuccess: React.FC = () => {
   const [isLoading, setIsLoading] = useState(true);
   const [redirectTimer, setRedirectTimer] = useState<ReturnType<typeof setTimeout> | null>(null);
   const [redirectCountdown, setRedirectCountdown] = useState<number | null>(null);
+
+  // Clear IAP flags on mount to prevent redirect loops
+  useEffect(() => {
+    clearIapRedirectFlags();
+  }, []);
 
   const getErrorMessage = (err: unknown): string | undefined => {
     if (err instanceof Error) return err.message
@@ -362,7 +397,10 @@ const PaymentSuccess: React.FC = () => {
         {error && <div className="mb-2 text-xs text-red-600 font-semibold animate-shake">{error}</div>}
         <Button
           className="w-full bg-gradient-to-r from-yellow-400 to-yellow-600 text-black font-extrabold py-2 px-4 rounded-full text-sm shadow-xl hover:scale-105 hover:shadow-2xl transition-all duration-200 mt-1"
-          onClick={() => navigate('/?premium=activated')}
+          onClick={() => {
+            clearPaymentCompletedFlag();
+            navigate('/?premium=activated');
+          }}
           disabled={upgrading || !upgradeSuccess}
         >
           Start Dripcheck Now
