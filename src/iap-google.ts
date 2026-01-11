@@ -85,6 +85,51 @@ function clearGoogleIapPending() {
   }
 }
 
+// Check if we're already on the payment success page (prevents redirect loops)
+function isOnPaymentSuccessPage(): boolean {
+  try {
+    return window.location.pathname === '/payment-success';
+  } catch {
+    return false;
+  }
+}
+
+// Mark that we've completed a payment successfully (prevents re-redirect on page reload)
+function markPaymentCompleted() {
+  try {
+    localStorage.setItem('driplove_google_iap_completed', '1');
+    localStorage.setItem('driplove_google_iap_completed_ts', String(Date.now()));
+  } catch {
+    // ignore
+  }
+}
+
+// Check if payment was recently completed (within 5 minutes)
+function wasPaymentRecentlyCompleted(): boolean {
+  try {
+    const completed = localStorage.getItem('driplove_google_iap_completed');
+    const ts = localStorage.getItem('driplove_google_iap_completed_ts');
+    if (completed === '1' && ts) {
+      const elapsed = Date.now() - Number(ts);
+      // Consider completed if within 5 minutes
+      return elapsed < 5 * 60 * 1000;
+    }
+  } catch {
+    // ignore
+  }
+  return false;
+}
+
+// Clear payment completed flag (call when starting a new purchase)
+function clearPaymentCompleted() {
+  try {
+    localStorage.removeItem('driplove_google_iap_completed');
+    localStorage.removeItem('driplove_google_iap_completed_ts');
+  } catch {
+    // ignore
+  }
+}
+
 export function initGoogleIAP() {
   return new Promise<void>((resolve, reject) => {
     // Only initialize on Android
@@ -166,6 +211,13 @@ export function initGoogleIAP() {
           .approved((t: any) => {
             noopLog('[Google IAP] Transaction approved:', t?.productId);
 
+            // GUARD: Prevent redirect if already on payment-success page or recently completed
+            if (isOnPaymentSuccessPage() || wasPaymentRecentlyCompleted()) {
+              noopLog('[Google IAP] Already on success page or recently completed, just finishing transaction');
+              if (t?.finish && typeof t.finish === 'function') t.finish();
+              return;
+            }
+
             // GUARD: Prevent duplicate validations/redirects
             if (window.googleIapRedirecting || window.googleIapValidationInProgress) {
               noopLog('[Google IAP] Already processing, skipping duplicate approved event');
@@ -238,6 +290,7 @@ export function initGoogleIAP() {
                 // Success: redirect to success page (only once)
                 if (!window.googleIapRedirecting) {
                   window.googleIapRedirecting = true;
+                  markPaymentCompleted();
                   window.location.href = '/payment-success?status=successful&payment_type=iap';
                 }
               } catch (err) {
@@ -252,6 +305,13 @@ export function initGoogleIAP() {
           })
           .verified(async (r: any) => {
             noopLog('[Google IAP] Purchase verified:', r?.productId);
+
+            // GUARD: Prevent redirect if already on payment-success page or recently completed
+            if (isOnPaymentSuccessPage() || wasPaymentRecentlyCompleted()) {
+              noopLog('[Google IAP] Already on success page or recently completed, just finishing transaction');
+              if (r?.finish && typeof r.finish === 'function') r.finish();
+              return;
+            }
 
             // GUARD: Prevent duplicate validations/redirects
             if (window.googleIapRedirecting || window.googleIapValidationInProgress) {
@@ -325,6 +385,7 @@ export function initGoogleIAP() {
               // Success: redirect to success page (only once)
               if (!window.googleIapRedirecting) {
                 window.googleIapRedirecting = true;
+                markPaymentCompleted();
                 window.location.href = '/payment-success?status=successful&payment_type=iap';
               }
             } catch (error) {
@@ -467,6 +528,7 @@ export const buyGoogleMonthly = async () => {
   // Reset validation/redirect guards for new purchase
   window.googleIapValidationInProgress = false;
   window.googleIapRedirecting = false;
+  clearPaymentCompleted(); // Clear any previous completion flag
 
   // Store current user_id BEFORE purchase for session-independent activation
   try {
