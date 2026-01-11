@@ -24,7 +24,7 @@ interface MatchCardProps {
   preloadedBlobImages?: { [url: string]: string }; // ⭐ Blob URLs for instant rendering
   preferredLanguageName?: string; // ⭐ Pre-fetched language name (no DB call needed)
   onImageClick: () => void;
-  onImageIndexChange?: () => void; // ⭐ ANDROID OPTIMIZATION: Callback when user flips through images
+  onImageIndexChange?: (currentIndex: number, totalImages: number) => void; // ⭐ SMART LOADING: Callback when user flips through images
   onToggleInfo: () => void;
   calculateAge: (dateOfBirth: string) => number;
   calculateDistance: (lat1: number, lon1: number, lat2: number, lon2: number) => number;
@@ -158,14 +158,20 @@ const MatchCard: React.FC<MatchCardProps> = ({
 
   // ⭐ PHASE 1.6: Memoize slide navigation handlers (prevents closure re-creation)
   const handleNext = useCallback(() => {
-    setCurrentSlide(s => Math.min(s + 1, slides.length - 1));
-    onImageIndexChange?.(); // ⭐ ANDROID OPTIMIZATION: Notify parent to abort pending loads
+    setCurrentSlide(s => {
+      const nextIndex = Math.min(s + 1, slides.length - 1);
+      onImageIndexChange?.(nextIndex, slides.length); // ⭐ SMART LOADING: Notify parent with index info
+      return nextIndex;
+    });
   }, [slides.length, onImageIndexChange]);
 
   const handlePrev = useCallback(() => {
-    setCurrentSlide(s => Math.max(s - 1, 0));
-    onImageIndexChange?.(); // ⭐ ANDROID OPTIMIZATION: Notify parent to abort pending loads
-  }, [onImageIndexChange]);
+    setCurrentSlide(s => {
+      const prevIndex = Math.max(s - 1, 0);
+      onImageIndexChange?.(prevIndex, slides.length); // ⭐ SMART LOADING: Notify parent with index info
+      return prevIndex;
+    });
+  }, [slides.length, onImageIndexChange]);
 
   // ⭐ PHASE 1.7: OPTIMIZED: Zero DOM reads on click (instant Android tap response)
   const handleSlideClick = useCallback((e: React.MouseEvent<HTMLDivElement>) => {

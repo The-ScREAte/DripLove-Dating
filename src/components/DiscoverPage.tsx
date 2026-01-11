@@ -732,7 +732,7 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, onNavigateToProfile, isPr
   const premiumActive = Boolean(isPremium) || isPremiumFromSubscription();
   const premiumResolved = isPremium !== undefined || !subscriptionLoading;
   
-  const { preloadImages, getOptimizedUrl, isImageLoaded, isImageLoading, clearCache } = useImagePreloader({
+  const { preloadImages, cancelImages, getOptimizedUrl, isImageLoaded, isImageLoading, clearCache } = useImagePreloader({
     maxConcurrent: 6, // Slightly higher concurrency for faster swipe experience
     quality: 60,
     width: 500
@@ -1933,15 +1933,15 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, onNavigateToProfile, isPr
 
     const imageMap: { [key: string]: string[] } = {};
     if (shuffled.length > 0) {
-      // Take first 6 profiles (or fewer if less exist)
-      const firstSix = shuffled.slice(0, 6);
-      const firstSixIds = firstSix.map(p => p.id);
+      // Take first 8 profiles (or fewer if less exist)
+      const firstEight = shuffled.slice(0, 8);
+      const firstEightIds = firstEight.map(p => p.id);
 
-      // Get ALL approved images for the first 6 profiles
+      // Get ALL approved images for the first 8 profiles
       const { data: imageRows, error: imgError } = await supabase
         .from('user_images')
         .select('user_id, image_url, image_order')
-        .in('user_id', firstSixIds)
+        .in('user_id', firstEightIds)
         .eq('is_approved', true)
         .order('user_id', { ascending: true })
         .order('image_order', { ascending: true });
@@ -1957,8 +1957,8 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, onNavigateToProfile, isPr
         // Apply limits:
         // 1st profile: 3 images
         // 2nd profile: 2 images
-        // 3rd–6th: 1 image each
-        firstSix.forEach((profile, index) => {
+        // 3rd–8th: 1 image each
+        firstEight.forEach((profile, index) => {
           const imgs = byUser[profile.id] || [];
           if (imgs.length === 0) return;
 
@@ -1967,19 +1967,10 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, onNavigateToProfile, isPr
           else if (index === 1) maxCount = 2;
 
           imageMap[profile.id] = imgs.slice(0, maxCount);
-
-          // For the first two, start loading the FULL set in background
-          if (index <= 1) {
-            loadAllImagesForProfile(profile.id).then(fullImgs => {
-              if (fullImgs && fullImgs.length > 0) {
-                setUserImages(prev => ({ ...prev, [profile.id]: fullImgs }));
-              }
-            });
-          }
         });
       }
 
-      // If there were fewer than 6 profiles or any without images, it's fine.
+      // If there were fewer than 8 profiles or any without images, it's fine.
       // The centralized preloader + loadAllImagesForProfile will keep loading the rest as user swipes.
     }
 
@@ -1989,7 +1980,7 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, onNavigateToProfile, isPr
       distances: distanceMap,
       index: startIndex
     };
-  }, [loadAllImagesForProfile, premiumActive, currentUser, fetchUnlockedCountryProfiles]);
+  }, [premiumActive, currentUser, fetchUnlockedCountryProfiles]);
 
   // Batch language fetch (avoid per-card calls)
   const batchFetchLanguages = useCallback(async (profileIds: string[]) => {
@@ -2101,6 +2092,24 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, onNavigateToProfile, isPr
         setCurrentIndex(0);
         setLastShuffleTime(Date.now());
 
+        // ⭐ SMART INITIAL IMAGE PRELOADING: Load images with priority
+        // First 8 profiles: 1 image each (already loaded in images object)
+        // Now preload them with correct priority
+        Object.entries(images).forEach(([profileId, imageUrls], index) => {
+          if (imageUrls.length > 0) {
+            if (index === 0) {
+              // Current profile: preload first 3 images with high priority
+              preloadImages(imageUrls.slice(0, 3), 'high');
+            } else if (index === 1) {
+              // Next profile: preload first 2 images with medium priority
+              preloadImages(imageUrls.slice(0, 2), 'medium');
+            } else {
+              // Other profiles: preload first image with low priority
+              preloadImages([imageUrls[0]], 'low');
+            }
+          }
+        });
+
         const cacheKeyForWrite = opts?.cacheKey;
         if (cacheKeyForWrite) {
           writeDeckCache(cacheKeyForWrite, initialDeck);
@@ -2148,6 +2157,80 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, onNavigateToProfile, isPr
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [currentUser, allowedGenders, toast, fetchPotentialMatchesData, injectAds, batchFetchLanguages]);
+
+  // ⭐ SMART BACKGROUND LOADING: Preload more profiles when user is idle
+  useEffect(() => {
+    if (!hasCompletedInitialFetch) return;
+    if (potentialMatches.length === 0) return;
+    
+    let idleTimer: NodeJS.Timeout;
+    let isIdle = false;
+    
+    const startIdleLoading = () => {
+      isIdle = true;
+      
+      // Background load remaining images for profiles 3-8 (if not already loaded)
+      const profilesToBackgroundLoad = potentialMatches.slice(2, 8).filter(p => !isAd(p)) as PotentialMatch[];
+      
+      profilesToBackgroundLoad.forEach((profile, idx) => {
+        const allImages = userImagesRef.current[profile.id] || [];
+        const loadedCount = (userImages[profile.id] || []).length;
+        
+        // If this profile has more images than currently loaded, load them
+        if (allImages.length > loadedCount) {
+          const remainingImages = allImages.slice(loadedCount);
+          // Stagger the loading to avoid network congestion
+          setTimeout(() => {
+            if (isIdle) {
+              preloadImages(remainingImages, 'low');
+            }
+          }, idx * 500); // 500ms between each profile
+        }
+      });
+      
+      // ⭐ PROACTIVE LOADING: Load images for profiles 9-15 in the background
+      const farProfiles = potentialMatches.slice(8, 15).filter(p => !isAd(p)) as PotentialMatch[];
+      farProfiles.forEach((profile, idx) => {
+        // Only load if we haven't started loading this profile yet
+        if (!userImages[profile.id] && !requestedImageProfileIds.current.has(profile.id)) {
+          setTimeout(() => {
+            if (isIdle) {
+              requestedImageProfileIds.current.add(profile.id);
+              loadAllImagesForProfile(profile.id).then(imgs => {
+                if (imgs && imgs.length > 0) {
+                  setUserImages(prevImgs => ({ ...prevImgs, [profile.id]: imgs }));
+                  // Preload first image with low priority
+                  preloadImages([imgs[0]], 'low');
+                }
+                requestedImageProfileIds.current.delete(profile.id);
+              });
+            }
+          }, 2000 + idx * 1000); // Start after 2s, then 1s between each
+        }
+      });
+    };
+    
+    const resetIdleTimer = () => {
+      isIdle = false;
+      clearTimeout(idleTimer);
+      // Start idle loading after 2 seconds of no activity
+      idleTimer = setTimeout(startIdleLoading, 2000);
+    };
+    
+    // Listen for user activity
+    window.addEventListener('touchstart', resetIdleTimer);
+    window.addEventListener('mousedown', resetIdleTimer);
+    
+    // Start initial timer
+    resetIdleTimer();
+    
+    return () => {
+      isIdle = false;
+      clearTimeout(idleTimer);
+      window.removeEventListener('touchstart', resetIdleTimer);
+      window.removeEventListener('mousedown', resetIdleTimer);
+    };
+  }, [hasCompletedInitialFetch, potentialMatches, userImages, preloadImages, loadAllImagesForProfile]);
 
   // Premium: attempt ONE auto-refill if deck becomes empty (don't loop infinitely)
   useEffect(() => {
@@ -3713,15 +3796,57 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, onNavigateToProfile, isPr
       // The useEffect will detect when remainingReal <= 10 and trigger loadMoreMatches
       // No need for duplicate reload logic here - keeps it simple and predictable
       
-      // ⭐ FIX 3A: Preload NEXT profile using NEW array (after removal)
-      // This ensures we preload the correct profile from the updated deck
-      const nextProfile = newMatches[0]; // After removal, the next card is index 0
-      if (nextProfile && !isAd(nextProfile)) {
-        loadAllImagesForProfile(nextProfile.id).then(imgs => {
-          if (imgs) {
-            setUserImages(prevImgs => ({ ...prevImgs, [nextProfile.id]: imgs }));
+      // ⭐ SMART IMAGE LOADING: Cancel previous profile images and preload next profiles with priority
+      // Cancel ALL images from the swiped profile (no longer needed)
+      if (!isAd(swipedItem)) {
+        const swipedImages = userImagesRef.current[swipedItem.id] || [];
+        if (swipedImages.length > 0) {
+          // Cancel all images for this profile to free up bandwidth
+          cancelImages(swipedImages);
+        }
+      }
+      
+      // ⭐ FIX 3A: Preload NEXT profiles using NEW array (after removal)
+      // Priority: Load 3 images for current profile, 2 for next profile
+      const currentProfile = newMatches[0]; // After removal, the next card is index 0
+      const nextProfile = newMatches[1]; // Profile after current
+      
+      if (currentProfile && !isAd(currentProfile)) {
+        loadAllImagesForProfile(currentProfile.id).then(imgs => {
+          if (imgs && imgs.length > 0) {
+            setUserImages(prevImgs => ({ ...prevImgs, [currentProfile.id]: imgs }));
+            // Preload first 3 images with high priority, rest with low priority
+            preloadImages(imgs.slice(0, 3), 'high');
+            if (imgs.length > 3) {
+              // Queue remaining images with low priority for background loading
+              preloadImages(imgs.slice(3), 'low');
+            }
           }
         });
+      }
+      
+      if (nextProfile && !isAd(nextProfile)) {
+        loadAllImagesForProfile(nextProfile.id).then(imgs => {
+          if (imgs && imgs.length > 0) {
+            setUserImages(prevImgs => ({ ...prevImgs, [nextProfile.id]: imgs }));
+            // Preload first 2 images with medium priority
+            preloadImages(imgs.slice(0, 2), 'medium');
+          }
+        });
+      }
+      
+      // ⭐ SMART BACKGROUND LOADING: Check if we're running low on profiles and trigger background load
+      const remainingProfiles = newMatches.filter(m => !isAd(m)).length;
+      if (remainingProfiles <= 5 && !isLoadingMore && hasCompletedInitialFetch && !noMoreProfiles) {
+        // Running low on profiles - trigger background load
+        const now = Date.now();
+        const COOLDOWN_MS = 10_000; // 10 second cooldown
+        if (now - lastAutoRefillAttemptAtRef.current >= COOLDOWN_MS) {
+          lastAutoRefillAttemptAtRef.current = now;
+          setTimeout(() => {
+            loadMoreMatches();
+          }, 100); // Small delay to not block the swipe animation
+        }
       }
       
       return newMatches;
@@ -4326,11 +4451,20 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, onNavigateToProfile, isPr
                 currentUserLongitude={currentUser.longitude}
                 onImageClick={() => handleImageAreaClick({} as React.MouseEvent<HTMLDivElement>)}
                 onToggleInfo={() => setShowMoreInfo(!showMoreInfo)}
-                onImageIndexChange={() => {
-                  // ⭐ ANDROID OPTIMIZATION: Abort pending loads when user flips through images
-                  if (currentImageAbortController) {
-                    currentImageAbortController.abort();
-                    currentImageAbortController = null;
+                onImageIndexChange={(currentIdx: number, totalImages: number) => {
+                  // ⭐ SMART PROGRESSIVE LOADING: Load more images as user slides through them
+                  if (!currentMatch || isAd(currentMatch)) return;
+                  
+                  const allImages = userImagesRef.current[currentMatch.id] || [];
+                  const hasMoreImages = allImages.length > totalImages;
+                  
+                  // If user is at image 2 or later, and there are more images to load, preload them
+                  if (currentIdx >= 1 && hasMoreImages) {
+                    const remainingImages = allImages.slice(totalImages);
+                    if (remainingImages.length > 0) {
+                      // Load next batch of images with medium priority
+                      preloadImages(remainingImages.slice(0, 3), 'medium');
+                    }
                   }
                 }}
                 calculateAge={calculateAge}

@@ -15,6 +15,13 @@ interface PreloadedImageData {
   optimizedUrl: string;
 }
 
+type Priority = 'high' | 'medium' | 'low';
+
+interface QueueItem {
+  url: string;
+  priority: Priority;
+}
+
 export const useImagePreloader = (options: ImagePreloaderOptions = {}) => {
   const {
     maxConcurrent = 3,
@@ -25,9 +32,10 @@ export const useImagePreloader = (options: ImagePreloaderOptions = {}) => {
 
   const [preloadedImages, setPreloadedImages] = useState<Map<string, PreloadedImageData>>(new Map());
   const preloadedImagesRef = useRef<Map<string, PreloadedImageData>>(new Map());
-  const loadingQueue = useRef<string[]>([]);
+  const loadingQueue = useRef<QueueItem[]>([]);
   const isProcessing = useRef(false);
   const inFlightLoads = useRef<Map<string, Promise<void>>>(new Map());
+  const cancelledUrls = useRef<Set<string>>(new Set());
 
   const setImageData = useCallback((url: string, data: PreloadedImageData) => {
     setPreloadedImages(prev => {
@@ -102,15 +110,28 @@ export const useImagePreloader = (options: ImagePreloaderOptions = {}) => {
 
     isProcessing.current = true;
 
+    // Sort queue by priority: high > medium > low
+    loadingQueue.current.sort((a, b) => {
+      const priorityOrder = { high: 0, medium: 1, low: 2 };
+      return priorityOrder[a.priority] - priorityOrder[b.priority];
+    });
+
     // Worker pool keeps concurrency saturated (no artificial delays).
     const workerCount = Math.max(1, maxConcurrent);
 
     await Promise.all(
       Array.from({ length: workerCount }).map(async () => {
         while (loadingQueue.current.length > 0) {
-          const nextUrl = loadingQueue.current.shift();
-          if (!nextUrl) return;
-          await preloadImage(nextUrl).catch(() => {
+          const nextItem = loadingQueue.current.shift();
+          if (!nextItem) return;
+          
+          // Skip cancelled URLs
+          if (cancelledUrls.current.has(nextItem.url)) {
+            cancelledUrls.current.delete(nextItem.url);
+            continue;
+          }
+          
+          await preloadImage(nextItem.url).catch(() => {
             // ignore individual image failures
           });
         }
@@ -120,24 +141,31 @@ export const useImagePreloader = (options: ImagePreloaderOptions = {}) => {
     isProcessing.current = false;
   }, [maxConcurrent, preloadImage]);
 
-  const preloadImages = useCallback((urls: string[]) => {
+  const preloadImages = useCallback((urls: string[], priority: Priority = 'medium') => {
     // Add new URLs to queue (avoid duplicates)
-    const newUrls: string[] = [];
-    const queued = new Set(loadingQueue.current);
+    const newItems: QueueItem[] = [];
+    const queuedUrls = new Set(loadingQueue.current.map(item => item.url));
 
     for (const url of urls) {
       const status = preloadedImagesRef.current.get(url);
       if (status?.loaded) continue;
-      if (queued.has(url)) continue;
+      if (queuedUrls.has(url)) continue;
       if (inFlightLoads.current.has(url)) continue;
-      newUrls.push(url);
+      if (cancelledUrls.current.has(url)) continue;
+      newItems.push({ url, priority });
     }
 
-    if (newUrls.length === 0) return;
+    if (newItems.length === 0) return;
 
-    loadingQueue.current.push(...newUrls);
+    loadingQueue.current.push(...newItems);
     processQueue();
   }, [processQueue]);
+
+  const cancelImages = useCallback((urls: string[]) => {
+    // Mark URLs as cancelled and remove from queue
+    urls.forEach(url => cancelledUrls.current.add(url));
+    loadingQueue.current = loadingQueue.current.filter(item => !cancelledUrls.current.has(item.url));
+  }, []);
 
   const getOptimizedUrl = useCallback((url: string): string => {
     const imageData = preloadedImagesRef.current.get(url);
@@ -157,10 +185,12 @@ export const useImagePreloader = (options: ImagePreloaderOptions = {}) => {
     preloadedImagesRef.current = new Map();
     inFlightLoads.current.clear();
     loadingQueue.current = [];
+    cancelledUrls.current.clear();
   }, []);
 
   return {
     preloadImages,
+    cancelImages,
     getOptimizedUrl,
     isImageLoaded,
     isImageLoading,
