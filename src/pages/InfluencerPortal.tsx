@@ -51,60 +51,57 @@ const InfluencerPortal = () => {
   const [payoutAmount, setPayoutAmount] = useState('');
   const [requestingPayout, setRequestingPayout] = useState(false);
 
-  // Check for existing session on mount
+  // Check for existing session on mount (display-only, no auto-refresh with credentials)
   useEffect(() => {
     const savedSession = localStorage.getItem('influencer_session');
     if (savedSession) {
       try {
         const parsed = JSON.parse(savedSession);
-        // Refresh data on load
-        refreshSession(parsed.code, parsed.cached_password);
+        // Only restore the session display data - no password stored
+        // User will see cached data but needs to refresh/re-login for updates
+        if (parsed.promo_code_id && parsed.code && parsed.owner_name) {
+          setSession({
+            promo_code_id: parsed.promo_code_id,
+            code: parsed.code,
+            owner_name: parsed.owner_name,
+            email: parsed.email,
+            percentage_cut: parsed.percentage_cut || 0,
+            commission_duration: parsed.commission_duration || 0,
+            status: parsed.status || 'active',
+            total_signups: parsed.total_signups || 0,
+            total_subscribers: parsed.total_subscribers || 0,
+            total_commission: parsed.total_commission || 0,
+            total_commission_usd: parsed.total_commission_usd || 0,
+            has_pending_payout: parsed.has_pending_payout || false
+          });
+        }
       } catch (e) {
         localStorage.removeItem('influencer_session');
       }
     }
   }, []);
 
-  const refreshSession = async (code: string, cachedPassword?: string) => {
-    setLoading(true);
-    try {
-      const { data, error } = await supabase.rpc('influencer_login', {
-        code_input: code,
-        password_input: cachedPassword || password
-      });
-
-      if (error) throw error;
-
-      const result = data as any;
-      
-      if (result.success) {
-        const sessionData: InfluencerSession = {
-          promo_code_id: result.promo_code_id,
-          code: result.code,
-          owner_name: result.owner_name,
-          email: result.email,
-          percentage_cut: result.percentage_cut,
-          commission_duration: result.commission_duration,
-          status: result.status,
-          total_signups: result.total_signups,
-          total_subscribers: result.total_subscribers,
-          total_commission: result.total_commission || 0,
-          total_commission_usd: result.total_commission_usd || 0,
-          has_pending_payout: result.has_pending_payout
-        };
-        
-        setSession(sessionData);
-        // Cache session with password for refresh
-        localStorage.setItem('influencer_session', JSON.stringify({
-          ...sessionData,
-          cached_password: cachedPassword || password
-        }));
-      }
-    } catch (error) {
-      console.error('Session refresh error:', error);
-    } finally {
-      setLoading(false);
-    }
+  // Update local session data from API response (no credentials stored)
+  const updateSessionFromResult = (result: any) => {
+    const sessionData: InfluencerSession = {
+      promo_code_id: result.promo_code_id,
+      code: result.code,
+      owner_name: result.owner_name,
+      email: result.email,
+      percentage_cut: result.percentage_cut,
+      commission_duration: result.commission_duration,
+      status: result.status,
+      total_signups: result.total_signups,
+      total_subscribers: result.total_subscribers,
+      total_commission: result.total_commission || 0,
+      total_commission_usd: result.total_commission_usd || 0,
+      has_pending_payout: result.has_pending_payout
+    };
+    
+    setSession(sessionData);
+    // Store session data WITHOUT password - secure storage
+    localStorage.setItem('influencer_session', JSON.stringify(sessionData));
+    return sessionData;
   };
 
   const handleLogin = async (e: React.FormEvent) => {
@@ -131,26 +128,7 @@ const InfluencerPortal = () => {
       const result = data as any;
       
       if (result.success) {
-        const sessionData: InfluencerSession = {
-          promo_code_id: result.promo_code_id,
-          code: result.code,
-          owner_name: result.owner_name,
-          email: result.email,
-          percentage_cut: result.percentage_cut,
-          commission_duration: result.commission_duration,
-          status: result.status,
-          total_signups: result.total_signups,
-          total_subscribers: result.total_subscribers,
-          total_commission: result.total_commission || 0,
-          total_commission_usd: result.total_commission_usd || 0,
-          has_pending_payout: result.has_pending_payout
-        };
-        
-        setSession(sessionData);
-        localStorage.setItem('influencer_session', JSON.stringify({
-          ...sessionData,
-          cached_password: password
-        }));
+        updateSessionFromResult(result);
         
         toast({ title: 'Welcome!', description: `Logged in as ${result.owner_name}` });
       } else {
@@ -216,8 +194,8 @@ const InfluencerPortal = () => {
       if (result.success) {
         toast({ title: 'Success', description: 'Payout request submitted!' });
         setPayoutAmount('');
-        // Refresh session to update has_pending_payout
-        refreshSession(session.code);
+        // Update has_pending_payout in local state
+        setSession(prev => prev ? { ...prev, has_pending_payout: true } : null);
       } else {
         toast({ 
           title: 'Error', 
