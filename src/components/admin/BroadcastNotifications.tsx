@@ -907,10 +907,10 @@ export default function BroadcastNotifications() {
                     value={notificationMessage}
                     onChange={(e) => setNotificationMessage(e.target.value)}
                     rows={6}
-                    maxLength={2000}
+                    maxLength={3000}
                     className="text-xs"
                   />
-                  <p className="text-[10px] text-gray-500">{notificationMessage.length}/2000 characters</p>
+                  <p className="text-[10px] text-gray-500">{notificationMessage.length}/3000 characters</p>
                 </div>
 
                 <Alert>

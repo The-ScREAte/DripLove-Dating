@@ -520,9 +520,9 @@ export default function ScheduledBroadcasts() {
                 onChange={(e) => setMessage(e.target.value)}
                 placeholder="Notification message"
                 rows={5}
-                maxLength={2000}
+                maxLength={3000}
               />
-              <p className="text-xs text-gray-500">{message.length}/2000 characters</p>
+              <p className="text-xs text-gray-500">{message.length}/3000 characters</p>
             </div>
 
             <div className="space-y-2">
