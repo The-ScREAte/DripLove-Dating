@@ -5,10 +5,13 @@ import { Badge } from '@/components/ui/badge';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/components/ui/use-toast';
 import { ScrollArea } from '@/components/ui/scroll-area';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Label } from '@/components/ui/label';
 import { 
   RefreshCw, Users, MapPin, Heart, X, Clock, 
   Database, Server, Wifi, AlertCircle, CheckCircle,
-  Bell, Mail, CreditCard, Archive, ImageOff, Eye, EyeOff
+  Bell, Mail, CreditCard, Archive, ImageOff, Eye, EyeOff,
+  Ban, Pause, Trash2, Play, Loader2
 } from 'lucide-react';
 
 interface UserPoolStats {
@@ -39,6 +42,7 @@ interface ProfileHealthIssue {
   lastName: string;
   email: string;
   issues: string[];
+  lastLoginAt?: string | null;
 }
 
 interface HealthStats {
@@ -67,6 +71,8 @@ const UserPoolDebugger: React.FC<Props> = ({ currentUserId, userPreferences, onV
   const [healthStats, setHealthStats] = useState<HealthStats | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [activeTab, setActiveTab] = useState<'userPool' | 'system' | 'health'>('userPool');
+  const [lastLoginFilter, setLastLoginFilter] = useState<string>('all');
+  const [actionLoading, setActionLoading] = useState<Record<string, boolean>>({});
   const { toast } = useToast();
 
   const calculateAge = (dateOfBirth: string) => {
@@ -116,13 +122,9 @@ const UserPoolDebugger: React.FC<Props> = ({ currentUserId, userPreferences, onV
     let hasMore = true;
 
     while (hasMore) {
-      // Build query manually to avoid type issues
       const baseQuery = supabase.from(tableName).select(selectFields);
-      
-      // We'll build queries for each table type separately
       let query = baseQuery.range(offset, offset + batchSize - 1);
 
-      // Apply filters using type-safe approach
       if (filters) {
         for (const filter of filters) {
           if (filter.column && filter.op === 'neq') {
@@ -156,12 +158,35 @@ const UserPoolDebugger: React.FC<Props> = ({ currentUserId, userPreferences, onV
     return allRows;
   };
 
+  const formatLastLogin = (lastLoginAt: string | null | undefined): string => {
+    if (!lastLoginAt) return 'Never';
+    
+    const loginDate = new Date(lastLoginAt);
+    const now = new Date();
+    const diffMs = now.getTime() - loginDate.getTime();
+    const diffDays = Math.floor(diffMs / (1000 * 60 * 60 * 24));
+    
+    if (diffDays === 0) return 'Today';
+    if (diffDays === 1) return '1d ago';
+    if (diffDays < 7) return `${diffDays}d ago`;
+    if (diffDays < 30) return `${Math.floor(diffDays / 7)}w ago`;
+    return `${Math.floor(diffDays / 30)}mo ago`;
+  };
+
+  const getLastLoginFilterDate = (filter: string): Date | null => {
+    if (filter === 'all') return null;
+    const days = parseInt(filter);
+    if (isNaN(days)) return null;
+    const date = new Date();
+    date.setDate(date.getDate() - days);
+    return date;
+  };
+
   const analyzeUserPool = async () => {
     if (!currentUserId) return;
     
     setIsLoading(true);
     try {
-      // Use count queries for accurate totals and batch fetch for data that needs processing
       const [
         { count: totalUsersCount },
         { count: activeUsersCount },
@@ -170,13 +195,11 @@ const UserPoolDebugger: React.FC<Props> = ({ currentUserId, userPreferences, onV
         blockedUsers,
         recentPasses
       ] = await Promise.all([
-        // Get accurate count of all users (excluding current user)
         supabase
           .from('profiles')
           .select('*', { count: 'exact', head: true })
           .neq('id', currentUserId)
           .eq('is_admin', false),
-        // Get count of active users
         supabase
           .from('profiles')
           .select('*', { count: 'exact', head: true })
@@ -184,22 +207,18 @@ const UserPoolDebugger: React.FC<Props> = ({ currentUserId, userPreferences, onV
           .eq('account_status', 'active')
           .eq('is_admin', false)
           .eq('is_archived', false),
-        // Get count of archived users
         supabase
           .from('profiles')
           .select('*', { count: 'exact', head: true })
           .neq('id', currentUserId)
           .eq('is_archived', true)
           .eq('is_admin', false),
-        // Fetch all liked users (batch)
         fetchAllRows<{ liked_id: string }>('likes', 'liked_id', [
           { column: 'liker_id', op: 'eq', value: currentUserId }
         ]),
-        // Fetch all blocks
         fetchAllRows<{ blocked_id: string; blocker_id: string }>('blocks', 'blocked_id, blocker_id', [
           { column: '', op: 'or', value: `blocker_id.eq.${currentUserId},blocked_id.eq.${currentUserId}` }
         ]),
-        // Fetch recent passes
         supabase
           .from('passes')
           .select('passed_id')
@@ -215,8 +234,6 @@ const UserPoolDebugger: React.FC<Props> = ({ currentUserId, userPreferences, onV
       const blockedUserIds = blockedUsers?.flatMap(block => [block.blocked_id, block.blocker_id]) || [];
       const recentPassIds = recentPasses.data?.map(pass => pass.passed_id) || [];
 
-      // For detailed filtering analysis, we need to fetch profiles in batches
-      // But for the main counts, use the count queries
       const allProfiles = await fetchAllRows<{
         id: string;
         gender: string;
@@ -232,32 +249,23 @@ const UserPoolDebugger: React.FC<Props> = ({ currentUserId, userPreferences, onV
       ]);
 
       const allowedGenders = getGenderFilter(preferences.preference || 'everyone');
-
-      // Step 1: Active & not archived users only
       const activeUsers = allProfiles.filter(user => 
         user.account_status === 'active' && !user.is_admin && !user.is_archived
       );
-
-      // Step 2: Gender preference filtering
       const genderFilteredUsers = activeUsers.filter(user =>
         allowedGenders.includes(user.gender)
       );
-
-      // Step 3: Age filtering
       const ageFilteredUsers = genderFilteredUsers.filter(user => {
         if (!user.date_of_birth) return false;
         const age = calculateAge(user.date_of_birth);
         return age >= minAge && age <= maxAge;
       });
 
-      // Step 4: Distance filtering
       let distanceFilteredUsers = ageFilteredUsers;
       const maxDistance = preferences.max_distance || 50;
       if (preferences.latitude && preferences.longitude) {
         distanceFilteredUsers = ageFilteredUsers.filter(user => {
-          if (!user.latitude || !user.longitude) {
-            return true;
-          }
+          if (!user.latitude || !user.longitude) return true;
           const distance = calculateDistance(
             preferences.latitude!,
             preferences.longitude!,
@@ -268,7 +276,6 @@ const UserPoolDebugger: React.FC<Props> = ({ currentUserId, userPreferences, onV
         });
       }
 
-      // Step 5: Remove excluded users
       const finalUsers = distanceFilteredUsers.filter(user =>
         !likedUserIds.includes(user.id) &&
         !blockedUserIds.includes(user.id) &&
@@ -289,7 +296,6 @@ const UserPoolDebugger: React.FC<Props> = ({ currentUserId, userPreferences, onV
       };
 
       setStats(stats);
-
       toast({
         title: "Analysis Complete",
         description: `Found ${stats.finalEligibleUsers} eligible users out of ${stats.totalUsers} total users.`,
@@ -355,7 +361,6 @@ const UserPoolDebugger: React.FC<Props> = ({ currentUserId, userPreferences, onV
   const analyzeProfileHealth = async () => {
     setIsLoading(true);
     try {
-      // Batch fetch all active profiles to bypass 1000 row limit
       const profiles = await fetchAllRows<{
         id: string;
         first_name: string;
@@ -369,36 +374,24 @@ const UserPoolDebugger: React.FC<Props> = ({ currentUserId, userPreferences, onV
         bio: string;
         is_admin: boolean;
         account_status: string;
-      }>('profiles', 'id, first_name, last_name, email, gender, preference, date_of_birth, country, city, bio, is_admin, account_status', [
+        last_login_at: string | null;
+      }>('profiles', 'id, first_name, last_name, email, gender, preference, date_of_birth, country, city, bio, is_admin, account_status, last_login_at', [
         { column: 'account_status', op: 'eq', value: 'active' },
         { column: 'is_admin', op: 'eq', value: false }
       ]);
 
-      // Batch fetch all user images
       const allImages = await fetchAllRows<{
         user_id: string;
         image_url: string;
         is_approved: boolean;
       }>('user_images', 'user_id, image_url, is_approved');
 
-      // Batch fetch all likes to determine users who have never been seen
       const allLikes = await fetchAllRows<{ liked_id: string }>('likes', 'liked_id');
-
-      // Batch fetch all passes
       const allPasses = await fetchAllRows<{ passed_id: string }>('passes', 'passed_id');
 
-      // Create sets for quick lookup
       const usersWithImages = new Set<string>();
-      const imagesByUser = new Map<string, { url: string; approved: boolean }[]>();
-
       (allImages || []).forEach(img => {
-        if (img.user_id) {
-          usersWithImages.add(img.user_id);
-          if (!imagesByUser.has(img.user_id)) {
-            imagesByUser.set(img.user_id, []);
-          }
-          imagesByUser.get(img.user_id)!.push({ url: img.image_url, approved: img.is_approved || false });
-        }
+        if (img.user_id) usersWithImages.add(img.user_id);
       });
 
       const seenUsers = new Set<string>();
@@ -409,39 +402,36 @@ const UserPoolDebugger: React.FC<Props> = ({ currentUserId, userPreferences, onV
         if (pass.passed_id) seenUsers.add(pass.passed_id);
       });
 
-      // Analyze profiles
       const usersWithNoImages: ProfileHealthIssue[] = [];
       const usersNeverSeen: ProfileHealthIssue[] = [];
       const usersWithIncompleteProfiles: ProfileHealthIssue[] = [];
 
       (profiles || []).forEach(profile => {
-        const issues: string[] = [];
         const hasImages = usersWithImages.has(profile.id);
         const hasBeenSeen = seenUsers.has(profile.id);
 
-        // Check for no images
         if (!hasImages) {
           usersWithNoImages.push({
             userId: profile.id,
             firstName: profile.first_name || '',
             lastName: profile.last_name || '',
             email: profile.email || '',
-            issues: ['No profile images']
+            issues: ['No profile images'],
+            lastLoginAt: profile.last_login_at
           });
         }
 
-        // Check if never seen (not liked or passed by anyone)
         if (!hasBeenSeen) {
           usersNeverSeen.push({
             userId: profile.id,
             firstName: profile.first_name || '',
             lastName: profile.last_name || '',
             email: profile.email || '',
-            issues: ['Never been seen by other users']
+            issues: ['Never been seen by other users'],
+            lastLoginAt: profile.last_login_at
           });
         }
 
-        // Check for incomplete profile
         if (!profile.gender || !profile.preference || !profile.bio || !profile.city) {
           const missing: string[] = [];
           if (!profile.gender) missing.push('gender');
@@ -454,14 +444,15 @@ const UserPoolDebugger: React.FC<Props> = ({ currentUserId, userPreferences, onV
             firstName: profile.first_name || '',
             lastName: profile.last_name || '',
             email: profile.email || '',
-            issues: [`Missing: ${missing.join(', ')}`]
+            issues: [`Missing: ${missing.join(', ')}`],
+            lastLoginAt: profile.last_login_at
           });
         }
       });
 
       setHealthStats({
         usersWithNoImages,
-        usersWithBrokenImages: [], // Would need server-side check for broken URLs
+        usersWithBrokenImages: [],
         usersNeverSeen,
         usersWithIncompleteProfiles
       });
@@ -481,6 +472,138 @@ const UserPoolDebugger: React.FC<Props> = ({ currentUserId, userPreferences, onV
     } finally {
       setIsLoading(false);
     }
+  };
+
+  // Filter users by last login
+  const filterUsersByLastLogin = (users: ProfileHealthIssue[]): ProfileHealthIssue[] => {
+    const filterDate = getLastLoginFilterDate(lastLoginFilter);
+    if (!filterDate) return users;
+    
+    return users.filter(user => {
+      if (!user.lastLoginAt) return true; // Include users who never logged in
+      const loginDate = new Date(user.lastLoginAt);
+      return loginDate < filterDate;
+    });
+  };
+
+  // Admin actions
+  const handleBlockUser = async (userId: string, userName: string) => {
+    if (!confirm(`Block ${userName}? They won't be able to use the app.`)) return;
+    
+    setActionLoading(prev => ({ ...prev, [`block-${userId}`]: true }));
+    try {
+      const { error } = await supabase
+        .from('profiles')
+        .update({ account_status: 'blocked' })
+        .eq('id', userId);
+
+      if (error) throw error;
+      
+      toast({ title: 'User Blocked', description: `${userName} has been blocked.` });
+      analyzeProfileHealth();
+    } catch (error) {
+      console.error('Error blocking user:', error);
+      toast({ title: 'Error', description: 'Failed to block user', variant: 'destructive' });
+    } finally {
+      setActionLoading(prev => ({ ...prev, [`block-${userId}`]: false }));
+    }
+  };
+
+  const handleHoldUser = async (userId: string, userName: string) => {
+    if (!confirm(`Put ${userName} on hold? Their account will be temporarily suspended.`)) return;
+    
+    setActionLoading(prev => ({ ...prev, [`hold-${userId}`]: true }));
+    try {
+      const { error } = await supabase
+        .from('profiles')
+        .update({ account_status: 'on_hold' })
+        .eq('id', userId);
+
+      if (error) throw error;
+      
+      toast({ title: 'User On Hold', description: `${userName} has been put on hold.` });
+      analyzeProfileHealth();
+    } catch (error) {
+      console.error('Error putting user on hold:', error);
+      toast({ title: 'Error', description: 'Failed to put user on hold', variant: 'destructive' });
+    } finally {
+      setActionLoading(prev => ({ ...prev, [`hold-${userId}`]: false }));
+    }
+  };
+
+  const handleDeleteUser = async (userId: string, userName: string) => {
+    if (!confirm(`DELETE ${userName}? This action is PERMANENT and cannot be undone!`)) return;
+    if (!confirm(`Are you ABSOLUTELY sure you want to permanently delete ${userName}?`)) return;
+    
+    setActionLoading(prev => ({ ...prev, [`delete-${userId}`]: true }));
+    try {
+      const { error } = await supabase.rpc('delete_user_and_data', { user_id_to_delete: userId });
+
+      if (error) throw error;
+      
+      toast({ title: 'User Deleted', description: `${userName} has been permanently deleted.` });
+      analyzeProfileHealth();
+    } catch (error) {
+      console.error('Error deleting user:', error);
+      toast({ title: 'Error', description: 'Failed to delete user', variant: 'destructive' });
+    } finally {
+      setActionLoading(prev => ({ ...prev, [`delete-${userId}`]: false }));
+    }
+  };
+
+  const renderUserRow = (user: ProfileHealthIssue, bgColor: string) => {
+    const isBlocking = actionLoading[`block-${user.userId}`];
+    const isHolding = actionLoading[`hold-${user.userId}`];
+    const isDeleting = actionLoading[`delete-${user.userId}`];
+    const userName = `${user.firstName} ${user.lastName}`;
+    
+    return (
+      <div key={user.userId} className={`flex items-center justify-between text-xs p-1.5 ${bgColor} rounded gap-1`}>
+        <div className="flex items-center gap-2 flex-1 min-w-0">
+          <span className="truncate font-medium">{userName}</span>
+          <Badge variant="outline" className="text-[9px] h-4 shrink-0 bg-white">
+            {formatLastLogin(user.lastLoginAt)}
+          </Badge>
+        </div>
+        <div className="flex items-center gap-0.5 shrink-0">
+          {onViewProfile && (
+            <Button size="sm" variant="ghost" className="h-5 w-5 p-0" onClick={() => onViewProfile(user.userId)} title="View Profile">
+              <Eye className="w-3 h-3" />
+            </Button>
+          )}
+          <Button 
+            size="sm" 
+            variant="ghost" 
+            className="h-5 w-5 p-0 text-orange-600 hover:text-orange-700 hover:bg-orange-50" 
+            onClick={() => handleHoldUser(user.userId, userName)}
+            disabled={isHolding}
+            title="Put on Hold"
+          >
+            {isHolding ? <Loader2 className="w-3 h-3 animate-spin" /> : <Pause className="w-3 h-3" />}
+          </Button>
+          <Button 
+            size="sm" 
+            variant="ghost" 
+            className="h-5 w-5 p-0 text-red-600 hover:text-red-700 hover:bg-red-50" 
+            onClick={() => handleBlockUser(user.userId, userName)}
+            disabled={isBlocking}
+            title="Block User"
+          >
+            {isBlocking ? <Loader2 className="w-3 h-3 animate-spin" /> : <Ban className="w-3 h-3" />}
+          </Button>
+          <Button 
+            size="sm" 
+            variant="ghost" 
+            className="h-5 w-5 p-0 text-red-700 hover:text-red-800 hover:bg-red-100" 
+            onClick={() => handleDeleteUser(user.userId, userName)}
+            disabled={isDeleting}
+            title="Delete User"
+          >
+            {isDeleting ? <Loader2 className="w-3 h-3 animate-spin" /> : <Trash2 className="w-3 h-3" />}
+          </Button>
+        </div>
+      </div>
+    );
   };
 
   return (
@@ -730,24 +853,45 @@ const UserPoolDebugger: React.FC<Props> = ({ currentUserId, userPreferences, onV
 
         {activeTab === 'health' && (
           <>
-            <Button 
-              onClick={analyzeProfileHealth} 
-              disabled={isLoading}
-              className="w-full"
-              size="sm"
-            >
-              {isLoading ? (
-                <>
-                  <RefreshCw className="w-3 h-3 mr-1 animate-spin" />
-                  Checking...
-                </>
-              ) : (
-                <>
-                  <AlertCircle className="w-3 h-3 mr-1" />
-                  Check Profile Health
-                </>
-              )}
-            </Button>
+            <div className="flex gap-2 items-end">
+              <Button 
+                onClick={analyzeProfileHealth} 
+                disabled={isLoading}
+                className="flex-1"
+                size="sm"
+              >
+                {isLoading ? (
+                  <>
+                    <RefreshCw className="w-3 h-3 mr-1 animate-spin" />
+                    Checking...
+                  </>
+                ) : (
+                  <>
+                    <AlertCircle className="w-3 h-3 mr-1" />
+                    Check Health
+                  </>
+                )}
+              </Button>
+            </div>
+
+            {/* Last Login Filter */}
+            <div className="space-y-1">
+              <Label className="text-[10px]">Filter by Last Login</Label>
+              <Select value={lastLoginFilter} onValueChange={setLastLoginFilter}>
+                <SelectTrigger className="h-7 text-xs">
+                  <SelectValue placeholder="All users" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All Users</SelectItem>
+                  <SelectItem value="7">Last login 7+ days ago</SelectItem>
+                  <SelectItem value="14">Last login 14+ days ago</SelectItem>
+                  <SelectItem value="30">Last login 30+ days ago</SelectItem>
+                  <SelectItem value="45">Last login 45+ days ago</SelectItem>
+                  <SelectItem value="60">Last login 60+ days ago</SelectItem>
+                  <SelectItem value="80">Last login 80+ days ago</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
 
             {healthStats && (
               <div className="space-y-3">
@@ -755,21 +899,16 @@ const UserPoolDebugger: React.FC<Props> = ({ currentUserId, userPreferences, onV
                 <div className="border rounded p-2">
                   <div className="flex items-center gap-2 mb-2">
                     <ImageOff className="w-4 h-4 text-red-500" />
-                    <span className="font-medium text-sm">No Images ({healthStats.usersWithNoImages.length})</span>
+                    <span className="font-medium text-sm">
+                      No Images ({filterUsersByLastLogin(healthStats.usersWithNoImages).length})
+                    </span>
                   </div>
-                  {healthStats.usersWithNoImages.length > 0 ? (
-                    <ScrollArea className="h-32">
+                  {filterUsersByLastLogin(healthStats.usersWithNoImages).length > 0 ? (
+                    <ScrollArea className="h-40">
                       <div className="space-y-1">
-                        {healthStats.usersWithNoImages.slice(0, 20).map(user => (
-                          <div key={user.userId} className="flex items-center justify-between text-xs p-1 bg-red-50 rounded">
-                            <span>{user.firstName} {user.lastName}</span>
-                            {onViewProfile && (
-                              <Button size="sm" variant="ghost" className="h-5 px-1" onClick={() => onViewProfile(user.userId)}>
-                                <Eye className="w-3 h-3" />
-                              </Button>
-                            )}
-                          </div>
-                        ))}
+                        {filterUsersByLastLogin(healthStats.usersWithNoImages).slice(0, 50).map(user => 
+                          renderUserRow(user, 'bg-red-50')
+                        )}
                       </div>
                     </ScrollArea>
                   ) : (
@@ -781,21 +920,16 @@ const UserPoolDebugger: React.FC<Props> = ({ currentUserId, userPreferences, onV
                 <div className="border rounded p-2">
                   <div className="flex items-center gap-2 mb-2">
                     <EyeOff className="w-4 h-4 text-orange-500" />
-                    <span className="font-medium text-sm">Never Seen ({healthStats.usersNeverSeen.length})</span>
+                    <span className="font-medium text-sm">
+                      Never Seen ({filterUsersByLastLogin(healthStats.usersNeverSeen).length})
+                    </span>
                   </div>
-                  {healthStats.usersNeverSeen.length > 0 ? (
-                    <ScrollArea className="h-32">
+                  {filterUsersByLastLogin(healthStats.usersNeverSeen).length > 0 ? (
+                    <ScrollArea className="h-40">
                       <div className="space-y-1">
-                        {healthStats.usersNeverSeen.slice(0, 20).map(user => (
-                          <div key={user.userId} className="flex items-center justify-between text-xs p-1 bg-orange-50 rounded">
-                            <span>{user.firstName} {user.lastName}</span>
-                            {onViewProfile && (
-                              <Button size="sm" variant="ghost" className="h-5 px-1" onClick={() => onViewProfile(user.userId)}>
-                                <Eye className="w-3 h-3" />
-                              </Button>
-                            )}
-                          </div>
-                        ))}
+                        {filterUsersByLastLogin(healthStats.usersNeverSeen).slice(0, 50).map(user => 
+                          renderUserRow(user, 'bg-orange-50')
+                        )}
                       </div>
                     </ScrollArea>
                   ) : (
@@ -807,24 +941,16 @@ const UserPoolDebugger: React.FC<Props> = ({ currentUserId, userPreferences, onV
                 <div className="border rounded p-2">
                   <div className="flex items-center gap-2 mb-2">
                     <AlertCircle className="w-4 h-4 text-yellow-500" />
-                    <span className="font-medium text-sm">Incomplete ({healthStats.usersWithIncompleteProfiles.length})</span>
+                    <span className="font-medium text-sm">
+                      Incomplete ({filterUsersByLastLogin(healthStats.usersWithIncompleteProfiles).length})
+                    </span>
                   </div>
-                  {healthStats.usersWithIncompleteProfiles.length > 0 ? (
-                    <ScrollArea className="h-32">
+                  {filterUsersByLastLogin(healthStats.usersWithIncompleteProfiles).length > 0 ? (
+                    <ScrollArea className="h-40">
                       <div className="space-y-1">
-                        {healthStats.usersWithIncompleteProfiles.slice(0, 20).map(user => (
-                          <div key={user.userId} className="flex items-center justify-between text-xs p-1 bg-yellow-50 rounded">
-                            <div>
-                              <span>{user.firstName} {user.lastName}</span>
-                              <span className="text-gray-400 ml-1">({user.issues[0]})</span>
-                            </div>
-                            {onViewProfile && (
-                              <Button size="sm" variant="ghost" className="h-5 px-1" onClick={() => onViewProfile(user.userId)}>
-                                <Eye className="w-3 h-3" />
-                              </Button>
-                            )}
-                          </div>
-                        ))}
+                        {filterUsersByLastLogin(healthStats.usersWithIncompleteProfiles).slice(0, 50).map(user => 
+                          renderUserRow(user, 'bg-yellow-50')
+                        )}
                       </div>
                     </ScrollArea>
                   ) : (

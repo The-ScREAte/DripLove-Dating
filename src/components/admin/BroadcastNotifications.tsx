@@ -906,11 +906,11 @@ export default function BroadcastNotifications() {
                     placeholder="e.g., Check out the new updates we've added to improve your experience..."
                     value={notificationMessage}
                     onChange={(e) => setNotificationMessage(e.target.value)}
-                    rows={4}
-                    maxLength={200}
+                    rows={6}
+                    maxLength={2000}
                     className="text-xs"
                   />
-                  <p className="text-[10px] text-gray-500">{notificationMessage.length}/200 characters</p>
+                  <p className="text-[10px] text-gray-500">{notificationMessage.length}/2000 characters</p>
                 </div>
 
                 <Alert>
