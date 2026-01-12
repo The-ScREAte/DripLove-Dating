@@ -23,6 +23,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog';
+import { fetchAllRows, applyDebugFilter } from '@/hooks/useBatchFetch';
 
 interface Country {
   code: string;
@@ -246,8 +247,7 @@ export default function BroadcastNotifications() {
     try {
       const countryArray = Array.from(selectedCountries);
 
-      // Supabase/PostgREST commonly applies a default max rows per request.
-      // Page through results so large countries (>1000 users) are fully included.
+      // Batch fetch all profiles from selected countries
       const PAGE_SIZE = 1000;
       const profiles: Array<{
         id: string;
@@ -258,14 +258,16 @@ export default function BroadcastNotifications() {
         gender?: string | null;
         preference?: string | null;
         bio?: string | null;
+        account_status?: string | null;
       }> = [];
+      
       for (let page = 0; ; page++) {
         const from = page * PAGE_SIZE;
         const to = from + PAGE_SIZE - 1;
 
         const { data: pageRows, error: profileError } = await supabase
           .from('profiles')
-          .select('id, first_name, last_name, country, city, gender, preference, bio')
+          .select('id, first_name, last_name, country, city, gender, preference, bio, account_status')
           .in('country', countryArray)
           .eq('is_admin', false)
           .order('id')
@@ -278,115 +280,19 @@ export default function BroadcastNotifications() {
         if (pageRows.length < PAGE_SIZE) break;
       }
 
-      const userIds = profiles.map((p) => p.id);
+      // Batch fetch ALL push tokens (not just for current users) to ensure accurate token check
+      const allTokens = await fetchAllRows<{ user_id: string }>('push_tokens', 'user_id');
       const usersWithTokens = new Set<string>();
+      allTokens.forEach(t => {
+        if (t.user_id) usersWithTokens.add(t.user_id);
+      });
 
-      // Avoid huge `.in(...)` queries that can exceed URL limits and return 400.
-      // Batch token lookups in smaller chunks.
-      const CHUNK_SIZE = 100;
-      for (let i = 0; i < userIds.length; i += CHUNK_SIZE) {
-        const chunk = userIds.slice(i, i + CHUNK_SIZE);
-        if (chunk.length === 0) continue;
+      let filteredProfiles = [...profiles];
 
-        const { data: tokensChunk, error: tokenError } = await supabase
-          .from('push_tokens')
-          .select('user_id')
-          .in('user_id', chunk);
-
-        if (tokenError) throw tokenError;
-        (tokensChunk || []).forEach((t) => {
-          if (t.user_id) usersWithTokens.add(t.user_id);
-        });
-      }
-
-      let filteredProfiles = profiles;
-
-      // Apply debug filters - these SHOW ONLY users matching the selected criteria
-      if (recipientFilter === 'no_images') {
-        // Show ONLY users WITHOUT any images
-        const usersWithImages = new Set<string>();
-        for (let i = 0; i < userIds.length; i += CHUNK_SIZE) {
-          const chunk = userIds.slice(i, i + CHUNK_SIZE);
-          if (chunk.length === 0) continue;
-
-          const { data: imagesChunk, error: imagesError } = await supabase
-            .from('user_images')
-            .select('user_id')
-            .in('user_id', chunk);
-
-          if (imagesError) throw imagesError;
-          (imagesChunk || []).forEach((img) => {
-            if (img.user_id) usersWithImages.add(img.user_id);
-          });
-        }
-
-        // FILTER: Keep only users who have NO images (not in usersWithImages set)
-        filteredProfiles = profiles.filter((p) => !usersWithImages.has(p.id));
-        console.log(`[Broadcast] no_images filter: ${usersWithImages.size} users have images, ${filteredProfiles.length} users without images`);
-      } else if (recipientFilter === 'never_seen') {
-        // Show ONLY users who have never been liked or passed
-        const seenUsers = new Set<string>();
-        for (let i = 0; i < userIds.length; i += CHUNK_SIZE) {
-          const chunk = userIds.slice(i, i + CHUNK_SIZE);
-          if (chunk.length === 0) continue;
-
-          const [{ data: likesChunk, error: likesError }, { data: passesChunk, error: passesError }] = await Promise.all([
-            supabase.from('likes').select('liked_id').in('liked_id', chunk),
-            supabase.from('passes').select('passed_id').in('passed_id', chunk),
-          ]);
-
-          if (likesError) throw likesError;
-          if (passesError) throw passesError;
-
-          (likesChunk || []).forEach((r: any) => {
-            if (r.liked_id) seenUsers.add(r.liked_id);
-          });
-          (passesChunk || []).forEach((r: any) => {
-            if (r.passed_id) seenUsers.add(r.passed_id);
-          });
-        }
-
-        // FILTER: Keep only users who have NOT been seen (not in seenUsers set)
-        filteredProfiles = profiles.filter((p) => !seenUsers.has(p.id));
-        console.log(`[Broadcast] never_seen filter: ${seenUsers.size} users have been seen, ${filteredProfiles.length} never seen`);
-      } else if (recipientFilter === 'incomplete_profile') {
-        // Show ONLY users with incomplete profiles
-        filteredProfiles = profiles.filter((p) => {
-          const gender = (p.gender || '').trim();
-          const preference = (p.preference || '').trim();
-          const bio = (p.bio || '').trim();
-          const city = (p.city || '').trim();
-          // Incomplete means missing at least one key field
-          return !(gender && preference && bio && city);
-        });
-        console.log(`[Broadcast] incomplete_profile filter: ${filteredProfiles.length} incomplete profiles`);
-      } else if (recipientFilter === 'active_accounts') {
-        // Show only users with active account status (non-archived, non-suspended)
-        // Since we're already querying active profiles by default, just show all
-        filteredProfiles = profiles;
-        console.log(`[Broadcast] active_accounts filter: ${filteredProfiles.length} active accounts`);
-      } else if (recipientFilter === 'premium_users') {
-        // Show ONLY premium users with active subscriptions
-        const premiumUserIds = new Set<string>();
-        for (let i = 0; i < userIds.length; i += CHUNK_SIZE) {
-          const chunk = userIds.slice(i, i + CHUNK_SIZE);
-          if (chunk.length === 0) continue;
-
-          const { data: subsChunk, error: subsError } = await supabase
-            .from('user_subscriptions')
-            .select('user_id')
-            .in('user_id', chunk)
-            .eq('status', 'active');
-
-          if (subsError) throw subsError;
-          (subsChunk || []).forEach((sub: any) => {
-            if (sub.user_id) premiumUserIds.add(sub.user_id);
-          });
-        }
-
-        // FILTER: Keep only users who ARE premium (in premiumUserIds set)
-        filteredProfiles = profiles.filter((p) => premiumUserIds.has(p.id));
-        console.log(`[Broadcast] premium_users filter: ${premiumUserIds.size} premium users found`);
+      // Apply debug filters using shared utility - these SHOW ONLY users matching the selected criteria
+      if (recipientFilter !== 'all') {
+        const result = await applyDebugFilter(filteredProfiles, recipientFilter);
+        filteredProfiles = result.filteredProfiles;
       }
 
       const userList: User[] = filteredProfiles.map(p => ({

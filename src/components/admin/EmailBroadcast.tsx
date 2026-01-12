@@ -12,6 +12,7 @@ import { ScrollArea } from '@/components/ui/scroll-area';
 import { Loader2, Send, Users, Globe, Mail, AlertCircle } from 'lucide-react';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Alert, AlertDescription } from '@/components/ui/alert';
+import { fetchAllRows, applyDebugFilter, fetchAllProfiles } from '@/hooks/useBatchFetch';
 
 interface Country {
   code: string;
@@ -122,133 +123,42 @@ export default function EmailBroadcast() {
     try {
       const countryArray = Array.from(selectedCountries);
 
-      const PAGE_SIZE = 1000;
-      const profiles: any[] = [];
-      
-      for (let page = 0; ; page++) {
-        const from = page * PAGE_SIZE;
-        const to = from + PAGE_SIZE - 1;
+      // Use batch fetch utility for profiles
+      const profiles = await fetchAllProfiles(countryArray, {
+        genderFilter,
+        preferenceFilter,
+        intentFilter,
+        statusFilter,
+        archiveFilter,
+        isAdmin: false,
+      });
 
-        let query = supabase
-          .from('profiles')
-          .select('id, first_name, last_name, email, country, city, account_status, gender, preference, relationship_intent, is_archived, bio')
-          .in('country', countryArray)
-          .not('email', 'is', null)
-          .eq('is_admin', false);
-
-        // Apply gender filter
-        if (genderFilter !== 'all') {
-          query = query.eq('gender', genderFilter);
-        }
-
-        // Apply preference filter
-        if (preferenceFilter !== 'all') {
-          query = query.eq('preference', preferenceFilter);
-        }
-
-        // Apply intent filter
-        if (intentFilter !== 'all') {
-          query = query.eq('relationship_intent', intentFilter);
-        }
-
-        // Apply status filter
-        if (statusFilter !== 'all') {
-          query = query.eq('account_status', statusFilter);
-        } else {
-          // Default to active if 'all' is selected
-          query = query.eq('account_status', 'active');
-        }
-
-        // Apply archive filter
-        if (archiveFilter === 'not_archived') {
-          query = query.or('is_archived.is.null,is_archived.eq.false');
-        } else if (archiveFilter === 'archived_only') {
-          query = query.eq('is_archived', true);
-        }
-
-        // Safety: exclude deleted/suspended users
-        query = query.neq('account_status', 'deleted')
-                     .neq('account_status', 'suspended');
-
-        const { data: pageRows, error: profileError } = await query
-          .order('id')
-          .range(from, to);
-
-        if (profileError) throw profileError;
-        if (!pageRows || pageRows.length === 0) break;
-
-        profiles.push(...pageRows);
-
-        if (pageRows.length < PAGE_SIZE) break;
-      }
-
-      let filteredProfiles = profiles;
+      // Filter to only profiles with email
+      let filteredProfiles = profiles.filter(p => p.email);
 
       // Apply premium/free filter if needed
       if (recipientFilter === 'premium' || recipientFilter === 'free') {
-        const userIds = profiles.map(p => p.id);
-        const premiumUserIds = new Set<string>();
+        // Use batch fetch for all subscriptions
+        const allSubs = await fetchAllRows<{ user_id: string; status: string; expires_at: string }>('user_subscriptions', 'user_id, status, expires_at', [
+          { column: 'status', op: 'eq', value: 'active' }
+        ]);
         
-        // Batch the subscription queries to avoid URL length limits
-        const CHUNK_SIZE = 50;
-        for (let i = 0; i < userIds.length; i += CHUNK_SIZE) {
-          const chunk = userIds.slice(i, i + CHUNK_SIZE);
-          if (chunk.length === 0) continue;
-
-          try {
-            const { data: subscriptions, error: subError } = await supabase
-              .from('user_subscriptions')
-              .select('user_id, status, expires_at')
-              .in('user_id', chunk);
-
-            if (!subError && subscriptions) {
-              subscriptions
-                .filter(s => s.status === 'active' && new Date(s.expires_at || 0) > new Date())
-                .forEach(s => premiumUserIds.add(s.user_id));
-            }
-          } catch (err) {
-            console.error('Error fetching subscriptions for chunk:', err);
-          }
-        }
+        const premiumUserIds = new Set<string>();
+        allSubs
+          .filter(s => s.status === 'active' && new Date(s.expires_at || 0) > new Date())
+          .forEach(s => premiumUserIds.add(s.user_id));
 
         if (recipientFilter === 'premium') {
-          filteredProfiles = profiles.filter(p => premiumUserIds.has(p.id));
+          filteredProfiles = filteredProfiles.filter(p => premiumUserIds.has(p.id));
         } else {
-          filteredProfiles = profiles.filter(p => !premiumUserIds.has(p.id));
+          filteredProfiles = filteredProfiles.filter(p => !premiumUserIds.has(p.id));
         }
       }
 
-      // Apply debug filter
+      // Apply debug filter using shared utility
       if (debugFilter !== 'all') {
-        const userIds = filteredProfiles.map(p => p.id);
-        
-        if (debugFilter === 'no_photo') {
-          // Show only users WITHOUT photos
-          const { data: images } = await supabase
-            .from('user_images')
-            .select('user_id')
-            .in('user_id', userIds);
-          const usersWithImages = new Set((images || []).map(img => img.user_id));
-          filteredProfiles = filteredProfiles.filter(p => !usersWithImages.has(p.id));
-        } else if (debugFilter === 'never_seen') {
-          // Show only users who have NEVER been liked or passed by anyone
-          const [likesData, passesData] = await Promise.all([
-            supabase.from('likes').select('liked_id'),
-            supabase.from('passes').select('passed_id')
-          ]);
-          const seenUsers = new Set<string>();
-          (likesData.data || []).forEach(l => seenUsers.add(l.liked_id));
-          (passesData.data || []).forEach(p => seenUsers.add(p.passed_id));
-          filteredProfiles = filteredProfiles.filter(p => !seenUsers.has(p.id));
-        } else if (debugFilter === 'incomplete') {
-          // Show only users with INCOMPLETE profiles
-          filteredProfiles = filteredProfiles.filter(p => 
-            !p.gender || !p.preference || !p.bio || !p.city
-          );
-        } else if (debugFilter === 'active') {
-          // Show only ACTIVE accounts
-          filteredProfiles = filteredProfiles.filter(p => p.account_status === 'active');
-        }
+        const result = await applyDebugFilter(filteredProfiles, debugFilter);
+        filteredProfiles = result.filteredProfiles;
       }
 
       setUsers(filteredProfiles.map(p => ({
@@ -258,7 +168,7 @@ export default function EmailBroadcast() {
         last_name: p.last_name || '',
         country: p.country || '',
         city: p.city || '',
-      })).filter(u => u.email)); // Only users with emails
+      })).filter(u => u.email));
     } catch (error) {
       console.error('Error loading users:', error);
       toast({

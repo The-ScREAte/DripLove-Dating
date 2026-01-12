@@ -10,6 +10,7 @@ import { ScrollArea } from '@/components/ui/scroll-area';
 import { Loader2, Copy, Check, Mail, Users, Globe, Filter, Download } from 'lucide-react';
 import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { fetchAllRows, applyDebugFilter } from '@/hooks/useBatchFetch';
 
 interface Country {
   code: string;
@@ -178,15 +179,13 @@ export default function EmailExport() {
 
       // Apply premium filter (requires joining with subscriptions)
       if (premiumFilter !== 'all') {
-        const userIds = filteredProfiles.map(p => p.id);
-        
-        const { data: subscriptions } = await supabase
-          .from('user_subscriptions')
-          .select('user_id, status, expires_at')
-          .in('user_id', userIds);
+        // Use batch fetch for all subscriptions
+        const allSubs = await fetchAllRows<{ user_id: string; status: string; expires_at: string }>('user_subscriptions', 'user_id, status, expires_at', [
+          { column: 'status', op: 'eq', value: 'active' }
+        ]);
 
         const premiumUserIds = new Set(
-          (subscriptions || [])
+          allSubs
             .filter(s => s.status === 'active' && new Date(s.expires_at || 0) > new Date())
             .map(s => s.user_id)
         );
@@ -198,52 +197,11 @@ export default function EmailExport() {
         }
       }
 
-      // Apply debug filter (no_photo, never_seen, incomplete, active)
+      // Apply debug filter using shared utility
       // These filters SHOW ONLY users matching the selected criteria
       if (debugFilter !== 'all') {
-        const userIds = filteredProfiles.map(p => p.id);
-        
-        if (debugFilter === 'no_photo') {
-          // Show only users WITHOUT photos
-          const allImages: any[] = [];
-          let imgOffset = 0;
-          let hasMoreImages = true;
-          while (hasMoreImages) {
-            const { data: images } = await supabase
-              .from('user_images')
-              .select('user_id')
-              .in('user_id', userIds.slice(imgOffset, imgOffset + 1000));
-            if (images && images.length > 0) {
-              allImages.push(...images);
-              imgOffset += 1000;
-              hasMoreImages = imgOffset < userIds.length;
-            } else {
-              hasMoreImages = false;
-            }
-          }
-          const usersWithImages = new Set(allImages.map(img => img.user_id));
-          // Keep only users who do NOT have images
-          filteredProfiles = filteredProfiles.filter(p => !usersWithImages.has(p.id));
-        } else if (debugFilter === 'never_seen') {
-          // Show only users who have NEVER been liked or passed by anyone
-          const [likesData, passesData] = await Promise.all([
-            supabase.from('likes').select('liked_id'),
-            supabase.from('passes').select('passed_id')
-          ]);
-          const seenUsers = new Set<string>();
-          (likesData.data || []).forEach(l => seenUsers.add(l.liked_id));
-          (passesData.data || []).forEach(p => seenUsers.add(p.passed_id));
-          // Keep only users who have NOT been seen
-          filteredProfiles = filteredProfiles.filter(p => !seenUsers.has(p.id));
-        } else if (debugFilter === 'incomplete') {
-          // Show only users with INCOMPLETE profiles (missing key fields)
-          filteredProfiles = filteredProfiles.filter(p => 
-            !p.gender || !p.preference || !p.bio || !p.city
-          );
-        } else if (debugFilter === 'active') {
-          // Show only ACTIVE accounts
-          filteredProfiles = filteredProfiles.filter(p => p.account_status === 'active');
-        }
+        const result = await applyDebugFilter(filteredProfiles, debugFilter);
+        filteredProfiles = result.filteredProfiles;
       }
 
       // Extract emails
