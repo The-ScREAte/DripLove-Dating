@@ -16,6 +16,8 @@ interface SlideRendererProps {
 }
 
 // Image Slide Component
+// ⭐ FIX: Show image immediately (opacity 1) - no more blank flash on swipe
+// Only use opacity transition for blob URLs where we know loading is instant
 const ImageSlide = React.memo<{
   imageSrc: string;
   matchFirstName: string;
@@ -24,14 +26,11 @@ const ImageSlide = React.memo<{
   showLoader: boolean;
 }>(({ imageSrc, matchFirstName, matchLastName, usingBlob, showLoader }) => {
   const [hasError, setHasError] = React.useState(false);
-  const [isLoaded, setIsLoaded] = React.useState(false);
   
   // Reset error state when image source changes
   React.useEffect(() => {
     setHasError(false);
-    // Blob URLs are already local and should render instantly; avoid any "loading" UI.
-    setIsLoaded(Boolean(usingBlob));
-  }, [imageSrc, usingBlob]);
+  }, [imageSrc]);
   
   // Show placeholder if image failed to load
   if (hasError) {
@@ -58,10 +57,8 @@ const ImageSlide = React.memo<{
         decoding="async"
         src={imageSrc}
         alt={`${matchFirstName} ${matchLastName}`}
-        className={`w-full h-full object-contain transition-opacity duration-200 relative z-10 ${styles.optimizedImage}`}
+        className={`w-full h-full object-contain relative z-10 ${styles.optimizedImage}`}
         draggable={false}
-        style={{ opacity: isLoaded ? 1 : 0 }}
-        onLoad={() => setIsLoaded(true)}
         onError={() => setHasError(true)}
       />
     </div>
