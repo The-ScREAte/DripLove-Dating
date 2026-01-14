@@ -218,7 +218,10 @@ const AppWrapper = () => {
           setAuthChecked(true);
         }
 
-        // Initialize heavy operations in the background
+        // ⭐ ANDROID OPTIMIZATION: Defer heavy background operations more on Android
+        // Android WebView initialization is slower - prioritize visible UI first
+        const initDelay = /Android/i.test(navigator.userAgent) ? 300 : 100;
+        
         setTimeout(async () => {
           try {
             // Initialize in-app purchase systems (background)
@@ -277,7 +280,7 @@ const AppWrapper = () => {
           }
 
           // Background initialization complete
-        }, 100); // Small delay to ensure app renders first
+        }, initDelay); // ⭐ ANDROID FIX: Dynamic delay based on platform
 
       } catch (error) {
         console.error('App initialization error:', error);
