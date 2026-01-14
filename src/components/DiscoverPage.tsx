@@ -67,6 +67,17 @@ const uniqUuids = (values: unknown[]): string[] => Array.from(new Set(values.fil
 
 const todayStr = () => new Date().toISOString().split('T')[0];
 
+// ⭐ PER-USER SEED: Generate a unique seed that varies by user AND time
+// This ensures different users see different profile orders (fair visibility for all)
+// Changes every 4 hours to give variety without being too chaotic
+const getUserFeedSeed = (userId: string): string => {
+  const now = new Date();
+  const dateStr = now.toISOString().split('T')[0];
+  const hourBlock = Math.floor(now.getUTCHours() / 4); // Changes every 4 hours (0-5)
+  // Put userId FIRST so different users get completely different shuffles
+  return `${userId}_${dateStr}_h${hourBlock}`;
+};
+
 const swipeCountCacheKey = (userId: string) => `driplove_swipe_count_${userId}_${todayStr()}`;
 
 const readCachedSwipeCount = (userId: string): number | null => {
@@ -248,12 +259,16 @@ const buildFeedSignature = (baseCountryCode: string, unlockedCountries: string[]
   const unlockedSignature = isPremium
     ? unlockedCountries.map(normalizeCountryCode).filter(Boolean).sort().join(',')
     : '';
-  // v8 feed signature
-  return `v8_${hashStringToInt(`${base}|${unlockedSignature}|${maxDistance}|${isPremium ? 'premium' : 'free'}`).toString(36)}`;
+  // v9 feed signature - includes version bump for new per-user randomization
+  return `v9_${hashStringToInt(`${base}|${unlockedSignature}|${maxDistance}|${isPremium ? 'premium' : 'free'}`).toString(36)}`;
 };
 
+// ⭐ PER-USER RANDOMIZATION: Include hour block in saved order key
+// This ensures the saved profile order rotates every 4 hours for variety
+const getHourBlock = () => Math.floor(new Date().getUTCHours() / 4);
+
 const buildSavedOrderKey = (userId: string, feedSignature: string) =>
-  `driplove_profile_order_${userId}_${todayStr()}_${feedSignature}`;
+  `driplove_profile_order_${userId}_${todayStr()}_h${getHourBlock()}_${feedSignature}`;
 
 const normalizeCountryCodeList = (value: unknown, baseCountryCode?: string): string[] => {
   const normalize = (items: unknown[]): string[] => {
@@ -1499,7 +1514,9 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, onNavigateToProfile, isPr
       
       
       // STEP 4: Define allowed countries for Premium mixing
-      const dailySeed = todayStr();
+      // ⭐ PER-USER RANDOMIZATION: Use user-specific seed so different users see different profiles
+      // This ensures fair visibility: everyone gets seen, not just the same few profiles
+      const userSeed = getUserFeedSeed(userId);
       // Ensure base country is ALWAYS first for proper rotation
       const allowedCountryCodes = [
         ...(baseCountryCode ? [normalizeCountryCode(baseCountryCode)] : []),
@@ -1520,10 +1537,11 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, onNavigateToProfile, isPr
 
       // Apply round-robin mixing directly first (defines eligible country distribution)
       // This produces a truly interleaved feed: A, B, C, A, B, C...
+      // ⭐ PER-USER RANDOMIZATION: Each user gets a unique shuffle order
       const mixedProfiles = mixByCountryRoundRobin(
         allActive,
         allowedCountryCodes,
-        `${userId}_${dailySeed}_countries`
+        `${userSeed}_countries`
       );
 
       // ⭐ ACTIVITY WEIGHTING (Premium): Bias toward recently active users AFTER country mix
@@ -1533,7 +1551,7 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, onNavigateToProfile, isPr
         ? mixedProfiles
         : applyActivityWeighting(
             mixedProfiles,
-            `${userId}_${dailySeed}_activity`
+            `${userSeed}_activity`
           );
 
 
@@ -1654,12 +1672,13 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, onNavigateToProfile, isPr
         usingArchivedFallback = true;
         
         // Mix archived profiles the same way (explicit country rotation).
+        // ⭐ PER-USER RANDOMIZATION: Use user-specific seed for archived profiles too
         if (premiumForFeed && allowedCountryCodes.length > 1) {
-          const mixSeed = `${userId}_${todayStr()}_archived`;
+          const archivedSeed = getUserFeedSeed(userId) + '_archived';
           filteredProfiles = mixByCountryRoundRobin(
             filteredProfiles.filter((p) => allowedCountryCodes.includes(normalizeCountryCode(p.country_code || ''))),
             allowedCountryCodes,
-            mixSeed
+            archivedSeed
           );
         }
       }
@@ -1698,16 +1717,17 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, onNavigateToProfile, isPr
       
       filteredProfiles = filteredProfiles.filter(profile => profile.id !== userId);
       
-      const dailySeed = todayStr();
+      // ⭐ PER-USER RANDOMIZATION: Use user-specific seed for free users too
+      const freeUserSeed = getUserFeedSeed(userId);
       // Apply stratified sampling for free users
-      filteredProfiles = getStratifiedBatches(filteredProfiles, 15, 4, `${userId}_${dailySeed}`);
+      filteredProfiles = getStratifiedBatches(filteredProfiles, 15, 4, freeUserSeed);
 
       // ⭐ ACTIVITY WEIGHTING (Free): Apply AFTER stratification so active users rise to the top
       // Soft reorder only: no filters/premium rules touched
       // ⭐ ANDROID OPTIMIZATION: Skip on Android for faster processing
       filteredProfiles = isAndroidPlatform()
         ? filteredProfiles
-        : applyActivityWeighting(filteredProfiles, `${userId}_${dailySeed}_activity`);
+        : applyActivityWeighting(filteredProfiles, `${freeUserSeed}_activity`);
     }
 
     // Add empty images array and precomputed distance
@@ -1727,8 +1747,8 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, onNavigateToProfile, isPr
     // Bucket A (≤7 days): 3/15 (20%), Bucket B (8-30 days): 4/15 (27%)
     // Bucket C (1-6 months): 4/15 (27%), Bucket D (>6 months): 4/15 (26%)
     // This ensures new users get visibility (47%) while established users stay visible (53%)
-    const today = todayStr();
-    const shuffleSeed = `${userId}_${today}`;
+    // ⭐ PER-USER RANDOMIZATION: Each user gets a unique shuffle order
+    const shuffleSeed = getUserFeedSeed(userId);
     
     // ⭐ Check if we have a saved profile order for today
     // IMPORTANT: include the “feed signature” so unlocking countries regenerates a mixed order
