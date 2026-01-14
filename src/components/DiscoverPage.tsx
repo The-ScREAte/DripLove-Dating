@@ -800,8 +800,8 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, onNavigateToProfile, isPr
   }, [currentUser?.country_code, currentUser?.country]);
   
   useEffect(() => {
-    // ⭐ ANDROID OPTIMIZATION: Defer ad loading to prioritize profiles
-    const delay = isAndroidPlatform() ? 500 : 300;
+    // ⭐ ANDROID OPTIMIZATION: Longer defer for Android to prioritize profile loading
+    const delay = isAndroidPlatform() ? 800 : 300;
     const timer = setTimeout(async () => {
       const fetchAds = async () => {
         try {
@@ -2159,9 +2159,15 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, onNavigateToProfile, isPr
   }, [currentUser, allowedGenders, toast, fetchPotentialMatchesData, injectAds, batchFetchLanguages]);
 
   // ⭐ SMART BACKGROUND LOADING: Preload more profiles when user is idle
+  // ⭐ ANDROID FIX: Skip heavy idle loading on Android to reduce CPU/memory pressure
   useEffect(() => {
     if (!hasCompletedInitialFetch) return;
     if (potentialMatches.length === 0) return;
+    
+    // ⭐ ANDROID OPTIMIZATION: Skip background idle loading entirely on Android
+    // Android WebView struggles with concurrent network requests + DOM updates
+    const isAndroid = isAndroidPlatform();
+    if (isAndroid) return;
     
     let idleTimer: NodeJS.Timeout;
     let isIdle = false;
@@ -2252,8 +2258,9 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, onNavigateToProfile, isPr
 
   const preloadProfileImages = useCallback((profiles: PotentialMatch[], startIndex: number = 0) => {
     const isAndroid = isAndroidPlatform();
-    // ⭐ ANDROID OPTIMIZATION: Load only current profile for instant display
-    const batchSize = isAndroid ? 3 : 10;
+    // ⭐ ANDROID FIX: Increased batch size from 3 to 5 for smoother swiping
+    // This ensures next profiles are ready when user swipes quickly
+    const batchSize = isAndroid ? 5 : 10;
     const profilesToLoad = profiles.slice(startIndex, startIndex + batchSize);
     
     // Filter out profiles that are already loaded or currently loading
@@ -2940,6 +2947,10 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, onNavigateToProfile, isPr
   // ⭐ SWIPE FATIGUE RESCUE: Inject active profiles after long no-match streaks
   // This prevents user fatigue and increases retention (Tinder-style behavior)
   useEffect(() => {
+    // ⭐ ANDROID OPTIMIZATION: Early exit on Android - skip entire effect
+    // This saves CPU cycles from computing rescue candidates on every render
+    if (isAndroidPlatform()) return;
+    
     if (noMatchStreak < FATIGUE_RESCUE_THRESHOLD) return;
     if (potentialMatches.length === 0) return;
     if (isArchivedFallback) return;
@@ -2965,9 +2976,6 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, onNavigateToProfile, isPr
     );
     
     if (rescueCandidates.length === 0) return;
-    
-    // ⭐ ANDROID OPTIMIZATION: Skip rescue profile injection on Android for faster performance
-    if (isAndroidPlatform()) return;
     
     // Inject rescue profiles near the front of the queue (positions 2-5)
     setPotentialMatches(prev => {

@@ -55,10 +55,15 @@ export const preloadImageToBlob = async (url: string): Promise<string> => {
 };
 
 // Cleanup blob URLs when needed (optional, for memory management)
+// ⭐ ANDROID FIX: Lower threshold for Android to prevent memory pressure
 export const cleanupOldBlobUrls = () => {
-  if (globalImageCache.size > 100) {
+  const isAndroid = isAndroidPlatform();
+  const threshold = isAndroid ? 50 : 100; // Android: more aggressive cleanup
+  const removeCount = isAndroid ? 15 : 20;
+  
+  if (globalImageCache.size > threshold) {
     const entries = Array.from(globalImageCache.entries());
-    const toRemove = entries.slice(0, 20);
+    const toRemove = entries.slice(0, removeCount);
     toRemove.forEach(([url, blobUrl]) => {
       URL.revokeObjectURL(blobUrl);
       globalImageCache.delete(url);
