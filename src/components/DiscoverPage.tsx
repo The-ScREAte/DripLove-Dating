@@ -2159,15 +2159,12 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, onNavigateToProfile, isPr
   }, [currentUser, allowedGenders, toast, fetchPotentialMatchesData, injectAds, batchFetchLanguages]);
 
   // ⭐ SMART BACKGROUND LOADING: Preload more profiles when user is idle
-  // ⭐ ANDROID FIX: Skip heavy idle loading on Android to reduce CPU/memory pressure
+  // ⭐ ANDROID FIX: Limited idle loading on Android (20 profiles max) to balance UX and performance
   useEffect(() => {
     if (!hasCompletedInitialFetch) return;
     if (potentialMatches.length === 0) return;
     
-    // ⭐ ANDROID OPTIMIZATION: Skip background idle loading entirely on Android
-    // Android WebView struggles with concurrent network requests + DOM updates
     const isAndroid = isAndroidPlatform();
-    if (isAndroid) return;
     
     let idleTimer: NodeJS.Timeout;
     let isIdle = false;
@@ -2175,8 +2172,15 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, onNavigateToProfile, isPr
     const startIdleLoading = () => {
       isIdle = true;
       
-      // Background load remaining images for profiles 3-8 (if not already loaded)
-      const profilesToBackgroundLoad = potentialMatches.slice(2, 8).filter(p => !isAd(p)) as PotentialMatch[];
+      // ⭐ ANDROID OPTIMIZATION: Limit background loading to 20 profiles on Android
+      // This caches profiles for smoother swiping when user returns, while staying memory-friendly
+      const maxBackgroundProfiles = isAndroid ? 20 : 15;
+      const backgroundStartOffset = isAndroid ? 3 : 2; // Start later on Android
+      const backgroundEndOffset = isAndroid ? Math.min(backgroundStartOffset + maxBackgroundProfiles, potentialMatches.length) : 8;
+      const staggerDelay = isAndroid ? 800 : 500; // Longer delay on Android to reduce CPU pressure
+      
+      // Background load remaining images for upcoming profiles (if not already loaded)
+      const profilesToBackgroundLoad = potentialMatches.slice(backgroundStartOffset, backgroundEndOffset).filter(p => !isAd(p)) as PotentialMatch[];
       
       profilesToBackgroundLoad.forEach((profile, idx) => {
         const allImages = userImagesRef.current[profile.id] || [];
@@ -2190,12 +2194,18 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, onNavigateToProfile, isPr
             if (isIdle) {
               preloadImages(remainingImages, 'low');
             }
-          }, idx * 500); // 500ms between each profile
+          }, idx * staggerDelay);
         }
       });
       
-      // ⭐ PROACTIVE LOADING: Load images for profiles 9-15 in the background
-      const farProfiles = potentialMatches.slice(8, 15).filter(p => !isAd(p)) as PotentialMatch[];
+      // ⭐ PROACTIVE LOADING: Load images for far profiles in the background
+      // Android: Load profiles up to the 20-profile limit; iOS/Web: Load more aggressively
+      const farProfilesStart = isAndroid ? backgroundEndOffset : 8;
+      const farProfilesEnd = isAndroid ? Math.min(farProfilesStart + 10, backgroundStartOffset + maxBackgroundProfiles) : 15;
+      const farStartDelay = isAndroid ? 3000 : 2000; // Longer initial delay on Android
+      const farStaggerDelay = isAndroid ? 1500 : 1000; // Longer stagger on Android
+      
+      const farProfiles = potentialMatches.slice(farProfilesStart, farProfilesEnd).filter(p => !isAd(p)) as PotentialMatch[];
       farProfiles.forEach((profile, idx) => {
         // Only load if we haven't started loading this profile yet
         if (!userImages[profile.id] && !requestedImageProfileIds.current.has(profile.id)) {
@@ -2211,7 +2221,7 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, onNavigateToProfile, isPr
                 requestedImageProfileIds.current.delete(profile.id);
               });
             }
-          }, 2000 + idx * 1000); // Start after 2s, then 1s between each
+          }, farStartDelay + idx * farStaggerDelay);
         }
       });
     };
@@ -2219,8 +2229,9 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, onNavigateToProfile, isPr
     const resetIdleTimer = () => {
       isIdle = false;
       clearTimeout(idleTimer);
-      // Start idle loading after 2 seconds of no activity
-      idleTimer = setTimeout(startIdleLoading, 2000);
+      // ⭐ ANDROID FIX: Slightly longer idle delay on Android (3s vs 2s)
+      const idleDelay = isAndroid ? 3000 : 2000;
+      idleTimer = setTimeout(startIdleLoading, idleDelay);
     };
     
     // Listen for user activity
@@ -2947,10 +2958,7 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, onNavigateToProfile, isPr
   // ⭐ SWIPE FATIGUE RESCUE: Inject active profiles after long no-match streaks
   // This prevents user fatigue and increases retention (Tinder-style behavior)
   useEffect(() => {
-    // ⭐ ANDROID OPTIMIZATION: Early exit on Android - skip entire effect
-    // This saves CPU cycles from computing rescue candidates on every render
-    if (isAndroidPlatform()) return;
-    
+    // Early exit conditions - these are lightweight checks
     if (noMatchStreak < FATIGUE_RESCUE_THRESHOLD) return;
     if (potentialMatches.length === 0) return;
     if (isArchivedFallback) return;
