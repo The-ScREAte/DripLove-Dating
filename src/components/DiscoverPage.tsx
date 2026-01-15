@@ -1453,7 +1453,7 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, onNavigateToProfile, isPr
 
 
     let filteredProfiles: ProfileRow[] = [];
-    let asyncActivityWeighted: Array<ProfileRow | PotentialMatch> | null = null;
+    let asyncActivityWeighted: ProfileRow[] | null = null;
     let usingArchivedFallback = false; // Track if we're showing archived profiles
 
     let localProfiles: ProfileRow[] = [];
@@ -1581,6 +1581,7 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, onNavigateToProfile, isPr
       );
 
       const activitySeed = `${userSeed}_activity`;
+      let activityWeightedMixed: ProfileRow[] = mixedProfiles;
 
       // ⭐ ACTIVITY WEIGHTING (Premium): bias to active users without slowing first paint
       // Android: show unweighted first, then light head-only weighting async.
@@ -1588,11 +1589,11 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, onNavigateToProfile, isPr
       const isAndroid = isAndroidPlatform();
       if (isAndroid) {
         activityWeightedMixed = mixedProfiles;
-        asyncActivityWeighted = applyLightActivityWeighting(mixedProfiles, activitySeed);
+        asyncActivityWeighted = applyLightActivityWeighting(mixedProfiles, activitySeed) as ProfileRow[];
       } else {
-        const lightHead = applyLightActivityWeighting(mixedProfiles, activitySeed, 48);
+        const lightHead = applyLightActivityWeighting(mixedProfiles, activitySeed, 48) as ProfileRow[];
         activityWeightedMixed = lightHead;
-        asyncActivityWeighted = applyActivityWeighting(mixedProfiles, activitySeed);
+        asyncActivityWeighted = applyActivityWeighting(mixedProfiles, activitySeed) as ProfileRow[];
       }
 
 
@@ -1770,11 +1771,11 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, onNavigateToProfile, isPr
       const freeActivitySeed = `${freeUserSeed}_activity`;
       const isAndroid = isAndroidPlatform();
       if (isAndroid) {
-        asyncActivityWeighted = applyLightActivityWeighting(filteredProfiles, freeActivitySeed);
+        asyncActivityWeighted = applyLightActivityWeighting(filteredProfiles, freeActivitySeed) as ProfileRow[];
       } else {
-        const lightHead = applyLightActivityWeighting(filteredProfiles, freeActivitySeed, 48);
+        const lightHead = applyLightActivityWeighting(filteredProfiles, freeActivitySeed, 48) as ProfileRow[];
         filteredProfiles = lightHead;
-        asyncActivityWeighted = applyActivityWeighting(filteredProfiles, freeActivitySeed);
+        asyncActivityWeighted = applyActivityWeighting(filteredProfiles, freeActivitySeed) as ProfileRow[];
       }
     }
 

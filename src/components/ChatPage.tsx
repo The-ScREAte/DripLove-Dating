@@ -2216,12 +2216,13 @@ const ChatPage = ({ currentUser, onUnreadChange, onDetailViewChange }: ChatPageP
                 const baseSpacing = isConsecutive ? 8 : 18;
                 const rowPaddingBottom = baseSpacing;
                 const rowPaddingTop = 0;
-                const replySpacer = hasReplyPreview ? 36 : 0; // reserve extra space for reply preview height
+
+                // Messages with reply preview need extra spacing below to prevent overlap
+                const replyPadding = hasReplyPreview ? 20 : 0;
 
                 return (
                   <div
                     key={message.id}
-                    ref={virtualRow.measureElement}
                     data-index={virtualRow.index}
                     style={{
                       position: 'absolute',
@@ -2229,7 +2230,7 @@ const ChatPage = ({ currentUser, onUnreadChange, onDetailViewChange }: ChatPageP
                       left: 0,
                       width: '100%',
                       transform: `translateY(${virtualRow.start}px)`,
-                      paddingBottom: rowPaddingBottom,
+                      paddingBottom: rowPaddingBottom + replyPadding,
                       paddingTop: rowPaddingTop,
                       overflow: 'visible',
                     }}
@@ -2246,9 +2247,6 @@ const ChatPage = ({ currentUser, onUnreadChange, onDetailViewChange }: ChatPageP
                       onReplyClick={handleScrollToMessage}
                       isHighlighted={message.id === highlightedMessageId}
                     />
-                    {replySpacer > 0 && (
-                      <div style={{ height: replySpacer }} aria-hidden />
-                    )}
                   </div>
                 );
               })}
