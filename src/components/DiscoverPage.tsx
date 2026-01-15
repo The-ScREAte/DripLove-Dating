@@ -67,6 +67,15 @@ const uniqUuids = (values: unknown[]): string[] => Array.from(new Set(values.fil
 
 const todayStr = () => new Date().toISOString().split('T')[0];
 
+// ⭐ LIGHT ACTIVITY WEIGHTING: Only reorder a small head slice to cap CPU
+const applyLightActivityWeighting = (profiles: PotentialMatch[] | ProfileRow[], seed: string, headSize = 32) => {
+  if (!profiles || profiles.length === 0) return profiles;
+  const head = profiles.slice(0, headSize);
+  const tail = profiles.slice(headSize);
+  const weightedHead = applyActivityWeighting(head as PotentialMatch[], seed);
+  return [...weightedHead, ...tail] as typeof profiles;
+};
+
 // ⭐ PER-USER SEED: Generate a unique seed that varies by user AND date
 // This ensures different users see different profile orders (fair visibility for all)
 // Stays consistent for the entire day to provide stable experience
@@ -265,6 +274,36 @@ const buildFeedSignature = (baseCountryCode: string, unlockedCountries: string[]
 // This ensures stable experience throughout the day with fair per-user distribution
 const buildSavedOrderKey = (userId: string, feedSignature: string) =>
   `driplove_profile_order_${userId}_${todayStr()}_${feedSignature}`;
+
+// Persist helpers with fallbacks for Android WebView storage quirks
+const readPersistentItem = (key: string): string | null => {
+  try {
+    const v = localStorage.getItem(key);
+    if (v !== null) return v;
+  } catch {
+    // ignore
+  }
+  try {
+    const v = sessionStorage.getItem(key);
+    if (v !== null) return v;
+  } catch {
+    // ignore
+  }
+  return null;
+};
+
+const writePersistentItem = (key: string, value: string) => {
+  try {
+    localStorage.setItem(key, value);
+  } catch {
+    // ignore
+  }
+  try {
+    sessionStorage.setItem(key, value);
+  } catch {
+    // ignore
+  }
+};
 
 const normalizeCountryCodeList = (value: unknown, baseCountryCode?: string): string[] => {
   const normalize = (items: unknown[]): string[] => {
@@ -1414,6 +1453,7 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, onNavigateToProfile, isPr
 
 
     let filteredProfiles: ProfileRow[] = [];
+    let asyncActivityWeighted: Array<ProfileRow | PotentialMatch> | null = null;
     let usingArchivedFallback = false; // Track if we're showing archived profiles
 
     let localProfiles: ProfileRow[] = [];
@@ -1540,21 +1580,27 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, onNavigateToProfile, isPr
         `${userSeed}_countries`
       );
 
-      // ⭐ ACTIVITY WEIGHTING (Premium): Bias toward recently active users AFTER country mix
-      // Soft reorder only: no users removed, premium rules preserved
-      // ⭐ ANDROID OPTIMIZATION: Skip on Android for faster processing
-      const activityWeightedMixed = isAndroidPlatform() 
-        ? mixedProfiles
-        : applyActivityWeighting(
-            mixedProfiles,
-            `${userSeed}_activity`
-          );
+      const activitySeed = `${userSeed}_activity`;
+
+      // ⭐ ACTIVITY WEIGHTING (Premium): bias to active users without slowing first paint
+      // Android: show unweighted first, then light head-only weighting async.
+      // iOS/web: light head weighting sync for quality, full weighting async for parity.
+      const isAndroid = isAndroidPlatform();
+      if (isAndroid) {
+        activityWeightedMixed = mixedProfiles;
+        asyncActivityWeighted = applyLightActivityWeighting(mixedProfiles, activitySeed);
+      } else {
+        const lightHead = applyLightActivityWeighting(mixedProfiles, activitySeed, 48);
+        activityWeightedMixed = lightHead;
+        asyncActivityWeighted = applyActivityWeighting(mixedProfiles, activitySeed);
+      }
 
 
       // STEP 6: For Premium multi-country, preserve the country rotation
       // Stratified sampling would re-group by account age and destroy the alternation
       // Premium users pay for the best experience → keep pure round-robin mixing
-      filteredProfiles = activityWeightedMixed.slice(0, 60);
+      const premiumInitialCap = isAndroid ? 30 : 60;
+      filteredProfiles = activityWeightedMixed.slice(0, premiumInitialCap);
 
 
       // (dev-only logging removed)
@@ -1718,12 +1764,18 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, onNavigateToProfile, isPr
       // Apply stratified sampling for free users
       filteredProfiles = getStratifiedBatches(filteredProfiles, 15, 4, freeUserSeed);
 
-      // ⭐ ACTIVITY WEIGHTING (Free): Apply AFTER stratification so active users rise to the top
-      // Soft reorder only: no filters/premium rules touched
-      // ⭐ ANDROID OPTIMIZATION: Skip on Android for faster processing
-      filteredProfiles = isAndroidPlatform()
-        ? filteredProfiles
-        : applyActivityWeighting(filteredProfiles, `${freeUserSeed}_activity`);
+      // ⭐ ACTIVITY WEIGHTING (Free): keep first paint fast, then boost actives
+      // Android: show unweighted first, apply light head weighting async.
+      // iOS/web: light head weighting sync, full weighting async for parity.
+      const freeActivitySeed = `${freeUserSeed}_activity`;
+      const isAndroid = isAndroidPlatform();
+      if (isAndroid) {
+        asyncActivityWeighted = applyLightActivityWeighting(filteredProfiles, freeActivitySeed);
+      } else {
+        const lightHead = applyLightActivityWeighting(filteredProfiles, freeActivitySeed, 48);
+        filteredProfiles = lightHead;
+        asyncActivityWeighted = applyActivityWeighting(filteredProfiles, freeActivitySeed);
+      }
     }
 
     // Add empty images array and precomputed distance
@@ -1756,7 +1808,7 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, onNavigateToProfile, isPr
         ...(premiumForFeed ? unlockedCountries : []),
       ])
     ).map((c) => normalizeCountryCode(String(c || ''))).filter(Boolean);
-    const savedOrderRaw = localStorage.getItem(savedOrderKey);
+    const savedOrderRaw = readPersistentItem(savedOrderKey);
 
     const normCountry = (c: unknown) => (typeof c === 'string' ? normalizeCountryCode(c) : '');
     const validateRotationCoverage = (profiles: Array<{ country_code?: string | null }>) => {
@@ -1839,11 +1891,17 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, onNavigateToProfile, isPr
 
     }
 
+    // ⭐ ANDROID FIRST BATCH: Keep the initial visible batch small, refill later
+    if (isAndroidPlatform()) {
+      const androidInitialCap = 30;
+      shuffled = shuffled.slice(0, androidInitialCap);
+    }
+
     // Save profile order to localStorage (post-mix)
     try {
       const profileIds = shuffled.map(p => p.id);
 
-      localStorage.setItem(
+      writePersistentItem(
         savedOrderKey,
         JSON.stringify({
           premium: premiumForFeed,
@@ -1932,8 +1990,8 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, onNavigateToProfile, isPr
 
     // ⭐ PROFILE POSITION PERSISTENCE: Resume from last viewed profile
     // Load last profile ID and time from localStorage
-    const savedId = localStorage.getItem(`driplove_last_profile_${userId}`);
-    const savedTime = parseInt(localStorage.getItem(`driplove_last_profile_time_${userId}`) || '0');
+    const savedId = readPersistentItem(`driplove_last_profile_${userId}`);
+    const savedTime = parseInt(readPersistentItem(`driplove_last_profile_time_${userId}`) || '0');
     const twentyFourHours = 24 * 60 * 60 * 1000;
     const isSavedValid = savedId && Date.now() - savedTime < twentyFourHours;
 
@@ -1990,11 +2048,23 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, onNavigateToProfile, isPr
       // The centralized preloader + loadAllImagesForProfile will keep loading the rest as user swipes.
     }
 
+    const asyncActivityDeck = asyncActivityWeighted
+      ? asyncActivityWeighted
+          .slice(0, shuffled.length)
+          .map((profile) =>
+            toPotentialMatch(profile, {
+              images: [],
+              distance: distanceMap[profile.id],
+            })
+          )
+      : null;
+
     return {
       matches: shuffled,
       images: imageMap,
       distances: distanceMap,
-      index: startIndex
+      index: startIndex,
+      asyncActivityDeck,
     };
   }, [premiumActive, currentUser, fetchUnlockedCountryProfiles]);
 
@@ -2024,29 +2094,90 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, onNavigateToProfile, isPr
 
   const DISCOVER_DECK_CACHE_TTL_MS = useMemo(() => 60 * 60 * 1000, []); // 1 hour
   const buildDeckCacheKey = useCallback((cacheKey: string) => `driplove_discover_deck_${cacheKey}`, []);
+  const deckMemoryCacheRef = useRef<Map<string, { ts: number; deck: MatchOrAd[] }>>(new Map());
 
   const readDeckCache = useCallback((cacheKey: string): MatchOrAd[] | null => {
-    try {
-      const raw = localStorage.getItem(buildDeckCacheKey(cacheKey));
+    const key = buildDeckCacheKey(cacheKey);
+    const readFromStorage = (store?: Storage) => {
+      if (!store) return null;
+      const raw = store.getItem(key);
       if (!raw) return null;
       const parsed = JSON.parse(raw) as { ts: number; deck: MatchOrAd[] };
       if (!parsed?.ts || !Array.isArray(parsed?.deck)) return null;
       if (Date.now() - parsed.ts > DISCOVER_DECK_CACHE_TTL_MS) return null;
       return parsed.deck;
-    } catch {
-      return null;
-    }
-  }, [buildDeckCacheKey, DISCOVER_DECK_CACHE_TTL_MS]);
+    };
 
-  const writeDeckCache = useCallback((cacheKey: string, deck: MatchOrAd[]) => {
     try {
-      if (!Array.isArray(deck) || deck.length === 0) return;
-      const key = `driplove_discover_deck_${cacheKey}`;
-      localStorage.setItem(key, JSON.stringify({ ts: Date.now(), deck }));
+      const local = readFromStorage(localStorage);
+      if (local) return local;
     } catch {
       // ignore
     }
+
+    try {
+      const session = readFromStorage(sessionStorage);
+      if (session) return session;
+    } catch {
+      // ignore
+    }
+
+    const mem = deckMemoryCacheRef.current.get(key);
+    if (mem && Date.now() - mem.ts <= DISCOVER_DECK_CACHE_TTL_MS) {
+      return mem.deck;
+    }
+
+    return null;
+  }, [buildDeckCacheKey, DISCOVER_DECK_CACHE_TTL_MS]);
+
+  const writeDeckCache = useCallback((cacheKey: string, deck: MatchOrAd[]) => {
+    if (!Array.isArray(deck) || deck.length === 0) return;
+    const key = `driplove_discover_deck_${cacheKey}`;
+    const payload = JSON.stringify({ ts: Date.now(), deck });
+
+    try {
+      localStorage.setItem(key, payload);
+    } catch {
+      // ignore
+    }
+
+    try {
+      sessionStorage.setItem(key, payload);
+    } catch {
+      // ignore
+    }
+
+    deckMemoryCacheRef.current.set(key, { ts: Date.now(), deck });
   }, []);
+
+  // Reorder an existing deck using a weighted profile list while keeping ad positions stable.
+  const reorderDeckWithWeightedProfiles = useCallback(
+    (deck: MatchOrAd[], weightedProfiles: PotentialMatch[], preserveRealHead = 5): MatchOrAd[] => {
+      if (!deck.length || !weightedProfiles.length) return deck;
+
+      const deckReal = deck.filter((item): item is PotentialMatch => !isAd(item));
+      if (!deckReal.length) return deck;
+
+      const preservedIds = new Set(
+        deckReal.slice(0, Math.max(0, preserveRealHead)).map((p) => p.id)
+      );
+
+      const deckRealIds = new Set(deckReal.map((p) => p.id));
+      const weightedReal = weightedProfiles.filter((p) => deckRealIds.has(p.id) && !preservedIds.has(p.id));
+
+      if (weightedReal.length === 0) return deck;
+
+      let realIdx = 0;
+      return deck.map((item) => {
+        if (isAd(item)) return item;
+        if (preservedIds.has(item.id)) return item;
+        const nextProfile = weightedReal[realIdx] ?? item;
+        if (realIdx < weightedReal.length - 1) realIdx += 1;
+        return nextProfile;
+      });
+    },
+    []
+  );
 
   const fetchPotentialMatches = useCallback(async (opts?: { background?: boolean; cacheKey?: string }) => {
 
@@ -2071,7 +2202,7 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, onNavigateToProfile, isPr
           // Discard stale fetch results
           return;
         }
-        const { matches, images, distances, index } = result;
+        const { matches, images, distances, index, asyncActivityDeck } = result;
         
         const matchesWithAds = injectAds(matches);
 
@@ -2107,6 +2238,16 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, onNavigateToProfile, isPr
         setUserDistances(distances);
         setCurrentIndex(0);
         setLastShuffleTime(Date.now());
+
+        // ⭐ ASYNC ACTIVITY WEIGHTING: apply after first paint to keep UI snappy
+        if (asyncActivityDeck) {
+          setTimeout(() => {
+            setPotentialMatches(prev => {
+              const weightedDeck = reorderDeckWithWeightedProfiles(prev, asyncActivityDeck, 6);
+              return weightedDeck;
+            });
+          }, 0);
+        }
 
         // ⭐ SMART INITIAL IMAGE PRELOADING: Load images with priority
         // First 8 profiles: 1 image each (already loaded in images object)
@@ -2884,7 +3025,8 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, onNavigateToProfile, isPr
       );
 
       const newProfiles = matches.filter((m) => !existingProfileIds.has(m.id));
-      const refillChunk = newProfiles.slice(0, 25);
+      const refillChunkSize = isAndroidPlatform() ? 15 : 25;
+      const refillChunk = newProfiles.slice(0, refillChunkSize);
 
       if (refillChunk.length === 0) {
         // Got profiles from DB but they're all duplicates
@@ -2953,7 +3095,7 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, onNavigateToProfile, isPr
       .filter(m => !isAd(m))
       .length;
 
-    const REFILL_THRESHOLD = 25; // Aggressive refill - starts early to keep buffer full
+    const REFILL_THRESHOLD = isAndroidPlatform() ? 10 : 25; // Smaller threshold on Android since initial batch is capped
 
     if (!hasCompletedInitialFetch) return;
     if (isLoadingMore) return;
@@ -3683,7 +3825,7 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, onNavigateToProfile, isPr
         const safeUserMaxDistance = Number.isFinite(userMaxDistance) && userMaxDistance > 0 ? userMaxDistance : 50;
         const feedSignature = buildFeedSignature(baseCountryCode, unlockedCountries, !!isPremium, safeUserMaxDistance);
         const savedOrderKey = buildSavedOrderKey(currentUser?.id || '', feedSignature);
-        const savedOrder = localStorage.getItem(savedOrderKey);
+        const savedOrder = readPersistentItem(savedOrderKey);
         if (savedOrder) {
           const parsed: unknown = JSON.parse(savedOrder);
           const obj = (parsed && typeof parsed === 'object') ? (parsed as Record<string, unknown>) : null;
@@ -3694,7 +3836,7 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, onNavigateToProfile, isPr
                 : []);
           if (!orderIds.includes(lastPassedUser.user_id)) {
             const next = { premium: !!isPremium, countries: unlockedCountries, order: [lastPassedUser.user_id, ...orderIds] };
-            localStorage.setItem(savedOrderKey, JSON.stringify(next));
+            writePersistentItem(savedOrderKey, JSON.stringify(next));
           }
         }
       } catch {
@@ -3807,7 +3949,7 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, onNavigateToProfile, isPr
         const feedSignature = buildFeedSignature(baseCountryCode, unlockedCountries, !!isPremium, safeUserMaxDistance);
         const savedOrderKey = buildSavedOrderKey(currentUser?.id || '', feedSignature);
         
-        const savedOrder = localStorage.getItem(savedOrderKey);
+        const savedOrder = readPersistentItem(savedOrderKey);
         if (savedOrder) {
           const parsed: unknown = JSON.parse(savedOrder);
           const obj = (parsed && typeof parsed === 'object') ? (parsed as Record<string, unknown>) : null;
@@ -3818,7 +3960,7 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, onNavigateToProfile, isPr
                 : []);
           const updatedOrder = orderIds.filter((id) => id !== swipedProfileId);
           const next = { premium: !!isPremium, countries: unlockedCountries, order: updatedOrder };
-          localStorage.setItem(savedOrderKey, JSON.stringify(next));
+          writePersistentItem(savedOrderKey, JSON.stringify(next));
         }
       } catch (error) {
         // Ignore localStorage errors

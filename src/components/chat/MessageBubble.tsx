@@ -273,7 +273,7 @@ const MessageBubble: React.FC<MessageBubbleProps> = ({
   return (
     <>
       <div 
-        className={`flex ${isOwnMessage ? 'justify-end' : 'justify-start'} items-start`}
+        className={`w-full flex ${isOwnMessage ? 'justify-end' : 'justify-start'}`}
         onTouchStart={handleTouchStart}
         onTouchMove={handleTouchMove}
         onTouchEnd={handleTouchEnd}
@@ -294,7 +294,7 @@ const MessageBubble: React.FC<MessageBubbleProps> = ({
       >
         <div
           ref={bubbleRef}
-          className={`relative max-w-[75%] lg:max-w-md px-2 py-1 rounded-2xl shadow-md transition-all duration-300 ${
+          className={`relative max-w-[78%] sm:max-w-[520px] rounded-2xl px-4 py-3 shadow-sm text-[15px] leading-5 mb-2 transition-all duration-300 ${
             isOwnMessage
               ? 'bg-gradient-to-br from-rose-500 to-pink-600 text-white'
               : 'bg-white text-slate-800 border border-slate-200'
@@ -309,13 +309,13 @@ const MessageBubble: React.FC<MessageBubbleProps> = ({
               : undefined,
           }}
         >
-          {/* Reply thread indicator */}
+          {/* Reply preview */}
           {repliedMessage && (
             <div
-              className={`mb-2 px-3 py-2 rounded-lg cursor-pointer transition-all hover:opacity-80 active:scale-[0.98] ${
+              className={`mb-2 rounded-xl px-3 py-2 border-l-4 cursor-pointer transition-all hover:opacity-80 active:scale-[0.98] ${
                 isOwnMessage 
-                  ? 'bg-white/20 border-l-4 border-white/60' 
-                  : 'bg-rose-50 border-l-4 border-rose-400'
+                  ? 'bg-black/10 border-white/40' 
+                  : 'bg-rose-50 border-rose-400'
               }`}
               onClick={(e) => {
                 e.stopPropagation();
@@ -324,16 +324,16 @@ const MessageBubble: React.FC<MessageBubbleProps> = ({
                 }
               }}
             >
-              <p className={`text-xs font-semibold mb-0.5 ${
+              <div className={`text-[11px] font-semibold opacity-90 truncate ${
                 isOwnMessage ? 'text-white' : 'text-rose-600'
               }`}>
-                {repliedMessage.sender_id === currentUser.id ? 'You' : repliedMessage.sender?.first_name}
-              </p>
-              <p className={`text-xs ${
-                isOwnMessage ? 'text-white/80' : 'text-slate-600'
+                {repliedMessage.sender_id === currentUser.id ? 'You' : repliedMessage.sender?.first_name || 'User'}
+              </div>
+              <div className={`text-xs opacity-90 line-clamp-2 break-words ${
+                isOwnMessage ? 'text-white' : 'text-slate-600'
               }`}>
                 {repliedMessage.message}
-              </p>
+              </div>
             </div>
           )}
           
@@ -375,12 +375,13 @@ const MessageBubble: React.FC<MessageBubbleProps> = ({
             </div>
           )}
 
-          <p className={`text-sm break-words pr-5 mt-1 ${isDeletedForMe ? 'italic opacity-70' : ''}`}>
+          {/* Actual message */}
+          <div className={`whitespace-pre-wrap break-words ${isDeletedForMe ? 'italic opacity-70' : ''}`}>
             {isDeletedForMe ? 'deleted' : message.message}
-          </p>
-          <div className={`flex items-center gap-0 text-[9px] leading-none mt-0 ${
-            isOwnMessage ? 'text-white/70' : 'text-slate-400'
-          }`}>
+          </div>
+
+          {/* Meta row */}
+          <div className={`mt-1 flex items-center justify-end gap-1 text-[11px] opacity-80`}>
             <span>
               {new Date(message.sent_at || message.created_at || '').toLocaleTimeString([], {
                 hour: '2-digit',
@@ -388,9 +389,7 @@ const MessageBubble: React.FC<MessageBubbleProps> = ({
               })}
             </span>
             {isOwnMessage && (
-              <span className="text-[9px] font-medium text-white/90 leading-none">
-                {message.is_read ? '✓✓' : '✓'}
-              </span>
+              <span>{message.is_read ? '✓✓' : '✓'}</span>
             )}
           </div>
         </div>

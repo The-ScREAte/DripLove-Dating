@@ -105,7 +105,7 @@ const ChatPage = ({ currentUser, onUnreadChange, onDetailViewChange }: ChatPageP
     // Show cached chats instantly - no loading spinner
     return isCacheValid() ? (chatCache.chats as ChatMatch[]) : [];
   });
-  
+   
   const matchesRef = useRef<ChatMatch[]>([]);
   const [selectedMatch, setSelectedMatch] = useState<ChatMatch | null>(null);
   const [messages, setMessages] = useState<ChatMessage[]>([]);
@@ -124,24 +124,23 @@ const ChatPage = ({ currentUser, onUnreadChange, onDetailViewChange }: ChatPageP
   const messagesContainerRef = useRef<HTMLDivElement>(null);
   const isAtBottomRef = useRef<boolean>(true);
   
+  // Reply state (must be before virtualizer effect that uses it)
+  const [replyingTo, setReplyingTo] = useState<ChatMessage | null>(null);
+  
   // ⭐ VIRTUAL SCROLLING: Only render visible messages (90% performance improvement)
   const rowVirtualizer = useVirtualizer({
     count: messages.length,
     getScrollElement: () => messagesContainerRef.current,
-    estimateSize: () => 80,
-    overscan: 5,
+    estimateSize: () => 80,   // starting guess - auto-measures real height after render
+    overscan: 10,
   });
 
-  // Ensure virtual row heights are up-to-date for variable-height messages (e.g. replies).
-  // Some WebViews can be inconsistent with ResizeObserver timing; forcing a measure here prevents overlap.
-  const lastMeasuredMessageCountRef = useRef<number>(0);
-
+  // Force re-measure after messages render (wait for DOM layout + reply preview)
   useLayoutEffect(() => {
-    if (messages.length !== lastMeasuredMessageCountRef.current) {
+    requestAnimationFrame(() => {
       rowVirtualizer.measure();
-      lastMeasuredMessageCountRef.current = messages.length;
-    }
-  }, [rowVirtualizer, messages.length]);
+    });
+  }, [messages, replyingTo?.id, selectedMatch?.id]);
 
   // Centralized debounced fetchMatches scheduler (prevents realtime burst storms)
   const fetchMatchesDebounceTimerRef = useRef<number | null>(null);
@@ -173,9 +172,6 @@ const ChatPage = ({ currentUser, onUnreadChange, onDetailViewChange }: ChatPageP
   // Dormant conversations state
   const [showDormant, setShowDormant] = useState(false);
   const [showRatingDialog, setShowRatingDialog] = useState(false);
-  
-  // Reply state
-  const [replyingTo, setReplyingTo] = useState<ChatMessage | null>(null);
 
   // Highlighted message state (for scroll-to-message)
   const [highlightedMessageId, setHighlightedMessageId] = useState<string | null>(null);
@@ -2170,7 +2166,7 @@ const ChatPage = ({ currentUser, onUnreadChange, onDetailViewChange }: ChatPageP
       {/* Scrollable Messages Area (only this area scrolls) */}
       <div
         ref={messagesContainerRef}
-        className="flex-1 overflow-y-auto px-4 space-y-2 bg-gray-50 chat-messages-container"
+        className="flex-1 overflow-y-auto px-4 bg-gray-50 chat-messages-container"
         style={{ 
           WebkitOverflowScrolling: 'touch', 
           paddingTop: getPlatformSync() === 'ios' 
@@ -2213,22 +2209,29 @@ const ChatPage = ({ currentUser, onUnreadChange, onDetailViewChange }: ChatPageP
                   new Date(prevMessage.created_at || prevMessage.sent_at || '').getTime() < 300000;
 
                 // Find the replied-to message if this message is a reply
-                const repliedMessage = message.reply_to 
+                const repliedMessage = message.reply_to
                   ? messages.find(m => m.id === message.reply_to)
                   : null;
+                const hasReplyPreview = !!repliedMessage;
+                const baseSpacing = isConsecutive ? 8 : 18;
+                const rowPaddingBottom = baseSpacing;
+                const rowPaddingTop = 0;
+                const replySpacer = hasReplyPreview ? 36 : 0; // reserve extra space for reply preview height
 
                 return (
                   <div
                     key={message.id}
-                    ref={rowVirtualizer.measureElement}
+                    ref={virtualRow.measureElement}
                     data-index={virtualRow.index}
-                    className="pt-0.5 pb-0"
                     style={{
                       position: 'absolute',
                       top: 0,
                       left: 0,
                       width: '100%',
                       transform: `translateY(${virtualRow.start}px)`,
+                      paddingBottom: rowPaddingBottom,
+                      paddingTop: rowPaddingTop,
+                      overflow: 'visible',
                     }}
                   >
                     <MessageBubble
@@ -2243,6 +2246,9 @@ const ChatPage = ({ currentUser, onUnreadChange, onDetailViewChange }: ChatPageP
                       onReplyClick={handleScrollToMessage}
                       isHighlighted={message.id === highlightedMessageId}
                     />
+                    {replySpacer > 0 && (
+                      <div style={{ height: replySpacer }} aria-hidden />
+                    )}
                   </div>
                 );
               })}
