@@ -135,28 +135,28 @@ const ChatPage = ({ currentUser, onUnreadChange, onDetailViewChange }: ChatPageP
       // Dynamic height estimation based on message content
       const msg = messages[index];
       if (!msg) return 56;
-      
+
       const hasReply = !!msg.reply_to;
       const messageLength = msg.message?.length || 0;
-      
-      // Base height: bubble padding (12px top + 12px bottom) + timestamp (16px) + message line (20px)
+
+      // Base height: bubble padding + timestamp + first line
       let estimatedHeight = 60;
-      
+
       // Calculate lines: ~32 chars per line on mobile, ~50 on desktop
       const charsPerLine = window.innerWidth < 640 ? 32 : 50;
       const lines = Math.ceil(messageLength / charsPerLine);
-      
+
       // Each additional line adds ~20px (font-size 15px + line-height)
       estimatedHeight += Math.max(0, lines - 1) * 20;
-      
+
       // Add height for reply preview
       if (hasReply) {
         estimatedHeight += 56;
       }
-      
-      // Tight spacing between messages (like WhatsApp/iMessage)
-      estimatedHeight += 4;
-      
+
+      // ✅ Always keep a consistent 6px gap between message bubbles
+      estimatedHeight += 6;
+
       return estimatedHeight;
     },
     overscan: 12,
@@ -2239,8 +2239,9 @@ const ChatPage = ({ currentUser, onUnreadChange, onDetailViewChange }: ChatPageP
                 const repliedMessage = message.reply_to
                   ? messages.find(m => m.id === message.reply_to)
                   : null;
-                // Spacing between messages
-                const spacing = isConsecutive ? 4 : 12;
+
+                // ✅ Consistent spacing between all messages
+                const spacing = 6;
 
                 return (
                   <div
