@@ -67,15 +67,13 @@ const uniqUuids = (values: unknown[]): string[] => Array.from(new Set(values.fil
 
 const todayStr = () => new Date().toISOString().split('T')[0];
 
-// ⭐ PER-USER SEED: Generate a unique seed that varies by user AND time
+// ⭐ PER-USER SEED: Generate a unique seed that varies by user AND date
 // This ensures different users see different profile orders (fair visibility for all)
-// Changes every 4 hours to give variety without being too chaotic
+// Stays consistent for the entire day to provide stable experience
 const getUserFeedSeed = (userId: string): string => {
-  const now = new Date();
-  const dateStr = now.toISOString().split('T')[0];
-  const hourBlock = Math.floor(now.getUTCHours() / 4); // Changes every 4 hours (0-5)
+  const dateStr = todayStr();
   // Put userId FIRST so different users get completely different shuffles
-  return `${userId}_${dateStr}_h${hourBlock}`;
+  return `${userId}_${dateStr}`;
 };
 
 const swipeCountCacheKey = (userId: string) => `driplove_swipe_count_${userId}_${todayStr()}`;
@@ -259,16 +257,14 @@ const buildFeedSignature = (baseCountryCode: string, unlockedCountries: string[]
   const unlockedSignature = isPremium
     ? unlockedCountries.map(normalizeCountryCode).filter(Boolean).sort().join(',')
     : '';
-  // v9 feed signature - includes version bump for new per-user randomization
-  return `v9_${hashStringToInt(`${base}|${unlockedSignature}|${maxDistance}|${isPremium ? 'premium' : 'free'}`).toString(36)}`;
+  // v10 feed signature - daily rotation per-user randomization (no hour blocks)
+  return `v10_${hashStringToInt(`${base}|${unlockedSignature}|${maxDistance}|${isPremium ? 'premium' : 'free'}`).toString(36)}`;
 };
 
-// ⭐ PER-USER RANDOMIZATION: Include hour block in saved order key
-// This ensures the saved profile order rotates every 4 hours for variety
-const getHourBlock = () => Math.floor(new Date().getUTCHours() / 4);
-
+// ⭐ PER-USER RANDOMIZATION: Saved order persists for entire day per user
+// This ensures stable experience throughout the day with fair per-user distribution
 const buildSavedOrderKey = (userId: string, feedSignature: string) =>
-  `driplove_profile_order_${userId}_${todayStr()}_h${getHourBlock()}_${feedSignature}`;
+  `driplove_profile_order_${userId}_${todayStr()}_${feedSignature}`;
 
 const normalizeCountryCodeList = (value: unknown, baseCountryCode?: string): string[] => {
   const normalize = (items: unknown[]): string[] => {
