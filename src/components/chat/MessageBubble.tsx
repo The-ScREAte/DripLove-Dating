@@ -1,7 +1,7 @@
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useRef, useState, useCallback } from 'react';
 import { ChatMessage, CurrentUser } from '@/types';
 import DeleteConfirmDialog from './DeleteConfirmDialog';
-import { Reply, Trash2 } from 'lucide-react';
+import { Reply, Trash2, Check, CheckCheck } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 
 interface MessageBubbleProps {
@@ -32,154 +32,83 @@ const MessageBubble: React.FC<MessageBubbleProps> = ({
   const { t } = useTranslation();
   const isOwnMessage = message.sender_id === currentUser.id;
   const isSystemMessage = message.sender_id === '00000000-0000-0000-0000-000000000000';
+  const isDeletedForMe = !!(message.deleted_for && message.deleted_for.includes(currentUser.id));
 
   const [showConfirm, setShowConfirm] = useState(false);
   const [deleteType, setDeleteType] = useState<'me' | 'everyone'>('me');
   const [hasResponded, setHasResponded] = useState(false);
-
-  const [touchStart, setTouchStart] = useState({ x: 0, y: 0 });
-  const [swipeOffset, setSwipeOffset] = useState(0);
-  const [isSwiping, setIsSwiping] = useState(false);
-  const [isMouseDown, setIsMouseDown] = useState(false);
-
   const [isOptionsOpen, setIsOptionsOpen] = useState(false);
   const [showOptionsBelow, setShowOptionsBelow] = useState(false);
-  const optionsMenuRef = useRef<HTMLDivElement>(null);
-  const bubbleRef = useRef<HTMLDivElement>(null);
+
+  // Swipe state
+  const [swipeOffset, setSwipeOffset] = useState(0);
+  const [isSwiping, setIsSwiping] = useState(false);
+  const touchStartRef = useRef({ x: 0, y: 0 });
   const longPressTimerRef = useRef<number | null>(null);
   const longPressTriggeredRef = useRef(false);
 
-  const isDeletedForMe = !!(message.deleted_for && message.deleted_for.includes(currentUser.id));
+  const bubbleRef = useRef<HTMLDivElement>(null);
+  const optionsMenuRef = useRef<HTMLDivElement>(null);
 
-  useEffect(() => {
-    const handleClickOutside = (event: MouseEvent | TouchEvent) => {
-      if (!isOptionsOpen) return;
-      const target = event.target as Node;
-      if (optionsMenuRef.current && optionsMenuRef.current.contains(target)) return;
-      if (bubbleRef.current && bubbleRef.current.contains(target)) return;
-      setIsOptionsOpen(false);
-    };
-
-    if (isOptionsOpen) {
-      document.addEventListener('mousedown', handleClickOutside);
-      document.addEventListener('touchstart', handleClickOutside);
-    }
-
-    return () => {
-      document.removeEventListener('mousedown', handleClickOutside);
-      document.removeEventListener('touchstart', handleClickOutside);
-    };
-  }, [isOptionsOpen]);
-
-  const openOptionsMenu = () => {
-    if (isSystemMessage) return;
-
-    if (bubbleRef.current) {
-      const rect = bubbleRef.current.getBoundingClientRect();
-
-      const safeAreaTop = parseInt(
-        getComputedStyle(document.documentElement).getPropertyValue('--safe-area-inset-top') || '0',
-        10
-      );
-      const safeAreaBottom = parseInt(
-        getComputedStyle(document.documentElement).getPropertyValue('--safe-area-inset-bottom') || '0',
-        10
-      );
-
-      const spaceAbove = rect.top - safeAreaTop;
-      const spaceBelow = window.innerHeight - rect.bottom - safeAreaBottom;
-
-      // If there's not enough space above (accounting for headers), show below.
-      setShowOptionsBelow(spaceAbove < 180);
-    }
-
-    setIsOptionsOpen(true);
+  const formatTime = (dateStr: string | undefined) => {
+    if (!dateStr) return '';
+    return new Date(dateStr).toLocaleTimeString([], {
+      hour: '2-digit',
+      minute: '2-digit',
+    });
   };
 
-  const clearLongPressTimer = () => {
+  const clearLongPressTimer = useCallback(() => {
     if (longPressTimerRef.current) {
       window.clearTimeout(longPressTimerRef.current);
       longPressTimerRef.current = null;
     }
-  };
+  }, []);
 
-  const handleDeleteForMe = () => {
-    setDeleteType('me');
-    setShowConfirm(true);
-    setIsOptionsOpen(false);
-  };
-
-  const handleDeleteForEveryone = () => {
-    setDeleteType('everyone');
-    setShowConfirm(true);
-    setIsOptionsOpen(false);
-  };
-
-  const handleReply = () => {
-    if (onReply) onReply(message);
-    setIsOptionsOpen(false);
-  };
-
-  const handleConfirmDelete = () => {
-    if (deleteType === 'me' && onDeleteForMe && message.id) {
-      onDeleteForMe(message.id);
-    } else if (deleteType === 'everyone' && onDeleteForEveryone && message.id) {
-      onDeleteForEveryone(message.id);
+  const openOptionsMenu = useCallback(() => {
+    if (isSystemMessage) return;
+    if (bubbleRef.current) {
+      const rect = bubbleRef.current.getBoundingClientRect();
+      const spaceAbove = rect.top;
+      setShowOptionsBelow(spaceAbove < 180);
     }
-  };
+    setIsOptionsOpen(true);
+  }, [isSystemMessage]);
 
-  const handleDormancyResponse = (response: boolean) => {
-    if (onDormancyResponse) {
-      onDormancyResponse(response);
-      setHasResponded(true);
-    }
-  };
-  
-  // Swipe gesture handlers for touch
-  const handleTouchStart = (e: React.TouchEvent) => {
-    e.stopPropagation();
-    setTouchStart({ x: e.touches[0].clientX, y: e.touches[0].clientY });
+  const closeOptionsMenu = useCallback(() => {
+    setIsOptionsOpen(false);
+  }, []);
+
+  // Touch handlers for swipe-to-reply
+  const handleTouchStart = useCallback((e: React.TouchEvent) => {
+    touchStartRef.current = { x: e.touches[0].clientX, y: e.touches[0].clientY };
     setIsSwiping(true);
-
     longPressTriggeredRef.current = false;
     clearLongPressTimer();
-    // iMessage-style long press to show options
     longPressTimerRef.current = window.setTimeout(() => {
       longPressTriggeredRef.current = true;
       setSwipeOffset(0);
       setIsSwiping(false);
       openOptionsMenu();
     }, 450);
-  };
-  
-  const handleTouchMove = (e: React.TouchEvent) => {
-    if (!isSwiping) return;
-    
-    const touchX = e.touches[0].clientX;
-    const touchY = e.touches[0].clientY;
-    const deltaX = touchX - touchStart.x;
-    const deltaY = touchY - touchStart.y;
+  }, [clearLongPressTimer, openOptionsMenu]);
 
-    // If the finger moves, cancel long-press.
+  const handleTouchMove = useCallback((e: React.TouchEvent) => {
+    if (!isSwiping) return;
+    const deltaX = e.touches[0].clientX - touchStartRef.current.x;
+    const deltaY = e.touches[0].clientY - touchStartRef.current.y;
     if (Math.abs(deltaX) > 10 || Math.abs(deltaY) > 10) {
       clearLongPressTimer();
     }
-    
-    // Only trigger swipe if horizontal movement is dominant
     if (Math.abs(deltaX) > Math.abs(deltaY)) {
-      // Prevent browser's native swipe-back gesture
       e.preventDefault();
-      e.stopPropagation();
-      
-      // Own messages: swipe left to reply
-      // Other's messages: swipe right to reply
       if ((isOwnMessage && deltaX < 0) || (!isOwnMessage && deltaX > 0)) {
-        setSwipeOffset(Math.abs(deltaX));
+        setSwipeOffset(Math.min(Math.abs(deltaX), 80));
       }
     }
-  };
-  
-  const handleTouchEnd = () => {
+  }, [isSwiping, isOwnMessage, clearLongPressTimer]);
+
+  const handleTouchEnd = useCallback(() => {
     clearLongPressTimer();
     if (longPressTriggeredRef.current) {
       longPressTriggeredRef.current = false;
@@ -187,64 +116,62 @@ const MessageBubble: React.FC<MessageBubbleProps> = ({
       setIsSwiping(false);
       return;
     }
-    const threshold = window.innerWidth * 0.3; // 30% of screen width
-    if (swipeOffset > threshold && onReply) {
+    if (swipeOffset > 50 && onReply) {
       onReply(message);
     }
     setSwipeOffset(0);
     setIsSwiping(false);
-  };
-  
-  // Mouse gesture handlers for desktop
-  const handleMouseDown = (e: React.MouseEvent) => {
+  }, [clearLongPressTimer, swipeOffset, onReply, message]);
+
+  const handleContextMenu = useCallback((e: React.MouseEvent) => {
     e.preventDefault();
-    setTouchStart({ x: e.clientX, y: e.clientY });
-    setIsMouseDown(true);
-    setIsSwiping(true);
-  };
-  
-  const handleMouseMove = (e: React.MouseEvent) => {
-    if (!isSwiping || !isMouseDown) return;
-    
-    const mouseX = e.clientX;
-    const mouseY = e.clientY;
-    const deltaX = mouseX - touchStart.x;
-    const deltaY = mouseY - touchStart.y;
-    
-    // Only trigger swipe if horizontal movement is dominant
-    if (Math.abs(deltaX) > Math.abs(deltaY)) {
-      // Own messages: swipe left to reply
-      // Other's messages: swipe right to reply
-      if ((isOwnMessage && deltaX < 0) || (!isOwnMessage && deltaX > 0)) {
-        setSwipeOffset(Math.abs(deltaX));
-      }
+    openOptionsMenu();
+  }, [openOptionsMenu]);
+
+  const handleReply = useCallback(() => {
+    if (onReply) onReply(message);
+    closeOptionsMenu();
+  }, [onReply, message, closeOptionsMenu]);
+
+  const handleDeleteForMe = useCallback(() => {
+    setDeleteType('me');
+    setShowConfirm(true);
+    closeOptionsMenu();
+  }, [closeOptionsMenu]);
+
+  const handleDeleteForEveryone = useCallback(() => {
+    setDeleteType('everyone');
+    setShowConfirm(true);
+    closeOptionsMenu();
+  }, [closeOptionsMenu]);
+
+  const handleConfirmDelete = useCallback(() => {
+    if (deleteType === 'me' && onDeleteForMe && message.id) {
+      onDeleteForMe(message.id);
+    } else if (deleteType === 'everyone' && onDeleteForEveryone && message.id) {
+      onDeleteForEveryone(message.id);
     }
-  };
-  
-  const handleMouseUp = () => {
-    const threshold = window.innerWidth * 0.3; // 30% of screen width
-    if (swipeOffset > threshold && onReply) {
-      onReply(message);
+  }, [deleteType, onDeleteForMe, onDeleteForEveryone, message.id]);
+
+  const handleDormancyResponse = useCallback((response: boolean) => {
+    if (onDormancyResponse) {
+      onDormancyResponse(response);
+      setHasResponded(true);
     }
-    setSwipeOffset(0);
-    setIsSwiping(false);
-    setIsMouseDown(false);
-  };
-  
-  const handleMouseLeave = () => {
-    // Reset if mouse leaves the bubble while dragging
-    if (isMouseDown) {
-      setSwipeOffset(0);
-      setIsSwiping(false);
-      setIsMouseDown(false);
+  }, [onDormancyResponse]);
+
+  const handleReplyPreviewClick = useCallback((e: React.MouseEvent) => {
+    e.stopPropagation();
+    if (onReplyClick && repliedMessage?.id) {
+      onReplyClick(repliedMessage.id);
     }
-  };
-  
-  // Render system message (dormancy check)
+  }, [onReplyClick, repliedMessage?.id]);
+
+  // System message (dormancy check)
   if (isSystemMessage) {
     return (
-      <div className="flex justify-center my-4">
-        <div className="bg-amber-50 border border-amber-200 rounded-lg px-4 py-3 max-w-md shadow-sm">
+      <div className="flex justify-center py-3">
+        <div className="bg-amber-50 border border-amber-200 rounded-xl px-4 py-3 max-w-sm shadow-sm">
           <p className="text-sm text-amber-900 text-center mb-3">{message.message}</p>
           {!hasResponded && onDormancyResponse && (
             <div className="flex gap-2 justify-center">
@@ -269,129 +196,132 @@ const MessageBubble: React.FC<MessageBubbleProps> = ({
       </div>
     );
   }
-  
+
+  const swipeTransform = swipeOffset > 0 
+    ? `translateX(${isOwnMessage ? -swipeOffset * 0.4 : swipeOffset * 0.4}px)` 
+    : 'translateX(0)';
+
   return (
     <>
-      <div 
-        className={`w-full flex ${isOwnMessage ? 'justify-end' : 'justify-start'}`}
+      {/* Click outside to close options */}
+      {isOptionsOpen && (
+        <div 
+          className="fixed inset-0 z-40" 
+          onClick={closeOptionsMenu}
+          onTouchStart={closeOptionsMenu}
+        />
+      )}
+
+      <div
+        className={`flex w-full ${isOwnMessage ? 'justify-end' : 'justify-start'} px-3`}
         onTouchStart={handleTouchStart}
         onTouchMove={handleTouchMove}
         onTouchEnd={handleTouchEnd}
-        onMouseDown={handleMouseDown}
-        onMouseMove={handleMouseMove}
-        onMouseUp={handleMouseUp}
-        onMouseLeave={handleMouseLeave}
-        onContextMenu={(e) => {
-          e.preventDefault();
-          openOptionsMenu();
-        }}
+        onContextMenu={handleContextMenu}
         style={{
-          transform: swipeOffset > 0 ? `translateX(${isOwnMessage ? -swipeOffset * 0.3 : swipeOffset * 0.3}px)` : 'none',
+          transform: swipeTransform,
           transition: isSwiping ? 'none' : 'transform 0.2s ease-out',
-          cursor: isMouseDown ? 'grabbing' : 'grab',
-          touchAction: 'pan-y'
         }}
       >
         <div
           ref={bubbleRef}
-          className={`relative max-w-[78%] sm:max-w-[520px] rounded-2xl px-4 py-3 shadow-sm text-[15px] leading-5 mb-3 transition-all duration-300 ${
-            isOwnMessage
-              ? 'bg-gradient-to-br from-rose-500 to-pink-600 text-white'
-              : 'bg-white text-slate-800 border border-slate-200'
-          } ${
-            isHighlighted
-              ? 'ring-4 ring-yellow-400 shadow-2xl shadow-yellow-400/50 scale-105 animate-pulse'
-              : ''
-          }`}
-          style={{
-            backgroundColor: isHighlighted 
-              ? (isOwnMessage ? 'rgba(251, 191, 36, 0.3)' : 'rgba(251, 191, 36, 0.2)')
-              : undefined,
-          }}
+          className={`
+            relative max-w-[80%] sm:max-w-md
+            rounded-2xl
+            ${isOwnMessage 
+              ? 'bg-gradient-to-br from-rose-500 to-pink-600 text-white rounded-br-md' 
+              : 'bg-white text-slate-800 border border-slate-100 shadow-sm rounded-bl-md'
+            }
+            ${isHighlighted ? 'ring-2 ring-yellow-400 ring-offset-2' : ''}
+          `}
         >
-          {/* Reply preview */}
+          {/* Reply Preview */}
           {repliedMessage && (
             <div
-              className={`mb-3 rounded-xl px-3 py-2.5 border-l-4 cursor-pointer transition-all hover:opacity-80 active:scale-[0.98] ${
-                isOwnMessage 
-                  ? 'bg-black/10 border-white/40' 
+              onClick={handleReplyPreviewClick}
+              className={`
+                mx-2 mt-2 mb-1 px-3 py-2 rounded-lg border-l-3
+                cursor-pointer transition-opacity hover:opacity-80
+                ${isOwnMessage 
+                  ? 'bg-white/15 border-white/50' 
                   : 'bg-rose-50 border-rose-400'
-              }`}
-              onClick={(e) => {
-                e.stopPropagation();
-                if (onReplyClick && repliedMessage.id) {
-                  onReplyClick(repliedMessage.id);
                 }
-              }}
+              `}
             >
-              <div className={`text-[11px] font-semibold opacity-90 truncate ${
-                isOwnMessage ? 'text-white' : 'text-rose-600'
-              }`}>
-                {repliedMessage.sender_id === currentUser.id ? 'You' : repliedMessage.sender?.first_name || 'User'}
-              </div>
-              <div className={`text-[13px] opacity-90 line-clamp-2 break-words mt-0.5 ${
-                isOwnMessage ? 'text-white' : 'text-slate-600'
-              }`}>
+              <p className={`text-xs font-semibold truncate ${isOwnMessage ? 'text-white/90' : 'text-rose-600'}`}>
+                {repliedMessage.sender_id === currentUser.id 
+                  ? t('chat.you', 'You') 
+                  : repliedMessage.sender?.first_name || 'User'
+                }
+              </p>
+              <p className={`text-xs line-clamp-2 mt-0.5 ${isOwnMessage ? 'text-white/80' : 'text-slate-600'}`}>
                 {repliedMessage.message}
-              </div>
+              </p>
             </div>
           )}
-          
-          {/* Options menu (shown on long-press / right-click) */}
-          {isOptionsOpen && !isSystemMessage && (
+
+          {/* Message Content */}
+          <div className={`px-3 ${repliedMessage ? 'pt-1' : 'pt-2.5'} pb-1`}>
+            <p className={`text-[15px] leading-relaxed whitespace-pre-wrap break-words ${isDeletedForMe ? 'italic opacity-60' : ''}`}>
+              {isDeletedForMe ? t('chat.deleted', 'This message was deleted') : message.message}
+            </p>
+          </div>
+
+          {/* Timestamp & Read Status */}
+          <div className={`flex items-center justify-end gap-1 px-3 pb-2 ${isOwnMessage ? 'text-white/70' : 'text-slate-400'}`}>
+            <span className="text-[11px]">
+              {formatTime(message.sent_at || message.created_at)}
+            </span>
+            {isOwnMessage && (
+              <span className="flex items-center">
+                {message.is_read ? (
+                  <CheckCheck className="w-3.5 h-3.5" />
+                ) : (
+                  <Check className="w-3.5 h-3.5" />
+                )}
+              </span>
+            )}
+          </div>
+
+          {/* Context Menu */}
+          {isOptionsOpen && (
             <div
               ref={optionsMenuRef}
-              className={`absolute ${showOptionsBelow ? 'top-full mt-1' : 'bottom-full mb-1'} ${
-                isOwnMessage ? 'right-0' : 'left-0'
-              } bg-white rounded-lg shadow-lg border border-gray-200 py-0.5 z-50 w-32 text-sm`}
+              className={`
+                absolute z-50 min-w-[140px]
+                bg-white rounded-xl shadow-lg border border-slate-200
+                py-1 overflow-hidden
+                ${showOptionsBelow ? 'top-full mt-1' : 'bottom-full mb-1'}
+                ${isOwnMessage ? 'right-0' : 'left-0'}
+              `}
             >
               {onReply && (
                 <button
                   onClick={handleReply}
-                  className="w-full px-2.5 py-1.5 text-left text-gray-700 hover:bg-gray-50 flex items-center gap-1.5 transition-colors text-xs"
+                  className="w-full flex items-center gap-2.5 px-3 py-2.5 text-sm text-slate-700 hover:bg-slate-50 transition-colors"
                 >
-                  <Reply className="w-3 h-3" />
-                  {t('chat.reply')}
+                  <Reply className="w-4 h-4 text-slate-500" />
+                  {t('chat.reply', 'Reply')}
                 </button>
               )}
-
               <button
                 onClick={handleDeleteForMe}
-                className="w-full px-2.5 py-1.5 text-left text-gray-700 hover:bg-gray-50 flex items-center gap-1.5 transition-colors text-xs"
+                className="w-full flex items-center gap-2.5 px-3 py-2.5 text-sm text-slate-700 hover:bg-slate-50 transition-colors"
               >
-                <Trash2 className="w-3 h-3" />
-                {t('chat.deleteForMe')}
+                <Trash2 className="w-4 h-4 text-slate-500" />
+                {t('chat.deleteForMe', 'Delete for me')}
               </button>
-
               {isOwnMessage && (
                 <button
                   onClick={handleDeleteForEveryone}
-                  className="w-full px-2.5 py-1.5 text-left text-red-600 hover:bg-red-50 flex items-center gap-1.5 transition-colors text-xs"
+                  className="w-full flex items-center gap-2.5 px-3 py-2.5 text-sm text-red-600 hover:bg-red-50 transition-colors"
                 >
-                  <Trash2 className="w-3 h-3" />
-                  {t('chat.deleteForEveryone')}
+                  <Trash2 className="w-4 h-4" />
+                  {t('chat.deleteForEveryone', 'Delete for everyone')}
                 </button>
               )}
             </div>
           )}
-
-          {/* Actual message */}
-          <div className={`whitespace-pre-wrap break-words ${isDeletedForMe ? 'italic opacity-70' : ''}`}>
-            {isDeletedForMe ? 'deleted' : message.message}
-          </div>
-
-          {/* Meta row */}
-          <div className={`mt-1 flex items-center justify-end gap-1 text-[11px] opacity-80`}>
-            <span>
-              {new Date(message.sent_at || message.created_at || '').toLocaleTimeString([], {
-                hour: '2-digit',
-                minute: '2-digit'
-              })}
-            </span>
-            {isOwnMessage && (
-              <span>{message.is_read ? '✓✓' : '✓'}</span>
-            )}
-          </div>
         </div>
       </div>
 
@@ -405,14 +335,13 @@ const MessageBubble: React.FC<MessageBubbleProps> = ({
   );
 };
 
-// ⭐ REACT.MEMO: Prevent re-renders when message hasn't changed (70% improvement)
-export default React.memo(MessageBubble, (prevProps, nextProps) => {
+export default React.memo(MessageBubble, (prev, next) => {
   return (
-    prevProps.message.id === nextProps.message.id &&
-    prevProps.message.is_read === nextProps.message.is_read &&
-    prevProps.message.deleted_for === nextProps.message.deleted_for &&
-    prevProps.isConsecutive === nextProps.isConsecutive &&
-    prevProps.isHighlighted === nextProps.isHighlighted &&
-    prevProps.repliedMessage?.id === nextProps.repliedMessage?.id
+    prev.message.id === next.message.id &&
+    prev.message.is_read === next.message.is_read &&
+    prev.message.deleted_for === next.message.deleted_for &&
+    prev.isConsecutive === next.isConsecutive &&
+    prev.isHighlighted === next.isHighlighted &&
+    prev.repliedMessage?.id === next.repliedMessage?.id
   );
 });

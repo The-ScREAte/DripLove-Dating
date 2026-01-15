@@ -132,12 +132,31 @@ const ChatPage = ({ currentUser, onUnreadChange, onDetailViewChange }: ChatPageP
     count: messages.length,
     getScrollElement: () => messagesContainerRef.current,
     estimateSize: (index) => {
-      // Estimate higher for messages with replies to prevent overlap
+      // Dynamic height estimation based on message content
       const msg = messages[index];
-      const hasReply = msg?.reply_to;
-      return hasReply ? 140 : 80; // Reply messages are taller
+      if (!msg) return 72;
+      
+      const hasReply = !!msg.reply_to;
+      const messageLength = msg.message?.length || 0;
+      
+      // Base height for simple message
+      let estimatedHeight = 56;
+      
+      // Add height for longer messages (roughly 45 chars per line)
+      const extraLines = Math.floor(messageLength / 45);
+      estimatedHeight += extraLines * 20;
+      
+      // Add height for reply preview
+      if (hasReply) {
+        estimatedHeight += 56;
+      }
+      
+      // Add spacing
+      estimatedHeight += 16;
+      
+      return estimatedHeight;
     },
-    overscan: 10,
+    overscan: 8,
   });
 
   // Force re-measure after messages render (wait for DOM layout + reply preview)
@@ -2217,13 +2236,8 @@ const ChatPage = ({ currentUser, onUnreadChange, onDetailViewChange }: ChatPageP
                 const repliedMessage = message.reply_to
                   ? messages.find(m => m.id === message.reply_to)
                   : null;
-                const hasReplyPreview = !!repliedMessage;
-                const baseSpacing = isConsecutive ? 8 : 18;
-                const rowPaddingBottom = baseSpacing;
-                const rowPaddingTop = 0;
-
-                // Messages with reply preview need extra spacing below to prevent overlap
-                const replyPadding = hasReplyPreview ? 20 : 0;
+                // Spacing between messages
+                const spacing = isConsecutive ? 4 : 12;
 
                 return (
                   <div
@@ -2236,9 +2250,7 @@ const ChatPage = ({ currentUser, onUnreadChange, onDetailViewChange }: ChatPageP
                       left: 0,
                       width: '100%',
                       transform: `translateY(${virtualRow.start}px)`,
-                      paddingBottom: rowPaddingBottom + replyPadding,
-                      paddingTop: rowPaddingTop,
-                      overflow: 'visible',
+                      paddingTop: spacing,
                     }}
                   >
                     <MessageBubble
