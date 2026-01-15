@@ -131,7 +131,12 @@ const ChatPage = ({ currentUser, onUnreadChange, onDetailViewChange }: ChatPageP
   const rowVirtualizer = useVirtualizer({
     count: messages.length,
     getScrollElement: () => messagesContainerRef.current,
-    estimateSize: () => 80,   // starting guess - auto-measures real height after render
+    estimateSize: (index) => {
+      // Estimate higher for messages with replies to prevent overlap
+      const msg = messages[index];
+      const hasReply = msg?.reply_to;
+      return hasReply ? 140 : 80; // Reply messages are taller
+    },
     overscan: 10,
   });
 
@@ -2223,6 +2228,7 @@ const ChatPage = ({ currentUser, onUnreadChange, onDetailViewChange }: ChatPageP
                 return (
                   <div
                     key={message.id}
+                    ref={rowVirtualizer.measureElement}
                     data-index={virtualRow.index}
                     style={{
                       position: 'absolute',
