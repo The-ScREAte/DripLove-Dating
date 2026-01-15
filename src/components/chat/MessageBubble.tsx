@@ -294,7 +294,7 @@ const MessageBubble: React.FC<MessageBubbleProps> = ({
       >
         <div
           ref={bubbleRef}
-          className={`relative max-w-[78%] sm:max-w-[520px] rounded-2xl px-4 py-3 shadow-sm text-[15px] leading-5 mb-2 transition-all duration-300 ${
+          className={`relative max-w-[78%] sm:max-w-[520px] rounded-2xl px-4 py-3 shadow-sm text-[15px] leading-5 mb-3 transition-all duration-300 ${
             isOwnMessage
               ? 'bg-gradient-to-br from-rose-500 to-pink-600 text-white'
               : 'bg-white text-slate-800 border border-slate-200'
@@ -312,7 +312,7 @@ const MessageBubble: React.FC<MessageBubbleProps> = ({
           {/* Reply preview */}
           {repliedMessage && (
             <div
-              className={`mb-2 rounded-xl px-3 py-2 border-l-4 cursor-pointer transition-all hover:opacity-80 active:scale-[0.98] ${
+              className={`mb-3 rounded-xl px-3 py-2.5 border-l-4 cursor-pointer transition-all hover:opacity-80 active:scale-[0.98] ${
                 isOwnMessage 
                   ? 'bg-black/10 border-white/40' 
                   : 'bg-rose-50 border-rose-400'
@@ -329,7 +329,7 @@ const MessageBubble: React.FC<MessageBubbleProps> = ({
               }`}>
                 {repliedMessage.sender_id === currentUser.id ? 'You' : repliedMessage.sender?.first_name || 'User'}
               </div>
-              <div className={`text-xs opacity-90 line-clamp-2 break-words ${
+              <div className={`text-[13px] opacity-90 line-clamp-2 break-words mt-0.5 ${
                 isOwnMessage ? 'text-white' : 'text-slate-600'
               }`}>
                 {repliedMessage.message}
