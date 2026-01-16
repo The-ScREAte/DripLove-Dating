@@ -77,16 +77,17 @@ const TermsAcceptance = ({ user, onAccept }: TermsAcceptanceProps) => {
           .from('user_subscriptions')
           .select('plan_name, status, expires_at')
           .eq('user_id', userId)
-          .eq('status', 'active')
-          .single()
+          .order('created_at', { ascending: false })
+          .limit(1)
+          .maybeSingle()
       ]);
 
       if (!currentUserData) return;
 
-      // Check premium status from subscription
-      const isPremium = subscriptionData?.plan_name === 'premium' && 
-        subscriptionData?.status === 'active' &&
-        (!subscriptionData?.expires_at || new Date(subscriptionData.expires_at) > new Date());
+      // Check premium entitlement from subscription (cancelled stays premium until expires_at)
+      const entitledByStatus = subscriptionData?.status === 'active' || subscriptionData?.status === 'cancelled';
+      const notExpired = !subscriptionData?.expires_at || new Date(subscriptionData.expires_at) > new Date();
+      const isPremium = subscriptionData?.plan_name === 'premium' && entitledByStatus && notExpired;
 
       // Get exclusion lists
       const [
