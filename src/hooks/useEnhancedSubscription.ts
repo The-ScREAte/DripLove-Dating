@@ -123,13 +123,13 @@ export function useEnhancedSubscription() {
       // Set loading to false immediately to show UI faster
       setLoading(false)
 
-      if (quickCheck && quickCheck.plan_name === 'premium' && quickCheck.status === 'active') {
-        // Check if subscription has actually expired
+      if (quickCheck && quickCheck.plan_name === 'premium') {
+        // Check if subscription has actually expired (regardless of status)
+        // Users should keep access until expires_at date, even if cancelled
         const isExpired = quickCheck.expires_at && new Date(quickCheck.expires_at) <= new Date()
         
         if (isExpired) {
           // Subscription has expired - update the database and set to free
-          // Update the subscription status in the database
           await supabase
             .from('user_subscriptions')
             .update({
@@ -147,8 +147,10 @@ export function useEnhancedSubscription() {
             payment_method: quickCheck.payment_method
           })
         } else {
-          // Verify with native store if on mobile
-          const storeValid = await verifyWithNativeStore(user.id, quickCheck);
+          // Not expired yet - user keeps premium access even if cancelled
+          // Verify with native store if on mobile AND status is active
+          const shouldVerifyStore = quickCheck.status === 'active';
+          const storeValid = shouldVerifyStore ? await verifyWithNativeStore(user.id, quickCheck) : true;
           
           if (!storeValid) {
             // Store says subscription is not valid
@@ -160,12 +162,12 @@ export function useEnhancedSubscription() {
               payment_method: quickCheck.payment_method
             })
           } else {
-            // Active premium subscription
+            // Premium access active until expires_at (even if cancelled)
             setSubscriptionStatus({
               plan_name: quickCheck.plan_name,
-              status: quickCheck.status,
+              status: quickCheck.status, // Can be 'active' or 'cancelled'
               expires_at: quickCheck.expires_at,
-              is_active: true,
+              is_active: true, // Access remains active until expiration
               payment_method: quickCheck.payment_method
             })
           }

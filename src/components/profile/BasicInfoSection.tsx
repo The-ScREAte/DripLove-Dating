@@ -34,7 +34,26 @@ const getSanitizedValue = (name: string, value: string) => {
 
 const BasicInfoSection = ({ editedProfile, isEditing, onInputChange }: BasicInfoSectionProps) => {
   const { t } = useTranslation();
-  // ...existing code...
+  
+  // Calculate age from date of birth
+  const calculateAge = (dateOfBirth: string | null | undefined): number | null => {
+    if (!dateOfBirth) return null;
+    try {
+      const birthDate = new Date(dateOfBirth);
+      const today = new Date();
+      let age = today.getFullYear() - birthDate.getFullYear();
+      const monthDiff = today.getMonth() - birthDate.getMonth();
+      if (monthDiff < 0 || (monthDiff === 0 && today.getDate() < birthDate.getDate())) {
+        age--;
+      }
+      return age;
+    } catch {
+      return null;
+    }
+  };
+  
+  const age = calculateAge(editedProfile.date_of_birth);
+  
   return (
     <Card>
       <CardHeader>
@@ -99,6 +118,32 @@ const BasicInfoSection = ({ editedProfile, isEditing, onInputChange }: BasicInfo
                 }}
                 disabled={!isEditing}
                 className="w-full"
+              />
+            </div>
+          </div>
+          
+          {/* Date of Birth and Age Display */}
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div>
+              <Label htmlFor="date_of_birth">{t('profile.dateOfBirth', 'Date of Birth')}</Label>
+              <Input
+                type="date"
+                id="date_of_birth"
+                name="date_of_birth"
+                value={editedProfile.date_of_birth || ''}
+                disabled={true}
+                className="w-full bg-gray-50 cursor-not-allowed"
+              />
+            </div>
+            <div>
+              <Label htmlFor="age">{t('profile.age', 'Age')}</Label>
+              <Input
+                type="text"
+                id="age"
+                name="age"
+                value={age ? `${age} years old` : 'Not set'}
+                disabled={true}
+                className="w-full bg-gray-50 cursor-not-allowed"
               />
             </div>
           </div>

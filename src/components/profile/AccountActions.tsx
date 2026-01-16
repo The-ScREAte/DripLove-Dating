@@ -436,22 +436,33 @@ const AccountActions = ({ currentUser, onLogout, onShowTerms, onShowPrivacy, hid
         )}
 
         {/* 6. Subscription Management - Cancel or Resume */}
-        {(isPremium || (subscriptionStatus && subscriptionStatus.plan_name === 'premium')) && (
+        {(isPremium || (subscriptionStatus && subscriptionStatus.plan_name === 'premium' && subscriptionStatus.is_active)) && (
           <div className="space-y-3">
-            {/* Show subscription status if cancelled */}
+            {/* Show subscription status if cancelled but still active until expiration */}
             {subscriptionStatus && subscriptionStatus.status === 'cancelled' && subscriptionStatus.expires_at && (
               <div className="p-4 bg-orange-50 border border-orange-200 rounded-lg">
                 <div className="flex items-center gap-2 mb-2">
                   <AlertTriangle className="w-4 h-4 text-orange-600" />
                   <span className="font-semibold text-orange-800">Subscription Cancelled</span>
                 </div>
-                <p className="text-sm text-orange-700">
-                  Your premium access ends on {new Date(subscriptionStatus.expires_at).toLocaleDateString()}
+                <p className="text-sm text-orange-700 mb-1">
+                  Your premium features remain active until:
+                </p>
+                <p className="text-base font-bold text-orange-900">
+                  {new Date(subscriptionStatus.expires_at).toLocaleDateString('en-US', { 
+                    weekday: 'long', 
+                    year: 'numeric', 
+                    month: 'long', 
+                    day: 'numeric' 
+                  })}
+                </p>
+                <p className="text-xs text-orange-600 mt-2">
+                  You will not be charged again and can resubscribe anytime.
                 </p>
               </div>
             )}
 
-            {/* Cancel button for active subscriptions */}
+            {/* Cancel button for active subscriptions only */}
             {(!subscriptionStatus || subscriptionStatus.status === 'active') && (
               <Button
                 variant="outline"
