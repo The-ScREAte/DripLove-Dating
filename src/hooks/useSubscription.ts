@@ -136,11 +136,14 @@ export const useSubscription = (userId: string | undefined) => {
   };
 
   const isPremium = () => {
-    // Handle both array and object formats from the RPC function
     const sub = Array.isArray(subscription) ? subscription[0] : subscription;
-    // Simple check: user is premium only if plan_name is 'premium' AND status is 'active'
-    // The database function handles expiration logic and automatically sets status to 'expired'
-    return sub?.plan_name === 'premium' && sub?.status === 'active';
+    if (!sub) return false;
+
+    const entitledByStatus = sub.status === 'active' || sub.status === 'cancelled';
+    const notExpired = !sub.expires_at || new Date(sub.expires_at) > new Date();
+
+    // Cancelled subscriptions remain premium until expires_at.
+    return sub.plan_name === 'premium' && entitledByStatus && notExpired;
   };
 
   const canUseFeature = (feature: 'swipe' | 'reverse_dislike' | 'liked_me_full') => {

@@ -356,7 +356,7 @@ export function initGoogleIAP() {
                   .limit(1)
                   .maybeSingle();
 
-                const isPremiumNow = !!subRow && subRow.plan_name === 'premium' && subRow.status === 'active' && (!subRow.expires_at || new Date(subRow.expires_at) > new Date());
+                const isPremiumNow = !!subRow && subRow.plan_name === 'premium' && (subRow.status === 'active' || subRow.status === 'cancelled') && (!subRow.expires_at || new Date(subRow.expires_at) > new Date());
                 if (!isPremiumNow) {
                   console.warn('[Google IAP] Validation ok but subscription not applied to current user; skipping redirect');
                   window.googleIapValidationInProgress = false;
@@ -469,7 +469,7 @@ export function initGoogleIAP() {
                 .limit(1)
                 .maybeSingle();
 
-              const isPremiumNow = !!subRow && subRow.plan_name === 'premium' && subRow.status === 'active' && (!subRow.expires_at || new Date(subRow.expires_at) > new Date());
+              const isPremiumNow = !!subRow && subRow.plan_name === 'premium' && (subRow.status === 'active' || subRow.status === 'cancelled') && (!subRow.expires_at || new Date(subRow.expires_at) > new Date());
               if (!isPremiumNow) {
                 console.warn('[Google IAP] Validation ok but subscription not applied to current user; skipping redirect');
                 window.googleIapValidationInProgress = false;

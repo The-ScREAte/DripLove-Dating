@@ -17,7 +17,8 @@ const premiumFeatures = [
 
 function isPremiumActive(row: { plan_name?: string; status?: string; expires_at?: string | null } | null) {
   if (!row) return false;
-  if (row.plan_name !== 'premium' || row.status !== 'active') return false;
+  const entitledByStatus = row.status === 'active' || row.status === 'cancelled';
+  if (row.plan_name !== 'premium' || !entitledByStatus) return false;
   if (!row.expires_at) return true;
   return new Date(row.expires_at) > new Date();
 }
