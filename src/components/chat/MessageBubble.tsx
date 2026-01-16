@@ -42,8 +42,8 @@ const MessageBubble: React.FC<MessageBubbleProps> = ({
 
   // Swipe state
   const [swipeOffset, setSwipeOffset] = useState(0);
-  const [isSwiping, setIsSwiping] = useState(false);
   const touchStartRef = useRef({ x: 0, y: 0 });
+  const gestureLockRef = useRef<'none' | 'horizontal' | 'vertical'>('none');
   const longPressTimerRef = useRef<number | null>(null);
   const longPressTriggeredRef = useRef(false);
 
@@ -79,48 +79,64 @@ const MessageBubble: React.FC<MessageBubbleProps> = ({
     setIsOptionsOpen(false);
   }, []);
 
-  // Touch handlers for swipe-to-reply
+  // Touch handlers for swipe-to-reply with gesture lock
   const handleTouchStart = useCallback((e: React.TouchEvent) => {
     touchStartRef.current = { x: e.touches[0].clientX, y: e.touches[0].clientY };
-    setIsSwiping(true);
+    gestureLockRef.current = 'none';
+    setSwipeOffset(0);
+
     longPressTriggeredRef.current = false;
     clearLongPressTimer();
     longPressTimerRef.current = window.setTimeout(() => {
       longPressTriggeredRef.current = true;
-      setSwipeOffset(0);
-      setIsSwiping(false);
       openOptionsMenu();
     }, 450);
   }, [clearLongPressTimer, openOptionsMenu]);
 
   const handleTouchMove = useCallback((e: React.TouchEvent) => {
-    if (!isSwiping) return;
     const deltaX = e.touches[0].clientX - touchStartRef.current.x;
     const deltaY = e.touches[0].clientY - touchStartRef.current.y;
-    if (Math.abs(deltaX) > 10 || Math.abs(deltaY) > 10) {
-      clearLongPressTimer();
-    }
-    if (Math.abs(deltaX) > Math.abs(deltaY)) {
-      e.preventDefault();
-      if ((isOwnMessage && deltaX < 0) || (!isOwnMessage && deltaX > 0)) {
-        setSwipeOffset(Math.min(Math.abs(deltaX), 80));
+
+    // Decide direction once
+    if (gestureLockRef.current === 'none') {
+      if (Math.abs(deltaX) < 12 && Math.abs(deltaY) < 12) return;
+
+      gestureLockRef.current = Math.abs(deltaX) > Math.abs(deltaY) ? 'horizontal' : 'vertical';
+
+      // If user is scrolling vertically, cancel long press
+      if (gestureLockRef.current === 'vertical') {
+        clearLongPressTimer();
+        return;
       }
     }
-  }, [isSwiping, isOwnMessage, clearLongPressTimer]);
+
+    // Only handle swipe if locked horizontal
+    if (gestureLockRef.current !== 'horizontal') return;
+
+    clearLongPressTimer();
+    e.preventDefault();
+
+    if ((isOwnMessage && deltaX < 0) || (!isOwnMessage && deltaX > 0)) {
+      setSwipeOffset(Math.min(Math.abs(deltaX), 80));
+    }
+  }, [isOwnMessage, clearLongPressTimer]);
 
   const handleTouchEnd = useCallback(() => {
     clearLongPressTimer();
+
     if (longPressTriggeredRef.current) {
       longPressTriggeredRef.current = false;
       setSwipeOffset(0);
-      setIsSwiping(false);
+      gestureLockRef.current = 'none';
       return;
     }
-    if (swipeOffset > 50 && onReply) {
+
+    if (gestureLockRef.current === 'horizontal' && swipeOffset > 50 && onReply) {
       onReply(message);
     }
+
     setSwipeOffset(0);
-    setIsSwiping(false);
+    gestureLockRef.current = 'none';
   }, [clearLongPressTimer, swipeOffset, onReply, message]);
 
   const handleContextMenu = useCallback((e: React.MouseEvent) => {
@@ -213,14 +229,14 @@ const MessageBubble: React.FC<MessageBubbleProps> = ({
       )}
 
       <div
-        className={`flex w-full ${isOwnMessage ? 'justify-end' : 'justify-start'} px-4`}
+        className={`flex w-full ${isOwnMessage ? 'justify-end' : 'justify-start'}`}
         onTouchStart={handleTouchStart}
         onTouchMove={handleTouchMove}
         onTouchEnd={handleTouchEnd}
         onContextMenu={handleContextMenu}
         style={{
           transform: swipeTransform,
-          transition: isSwiping ? 'none' : 'transform 0.2s ease-out',
+          transition: gestureLockRef.current === 'horizontal' ? 'none' : 'transform 0.2s ease-out',
         }}
       >
         <div
@@ -236,29 +252,36 @@ const MessageBubble: React.FC<MessageBubbleProps> = ({
           `}
         >
           {/* Reply Preview */}
-          {repliedMessage && (
-            <div
-              onClick={handleReplyPreviewClick}
-              className={`
-                mx-2 mt-2 mb-1 px-3 py-2 rounded-lg border-l-3
-                cursor-pointer transition-opacity hover:opacity-80
-                ${isOwnMessage 
-                  ? 'bg-white/15 border-white/50' 
-                  : 'bg-rose-50 border-rose-400'
-                }
-              `}
-            >
-              <p className={`text-xs font-semibold truncate ${isOwnMessage ? 'text-white/90' : 'text-rose-600'}`}>
-                {repliedMessage.sender_id === currentUser.id 
-                  ? t('chat.you', 'You') 
-                  : repliedMessage.sender?.first_name || 'User'
-                }
-              </p>
-              <p className={`text-xs line-clamp-2 mt-0.5 ${isOwnMessage ? 'text-white/80' : 'text-slate-600'}`}>
-                {repliedMessage.message}
-              </p>
-            </div>
-          )}
+          {repliedMessage && (() => {
+            const replyPreviewText = (repliedMessage.message || '')
+              .replace(/\s+/g, ' ')
+              .trim()
+              .slice(0, 80);
+            
+            return (
+              <div
+                onClick={handleReplyPreviewClick}
+                className={`
+                  mx-2 mt-2 mb-1 px-3 py-2 rounded-lg border-l-4
+                  cursor-pointer transition-opacity hover:opacity-80
+                  ${isOwnMessage 
+                    ? 'bg-white/15 border-white/50' 
+                    : 'bg-rose-50 border-rose-400'
+                  }
+                `}
+              >
+                <p className={`text-xs font-semibold truncate ${isOwnMessage ? 'text-white/90' : 'text-rose-600'}`}>
+                  {repliedMessage.sender_id === currentUser.id 
+                    ? t('chat.you', 'You') 
+                    : repliedMessage.sender?.first_name || 'User'
+                  }
+                </p>
+                <p className={`text-xs line-clamp-2 mt-0.5 ${isOwnMessage ? 'text-white/80' : 'text-slate-600'}`}>
+                  {replyPreviewText}{replyPreviewText.length >= 80 ? '...' : ''}
+                </p>
+              </div>
+            );
+          })()}
 
           {/* Message Content */}
           <div className={`px-3 ${repliedMessage ? 'pt-1' : 'pt-2.5'} pb-1`}>
@@ -339,7 +362,7 @@ export default React.memo(MessageBubble, (prev, next) => {
   return (
     prev.message.id === next.message.id &&
     prev.message.is_read === next.message.is_read &&
-    prev.message.deleted_for === next.message.deleted_for &&
+    JSON.stringify(prev.message.deleted_for) === JSON.stringify(next.message.deleted_for) &&
     prev.isConsecutive === next.isConsecutive &&
     prev.isHighlighted === next.isHighlighted &&
     prev.repliedMessage?.id === next.repliedMessage?.id

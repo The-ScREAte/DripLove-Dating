@@ -126,67 +126,20 @@ const ChatPage = ({ currentUser, onUnreadChange, onDetailViewChange }: ChatPageP
   
   // Reply state (must be before virtualizer effect that uses it)
   const [replyingTo, setReplyingTo] = useState<ChatMessage | null>(null);
-
-  const MESSAGE_ROW_GAP_PX = 6;
   
   // ⭐ VIRTUAL SCROLLING: Only render visible messages (90% performance improvement)
   const rowVirtualizer = useVirtualizer({
     count: messages.length,
     getScrollElement: () => messagesContainerRef.current,
-    // Key measurements by message id so cached heights don't get applied to the wrong row
-    // when messages are inserted/removed/reordered.
-    getItemKey: (index) => messages[index]?.id ?? index,
-    // Keep estimateSize stable (avoid width-based heuristics that can change between mounts).
-    // Real heights are measured via `measureElement`.
-    estimateSize: (index) => (messages[index]?.reply_to ? 150 : 100) + MESSAGE_ROW_GAP_PX,
-    overscan: 12,
+    estimateSize: () => 88, // Simple constant - let DOM measure real heights
+    overscan: 8,
   });
 
-  // Re-measure after messages render (layout settles after the browser paints)
-  useLayoutEffect(() => {
-    const raf = requestAnimationFrame(() => {
-      rowVirtualizer.measure();
-    });
-    return () => cancelAnimationFrame(raf);
-  }, [messages.length, replyingTo?.id, selectedMatch?.id, rowVirtualizer]);
-
-  // Re-measure on window resize to ensure consistent spacing
+  // Simple resize handler - single source of measurement
   useEffect(() => {
-    const handleResize = () => {
-      rowVirtualizer.measure();
-    };
-    window.addEventListener('resize', handleResize);
-    return () => window.removeEventListener('resize', handleResize);
-  }, [rowVirtualizer]);
-
-  // Re-measure when the scroll container's size changes (keyboard CSS vars, safe-area, etc.)
-  useEffect(() => {
-    const el = messagesContainerRef.current;
-    if (!el) return;
-    if (typeof ResizeObserver === 'undefined') return;
-
-    const ro = new ResizeObserver(() => {
-      rowVirtualizer.measure();
-    });
-    ro.observe(el);
-    return () => ro.disconnect();
-  }, [rowVirtualizer]);
-
-  // Fonts can load after mount and change line-wrapping/height; re-measure when ready.
-  useEffect(() => {
-    const fonts = (document as unknown as { fonts?: { ready: Promise<unknown> } }).fonts;
-    if (!fonts?.ready) return;
-    let cancelled = false;
-    fonts.ready
-      .then(() => {
-        if (!cancelled) rowVirtualizer.measure();
-      })
-      .catch(() => {
-        // ignore
-      });
-    return () => {
-      cancelled = true;
-    };
+    const onResize = () => rowVirtualizer.measure();
+    window.addEventListener('resize', onResize);
+    return () => window.removeEventListener('resize', onResize);
   }, [rowVirtualizer]);
 
   // Centralized debounced fetchMatches scheduler (prevents realtime burst storms)
@@ -2217,10 +2170,10 @@ const ChatPage = ({ currentUser, onUnreadChange, onDetailViewChange }: ChatPageP
         style={{ 
           WebkitOverflowScrolling: 'touch', 
           paddingTop: getPlatformSync() === 'ios' 
-            ? 'clamp(160px, calc(env(safe-area-inset-top, 10px) + 140px), 180px)'
+            ? '80px'
             : getPlatformSync() === 'web'
-              ? '140px'
-              : '140px'
+              ? '80px'
+              : '80px'
         }}
         onTouchStart={handleSwipeStart}
         onTouchMove={handleSwipeMove}
@@ -2250,22 +2203,21 @@ const ChatPage = ({ currentUser, onUnreadChange, onDetailViewChange }: ChatPageP
               {rowVirtualizer.getVirtualItems().map((virtualRow) => {
                 const message = messages[virtualRow.index];
                 const prevMessage = messages[virtualRow.index - 1];
-                const isConsecutive = prevMessage &&
+
+                const isConsecutive =
+                  !!prevMessage &&
                   prevMessage.sender_id === message.sender_id &&
                   new Date(message.created_at || message.sent_at || '').getTime() -
-                  new Date(prevMessage.created_at || prevMessage.sent_at || '').getTime() < 300000;
+                    new Date(prevMessage.created_at || prevMessage.sent_at || '').getTime() <
+                    300000;
 
-                // Find the replied-to message if this message is a reply
                 const repliedMessage = message.reply_to
-                  ? messages.find(m => m.id === message.reply_to)
+                  ? messages.find((m) => m.id === message.reply_to) ?? null
                   : null;
-
-                // ✅ Consistent spacing between all messages
-                const spacing = MESSAGE_ROW_GAP_PX;
 
                 return (
                   <div
-                    key={message.id}
+                    key={virtualRow.key}
                     ref={rowVirtualizer.measureElement}
                     data-index={virtualRow.index}
                     style={{
@@ -2274,8 +2226,8 @@ const ChatPage = ({ currentUser, onUnreadChange, onDetailViewChange }: ChatPageP
                       left: 0,
                       width: '100%',
                       transform: `translateY(${virtualRow.start}px)`,
+                      paddingBottom: 8,
                       boxSizing: 'border-box',
-                      paddingBottom: spacing,
                     }}
                   >
                     <MessageBubble
@@ -2285,10 +2237,10 @@ const ChatPage = ({ currentUser, onUnreadChange, onDetailViewChange }: ChatPageP
                       onDeleteForMe={deleteMessageForMe}
                       onDeleteForEveryone={deleteMessageForEveryone}
                       onDormancyResponse={handleDormancyResponse}
-                      onReply={setReplyingTo}
+                      onReply={(msg) => setReplyingTo(msg)}
                       repliedMessage={repliedMessage}
                       onReplyClick={handleScrollToMessage}
-                      isHighlighted={message.id === highlightedMessageId}
+                      isHighlighted={highlightedMessageId === message.id}
                     />
                   </div>
                 );
