@@ -4,7 +4,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { useToast } from '@/hooks/use-toast';
-import { Trash2, Upload, Video, Image as ImageIcon, Volume2, VolumeX, Play, Eye } from 'lucide-react';
+import { Trash2, Upload, Video, Image as ImageIcon, Volume2, VolumeX, Play, Eye, Pause } from 'lucide-react';
 import { Card, CardContent } from '@/components/ui/card';
 import { compressImage } from '@/utils/imageCompression';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
@@ -23,6 +23,7 @@ interface Ad {
   link_as: string | null;
   created_at: string;
   target_countries: string[];
+  is_active: boolean;
 }
 
 // Country options
@@ -275,6 +276,31 @@ const AdsManagement = () => {
     }
   };
 
+  const handleToggleActive = async (id: string, currentStatus: boolean) => {
+    try {
+      const { error } = await supabase
+        .from('ads')
+        .update({ is_active: !currentStatus } as any)
+        .eq('id', id);
+
+      if (error) throw error;
+
+      toast({
+        title: 'Success',
+        description: `Ad ${!currentStatus ? 'resumed' : 'paused'} successfully`
+      });
+
+      fetchAds();
+    } catch (error) {
+      console.error('Error toggling ad status:', error);
+      toast({
+        title: 'Error',
+        description: 'Failed to update ad status',
+        variant: 'destructive'
+      });
+    }
+  };
+
   return (
     <div className="space-y-6">
       <Card>
@@ -470,7 +496,12 @@ const AdsManagement = () => {
                       />
                     )}
                     <div className="flex-1">
-                      <h4 className="font-semibold">{ad.name}</h4>
+                      <div className="flex items-center gap-2">
+                        <h4 className="font-semibold">{ad.name}</h4>
+                        {!ad.is_active && (
+                          <span className="text-xs bg-orange-100 text-orange-600 px-2 py-0.5 rounded font-medium">Paused</span>
+                        )}
+                      </div>
                       <p className="text-sm text-gray-600 mt-1">{ad.about}</p>
                       <div className="flex items-center gap-2 mt-1 flex-wrap">
                         {ad.media_type === 'video' ? (
@@ -512,22 +543,42 @@ const AdsManagement = () => {
                         {new Date(ad.created_at).toLocaleDateString()}
                       </p>
                     </div>
-                    <div className="flex gap-2">
+                    <div className="flex flex-col gap-2">
+                      <div className="flex gap-2">
+                        <Button
+                          variant="outline"
+                          size="icon"
+                          onClick={() => setPreviewAd(ad)}
+                          title="Preview ad"
+                        >
+                          <Eye className="h-4 w-4" />
+                        </Button>
+                        <Button
+                          variant="destructive"
+                          size="icon"
+                          onClick={() => handleDelete(ad.id)}
+                          title="Delete ad"
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </Button>
+                      </div>
                       <Button
-                        variant="outline"
-                        size="icon"
-                        onClick={() => setPreviewAd(ad)}
-                        title="Preview ad"
+                        variant={ad.is_active ? "outline" : "default"}
+                        size="sm"
+                        onClick={() => handleToggleActive(ad.id, ad.is_active)}
+                        className={ad.is_active ? "text-orange-600 border-orange-300 hover:bg-orange-50" : "bg-green-600 hover:bg-green-700"}
                       >
-                        <Eye className="h-4 w-4" />
-                      </Button>
-                      <Button
-                        variant="destructive"
-                        size="icon"
-                        onClick={() => handleDelete(ad.id)}
-                        title="Delete ad"
-                      >
-                        <Trash2 className="h-4 w-4" />
+                        {ad.is_active ? (
+                          <>
+                            <Pause className="h-3 w-3 mr-1" />
+                            Pause
+                          </>
+                        ) : (
+                          <>
+                            <Play className="h-3 w-3 mr-1" />
+                            Resume
+                          </>
+                        )}
                       </Button>
                     </div>
                   </div>
