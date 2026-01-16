@@ -446,7 +446,7 @@ const AccountActions = ({ currentUser, onLogout, onShowTerms, onShowPrivacy, hid
                   <span className="font-semibold text-orange-800">Subscription Cancelled</span>
                 </div>
                 <p className="text-sm text-orange-700 mb-1">
-                  Your premium features remain active until:
+                  Your subscription will be cancelled on:
                 </p>
                 <p className="text-base font-bold text-orange-900">
                   {new Date(subscriptionStatus.expires_at).toLocaleDateString('en-US', { 
@@ -464,14 +464,33 @@ const AccountActions = ({ currentUser, onLogout, onShowTerms, onShowPrivacy, hid
 
             {/* Cancel button for active subscriptions only */}
             {(!subscriptionStatus || subscriptionStatus.status === 'active') && (
-              <Button
-                variant="outline"
-                size={isAndroidNative ? 'sm' : 'default'}
-                className={`w-full flex items-center justify-center space-x-2 border-orange-300 text-orange-600 hover:bg-orange-50 ${isAndroidNative ? 'text-xs' : ''}`}
-                onClick={() => navigate('/unsubscribe')}
-              >
-                {t('settings.cancelSubscription')}
-              </Button>
+              <>
+                <Button
+                  variant="outline"
+                  size={isAndroidNative ? 'sm' : 'default'}
+                  className={`w-full flex items-center justify-center space-x-2 border-orange-300 text-orange-600 hover:bg-orange-50 ${isAndroidNative ? 'text-xs' : ''}`}
+                  onClick={() => navigate('/unsubscribe')}
+                >
+                  {t('settings.cancelSubscription')}
+                </Button>
+                
+                {/* Show expiration date for active subscriptions */}
+                {subscriptionStatus && subscriptionStatus.expires_at && (
+                  <div className="p-3 bg-blue-50 border border-blue-200 rounded-lg">
+                    <p className="text-xs text-blue-600 mb-1">
+                      Your subscription renews on:
+                    </p>
+                    <p className="text-sm font-semibold text-blue-900">
+                      {new Date(subscriptionStatus.expires_at).toLocaleDateString('en-US', { 
+                        weekday: 'long', 
+                        year: 'numeric', 
+                        month: 'long', 
+                        day: 'numeric' 
+                      })}
+                    </p>
+                  </div>
+                )}
+              </>
             )}
 
             {/* Resume button for cancelled Paystack subscriptions */}
