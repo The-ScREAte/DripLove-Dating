@@ -170,7 +170,7 @@ const MessageBubble: React.FC<MessageBubbleProps> = ({
   // System message (dormancy check)
   if (isSystemMessage) {
     return (
-      <div className="flex justify-center py-3">
+      <div className="flex justify-center">
         <div className="bg-amber-50 border border-amber-200 rounded-xl px-4 py-3 max-w-sm shadow-sm">
           <p className="text-sm text-amber-900 text-center mb-3">{message.message}</p>
           {!hasResponded && onDormancyResponse && (
@@ -213,7 +213,7 @@ const MessageBubble: React.FC<MessageBubbleProps> = ({
       )}
 
       <div
-        className={`flex w-full ${isOwnMessage ? 'justify-end' : 'justify-start'} px-3`}
+        className={`flex w-full ${isOwnMessage ? 'justify-end' : 'justify-start'} px-4`}
         onTouchStart={handleTouchStart}
         onTouchMove={handleTouchMove}
         onTouchEnd={handleTouchEnd}

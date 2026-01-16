@@ -126,48 +126,68 @@ const ChatPage = ({ currentUser, onUnreadChange, onDetailViewChange }: ChatPageP
   
   // Reply state (must be before virtualizer effect that uses it)
   const [replyingTo, setReplyingTo] = useState<ChatMessage | null>(null);
+
+  const MESSAGE_ROW_GAP_PX = 6;
   
   // ⭐ VIRTUAL SCROLLING: Only render visible messages (90% performance improvement)
   const rowVirtualizer = useVirtualizer({
     count: messages.length,
     getScrollElement: () => messagesContainerRef.current,
-    estimateSize: (index) => {
-      // Dynamic height estimation based on message content
-      const msg = messages[index];
-      if (!msg) return 56;
-
-      const hasReply = !!msg.reply_to;
-      const messageLength = msg.message?.length || 0;
-
-      // Base height: bubble padding + timestamp + first line
-      let estimatedHeight = 60;
-
-      // Calculate lines: ~32 chars per line on mobile, ~50 on desktop
-      const charsPerLine = window.innerWidth < 640 ? 32 : 50;
-      const lines = Math.ceil(messageLength / charsPerLine);
-
-      // Each additional line adds ~20px (font-size 15px + line-height)
-      estimatedHeight += Math.max(0, lines - 1) * 20;
-
-      // Add height for reply preview
-      if (hasReply) {
-        estimatedHeight += 56;
-      }
-
-      // ✅ Always keep a consistent 6px gap between message bubbles
-      estimatedHeight += 6;
-
-      return estimatedHeight;
-    },
+    // Key measurements by message id so cached heights don't get applied to the wrong row
+    // when messages are inserted/removed/reordered.
+    getItemKey: (index) => messages[index]?.id ?? index,
+    // Keep estimateSize stable (avoid width-based heuristics that can change between mounts).
+    // Real heights are measured via `measureElement`.
+    estimateSize: (index) => (messages[index]?.reply_to ? 150 : 100) + MESSAGE_ROW_GAP_PX,
     overscan: 12,
   });
 
-  // Force re-measure after messages render (wait for DOM layout + reply preview)
+  // Re-measure after messages render (layout settles after the browser paints)
   useLayoutEffect(() => {
-    requestAnimationFrame(() => {
+    const raf = requestAnimationFrame(() => {
       rowVirtualizer.measure();
     });
-  }, [messages, replyingTo?.id, selectedMatch?.id]);
+    return () => cancelAnimationFrame(raf);
+  }, [messages.length, replyingTo?.id, selectedMatch?.id, rowVirtualizer]);
+
+  // Re-measure on window resize to ensure consistent spacing
+  useEffect(() => {
+    const handleResize = () => {
+      rowVirtualizer.measure();
+    };
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }, [rowVirtualizer]);
+
+  // Re-measure when the scroll container's size changes (keyboard CSS vars, safe-area, etc.)
+  useEffect(() => {
+    const el = messagesContainerRef.current;
+    if (!el) return;
+    if (typeof ResizeObserver === 'undefined') return;
+
+    const ro = new ResizeObserver(() => {
+      rowVirtualizer.measure();
+    });
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, [rowVirtualizer]);
+
+  // Fonts can load after mount and change line-wrapping/height; re-measure when ready.
+  useEffect(() => {
+    const fonts = (document as unknown as { fonts?: { ready: Promise<unknown> } }).fonts;
+    if (!fonts?.ready) return;
+    let cancelled = false;
+    fonts.ready
+      .then(() => {
+        if (!cancelled) rowVirtualizer.measure();
+      })
+      .catch(() => {
+        // ignore
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [rowVirtualizer]);
 
   // Centralized debounced fetchMatches scheduler (prevents realtime burst storms)
   const fetchMatchesDebounceTimerRef = useRef<number | null>(null);
@@ -2241,7 +2261,7 @@ const ChatPage = ({ currentUser, onUnreadChange, onDetailViewChange }: ChatPageP
                   : null;
 
                 // ✅ Consistent spacing between all messages
-                const spacing = 6;
+                const spacing = MESSAGE_ROW_GAP_PX;
 
                 return (
                   <div
@@ -2254,7 +2274,8 @@ const ChatPage = ({ currentUser, onUnreadChange, onDetailViewChange }: ChatPageP
                       left: 0,
                       width: '100%',
                       transform: `translateY(${virtualRow.start}px)`,
-                      paddingTop: spacing,
+                      boxSizing: 'border-box',
+                      paddingBottom: spacing,
                     }}
                   >
                     <MessageBubble
