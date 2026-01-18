@@ -334,29 +334,9 @@ const LocationInput = ({
         return;
       }
 
-      if (cityInput.length >= 2) {
-      // If no country is selected but user is typing, search across all countries
-      const allCities: CityData[] = [];
-      const countryCodes = getCountriesList();
-      
-      // Collect cities from all countries that match the search
-      countryCodes.forEach(country => {
-        const cities = getCitiesForCountry(country.code);
-        cities.forEach(city => {
-          if (city.name.toLowerCase().includes(cityInput.toLowerCase())) {
-            allCities.push({
-              ...city,
-              state: `${city.state ? city.state + ', ' : ''}${country.name}` // Add country name to state for context
-            });
-          }
-        });
-      });
-      
-      setSuggestedCities(allCities);
-    } else {
-      setSuggestedCities([]);
-    }
-
+      // No country selected - don't show any city suggestions
+      // User MUST select a country first before seeing cities
+      if (!isDisposed) setSuggestedCities([]);
     };
 
     // Debounce the live search a bit to avoid hammering the endpoint.

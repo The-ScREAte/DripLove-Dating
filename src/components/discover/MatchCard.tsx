@@ -144,7 +144,7 @@ const MatchCard: React.FC<MatchCardProps> = ({
 
   // ⭐ PHASE 2.7: Pre-calc card width AND left position once (eliminate ALL DOM reads on Android)
   // ⭐ FIX #3: Add resize listener for orientation changes
-  useEffect(() => {
+  useLayoutEffect(() => {
     const compute = () => {
       if (!containerRef.current) return;
       const rect = containerRef.current.getBoundingClientRect();
@@ -158,31 +158,60 @@ const MatchCard: React.FC<MatchCardProps> = ({
 
   // ⭐ PHASE 1.6: Memoize slide navigation handlers (prevents closure re-creation)
   const handleNext = useCallback(() => {
+    if (slideTransitionInProgress.current) return; // Prevent rapid clicks
+    slideTransitionInProgress.current = true;
+    
     setCurrentSlide(s => {
       const nextIndex = Math.min(s + 1, slides.length - 1);
       onImageIndexChange?.(nextIndex, slides.length); // ⭐ SMART LOADING: Notify parent with index info
       return nextIndex;
     });
+    
+    setTimeout(() => {
+      slideTransitionInProgress.current = false;
+    }, 150); // Small debounce to prevent accidental double-clicks
   }, [slides.length, onImageIndexChange]);
 
   const handlePrev = useCallback(() => {
+    if (slideTransitionInProgress.current) return; // Prevent rapid clicks
+    slideTransitionInProgress.current = true;
+    
     setCurrentSlide(s => {
       const prevIndex = Math.max(s - 1, 0);
       onImageIndexChange?.(prevIndex, slides.length); // ⭐ SMART LOADING: Notify parent with index info
       return prevIndex;
     });
+    
+    setTimeout(() => {
+      slideTransitionInProgress.current = false;
+    }, 150); // Small debounce to prevent accidental double-clicks
   }, [slides.length, onImageIndexChange]);
 
-  // ⭐ PHASE 1.7: OPTIMIZED: Zero DOM reads on click (instant Android tap response)
+  // ⭐ FIX: Robust click handler that gets fresh values from DOM if needed
   const handleSlideClick = useCallback((e: React.MouseEvent<HTMLDivElement>) => {
     e.stopPropagation();
     
-    const width = containerWidth.current;
-    if (!width) return;
+    // Prevent clicks during transitions
+    if (slideTransitionInProgress.current) return;
     
-    const clickX = e.clientX - containerLeft.current;
+    let width = containerWidth.current;
+    let left = containerLeft.current;
     
-    if (clickX < width / 2) {
+    // If values aren't initialized, compute them now (fallback for race conditions)
+    if (!width && containerRef.current) {
+      const rect = containerRef.current.getBoundingClientRect();
+      width = rect.width;
+      left = rect.left;
+      containerWidth.current = width;
+      containerLeft.current = left;
+    }
+    
+    if (!width) return; // Still no width, can't determine click position
+    
+    const clickX = e.clientX - left;
+    const isLeftHalf = clickX < width / 2;
+    
+    if (isLeftHalf) {
       handlePrev();
     } else {
       handleNext();

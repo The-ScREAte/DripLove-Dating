@@ -2170,10 +2170,10 @@ const ChatPage = ({ currentUser, onUnreadChange, onDetailViewChange }: ChatPageP
         style={{ 
           WebkitOverflowScrolling: 'touch', 
           paddingTop: getPlatformSync() === 'ios' 
-            ? '80px'
+            ? '150px'
             : getPlatformSync() === 'web'
-              ? '80px'
-              : '80px'
+              ? '150px'
+              : '140px'
         }}
         onTouchStart={handleSwipeStart}
         onTouchMove={handleSwipeMove}
