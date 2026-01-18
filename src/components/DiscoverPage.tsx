@@ -203,9 +203,21 @@ const normalizeCountryCode = (c: string) => {
   return iso3Map[cleaned] || nameMap[cleaned] || cleaned;
 };
 
+const isLocalCountryForFreeUser = (
+  p: { country_code?: unknown; country?: unknown },
+  baseCountryCode: string
+): boolean => {
+  if (!baseCountryCode) return false;
+  const cc = normalizeCountryCode(String(p?.country_code || ''));
+  const cn = normalizeCountryCode(String(p?.country || ''));
+  // If both exist, require they agree (prevents “country_code=GH, country=Kenya” leakage).
+  if (cc && cn) return cc === baseCountryCode && cn === baseCountryCode;
+  return (cc || cn) === baseCountryCode;
+};
+
 // Round-robin across selected countries, skipping empty buckets.
 const mixByCountryRoundRobin = <T extends { country_code?: string | null; id: string }>(
-  profiles: T[],
+  profiles: T[], 
   countryCodes: string[],
   seed: string
 ): T[] => {
@@ -1422,7 +1434,8 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, onNavigateToProfile, isPr
     const userMaxDistance = Number(userMaxDistanceRaw);
     const safeUserMaxDistance = Number.isFinite(userMaxDistance) && userMaxDistance > 0 ? userMaxDistance : 50;
 
-    const baseCountryCode = normalizeCountryCode(currentUserData?.country_code || '');
+    // CRITICAL: Use BOTH country_code AND country name as fallback for free user country filtering
+    const baseCountryCode = normalizeCountryCode(currentUserData?.country_code || currentUserData?.country || '');
 
     const premiumForFeed = premiumActive;
 
@@ -1432,11 +1445,19 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, onNavigateToProfile, isPr
       : [];
 
 
-    const locationMatches = await locationService.getLocationBasedMatches(userId, safeUserMaxDistance);
+  const locationMatches = await locationService.getLocationBasedMatches(userId, safeUserMaxDistance, premiumForFeed);
 
     const distanceMap: { [key: string]: number } = {};
+    // CRITICAL: For free users, ALWAYS filter by country (fail closed if no country)
+    // Premium users can see all countries in their unlocked list
     const locationProfileIds = uniqUuids(locationMatches
-      .filter((m) => !baseCountryCode || normalizeCountryCode((m.country_code || '') as string) === baseCountryCode)
+      .filter((m) => {
+        if (!baseCountryCode) {
+          // Free user with no country set - return empty (fail closed)
+          return premiumForFeed;
+        }
+        return normalizeCountryCode((m.country_code || '') as string) === baseCountryCode;
+      })
       .map((match) => {
         distanceMap[match.profile_id] = match.distance_km;
         return match.profile_id;
@@ -1611,16 +1632,16 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, onNavigateToProfile, isPr
         usingArchivedFallback = false;
       }
     } else {
-      // Free users: local country only
-      if (locationProfileIdsForQuery.length > 0) {
+      // Free users: local country only - MUST have a country set
+      if (!baseCountryCode) {
+        // Free user with no country set - return empty feed (fail closed)
+        filteredProfiles = [];
+      } else if (locationProfileIdsForQuery.length > 0) {
         let query = supabase
           .from('profiles')
           .select(PROFILE_SELECT)
-          .in('id', locationProfileIdsForQuery);
-
-        if (baseCountryCode) {
-          query = query.eq('country_code', baseCountryCode);
-        }
+          .in('id', locationProfileIdsForQuery)
+          .eq('country_code', baseCountryCode); // Always filter by country for free users
 
         if (excludedIds.length > 0) {
           query = query.not('id', 'in', formatUuidInFilter(excludedIds));
@@ -1635,8 +1656,10 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, onNavigateToProfile, isPr
 
         if (error) throw error;
         filteredProfiles = Array.isArray(profiles) ? (profiles as unknown as ProfileRow[]) : [];
-      } else if (baseCountryCode) {
-        let query = supabase.from('profiles').select(PROFILE_SELECT);
+      } else {
+        // Free users MUST have country set - baseCountryCode already checked above
+        let query = supabase.from('profiles').select(PROFILE_SELECT)
+          .eq('country_code', baseCountryCode); // Always filter by country for free users
 
         if (excludedIds.length > 0) {
           query = query.not('id', 'in', formatUuidInFilter(excludedIds));
@@ -1647,7 +1670,6 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, onNavigateToProfile, isPr
           .eq('account_status', 'active')
           .eq('is_admin', false)
           .eq('is_archived', false)
-          .eq('country_code', baseCountryCode)
           .limit(100);
 
         if (error) throw error;
@@ -1657,6 +1679,11 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, onNavigateToProfile, isPr
         if (filteredProfiles.length > 0) {
           usingArchivedFallback = false;
         }
+      }
+
+      // Final enforcement for free users: filter by normalized country using both fields.
+      if (baseCountryCode) {
+        filteredProfiles = filteredProfiles.filter((p) => isLocalCountryForFreeUser(p, baseCountryCode));
       }
     }
 
@@ -1713,6 +1740,11 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, onNavigateToProfile, isPr
       if (!archivedError && archivedProfiles && archivedProfiles.length > 0) {
         filteredProfiles = Array.isArray(archivedProfiles) ? (archivedProfiles as unknown as ProfileRow[]) : [];
         usingArchivedFallback = true;
+
+        // Non-premium must never show other countries, even in archived fallback.
+        if (!premiumForFeed && baseCountryCode) {
+          filteredProfiles = filteredProfiles.filter((p) => isLocalCountryForFreeUser(p, baseCountryCode));
+        }
         
         // Mix archived profiles the same way (explicit country rotation).
         // ⭐ PER-USER RANDOMIZATION: Use user-specific seed for archived profiles too
@@ -2586,13 +2618,14 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, onNavigateToProfile, isPr
     lastPremiumActiveRef.current = premiumActive;
 
     // Create preference hash from key fields that affect matching
+    const baseCountryCodeForKey = normalizeCountryCode(currentUser.country_code || currentUser.country || '');
     const prefHash = [
       currentUser.gender || '',
       currentUser.preference || '',
       currentUser.min_age || '',
       currentUser.max_age || '',
       currentUser.max_distance || '',
-      currentUser.country_code || '',
+      baseCountryCodeForKey,
       (currentUser.unlocked_countries || []).sort().join(','),
     ].join('_');
 
@@ -2746,10 +2779,25 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, onNavigateToProfile, isPr
           }
         }
         
+        const keyForStorage = buildDeckCacheKey(cacheKey);
         const filteredCachedDeck = cachedDeck.filter(item => {
           if (isAd(item)) return true; // Keep ads
-          return !swipedToExclude.has(item.id);
+          if (swipedToExclude.has(item.id)) return false;
+          // Free users: never show other countries, even from cached deck.
+          if (!premiumActive) {
+            if (!baseCountryCodeForKey) return false;
+            return isLocalCountryForFreeUser(item, baseCountryCodeForKey);
+          }
+          return true;
         });
+
+        // If cache contains disallowed entries, delete it so refresh can't resurrect them.
+        const hadProfilesRemoved = filteredCachedDeck.length !== cachedDeck.length;
+        if (hadProfilesRemoved) {
+          try { localStorage.removeItem(keyForStorage); } catch { /* ignore */ }
+          try { sessionStorage.removeItem(keyForStorage); } catch { /* ignore */ }
+          deckMemoryCacheRef.current.delete(keyForStorage);
+        }
         
         if (filteredCachedDeck.length > 0) {
           // ⭐ INSTANT LOAD: Use filtered cached deck for immediate display

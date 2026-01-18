@@ -89,10 +89,49 @@ const calculateDistanceKm = (lat1: number, lon1: number, lat2: number, lon2: num
   return R * c;
 };
 
-// Normalize country code to uppercase 2-letter ISO
+// Normalize country identifier to ISO2 when possible.
+// Handles ISO2, some ISO3, and common country names.
 const normalizeCountryCode = (c: string | null | undefined): string => {
-  if (!c) return '';
-  return c.trim().toUpperCase().slice(0, 2);
+  const cleaned = (c || '').trim().toUpperCase().replace(/[^A-Z]/g, '');
+  if (!cleaned) return '';
+
+  if (cleaned.length === 2) return cleaned;
+
+  const iso3Map: Record<string, string> = {
+    USA: 'US',
+    CAN: 'CA',
+    GBR: 'GB',
+    IRL: 'IE',
+    AUS: 'AU',
+    NZL: 'NZ',
+    IND: 'IN',
+    PAK: 'PK',
+    KEN: 'KE',
+    NGA: 'NG',
+    GHA: 'GH',
+    ZAF: 'ZA',
+  };
+
+  const nameMap: Record<string, string> = {
+    UNITEDSTATES: 'US',
+    UNITEDSTATESOFAMERICA: 'US',
+    AMERICA: 'US',
+    CANADA: 'CA',
+    UNITEDKINGDOM: 'GB',
+    GREATBRITAIN: 'GB',
+    ENGLAND: 'GB',
+    IRELAND: 'IE',
+    AUSTRALIA: 'AU',
+    NEWZEALAND: 'NZ',
+    INDIA: 'IN',
+    PAKISTAN: 'PK',
+    KENYA: 'KE',
+    NIGERIA: 'NG',
+    GHANA: 'GH',
+    SOUTHAFRICA: 'ZA',
+  };
+
+  return iso3Map[cleaned] || nameMap[cleaned] || cleaned;
 };
 
 export function useLikeBackInjection({
@@ -181,7 +220,7 @@ export function useLikeBackInjection({
       // This prevents huge downloads for accounts with lots of historical likes.
       const { data: myLikes, error: myLikesError } = await supabase
         .from('likes')
-        .select('liked_id')
+        .select('liked_id') 
         .eq('liker_id', userId)
         .in('liked_id', likerIds);
 
@@ -392,6 +431,9 @@ export function useLikeBackInjection({
   // Get injection candidate - respects location filtering for free users
   const getInjectionCandidate = useCallback((): LikerProfile | null => {
     const userCC = normalizeCountryCode(userCountryCode);
+
+    // Free users must have a known country; otherwise fail-closed.
+    if (!isPremium && !userCC) return null;
     
     for (const id of likedMeIds) {
       if (
@@ -407,9 +449,17 @@ export function useLikeBackInjection({
         // For FREE users: enforce same country AND distance filtering
         if (!isPremium) {
           const profileCC = normalizeCountryCode(profile.country_code);
+          const profileCN = normalizeCountryCode(profile.country);
+
+          // If both exist but disagree, treat as bad data and skip.
+          if (profileCC && profileCN && profileCC !== profileCN) {
+            continue;
+          }
+
+          const effectiveProfileCC = profileCC || profileCN;
           
           // Must be same country
-          if (userCC && profileCC && userCC !== profileCC) {
+          if (!effectiveProfileCC || userCC !== effectiveProfileCC) {
             continue;
           }
           
