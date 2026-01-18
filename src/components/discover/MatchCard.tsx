@@ -144,7 +144,6 @@ const MatchCard: React.FC<MatchCardProps> = ({
 
   // ⭐ PHASE 2.7: Pre-calc card width AND left position once (eliminate ALL DOM reads on Android)
   // ⭐ FIX #3: Add resize listener for orientation changes
-  // ⭐ FIX #4: Use ResizeObserver for more reliable initial measurement
   useEffect(() => {
     const compute = () => {
       if (!containerRef.current) return;
@@ -152,24 +151,10 @@ const MatchCard: React.FC<MatchCardProps> = ({
       containerWidth.current = rect.width;
       containerLeft.current = rect.left;
     };
-    
     compute();
-    
-    // Use ResizeObserver for reliable measurement after layout
-    let resizeObserver: ResizeObserver | null = null;
-    if (containerRef.current && typeof ResizeObserver !== 'undefined') {
-      resizeObserver = new ResizeObserver(() => {
-        compute();
-      });
-      resizeObserver.observe(containerRef.current);
-    }
-    
     window.addEventListener('resize', compute);
-    return () => {
-      window.removeEventListener('resize', compute);
-      resizeObserver?.disconnect();
-    };
-  }, [match.id]); // Re-run when match changes to ensure fresh measurements
+    return () => window.removeEventListener('resize', compute);
+  }, []);
 
   // ⭐ PHASE 1.6: Memoize slide navigation handlers (prevents closure re-creation)
   const handleNext = useCallback(() => {
@@ -189,25 +174,13 @@ const MatchCard: React.FC<MatchCardProps> = ({
   }, [slides.length, onImageIndexChange]);
 
   // ⭐ PHASE 1.7: OPTIMIZED: Zero DOM reads on click (instant Android tap response)
-  // ⭐ FIX #5: Fallback to live measurement if refs not initialized
   const handleSlideClick = useCallback((e: React.MouseEvent<HTMLDivElement>) => {
     e.stopPropagation();
     
-    let width = containerWidth.current;
-    let left = containerLeft.current;
-    
-    // Fallback: if width not cached, calculate now
-    if (!width && containerRef.current) {
-      const rect = containerRef.current.getBoundingClientRect();
-      width = rect.width;
-      left = rect.left;
-      containerWidth.current = width;
-      containerLeft.current = left;
-    }
-    
+    const width = containerWidth.current;
     if (!width) return;
     
-    const clickX = e.clientX - left;
+    const clickX = e.clientX - containerLeft.current;
     
     if (clickX < width / 2) {
       handlePrev();
