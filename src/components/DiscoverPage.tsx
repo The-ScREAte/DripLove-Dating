@@ -793,24 +793,6 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, onNavigateToProfile, isPr
   // - Subscription hook reports an active premium plan.
   const premiumActive = Boolean(isPremium) || isPremiumFromSubscription();
   const premiumResolved = isPremium !== undefined || !subscriptionLoading;
-
-  // FINAL SAFETY: In free mode, never allow other-country profiles to remain in the deck,
-  // regardless of source (cache restore, refill, injections, etc.).
-  const freeBaseCountryCode = useMemo(
-    () => normalizeCountryCode(currentUser?.country_code || currentUser?.country || ''),
-    [currentUser?.country_code, currentUser?.country]
-  );
-
-  useEffect(() => {
-    if (premiumActive) return;
-    if (!freeBaseCountryCode) return;
-
-    setPotentialMatches((prev) => {
-      if (!Array.isArray(prev) || prev.length === 0) return prev;
-      const next = prev.filter((item) => (isAd(item) ? true : isLocalCountryForFreeUser(item, freeBaseCountryCode)));
-      return next.length === prev.length ? prev : next;
-    });
-  }, [premiumActive, freeBaseCountryCode]);
   
   const { preloadImages, cancelImages, getOptimizedUrl, isImageLoaded, isImageLoading, clearCache } = useImagePreloader({
     maxConcurrent: 6, // Slightly higher concurrency for faster swipe experience
@@ -3092,12 +3074,8 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, onNavigateToProfile, isPr
       );
 
       const newProfiles = matches.filter((m) => !existingProfileIds.has(m.id));
-      const baseCC = normalizeCountryCode(currentUser?.country_code || currentUser?.country || '');
-      const countryFiltered = !premiumActive && baseCC
-        ? newProfiles.filter((p) => isLocalCountryForFreeUser(p, baseCC))
-        : newProfiles;
       const refillChunkSize = isAndroidPlatform() ? 15 : 25;
-      const refillChunk = countryFiltered.slice(0, refillChunkSize);
+      const refillChunk = newProfiles.slice(0, refillChunkSize);
 
       if (refillChunk.length === 0) {
         // Got profiles from DB but they're all duplicates
@@ -3151,7 +3129,6 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, onNavigateToProfile, isPr
     preloadNextProfileImages,
     injectAds,
     batchFetchLanguages,
-    premiumActive,
     premiumTrulyEmptyAfterRetry,
     fetchPotentialMatchesData,
   ]);
