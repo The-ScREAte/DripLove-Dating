@@ -103,14 +103,39 @@ const TermsAcceptance = ({ user, onAccept }: TermsAcceptanceProps) => {
       const passedUserIds = recentPasses?.map(p => p.passed_id) || [];
       const excludedIds = [...likedUserIds, ...blockedUserIds, ...passedUserIds, userId];
 
-      const userMaxDistance = currentUserData?.max_distance || currentUserData?.distance_preference || 50;
+      const userMaxDistanceRaw = currentUserData?.max_distance || currentUserData?.distance_preference || 50;
+      const userMaxDistanceUncapped = Number(userMaxDistanceRaw);
+      const safeUserMaxDistanceUncapped = Number.isFinite(userMaxDistanceUncapped) && userMaxDistanceUncapped > 0 ? userMaxDistanceUncapped : 50;
+
+      // Free users capped at 500km
+      const FREE_USER_MAX_DISTANCE = 500;
+      const safeUserMaxDistance = isPremium
+        ? safeUserMaxDistanceUncapped
+        : Math.min(safeUserMaxDistanceUncapped, FREE_USER_MAX_DISTANCE);
+
       const allowedGenders = currentUserData?.preference === 'male' ? ['male'] : 
                             currentUserData?.preference === 'female' ? ['female'] : 
                             ['male', 'female', 'other'];
 
-      const baseCountryCode = (currentUserData?.country_code || '').trim();
+      // Normalize + trust country name if it conflicts with country_code (prevents leakage)
+      const normalizeCountryCode = (c: string) => {
+        const cleaned = (c || '').trim().toUpperCase().replace(/[^A-Z]/g, '');
+        if (!cleaned) return '';
+        if (cleaned.length === 2) return cleaned;
+        const iso3Map: Record<string, string> = { USA: 'US', CAN: 'CA', GBR: 'GB', IRL: 'IE', AUS: 'AU', NZL: 'NZ', IND: 'IN', PAK: 'PK', KEN: 'KE', NGA: 'NG', GHA: 'GH', ZAF: 'ZA' };
+        const nameMap: Record<string, string> = { UNITEDSTATES: 'US', UNITEDSTATESOFAMERICA: 'US', AMERICA: 'US', CANADA: 'CA', UNITEDKINGDOM: 'GB', GREATBRITAIN: 'GB', ENGLAND: 'GB', IRELAND: 'IE', AUSTRALIA: 'AU', NEWZEALAND: 'NZ', INDIA: 'IN', PAKISTAN: 'PK', KENYA: 'KE', NIGERIA: 'NG', GHANA: 'GH', SOUTHAFRICA: 'ZA' };
+        return iso3Map[cleaned] || nameMap[cleaned] || cleaned;
+      };
+
+      const baseCountryCode = (() => {
+        const cc = normalizeCountryCode(String(currentUserData?.country_code || ''));
+        const cn = normalizeCountryCode(String(currentUserData?.country || ''));
+        if (cc && cn && cc !== cn) return cn;
+        return cc || cn;
+      })();
+
       const unlockedCountries = Array.isArray(currentUserData?.unlocked_countries) ? currentUserData.unlocked_countries : [];
-      
+
       const allowedCountryCodes = Array.from(
         new Set([
           ...(baseCountryCode ? [baseCountryCode] : []),
@@ -119,11 +144,19 @@ const TermsAcceptance = ({ user, onAccept }: TermsAcceptanceProps) => {
       );
 
       // Get location-based matches
-      const locationMatches = await locationService.getLocationBasedMatches(userId, userMaxDistance);
-      
+      const locationMatches = await locationService.getLocationBasedMatches(userId, safeUserMaxDistance);
+
       const distanceMap: { [key: string]: number } = {};
       const locationProfileIds = locationMatches
-        .filter((m) => !allowedCountryCodes.length || allowedCountryCodes.includes(m.country_code))
+        .filter((m) => {
+          // FREE users must have a local country (fail closed)
+          if (!baseCountryCode) return isPremium;
+          // FREE users: local country only; PREMIUM: allow local + unlocked
+          const matchCC = normalizeCountryCode(String(m.country_code || ''));
+          if (!matchCC) return false;
+          if (!isPremium) return matchCC === baseCountryCode;
+          return allowedCountryCodes.includes(matchCC);
+        })
         .map((match) => {
           distanceMap[match.profile_id] = match.distance_km;
           return match.profile_id;
