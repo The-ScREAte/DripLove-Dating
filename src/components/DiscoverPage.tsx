@@ -831,6 +831,14 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, onNavigateToProfile, isPr
     return inQueue;
   }, [potentialMatches]);
 
+  // Calculate max distance for like-back injection with 500km cap for free users
+  const likeBackMaxDistance = (() => {
+    const userMax = currentUser?.max_distance || currentUser?.distance_preference || 500;
+    const FREE_USER_MAX = 500;
+    // Free users are capped at 500km
+    return premiumActive ? userMax : Math.min(userMax, FREE_USER_MAX);
+  })();
+
   const {
     onSwipe: onLikeBackSwipe,
     isLikedMeProfile,
@@ -847,7 +855,7 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, onNavigateToProfile, isPr
     userCountryCode: currentUser?.country_code || currentUser?.country,
     userLatitude: currentUser?.latitude,
     userLongitude: currentUser?.longitude,
-    maxDistance: currentUser?.max_distance || 500, // Free users max 500km
+    maxDistance: likeBackMaxDistance, // Free users capped at 500km
   });
 
   // Fetch ads from database - load them BEFORE fetching profiles
@@ -1432,12 +1440,19 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, onNavigateToProfile, isPr
     
     const userMaxDistanceRaw = currentUserData?.max_distance ?? currentUserData?.distance_preference ?? 50;
     const userMaxDistance = Number(userMaxDistanceRaw);
-    const safeUserMaxDistance = Number.isFinite(userMaxDistance) && userMaxDistance > 0 ? userMaxDistance : 50;
+    // CRITICAL: Free users capped at 500km max, premium users can use their full setting
+    const safeUserMaxDistanceUncapped = Number.isFinite(userMaxDistance) && userMaxDistance > 0 ? userMaxDistance : 50;
 
     // CRITICAL: Use BOTH country_code AND country name as fallback for free user country filtering
     const baseCountryCode = normalizeCountryCode(currentUserData?.country_code || currentUserData?.country || '');
 
     const premiumForFeed = premiumActive;
+
+    // For FREE users: enforce 500km max distance cap
+    const FREE_USER_MAX_DISTANCE = 500;
+    const safeUserMaxDistance = premiumForFeed 
+      ? safeUserMaxDistanceUncapped 
+      : Math.min(safeUserMaxDistanceUncapped, FREE_USER_MAX_DISTANCE);
 
     const unlockedCountriesRaw = currentUserData?.unlocked_countries ?? currentUser.unlocked_countries;
     const unlockedCountries: string[] = premiumForFeed
@@ -1445,7 +1460,7 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, onNavigateToProfile, isPr
       : [];
 
 
-  const locationMatches = await locationService.getLocationBasedMatches(userId, safeUserMaxDistance, premiumForFeed);
+    const locationMatches = await locationService.getLocationBasedMatches(userId, safeUserMaxDistance);
 
     const distanceMap: { [key: string]: number } = {};
     // CRITICAL: For free users, ALWAYS filter by country (fail closed if no country)
@@ -1657,9 +1672,23 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, onNavigateToProfile, isPr
         if (error) throw error;
         filteredProfiles = Array.isArray(profiles) ? (profiles as unknown as ProfileRow[]) : [];
       } else {
-        // Free users MUST have country set - baseCountryCode already checked above
+        // Free users fallback: no location IDs from locationService
+        // Apply bounding box distance filter if user has coordinates
+        const userLat = currentUserData?.latitude;
+        const userLon = currentUserData?.longitude;
+        
         let query = supabase.from('profiles').select(PROFILE_SELECT)
           .eq('country_code', baseCountryCode); // Always filter by country for free users
+
+        // Apply distance bounding box for free users (CRITICAL for location enforcement)
+        if (userLat && userLon) {
+          const radiusInDegrees = safeUserMaxDistance / 111.32;
+          query = query
+            .gte('latitude', userLat - radiusInDegrees)
+            .lte('latitude', userLat + radiusInDegrees)
+            .gte('longitude', userLon - radiusInDegrees)
+            .lte('longitude', userLon + radiusInDegrees);
+        }
 
         if (excludedIds.length > 0) {
           query = query.not('id', 'in', formatUuidInFilter(excludedIds));
@@ -1684,6 +1713,20 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, onNavigateToProfile, isPr
       // Final enforcement for free users: filter by normalized country using both fields.
       if (baseCountryCode) {
         filteredProfiles = filteredProfiles.filter((p) => isLocalCountryForFreeUser(p, baseCountryCode));
+      }
+
+      // CRITICAL: Client-side distance enforcement for free users
+      // Even if profiles passed DB filters, re-check distance using precise calculation
+      const userLat = currentUserData?.latitude;
+      const userLon = currentUserData?.longitude;
+      if (userLat && userLon) {
+        filteredProfiles = filteredProfiles.filter((p) => {
+          if (!p.latitude || !p.longitude) return true; // Allow profiles without coords (they passed country filter)
+          const dist = calculateDistance(userLat, userLon, p.latitude, p.longitude);
+          // Store distance for later use
+          distanceMap[p.id] = dist;
+          return dist <= safeUserMaxDistance;
+        });
       }
     }
 
@@ -1717,11 +1760,11 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, onNavigateToProfile, isPr
       // We'll filter after fetching based on calculated age
 
       // Apply distance filtering for local country (use currentUserData for location)
+      // CRITICAL: For free users, use safeUserMaxDistance (capped at 500km)
       const userLat = currentUserData?.latitude;
       const userLon = currentUserData?.longitude;
       if (baseCountryCode && userLat && userLon) {
-        const maxDistanceKm = currentUserData?.max_distance || 50;
-        const radiusInDegrees = maxDistanceKm / 111.32;
+        const radiusInDegrees = safeUserMaxDistance / 111.32;
 
         archivedQuery = archivedQuery
           .gte('latitude', userLat - radiusInDegrees)
@@ -1744,6 +1787,16 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, onNavigateToProfile, isPr
         // Non-premium must never show other countries, even in archived fallback.
         if (!premiumForFeed && baseCountryCode) {
           filteredProfiles = filteredProfiles.filter((p) => isLocalCountryForFreeUser(p, baseCountryCode));
+          
+          // CRITICAL: Client-side distance enforcement for free users in archived fallback
+          if (userLat && userLon) {
+            filteredProfiles = filteredProfiles.filter((p) => {
+              if (!p.latitude || !p.longitude) return true; // Allow profiles without coords
+              const dist = calculateDistance(userLat, userLon, p.latitude, p.longitude);
+              distanceMap[p.id] = dist;
+              return dist <= safeUserMaxDistance;
+            });
+          }
         }
         
         // Mix archived profiles the same way (explicit country rotation).
