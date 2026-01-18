@@ -203,6 +203,15 @@ const normalizeCountryCode = (c: string) => {
   return iso3Map[cleaned] || nameMap[cleaned] || cleaned;
 };
 
+// When country_code and country disagree, trust the country name (what the user sees/sets)
+// to avoid leaking international profiles to free users due to stale/incorrect country_code.
+const getTrustedBaseCountryCode = (countryCode: unknown, country: unknown): string => {
+  const cc = normalizeCountryCode(String(countryCode || ''));
+  const cn = normalizeCountryCode(String(country || ''));
+  if (cc && cn && cc !== cn) return cn;
+  return cc || cn;
+};
+
 const isLocalCountryForFreeUser = (
   p: { country_code?: unknown; country?: unknown },
   baseCountryCode: string
@@ -1444,7 +1453,8 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, onNavigateToProfile, isPr
     const safeUserMaxDistanceUncapped = Number.isFinite(userMaxDistance) && userMaxDistance > 0 ? userMaxDistance : 50;
 
     // CRITICAL: Use BOTH country_code AND country name as fallback for free user country filtering
-    const baseCountryCode = normalizeCountryCode(currentUserData?.country_code || currentUserData?.country || '');
+    // If they disagree, trust the country name (what the user sees/sets) and fail-closed on missing.
+    const baseCountryCode = getTrustedBaseCountryCode(currentUserData?.country_code, currentUserData?.country);
 
     const premiumForFeed = premiumActive;
 
@@ -2671,7 +2681,7 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, onNavigateToProfile, isPr
     lastPremiumActiveRef.current = premiumActive;
 
     // Create preference hash from key fields that affect matching
-    const baseCountryCodeForKey = normalizeCountryCode(currentUser.country_code || currentUser.country || '');
+    const baseCountryCodeForKey = getTrustedBaseCountryCode(currentUser.country_code, currentUser.country);
     // CRITICAL: For FREE users, ignore unlocked_countries in cache key (they shouldn't see international profiles)
     const unlockedCountriesForKey = premiumActive 
       ? (currentUser.unlocked_countries || []).sort().join(',')
