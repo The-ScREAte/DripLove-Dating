@@ -55,22 +55,13 @@ const TermsAcceptance = ({ user, onAccept }: TermsAcceptanceProps) => {
   // Background profile preloading - runs while user reads terms
   const preloadDiscoverProfiles = async (userId: string) => {
     try {
-      // Check if already cached
       const today = new Date().toISOString().split('T')[0];
-      const cacheKey = `${userId}_${today}`;
-      
-      if (discoverCache.has(cacheKey)) {
-        // Profiles already cached, skipping preload
-        return;
-      }
 
-      // Preloading discover profiles in background
-
-      // Fetch user preferences first
+      // Fetch user preferences and subscription together
       const [{ data: currentUserData }, { data: subscriptionData }] = await Promise.all([
         supabase
           .from('profiles')
-          .select('max_distance, distance_preference, country, country_code, min_age, max_age, preference, unlocked_countries')
+          .select('max_distance, distance_preference, country, country_code, min_age, max_age, preference, unlocked_countries, latitude, longitude')
           .eq('id', userId)
           .single(),
         supabase
@@ -88,6 +79,13 @@ const TermsAcceptance = ({ user, onAccept }: TermsAcceptanceProps) => {
       const entitledByStatus = subscriptionData?.status === 'active' || subscriptionData?.status === 'cancelled';
       const notExpired = !subscriptionData?.expires_at || new Date(subscriptionData.expires_at) > new Date();
       const isPremium = subscriptionData?.plan_name === 'premium' && entitledByStatus && notExpired;
+
+      // CRITICAL: Include premium status in cache key for proper isolation
+      const cacheKey = `${userId}_${today}_${isPremium ? 'premium' : 'free'}`;
+      
+      if (discoverCache.has(cacheKey)) {
+        return;
+      }
 
       // Get exclusion lists
       const [

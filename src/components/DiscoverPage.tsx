@@ -2672,6 +2672,10 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, onNavigateToProfile, isPr
 
     // Create preference hash from key fields that affect matching
     const baseCountryCodeForKey = normalizeCountryCode(currentUser.country_code || currentUser.country || '');
+    // CRITICAL: For FREE users, ignore unlocked_countries in cache key (they shouldn't see international profiles)
+    const unlockedCountriesForKey = premiumActive 
+      ? (currentUser.unlocked_countries || []).sort().join(',')
+      : ''; // Free users always get empty unlocked countries
     const prefHash = [
       currentUser.gender || '',
       currentUser.preference || '',
@@ -2679,7 +2683,7 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, onNavigateToProfile, isPr
       currentUser.max_age || '',
       currentUser.max_distance || '',
       baseCountryCodeForKey,
-      (currentUser.unlocked_countries || []).sort().join(','),
+      unlockedCountriesForKey,
     ].join('_');
 
     // Create cache key that includes date, premium status, AND preferences
@@ -2833,13 +2837,30 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, onNavigateToProfile, isPr
         }
         
         const keyForStorage = buildDeckCacheKey(cacheKey);
+        
+        // For free users: calculate max distance (capped at 500km)
+        const FREE_USER_MAX_DISTANCE_CACHE = 500;
+        const userMaxDistanceForCache = currentUser.max_distance || currentUser.distance_preference || 500;
+        const freeUserMaxDistance = premiumActive 
+          ? userMaxDistanceForCache 
+          : Math.min(userMaxDistanceForCache, FREE_USER_MAX_DISTANCE_CACHE);
+        const userLat = currentUser.latitude;
+        const userLon = currentUser.longitude;
+        
         const filteredCachedDeck = cachedDeck.filter(item => {
           if (isAd(item)) return true; // Keep ads
           if (swipedToExclude.has(item.id)) return false;
-          // Free users: never show other countries, even from cached deck.
+          // Free users: never show other countries AND enforce distance limit
           if (!premiumActive) {
             if (!baseCountryCodeForKey) return false;
-            return isLocalCountryForFreeUser(item, baseCountryCodeForKey);
+            // First check country
+            if (!isLocalCountryForFreeUser(item, baseCountryCodeForKey)) return false;
+            // Then check distance (if coordinates available)
+            if (userLat && userLon && item.latitude && item.longitude) {
+              const dist = calculateDistance(userLat, userLon, item.latitude, item.longitude);
+              if (dist > freeUserMaxDistance) return false;
+            }
+            return true;
           }
           return true;
         });
