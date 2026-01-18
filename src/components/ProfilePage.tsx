@@ -647,6 +647,7 @@ const ProfilePage = ({ currentUser, profile, onProfileUpdate, onLogout, onShowTe
         city: profile.city || '',
         country: profile.country || '',
         country_code: profile.country_code || '',
+        date_of_birth: profile.date_of_birth || '',
         max_distance: profile.max_distance || profile.distance_preference || 250,
         min_age: profile.min_age || 18,
         max_age: profile.max_age || 40,
