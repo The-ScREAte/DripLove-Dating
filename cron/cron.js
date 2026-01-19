@@ -140,6 +140,37 @@ const processSubscriptionChecker = async () => {
   }
 };
 
+// Sync Google subscriptions - backup for webhook failures
+const processGoogleSync = async () => {
+  try {
+    console.log(`[${new Date().toISOString()}] Running Google subscription sync...`);
+
+    const response = await fetch(
+      `${SUPABASE_URL}/functions/v1/sync-google-subscriptions`,
+      {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${SUPABASE_SERVICE_KEY}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({}),
+      }
+    );
+
+    const data = await response.json().catch(() => ({}));
+    if (response.ok) {
+      console.log('✅ Google sync success:', data.message || data);
+      if (typeof data.updated === 'number') {
+        console.log(`  updated=${data.updated} expired=${data.expired} errors=${data.errors}`);
+      }
+    } else {
+      console.error('❌ Google sync error:', data);
+    }
+  } catch (error) {
+    console.error('❌ Failed to sync Google subscriptions:', error.message);
+  }
+};
+
 // Run every 15 minutes: */15 * * * *
 // For testing every minute: * * * * *
 cron.schedule('*/15 * * * *', processScheduledBroadcasts);
@@ -147,13 +178,19 @@ cron.schedule('*/15 * * * *', processScheduledBroadcasts);
 // Paystack recurring billing (every hour at :05)
 cron.schedule('5 * * * *', processPaystackRecurringBilling);
 
-// Subscription status check (every hour at :10)
+// Subscription status check (every hour at :10) - now includes Google sync
 cron.schedule('10 * * * *', processSubscriptionChecker);
 
+// Google subscription sync (every 4 hours as extra backup - subscription-checker does hourly sync now)
+cron.schedule('0 */4 * * *', processGoogleSync);
+
 console.log('🚀 Scheduled broadcasts cron job started');
-console.log('📅 Running every 15 minutes');
+console.log('📅 Broadcasts: every 15 minutes');
+console.log('💳 Paystack billing: hourly at :05');
+console.log('🔍 Subscription checker: hourly at :10 (includes Google sync)');
+console.log('🔄 Google full sync: every 4 hours');
 console.log('🔗 Supabase URL:', SUPABASE_URL);
-console.log('⏰ Next run at:', new Date(Date.now() + 15 * 60 * 1000).toLocaleString());
+console.log('⏰ Next broadcast run at:', new Date(Date.now() + 15 * 60 * 1000).toLocaleString());
 
 // Run once on startup for testing
 processScheduledBroadcasts();

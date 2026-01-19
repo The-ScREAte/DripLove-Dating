@@ -1,11 +1,14 @@
 // Supabase Edge Function: subscription-checker
-// Periodically checks and updates subscription statuses, handles expiry and failures
+// Periodically checks and updates subscription statuses
+// ENHANCED: Now also handles Google subscription activation/sync (not just expiry)
 // Runs hourly via cron job
+
 import { serve } from 'https://deno.land/std@0.177.0/http/server.ts'
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.45.0'
 
 const SUPABASE_URL = Deno.env.get('SUPABASE_URL')
 const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')
+const GOOGLE_PACKAGE_NAME = Deno.env.get('GOOGLE_PACKAGE_NAME') || 'com.driplove.dating'
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -20,6 +23,138 @@ function json(status: number, body: unknown) {
   })
 }
 
+// ========== Google API Authentication (for subscription sync) ==========
+function base64UrlEncode(data: string | ArrayBuffer): string {
+  let base64: string
+  if (typeof data === 'string') {
+    base64 = btoa(data)
+  } else {
+    const bytes = new Uint8Array(data)
+    let binary = ''
+    for (let i = 0; i < bytes.length; i++) {
+      binary += String.fromCharCode(bytes[i])
+    }
+    base64 = btoa(binary)
+  }
+  return base64.replace(/\+/g, '-').replace(/\//g, '_').replace(/=/g, '')
+}
+
+function pemToArrayBuffer(pem: string): ArrayBuffer {
+  const b64 = pem
+    .replace(/-----BEGIN PRIVATE KEY-----/, '')
+    .replace(/-----END PRIVATE KEY-----/, '')
+    .replace(/\s/g, '')
+  const binary = atob(b64)
+  const bytes = new Uint8Array(binary.length)
+  for (let i = 0; i < binary.length; i++) {
+    bytes[i] = binary.charCodeAt(i)
+  }
+  return bytes.buffer
+}
+
+async function generateAccessToken(serviceAccount: any, scope: string): Promise<string> {
+  const now = Math.floor(Date.now() / 1000)
+  const expiry = now + 3600
+  const header = { alg: 'RS256', typ: 'JWT' }
+  const payload = {
+    iss: serviceAccount.client_email,
+    sub: serviceAccount.client_email,
+    aud: 'https://oauth2.googleapis.com/token',
+    iat: now,
+    exp: expiry,
+    scope,
+  }
+
+  const privateKey = await crypto.subtle.importKey(
+    'pkcs8',
+    pemToArrayBuffer(serviceAccount.private_key),
+    { name: 'RSASSA-PKCS1-v1_5', hash: 'SHA-256' },
+    false,
+    ['sign'],
+  )
+
+  const encodedHeader = base64UrlEncode(JSON.stringify(header))
+  const encodedPayload = base64UrlEncode(JSON.stringify(payload))
+  const signatureInput = `${encodedHeader}.${encodedPayload}`
+
+  const signature = await crypto.subtle.sign(
+    'RSASSA-PKCS1-v1_5',
+    privateKey,
+    new TextEncoder().encode(signatureInput),
+  )
+
+  const encodedSignature = base64UrlEncode(signature)
+  const jwt = `${signatureInput}.${encodedSignature}`
+
+  const tokenResponse = await fetch('https://oauth2.googleapis.com/token', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+    body: `grant_type=urn:ietf:params:oauth:grant-type:jwt-bearer&assertion=${jwt}`,
+  })
+
+  const tokenData = await tokenResponse.json()
+  if (!tokenResponse.ok || !tokenData?.access_token) {
+    throw new Error(`Failed to get Google OAuth token: ${tokenResponse.status}`)
+  }
+  return tokenData.access_token
+}
+
+async function getAndroidPublisherAccessToken(): Promise<string | null> {
+  try {
+    const base64Json = Deno.env.get('GOOGLE_PLAY_SERVICE_ACCOUNT') ||
+                       Deno.env.get('FIREBASE_SERVICE_ACCOUNT')
+    if (!base64Json) {
+      console.log('[SUBSCRIPTION-CHECKER] No Google service account configured')
+      return null
+    }
+    const serviceAccountJson = atob(base64Json)
+    const serviceAccount = JSON.parse(serviceAccountJson)
+    return await generateAccessToken(serviceAccount, 'https://www.googleapis.com/auth/androidpublisher')
+  } catch (error) {
+    console.error('[SUBSCRIPTION-CHECKER] Failed to get Google access token:', error)
+    return null
+  }
+}
+
+async function verifyGoogleSubscription(
+  accessToken: string,
+  purchaseToken: string
+): Promise<{ expiryTimeMillis: number; autoRenewing: boolean } | null> {
+  const subscriptionIds = ['premium_monthly', 'monthly']
+  
+  // Try v3 endpoint
+  for (const subId of subscriptionIds) {
+    try {
+      const url = `https://androidpublisher.googleapis.com/androidpublisher/v3/applications/${GOOGLE_PACKAGE_NAME}/purchases/subscriptions/${subId}/tokens/${purchaseToken}`
+      const response = await fetch(url, { headers: { Authorization: `Bearer ${accessToken}` } })
+      if (response.ok) {
+        const data = await response.json()
+        return {
+          expiryTimeMillis: Number(data.expiryTimeMillis),
+          autoRenewing: data.autoRenewing === true,
+        }
+      }
+    } catch {}
+  }
+  
+  // Fallback to v2 endpoint
+  try {
+    const url = `https://androidpublisher.googleapis.com/androidpublisher/v3/applications/${GOOGLE_PACKAGE_NAME}/purchases/subscriptionsv2/tokens/${purchaseToken}`
+    const response = await fetch(url, { headers: { Authorization: `Bearer ${accessToken}` } })
+    if (response.ok) {
+      const data = await response.json()
+      const firstLineItem = Array.isArray(data.lineItems) ? data.lineItems[0] : null
+      const expiryTime = firstLineItem?.expiryTime
+      return {
+        expiryTimeMillis: expiryTime ? Date.parse(expiryTime) : 0,
+        autoRenewing: !!firstLineItem?.autoRenewingPlan,
+      }
+    }
+  } catch {}
+  
+  return null
+}
+
 serve(async (req) => {
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders })
@@ -30,7 +165,7 @@ serve(async (req) => {
     
     const supabase = createClient(SUPABASE_URL!, SUPABASE_SERVICE_ROLE_KEY!)
     
-    // Step 1: Get count of subscriptions that need processing BEFORE running the handler
+    // ========== STEP 1: Handle expired subscriptions ==========
     const { data: beforeCheck } = await supabase
       .from('user_subscriptions')
       .select('id, user_id, status, plan_name, expires_at, auto_renew, payment_method')
@@ -53,17 +188,131 @@ serve(async (req) => {
       })))
     }
     
-    // Step 2: Run the subscription expiry handler
+    // Run the subscription expiry handler
     const { error: expiryError } = await supabase.rpc('handle_subscription_expiry')
     
     if (expiryError) {
       console.error('[SUBSCRIPTION-CHECKER] Error handling subscription expiry:', expiryError)
-      return json(500, { error: 'Failed to handle subscription expiry', details: expiryError.message })
+    } else {
+      console.log('[SUBSCRIPTION-CHECKER] handle_subscription_expiry RPC completed successfully')
     }
-    
-    console.log('[SUBSCRIPTION-CHECKER] handle_subscription_expiry RPC completed successfully')
 
-    // Step 3: Get stats of what was updated (look at last 5 minutes to catch all updates)
+    // ========== STEP 2: Sync Google Play subscriptions ==========
+    // This catches missed webhooks and ensures DB matches Google's actual state
+    let googleSyncStats = { checked: 0, activated: 0, updated: 0, errors: 0 }
+    
+    const googleAccessToken = await getAndroidPublisherAccessToken()
+    
+    if (googleAccessToken) {
+      console.log('[SUBSCRIPTION-CHECKER] Syncing Google Play subscriptions...')
+      
+      // Get all Google subscriptions that might need syncing
+      const { data: googleSubs } = await supabase
+        .from('user_subscriptions')
+        .select('id, user_id, provider_transaction_id, expires_at, status, plan_name, auto_renew')
+        .eq('payment_method', 'google')
+        .in('status', ['active', 'cancelled', 'payment_pending', 'expired', 'payment_failed'])
+        .not('provider_transaction_id', 'is', null)
+      
+      if (googleSubs && googleSubs.length > 0) {
+        console.log(`[SUBSCRIPTION-CHECKER] Found ${googleSubs.length} Google subscriptions to check`)
+        googleSyncStats.checked = googleSubs.length
+        
+        for (const sub of googleSubs) {
+          try {
+            const purchaseToken = sub.provider_transaction_id
+            if (!purchaseToken) continue
+            
+            const googleData = await verifyGoogleSubscription(googleAccessToken, purchaseToken)
+            
+            if (!googleData) {
+              console.log(`[SUBSCRIPTION-CHECKER] Could not verify Google subscription for user ${sub.user_id}`)
+              googleSyncStats.errors++
+              continue
+            }
+            
+            const isActiveOnGoogle = googleData.expiryTimeMillis > Date.now()
+            const googleExpiresAt = new Date(googleData.expiryTimeMillis).toISOString()
+            const dbExpiresAt = new Date(sub.expires_at).getTime()
+            
+            // Check if we need to update
+            const statusMismatch = isActiveOnGoogle && sub.status !== 'active'
+            const expiryMismatch = Math.abs(dbExpiresAt - googleData.expiryTimeMillis) > 60000 // 1 min tolerance
+            const shouldBeExpired = !isActiveOnGoogle && sub.status === 'active'
+            
+            if (statusMismatch) {
+              // ACTIVATION: User is active on Google but not in our DB
+              console.log(`[SUBSCRIPTION-CHECKER] 🔄 Activating subscription for user ${sub.user_id}`)
+              
+              const { error } = await supabase
+                .from('user_subscriptions')
+                .update({
+                  status: 'active',
+                  plan_name: 'premium',
+                  expires_at: googleExpiresAt,
+                  next_billing_date: googleExpiresAt,
+                  auto_renew: googleData.autoRenewing,
+                  payment_attempts: 0,
+                  updated_at: new Date().toISOString(),
+                })
+                .eq('id', sub.id)
+              
+              if (!error) {
+                googleSyncStats.activated++
+                console.log(`[SUBSCRIPTION-CHECKER] ✅ Activated user ${sub.user_id} until ${googleExpiresAt}`)
+              } else {
+                googleSyncStats.errors++
+              }
+            } else if (expiryMismatch && isActiveOnGoogle) {
+              // UPDATE: Expiry dates don't match
+              console.log(`[SUBSCRIPTION-CHECKER] 📅 Updating expiry for user ${sub.user_id}`)
+              
+              const { error } = await supabase
+                .from('user_subscriptions')
+                .update({
+                  expires_at: googleExpiresAt,
+                  next_billing_date: googleExpiresAt,
+                  auto_renew: googleData.autoRenewing,
+                  updated_at: new Date().toISOString(),
+                })
+                .eq('id', sub.id)
+              
+              if (!error) {
+                googleSyncStats.updated++
+              } else {
+                googleSyncStats.errors++
+              }
+            } else if (shouldBeExpired) {
+              // EXPIRY: Google says expired but we have it as active
+              console.log(`[SUBSCRIPTION-CHECKER] ⏰ Expiring subscription for user ${sub.user_id}`)
+              
+              const newStatus = sub.auto_renew ? 'payment_failed' : 'expired'
+              const { error } = await supabase
+                .from('user_subscriptions')
+                .update({
+                  status: newStatus,
+                  plan_name: 'free',
+                  updated_at: new Date().toISOString(),
+                })
+                .eq('id', sub.id)
+              
+              if (!error) {
+                googleSyncStats.updated++
+              } else {
+                googleSyncStats.errors++
+              }
+            }
+          } catch (err) {
+            console.error(`[SUBSCRIPTION-CHECKER] Error syncing user ${sub.user_id}:`, err)
+            googleSyncStats.errors++
+          }
+        }
+      }
+      
+      console.log('[SUBSCRIPTION-CHECKER] Google sync complete:', googleSyncStats)
+    }
+
+    // ========== STEP 3: Get stats of what was updated ==========
     const { data: expiredSubscriptions } = await supabase
       .from('user_subscriptions')
       .select('id, user_id, status, plan_name, expires_at, payment_method')
@@ -71,18 +320,9 @@ serve(async (req) => {
       .gte('updated_at', new Date(Date.now() - 5 * 60000).toISOString())
     
     const expiredCount = expiredSubscriptions?.length || 0
-    
     console.log(`[SUBSCRIPTION-CHECKER] Processed ${expiredCount} expired/failed subscriptions in last 5 min`)
-    
-    if (expiredSubscriptions && expiredSubscriptions.length > 0) {
-      console.log('[SUBSCRIPTION-CHECKER] Recently expired/failed:', expiredSubscriptions.map(s => ({
-        user_id: s.user_id,
-        status: s.status,
-        payment_method: s.payment_method
-      })))
-    }
 
-    // Step 4: Check for subscriptions expiring within 24 hours (for potential notifications)
+    // ========== STEP 4: Check for subscriptions expiring soon ==========
     const { data: soonToExpire } = await supabase
       .from('user_subscriptions')
       .select('id, user_id, expires_at, payment_method, auto_renew')
@@ -93,12 +333,10 @@ serve(async (req) => {
       .gte('expires_at', new Date().toISOString())
 
     const soonToExpireCount = soonToExpire?.length || 0
-    
     console.log(`[SUBSCRIPTION-CHECKER] Found ${soonToExpireCount} subscriptions expiring within 24 hours`)
     
-    // Step 5: Also check for "stuck" subscriptions - premium status but already expired
-    // This catches any that weren't properly processed by the RPC
-    const { data: stuckSubscriptions, error: stuckError } = await supabase
+    // ========== STEP 5: Fix stuck subscriptions ==========
+    const { data: stuckSubscriptions } = await supabase
       .from('user_subscriptions')
       .select('id, user_id, status, plan_name, expires_at, payment_method, auto_renew')
       .eq('status', 'active')
@@ -106,11 +344,10 @@ serve(async (req) => {
       .not('expires_at', 'is', null)
       .lt('expires_at', new Date().toISOString())
     
+    let stuckFixed = 0
     if (stuckSubscriptions && stuckSubscriptions.length > 0) {
-      console.warn(`[SUBSCRIPTION-CHECKER] WARNING: Found ${stuckSubscriptions.length} stuck subscriptions that should have expired!`)
-      console.log('[SUBSCRIPTION-CHECKER] Stuck subscriptions:', stuckSubscriptions)
+      console.warn(`[SUBSCRIPTION-CHECKER] WARNING: Found ${stuckSubscriptions.length} stuck subscriptions!`)
       
-      // Force update these manually
       for (const sub of stuckSubscriptions) {
         const newStatus = sub.auto_renew ? 'payment_failed' : 'expired'
         const { error: updateError } = await supabase
@@ -122,9 +359,8 @@ serve(async (req) => {
           })
           .eq('id', sub.id)
         
-        if (updateError) {
-          console.error(`[SUBSCRIPTION-CHECKER] Failed to fix stuck subscription ${sub.id}:`, updateError)
-        } else {
+        if (!updateError) {
+          stuckFixed++
           console.log(`[SUBSCRIPTION-CHECKER] Fixed stuck subscription ${sub.id} -> ${newStatus}`)
         }
       }
@@ -135,7 +371,8 @@ serve(async (req) => {
       found_expired: needsProcessingCount,
       processed: expiredCount,
       expiring_soon: soonToExpireCount,
-      stuck_fixed: stuckSubscriptions?.length || 0,
+      stuck_fixed: stuckFixed,
+      google_sync: googleSyncStats,
       timestamp: new Date().toISOString()
     })
   } catch (error) {
