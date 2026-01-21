@@ -9,6 +9,7 @@ import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.45.0'
 const SUPABASE_URL = Deno.env.get('SUPABASE_URL')
 const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')
 const GOOGLE_PACKAGE_NAME = Deno.env.get('GOOGLE_PACKAGE_NAME') || 'com.driplove.dating'
+const APPLE_SHARED_SECRET = Deno.env.get('APPLE_SHARED_SECRET') || ''
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -153,6 +154,68 @@ async function verifyGoogleSubscription(
   } catch {}
   
   return null
+}
+
+// ========== Apple Receipt Validation (for subscription sync) ==========
+async function validateAppleReceipt(
+  receiptData: string,
+  isProduction: boolean
+): Promise<{ expiryTimeMillis: number; autoRenewing: boolean; transactionId: string } | null> {
+  const url = isProduction
+    ? 'https://buy.itunes.apple.com/verifyReceipt'
+    : 'https://sandbox.itunes.apple.com/verifyReceipt'
+
+  try {
+    const response = await fetch(url, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        'receipt-data': receiptData,
+        'password': APPLE_SHARED_SECRET,
+        'exclude-old-transactions': true,
+      }),
+    })
+
+    const result = await response.json()
+    
+    // Handle sandbox/production mismatch
+    if (result.status === 21007) {
+      return validateAppleReceipt(receiptData, false)
+    } else if (result.status === 21008) {
+      return validateAppleReceipt(receiptData, true)
+    }
+    
+    if (result.status !== 0) {
+      return null
+    }
+    
+    // Get latest transaction info
+    const allTransactions = [
+      ...(result.receipt?.in_app || []),
+      ...(result.latest_receipt_info || []),
+    ]
+    
+    if (allTransactions.length === 0) return null
+    
+    // Sort by latest purchase
+    allTransactions.sort((a, b) =>
+      parseInt(b.purchase_date_ms || '0') - parseInt(a.purchase_date_ms || '0')
+    )
+    
+    const latest = allTransactions[0]
+    const expiresDateMs = latest.expires_date_ms
+    
+    if (!expiresDateMs) return null
+    
+    return {
+      expiryTimeMillis: parseInt(expiresDateMs),
+      autoRenewing: latest.is_in_billing_retry_period !== 'true',
+      transactionId: latest.transaction_id,
+    }
+  } catch (err) {
+    console.error('[SUBSCRIPTION-CHECKER] Apple validation error:', err)
+    return null
+  }
 }
 
 serve(async (req) => {
@@ -312,6 +375,148 @@ serve(async (req) => {
       console.log('[SUBSCRIPTION-CHECKER] Google sync complete:', googleSyncStats)
     }
 
+    // ========== STEP 2B: Sync Apple App Store subscriptions ==========
+    // This catches missed webhooks and ensures DB matches Apple's actual state
+    let appleSyncStats = { checked: 0, activated: 0, updated: 0, errors: 0 }
+    
+    if (APPLE_SHARED_SECRET) {
+      console.log('[SUBSCRIPTION-CHECKER] Syncing Apple App Store subscriptions...')
+      
+      // Get all Apple subscriptions that might need syncing
+      // NOTE: We need the receipt data stored somewhere - for now we'll just check expiry dates
+      // In the future, store the latest_receipt in the database for re-validation
+      const { data: appleSubs } = await supabase
+        .from('user_subscriptions')
+        .select('id, user_id, provider_transaction_id, expires_at, status, plan_name, auto_renew')
+        .eq('payment_method', 'apple')
+        .in('status', ['active', 'cancelled', 'payment_pending', 'expired', 'payment_failed'])
+      
+      if (appleSubs && appleSubs.length > 0) {
+        console.log(`[SUBSCRIPTION-CHECKER] Found ${appleSubs.length} Apple subscriptions to check`)
+        appleSyncStats.checked = appleSubs.length
+        
+        // For Apple, we primarily rely on webhook notifications and expiry date checking
+        // Full receipt validation requires storing receipts, which we can add later if needed
+        for (const sub of appleSubs) {
+          try {
+            const dbExpiresAt = new Date(sub.expires_at).getTime()
+            const now = Date.now()
+            const isExpiredInDb = dbExpiresAt < now
+            const isActiveInDb = sub.status === 'active'
+            
+            // Check for stuck subscriptions (expired but still active)
+            if (isExpiredInDb && isActiveInDb) {
+              console.log(`[SUBSCRIPTION-CHECKER] ⏰ Expiring Apple subscription for user ${sub.user_id}`)
+              
+              const newStatus = sub.auto_renew ? 'payment_failed' : 'expired'
+              const { error } = await supabase
+                .from('user_subscriptions')
+                .update({
+                  status: newStatus,
+                  plan_name: 'free',
+                  updated_at: new Date().toISOString(),
+                })
+                .eq('id', sub.id)
+              
+              if (!error) {
+                appleSyncStats.updated++
+              } else {
+                appleSyncStats.errors++
+              }
+            }
+          } catch (err) {
+            console.error(`[SUBSCRIPTION-CHECKER] Error syncing Apple user ${sub.user_id}:`, err)
+            appleSyncStats.errors++
+          }
+        }
+      }
+      
+      console.log('[SUBSCRIPTION-CHECKER] Apple sync complete:', appleSyncStats)
+    } else {
+      console.log('[SUBSCRIPTION-CHECKER] Skipping Apple sync (no APPLE_SHARED_SECRET)')
+    }
+
+    // ========== STEP 2C: Sync Paystack subscriptions ==========
+    // Check for Paystack subscriptions that might be stuck
+    let paystackSyncStats = { checked: 0, activated: 0, updated: 0, errors: 0 }
+    
+    console.log('[SUBSCRIPTION-CHECKER] Syncing Paystack subscriptions...')
+    
+    // Get all Paystack subscriptions that might need syncing
+    const { data: paystackSubs } = await supabase
+      .from('user_subscriptions')
+      .select('id, user_id, provider_transaction_id, expires_at, status, plan_name, auto_renew, payment_attempts, cancellation_requested')
+    if (paystackSubs && paystackSubs.length > 0) {
+      console.log(`[SUBSCRIPTION-CHECKER] Found ${paystackSubs.length} Paystack subscriptions to check`)
+      paystackSyncStats.checked = paystackSubs.length
+      
+      // For Paystack, check based on expiry dates and payment status
+      // Paystack relies on webhook notifications and the recurring billing system
+      for (const sub of paystackSubs) {
+        try {
+          const dbExpiresAt = new Date(sub.expires_at).getTime()
+          const now = Date.now()
+          const isExpiredInDb = dbExpiresAt < now
+          const isActiveInDb = sub.status === 'active'
+          const hasCancellationRequested = sub.cancellation_requested === true
+          
+          // Check for stuck subscriptions (expired but still active)
+          // This includes both cancellation_requested=true and old status='cancelled'
+          if (isExpiredInDb && isActiveInDb) {
+            console.log(`[SUBSCRIPTION-CHECKER] ⏰ Expiring Paystack subscription for user ${sub.user_id}`)
+            
+            const newStatus = sub.auto_renew && !hasCancellationRequested ? 'payment_failed' : 'expired'
+            const { error } = await supabase
+              .from('user_subscriptions')
+              .update({
+                status: newStatus,
+                plan_name: 'free',
+                updated_at: new Date().toISOString(),
+              })
+              .eq('id', sub.id)
+            
+            if (!error) {
+              paystackSyncStats.updated++
+            } else {
+              paystackSyncStats.errors++
+            }
+          }
+          
+          // Check for old status='cancelled' that are also expired
+          if (sub.status === 'cancelled' && isExpiredInDb) {
+            console.log(`[SUBSCRIPTION-CHECKER] ⏰ Migrating old cancelled status for user ${sub.user_id}`)
+            
+            const { error } = await supabase
+              .from('user_subscriptions')
+              .update({
+                status: 'expired',
+                plan_name: 'free',
+                updated_at: new Date().toISOString(),
+              })
+              .eq('id', sub.id)
+            
+            if (!error) {
+              paystackSyncStats.updated++
+            } else {
+              paystackSyncStats.errors++
+            }
+          }
+          
+          // Check for payment_pending that should be activated
+          // (webhook might have been missed)
+          if (sub.status === 'payment_pending' && !isExpiredInDb && sub.payment_attempts < 3) {
+            console.log(`[SUBSCRIPTION-CHECKER] 🔄 Checking payment_pending for user ${sub.user_id}`)
+            // For now, just log - in the future, could verify with Paystack API
+          }
+        } catch (err) {
+          console.error(`[SUBSCRIPTION-CHECKER] Error syncing Paystack user ${sub.user_id}:`, err)
+          paystackSyncStats.errors++
+        }
+      }
+    }
+    
+    console.log('[SUBSCRIPTION-CHECKER] Paystack sync complete:', paystackSyncStats)
+
     // ========== STEP 3: Get stats of what was updated ==========
     const { data: expiredSubscriptions } = await supabase
       .from('user_subscriptions')
@@ -373,6 +578,8 @@ serve(async (req) => {
       expiring_soon: soonToExpireCount,
       stuck_fixed: stuckFixed,
       google_sync: googleSyncStats,
+      apple_sync: appleSyncStats,
+      paystack_sync: paystackSyncStats,
       timestamp: new Date().toISOString()
     })
   } catch (error) {

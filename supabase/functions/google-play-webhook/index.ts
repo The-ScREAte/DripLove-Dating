@@ -396,6 +396,9 @@ serve(async (req) => {
           next_billing_date: newExpiry.toISOString(),
           payment_attempts: 0,
           auto_renew: autoRenew,
+          // If Google says not auto-renewing, set cancellation flag
+          cancellation_requested: !autoRenew,
+          cancellation_requested_at: !autoRenew ? new Date().toISOString() : null,
         })
         
         if (renewError) {
@@ -407,7 +410,7 @@ serve(async (req) => {
         break
       
       case NOTIFICATION_TYPES.SUBSCRIPTION_CANCELED:
-        console.log(`[GOOGLE-WEBHOOK] 🚫 Subscription canceled`)
+        console.log(`[GOOGLE-WEBHOOK] 🚫 Subscription canceled via Play Store`)
         
         if (!subscription) {
           return json(200, { message: 'Subscription not found for cancellation' })
@@ -420,9 +423,11 @@ serve(async (req) => {
         }
         
         const { error: cancelError } = await updateSubscriptionByToken(supabase, purchaseToken, {
-          status: 'cancelled',
+          cancellation_requested: true,
+          cancellation_requested_at: new Date().toISOString(),
           auto_renew: false,
           expires_at: cancelExpiry, // Keep access until actual expiry
+          // status stays 'active' - they keep premium until expires_at
         })
         
         if (cancelError) {
@@ -430,7 +435,7 @@ serve(async (req) => {
           return json(500, { error: 'Failed to update subscription' })
         }
         
-        console.log('[GOOGLE-WEBHOOK] ✅ Subscription marked as canceled, access until:', cancelExpiry)
+        console.log('[GOOGLE-WEBHOOK] ✅ Cancellation requested, user keeps premium until:', cancelExpiry)
         break
       
       case NOTIFICATION_TYPES.SUBSCRIPTION_EXPIRED:

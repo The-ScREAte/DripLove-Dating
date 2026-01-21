@@ -438,15 +438,15 @@ const AccountActions = ({ currentUser, onLogout, onShowTerms, onShowPrivacy, hid
         {/* 6. Subscription Management - Cancel or Resume */}
         {(isPremium || (subscriptionStatus && subscriptionStatus.plan_name === 'premium' && subscriptionStatus.is_active)) && (
           <div className="space-y-3">
-            {/* Show subscription status if cancelled but still active until expiration */}
-            {subscriptionStatus && subscriptionStatus.status === 'cancelled' && subscriptionStatus.expires_at && (
+            {/* Show subscription status if cancellation requested but still active until expiration */}
+            {subscriptionStatus && (subscriptionStatus.cancellation_requested || subscriptionStatus.status === 'cancelled') && subscriptionStatus.expires_at && (
               <div className="p-4 bg-orange-50 border border-orange-200 rounded-lg">
                 <div className="flex items-center gap-2 mb-2">
                   <AlertTriangle className="w-4 h-4 text-orange-600" />
-                  <span className="font-semibold text-orange-800">Subscription Cancelled</span>
+                  <span className="font-semibold text-orange-800">Subscription Will Not Renew</span>
                 </div>
                 <p className="text-sm text-orange-700 mb-1">
-                  Your subscription will be cancelled on:
+                  Your current subscription expires on:
                 </p>
                 <p className="text-base font-bold text-orange-900">
                   {new Date(subscriptionStatus.expires_at).toLocaleDateString('en-US', { 
@@ -457,13 +457,13 @@ const AccountActions = ({ currentUser, onLogout, onShowTerms, onShowPrivacy, hid
                   })}
                 </p>
                 <p className="text-xs text-orange-600 mt-2">
-                  You will not be charged again and can resubscribe anytime.
+                  You will not be charged again. You'll keep premium access until the expiration date above.
                 </p>
               </div>
             )}
 
-            {/* Cancel button for active subscriptions only */}
-            {(!subscriptionStatus || subscriptionStatus.status === 'active') && (
+            {/* Cancel button for active subscriptions only (not cancelled) */}
+            {subscriptionStatus && subscriptionStatus.status === 'active' && !subscriptionStatus.cancellation_requested && (
               <>
                 <Button
                   variant="outline"
@@ -475,7 +475,7 @@ const AccountActions = ({ currentUser, onLogout, onShowTerms, onShowPrivacy, hid
                 </Button>
                 
                 {/* Show expiration date for active subscriptions */}
-                {subscriptionStatus && subscriptionStatus.expires_at && (
+                {subscriptionStatus.expires_at && (
                   <div className="p-3 bg-blue-50 border border-blue-200 rounded-lg">
                     <p className="text-xs text-blue-600 mb-1">
                       Your subscription renews on:
@@ -493,49 +493,77 @@ const AccountActions = ({ currentUser, onLogout, onShowTerms, onShowPrivacy, hid
               </>
             )}
 
-            {/* Resume button for cancelled Paystack subscriptions */}
-            {subscriptionStatus && 
-             subscriptionStatus.status === 'cancelled' && 
-             subscriptionStatus.payment_method === 'paystack' && (
-              <Button
-                variant="outline"
-                size={isAndroidNative ? 'sm' : 'default'}
-                className={`w-full flex items-center justify-center space-x-2 border-green-300 text-green-600 hover:bg-green-50 ${isAndroidNative ? 'text-xs' : ''}`}
-                onClick={async () => {
-                  try {
-                    const { data: { user } } = await supabase.auth.getUser();
-                    if (!user) return;
+            {/* Reactivation buttons for cancelled subscriptions */}
+            {subscriptionStatus && (subscriptionStatus.cancellation_requested || subscriptionStatus.status === 'cancelled') && (
+              <>
+                {/* Paystack - Direct reactivation via button */}
+                {subscriptionStatus.payment_method === 'paystack' && (
+                  <Button
+                    variant="outline"
+                    size={isAndroidNative ? 'sm' : 'default'}
+                    className={`w-full flex items-center justify-center space-x-2 border-green-300 text-green-600 hover:bg-green-50 ${isAndroidNative ? 'text-xs' : ''}`}
+                    onClick={async () => {
+                      try {
+                        const { data: { user } } = await supabase.auth.getUser();
+                        if (!user) return;
 
-                    const { error } = await supabase
-                      .from('user_subscriptions')
-                      .update({ 
-                        status: 'active',
-                        auto_renew: true,
-                        updated_at: new Date().toISOString()
-                      })
-                      .eq('user_id', user.id)
-                      .eq('status', 'cancelled');
+                        const { data, error } = await supabase.functions.invoke('reactivate-subscription', {
+                          body: { user_id: user.id }
+                        });
 
-                    if (error) throw error;
+                        if (error) throw error;
 
-                    toast({
-                      title: 'Subscription Resumed',
-                      description: 'Your subscription has been reactivated and will auto-renew.',
-                    });
+                        if (data.charged_immediately) {
+                          toast({
+                            title: 'Subscription Reactivated & Charged',
+                            description: `Your subscription has been reactivated and your card was charged. New expiry: ${new Date(data.new_expires_at).toLocaleDateString()}`,
+                          });
+                        } else {
+                          toast({
+                            title: 'Subscription Reactivated',
+                            description: `Your subscription will auto-renew on ${new Date(data.will_renew_on).toLocaleDateString()}`,
+                          });
+                        }
 
-                    // Refresh the page to update UI
-                    window.location.reload();
-                  } catch (err: any) {
-                    toast({
-                      title: 'Error',
-                      description: 'Failed to resume subscription. Please try again.',
-                      variant: 'destructive',
-                    });
-                  }
-                }}
-              >
-                Resume Subscription
-              </Button>
+                        // Refresh the page to update UI
+                        window.location.reload();
+                      } catch (err: any) {
+                        toast({
+                          title: 'Error',
+                          description: err.message || 'Failed to reactivate subscription. Please try again.',
+                          variant: 'destructive',
+                        });
+                      }
+                    }}
+                  >
+                    Continue with Subscription
+                  </Button>
+                )}
+
+                {/* iOS - Redirect to App Store */}
+                {subscriptionStatus.payment_method === 'apple' && (
+                  <div className="p-4 bg-blue-50 border border-blue-200 rounded-lg">
+                    <p className="text-sm text-blue-700 mb-2">
+                      To reactivate your subscription, please go to:
+                    </p>
+                    <p className="text-xs font-mono text-blue-900">
+                      iPhone Settings → [Your Name] → Subscriptions → DripLove → Turn on Auto-Renew
+                    </p>
+                  </div>
+                )}
+
+                {/* Android - Redirect to Play Store */}
+                {subscriptionStatus.payment_method === 'google' && (
+                  <div className="p-4 bg-green-50 border border-green-200 rounded-lg">
+                    <p className="text-sm text-green-700 mb-2">
+                      To reactivate your subscription, please go to:
+                    </p>
+                    <p className="text-xs font-mono text-green-900">
+                      Play Store → Menu → Subscriptions → DripLove → Resubscribe
+                    </p>
+                  </div>
+                )}
+              </>
             )}
           </div>
         )}
