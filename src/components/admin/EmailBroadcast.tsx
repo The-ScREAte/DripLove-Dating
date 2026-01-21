@@ -253,43 +253,37 @@ export default function EmailBroadcast() {
         return;
       }
 
-      // Create HTML content from plain text
+      // Create Primary inbox-friendly HTML content (minimal design, no promotions triggers)
       const htmlContent = `
-        <!DOCTYPE html>
-        <html>
-          <head>
-            <meta charset="utf-8">
-            <meta name="viewport" content="width=device-width, initial-scale=1.0">
-          </head>
-          <body style="font-family: Arial, sans-serif; line-height: 1.6; color: #333; margin: 0; padding: 20px; background-color: #f5f5f5;">
-            <table width="100%" cellpadding="0" cellspacing="0" style="max-width: 600px; margin: 0 auto; background: white; border-radius: 8px; overflow: hidden;">
-              <tr>
-                <td align="center" style="padding: 10px; background: linear-gradient(135deg, #f472b6 0%, #a855f7 50%, #6366f1 100%);">
-                  <img src="https://driplove.love/driplove-logo.png" alt="DripLove" width="80" style="display: block;" />
-                </td>
-              </tr>
-              <tr>
-                <td style="padding: 20px 15px;">
-                  ${emailBody.replace(/\n/g, '<br>')}
-                </td>
-              </tr>
-              <tr>
-                <td style="padding: 15px; text-align: center; border-top: 1px solid #eee; font-size: 12px;">
-                  <p style="margin: 5px 0;">
-                    <a href="https://driplove.love/r/o5f15uwE" style="color: #a855f7; text-decoration: none;">Upgrade Now</a>
-                  </p>
-                  <p style="margin: 8px 0;">
-                    <a href="https://www.instagram.com/driplove_official" style="color: #a855f7; text-decoration: none;">Instagram</a> · 
-                    <a href="https://www.tiktok.com/@driplove_official" style="color: #a855f7; text-decoration: none;">TikTok</a> · 
-                    <a href="https://www.facebook.com/share/1BqpJ6WrA9" style="color: #a855f7; text-decoration: none;">Facebook</a> · 
-                    <a href="https://x.com/driploveinfo" style="color: #a855f7; text-decoration: none;">X</a>
-                  </p>
-                  <p style="margin: 8px 0 0 0; font-size: 11px; color: #999;">© 2026 DripLove</p>
-                </td>
-              </tr>
-            </table>
-          </body>
-        </html>
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+</head>
+<body style="font-family: Arial, Helvetica, sans-serif; font-size: 14px; line-height: 1.6; color: #333333; margin: 0; padding: 0;">
+  <div style="max-width: 580px; margin: 0 auto; padding: 20px;">
+    <!-- Small logo, left-aligned, no background -->
+    <img src="https://driplove.love/driplove-logo.png" alt="DripLove" width="45" height="45" style="display: block; margin-bottom: 20px;" />
+    
+    <!-- Message content -->
+    <div style="color: #333333;">
+      ${emailBody.replace(/\n/g, '<br>')}
+    </div>
+    
+    <!-- Simple text link (only if needed) -->
+    <p style="margin-top: 20px; color: #333333;">
+      You can access your account anytime: <a href="https://driplove.love" style="color: #6366f1; text-decoration: underline;">driplove.love</a>
+    </p>
+    
+    <!-- Simple sign-off -->
+    <p style="margin-top: 30px; color: #333333;">
+      Best regards,<br>
+      DripLove Team
+    </p>
+  </div>
+</body>
+</html>
       `;
 
       // Call edge function to send emails
