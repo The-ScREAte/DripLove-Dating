@@ -263,24 +263,23 @@ export default function EmailBroadcast() {
 </head>
 <body style="font-family: Arial, Helvetica, sans-serif; font-size: 14px; line-height: 1.6; color: #333333; margin: 0; padding: 0;">
   <div style="max-width: 580px; margin: 0 auto; padding: 20px;">
-    <!-- Small logo, left-aligned, no background -->
-    <img src="https://driplove.love/driplove-logo.png" alt="DripLove" width="45" height="45" style="display: block; margin-bottom: 20px;" />
-    
     <!-- Message content -->
     <div style="color: #333333;">
       ${emailBody.replace(/\n/g, '<br>')}
     </div>
     
-    <!-- Simple text link (only if needed) -->
-    <p style="margin-top: 20px; color: #333333;">
-      You can access your account anytime: <a href="https://driplove.love" style="color: #6366f1; text-decoration: underline;">driplove.love</a>
-    </p>
-    
-    <!-- Simple sign-off -->
-    <p style="margin-top: 30px; color: #333333;">
-      Best regards,<br>
-      DripLove Team
-    </p>
+    <!-- Professional sign-off with logo -->
+    <table style="margin-top: 30px; border: none;" cellpadding="0" cellspacing="0">
+      <tr>
+        <td style="vertical-align: top; padding-right: 12px;">
+          <img src="https://driplove.love/driplove-logo.png" alt="DripLove" width="40" height="40" style="display: block; border-radius: 6px;" />
+        </td>
+        <td style="vertical-align: middle;">
+          <span style="font-size: 14px; color: #333333; display: block;">Best regards,</span>
+          <span style="font-size: 14px; font-weight: 600; color: #333333; display: block;">The DripLove Team</span>
+        </td>
+      </tr>
+    </table>
   </div>
 </body>
 </html>
