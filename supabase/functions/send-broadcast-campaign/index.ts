@@ -122,8 +122,17 @@ serve(async (req: Request) => {
     const usersWithoutTokens = userIds.filter(id => !tokenUserIdSet.has(id));
     console.log(`${deliverableUserIds.length} users have push tokens, ${usersWithoutTokens.length} do not`);
 
-    if (deliverableUserIds.length === 0) {
+    // If saveToProfile is enabled, we can still save messages even without push tokens
+    // Only throw error if NO push tokens AND NOT saving to profile
+    if (deliverableUserIds.length === 0 && !saveToProfile) {
       throw new Error('No selected users have push notifications enabled (no push tokens found).');
+    }
+
+    // If saving to profile, use ALL selected users (not just those with push tokens)
+    const recipientUserIds = saveToProfile ? userIds : deliverableUserIds;
+    
+    if (recipientUserIds.length === 0) {
+      throw new Error('No users to send to.');
     }
 
     // Create campaign with 'queued' status
@@ -135,7 +144,7 @@ serve(async (req: Request) => {
         message,
         notification_type: notificationType,
         target_countries: targetCountries,
-        total_recipients: deliverableUserIds.length,
+        total_recipients: recipientUserIds.length,
         successful_sends: 0,
         failed_sends: 0,
         status: 'queued',
@@ -152,7 +161,7 @@ serve(async (req: Request) => {
     console.log(`Created campaign ${campaign.id} with status: queued`);
 
     // Create recipient records in batches to avoid timeout
-    const recipientsToInsert = deliverableUserIds.map(userId => ({
+    const recipientsToInsert = recipientUserIds.map(userId => ({
       campaign_id: campaign.id,
       user_id: userId,
       status: 'pending',
@@ -173,7 +182,7 @@ serve(async (req: Request) => {
       }
     }
 
-    console.log(`Queued ${deliverableUserIds.length} recipients for background processing`);
+    console.log(`Queued ${recipientUserIds.length} recipients for background processing (${deliverableUserIds.length} have push tokens)`);
 
     // Immediately trigger the queue processor to start processing
     supabase.functions.invoke('process-broadcast-queue', {
@@ -185,8 +194,11 @@ serve(async (req: Request) => {
       JSON.stringify({
         success: true,
         campaignId: campaign.id,
-        totalRecipients: deliverableUserIds.length,
-        message: 'Broadcast queued successfully. Processing will continue in background.',
+        totalRecipients: recipientUserIds.length,
+        pushEnabledCount: deliverableUserIds.length,
+        message: saveToProfile 
+          ? `Broadcast queued for ${recipientUserIds.length} users (${deliverableUserIds.length} will receive push notifications).`
+          : 'Broadcast queued successfully. Processing will continue in background.',
       }),
       {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
