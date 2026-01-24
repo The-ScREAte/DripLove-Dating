@@ -162,6 +162,7 @@ DECLARE
   subscriber_count integer;
   total_commission numeric;
   pending_payout boolean;
+  usd_rate numeric := 0.08; -- Approx conversion GHS->USD; keep configurable via migrations/env later
 BEGIN
   SELECT * INTO promo_record
   FROM public.promo_codes
@@ -210,6 +211,7 @@ BEGIN
     'total_signups', referral_count,
     'total_subscribers', subscriber_count,
     'total_commission', total_commission,
+    'total_commission_usd', ROUND(total_commission * usd_rate, 2),
     'has_pending_payout', pending_payout
   );
 END;

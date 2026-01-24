@@ -41,7 +41,9 @@ const InfluencerPortal = () => {
   const { toast } = useToast();
   const [session, setSession] = useState<InfluencerSession | null>(null);
   const [loading, setLoading] = useState(false);
+  const [refreshing, setRefreshing] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
+  const [sessionPassword, setSessionPassword] = useState('');
   
   // Login form state
   const [promoCode, setPromoCode] = useState('');
@@ -129,6 +131,7 @@ const InfluencerPortal = () => {
       
       if (result.success) {
         updateSessionFromResult(result);
+        setSessionPassword(password);
         
         toast({ title: 'Welcome!', description: `Logged in as ${result.owner_name}` });
       } else {
@@ -154,8 +157,53 @@ const InfluencerPortal = () => {
     setSession(null);
     setPromoCode('');
     setPassword('');
+    setSessionPassword('');
     localStorage.removeItem('influencer_session');
     toast({ title: 'Logged out', description: 'You have been logged out successfully.' });
+  };
+
+  const refreshStats = async () => {
+    if (!session) return;
+    const passwordToUse = sessionPassword || password;
+    if (!passwordToUse) {
+      toast({
+        title: 'Re-login required',
+        description: 'Enter your password to refresh stats.',
+        variant: 'destructive'
+      });
+      return;
+    }
+
+    setRefreshing(true);
+    try {
+      const { data, error } = await supabase.rpc('influencer_login', {
+        code_input: session.code,
+        password_input: passwordToUse
+      });
+
+      if (error) throw error;
+
+      const result = data as any;
+      if (result.success) {
+        updateSessionFromResult(result);
+        toast({ title: 'Stats refreshed', description: 'Latest totals loaded.' });
+      } else {
+        toast({
+          title: 'Refresh failed',
+          description: result.error || 'Please re-login to continue.',
+          variant: 'destructive'
+        });
+      }
+    } catch (err) {
+      console.error('Refresh error:', err);
+      toast({
+        title: 'Error',
+        description: 'Could not refresh stats. Please try again.',
+        variant: 'destructive'
+      });
+    } finally {
+      setRefreshing(false);
+    }
   };
 
   const handleRequestPayout = async () => {
@@ -303,9 +351,19 @@ const InfluencerPortal = () => {
                   Code: {session.code}
                 </Badge>
               </div>
-              <Button variant="ghost" size="sm" onClick={handleLogout}>
-                <LogOut className="w-4 h-4" />
-              </Button>
+              <div className="flex gap-2">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={refreshStats}
+                  disabled={refreshing}
+                >
+                  {refreshing ? 'Refreshing...' : 'Refresh'}
+                </Button>
+                <Button variant="ghost" size="sm" onClick={handleLogout}>
+                  <LogOut className="w-4 h-4" />
+                </Button>
+              </div>
             </div>
           </CardContent>
         </Card>
