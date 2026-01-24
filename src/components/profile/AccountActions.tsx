@@ -439,7 +439,7 @@ const AccountActions = ({ currentUser, onLogout, onShowTerms, onShowPrivacy, hid
         {(isPremium || (subscriptionStatus && subscriptionStatus.plan_name === 'premium' && subscriptionStatus.is_active)) && (
           <div className="space-y-3">
             {/* Show subscription status if cancellation requested but still active until expiration */}
-            {subscriptionStatus && (subscriptionStatus.cancellation_requested || subscriptionStatus.status === 'cancelled') && subscriptionStatus.expires_at && (
+            {subscriptionStatus && subscriptionStatus.status === 'cancelled' && subscriptionStatus.expires_at && (
               <div className="p-4 bg-orange-50 border border-orange-200 rounded-lg">
                 <div className="flex items-center gap-2 mb-2">
                   <AlertTriangle className="w-4 h-4 text-orange-600" />
@@ -463,7 +463,7 @@ const AccountActions = ({ currentUser, onLogout, onShowTerms, onShowPrivacy, hid
             )}
 
             {/* Cancel button for active subscriptions only (not cancelled) */}
-            {subscriptionStatus && subscriptionStatus.status === 'active' && !subscriptionStatus.cancellation_requested && (
+            {subscriptionStatus && subscriptionStatus.status === 'active' && (
               <>
                 <Button
                   variant="outline"
@@ -494,7 +494,7 @@ const AccountActions = ({ currentUser, onLogout, onShowTerms, onShowPrivacy, hid
             )}
 
             {/* Reactivation buttons for cancelled subscriptions */}
-            {subscriptionStatus && (subscriptionStatus.cancellation_requested || subscriptionStatus.status === 'cancelled') && (
+            {subscriptionStatus && subscriptionStatus.status === 'cancelled' && (
               <>
                 {/* Paystack - Direct reactivation via button */}
                 {subscriptionStatus.payment_method === 'paystack' && (
