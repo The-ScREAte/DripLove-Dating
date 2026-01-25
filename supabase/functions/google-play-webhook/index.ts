@@ -458,6 +458,22 @@ serve(async (req) => {
           }
           break
         }
+
+        // SAFEGUARD: if our DB still shows entitlement time remaining, do NOT downgrade.
+        // This prevents wrong expirations when Google API verification is temporarily unavailable/stale.
+        const dbExpiryMs = subscription.expires_at ? new Date(subscription.expires_at).getTime() : NaN
+        const dbStillEntitled = Number.isFinite(dbExpiryMs) && dbExpiryMs > Date.now()
+        if (dbStillEntitled) {
+          console.warn(
+            `[GOOGLE-WEBHOOK] 🛡️ Skipping downgrade on EXPIRED: DB expires_at=${subscription.expires_at} still in future for user ${subscription.user_id}`
+          )
+          // Keep them active/premium; the hourly subscription-checker will reconcile once Google API is available.
+          await updateSubscriptionByToken(supabase, purchaseToken, {
+            status: 'active',
+            plan_name: 'premium',
+          })
+          break
+        }
         
         // Downgrade to free
         const { error: expireError } = await supabase.rpc('handle_payment_failure', {

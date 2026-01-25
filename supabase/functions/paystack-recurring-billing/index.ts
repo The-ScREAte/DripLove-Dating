@@ -329,6 +329,9 @@ serve(async (req) => {
           await supabase
             .from('user_subscriptions')
             .update({
+              // Ensure renewal always keeps the user on premium
+              status: 'active',
+              plan_name: 'premium',
               expires_at: nextExpiry.toISOString(),
               next_billing_date: nextExpiry.toISOString(),
               payment_attempts: 0,
