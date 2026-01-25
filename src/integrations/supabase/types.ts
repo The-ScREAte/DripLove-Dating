@@ -383,6 +383,59 @@ export type Database = {
         }
         Relationships: []
       }
+      email_broadcast_history: {
+        Row: {
+          admin_id: string | null
+          created_at: string | null
+          error_details: Json | null
+          failed_sends: number
+          id: string
+          message: string
+          recipient_count: number
+          recipient_filter: string | null
+          status: string
+          subject: string
+          successful_sends: number
+          target_countries: string[] | null
+        }
+        Insert: {
+          admin_id?: string | null
+          created_at?: string | null
+          error_details?: Json | null
+          failed_sends?: number
+          id?: string
+          message: string
+          recipient_count?: number
+          recipient_filter?: string | null
+          status?: string
+          subject: string
+          successful_sends?: number
+          target_countries?: string[] | null
+        }
+        Update: {
+          admin_id?: string | null
+          created_at?: string | null
+          error_details?: Json | null
+          failed_sends?: number
+          id?: string
+          message?: string
+          recipient_count?: number
+          recipient_filter?: string | null
+          status?: string
+          subject?: string
+          successful_sends?: number
+          target_countries?: string[] | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "email_broadcast_history_admin_id_fkey"
+            columns: ["admin_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       enabled_countries: {
         Row: {
           country_code: string
