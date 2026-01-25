@@ -6,6 +6,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Badge } from '@/components/ui/badge';
 import { useToast } from '@/hooks/use-toast';
+import { getExchangeRate } from '@/services/exchangeRateService';
 import { 
   Gift, 
   LogIn, 
@@ -34,6 +35,7 @@ interface InfluencerSession {
   total_subscribers: number;
   total_commission: number;
   total_commission_usd: number;
+  total_commission_ghs_raw?: number; // Raw GHS value for dynamic conversion
   has_pending_payout: boolean;
 }
 
@@ -84,7 +86,22 @@ const InfluencerPortal = () => {
   }, []);
 
   // Update local session data from API response (no credentials stored)
-  const updateSessionFromResult = (result: any) => {
+  // Now includes dynamic exchange rate conversion
+  const updateSessionFromResult = async (result: any) => {
+    // Get raw GHS commission from DB
+    const ghsCommission = result.total_commission || result.total_commission_ghs_raw || 0;
+    
+    // Use dynamic exchange rate from API
+    let usdCommission = result.total_commission_usd || 0;
+    try {
+      const rate = await getExchangeRate('GHS', 'USD');
+      if (rate) {
+        usdCommission = Math.round(ghsCommission * rate * 100) / 100; // Round to 2 decimal places
+      }
+    } catch (err) {
+      console.warn('Failed to get dynamic exchange rate, using server value:', err);
+    }
+    
     const sessionData: InfluencerSession = {
       promo_code_id: result.promo_code_id,
       code: result.code,
@@ -95,8 +112,9 @@ const InfluencerPortal = () => {
       status: result.status,
       total_signups: result.total_signups,
       total_subscribers: result.total_subscribers,
-      total_commission: result.total_commission || 0,
-      total_commission_usd: result.total_commission_usd || 0,
+      total_commission: ghsCommission,
+      total_commission_usd: usdCommission,
+      total_commission_ghs_raw: ghsCommission,
       has_pending_payout: result.has_pending_payout
     };
     
@@ -130,7 +148,7 @@ const InfluencerPortal = () => {
       const result = data as any;
       
       if (result.success) {
-        updateSessionFromResult(result);
+        await updateSessionFromResult(result);
         setSessionPassword(password);
         
         toast({ title: 'Welcome!', description: `Logged in as ${result.owner_name}` });
@@ -185,7 +203,7 @@ const InfluencerPortal = () => {
 
       const result = data as any;
       if (result.success) {
-        updateSessionFromResult(result);
+        await updateSessionFromResult(result);
         toast({ title: 'Stats refreshed', description: 'Latest totals loaded.' });
       } else {
         toast({

@@ -285,6 +285,9 @@ export default function EmailBroadcast() {
 </html>
       `;
 
+      // Get current user for logging
+      const { data: { user } } = await supabase.auth.getUser();
+
       // Call edge function to send emails
       const response = await supabase.functions.invoke('send-broadcast-email', {
         body: {
@@ -292,12 +295,28 @@ export default function EmailBroadcast() {
           subject: emailSubject,
           htmlContent: htmlContent,
           textContent: emailBody,
+          targetCountries: Array.from(selectedCountries),
+          recipientFilter: recipientFilter,
+          adminId: user?.id,
         },
       });
 
       if (response.error) {
         console.error('Edge function error:', response.error);
-        throw new Error(response.error.message || 'Failed to send emails');
+        // Show more specific error from the response
+        const errorData = response.error;
+        let errorMessage = 'Failed to send emails';
+        if (typeof errorData === 'object' && errorData.message) {
+          errorMessage = errorData.message;
+        } else if (typeof errorData === 'string') {
+          errorMessage = errorData;
+        }
+        throw new Error(errorMessage);
+      }
+      
+      // Check for error in response data (edge function returned error)
+      if (response.data?.error) {
+        throw new Error(response.data.error);
       }
 
       const results = response.data?.results;

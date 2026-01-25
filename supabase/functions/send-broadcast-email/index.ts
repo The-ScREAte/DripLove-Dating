@@ -12,6 +12,10 @@ interface SendEmailPayload {
   subject: string
   htmlContent: string
   textContent?: string
+  // Optional metadata for logging
+  targetCountries?: string[]
+  recipientFilter?: string
+  adminId?: string
 }
 
 // Helper function to send email via Brevo with automatic fallback
@@ -140,7 +144,7 @@ serve(async (req) => {
     */
 
     const payload: SendEmailPayload = await req.json()
-    const { recipients, subject, htmlContent, textContent } = payload
+    const { recipients, subject, htmlContent, textContent, targetCountries, recipientFilter, adminId } = payload
 
     if (!recipients || recipients.length === 0) {
       return new Response(
@@ -256,6 +260,32 @@ serve(async (req) => {
 
     console.log(`✅ Email broadcast complete: ${results.successful.length} sent, ${results.failed.length} failed`)
 
+    // Log to email_broadcast_history table
+    try {
+      const { error: historyError } = await supabaseAdmin
+        .from('email_broadcast_history')
+        .insert({
+          admin_id: adminId || null,
+          subject: subject,
+          message: textContent || htmlContent.substring(0, 1000),
+          recipient_count: recipients.length,
+          successful_sends: results.successful.length,
+          failed_sends: results.failed.length,
+          target_countries: targetCountries || [],
+          recipient_filter: recipientFilter || 'all',
+          status: results.failed.length === 0 ? 'completed' : 'partial',
+          error_details: results.failed.length > 0 ? results.failed : [],
+        })
+      
+      if (historyError) {
+        console.error('Failed to log email broadcast history:', historyError)
+      } else {
+        console.log('📝 Email broadcast logged to history')
+      }
+    } catch (logError) {
+      console.error('Error logging broadcast history:', logError)
+    }
+
     return new Response(
       JSON.stringify({
         success: true,
@@ -270,9 +300,24 @@ serve(async (req) => {
 
   } catch (error) {
     console.error('Error in send-broadcast-email:', error)
+    const errorMessage = error instanceof Error ? error.message : 'Internal server error'
+    
+    // Provide more specific error messages
+    let userFriendlyError = errorMessage
+    if (errorMessage.includes('daily limit') || errorMessage.includes('quota')) {
+      userFriendlyError = 'Email sending quota exceeded. Try again tomorrow or add more Brevo API keys.'
+    } else if (errorMessage.includes('api-key') || errorMessage.includes('unauthorized')) {
+      userFriendlyError = 'Email service authentication failed. Check your Brevo/Resend API keys in Supabase secrets.'
+    } else if (errorMessage.includes('BREVO') || errorMessage.includes('Brevo')) {
+      userFriendlyError = `Brevo API error: ${errorMessage}`
+    } else if (errorMessage.includes('RESEND') || errorMessage.includes('Resend')) {
+      userFriendlyError = `Resend API error: ${errorMessage}`
+    }
+    
     return new Response(
       JSON.stringify({
-        error: error instanceof Error ? error.message : 'Internal server error',
+        error: userFriendlyError,
+        details: errorMessage,
       }),
       { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 500 }
     )
