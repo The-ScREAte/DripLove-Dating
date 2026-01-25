@@ -294,14 +294,22 @@ serve(async (req) => {
               continue
             }
             
-            const isActiveOnGoogle = googleData.expiryTimeMillis > Date.now()
+            const nowMs = Date.now()
+            const isActiveOnGoogle = googleData.expiryTimeMillis > nowMs
             const googleExpiresAt = new Date(googleData.expiryTimeMillis).toISOString()
-            const dbExpiresAt = new Date(sub.expires_at).getTime()
+
+            // Guard against NULL/invalid expires_at values
+            const dbExpiresAtMs = sub.expires_at ? new Date(sub.expires_at).getTime() : NaN
+            const dbHasValidExpiry = Number.isFinite(dbExpiresAtMs)
+            const dbStillEntitled = dbHasValidExpiry && dbExpiresAtMs > nowMs
             
             // Check if we need to update
             const statusMismatch = isActiveOnGoogle && sub.status !== 'active'
-            const expiryMismatch = Math.abs(dbExpiresAt - googleData.expiryTimeMillis) > 60000 // 1 min tolerance
-            const shouldBeExpired = !isActiveOnGoogle && sub.status === 'active'
+            const expiryMismatch = isActiveOnGoogle && dbHasValidExpiry && Math.abs(dbExpiresAtMs - googleData.expiryTimeMillis) > 60000 // 1 min tolerance
+            // IMPORTANT SAFEGUARD:
+            // Never downgrade a user if our DB says they still have time left.
+            // External APIs can be stale/momentarily inconsistent.
+            const shouldBeExpired = !isActiveOnGoogle && sub.status === 'active' && !dbStillEntitled
             
             if (statusMismatch) {
               // ACTIVATION: User is active on Google but not in our DB
@@ -345,8 +353,13 @@ serve(async (req) => {
               } else {
                 googleSyncStats.errors++
               }
+            } else if (!isActiveOnGoogle && sub.status === 'active' && dbStillEntitled) {
+              // SAFEGUARD: DB shows user still entitled; do not expire.
+              console.warn(
+                `[SUBSCRIPTION-CHECKER] 🛡️ Skipping Google expiry for user ${sub.user_id} (DB expires_at=${sub.expires_at}, Google says inactive)`
+              )
             } else if (shouldBeExpired) {
-              // EXPIRY: Google says expired but we have it as active
+              // EXPIRY: Google says expired and DB also shows no remaining entitlement
               console.log(`[SUBSCRIPTION-CHECKER] ⏰ Expiring subscription for user ${sub.user_id}`)
               
               const newStatus = sub.auto_renew ? 'payment_failed' : 'expired'
