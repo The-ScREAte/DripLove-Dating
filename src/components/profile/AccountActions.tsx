@@ -540,6 +540,52 @@ const AccountActions = ({ currentUser, onLogout, onShowTerms, onShowPrivacy, hid
                   </Button>
                 )}
 
+                {/* Non-store subscriptions (e.g., admin/manual) - allow undo in-app */}
+                {subscriptionStatus.payment_method !== 'paystack' &&
+                  subscriptionStatus.payment_method !== 'apple' &&
+                  subscriptionStatus.payment_method !== 'google' &&
+                  subscriptionStatus.payment_method !== 'iap' && (
+                    <Button
+                      variant="outline"
+                      size={isAndroidNative ? 'sm' : 'default'}
+                      className={`w-full flex items-center justify-center space-x-2 border-green-300 text-green-600 hover:bg-green-50 ${isAndroidNative ? 'text-xs' : ''}`}
+                      onClick={async () => {
+                        try {
+                          const { data: { user } } = await supabase.auth.getUser();
+                          if (!user) return;
+
+                          const { error } = await supabase
+                            .from('user_subscriptions')
+                            .update({
+                              status: 'active',
+                              auto_renew: true,
+                              updated_at: new Date().toISOString(),
+                            })
+                            .eq('user_id', user.id)
+                            .eq('plan_name', 'premium')
+                            .eq('status', 'cancelled');
+
+                          if (error) throw error;
+
+                          toast({
+                            title: 'Subscription Reactivated',
+                            description: 'Auto-renew has been turned back on.',
+                          });
+
+                          window.location.reload();
+                        } catch (err: any) {
+                          toast({
+                            title: 'Error',
+                            description: err.message || 'Failed to reactivate subscription. Please try again.',
+                            variant: 'destructive',
+                          });
+                        }
+                      }}
+                    >
+                      Continue with Subscription
+                    </Button>
+                  )}
+
                 {/* iOS - Redirect to App Store */}
                 {subscriptionStatus.payment_method === 'apple' && (
                   <div className="p-4 bg-blue-50 border border-blue-200 rounded-lg">
