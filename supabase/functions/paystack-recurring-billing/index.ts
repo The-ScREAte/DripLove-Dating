@@ -168,7 +168,7 @@ serve(async (req) => {
         auto_renew,
         next_billing_date,
         payment_attempts,
-        cancellation_requested
+        
       `)
       .eq('status', 'active')
       .eq('auto_renew', true)
@@ -210,22 +210,7 @@ serve(async (req) => {
       processed++
       console.log(`[PAYSTACK-RECURRING] Processing subscription for user ${sub.user_id}`)
       
-      // Check if user requested cancellation - don't charge them!
-      if (sub.cancellation_requested === true) {
-        console.log(`[PAYSTACK-RECURRING] User ${sub.user_id} requested cancellation, marking as expired instead of charging`)
-        
-        await supabase
-          .from('user_subscriptions')
-          .update({
-            status: 'expired',
-            plan_name: 'free',
-            updated_at: new Date().toISOString()
-          })
-          .eq('id', sub.id)
-        
-        failed++  // Count as "failed" (not charged)
-        continue  // Skip to next subscription
-      }
+      // No extra cancellation flag needed: cancelled subscriptions have auto_renew=false and won't be selected above.
 
       // Get the user's active authorization
       const { data: authData } = await supabase

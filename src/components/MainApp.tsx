@@ -156,22 +156,36 @@ const MainApp = ({ user, onLogout }: MainAppProps) => {
         console.error('[MainApp] Failed to fetch images for profile completion:', imgErr);
       }
 
-      // Check premium status from user_subscriptions
+      // Check premium status (must respect cancelled-but-not-expired grace period)
       if (data?.id) {
         try {
-          const { data: subData, error: subError } = await supabase
-            .from('user_subscriptions')
-            .select('plan_name, status')
-            .eq('user_id', data.id)
-            .eq('plan_name', 'premium')
-            .eq('status', 'active')
-            .maybeSingle();
+          const { data: subData, error: subError } = await supabase.rpc('get_current_subscription_status', {
+            p_user_id: data.id,
+          });
 
           if (subError) {
-            console.error('[MainApp] Subscription fetch error:', subError);
-          }
+            console.error('[MainApp] Subscription RPC failed, falling back:', subError);
+            // Fallback: keep conservative behavior if RPC fails
+            const { data: fallback, error: fallbackError } = await supabase
+              .from('user_subscriptions')
+              .select('plan_name, status, expires_at')
+              .eq('user_id', data.id)
+              .order('created_at', { ascending: false })
+              .limit(1)
+              .maybeSingle();
 
-          setIsPremium(!!subData);
+            if (fallbackError) {
+              console.error('[MainApp] Subscription fallback failed:', fallbackError);
+              setIsPremium(false);
+            } else {
+              const entitledByStatus = fallback?.status === 'active' || fallback?.status === 'cancelled';
+              const notExpired = !fallback?.expires_at || new Date(fallback.expires_at) > new Date();
+              setIsPremium(!!fallback && fallback.plan_name === 'premium' && entitledByStatus && notExpired);
+            }
+          } else {
+            const status = Array.isArray(subData) ? subData[0] : (subData as any);
+            setIsPremium(!!status && status.plan_name === 'premium' && status.is_active === true);
+          }
         } catch (subErr) {
           console.error('[MainApp] Subscription check failed:', subErr);
           setIsPremium(false);

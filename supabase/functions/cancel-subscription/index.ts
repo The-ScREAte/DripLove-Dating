@@ -111,14 +111,12 @@ serve(async (req) => {
       }
     }
 
-    // Mark cancellation requested, keep status=active so user stays premium until expiry
+    // Mark as cancelled but keep plan_name/expires_at so user stays premium until expiry
     const { error: updateErr } = await supabase
       .from('user_subscriptions')
       .update({ 
-        cancellation_requested: true,
-        cancellation_requested_at: new Date().toISOString(),
         auto_renew: false,
-        status: 'active',  // Keep active until expiry!
+        status: 'cancelled',
         updated_at: new Date().toISOString()
         // plan_name stays 'premium'
         // expires_at unchanged

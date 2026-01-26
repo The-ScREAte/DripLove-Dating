@@ -38,14 +38,18 @@ serve(async (req) => {
       .from('user_subscriptions')
       .select('*')
       .eq('user_id', user_id)
-      .eq('status', 'active')
+      .in('status', ['active', 'cancelled'])
+      .eq('plan_name', 'premium')
+      .order('created_at', { ascending: false })
+      .limit(1)
       .single()
     
     if (error || !sub) {
       return json(404, { error: 'No active subscription found' })
     }
 
-    if (!sub.cancellation_requested) {
+    // Must be currently cancelled to reactivate
+    if (sub.status !== 'cancelled' || sub.auto_renew === true) {
       return json(400, { error: 'Subscription is not canceled' })
     }
 
@@ -102,9 +106,8 @@ serve(async (req) => {
       await supabase
         .from('user_subscriptions')
         .update({
-          cancellation_requested: false,
-          cancellation_requested_at: null,
           auto_renew: true,
+          status: 'active',
           next_billing_date: new Date().toISOString(), // Charge on next run
           updated_at: new Date().toISOString()
         })
@@ -120,9 +123,8 @@ serve(async (req) => {
       await supabase
         .from('user_subscriptions')
         .update({
-          cancellation_requested: false,
-          cancellation_requested_at: null,
           auto_renew: true,
+          status: 'active',
           // next_billing_date stays the same
           updated_at: new Date().toISOString()
         })
