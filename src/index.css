@@ -67,7 +67,8 @@ body.keyboard-open .chat-messages-container {
     position: relative;
     top: 0;
     left: 0;
-    overflow: hidden;
+    overflow-x: hidden;
+    overflow-y: auto;
     background: transparent !important;
     background-color: transparent !important;
     /* Disable double-tap zoom */
@@ -88,10 +89,10 @@ body.keyboard-open .chat-messages-container {
   }
   
   body {
-    position: fixed; /* Good for iOS */
+    position: relative; /* Allow scrolling on desktop and web */
     width: 100%;
-    height: 100vh;
-    height: 100dvh; /* Dynamic viewport height */
+    min-height: 100vh;
+    min-height: 100dvh; /* Dynamic viewport height */
   }
 
   /* On Android, do not fix body to avoid keyboard layout issues */

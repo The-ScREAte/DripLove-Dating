@@ -46,6 +46,11 @@ const InfluencerPortal = () => {
   const [refreshing, setRefreshing] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
   const [sessionPassword, setSessionPassword] = useState('');
+  const [exchangeRate, setExchangeRate] = useState<number | null>(null);
+  const [paidAmount, setPaidAmount] = useState(0);
+  const [paidAmountUsd, setPaidAmountUsd] = useState(0);
+  const [availableBalance, setAvailableBalance] = useState(0);
+  const [availableBalanceUsd, setAvailableBalanceUsd] = useState(0);
   
   // Login form state
   const [promoCode, setPromoCode] = useState('');
@@ -93,13 +98,22 @@ const InfluencerPortal = () => {
     
     // Use dynamic exchange rate from API
     let usdCommission = result.total_commission_usd || 0;
+    let effectiveRate: number | null = null;
     try {
       const rate = await getExchangeRate('GHS', 'USD');
       if (rate) {
         usdCommission = Math.round(ghsCommission * rate * 100) / 100; // Round to 2 decimal places
+        setExchangeRate(rate);
+        effectiveRate = rate;
       }
     } catch (err) {
       console.warn('Failed to get dynamic exchange rate, using server value:', err);
+    }
+    if (!effectiveRate && exchangeRate) {
+      effectiveRate = exchangeRate;
+    }
+    if (!effectiveRate) {
+      effectiveRate = 0.0625; // Fallback ~1/16
     }
     
     const sessionData: InfluencerSession = {
@@ -121,6 +135,27 @@ const InfluencerPortal = () => {
     setSession(sessionData);
     // Store session data WITHOUT password - secure storage
     localStorage.setItem('influencer_session', JSON.stringify(sessionData));
+    
+    // Fetch paid amount from payout_requests
+    try {
+      const { data: payouts } = await supabase
+        .from('payout_requests')
+        .select('amount, status')
+        .eq('promo_code_id', result.promo_code_id);
+      
+      const totalPaid = payouts?.filter(p => p.status === 'completed').reduce((sum, p) => sum + Number(p.amount), 0) || 0;
+      setPaidAmount(totalPaid);
+      const paidUsd = Math.round(totalPaid * effectiveRate * 100) / 100;
+      setPaidAmountUsd(paidUsd);
+
+      const availableGhs = Math.max(ghsCommission - totalPaid, 0);
+      const availableUsd = Math.round(availableGhs * effectiveRate * 100) / 100;
+      setAvailableBalance(availableGhs);
+      setAvailableBalanceUsd(Math.max(availableUsd, 0));
+    } catch (err) {
+      console.warn('Could not fetch payout info:', err);
+    }
+    
     return sessionData;
   };
 
@@ -176,6 +211,11 @@ const InfluencerPortal = () => {
     setPromoCode('');
     setPassword('');
     setSessionPassword('');
+    setExchangeRate(null);
+    setPaidAmount(0);
+    setPaidAmountUsd(0);
+    setAvailableBalance(0);
+    setAvailableBalanceUsd(0);
     localStorage.removeItem('influencer_session');
     toast({ title: 'Logged out', description: 'You have been logged out successfully.' });
   };
@@ -184,9 +224,11 @@ const InfluencerPortal = () => {
     if (!session) return;
     const passwordToUse = sessionPassword || password;
     if (!passwordToUse) {
+      // Auto-logout and redirect to login
+      handleLogout();
       toast({
-        title: 'Re-login required',
-        description: 'Enter your password to refresh stats.',
+        title: 'Session expired',
+        description: 'Please log in again.',
         variant: 'destructive'
       });
       return;
@@ -206,19 +248,25 @@ const InfluencerPortal = () => {
         await updateSessionFromResult(result);
         toast({ title: 'Stats refreshed', description: 'Latest totals loaded.' });
       } else {
+        // Auto-logout on refresh failure
+        handleLogout();
         toast({
-          title: 'Refresh failed',
-          description: result.error || 'Please re-login to continue.',
+          title: 'Session expired',
+          description: result.error || 'Please log in again.',
           variant: 'destructive'
         });
+        return;
       }
     } catch (err) {
       console.error('Refresh error:', err);
+      // Auto-logout on error
+      handleLogout();
       toast({
-        title: 'Error',
-        description: 'Could not refresh stats. Please try again.',
+        title: 'Session expired',
+        description: 'Please log in again.',
         variant: 'destructive'
       });
+      return;
     } finally {
       setRefreshing(false);
     }
@@ -237,10 +285,10 @@ const InfluencerPortal = () => {
       return;
     }
 
-    if (amount > session.total_commission) {
+    if (amount > availableBalanceUsd) {
       toast({ 
         title: 'Error', 
-        description: 'Amount exceeds available balance', 
+        description: `Amount exceeds available balance ($${availableBalanceUsd.toFixed(2)})`, 
         variant: 'destructive' 
       });
       return;
@@ -354,7 +402,7 @@ const InfluencerPortal = () => {
   // Dashboard
   return (
     <div className="min-h-screen bg-gradient-to-br from-pink-50 via-white to-purple-50 p-4">
-      <div className="max-w-md mx-auto space-y-4">
+      <div className="max-w-md mx-auto space-y-4 pb-20">
         {/* Header */}
         <Card>
           <CardContent className="py-4">
@@ -403,6 +451,11 @@ const InfluencerPortal = () => {
               </div>
               <span className="text-lg font-semibold text-purple-600">{session.commission_duration}x per user</span>
             </div>
+            <div className="mt-3 p-2 bg-white/60 rounded-lg border border-pink-200">
+              <p className="text-xs text-pink-700">
+                💰 You earn <span className="font-bold">{session.percentage_cut}%</span> of each payment for up to <span className="font-bold">{session.commission_duration}</span> months per user
+              </p>
+            </div>
           </CardContent>
         </Card>
 
@@ -437,17 +490,25 @@ const InfluencerPortal = () => {
               <p className="text-3xl font-bold text-green-600">
                 ${session.total_commission_usd.toFixed(2)}
               </p>
-              <p className="text-sm text-gray-500">
-                (GHS {session.total_commission.toFixed(2)})
-              </p>
             </div>
             <p className="text-xs text-gray-500 mt-1">
               Earned from {session.total_subscribers} premium subscribers
             </p>
-            <div className="mt-3 p-2 bg-white/60 rounded-lg border border-green-200">
-              <p className="text-xs text-green-700">
-                💰 You earn <span className="font-bold">{session.percentage_cut}%</span> of each payment for up to <span className="font-bold">{session.commission_duration}</span> months per user
-              </p>
+            
+            {/* Financial Breakdown */}
+            <div className="mt-3 space-y-2">
+              <div className="flex justify-between text-sm p-2 bg-white/60 rounded border border-green-200">
+                <span className="text-gray-600">💰 Total Earned (USD):</span>
+                <span className="font-bold text-green-700">${session.total_commission_usd.toFixed(2)}</span>
+              </div>
+              <div className="flex justify-between text-sm p-2 bg-white/60 rounded border border-blue-200">
+                <span className="text-gray-600">✅ Paid Out (USD):</span>
+                <span className="font-semibold text-blue-700">${paidAmountUsd.toFixed(2)}</span>
+              </div>
+              <div className="flex justify-between text-sm p-2 bg-white/60 rounded border border-orange-200">
+                <span className="text-gray-600">💵 Available (USD):</span>
+                <span className="font-bold text-orange-700">${availableBalanceUsd.toFixed(2)}</span>
+              </div>
             </div>
           </CardContent>
         </Card>
@@ -469,16 +530,17 @@ const InfluencerPortal = () => {
                   <p className="text-xs text-yellow-600">Your request is being processed</p>
                 </div>
               </div>
-            ) : session.total_commission > 0 ? (
+            ) : availableBalanceUsd > 0 ? (
               <>
                 <div className="flex gap-2">
                   <Input
                     type="number"
                     value={payoutAmount}
                     onChange={(e) => setPayoutAmount(e.target.value)}
-                    placeholder="Amount to withdraw"
+                    placeholder="Amount to withdraw (USD)"
                     min="1"
-                    max={session.total_commission}
+                    max={availableBalanceUsd}
+                    step="0.01"
                   />
                   <Button 
                     onClick={handleRequestPayout}
@@ -489,8 +551,13 @@ const InfluencerPortal = () => {
                   </Button>
                 </div>
                 <p className="text-xs text-gray-500">
-                  Available balance: ${session.total_commission_usd.toFixed(2)} (GHS {session.total_commission.toFixed(2)})
+                  Available to withdraw: ${availableBalanceUsd.toFixed(2)}
                 </p>
+                {paidAmountUsd > 0 && (
+                  <p className="text-xs text-blue-600">
+                    ✓ Already paid out: ${paidAmountUsd.toFixed(2)}
+                  </p>
+                )}
               </>
             ) : (
               <p className="text-sm text-gray-500 text-center py-2">

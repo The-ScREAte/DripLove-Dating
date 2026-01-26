@@ -27,7 +27,8 @@ import {
   Copy,
   Link,
   ToggleLeft,
-  AlertCircle
+  AlertCircle,
+  Wallet
 } from 'lucide-react';
 
 interface PromoCode {
@@ -69,6 +70,7 @@ const InfluencerManagement = () => {
   const [selectedPromoCode, setSelectedPromoCode] = useState<PromoCode | null>(null);
   const [detailStats, setDetailStats] = useState<any>(null);
   const [passwordSetupLink, setPasswordSetupLink] = useState<string | null>(null);
+  const [payoutStats, setPayoutStats] = useState<{[key: string]: {totalPaid: number, outstanding: number, pendingRequests: number}}>({});
 
   // Sync local toggle state with fetched value
   useEffect(() => {
@@ -123,7 +125,12 @@ const InfluencerManagement = () => {
           .select('*', { count: 'exact', head: true })
           .eq('promo_code_id', code.id);
         
-        // Get premium subscriber count
+        // Get premium subscriber count - MUST match database function logic exactly
+        // Database uses: COUNT(DISTINCT r.user_id) FROM referrals r INNER JOIN user_subscriptions us
+        // WHERE us.plan_name = 'premium' AND us.status IN ('active', 'cancelled') 
+        // AND (us.expires_at IS NULL OR us.expires_at > NOW())
+        
+        // First get all referrals for this promo code
         const { data: referrals } = await supabase
           .from('referrals')
           .select('user_id')
@@ -132,13 +139,22 @@ const InfluencerManagement = () => {
         let subscriberCount = 0;
         if (referrals && referrals.length > 0) {
           const userIds = referrals.map(r => r.user_id);
-          const { count } = await supabase
+          
+          // Now count DISTINCT users who have premium subscriptions matching the criteria
+          // We need to get the data and count distinct manually since Supabase might not handle this exactly
+          const { data: subs } = await supabase
             .from('user_subscriptions')
-            .select('*', { count: 'exact', head: true })
+            .select('user_id')
             .in('user_id', userIds)
             .eq('plan_name', 'premium')
-            .in('status', ['active', 'cancelled']); // Include cancelled (still premium until expires)
-          subscriberCount = count || 0;
+            .in('status', ['active', 'cancelled'])
+            .or('expires_at.is.null,expires_at.gt.' + new Date().toISOString());
+          
+          // Count distinct user_ids
+          if (subs) {
+            const uniqueUserIds = new Set(subs.map(s => s.user_id));
+            subscriberCount = uniqueUserIds.size;
+          }
         }
         
         // Get total commission
@@ -148,6 +164,22 @@ const InfluencerManagement = () => {
           .eq('promo_code_id', code.id);
         
         const totalCommission = commissions?.reduce((sum, c) => sum + Number(c.commission_amount), 0) || 0;
+
+        // Get payout stats
+        const { data: allPayouts } = await supabase
+          .from('payout_requests')
+          .select('amount, status')
+          .eq('promo_code_id', code.id);
+        
+        const totalPaid = allPayouts?.filter(p => p.status === 'completed').reduce((sum, p) => sum + Number(p.amount), 0) || 0;
+        const pendingRequests = allPayouts?.filter(p => p.status === 'pending').length || 0;
+        const outstanding = totalCommission - totalPaid;
+
+        // Store payout stats separately
+        setPayoutStats(prev => ({
+          ...prev,
+          [code.id]: { totalPaid, outstanding, pendingRequests }
+        }));
 
         return {
           ...code,
@@ -560,8 +592,28 @@ const InfluencerManagement = () => {
                   </div>
                 </div>
 
-                <div className="text-xs text-gray-500">
-                  Total Earned: <span className="font-semibold text-green-600">GHS {(promo.total_commission_earned || 0).toFixed(2)}</span>
+                <div className="text-xs space-y-1">
+                  <div>
+                    Total Earned: <span className="font-semibold text-green-600">GHS {(promo.total_commission_earned || 0).toFixed(2)}</span>
+                  </div>
+                  {payoutStats[promo.id] && (
+                    <>
+                      <div className="flex justify-between">
+                        <span className="text-gray-500">Paid Out:</span>
+                        <span className="font-medium text-blue-600">GHS {payoutStats[promo.id].totalPaid.toFixed(2)}</span>
+                      </div>
+                      <div className="flex justify-between">
+                        <span className="text-gray-500">Outstanding:</span>
+                        <span className="font-medium text-orange-600">GHS {payoutStats[promo.id].outstanding.toFixed(2)}</span>
+                      </div>
+                      {payoutStats[promo.id].pendingRequests > 0 && (
+                        <div className="flex items-center gap-1 text-orange-600">
+                          <Clock className="w-3 h-3" />
+                          <span>{payoutStats[promo.id].pendingRequests} pending request(s)</span>
+                        </div>
+                      )}
+                    </>
+                  )}
                 </div>
 
                 <div className="flex gap-1 pt-2 border-t">
@@ -754,43 +806,99 @@ const InfluencerManagement = () => {
                   <p className="text-2xl font-bold text-blue-600">{detailStats.referrals.length}</p>
                   <p className="text-xs text-gray-500">Total Signups</p>
                 </div>
-                <div className="p-3 bg-green-50 rounded-lg text-center">
-                  <p className="text-2xl font-bold text-green-600">
-                    GHS {detailStats.commissions.reduce((s: number, c: any) => s + Number(c.commission_amount), 0).toFixed(2)}
-                  </p>
-                  <p className="text-xs text-gray-500">Total Commission</p>
+                <div className="p-3 bg-purple-50 rounded-lg text-center">
+                  <p className="text-2xl font-bold text-purple-600">{selectedPromoCode.total_paid_subscribers}</p>
+                  <p className="text-xs text-gray-500">Premium Users</p>
+                </div>
+              </div>
+
+              {/* Financial Summary */}
+              <div className="border rounded-lg p-3 bg-gradient-to-br from-green-50 to-emerald-50">
+                <h4 className="font-semibold text-sm mb-3 text-green-800">Financial Summary</h4>
+                <div className="space-y-2 text-sm">
+                  <div className="flex justify-between">
+                    <span className="text-gray-600">Total Commission Earned:</span>
+                    <span className="font-bold text-green-700">
+                      GHS {detailStats.commissions.reduce((s: number, c: any) => s + Number(c.commission_amount), 0).toFixed(2)}
+                    </span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-gray-600">Total Paid Out:</span>
+                    <span className="font-semibold text-blue-600">
+                      GHS {detailStats.payouts.filter((p: any) => p.status === 'completed').reduce((s: number, p: any) => s + Number(p.amount), 0).toFixed(2)}
+                    </span>
+                  </div>
+                  <div className="flex justify-between pt-2 border-t border-green-200">
+                    <span className="font-medium text-gray-700">Outstanding Balance:</span>
+                    <span className="font-bold text-orange-600">
+                      GHS {(
+                        detailStats.commissions.reduce((s: number, c: any) => s + Number(c.commission_amount), 0) -
+                        detailStats.payouts.filter((p: any) => p.status === 'completed').reduce((s: number, p: any) => s + Number(p.amount), 0)
+                      ).toFixed(2)}
+                    </span>
+                  </div>
                 </div>
               </div>
 
               {/* Payout Requests */}
-              {detailStats.payouts.length > 0 && (
-                <div>
-                  <h4 className="font-semibold text-sm mb-2">Payout Requests</h4>
+              <div>
+                <h4 className="font-semibold text-sm mb-2 flex items-center gap-2">
+                  <Wallet className="w-4 h-4" />
+                  Payout Requests
+                  {detailStats.payouts.filter((p: any) => p.status === 'pending').length > 0 && (
+                    <Badge className="bg-orange-100 text-orange-800">
+                      {detailStats.payouts.filter((p: any) => p.status === 'pending').length} Pending
+                    </Badge>
+                  )}
+                </h4>
+                {detailStats.payouts.length === 0 ? (
+                  <p className="text-sm text-gray-500 py-2">No payout requests yet</p>
+                ) : (
                   <div className="space-y-2">
                     {detailStats.payouts.map((payout: any) => (
-                      <div key={payout.id} className="border rounded p-2 text-sm">
-                        <div className="flex justify-between items-center">
-                          <span className="font-semibold">GHS {payout.amount}</span>
-                          <Badge variant={payout.status === 'pending' ? 'outline' : payout.status === 'completed' ? 'default' : 'destructive'}>
-                            {payout.status}
+                      <div key={payout.id} className="border rounded p-3 text-sm">
+                        <div className="flex justify-between items-center mb-1">
+                          <span className="font-semibold text-lg">GHS {Number(payout.amount).toFixed(2)}</span>
+                          <Badge 
+                            variant={payout.status === 'pending' ? 'outline' : payout.status === 'completed' ? 'default' : 'destructive'}
+                            className={
+                              payout.status === 'pending' ? 'bg-orange-100 text-orange-800' :
+                              payout.status === 'completed' ? 'bg-green-100 text-green-800' :
+                              'bg-red-100 text-red-800'
+                            }
+                          >
+                            {payout.status === 'pending' && <Clock className="w-3 h-3 mr-1" />}
+                            {payout.status === 'completed' && <CheckCircle className="w-3 h-3 mr-1" />}
+                            {payout.status === 'rejected' && <XCircle className="w-3 h-3 mr-1" />}
+                            {payout.status.charAt(0).toUpperCase() + payout.status.slice(1)}
                           </Badge>
                         </div>
-                        <p className="text-xs text-gray-500">{new Date(payout.created_at).toLocaleDateString()}</p>
+                        <p className="text-xs text-gray-500">
+                          Requested: {new Date(payout.created_at).toLocaleString()}
+                        </p>
+                        {payout.processed_at && (
+                          <p className="text-xs text-gray-500">
+                            Processed: {new Date(payout.processed_at).toLocaleString()}
+                          </p>
+                        )}
+                        {payout.admin_notes && (
+                          <p className="text-xs text-gray-600 mt-1 italic">Note: {payout.admin_notes}</p>
+                        )}
                         {payout.status === 'pending' && (
                           <div className="flex gap-2 mt-2">
-                            <Button size="sm" className="text-xs h-6 bg-green-500" onClick={() => handlePayoutAction(payout.id, 'completed')}>
-                              Approve
+                            <Button size="sm" className="text-xs h-7 bg-green-500 hover:bg-green-600" onClick={() => handlePayoutAction(payout.id, 'completed')}>
+                              <CheckCircle className="w-3 h-3 mr-1" /> Approve & Mark Paid
                             </Button>
-                            <Button size="sm" variant="destructive" className="text-xs h-6" onClick={() => handlePayoutAction(payout.id, 'rejected')}>
-                              Reject
+                            <Button size="sm" variant="destructive" className="text-xs h-7" onClick={() => handlePayoutAction(payout.id, 'rejected')}>
+                              <XCircle className="w-3 h-3 mr-1" /> Reject
                             </Button>
                           </div>
                         )}
                       </div>
                     ))}
                   </div>
-                </div>
-              )}
+                )}
+              </div>
 
               {/* Commission History */}
               <div>
