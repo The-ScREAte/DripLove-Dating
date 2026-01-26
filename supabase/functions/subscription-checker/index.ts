@@ -297,6 +297,9 @@ serve(async (req) => {
             const nowMs = Date.now()
             const isActiveOnGoogle = googleData.expiryTimeMillis > nowMs
             const googleExpiresAt = new Date(googleData.expiryTimeMillis).toISOString()
+            const desiredStatus = isActiveOnGoogle
+              ? (googleData.autoRenewing ? 'active' : 'cancelled')
+              : sub.status
 
             // Guard against NULL/invalid expires_at values
             const dbExpiresAtMs = sub.expires_at ? new Date(sub.expires_at).getTime() : NaN
@@ -304,7 +307,7 @@ serve(async (req) => {
             const dbStillEntitled = dbHasValidExpiry && dbExpiresAtMs > nowMs
             
             // Check if we need to update
-            const statusMismatch = isActiveOnGoogle && sub.status !== 'active'
+            const statusMismatch = isActiveOnGoogle && sub.status !== desiredStatus
             const expiryMismatch = isActiveOnGoogle && dbHasValidExpiry && Math.abs(dbExpiresAtMs - googleData.expiryTimeMillis) > 60000 // 1 min tolerance
             // IMPORTANT SAFEGUARD:
             // Never downgrade a user if our DB says they still have time left.
@@ -318,7 +321,7 @@ serve(async (req) => {
               const { error } = await supabase
                 .from('user_subscriptions')
                 .update({
-                  status: 'active',
+                  status: desiredStatus,
                   plan_name: 'premium',
                   expires_at: googleExpiresAt,
                   next_billing_date: googleExpiresAt,
@@ -344,6 +347,7 @@ serve(async (req) => {
                   expires_at: googleExpiresAt,
                   next_billing_date: googleExpiresAt,
                   auto_renew: googleData.autoRenewing,
+                  status: desiredStatus,
                   updated_at: new Date().toISOString(),
                 })
                 .eq('id', sub.id)
@@ -458,7 +462,7 @@ serve(async (req) => {
     // Get all Paystack subscriptions that might need syncing
     const { data: paystackSubs } = await supabase
       .from('user_subscriptions')
-      .select('id, user_id, provider_transaction_id, expires_at, status, plan_name, auto_renew, payment_attempts, cancellation_requested')
+      .select('id, user_id, provider_transaction_id, expires_at, status, plan_name, auto_renew, payment_attempts')
     if (paystackSubs && paystackSubs.length > 0) {
       console.log(`[SUBSCRIPTION-CHECKER] Found ${paystackSubs.length} Paystack subscriptions to check`)
       paystackSyncStats.checked = paystackSubs.length
@@ -471,7 +475,8 @@ serve(async (req) => {
           const now = Date.now()
           const isExpiredInDb = dbExpiresAt < now
           const isActiveInDb = sub.status === 'active'
-          const hasCancellationRequested = sub.cancellation_requested === true
+          // Unified cancellation flag: either explicit status='cancelled' or auto_renew=false
+          const hasCancellationRequested = sub.status === 'cancelled' || sub.auto_renew === false
           
           // Check for stuck subscriptions (expired but still active)
           // This includes both cancellation_requested=true and old status='cancelled'
