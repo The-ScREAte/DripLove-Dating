@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Capacitor } from '@capacitor/core';
+import { Browser } from '@capacitor/browser';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -42,11 +43,31 @@ const AccountActions = ({ currentUser, onLogout, onShowTerms, onShowPrivacy, hid
   const [sendingCode, setSendingCode] = useState(false);
   const [showLiveChat, setShowLiveChat] = useState(false);
   const { toast } = useToast();
-  const { isPremium, subscriptionStatus, loading } = useEnhancedSubscription();
+  const { isPremium, subscriptionStatus, loading, refetch: refetchSubscription } = useEnhancedSubscription();
   const navigate = useNavigate();
   
   const isNativePlatform = Capacitor.isNativePlatform();
   const isAndroidNative = isNativePlatform && Capacitor.getPlatform() === 'android';
+
+  const openStoreSubscriptionManagement = async () => {
+    const platform = Capacitor.getPlatform();
+    try {
+      if (platform === 'ios') {
+        await Browser.open({ url: 'itms-apps://apps.apple.com/account/subscriptions', windowName: '_system' });
+        return;
+      }
+      if (platform === 'android') {
+        await Browser.open({ url: 'https://play.google.com/store/account/subscriptions', windowName: '_system' });
+        return;
+      }
+    } catch (e) {
+      // Web fallback
+      const url = platform === 'ios'
+        ? 'https://apps.apple.com/account/subscriptions'
+        : 'https://play.google.com/store/account/subscriptions';
+      window.open(url, '_blank');
+    }
+  };
 
   // Determine auth provider on mount
   useEffect(() => {
@@ -595,6 +616,29 @@ const AccountActions = ({ currentUser, onLogout, onShowTerms, onShowPrivacy, hid
                     <p className="text-xs font-mono text-blue-900">
                       iPhone Settings → [Your Name] → Subscriptions → DripLove → Turn on Auto-Renew
                     </p>
+                    <div className="mt-3 space-y-2">
+                      <Button
+                        variant="outline"
+                        size={isAndroidNative ? 'sm' : 'default'}
+                        className={`w-full flex items-center justify-center space-x-2 border-green-300 text-green-600 hover:bg-green-50 ${isAndroidNative ? 'text-xs' : ''}`}
+                        onClick={async () => {
+                          await openStoreSubscriptionManagement();
+                        }}
+                      >
+                        Continue with Subscription
+                      </Button>
+                      <Button
+                        variant="outline"
+                        size={isAndroidNative ? 'sm' : 'default'}
+                        className={`w-full ${isAndroidNative ? 'text-xs' : ''}`}
+                        onClick={async () => {
+                          await refetchSubscription();
+                          toast({ title: 'Refreshed', description: 'We re-checked your subscription status.' });
+                        }}
+                      >
+                        I reactivated — Refresh
+                      </Button>
+                    </div>
                   </div>
                 )}
 
@@ -607,6 +651,29 @@ const AccountActions = ({ currentUser, onLogout, onShowTerms, onShowPrivacy, hid
                     <p className="text-xs font-mono text-green-900">
                       Play Store → Menu → Subscriptions → DripLove → Resubscribe
                     </p>
+                    <div className="mt-3 space-y-2">
+                      <Button
+                        variant="outline"
+                        size={isAndroidNative ? 'sm' : 'default'}
+                        className={`w-full flex items-center justify-center space-x-2 border-green-300 text-green-600 hover:bg-green-50 ${isAndroidNative ? 'text-xs' : ''}`}
+                        onClick={async () => {
+                          await openStoreSubscriptionManagement();
+                        }}
+                      >
+                        Continue with Subscription
+                      </Button>
+                      <Button
+                        variant="outline"
+                        size={isAndroidNative ? 'sm' : 'default'}
+                        className={`w-full ${isAndroidNative ? 'text-xs' : ''}`}
+                        onClick={async () => {
+                          await refetchSubscription();
+                          toast({ title: 'Refreshed', description: 'We re-checked your subscription status.' });
+                        }}
+                      >
+                        I reactivated — Refresh
+                      </Button>
+                    </div>
                   </div>
                 )}
               </>

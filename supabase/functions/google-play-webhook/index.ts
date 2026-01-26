@@ -390,15 +390,13 @@ serve(async (req) => {
         }
         
         const { error: renewError } = await updateSubscriptionByToken(supabase, purchaseToken, {
-          status: 'active',
+          // If user has turned off auto-renew in Play Store, mark as cancelled (still premium until expires_at)
+          status: autoRenew ? 'active' : 'cancelled',
           plan_name: 'premium',
           expires_at: newExpiry.toISOString(),
           next_billing_date: newExpiry.toISOString(),
           payment_attempts: 0,
           auto_renew: autoRenew,
-          // If Google says not auto-renewing, set cancellation flag
-          cancellation_requested: !autoRenew,
-          cancellation_requested_at: !autoRenew ? new Date().toISOString() : null,
         })
         
         if (renewError) {
@@ -423,11 +421,9 @@ serve(async (req) => {
         }
         
         const { error: cancelError } = await updateSubscriptionByToken(supabase, purchaseToken, {
-          cancellation_requested: true,
-          cancellation_requested_at: new Date().toISOString(),
+          status: 'cancelled',
           auto_renew: false,
           expires_at: cancelExpiry, // Keep access until actual expiry
-          // status stays 'active' - they keep premium until expires_at
         })
         
         if (cancelError) {
@@ -450,8 +446,9 @@ serve(async (req) => {
           // Google says it's still active! Don't expire it
           console.warn('[GOOGLE-WEBHOOK] ⚠️ Received EXPIRED but Google API says still active')
           const { error } = await updateSubscriptionByToken(supabase, purchaseToken, {
-            status: 'active',
+            status: googleData.autoRenewing ? 'active' : 'cancelled',
             expires_at: new Date(googleData.expiryTimeMillis).toISOString(),
+            auto_renew: googleData.autoRenewing,
           })
           if (!error) {
             console.log('[GOOGLE-WEBHOOK] ✅ Corrected to active based on Google API')
@@ -469,7 +466,7 @@ serve(async (req) => {
           )
           // Keep them active/premium; the hourly subscription-checker will reconcile once Google API is available.
           await updateSubscriptionByToken(supabase, purchaseToken, {
-            status: 'active',
+            status: subscription.auto_renew ? 'active' : 'cancelled',
             plan_name: 'premium',
           })
           break

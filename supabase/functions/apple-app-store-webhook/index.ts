@@ -230,10 +230,9 @@ serve(async (req) => {
         const { error: updateError } = await supabase
           .from('user_subscriptions')
           .update({
-            cancellation_requested: true,
-            cancellation_requested_at: new Date().toISOString(),
+            // Cancellation activated in App Store: stop auto-renew but keep access until expires_at
+            status: 'cancelled',
             auto_renew: false,
-            // status stays 'active' - user keeps premium until expires_at
             updated_at: new Date().toISOString(),
           })
           .eq('user_id', userId)
@@ -255,10 +254,9 @@ serve(async (req) => {
           const { error: updateError } = await supabase
             .from('user_subscriptions')
             .update({
-              cancellation_requested: true,
-              cancellation_requested_at: new Date().toISOString(),
+              // Cancellation activated in App Store: stop auto-renew but keep access until expires_at
+              status: 'cancelled',
               auto_renew: false,
-              // status stays 'active' - user keeps premium until expires_at
               updated_at: new Date().toISOString(),
             })
             .eq('user_id', userId)

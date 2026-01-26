@@ -105,6 +105,22 @@ const Unsubscribe: React.FC = () => {
       // For iOS/Android IAP subscriptions, redirect to native settings
       if (isNativeApp() && (subscription.payment_method === 'apple' || subscription.payment_method === 'google' || subscription.payment_method === 'iap')) {
         const platform = Capacitor.getPlatform() as 'ios' | 'android';
+
+        // Record the user's cancellation intent immediately in our DB so UI/entitlements
+        // are controlled by expires_at (premium remains until expiry).
+        try {
+          await supabase
+            .from('user_subscriptions')
+            .update({
+              status: 'cancelled',
+              auto_renew: false,
+              updated_at: new Date().toISOString(),
+            })
+            .eq('id', subscription.id)
+            .eq('user_id', user.id);
+        } catch {
+          // Non-blocking: store/webhook sync will still correct state.
+        }
         
         // Open native subscription management (don't show toast yet)
         await openNativeSubscriptionManagement(platform);
