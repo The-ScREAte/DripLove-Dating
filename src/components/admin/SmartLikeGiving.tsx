@@ -181,6 +181,7 @@ const SmartLikeGiving: React.FC<Props> = ({ users, onLikesCreated }) => {
     setIsLoading(true);
     let successCount = 0;
     let errorCount = 0;
+    let notificationsSent = 0;
 
     try {
       // Create likes in batches to avoid overwhelming the DB
@@ -204,6 +205,25 @@ const SmartLikeGiving: React.FC<Props> = ({ users, onLikesCreated }) => {
           errorCount += batch.length;
         } else {
           successCount += batch.length;
+          
+          // Send notifications to each receiver in this batch
+          for (const receiverId of batch) {
+            try {
+              await supabase.functions.invoke('send-push-notification', {
+                body: {
+                  title: 'Someone is interested in you! 💕',
+                  body: 'People are showing interest in you. Check who liked you!',
+                  userId: receiverId,
+                  type: 'like',
+                  save_to_db: true
+                }
+              });
+              notificationsSent++;
+            } catch (notifErr) {
+              console.error('Failed to send notification to:', receiverId, notifErr);
+              // Non-fatal: continue with other notifications
+            }
+          }
         }
       }
 
@@ -219,7 +239,7 @@ const SmartLikeGiving: React.FC<Props> = ({ users, onLikesCreated }) => {
 
       toast({
         title: 'Likes Created',
-        description: `Successfully created ${successCount} likes${errorCount > 0 ? `, ${errorCount} failed` : ''}`
+        description: `Created ${successCount} likes, sent ${notificationsSent} notifications${errorCount > 0 ? `, ${errorCount} failed` : ''}`
       });
 
       onLikesCreated();
