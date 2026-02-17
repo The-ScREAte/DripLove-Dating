@@ -2070,6 +2070,14 @@ export type Database = {
         Args: { p_amount: number; p_promo_code_id: string }
         Returns: Json
       }
+      set_influencer_password: {
+        Args: {
+          p_new_password: string
+          p_promo_code_id: string
+          p_token: string
+        }
+        Returns: Json
+      }
       test_subscription_info: { Args: { user_id_param: string }; Returns: Json }
       update_user_usage: {
         Args: {
