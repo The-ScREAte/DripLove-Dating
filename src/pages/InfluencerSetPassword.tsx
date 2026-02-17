@@ -85,24 +85,22 @@ const InfluencerSetPassword = () => {
     setLoading(true);
 
     try {
-      // Update the password and status in the database
-      // Note: We only check the ID, not the token, to allow status updates even if password was already changed
-      const { error: updateError, data: updateData } = await supabase
-        .from('promo_codes')
-        .update({ 
-          password_hash: password,
-          status: 'active',
-          updated_at: new Date().toISOString()
-        })
-        .eq('id', promoCodeId)
-        .select();
+      // Use SECURITY DEFINER RPC to bypass RLS for password setting
+      const { data: rpcResult, error: rpcError } = await supabase
+        .rpc('set_influencer_password', {
+          p_promo_code_id: promoCodeId,
+          p_token: token,
+          p_new_password: password
+        });
 
-      if (updateError) {
-        throw updateError;
+      if (rpcError) {
+        throw rpcError;
       }
 
-      if (!updateData || updateData.length === 0) {
-        throw new Error('Failed to update promo code. Please contact support.');
+      const result = rpcResult as { success: boolean; error?: string };
+
+      if (!result || !result.success) {
+        throw new Error(result?.error || 'Failed to set password. Please contact support.');
       }
 
       setSuccess(true);
