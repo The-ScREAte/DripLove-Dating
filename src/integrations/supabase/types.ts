@@ -473,7 +473,7 @@ export type Database = {
           payment_amount: number
           payment_id: string
           promo_code_id: string
-          user_id: string
+          user_id: string | null
         }
         Insert: {
           commission_amount: number
@@ -484,7 +484,7 @@ export type Database = {
           payment_amount: number
           payment_id: string
           promo_code_id: string
-          user_id: string
+          user_id?: string | null
         }
         Update: {
           commission_amount?: number
@@ -495,7 +495,7 @@ export type Database = {
           payment_amount?: number
           payment_id?: string
           promo_code_id?: string
-          user_id?: string
+          user_id?: string | null
         }
         Relationships: [
           {
@@ -1255,19 +1255,19 @@ export type Database = {
           created_at: string | null
           id: string
           promo_code_id: string
-          user_id: string
+          user_id: string | null
         }
         Insert: {
           created_at?: string | null
           id?: string
           promo_code_id: string
-          user_id: string
+          user_id?: string | null
         }
         Update: {
           created_at?: string | null
           id?: string
           promo_code_id?: string
-          user_id?: string
+          user_id?: string | null
         }
         Relationships: [
           {
@@ -1280,7 +1280,7 @@ export type Database = {
           {
             foreignKeyName: "referrals_user_id_fkey"
             columns: ["user_id"]
-            isOneToOne: true
+            isOneToOne: false
             referencedRelation: "profiles"
             referencedColumns: ["id"]
           },
@@ -1636,7 +1636,7 @@ export type Database = {
           id: string
           promo_code_id: string
           updated_at: string | null
-          user_id: string
+          user_id: string | null
         }
         Insert: {
           created_at?: string | null
@@ -1644,7 +1644,7 @@ export type Database = {
           id?: string
           promo_code_id: string
           updated_at?: string | null
-          user_id: string
+          user_id?: string | null
         }
         Update: {
           created_at?: string | null
@@ -1652,7 +1652,7 @@ export type Database = {
           id?: string
           promo_code_id?: string
           updated_at?: string | null
-          user_id?: string
+          user_id?: string | null
         }
         Relationships: [
           {
@@ -2068,6 +2068,14 @@ export type Database = {
       }
       request_influencer_payout: {
         Args: { p_amount: number; p_promo_code_id: string }
+        Returns: Json
+      }
+      set_influencer_password: {
+        Args: {
+          p_new_password: string
+          p_promo_code_id: string
+          p_token: string
+        }
         Returns: Json
       }
       test_subscription_info: { Args: { user_id_param: string }; Returns: Json }
