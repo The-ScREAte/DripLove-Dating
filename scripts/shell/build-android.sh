@@ -13,6 +13,9 @@ YELLOW='\033[1;33m'
 BLUE='\033[0;34m'
 NC='\033[0m' # No Color
 
+# Must match android/gradle.properties -> RELEASE_STORE_FILE=../../my-release-key.keystore
+KEYSTORE_PATH="my-release-key.keystore"
+
 # Build type selection
 echo "Select build type:"
 echo "1. Debug APK"
@@ -36,8 +39,8 @@ case $choice in
         ;;
     2)
         echo -e "${BLUE}Building Release APK...${NC}"
-        if [ ! -f "android/app/release-key.keystore" ]; then
-            echo -e "${RED}❌ Keystore not found! Run ./scripts/shell/setup-android-release.sh first${NC}"
+        if [ ! -f "$KEYSTORE_PATH" ]; then
+            echo -e "${RED}❌ Keystore not found at $KEYSTORE_PATH${NC}"
             exit 1
         fi
         cd android
@@ -51,8 +54,8 @@ case $choice in
         ;;
     3)
         echo -e "${BLUE}Building Release AAB for Google Play...${NC}"
-        if [ ! -f "android/app/release-key.keystore" ]; then
-            echo -e "${RED}❌ Keystore not found! Run ./scripts/shell/setup-android-release.sh first${NC}"
+        if [ ! -f "$KEYSTORE_PATH" ]; then
+            echo -e "${RED}❌ Keystore not found at $KEYSTORE_PATH${NC}"
             exit 1
         fi
         cd android

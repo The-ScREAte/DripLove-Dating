@@ -68,9 +68,22 @@ index 0000000..626e0e1
 +org.eclipse.jdt.core.compiler.codegen.targetPlatform=17
 +org.eclipse.jdt.core.compiler.compliance=17
 +org.eclipse.jdt.core.compiler.source=17
+diff --git a/node_modules/@capacitor/status-bar/android/build.gradle b/node_modules/@capacitor/status-bar/android/build.gradle
+index 9badef6..b2b5222 100644
+--- a/node_modules/@capacitor/status-bar/android/build.gradle
++++ b/node_modules/@capacitor/status-bar/android/build.gradle
+@@ -43,7 +43,7 @@ android {
+     buildTypes {
+         release {
+             minifyEnabled false
+-            proguardFiles getDefaultProguardFile('proguard-android.txt'), 'proguard-rules.pro'
++            proguardFiles getDefaultProguardFile('proguard-android-optimize.txt'), 'proguard-rules.pro'
+         }
+     }
+     lintOptions {
 diff --git a/node_modules/@capacitor/status-bar/android/build/intermediates/aapt_friendly_merged_manifests/release/processReleaseManifest/aapt/AndroidManifest.xml b/node_modules/@capacitor/status-bar/android/build/intermediates/aapt_friendly_merged_manifests/release/processReleaseManifest/aapt/AndroidManifest.xml
 new file mode 100644
-index 0000000..a2f2321
+index 0000000..9c079ca
 --- /dev/null
 +++ b/node_modules/@capacitor/status-bar/android/build/intermediates/aapt_friendly_merged_manifests/release/processReleaseManifest/aapt/AndroidManifest.xml
 @@ -0,0 +1,7 @@
@@ -84,7 +97,7 @@ index 0000000..a2f2321
 \ No newline at end of file
 diff --git a/node_modules/@capacitor/status-bar/android/build/intermediates/aapt_friendly_merged_manifests/release/processReleaseManifest/aapt/output-metadata.json b/node_modules/@capacitor/status-bar/android/build/intermediates/aapt_friendly_merged_manifests/release/processReleaseManifest/aapt/output-metadata.json
 new file mode 100644
-index 0000000..d76e4cc
+index 0000000..c5cb503
 --- /dev/null
 +++ b/node_modules/@capacitor/status-bar/android/build/intermediates/aapt_friendly_merged_manifests/release/processReleaseManifest/aapt/output-metadata.json
 @@ -0,0 +1,18 @@
@@ -121,7 +134,7 @@ index 0000000..1211b1e
 +coreLibraryDesugaringEnabled=false
 diff --git a/node_modules/@capacitor/status-bar/android/build/intermediates/annotation_processor_list/release/javaPreCompileRelease/annotationProcessors.json b/node_modules/@capacitor/status-bar/android/build/intermediates/annotation_processor_list/release/javaPreCompileRelease/annotationProcessors.json
 new file mode 100644
-index 0000000..9e26dfe
+index 0000000..8372b41
 --- /dev/null
 +++ b/node_modules/@capacitor/status-bar/android/build/intermediates/annotation_processor_list/release/javaPreCompileRelease/annotationProcessors.json
 @@ -0,0 +1 @@
@@ -129,18 +142,16 @@ index 0000000..9e26dfe
 \ No newline at end of file
 diff --git a/node_modules/@capacitor/status-bar/android/build/intermediates/compile_library_classes_jar/release/bundleLibCompileToJarRelease/classes.jar b/node_modules/@capacitor/status-bar/android/build/intermediates/compile_library_classes_jar/release/bundleLibCompileToJarRelease/classes.jar
 new file mode 100644
-index 0000000..9f38433
-Binary files /dev/null and b/node_modules/@capacitor/status-bar/android/build/intermediates/compile_library_classes_jar/release/bundleLibCompileToJarRelease/classes.jar differ
+index 0000000..e69de29
 diff --git a/node_modules/@capacitor/status-bar/android/build/intermediates/compile_r_class_jar/release/generateReleaseRFile/R.jar b/node_modules/@capacitor/status-bar/android/build/intermediates/compile_r_class_jar/release/generateReleaseRFile/R.jar
 new file mode 100644
-index 0000000..f75e024
-Binary files /dev/null and b/node_modules/@capacitor/status-bar/android/build/intermediates/compile_r_class_jar/release/generateReleaseRFile/R.jar differ
+index 0000000..e69de29
 diff --git a/node_modules/@capacitor/status-bar/android/build/intermediates/compile_symbol_list/release/generateReleaseRFile/R.txt b/node_modules/@capacitor/status-bar/android/build/intermediates/compile_symbol_list/release/generateReleaseRFile/R.txt
 new file mode 100644
 index 0000000..e69de29
 diff --git a/node_modules/@capacitor/status-bar/android/build/intermediates/incremental/mergeReleaseJniLibFolders/merger.xml b/node_modules/@capacitor/status-bar/android/build/intermediates/incremental/mergeReleaseJniLibFolders/merger.xml
 new file mode 100644
-index 0000000..eb049d7
+index 0000000..d45b864
 --- /dev/null
 +++ b/node_modules/@capacitor/status-bar/android/build/intermediates/incremental/mergeReleaseJniLibFolders/merger.xml
 @@ -0,0 +1,2 @@
@@ -149,7 +160,7 @@ index 0000000..eb049d7
 \ No newline at end of file
 diff --git a/node_modules/@capacitor/status-bar/android/build/intermediates/incremental/mergeReleaseShaders/merger.xml b/node_modules/@capacitor/status-bar/android/build/intermediates/incremental/mergeReleaseShaders/merger.xml
 new file mode 100644
-index 0000000..56277dd
+index 0000000..7dfadf0
 --- /dev/null
 +++ b/node_modules/@capacitor/status-bar/android/build/intermediates/incremental/mergeReleaseShaders/merger.xml
 @@ -0,0 +1,2 @@
@@ -158,7 +169,7 @@ index 0000000..56277dd
 \ No newline at end of file
 diff --git a/node_modules/@capacitor/status-bar/android/build/intermediates/incremental/packageReleaseAssets/merger.xml b/node_modules/@capacitor/status-bar/android/build/intermediates/incremental/packageReleaseAssets/merger.xml
 new file mode 100644
-index 0000000..ffd60a5
+index 0000000..8d1ad60
 --- /dev/null
 +++ b/node_modules/@capacitor/status-bar/android/build/intermediates/incremental/packageReleaseAssets/merger.xml
 @@ -0,0 +1,2 @@
@@ -174,7 +185,7 @@ index 0000000..945535e
 +#Wed Dec 17 22:17:26 MST 2025
 diff --git a/node_modules/@capacitor/status-bar/android/build/intermediates/incremental/release/packageReleaseResources/merger.xml b/node_modules/@capacitor/status-bar/android/build/intermediates/incremental/release/packageReleaseResources/merger.xml
 new file mode 100644
-index 0000000..ab13014
+index 0000000..6510e2b
 --- /dev/null
 +++ b/node_modules/@capacitor/status-bar/android/build/intermediates/incremental/release/packageReleaseResources/merger.xml
 @@ -0,0 +1,2 @@
@@ -183,24 +194,19 @@ index 0000000..ab13014
 \ No newline at end of file
 diff --git a/node_modules/@capacitor/status-bar/android/build/intermediates/javac/release/compileReleaseJavaWithJavac/classes/com/capacitorjs/plugins/statusbar/StatusBar$ChangeListener.class b/node_modules/@capacitor/status-bar/android/build/intermediates/javac/release/compileReleaseJavaWithJavac/classes/com/capacitorjs/plugins/statusbar/StatusBar$ChangeListener.class
 new file mode 100644
-index 0000000..d48d579
-Binary files /dev/null and b/node_modules/@capacitor/status-bar/android/build/intermediates/javac/release/compileReleaseJavaWithJavac/classes/com/capacitorjs/plugins/statusbar/StatusBar$ChangeListener.class differ
+index 0000000..e69de29
 diff --git a/node_modules/@capacitor/status-bar/android/build/intermediates/javac/release/compileReleaseJavaWithJavac/classes/com/capacitorjs/plugins/statusbar/StatusBar.class b/node_modules/@capacitor/status-bar/android/build/intermediates/javac/release/compileReleaseJavaWithJavac/classes/com/capacitorjs/plugins/statusbar/StatusBar.class
 new file mode 100644
-index 0000000..bc8c330
-Binary files /dev/null and b/node_modules/@capacitor/status-bar/android/build/intermediates/javac/release/compileReleaseJavaWithJavac/classes/com/capacitorjs/plugins/statusbar/StatusBar.class differ
+index 0000000..e69de29
 diff --git a/node_modules/@capacitor/status-bar/android/build/intermediates/javac/release/compileReleaseJavaWithJavac/classes/com/capacitorjs/plugins/statusbar/StatusBarConfig.class b/node_modules/@capacitor/status-bar/android/build/intermediates/javac/release/compileReleaseJavaWithJavac/classes/com/capacitorjs/plugins/statusbar/StatusBarConfig.class
 new file mode 100644
-index 0000000..16bc00a
-Binary files /dev/null and b/node_modules/@capacitor/status-bar/android/build/intermediates/javac/release/compileReleaseJavaWithJavac/classes/com/capacitorjs/plugins/statusbar/StatusBarConfig.class differ
+index 0000000..e69de29
 diff --git a/node_modules/@capacitor/status-bar/android/build/intermediates/javac/release/compileReleaseJavaWithJavac/classes/com/capacitorjs/plugins/statusbar/StatusBarInfo.class b/node_modules/@capacitor/status-bar/android/build/intermediates/javac/release/compileReleaseJavaWithJavac/classes/com/capacitorjs/plugins/statusbar/StatusBarInfo.class
 new file mode 100644
-index 0000000..1bc1f54
-Binary files /dev/null and b/node_modules/@capacitor/status-bar/android/build/intermediates/javac/release/compileReleaseJavaWithJavac/classes/com/capacitorjs/plugins/statusbar/StatusBarInfo.class differ
+index 0000000..e69de29
 diff --git a/node_modules/@capacitor/status-bar/android/build/intermediates/javac/release/compileReleaseJavaWithJavac/classes/com/capacitorjs/plugins/statusbar/StatusBarPlugin.class b/node_modules/@capacitor/status-bar/android/build/intermediates/javac/release/compileReleaseJavaWithJavac/classes/com/capacitorjs/plugins/statusbar/StatusBarPlugin.class
 new file mode 100644
-index 0000000..b859820
-Binary files /dev/null and b/node_modules/@capacitor/status-bar/android/build/intermediates/javac/release/compileReleaseJavaWithJavac/classes/com/capacitorjs/plugins/statusbar/StatusBarPlugin.class differ
+index 0000000..e69de29
 diff --git a/node_modules/@capacitor/status-bar/android/build/intermediates/local_only_symbol_list/release/parseReleaseLocalResources/R-def.txt b/node_modules/@capacitor/status-bar/android/build/intermediates/local_only_symbol_list/release/parseReleaseLocalResources/R-def.txt
 new file mode 100644
 index 0000000..78ac5b8
@@ -224,7 +230,7 @@ index 0000000..18e4dc1
 +7</manifest>
 diff --git a/node_modules/@capacitor/status-bar/android/build/intermediates/merged_manifest/release/processReleaseManifest/AndroidManifest.xml b/node_modules/@capacitor/status-bar/android/build/intermediates/merged_manifest/release/processReleaseManifest/AndroidManifest.xml
 new file mode 100644
-index 0000000..a2f2321
+index 0000000..9c079ca
 --- /dev/null
 +++ b/node_modules/@capacitor/status-bar/android/build/intermediates/merged_manifest/release/processReleaseManifest/AndroidManifest.xml
 @@ -0,0 +1,7 @@
@@ -238,7 +244,7 @@ index 0000000..a2f2321
 \ No newline at end of file
 diff --git a/node_modules/@capacitor/status-bar/android/build/intermediates/navigation_json/release/extractDeepLinksRelease/navigation.json b/node_modules/@capacitor/status-bar/android/build/intermediates/navigation_json/release/extractDeepLinksRelease/navigation.json
 new file mode 100644
-index 0000000..0637a08
+index 0000000..8d3f940
 --- /dev/null
 +++ b/node_modules/@capacitor/status-bar/android/build/intermediates/navigation_json/release/extractDeepLinksRelease/navigation.json
 @@ -0,0 +1 @@
@@ -246,7 +252,7 @@ index 0000000..0637a08
 \ No newline at end of file
 diff --git a/node_modules/@capacitor/status-bar/android/build/intermediates/nested_resources_validation_report/release/generateReleaseResources/nestedResourcesValidationReport.txt b/node_modules/@capacitor/status-bar/android/build/intermediates/nested_resources_validation_report/release/generateReleaseResources/nestedResourcesValidationReport.txt
 new file mode 100644
-index 0000000..08f4ebe
+index 0000000..c1c7878
 --- /dev/null
 +++ b/node_modules/@capacitor/status-bar/android/build/intermediates/nested_resources_validation_report/release/generateReleaseResources/nestedResourcesValidationReport.txt
 @@ -0,0 +1 @@
@@ -254,8 +260,7 @@ index 0000000..08f4ebe
 \ No newline at end of file
 diff --git a/node_modules/@capacitor/status-bar/android/build/intermediates/runtime_library_classes_jar/release/bundleLibRuntimeToJarRelease/classes.jar b/node_modules/@capacitor/status-bar/android/build/intermediates/runtime_library_classes_jar/release/bundleLibRuntimeToJarRelease/classes.jar
 new file mode 100644
-index 0000000..4414f5e
-Binary files /dev/null and b/node_modules/@capacitor/status-bar/android/build/intermediates/runtime_library_classes_jar/release/bundleLibRuntimeToJarRelease/classes.jar differ
+index 0000000..e69de29
 diff --git a/node_modules/@capacitor/status-bar/android/build/intermediates/symbol_list_with_package_name/release/generateReleaseRFile/package-aware-r.txt b/node_modules/@capacitor/status-bar/android/build/intermediates/symbol_list_with_package_name/release/generateReleaseRFile/package-aware-r.txt
 new file mode 100644
 index 0000000..5c9a663
@@ -287,8 +292,7 @@ index 0000000..1a0e6de
 +		INJECTED from /Users/deanonearth/Desktop/dataing-buddy-auth-hub/node_modules/@capacitor/status-bar/android/src/main/AndroidManifest.xml
 diff --git a/node_modules/@capacitor/status-bar/android/build/tmp/compileReleaseJavaWithJavac/previous-compilation-data.bin b/node_modules/@capacitor/status-bar/android/build/tmp/compileReleaseJavaWithJavac/previous-compilation-data.bin
 new file mode 100644
-index 0000000..8303e1b
-Binary files /dev/null and b/node_modules/@capacitor/status-bar/android/build/tmp/compileReleaseJavaWithJavac/previous-compilation-data.bin differ
+index 0000000..e69de29
 diff --git a/node_modules/@capacitor/status-bar/android/src/main/java/com/capacitorjs/plugins/statusbar/StatusBar.java b/node_modules/@capacitor/status-bar/android/src/main/java/com/capacitorjs/plugins/statusbar/StatusBar.java
 index 0239bd8..e466b6c 100644
 --- a/node_modules/@capacitor/status-bar/android/src/main/java/com/capacitorjs/plugins/statusbar/StatusBar.java

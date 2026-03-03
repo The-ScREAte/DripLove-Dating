@@ -3,7 +3,6 @@ import React from "react";
 import ReactDOM from "react-dom/client";
 import App from "./App.tsx";
 import "./index.css";
-import { initializeGoogleAuth } from "./utils/googleNativeAuth";
 import "./i18n/config"; // Initialize i18n
 import { supabase } from "./integrations/supabase/client";
 
@@ -113,7 +112,11 @@ const AppWrapper = () => {
     const initializeApp = async () => {
       try {
         // Initialize native Google Auth on mobile platforms
-        initializeGoogleAuth();
+        void import('./utils/googleNativeAuth')
+          .then(({ initializeGoogleAuth }) => initializeGoogleAuth())
+          .catch(() => {
+            // ignore startup auth init import errors
+          });
         
         // Quick OAuth redirect check (non-blocking)
         // If we detect an OAuth fragment or error in the URL, ensure the app

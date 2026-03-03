@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { PotentialMatch } from '@/types';
+import { normalizeCountryCode } from '@/utils/countryCode';
 
 /**
  * 30% Like-Back Injection Hook
@@ -87,51 +88,6 @@ const calculateDistanceKm = (lat1: number, lon1: number, lat2: number, lon2: num
     Math.sin(dLon / 2) * Math.sin(dLon / 2);
   const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
   return R * c;
-};
-
-// Normalize country identifier to ISO2 when possible.
-// Handles ISO2, some ISO3, and common country names.
-const normalizeCountryCode = (c: string | null | undefined): string => {
-  const cleaned = (c || '').trim().toUpperCase().replace(/[^A-Z]/g, '');
-  if (!cleaned) return '';
-
-  if (cleaned.length === 2) return cleaned;
-
-  const iso3Map: Record<string, string> = {
-    USA: 'US',
-    CAN: 'CA',
-    GBR: 'GB',
-    IRL: 'IE',
-    AUS: 'AU',
-    NZL: 'NZ',
-    IND: 'IN',
-    PAK: 'PK',
-    KEN: 'KE',
-    NGA: 'NG',
-    GHA: 'GH',
-    ZAF: 'ZA',
-  };
-
-  const nameMap: Record<string, string> = {
-    UNITEDSTATES: 'US',
-    UNITEDSTATESOFAMERICA: 'US',
-    AMERICA: 'US',
-    CANADA: 'CA',
-    UNITEDKINGDOM: 'GB',
-    GREATBRITAIN: 'GB',
-    ENGLAND: 'GB',
-    IRELAND: 'IE',
-    AUSTRALIA: 'AU',
-    NEWZEALAND: 'NZ',
-    INDIA: 'IN',
-    PAKISTAN: 'PK',
-    KENYA: 'KE',
-    NIGERIA: 'NG',
-    GHANA: 'GH',
-    SOUTHAFRICA: 'ZA',
-  };
-
-  return iso3Map[cleaned] || nameMap[cleaned] || cleaned;
 };
 
 export function useLikeBackInjection({

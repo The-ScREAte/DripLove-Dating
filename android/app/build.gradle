@@ -8,8 +8,8 @@ android {
         applicationId "com.driplove.dating"
         minSdkVersion rootProject.ext.minSdkVersion
         targetSdkVersion rootProject.ext.targetSdkVersion
-        versionCode 52
-        versionName "1.23.7"
+        versionCode 53
+        versionName "1.23.8"
         testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
         aaptOptions {
              // Files and dirs to omit from the packaged assets dir, modified to accommodate modern web apps.
@@ -44,12 +44,6 @@ android {
         renderScript true
     }
     
-    // Optimize dex compilation
-    dexOptions {
-        preDexLibraries = true
-        maxProcessCount 8
-        javaMaxHeapSize "2g"
-    }
     compileOptions {
         sourceCompatibility JavaVersion.VERSION_21
         targetCompatibility JavaVersion.VERSION_21

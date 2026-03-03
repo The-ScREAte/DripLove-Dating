@@ -12,6 +12,7 @@ import TermsOfService from './TermsOfService';
 import PrivacyPolicy from './PrivacyPolicy';
 import { preloadPricingConfig } from '@/hooks/usePricingConfig';
 import { discoverCache, calculateAge, createDeterministicShuffle } from '@/utils/discoverCache';
+import { normalizeCountryCode } from '@/utils/countryCode';
 import { getStratifiedBatches } from '@/utils/stratifiedSampling';
 import { locationService } from '@/services/locationService';
 
@@ -116,16 +117,6 @@ const TermsAcceptance = ({ user, onAccept }: TermsAcceptanceProps) => {
       const allowedGenders = currentUserData?.preference === 'male' ? ['male'] : 
                             currentUserData?.preference === 'female' ? ['female'] : 
                             ['male', 'female', 'other'];
-
-      // Normalize + trust country name if it conflicts with country_code (prevents leakage)
-      const normalizeCountryCode = (c: string) => {
-        const cleaned = (c || '').trim().toUpperCase().replace(/[^A-Z]/g, '');
-        if (!cleaned) return '';
-        if (cleaned.length === 2) return cleaned;
-        const iso3Map: Record<string, string> = { USA: 'US', CAN: 'CA', GBR: 'GB', IRL: 'IE', AUS: 'AU', NZL: 'NZ', IND: 'IN', PAK: 'PK', KEN: 'KE', NGA: 'NG', GHA: 'GH', ZAF: 'ZA' };
-        const nameMap: Record<string, string> = { UNITEDSTATES: 'US', UNITEDSTATESOFAMERICA: 'US', AMERICA: 'US', CANADA: 'CA', UNITEDKINGDOM: 'GB', GREATBRITAIN: 'GB', ENGLAND: 'GB', IRELAND: 'IE', AUSTRALIA: 'AU', NEWZEALAND: 'NZ', INDIA: 'IN', PAKISTAN: 'PK', KENYA: 'KE', NIGERIA: 'NG', GHANA: 'GH', SOUTHAFRICA: 'ZA' };
-        return iso3Map[cleaned] || nameMap[cleaned] || cleaned;
-      };
 
       const baseCountryCode = (() => {
         const cc = normalizeCountryCode(String(currentUserData?.country_code || ''));

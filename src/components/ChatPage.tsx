@@ -2,7 +2,6 @@ import React, { useState, useEffect, useLayoutEffect, useRef } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import { usePushNotifications } from '@/hooks/usePushNotifications';
-import { requestNotificationPermission } from '@/services/pushNotifications';
 // ⭐ ANDROID FIX: Use platform utils instead of synchronous Capacitor import
 import { getPlatformSync } from '@/utils/platformUtils';
 import { useVirtualizer } from '@tanstack/react-virtual';
@@ -1676,6 +1675,7 @@ const ChatPage = ({ currentUser, onUnreadChange, onDetailViewChange }: ChatPageP
 
       // Request permission if not granted
       if (Notification.permission === 'default') {
+        const { requestNotificationPermission } = await import('@/services/pushNotifications');
         const granted = await requestNotificationPermission();
         if (!granted) {
           toast({

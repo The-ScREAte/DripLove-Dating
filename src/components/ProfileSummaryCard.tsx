@@ -87,10 +87,9 @@ const ProfileSummaryCard = ({ currentUser }: ProfileSummaryCardProps) => {
       const detail = custom?.detail;
       if (!detail) return;
 
-      if (detail.type === 'like') {
-        const delta = typeof detail.delta === 'number' ? detail.delta : 1;
-        setStats(prev => ({ ...prev, totalLikes: prev.totalLikes + delta }));
-      }
+      // Keep profile stats source-of-truth from DB to avoid optimistic drift on refresh.
+      // (e.g., duplicate/replayed local events should not inflate Likes Given.)
+      fetchUserStats();
     };
 
     window.addEventListener('swipePersisted', onSwipePersisted);
