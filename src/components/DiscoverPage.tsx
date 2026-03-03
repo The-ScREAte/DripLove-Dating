@@ -109,6 +109,26 @@ const writeCachedSwipeCount = (userId: string, count: number) => {
   }
 };
 
+// Paginated fetch for tables that can exceed Supabase's 1000-row default limit.
+// Returns all matching rows by fetching in pages of `pageSize`.
+const fetchAllRows = async <T,>(
+  queryBuilder: () => ReturnType<ReturnType<typeof supabase.from>['select']>,
+  pageSize = 1000
+): Promise<T[]> => {
+  const allRows: T[] = [];
+  let offset = 0;
+  // eslint-disable-next-line no-constant-condition
+  while (true) {
+    const { data, error } = await queryBuilder().range(offset, offset + pageSize - 1);
+    if (error) throw error;
+    const rows = (data ?? []) as T[];
+    allRows.push(...rows);
+    if (rows.length < pageSize) break; // last page
+    offset += pageSize;
+  }
+  return allRows;
+};
+
 // PostgREST `in.(...)` / `not.in.(...)` expects a comma-separated list inside parentheses.
 // Since we validate UUID format, we can safely emit raw UUIDs (no extra quoting), which
 // avoids 400 "Bad Request" errors caused by invalid quoting.
@@ -1341,7 +1361,7 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, onNavigateToProfile, isPr
 
     const [
       { data: currentUserData },
-      { data: likedUsers },
+      likedUsers,
       { data: matches },
       { data: blockedUsers },
       { data: recentPasses },
@@ -1352,10 +1372,9 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, onNavigateToProfile, isPr
         .select('max_distance, distance_preference, country, country_code, min_age, max_age, preference, unlocked_countries, profile_completion, latitude, longitude')
         .eq('id', userId)
         .single(),
-      supabase
-        .from('likes')
-        .select('liked_id')
-        .eq('liker_id', userId),
+      fetchAllRows<{ liked_id: string }>(() =>
+        supabase.from('likes').select('liked_id').eq('liker_id', userId)
+      ),
       supabase
         .from('matches')
         .select(`
@@ -1381,7 +1400,7 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, onNavigateToProfile, isPr
         .limit(50) // Get up to 50 recent likers
     ]));
 
-    const likedUserIds = uniqUuids(likedUsers?.map(like => like.liked_id) || []);
+    const likedUserIds = uniqUuids((likedUsers || []).map(like => like.liked_id));
     const matchedUserIds = uniqUuids((matches || [])
       .map((m) => (m.user1_id === userId ? m.user2_id : m.user1_id))
       .filter(Boolean));
@@ -1449,8 +1468,11 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, onNavigateToProfile, isPr
     const distanceMap: { [key: string]: number } = {};
     // CRITICAL: For free users, ALWAYS filter by country (fail closed if no country)
     // Premium users can see all countries in their unlocked list
+    const excludedIdsSet = new Set(excludedIds);
     const locationProfileIds = uniqUuids(locationMatches
       .filter((m) => {
+        // CRITICAL: Pre-filter excluded IDs (liked/matched/blocked/passed) from location results
+        if (excludedIdsSet.has(m.profile_id)) return false;
         if (!baseCountryCode) {
           // Free user with no country set - return empty (fail closed)
           return premiumForFeed;
@@ -1803,7 +1825,7 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, onNavigateToProfile, isPr
     // `not.in(...)` is length-limited for PostgREST URLs and can only include a prefix
     // of very large exclusion lists (e.g., users with thousands of prior likes).
     // Without this pass, already-liked profiles can leak back into the deck.
-    const excludedIdsSet = new Set(excludedIds);
+    // Reuse excludedIdsSet built earlier (before location query)
     filteredProfiles = filteredProfiles.filter((p) => !excludedIdsSet.has(p.id));
     localProfiles = localProfiles.filter((p) => !excludedIdsSet.has(p.id));
     intlProfiles = intlProfiles.filter((p) => !excludedIdsSet.has(p.id));
@@ -2714,7 +2736,7 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, onNavigateToProfile, isPr
             .select('max_distance, distance_preference, country, country_code, min_age, max_age, latitude, longitude')
             .eq('id', userId)
             .single(),
-          supabase.from('likes').select('liked_id').eq('liker_id', userId),
+          fetchAllRows<{ liked_id: string }>(() => supabase.from('likes').select('liked_id').eq('liker_id', userId)),
           supabase.from('matches').select('user1_id,user2_id').or(`user1_id.eq.${userId},user2_id.eq.${userId}`),
           supabase.from('blocks').select('blocked_id,blocker_id').or(`blocker_id.eq.${userId},blocked_id.eq.${userId}`),
           supabase
@@ -2732,7 +2754,7 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, onNavigateToProfile, isPr
           const maxAge = Number(currentUserData.max_age ?? 99);
 
           const excluded = new Set<string>([userId]);
-          (likesRes.data || []).forEach((x) => x?.liked_id && excluded.add(x.liked_id));
+          (likesRes || []).forEach((x) => x?.liked_id && excluded.add(x.liked_id));
           (matchesRes.data || []).forEach((m) => {
             const other = m.user1_id === userId ? m.user2_id : m.user1_id;
             if (other) excluded.add(other);
