@@ -1515,8 +1515,8 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, onNavigateToProfile, isPr
             if (baseCountryCode) {
               query = query.eq('country_code', baseCountryCode);
             }
-
-            if (excludedIds.length > 0) {
+            const useDbExclusionPremium = excludedIds.length <= 90;
+            if (useDbExclusionPremium && excludedIds.length > 0) {
               query = query.not('id', 'in', formatUuidInFilter(excludedIds));
             }
 
@@ -1525,7 +1525,7 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, onNavigateToProfile, isPr
               .eq('account_status', 'active')
               .eq('is_admin', false)
               .eq('is_archived', false)
-              .limit(100);
+              .limit(useDbExclusionPremium ? 100 : 500);
 
             if (error) throw error;
             return Array.isArray(profiles) ? (profiles as unknown as ProfileRow[]) : [];
@@ -1543,9 +1543,9 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, onNavigateToProfile, isPr
             .eq('is_admin', false)
             .eq('is_archived', false)
             .in('gender', allowedGenders)
-            .limit(80);
+            .limit(excludedIds.length <= 90 ? 80 : 400);
 
-          if (excludedIds.length > 0) {
+          if (excludedIds.length > 0 && excludedIds.length <= 90) {
             fallbackQuery = fallbackQuery.not('id', 'in', formatUuidInFilter(excludedIds));
           }
 
@@ -1664,16 +1664,22 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, onNavigateToProfile, isPr
           .in('id', locationProfileIdsForQuery)
           .eq('country_code', baseCountryCode); // Always filter by country for free users
 
-        if (excludedIds.length > 0) {
+        // PERF: Only apply not.in() when exclusion list is small enough to be reliable.
+        // With 2000+ likes, formatUuidInFilter truncates to ~94 UUIDs, making the filter
+        // ineffective. Instead, fetch a larger batch and rely on client-side excludedIdsSet.
+        const useDbExclusion = excludedIds.length <= 90;
+        if (useDbExclusion && excludedIds.length > 0) {
           query = query.not('id', 'in', formatUuidInFilter(excludedIds));
         }
 
+        // Fetch more profiles when DB exclusion is unreliable to compensate for client-side filtering
+        const fetchLimit = useDbExclusion ? 100 : 500;
         const { data: profiles, error } = await query
           .in('gender', allowedGenders)
           .eq('account_status', 'active')
           .eq('is_admin', false)
           .eq('is_archived', false)
-          .limit(100);
+          .limit(fetchLimit);
 
         if (error) throw error;
         filteredProfiles = Array.isArray(profiles) ? (profiles as unknown as ProfileRow[]) : [];
@@ -1696,16 +1702,19 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, onNavigateToProfile, isPr
             .lte('longitude', userLon + radiusInDegrees);
         }
 
-        if (excludedIds.length > 0) {
+        // Same logic: skip DB exclusion when list is too large for PostgREST URL
+        const useDbExclusionFallback = excludedIds.length <= 90;
+        if (useDbExclusionFallback && excludedIds.length > 0) {
           query = query.not('id', 'in', formatUuidInFilter(excludedIds));
         }
 
+        const fallbackFetchLimit = useDbExclusionFallback ? 100 : 500;
         const { data: profiles, error } = await query
           .in('gender', allowedGenders)
           .eq('account_status', 'active')
           .eq('is_admin', false)
           .eq('is_archived', false)
-          .limit(100);
+          .limit(fallbackFetchLimit);
 
         if (error) throw error;
         filteredProfiles = Array.isArray(profiles) ? (profiles as unknown as ProfileRow[]) : [];
@@ -1751,7 +1760,8 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, onNavigateToProfile, isPr
       
       let archivedQuery = supabase.from('profiles').select(PROFILE_SELECT);
       
-      if (excludedIds.length > 0) {
+      const useDbExclusionArchived = excludedIds.length <= 90;
+      if (useDbExclusionArchived && excludedIds.length > 0) {
         archivedQuery = archivedQuery.not('id', 'in', formatUuidInFilter(excludedIds));
       }
       
@@ -1784,7 +1794,7 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, onNavigateToProfile, isPr
         .eq('account_status', 'active') // Still respect account status
         .eq('is_admin', false)
         .in('gender', allowedGenders)
-        .limit(50);
+        .limit(useDbExclusionArchived ? 50 : 300);
 
       if (!archivedError && archivedProfiles && archivedProfiles.length > 0) {
         filteredProfiles = Array.isArray(archivedProfiles) ? (archivedProfiles as unknown as ProfileRow[]) : [];
@@ -2772,13 +2782,14 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, onNavigateToProfile, isPr
             .eq('account_status', 'active')
             .eq('is_admin', false)
             .eq('is_archived', false)
-            .limit(25);
+            .limit(200);
 
           if (baseCountryCode) {
             query = query.eq('country_code', baseCountryCode);
           }
 
-          if (excluded.size > 0) {
+          // Only use DB exclusion when the set is small enough for PostgREST URLs
+          if (excluded.size > 0 && excluded.size <= 90) {
             query = query.not('id', 'in', formatUuidInFilter(Array.from(excluded)));
           }
 
