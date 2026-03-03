@@ -2887,9 +2887,18 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, onNavigateToProfile, isPr
       }
 
       if (isCancelled) return;
+      // The direct DB sanity query above already found no eligible candidates,
+      // AND we just cleared all local caches.  There is genuinely nobody left to
+      // show, so settle into the exhausted empty state rather than calling
+      // forceRefresh() — which would reset hasCompletedInitialFetch→false and
+      // isLoading→true and could stall forever if the re-triggered fetch never
+      // completes (e.g. for users who truly have 0 eligible profiles).
       locallySwipedProfileIds.current.clear();
-      setNoMoreProfiles(false);
-      forceRefresh();
+      setNoMoreProfiles(true);
+      setEmptyStateMode('exhausted');
+      setIsLoading(false);
+      // hasCompletedInitialFetch stays true so the UI renders the empty state
+      // card instead of the spinner.
     };
 
     void runRecovery();
