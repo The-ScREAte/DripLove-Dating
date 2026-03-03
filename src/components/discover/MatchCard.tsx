@@ -460,8 +460,8 @@ const MatchCard: React.FC<MatchCardProps> = ({
                   key={index}
                   className={`w-3 h-2 rounded-full transition-all duration-300 ${
                     index === currentSlide 
-                      ? 'bg-white shadow-lg' 
-                      : 'bg-white/30'
+                      ? 'bg-white shadow-lg border border-pink-300' 
+                      : 'bg-white/30 border border-pink-300/80'
                   }`}
                 />
               ))}
