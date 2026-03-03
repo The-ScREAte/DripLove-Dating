@@ -554,6 +554,10 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, onNavigateToProfile, isPr
   const [isLoading, setIsLoading] = useState(true);
   const [isLoadingMore, setIsLoadingMore] = useState(false);
   const [hasCompletedInitialFetch, setHasCompletedInitialFetch] = useState(false);
+  const hasCompletedInitialFetchRef = useRef(false);
+  useEffect(() => {
+    hasCompletedInitialFetchRef.current = hasCompletedInitialFetch;
+  }, [hasCompletedInitialFetch]);
   const [noMoreProfiles, setNoMoreProfiles] = useState(false); // Track when truly no more profiles available
   const [emptyStateMode, setEmptyStateMode] = useState<'exhausted' | 'transient-error' | 'no-new'>('exhausted');
 
@@ -2350,21 +2354,30 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, onNavigateToProfile, isPr
   const fetchPotentialMatches = useCallback(async (opts?: { background?: boolean; cacheKey?: string }) => {
 
     if (!currentUser?.id) return;
+    const isBackgroundFetch = opts?.background === true;
 
     // Swipe cache is now hydrated early via useEffect - no need to check here
     suppressFetchRef.current = false;
 
     // Latest-wins: if multiple fetches overlap (e.g., free -> premium flip),
-    // only apply results from the most recent invocation.
-    const fetchSeq = ++fetchSequenceRef.current;
+    // only apply results from the most recent foreground invocation.
+    // Background refreshes should not invalidate an in-flight initial foreground fetch.
+    const fetchSeq = isBackgroundFetch ? fetchSequenceRef.current : ++fetchSequenceRef.current;
   
     try {
-      // Background loading - don't block UI
-      setIsLoading(true);
+      // Only foreground fetches should drive the blocking loader.
+      if (!isBackgroundFetch) {
+        setIsLoading(true);
+      }
       setNoMoreProfiles(false); // Reset when fetching new profiles
       setEmptyStateMode('exhausted');
 
-      const result = await fetchPotentialMatchesData(currentUser.id, allowedGenders);
+      const result = await Promise.race([
+        fetchPotentialMatchesData(currentUser.id, allowedGenders),
+        new Promise<never>((_, reject) => {
+          setTimeout(() => reject(new Error('Discover fetch timed out')), 25000);
+        }),
+      ]);
       
       if (result) {
         if (fetchSeq !== fetchSequenceRef.current) {
@@ -2469,8 +2482,8 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, onNavigateToProfile, isPr
       // Only show message if user is offline
       if (!navigator.onLine) {
         toast({
-          title: "Connection Issue",
-          description: "You appear to be offline. Please check your connection.",
+          title: "Connection issue",
+          description: "You seem offline. Please check your connection.",
           variant: "destructive",
         });
       }
@@ -3130,6 +3143,7 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, onNavigateToProfile, isPr
           .then(() => {
             if (isCancelled) return;
             if (initializedUserRef.current !== cacheKey) return;
+            if (!hasCompletedInitialFetchRef.current) return;
             pruneExpiredPassedSwipes();
             hydrateLocalSwipedIds();
             void fetchPotentialMatches({ background: true, cacheKey });
@@ -3690,8 +3704,8 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, onNavigateToProfile, isPr
     // Prevent refresh from “resetting” swipes: don’t allow swiping until the DB swipe count is loaded.
     if (!hasLoadedSwipeCountFromDb || todaySwipeCount === null) {
       toast({
-        title: 'Loading…',
-        description: 'Checking your daily swipes.',
+        title: 'One sec 💕',
+        description: 'Checking your swipe balance...',
         duration: 1500,
       });
       return;
@@ -3999,8 +4013,8 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, onNavigateToProfile, isPr
     // Prevent refresh from “resetting” swipes: don’t allow swiping until the DB swipe count is loaded.
     if (!hasLoadedSwipeCountFromDb || todaySwipeCount === null) {
       toast({
-        title: 'Loading…',
-        description: 'Checking your daily swipes.',
+        title: 'One sec 💕',
+        description: 'Checking your swipe balance...',
         duration: 1500,
       });
       return;
@@ -4186,8 +4200,8 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, onNavigateToProfile, isPr
     // ⭐ NEW: Show notification if this user already liked you (but still allow the pass)
     if (usersWhoLikedMeIds.includes(currentMatch.id)) {
       toast({
-        title: `💕 ${currentMatch.first_name} likes you!`,
-        description: "They've already liked your profile",
+        title: `${currentMatch.first_name} already likes you 💕`,
+        description: 'Want to give them a chance?',
         duration: 3000,
       });
     }
@@ -4616,7 +4630,7 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, onNavigateToProfile, isPr
                 aria-label="Play games"
               >
                 <Gamepad2 className="w-4 h-4" />
-                Test Your Dating Skills
+                  Try a quick love game
               </Button>
             </div>
           </CardContent>
@@ -4730,15 +4744,15 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, onNavigateToProfile, isPr
   // Do NOT show loading spinner when deck is empty - this prevents infinite reload loop
   if (potentialMatches.length === 0 && hasCompletedInitialFetch) {
     const emptyTitle = emptyStateMode === 'transient-error'
-      ? 'Couldn\'t refresh profiles'
+      ? 'Refresh didn\'t work'
       : emptyStateMode === 'no-new'
-        ? 'No new profiles right now'
+        ? 'No new profiles yet'
         : t('discover.noMoreProfiles');
 
     const emptyDescription = emptyStateMode === 'transient-error'
-      ? 'There was a temporary network or fetch issue. Tap refresh to try again.'
+      ? 'We hit a quick connection issue. Tap refresh to retry.'
       : emptyStateMode === 'no-new'
-        ? 'You\'ve already seen the currently loaded set. Tap refresh to check again.'
+        ? 'You\'re all caught up for now. Tap refresh to check again.'
         : t('discover.noProfilesDescription');
 
     // Show empty state - user can manually refresh
@@ -4783,7 +4797,7 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, onNavigateToProfile, isPr
               aria-label="Play games"
             >
               <Gamepad2 className="w-4 h-4" />
-              Test Your Dating Skills
+              Try a quick love game
             </Button>
           </CardContent>
         </Card>
@@ -5129,7 +5143,7 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, onNavigateToProfile, isPr
           <LazyAdinkraBar userCountry={currentUser?.country} />
 
           {/* Info section - dynamic height that fits content exactly */}
-          <div className={`discover-info-area bg-white transition-all duration-300 flex-shrink-0 -mt-0.1 ${
+          <div className={`discover-info-area bg-pink-50 transition-all duration-300 flex-shrink-0 -mt-0.1 ${
             showMoreInfo ? 'expanded' : 'overflow-hidden'
           }`}>
             <div 

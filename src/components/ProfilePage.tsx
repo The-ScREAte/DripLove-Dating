@@ -741,7 +741,7 @@ const ProfilePage = ({ currentUser, profile, onProfileUpdate, onLogout, onShowTe
   // Safety check for required data
   if (!currentUser) {
     return (
-      <div className="h-full w-full bg-gray-50 flex items-center justify-center" style={{ minHeight: '100%' }}>
+      <div className="h-full w-full bg-pink-50 flex items-center justify-center" style={{ minHeight: '100%' }}>
         <div className="text-center">
           <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-500 mx-auto mb-4"></div>
           <p className="text-gray-600">{t('common.loading')}</p>
@@ -751,7 +751,7 @@ const ProfilePage = ({ currentUser, profile, onProfileUpdate, onLogout, onShowTe
   }
 
   return (
-      <div className="h-full w-full bg-gray-50 overflow-x-hidden"
+      <div className="h-full w-full bg-pink-50 overflow-x-hidden"
          style={{ 
            touchAction: 'pan-y', // allow horizontal gestures (e.g. slider drags) to be handled by child controls
            userSelect: 'none',
@@ -762,7 +762,7 @@ const ProfilePage = ({ currentUser, profile, onProfileUpdate, onLogout, onShowTe
          }}> 
       {/* Fixed Header with Progress Bar - completely fixed below main header */}
       <div
-        className="fixed left-0 right-0 z-40 bg-white border-b border-gray-200 shadow-sm"
+        className="fixed left-0 right-0 z-40 bg-pink-50 border-b border-gray-200 shadow-sm"
         style={{
           // Start from where main header ends - pushed up higher
           top: platform === 'android' 
@@ -788,7 +788,7 @@ const ProfilePage = ({ currentUser, profile, onProfileUpdate, onLogout, onShowTe
                 <div className="relative">
                   <Button
                     onClick={openProfileMessages}
-                    className="w-full sm:w-auto border-gray-300 text-gray-700 hover:bg-gray-50 disabled:opacity-50 bg-white border"
+                    className="w-full sm:w-auto border-gray-300 text-gray-700 hover:bg-pink-100 disabled:opacity-50 bg-pink-50 border"
                     variant="outline"
                     aria-label="Open profile messages"
                   >
@@ -806,7 +806,7 @@ const ProfilePage = ({ currentUser, profile, onProfileUpdate, onLogout, onShowTe
               {isOwnProfile && (
                 <Button
                   onClick={() => navigate('/games')}
-                  className="w-full sm:w-auto border-purple-300 text-purple-700 hover:bg-purple-50 bg-white border"
+                  className="w-full sm:w-auto border-purple-300 text-purple-700 hover:bg-purple-50 bg-pink-50 border"
                   variant="outline"
                   size="sm"
                   aria-label="Play games"
@@ -822,7 +822,7 @@ const ProfilePage = ({ currentUser, profile, onProfileUpdate, onLogout, onShowTe
                 size="sm"
                 className={`w-full sm:w-auto font-medium transition-all duration-200 ${
                   isEditing 
-                    ? 'border-red-300 text-red-700 hover:bg-red-50 disabled:opacity-50 bg-white border' 
+                    ? 'border-red-300 text-red-700 hover:bg-red-50 disabled:opacity-50 bg-pink-50 border' 
                     : 'bg-gray-900 hover:bg-gray-800 text-white'
                 }`}
                 variant={isEditing ? 'outline' : 'default'}

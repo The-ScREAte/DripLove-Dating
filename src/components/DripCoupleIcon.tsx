@@ -14,18 +14,13 @@ const DripCoupleIcon: React.FC<DripCoupleIconProps> = ({ className = '', size = 
       fill="none"
       xmlns="http://www.w3.org/2000/svg"
       className={className}
+      aria-hidden="true"
     >
-      {/* Couple silhouettes */}
-      {/* Person 1 (left) */}
-      <circle cx="8" cy="6" r="2.5" fill="currentColor" />
-      <path d="M8 10c-2.5 0-4.5 1.5-4.5 3.5v2c0 0.5 0.5 1 1 1h7c0.5 0 1-0.5 1-1v-2c0-2-2-3.5-4.5-3.5z" fill="currentColor" />
-      
-      {/* Person 2 (right) */}
-      <circle cx="16" cy="6" r="2.5" fill="currentColor" />
-      <path d="M16 10c-2.5 0-4.5 1.5-4.5 3.5v2c0 0.5 0.5 1 1 1h7c0.5 0 1-0.5 1-1v-2c0-2-2-3.5-4.5-3.5z" fill="currentColor" />
-      
-      {/* Heart between them */}
-      <path d="M12 18c-0.5-0.5-2-2-2-3.5 0-1 0.5-1.5 1.5-1.5s1.5 0.5 1.5 1.5c0 0 0-1 1.5-1s1.5 0.5 1.5 1.5c0 1.5-1.5 3-2 3.5z" fill="#ff6b7d" />
+      <circle cx="8.5" cy="7" r="2.25" stroke="currentColor" strokeWidth="2" />
+      <circle cx="15.5" cy="7" r="2.25" stroke="currentColor" strokeWidth="2" />
+      <path d="M4.5 16.5C4.5 14.291 6.291 12.5 8.5 12.5" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
+      <path d="M19.5 16.5C19.5 14.291 17.709 12.5 15.5 12.5" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
+      <path d="M12 19.25C10.2 18 9 16.85 9 15.45C9 14.35 9.85 13.5 10.95 13.5C11.5 13.5 12 13.72 12.35 14.1C12.7 13.72 13.2 13.5 13.75 13.5C14.85 13.5 15.7 14.35 15.7 15.45C15.7 16.85 14.5 18 12.7 19.25L12.35 19.5L12 19.25Z" fill="currentColor" />
     </svg>
   );
 };

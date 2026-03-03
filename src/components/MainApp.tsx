@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useCallback, useMemo, useRef, lazy, Suspense } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Button } from '@/components/ui/button';
-import { Heart, MessageCircle, Users, User } from 'lucide-react';
+import { MessageCircle, Users, User } from 'lucide-react';
 // ⭐ ANDROID FIX: Use platform utils instead of synchronous Capacitor import
 import { isAndroidPlatform, isIOSPlatform, getPlatformSync, getPlatformSafe } from '@/utils/platformUtils';
 import TermsOfService from '@/components/TermsOfService';
@@ -878,7 +878,7 @@ const MainApp = ({ user, onLogout }: MainAppProps) => {
         {/* Fixed Header - always visible */}
           {/* Fixed Header */}
           {!showTerms && !showPrivacy && (
-            <div className="fixed top-0 left-0 right-0 w-full bg-white shadow-sm z-50" style={{ margin: 0, padding: 0, top: 0 }}>
+            <div className="fixed top-0 left-0 right-0 w-full bg-pink-50 shadow-sm z-50 border-2 border-pink-300 rounded-b-2xl" style={{ margin: 0, padding: 0, top: 0 }}>
               <div 
                 className="px-2 py-2 flex justify-between items-center"
                 style={{
@@ -955,7 +955,7 @@ const MainApp = ({ user, onLogout }: MainAppProps) => {
         {/* Fixed Bottom Nav - always visible */}
   {!showTerms && !showPrivacy && !isKeyboardOpen && !isChatDetailOpen && (
           <div
-            className="fixed bottom-0 left-0 right-0 w-full bg-white z-[99999]"
+            className="fixed bottom-0 left-0 right-0 w-full bg-pink-50 z-[99999] rounded-t-2xl border-2 border-pink-300"
             style={{ 
               paddingBottom: getPlatformSync() === 'android' 
                 ? '24px' 
@@ -976,11 +976,7 @@ const MainApp = ({ user, onLogout }: MainAppProps) => {
                     activeTab === value ? 'text-pink-600' : 'text-gray-500'
                   }`}
                 >
-                  {value === 'dripcheck' ? (
-                    <Icon className={`w-7 h-7 ${activeTab === value ? 'fill-current' : ''}`} />
-                  ) : (
-                    <Icon className={`w-6 h-6 ${activeTab === value ? 'fill-current' : ''}`} />
-                  )}
+                  <Icon className="w-6 h-6 shrink-0" />
                   <span className="text-xs font-medium">{label}</span>
                    {value === 'chat' && unreadCount > 0 && (
                      <div className="absolute -top-1 -right-1 h-5 w-5 rounded-full bg-red-500 border-2 border-white z-10 flex items-center justify-center">

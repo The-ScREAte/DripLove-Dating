@@ -7,6 +7,58 @@
 :root {
   --keyboard-height: 0px;
   --input-bar-height: 70px;
+  --app-light-bg-rgb: 253 242 248;
+}
+
+/* Global app theme override: map white backgrounds to light app tint */
+@layer utilities {
+  .bg-white,
+  .hover\:bg-white:hover,
+  .focus\:bg-white:focus {
+    --tw-bg-opacity: 1 !important;
+    background-color: rgb(var(--app-light-bg-rgb) / var(--tw-bg-opacity)) !important;
+  }
+
+  .bg-white\/95,
+  .hover\:bg-white\/95:hover,
+  .focus\:bg-white\/95:focus { background-color: rgb(var(--app-light-bg-rgb) / 0.95) !important; }
+  .bg-white\/90,
+  .hover\:bg-white\/90:hover,
+  .focus\:bg-white\/90:focus { background-color: rgb(var(--app-light-bg-rgb) / 0.9) !important; }
+  .bg-white\/80,
+  .hover\:bg-white\/80:hover,
+  .focus\:bg-white\/80:focus { background-color: rgb(var(--app-light-bg-rgb) / 0.8) !important; }
+  .bg-white\/70,
+  .hover\:bg-white\/70:hover,
+  .focus\:bg-white\/70:focus { background-color: rgb(var(--app-light-bg-rgb) / 0.7) !important; }
+  .bg-white\/60,
+  .hover\:bg-white\/60:hover,
+  .focus\:bg-white\/60:focus { background-color: rgb(var(--app-light-bg-rgb) / 0.6) !important; }
+  .bg-white\/50,
+  .hover\:bg-white\/50:hover,
+  .focus\:bg-white\/50:focus { background-color: rgb(var(--app-light-bg-rgb) / 0.5) !important; }
+  .bg-white\/40,
+  .hover\:bg-white\/40:hover,
+  .focus\:bg-white\/40:focus { background-color: rgb(var(--app-light-bg-rgb) / 0.4) !important; }
+  .bg-white\/30,
+  .hover\:bg-white\/30:hover,
+  .focus\:bg-white\/30:focus { background-color: rgb(var(--app-light-bg-rgb) / 0.3) !important; }
+  .bg-white\/20,
+  .hover\:bg-white\/20:hover,
+  .focus\:bg-white\/20:focus { background-color: rgb(var(--app-light-bg-rgb) / 0.2) !important; }
+  .bg-white\/15,
+  .hover\:bg-white\/15:hover,
+  .focus\:bg-white\/15:focus { background-color: rgb(var(--app-light-bg-rgb) / 0.15) !important; }
+  .bg-white\/10,
+  .hover\:bg-white\/10:hover,
+  .focus\:bg-white\/10:focus { background-color: rgb(var(--app-light-bg-rgb) / 0.1) !important; }
+
+  [style*='background-color: white'],
+  [style*='background-color:white'],
+  [style*='background: white'],
+  [style*='background:white'] {
+    background-color: rgb(var(--app-light-bg-rgb)) !important;
+  }
 }
 
 /* Fixed input container that stays above keyboard */
@@ -16,7 +68,7 @@
   right: 0 !important;
   bottom: 0 !important;
   width: 100% !important;
-  background: white;
+  background: rgb(var(--app-light-bg-rgb));
   z-index: 9999 !important;
   /* GPU acceleration for smooth movement */
   transform: translate3d(0, calc(-1 * var(--keyboard-height, 0px)), 0);

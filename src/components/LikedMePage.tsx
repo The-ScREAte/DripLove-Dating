@@ -1474,7 +1474,7 @@ const LikedMePage = ({ currentUser, isPremium = false }: LikedMePageProps) => {
 
   if (loading) {
     return (
-      <div className="h-full w-full flex items-center justify-center bg-white">
+      <div className="h-full w-full flex items-center justify-center bg-pink-50">
         <div className="animate-spin rounded-full h-32 w-32 border-b-2 border-pink-600"></div>
       </div>
     );
@@ -1484,7 +1484,7 @@ const LikedMePage = ({ currentUser, isPremium = false }: LikedMePageProps) => {
   // Guard must run after all hooks have been declared
   if (!currentUser || !currentUser.id) {
     return (
-      <div className="h-full w-full flex items-center justify-center bg-white">
+      <div className="h-full w-full flex items-center justify-center bg-pink-50">
         <div className="animate-spin rounded-full h-32 w-32 border-b-2 border-pink-600"></div>
       </div>
     );
@@ -1497,7 +1497,7 @@ const LikedMePage = ({ currentUser, isPremium = false }: LikedMePageProps) => {
 
   return (
     <div 
-      className="h-full flex flex-col bg-white"
+      className="h-full flex flex-col bg-pink-50"
       style={{ 
         touchAction: 'pan-x pan-y',
         userSelect: 'none',
@@ -1521,7 +1521,7 @@ const LikedMePage = ({ currentUser, isPremium = false }: LikedMePageProps) => {
       )}
       
   <div 
-    className="flex-shrink-0 bg-white border-b px-4 py-4 mx-4"
+    className="flex-shrink-0 bg-pink-50 border-b px-4 py-4 mx-4"
     style={{
       marginTop: platform === 'ios' 
         ? 'clamp(20px, calc(env(safe-area-inset-top, 10px) + 23px), 50px)'
@@ -1560,7 +1560,7 @@ const LikedMePage = ({ currentUser, isPremium = false }: LikedMePageProps) => {
         )}
       </div>
       
-      <div className="flex-1 overflow-y-auto p-4 pb-24 bg-white" ref={scrollContainerRef}>
+      <div className="flex-1 overflow-y-auto p-4 pb-24 bg-pink-50" ref={scrollContainerRef}>
         {likers.length === 0 ? (
           <div className="flex items-center justify-center h-full">
             <div className="text-center">
@@ -1648,7 +1648,7 @@ const LikedMePage = ({ currentUser, isPremium = false }: LikedMePageProps) => {
                           </div>
                         )}
                       </div>
-                      <CardContent className="p-3 flex-1">
+                      <CardContent className="p-3 flex-1 bg-pink-50">
                         <h3 className={`font-semibold text-gray-800 truncate text-sm ${isLocked ? 'blur-sm' : ''}`}>
                           {liker.first_name}, {ageByLikerId[liker.id] ?? calculateAge(liker.date_of_birth)}
                         </h3>

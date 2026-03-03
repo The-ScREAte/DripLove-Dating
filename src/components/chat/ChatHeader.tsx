@@ -96,7 +96,7 @@ const ChatHeader: React.FC<ChatHeaderProps> = ({
 
   return (
     <div
-      className="fixed top-0 left-0 right-0 z-50 bg-white border-b border-gray-200"
+      className="fixed top-0 left-0 right-0 z-50 bg-white border-b border-pink-200 shadow-[0_6px_14px_rgba(15,23,42,0.10)]"
       style={{ paddingTop: paddingTopValue }}
     >
       <div className="flex items-center px-4 py-3 justify-between">
@@ -145,9 +145,9 @@ const ChatHeader: React.FC<ChatHeaderProps> = ({
 
         {menuOpen && (
             <div className="absolute top-16 right-4 z-[999999]">
-              <div className="min-w-[160px] overflow-hidden rounded-md border bg-white p-4 shadow-lg space-y-1">
+              <div className="w-max overflow-hidden rounded-md border border-pink-200 bg-white p-1.5 shadow-lg divide-y divide-pink-200">
                 <button
-                  className="w-full text-left px-4 py-3 text-sm hover:bg-gray-50"
+                  className="block text-left px-2 py-2 text-sm hover:bg-pink-100 whitespace-nowrap"
                   onClick={() => {
                     setMenuOpen(false);
                     // delegate to parent to open the report dialog; allow undefined message id
@@ -157,7 +157,7 @@ const ChatHeader: React.FC<ChatHeaderProps> = ({
                   {t('chat.report')}
                 </button>
                 <button
-                  className="w-full text-left px-4 py-3 text-sm hover:bg-gray-50"
+                  className="block text-left px-2 py-2 text-sm hover:bg-pink-100 whitespace-nowrap"
                   onClick={() => { 
                     setMenuOpen(false);
                     onDeleteChat();
@@ -166,7 +166,7 @@ const ChatHeader: React.FC<ChatHeaderProps> = ({
                   {t('chat.deleteChat')}
                 </button>
                 <button
-                  className="w-full text-left px-4 py-3 text-sm text-red-600 hover:bg-red-50"
+                  className="block text-left px-2 py-2 text-sm text-red-600 hover:bg-red-50 whitespace-nowrap"
                   onClick={() => { onBlockUser(selectedMatch); setMenuOpen(false); }}
                 >
                   {t('chat.blockUser')}

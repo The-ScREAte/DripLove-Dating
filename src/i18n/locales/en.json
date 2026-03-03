@@ -314,14 +314,14 @@
       "description": "Your premium features are now active. Enjoy unlimited access!"
     },
     "errors": {
-      "loadFailed": "Failed to load potential matches. Please try again.",
-      "reverseFailed": "Could not reverse the dislike. Please try again.",
-      "likeFailed": "Failed to record like.",
-      "profileCompletionRequired": "Complete Your Profile",
-      "profileCompletionMessage": "You need {{percentage}}% more to continue swiping. Complete your profile to unlock more swipes!",
-      "dailyLimitReached": "Daily Limit Reached",
-      "dailyLimitMessage": "You have reached your swipe limit.",
-      "premiumDailyLimitMessage": "You've reached your max swipes for today! Check back later as DripLove puts together a new set of people based on your past swipes."
+      "loadFailed": "Couldn’t load profiles. Please try again.",
+      "reverseFailed": "Couldn’t undo that pass. Try again.",
+      "likeFailed": "Couldn’t save your like.",
+      "profileCompletionRequired": "Almost there 💫",
+      "profileCompletionMessage": "Add {{percentage}}% more to your profile to keep swiping.",
+      "dailyLimitReached": "Daily limit reached",
+      "dailyLimitMessage": "You’ve reached your swipe limit.",
+      "premiumDailyLimitMessage": "You’ve reached today’s swipe limit. Check back soon for more matches."
     },
     "actions": {
       "pass": "Pass",

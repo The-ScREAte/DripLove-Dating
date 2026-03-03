@@ -245,8 +245,8 @@ const MessageBubble: React.FC<MessageBubbleProps> = ({
             relative max-w-[80%] sm:max-w-md
             rounded-2xl
             ${isOwnMessage 
-              ? 'bg-gradient-to-br from-rose-500 to-pink-600 text-white rounded-br-md' 
-              : 'bg-white text-slate-800 border border-slate-100 shadow-sm rounded-bl-md'
+              ? 'bg-gradient-to-br from-rose-500 to-pink-600 text-white border border-rose-300/40 shadow-[0_6px_18px_rgba(236,72,153,0.22)] rounded-br-md' 
+              : 'bg-white text-slate-800 border border-pink-200 shadow-[0_4px_14px_rgba(15,23,42,0.10)] rounded-bl-md'
             }
             ${isHighlighted ? 'ring-2 ring-yellow-400 ring-offset-2' : ''}
           `}

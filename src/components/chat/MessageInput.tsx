@@ -84,7 +84,7 @@ const MessageInput: React.FC<MessageInputProps> = ({
   return (
     <div 
       ref={containerRef}
-      className="chat-input-container border-t border-gray-200"
+      className="chat-input-container border-t border-gray-200 shadow-[0_-4px_12px_rgba(15,23,42,0.08)]"
     >
       {/* Reply preview */}
       {replyingTo && (
@@ -118,7 +118,7 @@ const MessageInput: React.FC<MessageInputProps> = ({
       
       <div className="p-2">
         <div className="flex items-center space-x-2">
-          <div className="flex-1 flex items-center space-x-2 bg-gray-100 rounded-full px-4 py-2">
+          <div className="flex-1 flex items-center space-x-2 bg-gray-100 rounded-full px-4 py-2 border border-pink-200 shadow-sm">
             <Input
               ref={inputRef}
               value={draft}

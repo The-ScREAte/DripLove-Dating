@@ -117,6 +117,8 @@ const ChatPage = ({ currentUser, onUnreadChange, onDetailViewChange }: ChatPageP
   const [reportMessageId, setReportMessageId] = useState<string | undefined>(undefined);
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
   const autoDeletingDormantMatchIdsRef = useRef<Set<string>>(new Set());
+  const markReadInFlightRef = useRef(false);
+  const markReadPendingRef = useRef(false);
   const { toast } = useToast();
   const { sendMessageNotification, isInitialized, isSupported } = usePushNotifications(currentUser?.id);
   const messagesEndRef = useRef<HTMLDivElement>(null);
@@ -333,7 +335,7 @@ const ChatPage = ({ currentUser, onUnreadChange, onDetailViewChange }: ChatPageP
 
     // Supabase realtime filters only support a single condition, so subscribe twice.
     const channelUser1 = supabase
-      .channel('chat-matches-user1')
+      .channel(`chat-matches-user1:${currentUser.id}`)
       .on(
         'postgres_changes',
         {
@@ -347,7 +349,7 @@ const ChatPage = ({ currentUser, onUnreadChange, onDetailViewChange }: ChatPageP
       .subscribe();
 
     const channelUser2 = supabase
-      .channel('chat-matches-user2')
+      .channel(`chat-matches-user2:${currentUser.id}`)
       .on(
         'postgres_changes',
         {
@@ -827,13 +829,14 @@ const ChatPage = ({ currentUser, onUnreadChange, onDetailViewChange }: ChatPageP
       const { data: matches, error } = await supabase
         .from('matches')
         .select(`
-          *,
+          id, created_at, user1_id, user2_id, user1_unread_count, user2_unread_count,
           user1:profiles!matches_user1_id_fkey(id, first_name, last_name, is_admin, is_archived),
           user2:profiles!matches_user2_id_fkey(id, first_name, last_name, is_admin, is_archived),
           chats(id, message, created_at, sender_id)
         `)
         .or(`user1_id.eq.${currentUser.id},user2_id.eq.${currentUser.id}`)
         .order('created_at', { ascending: false })
+        .limit(1, { foreignTable: 'chats' })
         .order('created_at', { foreignTable: 'chats', ascending: false });
 
       if (error) throw error;
@@ -908,13 +911,14 @@ const ChatPage = ({ currentUser, onUnreadChange, onDetailViewChange }: ChatPageP
       const { data: matches, error } = await supabase
         .from('matches')
         .select(`
-          *,
+          id, created_at, user1_id, user2_id, user1_unread_count, user2_unread_count,
           user1:profiles!matches_user1_id_fkey(id, first_name, last_name, is_admin, is_archived),
           user2:profiles!matches_user2_id_fkey(id, first_name, last_name, is_admin, is_archived),
           chats(id, message, created_at, sender_id)
         `)
         .or(`user1_id.eq.${currentUser.id},user2_id.eq.${currentUser.id}`)
         .order('created_at', { ascending: false })
+        .limit(1, { foreignTable: 'chats' })
         .order('created_at', { foreignTable: 'chats', ascending: false });
 
       if (error) throw error;
@@ -1144,11 +1148,16 @@ const ChatPage = ({ currentUser, onUnreadChange, onDetailViewChange }: ChatPageP
 
       if (error) throw error;
 
+      const matchForReceiver = matchesRef.current.find((m) => m.id === matchId);
       const mappedMessages = data?.map(msg => ({
         ...msg,
         sent_at: msg.created_at,
-        receiver_id: msg.sender_id === currentUser.id 
-          ? (selectedMatch?.user1_id === currentUser.id ? selectedMatch?.user2_id : selectedMatch?.user1_id)
+        receiver_id: msg.sender_id === currentUser.id
+          ? (
+              matchForReceiver
+                ? (matchForReceiver.user1_id === currentUser.id ? matchForReceiver.user2_id : matchForReceiver.user1_id)
+                : (selectedMatch?.user1_id === currentUser.id ? selectedMatch?.user2_id : selectedMatch?.user1_id)
+            )
           : currentUser.id
       })) || [];
 
@@ -1186,6 +1195,13 @@ const ChatPage = ({ currentUser, onUnreadChange, onDetailViewChange }: ChatPageP
 
   const markMessagesAsRead = async () => {
     if (!selectedMatch) return;
+
+    if (markReadInFlightRef.current) {
+      markReadPendingRef.current = true;
+      return;
+    }
+
+    markReadInFlightRef.current = true;
 
     const isUser1 = selectedMatch.user1_id === currentUser.id;
     const unreadField = isUser1 ? 'user1_unread_count' : 'user2_unread_count';
@@ -1235,6 +1251,13 @@ const ChatPage = ({ currentUser, onUnreadChange, onDetailViewChange }: ChatPageP
     } catch (error) {
       console.error('[ChatPage] markMessagesAsRead unexpected error:', error);
     } finally {
+      markReadInFlightRef.current = false;
+
+      if (markReadPendingRef.current) {
+        markReadPendingRef.current = false;
+        void markMessagesAsRead();
+      }
+
       // Always ask the parent to refresh nav unread badge after a short delay
       // to ensure the DB transaction is fully committed
       setTimeout(() => {
@@ -1462,7 +1485,7 @@ const ChatPage = ({ currentUser, onUnreadChange, onDetailViewChange }: ChatPageP
           // IMPORTANT: Refresh matches immediately when first message is sent
           // This moves the match from "New Matches" to "Conversations" instantly
           chatMatchesCache.delete(currentUser.id);
-          await fetchMatches();
+          void fetchMatchesInBackground();
         } catch {
           // ignore post-send side effects
         }
@@ -1787,7 +1810,7 @@ const ChatPage = ({ currentUser, onUnreadChange, onDetailViewChange }: ChatPageP
   // unconditionally called (so don't early-return before them).
   if (!currentUser || !currentUser.id) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-gray-50">
+      <div className="min-h-screen flex items-center justify-center bg-pink-50">
         <div className="text-center">
           <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-pink-500 mx-auto mb-4" />
           <p className="text-gray-600">Loading chats...</p>
@@ -1871,10 +1894,10 @@ const ChatPage = ({ currentUser, onUnreadChange, onDetailViewChange }: ChatPageP
     );
     
     return (
-  <div className="fixed inset-0 flex flex-col bg-gray-50">
+  <div className="fixed inset-0 flex flex-col bg-pink-50">
         {/* Header (safe area respected via env padding) */}
         <div 
-          className="sticky top-0 z-30 bg-white text-gray-900 shadow-sm border-b border-gray-100" 
+          className="sticky top-0 z-30 bg-pink-50 text-gray-900 shadow-sm border-b border-gray-100" 
           style={{ 
             paddingTop: getPlatformSync() === 'web' 
               ? '64px' 
@@ -1900,9 +1923,7 @@ const ChatPage = ({ currentUser, onUnreadChange, onDetailViewChange }: ChatPageP
         {newMatchList.length > 0 && (
           <div 
             className="px-4 py-3 border-b bg-white"
-            style={{
-              marginTop: getPlatformSync() === 'ios' ? '54px' : '0px'
-            }}
+            style={{ marginTop: '0px' }}
           >
             <h3 className="text-sm font-semibold text-gray-900 mb-3">{t('chat.newMatches')}</h3>
             <div className="flex gap-4 overflow-x-auto pb-2 scrollbar-hide">
@@ -1944,7 +1965,7 @@ const ChatPage = ({ currentUser, onUnreadChange, onDetailViewChange }: ChatPageP
     className="flex-1 overflow-y-auto pb-44 sm:pb-35"
     style={{ 
       WebkitOverflowScrolling: 'touch',
-      paddingTop: getPlatformSync() === 'android' ? '0px' : (newMatchList.length > 0 ? '0px' : '54px')
+      paddingTop: '0px'
     }}
     onTouchStart={handleTouchStart}
     onTouchMove={handleTouchMove}
@@ -2006,9 +2027,9 @@ const ChatPage = ({ currentUser, onUnreadChange, onDetailViewChange }: ChatPageP
               return (
                 <div
                   key={match.id}
-                  className={`p-4 border-b border-gray-200 cursor-pointer hover:bg-gray-100 transition-colors ${
-                    selectedMatch?.id === match.id ? 'bg-pink-50 border-pink-200' : 'bg-white'
-                  } ${match.unread_messages > 0 ? 'font-bold bg-purple-50' : ''}`}
+                  className={`p-4 border-b border-gray-200 cursor-pointer hover:bg-pink-100 transition-colors ${
+                    selectedMatch?.id === match.id ? 'bg-pink-100 border-pink-200' : 'bg-pink-50'
+                  } ${match.unread_messages > 0 ? 'font-bold bg-pink-100' : ''}`}
                   style={{
                     marginTop: index === 0 && newMatchList.length === 0 && getPlatformSync() === 'ios' 
                       ? '0px'
@@ -2077,7 +2098,7 @@ const ChatPage = ({ currentUser, onUnreadChange, onDetailViewChange }: ChatPageP
                       return (
                         <div
                           key={match.id}
-                          className="p-4 border-b border-gray-200 cursor-pointer hover:bg-gray-100 transition-colors bg-white"
+                          className="p-4 border-b border-gray-200 cursor-pointer hover:bg-pink-100 transition-colors bg-pink-50"
                           onClick={() => setSelectedMatch(match)}
                         >
                           <div className="flex items-center space-x-3">
@@ -2166,11 +2187,11 @@ const ChatPage = ({ currentUser, onUnreadChange, onDetailViewChange }: ChatPageP
       {/* Scrollable Messages Area (only this area scrolls) */}
       <div
         ref={messagesContainerRef}
-        className="flex-1 overflow-y-auto px-4 bg-gray-50 chat-messages-container"
+        className="flex-1 overflow-y-auto px-4 bg-pink-50 chat-messages-container"
         style={{ 
           WebkitOverflowScrolling: 'touch', 
           paddingTop: getPlatformSync() === 'ios' 
-            ? '150px'
+            ? '158px'
             : getPlatformSync() === 'web'
               ? '150px'
               : '140px'
