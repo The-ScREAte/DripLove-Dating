@@ -26,11 +26,20 @@
 
 /* Image touch optimization styles */
 .optimizedImage {
-  background-color: #111827;
+  background-color: rgb(253 242 248);
+  border-radius: 0.75rem !important;
+  clip-path: inset(0 round 0.75rem);
   touch-action: manipulation;
   user-select: none;
   -webkit-user-select: none;
   -webkit-touch-callout: none;
+}
+
+@media (min-width: 768px) {
+  .optimizedImage {
+    border-radius: 1rem !important;
+    clip-path: inset(0 round 1rem);
+  }
 }
 
 /* Adinkra glow gradient - static class for better performance */

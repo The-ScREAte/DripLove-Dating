@@ -50,14 +50,14 @@ const ImageSlide = React.memo<{
   }
   
   return (
-    <div className="relative w-full h-full bg-gray-900">
+    <div className="relative w-full h-full bg-pink-50">
       <img
         key={imageSrc}
         loading="eager"
         decoding="async"
         src={imageSrc}
         alt={`${matchFirstName} ${matchLastName}`}
-        className={`w-full h-full object-contain relative z-10 ${styles.optimizedImage}`}
+        className={`w-full h-full object-contain relative z-10 rounded-xl md:rounded-2xl ${styles.optimizedImage}`}
         draggable={false}
         onError={() => setHasError(true)}
       />

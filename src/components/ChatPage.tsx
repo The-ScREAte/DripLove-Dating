@@ -2027,7 +2027,7 @@ const ChatPage = ({ currentUser, onUnreadChange, onDetailViewChange }: ChatPageP
               return (
                 <div
                   key={match.id}
-                  className={`p-4 border-b border-gray-200 cursor-pointer hover:bg-pink-100 transition-colors ${
+                  className={`p-4 border-b border-pink-300 cursor-pointer hover:bg-pink-100 transition-colors ${
                     selectedMatch?.id === match.id ? 'bg-pink-100 border-pink-200' : 'bg-pink-50'
                   } ${match.unread_messages > 0 ? 'font-bold bg-pink-100' : ''}`}
                   style={{
@@ -2098,7 +2098,7 @@ const ChatPage = ({ currentUser, onUnreadChange, onDetailViewChange }: ChatPageP
                       return (
                         <div
                           key={match.id}
-                          className="p-4 border-b border-gray-200 cursor-pointer hover:bg-pink-100 transition-colors bg-pink-50"
+                          className="p-4 border-b border-pink-200 cursor-pointer hover:bg-pink-100 transition-colors bg-pink-50"
                           onClick={() => setSelectedMatch(match)}
                         >
                           <div className="flex items-center space-x-3">

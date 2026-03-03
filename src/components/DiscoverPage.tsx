@@ -558,6 +558,10 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, onNavigateToProfile, isPr
   useEffect(() => {
     hasCompletedInitialFetchRef.current = hasCompletedInitialFetch;
   }, [hasCompletedInitialFetch]);
+  const potentialMatchesRef = useRef<MatchOrAd[]>([]);
+  useEffect(() => {
+    potentialMatchesRef.current = potentialMatches;
+  }, [potentialMatches]);
   const [noMoreProfiles, setNoMoreProfiles] = useState(false); // Track when truly no more profiles available
   const [emptyStateMode, setEmptyStateMode] = useState<'exhausted' | 'transient-error' | 'no-new'>('exhausted');
 
@@ -2938,14 +2942,24 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, onNavigateToProfile, isPr
       // Invalidate any in-flight fetch results so they cannot overwrite the new deck.
       fetchSequenceRef.current += 1;
 
+      // Keep empty-state UI visible while this automatic re-initialization runs.
+      // This avoids flashing the foreground "finding matches" loader when the user
+      // is already in a confirmed empty state and we are just refreshing in background.
+      const shouldKeepEmptyStateVisible =
+        hasCompletedInitialFetchRef.current && potentialMatchesRef.current.length === 0;
+
       setPotentialMatches([]);
       setCurrentIndex(0);
       setImageIndex(0);
       setNoMoreProfiles(false);
-      setHasCompletedInitialFetch(false);
+      setHasCompletedInitialFetch(!shouldKeepEmptyStateVisible ? false : true);
       setIsArchivedFallback(false);
       setPremiumTrulyEmptyAfterRetry(false);
       premiumEmptyAutoRetryRef.current = false;
+
+      if (shouldKeepEmptyStateVisible) {
+        setIsLoading(false);
+      }
     }
     lastPremiumActiveRef.current = premiumActive;
 

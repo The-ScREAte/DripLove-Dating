@@ -204,29 +204,93 @@ const MainApp = ({ user, onLogout }: MainAppProps) => {
   const fetchUnreadCount = useCallback(async () => {
     if (!userId) return;
     try {
-      // Fetch matches where current user is user1 or user2, using standard Supabase query
+      // Fetch matches where current user is user1 or user2.
+      // Include minimal partner + latest chat fields so unread badge can match ChatPage visibility.
       const { data: matchesData, error: matchesError } = await supabase
         .from('matches')
-        .select('id, user1_id, user2_id, user1_unread_count, user2_unread_count')
+        .select(`
+          id,
+          user1_id,
+          user2_id,
+          user1_unread_count,
+          user2_unread_count,
+          user1:profiles!matches_user1_id_fkey(id, is_archived),
+          user2:profiles!matches_user2_id_fkey(id, is_archived),
+          chats(id, message, created_at)
+        `)
         .or(`user1_id.eq.${userId},user2_id.eq.${userId}`);
 
-      if (matchesError) throw matchesError;
+      const { data: matchesWithLatestChat, error: latestChatError } = await supabase
+        .from('matches')
+        .select('id, chats(id, message, created_at)')
+        .or(`user1_id.eq.${userId},user2_id.eq.${userId}`)
+        .limit(1, { foreignTable: 'chats' })
+        .order('created_at', { foreignTable: 'chats', ascending: false });
 
-      const rows = matchesData || [];
+      if (matchesError) throw matchesError;
+      if (latestChatError) throw latestChatError;
+
+      type NavMatchRow = {
+        id: string;
+        user1_id: string;
+        user2_id: string;
+        user1_unread_count?: unknown;
+        user2_unread_count?: unknown;
+        user1?: { id?: string; is_archived?: boolean } | null;
+        user2?: { id?: string; is_archived?: boolean } | null;
+        chats?: Array<{ id?: string; message?: string | null; created_at?: string | null }> | null;
+      };
+
+      const latestChatByMatchId = new Map<string, { message: string; created_at: string }>();
+      for (const row of ((matchesWithLatestChat || []) as NavMatchRow[])) {
+        const lastChat = Array.isArray(row.chats) ? row.chats[0] : undefined;
+        if (!lastChat?.created_at) continue;
+        latestChatByMatchId.set(row.id, {
+          message: String(lastChat.message || ''),
+          created_at: String(lastChat.created_at),
+        });
+      }
+
+      const rows = (matchesData || []) as NavMatchRow[];
       userMatchIdSetRef.current = new Set(rows.map((r) => r.id));
 
-      // Only count unread messages FOR the current user (not what they sent)
+      const DORMANT_DAYS = 30;
+      const DORMANT_DELETE_AFTER_DAYS_IN_EARLIER = 15;
+      const MS_PER_DAY = 24 * 60 * 60 * 1000;
+
+      // Count unread ONLY for chats visible on Chat page:
+      // - include Active + Earlier conversations
+      // - exclude archived partners
+      // - exclude auto-deletable dormant chats (already removed from list)
       let total = 0;
-      const matchesWithUnread: { matchId: string; count: number }[] = [];
       for (const row of rows) {
         const isUser1 = row.user1_id === userId;
+        const partner = isUser1 ? row.user2 : row.user1;
+
+        // ChatPage excludes archived partner chats entirely.
+        if (partner?.is_archived === true) continue;
+
+        const latest = latestChatByMatchId.get(row.id);
+        const hasLastMessage = Boolean(latest?.message);
+        const lastMessageTime = latest?.created_at;
+
+        // ChatPage list includes only conversations with a last message in Active/Earlier sections.
+        // New matches (no message yet) are not part of those sections.
+        if (!hasLastMessage || !lastMessageTime) continue;
+
+        // Match ChatPage auto-delete exclusion: hide chats dormant for 45+ days.
+        const lastActivityMs = new Date(lastMessageTime).getTime();
+        const autoDeleteThresholdMs = (DORMANT_DAYS + DORMANT_DELETE_AFTER_DAYS_IN_EARLIER) * MS_PER_DAY;
+        if (Number.isFinite(lastActivityMs) && (Date.now() - lastActivityMs > autoDeleteThresholdMs)) {
+          continue;
+        }
+
         // If user is user1, count user1_unread_count (messages user1 hasn't read)
         // If user is user2, count user2_unread_count (messages user2 hasn't read)
         const unreadForUser = isUser1 ? row.user1_unread_count : row.user2_unread_count;
         const n = Number(unreadForUser) || 0;
         if (n > 0) {
           total += n;
-          matchesWithUnread.push({ matchId: row.id, count: n });
         }
       }
 

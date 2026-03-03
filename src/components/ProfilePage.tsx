@@ -913,7 +913,7 @@ const ProfilePage = ({ currentUser, profile, onProfileUpdate, onLogout, onShowTe
         style={{ 
           paddingTop: '160px', 
           paddingBottom: Capacitor.getPlatform() === 'web'
-            ? '100px'
+            ? '30px'
             : 'clamp(100px, calc(env(safe-area-inset-bottom, 0px) + 90px), 150px)'
         }}
       >
