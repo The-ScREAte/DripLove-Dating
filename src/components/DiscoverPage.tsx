@@ -1799,6 +1799,15 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, onNavigateToProfile, isPr
     // Update the fallback state
     setIsArchivedFallback(usingArchivedFallback);
 
+    // CRITICAL: Always enforce full exclusion client-side as a final safety net.
+    // `not.in(...)` is length-limited for PostgREST URLs and can only include a prefix
+    // of very large exclusion lists (e.g., users with thousands of prior likes).
+    // Without this pass, already-liked profiles can leak back into the deck.
+    const excludedIdsSet = new Set(excludedIds);
+    filteredProfiles = filteredProfiles.filter((p) => !excludedIdsSet.has(p.id));
+    localProfiles = localProfiles.filter((p) => !excludedIdsSet.has(p.id));
+    intlProfiles = intlProfiles.filter((p) => !excludedIdsSet.has(p.id));
+
     // ✅ FINAL EMPTY RULE
     // Free users: empty when local is empty
     // Premium users: empty ONLY when local + intl are empty
@@ -2763,6 +2772,8 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, onNavigateToProfile, isPr
           const { data: rows } = await query;
           const recoveredProfiles = (Array.isArray(rows) ? (rows as ProfileRow[]) : [])
             .filter((p) => {
+              // Final guard for large exclusion lists (liked/matched/passed/blocked).
+              if (excluded.has(p.id)) return false;
               if (!baseCountryCode) return false;
               if (!isLocalCountryForFreeUser(p, baseCountryCode)) return false;
               if (!p.date_of_birth) return false;
