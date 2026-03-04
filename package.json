@@ -9,7 +9,7 @@
     "build:dev": "tsc && vite build --mode development",
     "build:capacitor": "tsc && vite build --mode capacitor",
     "build:android": "npm run build:capacitor",
-    "postinstall": "patch-package",
+    "postinstall": "patch-package || ( [ \"$RENDER\" = \"true\" ] && echo 'patch-package failed on Render; continuing web deploy' || exit 1 )",
     "start": "serve -s dist -l 10000",
     "test": "echo \"(tests removed)\"",
     "test:google:iap": "node scripts/test-google-iap-validator.mjs",
