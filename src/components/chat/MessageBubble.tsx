@@ -242,11 +242,11 @@ const MessageBubble: React.FC<MessageBubbleProps> = ({
         <div
           ref={bubbleRef}
           className={`
-            relative max-w-[80%] sm:max-w-md
+            relative max-w-[82%] sm:max-w-lg
             rounded-2xl
             ${isOwnMessage 
-              ? 'bg-gradient-to-br from-rose-500 to-pink-600 text-white border border-rose-300/40 shadow-[0_6px_18px_rgba(236,72,153,0.22)] rounded-br-md' 
-              : 'bg-white text-slate-800 border border-pink-200 shadow-[0_4px_14px_rgba(15,23,42,0.10)] rounded-bl-md'
+              ? 'bg-gradient-to-br from-rose-500 to-pink-600 text-white border border-rose-300/40 shadow-[0_6px_18px_rgba(236,72,153,0.22)] rounded-br-md'
+              : 'bg-white text-slate-800 border border-pink-200 shadow-[0_3px_10px_rgba(15,23,42,0.08)] rounded-bl-md'
             }
             ${isHighlighted ? 'ring-2 ring-yellow-400 ring-offset-2' : ''}
           `}
@@ -284,14 +284,14 @@ const MessageBubble: React.FC<MessageBubbleProps> = ({
           })()}
 
           {/* Message Content */}
-          <div className={`px-3 ${repliedMessage ? 'pt-1' : 'pt-2.5'} pb-1`}>
-            <p className={`text-[15px] leading-relaxed whitespace-pre-wrap break-words ${isDeletedForMe ? 'italic opacity-60' : ''}`}>
+          <div className={`px-3.5 ${repliedMessage ? 'pt-1.5' : 'pt-2.5'} pb-1`}>
+            <p className={`text-[15px] leading-[1.45] whitespace-pre-wrap break-words ${isDeletedForMe ? 'italic opacity-60' : ''}`}>
               {isDeletedForMe ? t('chat.deleted', 'This message was deleted') : message.message}
             </p>
           </div>
 
           {/* Timestamp & Read Status */}
-          <div className={`flex items-center justify-end gap-1 px-3 pb-2 ${isOwnMessage ? 'text-white/70' : 'text-slate-400'}`}>
+          <div className={`flex items-center justify-end gap-1 px-3.5 pb-2 ${isOwnMessage ? 'text-white/70' : 'text-slate-400'}`}>
             <span className="text-[11px]">
               {formatTime(message.sent_at || message.created_at)}
             </span>

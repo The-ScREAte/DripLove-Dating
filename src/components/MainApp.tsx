@@ -942,7 +942,7 @@ const MainApp = ({ user, onLogout }: MainAppProps) => {
         {/* Fixed Header - always visible */}
           {/* Fixed Header */}
           {!showTerms && !showPrivacy && (
-            <div className="fixed top-0 left-0 right-0 w-full bg-pink-50 shadow-sm z-50 border-2 border-pink-300 rounded-b-2xl" style={{ margin: 0, padding: 0, top: 0 }}>
+            <div data-driplove-global-header className="fixed top-0 left-0 right-0 w-full bg-pink-50 shadow-sm z-50 border-2 border-pink-300 rounded-b-2xl" style={{ margin: 0, padding: 0, top: 0 }}>
               <div 
                 className="px-2 py-2 flex justify-between items-center"
                 style={{

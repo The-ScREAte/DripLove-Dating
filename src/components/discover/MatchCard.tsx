@@ -63,6 +63,25 @@ const MatchCard: React.FC<MatchCardProps> = ({
 }) => {
   const { t } = useTranslation();
 
+  const toTitleCase = (value?: string | null) => {
+    if (!value) return '';
+    return value
+      .toLowerCase()
+      .split(' ')
+      .filter(Boolean)
+      .map(word => word.charAt(0).toUpperCase() + word.slice(1))
+      .join(' ');
+  };
+
+  const formatRelationshipIntent = (intent?: string | null) => {
+    if (!intent) return '';
+    if (intent === 'serious') return 'Looking for something serious';
+    if (intent === 'open_to_anything') return 'Open to anything';
+
+    const normalized = intent.replace(/_/g, ' ').toLowerCase();
+    return `Looking for ${normalized}`;
+  };
+
   // Debug logging (enable with: localStorage.setItem('driplove_debug_swipe','1'))
   useEffect(() => {
     try {
@@ -620,17 +639,17 @@ const MatchCard: React.FC<MatchCardProps> = ({
     return (
       <div 
         className={`w-full ${showMoreInfo ? 'pt-0' : 'pt-0'} px-4 ${styles.detailsContainer}`}
+        style={{
+          fontFamily: 'Inter, -apple-system, BlinkMacSystemFont, "SF Pro Text", "SF Pro Display", Roboto, "Segoe UI", sans-serif'
+        }}
       >
         {/* Basic Info - Always shown */}
         <div className="flex justify-between items-start">
           <div className="flex-1">
-            <div className="flex items-center gap-2 mb-1">
-              <h2 className="text-1.9xl font-bold text-gray-900">
-                {match.first_name} {match.last_name}
+            <div className="flex items-center gap-2 mb-2 leading-tight">
+              <h2 className="text-[19px] font-bold text-gray-900">
+                {toTitleCase(match.first_name)} {toTitleCase(match.last_name)}, {calculateAge(match.date_of_birth)}
               </h2>
-              <span className="text-lg text-gray-500">
-                {calculateAge(match.date_of_birth)}
-              </span>
               {/* Verified badge beside name and age - exact same as ProfilePage */}
               {isVerified && (
                 <img
@@ -646,9 +665,9 @@ const MatchCard: React.FC<MatchCardProps> = ({
             </div>
 
             {match.city && (
-              <div className="flex items-center mt-1 text-gray-600">
+              <div className="flex items-center mt-1.5 text-gray-600 leading-tight">
                 <MapPin className="w-4 h-4 mr-1" />
-                <span className="text-base">
+                <span className="text-sm font-normal">
                   {match.city}, {match.country}
                   {match.distance !== undefined ? (
                     <span className="ml-2">
@@ -673,10 +692,10 @@ const MatchCard: React.FC<MatchCardProps> = ({
             )}
             
             {match.relationship_intent && (
-              <div className="flex items-center mt-1 text-gray-600">
+              <div className="flex items-center mt-2 text-gray-600 leading-tight">
                 <Heart className="w-4 h-4 mr-1" />
-                <span className="text-base capitalize">
-                  {match.relationship_intent === 'open_to_anything' ? 'Open to anything' : match.relationship_intent}
+                <span className="text-[13px] font-medium">
+                  {formatRelationshipIntent(match.relationship_intent)}
                 </span>
               </div>
             )}

@@ -97,6 +97,7 @@ const markExpirationWarningSent = (matchId: string): void => {
 
 const ChatPage = ({ currentUser, onUnreadChange, onDetailViewChange }: ChatPageProps) => {
   const { t } = useTranslation();
+  const [topCompensation, setTopCompensation] = useState(0);
   
   // ⭐ INSTANT LOAD: Initialize with cached data (0ms render, like Instagram/Telegram)
   const [matches, setMatches] = useState<ChatMatch[]>(() => {
@@ -180,6 +181,29 @@ const ChatPage = ({ currentUser, onUnreadChange, onDetailViewChange }: ChatPageP
 
   // Keyboard handling for chat input
   useChatKeyboardFix();
+
+  useLayoutEffect(() => {
+    const measureTopCompensation = () => {
+      const globalHeader = document.querySelector('[data-driplove-global-header]') as HTMLElement | null;
+      if (!globalHeader) {
+        setTopCompensation(0);
+        return;
+      }
+
+      const contentReservedTop = 56;
+      const needed = Math.max(0, Math.ceil(globalHeader.getBoundingClientRect().height - contentReservedTop));
+      setTopCompensation(needed);
+    };
+
+    measureTopCompensation();
+    window.addEventListener('resize', measureTopCompensation);
+    window.addEventListener('orientationchange', measureTopCompensation);
+
+    return () => {
+      window.removeEventListener('resize', measureTopCompensation);
+      window.removeEventListener('orientationchange', measureTopCompensation);
+    };
+  }, []);
 
   // Cleanup highlight timeout on unmount
   useEffect(() => {
@@ -1894,24 +1918,14 @@ const ChatPage = ({ currentUser, onUnreadChange, onDetailViewChange }: ChatPageP
     );
     
     return (
-  <div className="fixed inset-0 flex flex-col bg-pink-50">
-        {/* Header (safe area respected via env padding) */}
+  <div className="h-full min-h-0 flex flex-col bg-pink-50" style={{ paddingTop: `${topCompensation}px` }}>
+        {/* Header */}
         <div 
-          className="sticky top-0 z-30 bg-pink-50 text-gray-900 shadow-sm border-b border-gray-100" 
-          style={{ 
-            paddingTop: getPlatformSync() === 'web' 
-              ? '64px' 
-              : getPlatformSync() === 'ios' 
-                ? '44px' 
-                : '64px'
-          }}
+          className="shrink-0 z-30 bg-pink-50 text-gray-900 shadow-sm border-b border-gray-100"
         >
           <div 
             className="px-4"
-            style={{
-              paddingTop: getPlatformSync() === 'ios' ? '4px' : '12px',
-              paddingBottom: getPlatformSync() === 'ios' ? '6px' : '12px'
-            }}
+            style={{ paddingTop: '12px', paddingBottom: '12px' }}
           >
             <h2 className="text-xl font-bold bg-gradient-to-r from-pink-500 to-purple-600 bg-clip-text text-transparent">
               💧 DripChat
@@ -1962,7 +1976,7 @@ const ChatPage = ({ currentUser, onUnreadChange, onDetailViewChange }: ChatPageP
 
   {/* Scrollable Chat List (only this area scrolls) */}
   <div
-    className="flex-1 overflow-y-auto pb-44 sm:pb-35"
+    className="flex-1 min-h-0 overflow-y-auto pb-44 sm:pb-35"
     style={{ 
       WebkitOverflowScrolling: 'touch',
       paddingTop: '0px'
@@ -2165,7 +2179,7 @@ const ChatPage = ({ currentUser, onUnreadChange, onDetailViewChange }: ChatPageP
   };
 
   return (
-  <div className="fixed inset-0 flex flex-col bg-gray-50">
+  <div className="h-full min-h-0 flex flex-col bg-gray-50" style={{ paddingTop: `${topCompensation}px` }}>
       {/* Chat Header (below global header) */}
   <div className="shrink-0 bg-white border-b border-gray-200 shadow-sm z-20 m-0 p-0">
         <ChatHeader
@@ -2187,14 +2201,10 @@ const ChatPage = ({ currentUser, onUnreadChange, onDetailViewChange }: ChatPageP
       {/* Scrollable Messages Area (only this area scrolls) */}
       <div
         ref={messagesContainerRef}
-        className="flex-1 overflow-y-auto px-4 bg-pink-50 chat-messages-container"
+        className="flex-1 overflow-y-auto px-3 sm:px-4 py-2 bg-pink-50/90 chat-messages-container"
         style={{ 
-          WebkitOverflowScrolling: 'touch', 
-          paddingTop: getPlatformSync() === 'ios' 
-            ? '158px'
-            : getPlatformSync() === 'web'
-              ? '150px'
-              : '140px'
+          WebkitOverflowScrolling: 'touch',
+          paddingTop: '0px'
         }}
         onTouchStart={handleSwipeStart}
         onTouchMove={handleSwipeMove}

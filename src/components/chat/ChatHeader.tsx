@@ -6,7 +6,6 @@ import ChatUserAvatar from '../ChatUserAvatar';
 import { createPortal } from 'react-dom';
 import ReportModal from '@/components/ReportModal';
 import { useToast } from '@/hooks/use-toast';
-import { Capacitor } from '@capacitor/core';
 import { useTranslation } from 'react-i18next';
 import { supabase } from '@/integrations/supabase/client';
 import { getLanguageName } from '@/utils/languageNames';
@@ -67,14 +66,6 @@ const ChatHeader: React.FC<ChatHeaderProps> = ({
 
     fetchPartnerLanguage();
   }, [partnerId]);
-  // Platform-specific safe area padding
-  const platform = Capacitor.getPlatform();
-  const paddingTopValue = platform === 'ios' 
-    ? 'clamp(70px, calc(env(safe-area-inset-top, 10px) + 50px), 90px)' 
-    : platform === 'android' 
-    ? '72px' 
-    : '72px'; // Increased from 56px to 72px for better visibility on web
-
   // Click outside to close menu
   React.useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
@@ -96,17 +87,16 @@ const ChatHeader: React.FC<ChatHeaderProps> = ({
 
   return (
     <div
-      className="fixed top-0 left-0 right-0 z-50 bg-white border-b border-pink-200 shadow-[0_6px_14px_rgba(15,23,42,0.10)]"
-      style={{ paddingTop: paddingTopValue }}
+      className="relative bg-white/95 backdrop-blur-sm border-b border-pink-200 shadow-[0_6px_14px_rgba(15,23,42,0.10)]"
     >
-      <div className="flex items-center px-4 py-3 justify-between">
+      <div className="flex items-center px-4 py-2.5 sm:py-3 justify-between">
       <div className="flex items-center space-x-3">
         {isMobile && (
           <Button 
             variant="ghost" 
             size="sm" 
             onClick={onBack}
-            className="p-2"
+            className="p-2 rounded-full hover:bg-pink-100"
             aria-label={t('chat.goBack')}
           >
             <ArrowLeft className="w-4 h-4" />
@@ -118,11 +108,11 @@ const ChatHeader: React.FC<ChatHeaderProps> = ({
           lastName={selectedMatch.last_name}
           onClick={() => onUserProfileOpen(partnerId)}
         />
-        <div>
-          <h3 className="font-semibold text-gray-900">
+        <div className="leading-tight">
+          <h3 className="font-semibold text-gray-900 text-[15px] sm:text-base">
             {selectedMatch.first_name} {selectedMatch.last_name}
           </h3>
-          <p className="text-sm text-gray-500">
+          <p className="text-xs sm:text-sm text-gray-500 mt-0.5">
             {partnerLanguage ? t('chat.speaks', { language: partnerLanguage }) : t('chat.activeOnDripLove')}
           </p>
         </div>
@@ -132,7 +122,7 @@ const ChatHeader: React.FC<ChatHeaderProps> = ({
         <Button
           variant="ghost"
           size="sm"
-          className="p-2"
+          className="p-2 rounded-full hover:bg-pink-100"
           onClick={() => setMenuOpen(!menuOpen)}
           onContextMenu={(e) => e.preventDefault()}
           style={{ WebkitUserSelect: 'none', userSelect: 'none', WebkitTouchCallout: 'none', touchAction: 'manipulation' }}
@@ -144,7 +134,7 @@ const ChatHeader: React.FC<ChatHeaderProps> = ({
         </Button>
 
         {menuOpen && (
-            <div className="absolute top-16 right-4 z-[999999]">
+          <div className="absolute top-14 right-3 z-[999999]">
               <div className="w-max overflow-hidden rounded-md border border-pink-200 bg-white p-1.5 shadow-lg divide-y divide-pink-200">
                 <button
                   className="block text-left px-2 py-2 text-sm hover:bg-pink-100 whitespace-nowrap"
