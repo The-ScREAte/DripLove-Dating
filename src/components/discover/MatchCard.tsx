@@ -647,7 +647,7 @@ const MatchCard: React.FC<MatchCardProps> = ({
         <div className="flex justify-between items-start">
           <div className="flex-1">
             <div className="flex items-center gap-2 mb-2 leading-tight">
-              <h2 className="text-[19px] font-bold text-gray-900">
+              <h2 className="text-[18px] font-medium text-gray-900">
                 {toTitleCase(match.first_name)} {toTitleCase(match.last_name)}, {calculateAge(match.date_of_birth)}
               </h2>
               {/* Verified badge beside name and age - exact same as ProfilePage */}

@@ -57,7 +57,7 @@ const ImageSlide = React.memo<{
         decoding="async"
         src={imageSrc}
         alt={`${matchFirstName} ${matchLastName}`}
-        className={`w-full h-full object-contain relative z-10 rounded-xl md:rounded-2xl ${styles.optimizedImage}`}
+        className={`w-full h-full object-contain relative z-10 rounded-xl md:rounded-2xl [clip-path:inset(0_round_0.75rem)] md:[clip-path:inset(0_round_1rem)] ${styles.optimizedImage}`}
         draggable={false}
         onError={() => setHasError(true)}
       />

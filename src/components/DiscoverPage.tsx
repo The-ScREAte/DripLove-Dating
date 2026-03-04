@@ -5177,12 +5177,12 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, onNavigateToProfile, isPr
           <LazyAdinkraBar userCountry={currentUser?.country} />
 
           {/* Info section - dynamic height that fits content exactly */}
-          <div className={`discover-info-area bg-pink-50 transition-all duration-300 flex-shrink-0 -mt-0.1 ${
+          <div className={`discover-info-area bg-pink-50 transition-all duration-300 flex-shrink-0 -mt-2 ${
             showMoreInfo ? 'expanded' : 'overflow-hidden'
           }`}>
             <div 
               ref={contentRef}
-              className={`w-full ${showMoreInfo ? 'overflow-y-scroll px-1' : 'overflow-hidden'}`} 
+              className={`w-full pt-1 ${showMoreInfo ? 'overflow-y-scroll px-1' : 'overflow-hidden'}`} 
               style={{
                 WebkitOverflowScrolling: 'touch',
                 overscrollBehavior: 'contain',
