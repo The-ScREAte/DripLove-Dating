@@ -37,7 +37,12 @@ const AppRoutes = ({
   user,
   isAuthenticated,
 }: {
-  user: any | null;
+  user: ({
+    id: string;
+    email?: string | null;
+    app_metadata?: { provider?: string };
+    user_metadata?: Record<string, unknown>;
+  } & Record<string, unknown>) | null;
   isAuthenticated: boolean;
 }) => {
   // Initialize mobile OAuth handler inside router context

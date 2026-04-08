@@ -141,7 +141,7 @@ const LikedMePage = ({ currentUser, isPremium = false }: LikedMePageProps) => {
       // Grid thumbnails: 400x400 quality 70, Profile images: 520x520 quality 70
       if (urlOrBlob.includes('supabase')) {
         const width = isGridThumbnail ? 400 : 520;
-        return `${urlOrBlob}?width=${width}&quality=60&format=webp`;
+        return optimizeImageUrl(urlOrBlob, { width, quality: 60 });
       }
       return urlOrBlob;
     },

@@ -41,8 +41,7 @@ const MatchAnimation = ({
     try {
       // If the image is served from Supabase, request a reasonably small optimized size
       if (url.includes('supabase')) {
-        const sep = url.includes('?') ? '&' : '?';
-        return `${url}${sep}width=400&quality=80&format=webp`;
+        return optimizeImageUrl(url, { width: 400, quality: 80 });
       }
       return url;
     } catch (e) {
@@ -134,7 +133,7 @@ const MatchAnimation = ({
           {imgSrc && (
             <div className="mb-4 flex justify-center">
               <div className="w-20 h-20 rounded-full overflow-hidden border-4 border-pink-100 shadow-sm" style={{ willChange: 'transform, opacity' }}>
-                <img src={imgSrc.includes('supabase') ? `${imgSrc}?width=200&quality=60&format=webp` : imgSrc} alt={matchedUserName} className="w-full h-full object-cover" loading="lazy" decoding="async" />
+                <img src={optimizeImageUrl(imgSrc, { width: 200, quality: 60 })} alt={matchedUserName} className="w-full h-full object-cover" loading="lazy" decoding="async" />
               </div>
             </div>
           )}

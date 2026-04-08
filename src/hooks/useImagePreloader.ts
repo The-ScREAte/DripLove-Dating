@@ -1,10 +1,10 @@
 import { useState, useCallback, useRef } from 'react';
+import { optimizeImageUrl as buildOptimizedImageUrl, getRawStorageUrl } from '@/utils/imageOptimizer';
 
 interface ImagePreloaderOptions {
   maxConcurrent?: number;
   quality?: number;
   width?: number;
-  format?: string;
 }
 
 interface PreloadedImageData {
@@ -46,11 +46,7 @@ export const useImagePreloader = (options: ImagePreloaderOptions = {}) => {
   }, []);
 
   const optimizeImageUrl = useCallback((url: string): string => {
-    if (url.includes('supabase')) {
-      // No format param — Supabase changes allowed values and breaks things
-      return `${url}?width=${width}&quality=${quality}`;
-    }
-    return url;
+    return buildOptimizedImageUrl(url, { width, quality });
   }, [width, quality]);
 
   const preloadImage = useCallback((url: string): Promise<void> => {
@@ -86,18 +82,23 @@ export const useImagePreloader = (options: ImagePreloaderOptions = {}) => {
       };
 
       img.onerror = () => {
-        // Fallback: if optimized URL failed, try the raw original URL
-        if (optimizedUrl !== url) {
+        // Fallback: always try the raw storage object URL when possible.
+        const rawFallbackUrl = getRawStorageUrl(optimizedUrl);
+        const fallbackUrl = rawFallbackUrl && rawFallbackUrl !== optimizedUrl
+          ? rawFallbackUrl
+          : url;
+
+        if (fallbackUrl && fallbackUrl !== optimizedUrl) {
           const fallbackImg = new Image();
           fallbackImg.onload = () => {
-            setImageData(url, { url, loaded: true, loading: false, error: false, optimizedUrl: url });
+            setImageData(url, { url, loaded: true, loading: false, error: false, optimizedUrl: fallbackUrl });
             resolve();
           };
           fallbackImg.onerror = () => {
-            setImageData(url, { url, loaded: false, loading: false, error: true, optimizedUrl: url });
+            setImageData(url, { url, loaded: false, loading: false, error: true, optimizedUrl: fallbackUrl });
             reject(new Error('Image failed to load'));
           };
-          fallbackImg.src = url;
+          fallbackImg.src = fallbackUrl;
         } else {
           setImageData(url, { url, loaded: false, loading: false, error: true, optimizedUrl });
           reject(new Error('Image failed to load'));

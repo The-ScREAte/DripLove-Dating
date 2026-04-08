@@ -1,6 +1,7 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { ExternalLink, Volume2, VolumeX } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import { optimizeImageUrl } from '@/utils/imageOptimizer';
 
 interface AdCardProps {
   ad: {
@@ -70,7 +71,7 @@ const AdCard: React.FC<AdCardProps> = ({ ad, onSwipe }) => {
           <img 
             loading="lazy" 
             decoding="async"
-            src={ad.image_url.includes('supabase') ? `${ad.image_url}?width=500&quality=60&format=webp` : ad.image_url}
+            src={optimizeImageUrl(ad.image_url, { width: 500, quality: 60 })}
             alt={ad.name}
             className="w-full h-full object-cover"
           />

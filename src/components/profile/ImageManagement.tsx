@@ -23,7 +23,9 @@ interface ImageManagementProps {
     id: string;
     email?: string;
   } | null;
-  profile?: any;
+  profile?: {
+    face_descriptor?: string | null;
+  } | null;
   onProfileUpdate?: () => void;
 }
 
@@ -796,7 +798,7 @@ const ImageManagement = ({ currentUser, profile, onProfileUpdate }: ImageManagem
         <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-4">
           {userImages.map((userImage, index) => (
             <div key={userImage.image_url} className="relative group">
-              <img loading="lazy" decoding="async" src={userImage.image_url.includes('supabase') ? `${userImage.image_url}?width=500&quality=60&format=webp` : userImage.image_url} alt={`User Image ${index + 1}`} className="w-full h-28 sm:h-36 object-cover rounded-lg shadow-sm" />
+              <img loading="lazy" decoding="async" src={optimizeImageUrl(userImage.image_url, { width: 500, quality: 60 })} alt={`User Image ${index + 1}`} className="w-full h-28 sm:h-36 object-cover rounded-lg shadow-sm" />
               
               {/* Pending approval indicator */}
               {userImage.is_approved === false && (

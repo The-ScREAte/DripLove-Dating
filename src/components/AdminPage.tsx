@@ -78,6 +78,7 @@ interface UserProfile {
   is_premium?: boolean;
   last_login_at?: string | null;
   login_count?: number | null;
+  is_archived?: boolean;
 }
 
 interface PendingImage {
@@ -93,6 +94,67 @@ interface PendingImage {
     email: string;
   };
 }
+
+interface PaymentConfigData {
+  payment_methods: unknown;
+  default_international_price?: number | string | null;
+  default_international_currency?: string | null;
+}
+
+interface ReportedChatAction {
+  id: string;
+  created_at: string;
+  admin_id: string | null;
+  chat_id: string | null;
+  reporter_id: string | null;
+  reported_user_id: string | null;
+  reason: string | null;
+  description: string | null;
+}
+
+interface ChatMessageSummary {
+  id: string;
+  message: string | null;
+  sender_id: string | null;
+  match_id: string | null;
+  created_at: string;
+}
+
+interface MinimalProfile {
+  id: string;
+  first_name: string | null;
+  last_name: string | null;
+  email: string | null;
+}
+
+interface ReportedChatItem {
+  id: string;
+  created_at: string;
+  admin_id: string | null;
+  details: {
+    reporter_id: string | null;
+    content_type: 'message';
+    content_id: string | null;
+    reason: string | null;
+    description: string | null;
+  };
+  message: ChatMessageSummary | null;
+  reporter: MinimalProfile | null;
+  reportedUser: MinimalProfile | null;
+}
+
+interface PremiumStatusRow {
+  user_id: string;
+  is_premium: boolean;
+}
+
+interface ErrorLike {
+  status?: number;
+  message?: string;
+  details?: string;
+}
+
+type RawUserProfile = Omit<UserProfile, 'age' | 'is_premium'>;
 
 const AdminPageComponent = ({ currentUser, onLogout }: AdminPageProps) => {
   // Always call hooks in the same order - performance monitoring
@@ -129,12 +191,12 @@ const AdminPageComponent = ({ currentUser, onLogout }: AdminPageProps) => {
   const [loadingPendingImages, setLoadingPendingImages] = useState(false);
   const [approvingImages, setApprovingImages] = useState<Record<string, boolean>>({});
   const [rejectingImages, setRejectingImages] = useState<Record<string, boolean>>({});
-  const [reportedChats, setReportedChats] = useState<any[]>([]);
+  const [reportedChats, setReportedChats] = useState<ReportedChatItem[]>([]);
   const [loadingReportedChats, setLoadingReportedChats] = useState(false);
   const [processingReportIds, setProcessingReportIds] = useState<Record<string, boolean>>({});
   const [isAdmin, setIsAdmin] = useState<boolean | null>(null);
   const [isEmailModalOpen, setIsEmailModalOpen] = useState(false);
-  const [emailReport, setEmailReport] = useState<any | null>(null);
+  const [emailReport, setEmailReport] = useState<ReportedChatItem | null>(null);
   const [emailRecipient, setEmailRecipient] = useState<'reported' | 'reporter'>('reported');
   const [emailSubject, setEmailSubject] = useState('');
   const [emailBody, setEmailBody] = useState('');
@@ -160,8 +222,11 @@ const AdminPageComponent = ({ currentUser, onLogout }: AdminPageProps) => {
 
         if (response.error) throw response.error;
 
-        const data = response.data as any; // Use any to bypass TypeScript issues
-        setPaymentMethods(data.payment_methods as unknown as PaymentMethod[]);
+        const data = response.data as PaymentConfigData;
+        const paymentMethodsValue = Array.isArray(data.payment_methods)
+          ? (data.payment_methods as PaymentMethod[])
+          : defaultPaymentMethods;
+        setPaymentMethods(paymentMethodsValue);
         setDefaultInternationalPrice(data.default_international_price?.toString() || '5');
         setDefaultInternationalCurrency(data.default_international_currency || 'USD');
       } catch (error) {
@@ -199,7 +264,7 @@ const AdminPageComponent = ({ currentUser, onLogout }: AdminPageProps) => {
         const { error } = await supabase
           .from('payment_config')
           .update({
-            payment_methods: paymentMethods as unknown as any,
+            payment_methods: paymentMethods as unknown,
             premium_price: Number(defaultInternationalPrice) || 5,
             premium_price_monthly: Number(defaultInternationalPrice) || 5,
             default_international_price: Number(defaultInternationalPrice) || 5,
@@ -215,7 +280,7 @@ const AdminPageComponent = ({ currentUser, onLogout }: AdminPageProps) => {
         const { error } = await supabase
           .from('payment_config')
           .insert({
-            payment_methods: paymentMethods as unknown as any,
+            payment_methods: paymentMethods as unknown,
             premium_price: Number(defaultInternationalPrice) || 5,
             premium_price_monthly: Number(defaultInternationalPrice) || 5,
             default_international_price: Number(defaultInternationalPrice) || 5,
@@ -552,7 +617,7 @@ const AdminPageComponent = ({ currentUser, onLogout }: AdminPageProps) => {
       const cached = userDataCache.get(cacheKey);
       // If we have a cached value and force isn't set, use cache to avoid refetching
       if (cached && !force) {
-        setReportedChats(cached as any[]);
+        setReportedChats(cached as ReportedChatItem[]);
         setLoadingReportedChats(false);
         return;
       }
@@ -573,9 +638,15 @@ const AdminPageComponent = ({ currentUser, onLogout }: AdminPageProps) => {
 
       // Collect message ids and user ids to batch fetch
       // reported_chats already has reporter_id, reported_user_id and chat_id fields
-      const messageIds = actions.map((a: any) => a.chat_id).filter(Boolean);
+      const reportActions = actions as ReportedChatAction[];
+      const messageIds = reportActions.map((a) => a.chat_id).filter(Boolean) as string[];
       const userIds = [
-        ...new Set(actions.map((a: any) => a.reporter_id).filter(Boolean).concat(actions.map((a: any) => a.reported_user_id).filter(Boolean)))
+        ...new Set(
+          reportActions
+            .map((a) => a.reporter_id)
+            .filter(Boolean)
+            .concat(reportActions.map((a) => a.reported_user_id).filter(Boolean))
+        )
       ];
 
       // Fetch chats/messages
@@ -584,10 +655,13 @@ const AdminPageComponent = ({ currentUser, onLogout }: AdminPageProps) => {
       // Fetch profiles for reporter and reported users
       const { data: profiles } = await supabase.from('profiles').select('id, first_name, last_name, email').in('id', userIds || []);
 
-      const transformed = actions.map((a: any) => {
-        const msg = (chats || []).find((c: any) => c.id === a.chat_id) || null;
-        const reporter = (profiles || []).find((p: any) => p.id === a.reporter_id) || null;
-        const reportedUser = (profiles || []).find((p: any) => p.id === a.reported_user_id) || null;
+      const chatRows = (chats || []) as ChatMessageSummary[];
+      const profileRows = (profiles || []) as MinimalProfile[];
+
+      const transformed: ReportedChatItem[] = reportActions.map((a) => {
+        const msg = chatRows.find((c) => c.id === a.chat_id) || null;
+        const reporter = profileRows.find((p) => p.id === a.reporter_id) || null;
+        const reportedUser = profileRows.find((p) => p.id === a.reported_user_id) || null;
 
         return {
           id: a.id,
@@ -705,7 +779,7 @@ const AdminPageComponent = ({ currentUser, onLogout }: AdminPageProps) => {
     }
   };
 
-  const openEmailModal = (report: any) => {
+  const openEmailModal = (report: ReportedChatItem) => {
     setEmailReport(report);
     // default to emailing the reported user if present, otherwise the reporter
     setEmailRecipient(report.reportedUser ? 'reported' : 'reporter');
@@ -895,7 +969,7 @@ const AdminPageComponent = ({ currentUser, onLogout }: AdminPageProps) => {
       }
 
       // Fetch ALL users in batches to bypass 1000 limit
-      const allData: any[] = [];
+      const allData: RawUserProfile[] = [];
       const BATCH_SIZE = 1000;
       let offset = 0;
       let hasMore = true;
@@ -971,7 +1045,7 @@ const AdminPageComponent = ({ currentUser, onLogout }: AdminPageProps) => {
         const CHUNK_SIZE = 500;
         for (let i = 0; i < userIds.length; i += CHUNK_SIZE) {
           const chunk = userIds.slice(i, i + CHUNK_SIZE);
-          const { data: premiumRowsRaw, error: premiumError } = await (supabase as any).rpc(
+          const { data: premiumRowsRaw, error: premiumError } = await supabase.rpc(
             'admin_get_premium_status_for_users',
             { target_user_ids: chunk }
           );
@@ -980,8 +1054,10 @@ const AdminPageComponent = ({ currentUser, onLogout }: AdminPageProps) => {
             throw premiumError;
           }
 
-          const premiumRows: any[] = Array.isArray(premiumRowsRaw) ? premiumRowsRaw : [];
-          premiumRows.forEach((row: any) => {
+          const premiumRows: PremiumStatusRow[] = Array.isArray(premiumRowsRaw)
+            ? (premiumRowsRaw as PremiumStatusRow[])
+            : [];
+          premiumRows.forEach((row) => {
             if (!row?.user_id) return;
 
             // Be resilient to duplicate rows per user_id. If any row says premium, treat as premium.
@@ -1027,7 +1103,9 @@ const AdminPageComponent = ({ currentUser, onLogout }: AdminPageProps) => {
       // Cache ALL users data for 3 minutes (not pre-filtered)
       userDataCache.set(cacheKey, { regularUsers: usersWithAge, admins: adminsWithAge });
     } catch (error) {
-      const errAny = error as any;
+      const errAny: ErrorLike = (typeof error === 'object' && error !== null)
+        ? (error as ErrorLike)
+        : {};
       const status = errAny?.status;
       const message: string = errAny?.message || '';
       const details: string = errAny?.details || '';
@@ -1375,9 +1453,9 @@ const AdminPageComponent = ({ currentUser, onLogout }: AdminPageProps) => {
     // Archive filter logic
     let matchesArchive = true;
     if (archiveFilter === 'archived') {
-      matchesArchive = (user as any).is_archived === true;
+      matchesArchive = user.is_archived === true;
     } else if (archiveFilter === 'active') {
-      matchesArchive = (user as any).is_archived !== true;
+      matchesArchive = user.is_archived !== true;
     }
     
     return matchesSearch && matchesStatus && matchesGender && matchesInterestedIn && matchesCountry && matchesRelationshipIntent && matchesPremium && matchesActivity && matchesArchive;
@@ -1808,7 +1886,7 @@ const AdminPageComponent = ({ currentUser, onLogout }: AdminPageProps) => {
                                   {user.city}, {user.country} • Age {user.age}
                                   {user.gender && ` • ${user.gender.charAt(0).toUpperCase() + user.gender.slice(1)}`}
                                 </p>
-                                {(user as any).is_archived && (
+                                {user.is_archived && (
                                   <Badge variant="outline" className="text-[10px] h-4 text-gray-500 mt-1">
                                     Archived
                                   </Badge>

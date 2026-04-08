@@ -11,6 +11,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 import { ChevronDown, ChevronUp } from 'lucide-react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { optimizeImageUrl } from '@/utils/imageOptimizer';
 
 interface Ad {
   id: string;
@@ -369,7 +370,7 @@ const AdsManagement = () => {
                     <img
                       loading="lazy"
                       decoding="async"
-                      src={formData.image_url.includes('supabase') ? `${formData.image_url}?width=200&quality=60&format=webp` : formData.image_url} 
+                      src={optimizeImageUrl(formData.image_url, { width: 200, quality: 60 })}
                       alt="Preview" 
                       className="w-20 h-20 object-cover rounded"
                     />
@@ -490,7 +491,7 @@ const AdsManagement = () => {
                       <img
                         loading="lazy"
                         decoding="async"
-                        src={ad.image_url.includes('supabase') ? `${ad.image_url}?width=200&quality=60&format=webp` : ad.image_url} 
+                        src={optimizeImageUrl(ad.image_url, { width: 200, quality: 60 })}
                         alt={ad.name}
                         className="w-24 h-24 object-cover rounded"
                       />
@@ -621,7 +622,7 @@ const AdsManagement = () => {
                   </>
                 ) : (
                   <img
-                    src={previewAd.image_url.includes('supabase') ? `${previewAd.image_url}?width=500&quality=60&format=webp` : previewAd.image_url}
+                    src={optimizeImageUrl(previewAd.image_url, { width: 500, quality: 60 })}
                     alt={previewAd.name}
                     className="w-full h-full object-cover"
                   />

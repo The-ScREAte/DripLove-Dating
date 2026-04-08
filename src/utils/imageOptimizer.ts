@@ -40,20 +40,23 @@ export function optimizeImageUrl(
   } = options;
   
   try {
+    const setOptimizationParams = (inputUrl: string): string => {
+      const parsed = new URL(inputUrl);
+      parsed.searchParams.set('width', String(width));
+      if (height) parsed.searchParams.set('height', String(height));
+      parsed.searchParams.set('quality', String(quality));
+      parsed.searchParams.set('resize', 'cover');
+      return parsed.toString();
+    };
+
     // Convert /object/public/ to /render/image/public/
     const transformedUrl = url.replace(
       '/storage/v1/object/public/',
       '/storage/v1/render/image/public/'
     );
-    
-    // Build query parameters — no `format` to avoid Supabase API breakage
-    const params = new URLSearchParams();
-    params.set('width', String(width));
-    if (height) params.set('height', String(height));
-    params.set('quality', String(quality));
-    params.set('resize', 'cover');
-    
-    return `${transformedUrl}?${params.toString()}`;
+
+    // Preserve existing query params and override optimization params safely.
+    return setOptimizationParams(transformedUrl);
   } catch (error) {
     console.error('[imageOptimizer] Failed to optimize URL:', error);
     return url;

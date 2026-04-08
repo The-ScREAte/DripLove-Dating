@@ -457,8 +457,7 @@ export function initIAP() {
     };
 
     // Check if deviceready already fired
-    // @ts-ignore
-    if (window.cordova && window.cordova.platformId) {
+    if ((window as any).cordova && (window as any).cordova.platformId) {
       initializeStore();
     } else {
       // Set a timeout for deviceready event (10 seconds)

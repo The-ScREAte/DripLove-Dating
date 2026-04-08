@@ -11,6 +11,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { buildSlides, getUserColorHash } from './MatchCardHelpers';
 import { SlideRenderer } from './SlideRenderer';
 import { getPlatformSync } from '@/utils/platformUtils';
+import { optimizeImageUrl } from '@/utils/imageOptimizer';
 
 interface MatchCardProps {
   match: PotentialMatch;
@@ -57,7 +58,7 @@ const MatchCard: React.FC<MatchCardProps> = ({
   swipeDistance,
   isSwipeAreaOnly = false,
   isDetailsAreaOnly = false,
-  getOptimizedUrl = (url: string) => url.includes('supabase') ? `${url}?width=500&quality=60&format=webp` : url,
+  getOptimizedUrl = (url: string) => optimizeImageUrl(url, { width: 500, quality: 60 }),
   preCalculatedDistance
   , imageStatus
 }) => {

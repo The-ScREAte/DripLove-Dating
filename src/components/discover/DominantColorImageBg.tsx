@@ -1,5 +1,6 @@
 import React from 'react';
 import { isAndroidPlatform } from '@/utils/platformUtils';
+import { optimizeImageUrl } from '@/utils/imageOptimizer';
 
 interface DominantColorImageBgProps {
   imageUrl?: string;
@@ -23,20 +24,7 @@ const DominantColorImageBg: React.FC<DominantColorImageBgProps> = ({ imageUrl, c
       {/* Low-res thumbnail as background (cheap to decode). We intentionally request a tiny optimized image and lightly blur it. */}
       {imageUrl && (
         <img
-          src={(() => {
-            // `imageUrl` may already include query params from higher-level optimizers.
-            // Append thumbnail params safely.
-            try {
-              const u = new URL(imageUrl);
-              u.searchParams.set('width', '40');
-              u.searchParams.set('quality', '20');
-              u.searchParams.set('format', 'webp');
-              return u.toString();
-            } catch {
-              const joiner = imageUrl.includes('?') ? '&' : '?';
-              return `${imageUrl}${joiner}width=40&quality=20&format=webp`;
-            }
-          })()}
+          src={optimizeImageUrl(imageUrl, { width: 40, quality: 20 })}
           aria-hidden="true"
           className="absolute inset-0 w-full h-full object-cover"
           style={{
