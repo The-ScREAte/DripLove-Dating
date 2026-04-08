@@ -27,7 +27,6 @@ export const useImagePreloader = (options: ImagePreloaderOptions = {}) => {
     maxConcurrent = 3,
     quality = 85,
     width = 800,
-    format = 'webp'
   } = options;
 
   const [preloadedImages, setPreloadedImages] = useState<Map<string, PreloadedImageData>>(new Map());
@@ -48,10 +47,11 @@ export const useImagePreloader = (options: ImagePreloaderOptions = {}) => {
 
   const optimizeImageUrl = useCallback((url: string): string => {
     if (url.includes('supabase')) {
-      return `${url}?width=${width}&quality=${quality}&format=${format}`;
+      // No format param — Supabase changes allowed values and breaks things
+      return `${url}?width=${width}&quality=${quality}`;
     }
     return url;
-  }, [width, quality, format]);
+  }, [width, quality]);
 
   const preloadImage = useCallback((url: string): Promise<void> => {
     const existing = preloadedImagesRef.current.get(url);
@@ -86,14 +86,22 @@ export const useImagePreloader = (options: ImagePreloaderOptions = {}) => {
       };
 
       img.onerror = () => {
-        setImageData(url, {
-          url,
-          loaded: false,
-          loading: false,
-          error: true,
-          optimizedUrl
-        });
-        reject(new Error('Image failed to load'));
+        // Fallback: if optimized URL failed, try the raw original URL
+        if (optimizedUrl !== url) {
+          const fallbackImg = new Image();
+          fallbackImg.onload = () => {
+            setImageData(url, { url, loaded: true, loading: false, error: false, optimizedUrl: url });
+            resolve();
+          };
+          fallbackImg.onerror = () => {
+            setImageData(url, { url, loaded: false, loading: false, error: true, optimizedUrl: url });
+            reject(new Error('Image failed to load'));
+          };
+          fallbackImg.src = url;
+        } else {
+          setImageData(url, { url, loaded: false, loading: false, error: true, optimizedUrl });
+          reject(new Error('Image failed to load'));
+        }
       };
 
       img.src = optimizedUrl;

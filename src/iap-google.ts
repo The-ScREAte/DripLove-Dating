@@ -178,7 +178,7 @@ export function initGoogleIAP() {
     }
 
     // If not a Cordova app, resolve immediately
-    if (typeof window.cordova === 'undefined') {
+    if (typeof (window as any).cordova === 'undefined') {
       resolve();
       return;
     }
