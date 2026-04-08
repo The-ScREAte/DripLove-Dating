@@ -47,10 +47,11 @@ export const useImagePreloader = (options: ImagePreloaderOptions = {}) => {
 
   const optimizeImageUrl = useCallback((url: string): string => {
     if (url.includes('supabase')) {
-      return `${url}?width=${width}&quality=${quality}&format=${format}`;
+      // No format param — Supabase changes allowed values and breaks things
+      return `${url}?width=${width}&quality=${quality}`;
     }
     return url;
-  }, [width, quality, format]);
+  }, [width, quality]);
 
   const preloadImage = useCallback((url: string): Promise<void> => {
     const existing = preloadedImagesRef.current.get(url);
