@@ -46,7 +46,7 @@ export function initIAP() {
   return new Promise<void>((resolve, reject) => {
     
     // If not a Cordova app, resolve immediately
-    if (typeof window.cordova === 'undefined') {
+    if (typeof (window as any).cordova === 'undefined') {
       resolve();
       return;
     }

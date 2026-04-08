@@ -1,21 +1,21 @@
 /**
  * Image optimization utilities for Supabase Storage URLs
  * Uses Supabase's built-in image transformation capabilities
+ * 
+ * IMPORTANT: The `format` parameter is intentionally omitted because
+ * Supabase periodically changes the allowed values, causing 400 errors.
+ * Without `format`, Supabase serves the original format which always works.
  */
 
 interface OptimizeOptions {
   width?: number;
   height?: number;
   quality?: number;
-  format?: 'webp' | 'origin';
 }
 
 /**
- * Optimize a Supabase Storage image URL using image transformations
- * 
- * @param url - The original Supabase Storage URL
- * @param options - Optimization options (width, height, quality, format)
- * @returns Optimized URL with transformation parameters
+ * Optimize a Supabase Storage image URL using image transformations.
+ * Falls back to the original URL if the transformation endpoint is unavailable.
  */
 export function optimizeImageUrl(
   url: string | null | undefined,
@@ -37,7 +37,6 @@ export function optimizeImageUrl(
     width = 400,
     height,
     quality = 80,
-    format = 'webp'
   } = options;
   
   try {
@@ -47,14 +46,11 @@ export function optimizeImageUrl(
       '/storage/v1/render/image/public/'
     );
     
-    // Build query parameters
+    // Build query parameters — no `format` to avoid Supabase API breakage
     const params = new URLSearchParams();
     params.set('width', String(width));
     if (height) params.set('height', String(height));
     params.set('quality', String(quality));
-    if (format !== 'origin') params.set('format', format);
-    
-    // Add resize mode for consistent sizing
     params.set('resize', 'cover');
     
     return `${transformedUrl}?${params.toString()}`;
@@ -65,6 +61,16 @@ export function optimizeImageUrl(
 }
 
 /**
+ * Get the raw (non-transformed) Supabase storage URL.
+ * Use as a fallback when the /render/image/ endpoint fails.
+ */
+export function getRawStorageUrl(url: string | null | undefined): string {
+  if (!url) return '';
+  // Convert any /render/image/ URL back to /object/public/
+  return url.replace('/storage/v1/render/image/public/', '/storage/v1/object/public/');
+}
+
+/**
  * Generate a thumbnail URL for profile images
  */
 export function getThumbnailUrl(url: string | null | undefined): string {
@@ -72,7 +78,6 @@ export function getThumbnailUrl(url: string | null | undefined): string {
     width: 200,
     height: 200,
     quality: 70,
-    format: 'webp'
   });
 }
 
@@ -84,7 +89,6 @@ export function getMediumImageUrl(url: string | null | undefined): string {
     width: 400,
     height: 500,
     quality: 80,
-    format: 'webp'
   });
 }
 
@@ -95,6 +99,5 @@ export function getFullImageUrl(url: string | null | undefined): string {
   return optimizeImageUrl(url, {
     width: 800,
     quality: 85,
-    format: 'webp'
   });
 }

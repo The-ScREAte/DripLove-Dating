@@ -86,14 +86,22 @@ export const useImagePreloader = (options: ImagePreloaderOptions = {}) => {
       };
 
       img.onerror = () => {
-        setImageData(url, {
-          url,
-          loaded: false,
-          loading: false,
-          error: true,
-          optimizedUrl
-        });
-        reject(new Error('Image failed to load'));
+        // Fallback: if optimized URL failed, try the raw original URL
+        if (optimizedUrl !== url) {
+          const fallbackImg = new Image();
+          fallbackImg.onload = () => {
+            setImageData(url, { url, loaded: true, loading: false, error: false, optimizedUrl: url });
+            resolve();
+          };
+          fallbackImg.onerror = () => {
+            setImageData(url, { url, loaded: false, loading: false, error: true, optimizedUrl: url });
+            reject(new Error('Image failed to load'));
+          };
+          fallbackImg.src = url;
+        } else {
+          setImageData(url, { url, loaded: false, loading: false, error: true, optimizedUrl });
+          reject(new Error('Image failed to load'));
+        }
       };
 
       img.src = optimizedUrl;
