@@ -2063,7 +2063,7 @@ export type Database = {
         Returns: boolean
       }
       release_stale_broadcast_recipients: {
-        Args: { p_stale_after: unknown }
+        Args: { p_stale_after: string }
         Returns: number
       }
       request_influencer_payout: {
