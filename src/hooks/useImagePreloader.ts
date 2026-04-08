@@ -27,7 +27,6 @@ export const useImagePreloader = (options: ImagePreloaderOptions = {}) => {
     maxConcurrent = 3,
     quality = 85,
     width = 800,
-    format = 'webp'
   } = options;
 
   const [preloadedImages, setPreloadedImages] = useState<Map<string, PreloadedImageData>>(new Map());
