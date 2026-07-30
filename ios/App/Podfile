@@ -53,12 +53,28 @@ post_install do |installer|
       config.build_settings['CLANG_WARN_DEPRECATED_OBJC_IMPLEMENTATIONS'] = 'NO'
       config.build_settings['GCC_WARN_DEPRECATED_DECLARATIONS'] = 'NO'
       config.build_settings['CLANG_WARN_DEPRECATED_DECLARATIONS'] = 'NO'
+      config.build_settings['GCC_WARN_INHIBIT_ALL_WARNINGS'] = 'YES'
       
       # Suppress specific Swift warnings
       config.build_settings['OTHER_SWIFT_FLAGS'] = ['$(inherited)', '-Xcc', '-Wno-deprecated-declarations', '-suppress-warnings']
       
       # Suppress warning about script phase outputs
       config.build_settings['CLANG_WARN_STRICT_PROTOTYPES'] = 'NO'
+
+      # Xcode 15/16: nanopb uses quoted includes in framework headers.
+      # Treat this as non-fatal to prevent pod compile failures.
+      config.build_settings['CLANG_WARN_QUOTED_INCLUDE_IN_FRAMEWORK_HEADER'] = 'NO'
+      config.build_settings['WARNING_CFLAGS'] = [
+        '$(inherited)',
+        '-Wno-quoted-include-in-framework-header',
+        '-Wno-deprecated-declarations',
+        '-Wno-objc-protocol-property-synthesis'
+      ]
+      config.build_settings['OTHER_CFLAGS'] = [
+        '$(inherited)',
+        '-Wno-deprecated-declarations',
+        '-Wno-objc-protocol-property-synthesis'
+      ]
     end
   end
   
@@ -68,6 +84,7 @@ post_install do |installer|
       target.build_configurations.each do |config|
         config.build_settings['GCC_WARN_DEPRECATED_DECLARATIONS'] = 'NO'
         config.build_settings['CLANG_WARN_DEPRECATED_DECLARATIONS'] = 'NO'
+        config.build_settings['CLANG_WARN_QUOTED_INCLUDE_IN_FRAMEWORK_HEADER'] = 'NO'
       end
     end
   end

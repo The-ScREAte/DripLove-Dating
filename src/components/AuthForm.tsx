@@ -6,7 +6,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Heart, Mail, Lock, Eye, EyeOff } from 'lucide-react';
-import { supabase } from '@/integrations/supabase/client';
+import { supabase, SUPABASE_URL } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import { handleInputFocus, handleInputBlur, getInputStyles } from '@/utils/inputUtils';
 import { getPasswordResetRedirectUri, getEmailConfirmRedirectUri } from '@/config/oauth';
@@ -44,6 +44,39 @@ const AuthForm = ({ isLogin, onToggle, onBack }: AuthFormProps) => {
   const [errors, setErrors] = useState<{[key: string]: string}>({});
   const [showForgotPassword, setShowForgotPassword] = useState(false);
   const [sendingConfirmationAgain, setSendingConfirmationAgain] = useState(false);
+
+  const isLikelyNetworkAuthError = (message: string) => {
+    const normalized = message.toLowerCase();
+    return (
+      normalized.includes('failed to fetch') ||
+      normalized.includes('networkerror') ||
+      normalized.includes('network') ||
+      normalized.includes('timeout') ||
+      normalized.includes('unable to connect') ||
+      normalized.includes('tls error') ||
+      normalized.includes('secure connection')
+    );
+  };
+
+  const preflightAuthEndpoint = async () => {
+    try {
+      const controller = new AbortController();
+      const timeoutId = window.setTimeout(() => controller.abort(), 6000);
+
+      const response = await fetch(`${SUPABASE_URL}/auth/v1/health`, {
+        method: 'GET',
+        headers: {
+          apikey: (import.meta as ImportMeta).env?.VITE_SUPABASE_ANON_KEY || '',
+        },
+        signal: controller.signal,
+      });
+
+      window.clearTimeout(timeoutId);
+      return response.ok;
+    } catch {
+      return false;
+    }
+  };
 
   const validateForm = () => {
     const newErrors: {[key: string]: string} = {};
@@ -243,20 +276,29 @@ const AuthForm = ({ isLogin, onToggle, onBack }: AuthFormProps) => {
       }
 
       if (isLogin) {
+        // iOS simulator/webview can occasionally fail the first TLS handshake.
+        // Warm up the auth endpoint first to reduce first-request TLS failures.
+        if (isIOS) {
+          await preflightAuthEndpoint();
+        }
+
         // Login flow
-        const { data: authData, error: authError } = await supabase.auth.signInWithPassword({
+        let { data: authData, error: authError } = await supabase.auth.signInWithPassword({
           email,
           password
         });
 
+        // Retry once for transient network/TLS failures (mostly seen on iOS simulator).
+        if (authError && isLikelyNetworkAuthError(authError.message)) {
+          await new Promise((resolve) => setTimeout(resolve, 700));
+          const retry = await supabase.auth.signInWithPassword({ email, password });
+          authData = retry.data;
+          authError = retry.error;
+        }
+
         if (authError) {
           // Check for network-related errors
-          if (authError.message.includes('Failed to fetch') || 
-              authError.message.includes('NetworkError') ||
-              authError.message.includes('network') ||
-              authError.message.includes('NETWORK') ||
-              authError.message.includes('timeout') ||
-              authError.message.includes('Unable to connect')) {
+          if (isLikelyNetworkAuthError(authError.message)) {
             toast({
               title: t('auth.noConnection'),
               description: t('auth.checkConnection'),
