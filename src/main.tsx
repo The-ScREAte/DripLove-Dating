@@ -6,6 +6,7 @@ import "./index.css";
 import "./i18n/config"; // Initialize i18n
 import { supabase } from "./integrations/supabase/client";
 import { clearChatCache } from "./cache/chatCache";
+import HoppingLogo from "./components/HoppingLogo";
 
 // Suppress non-critical console output in production
 if (import.meta.env.PROD) {
@@ -35,10 +36,11 @@ if (import.meta.env.PROD) {
   console.log = () => {};
 }
 
-// Minimal loading screen component - no branding
+// Minimal branded loading screen used during bootstrap/session hydration.
 const LoadingScreen = () => (
-  <div className="w-full h-screen flex items-center justify-center bg-white">
-    <div className="w-8 h-8 border-4 border-gray-200 border-t-purple-500 rounded-full animate-spin"></div>
+  <div className="w-full h-screen flex flex-col items-center justify-center gap-3 bg-gradient-to-br from-purple-500 to-pink-500">
+    <HoppingLogo size={64} opacity={0.82} />
+    <p className="text-white text-sm font-medium">Loading DripLove...</p>
   </div>
 );
 

@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, lazy, Suspense } from 'react';
 import type { User } from '@supabase/supabase-js';
 import { useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
@@ -18,12 +18,13 @@ import PromoCodeInput from '@/components/forms/PromoCodeInput';
 import { moderateImage, ModerationResult } from '@/utils/photoModeration';
 import { compressImage } from '@/utils/imageCompression';
 import { verifyUploadedImage, detectHumanFace } from '@/utils/faceVerificationUtils';
-import TermsAcceptance from './TermsAcceptance';
 import { getLanguageForCountry } from '@/i18n/config';
 import { videoPreloader } from '@/utils/videoPreloader';
 import FaceVerification from '@/components/FaceVerification';
 import HoppingLogo from '@/components/HoppingLogo';
 import { usePromoCodeEnabled } from '@/hooks/usePromoCodeEnabled';
+
+const TermsAcceptance = lazy(() => import('./TermsAcceptance'));
 
 interface ImageUpload {
   file: File | null;
@@ -72,6 +73,7 @@ const ProfileCompletionPage = () => {
   const [faceVerified, setFaceVerified] = useState(false);
   const [faceImageData, setFaceImageData] = useState<string | null>(null);
   const [isVerifying, setIsVerifying] = useState(false);
+  const [isFinalizingTerms, setIsFinalizingTerms] = useState(false);
 
   // Restore face verification from localStorage on mount
   useEffect(() => {
@@ -572,6 +574,7 @@ const ProfileCompletionPage = () => {
   };
 
   const handleTermsAccept = async () => {
+    setIsFinalizingTerms(true);
     toast({
       title: "Welcome to DripLove!",
       description: "Your profile has been completed and terms accepted. Welcome to the community!",
@@ -613,6 +616,15 @@ const ProfileCompletionPage = () => {
       window.location.reload();
     }, 300);
   };
+
+  if (isFinalizingTerms) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-purple-500 to-pink-500 flex flex-col items-center justify-center gap-4">
+        <HoppingLogo size={72} opacity={0.85} />
+        <p className="text-white text-sm font-medium tracking-wide">Loading your DripLove experience...</p>
+      </div>
+    );
+  }
 
   const handleCancel = async () => {
     await supabase.auth.signOut();
@@ -773,9 +785,63 @@ const ProfileCompletionPage = () => {
       }
 
       // Upload approved images to storage and DB for the existing user
-      const approvedImages = images.filter(img => img.status === 'approved' || img.status === 'pending');
-      let imageOrder = 1;
-      for (const image of approvedImages) {
+      const approvedImages = images.filter(
+        (img) => (img.status === 'approved' || img.status === 'pending') && img.file !== null
+      );
+
+      const extractStoragePathFromPublicUrl = (url: string) => {
+        try {
+          const parsed = new URL(url);
+          const marker = '/storage/v1/object/public/user-photos/';
+          const markerIndex = parsed.pathname.indexOf(marker);
+          if (markerIndex === -1) return null;
+          return decodeURIComponent(parsed.pathname.slice(markerIndex + marker.length));
+        } catch {
+          return null;
+        }
+      };
+
+      // Replace existing image records to avoid unique(user_id, image_order) conflicts on retries.
+      const { data: existingUserImages, error: existingUserImagesError } = await supabase
+        .from('user_images')
+        .select('image_url')
+        .eq('user_id', user.id);
+
+      if (existingUserImagesError) {
+        throw existingUserImagesError;
+      }
+
+      if ((existingUserImages?.length || 0) > 0) {
+        const { error: deleteExistingImagesError } = await supabase
+          .from('user_images')
+          .delete()
+          .eq('user_id', user.id);
+
+        if (deleteExistingImagesError) {
+          throw deleteExistingImagesError;
+        }
+
+        // Best-effort storage cleanup for replaced photos.
+        const oldStoragePaths = (existingUserImages || [])
+          .map((img) => extractStoragePathFromPublicUrl(img.image_url))
+          .filter((path): path is string => Boolean(path));
+
+        if (oldStoragePaths.length > 0) {
+          const { error: removeOldStorageError } = await supabase.storage
+            .from('user-photos')
+            .remove(oldStoragePaths);
+
+          if (removeOldStorageError) {
+            console.warn('Old image cleanup warning:', removeOldStorageError);
+          }
+        }
+      }
+
+      const uploadFailures: string[] = [];
+      let successfulUploads = 0;
+
+      for (let index = 0; index < approvedImages.length; index++) {
+        const image = approvedImages[index];
         try {
           if (!image.file) continue;
           const mimeToExt: Record<string, string> = {
@@ -785,39 +851,60 @@ const ProfileCompletionPage = () => {
             'image/gif': 'gif'
           };
           const fileExt = mimeToExt[image.file.type] || 'jpg';
-          const fileName = `${Date.now()}-${Math.random().toString(36).substr(2, 9)}.${fileExt}`;
+          const uniqueSuffix =
+            typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function'
+              ? crypto.randomUUID()
+              : `${Date.now()}-${Math.random().toString(36).slice(2, 11)}`;
+          const fileName = `${uniqueSuffix}.${fileExt}`;
           const filePath = `${user.id}/${fileName}`;
+
           const { error: uploadError } = await supabase.storage
             .from('user-photos')
             .upload(filePath, image.file, {
               contentType: image.file.type,
-              cacheControl: '3600'
+              cacheControl: '3600',
+              upsert: false
             });
           if (uploadError) throw uploadError;
-          const { data: { publicUrl } } = supabase.storage
-            .from('user-photos')
-            .getPublicUrl(filePath);
+
+          const {
+            data: { publicUrl }
+          } = supabase.storage.from('user-photos').getPublicUrl(filePath);
+
           const { error: dbError } = await supabase
             .from('user_images')
-            .insert({
-              user_id: user.id,
-              image_url: publicUrl,
-              image_order: imageOrder,
-              is_approved: image.status === 'approved',
-              moderation_status: image.status === 'approved' ? 'approved' : 'pending',
-              flagged_content: image.moderationResult?.flags || [],
-              confidence_score: image.moderationResult?.confidence || 0
-            });
+            .upsert(
+              {
+                user_id: user.id,
+                image_url: publicUrl,
+                image_order: index + 1,
+                is_approved: image.status === 'approved',
+                moderation_status: image.status === 'approved' ? 'approved' : 'pending',
+                flagged_content: image.moderationResult?.flags || [],
+                confidence_score: image.moderationResult?.confidence || 0
+              },
+              { onConflict: 'user_id,image_order' }
+            );
+
           if (dbError) throw dbError;
-          imageOrder++;
-        } catch (error) {
-          console.error('Error uploading image:', error);
-          toast({
-            title: "Image upload error",
-            description: "Some images failed to upload. You can add them later.",
-            variant: "destructive"
-          });
+          successfulUploads++;
+        } catch (uploadErr) {
+          const errorMessage = uploadErr instanceof Error ? uploadErr.message : 'Unknown upload error';
+          console.error('Error uploading image:', uploadErr);
+          uploadFailures.push(errorMessage);
         }
+      }
+
+      if (successfulUploads < 2) {
+        throw new Error('Image upload failed: less than 2 images were saved successfully.');
+      }
+
+      if (uploadFailures.length > 0) {
+        toast({
+          title: 'Image upload warning',
+          description: 'Some images failed, but required photos were saved. You can re-upload any missing ones later.',
+          variant: 'default'
+        });
       }
 
       // Index face in AWS Rekognition with user's name (only now, after profile is saved)
@@ -869,7 +956,7 @@ const ProfileCompletionPage = () => {
     }
   };
 
-  if (loading || !user) {
+  if (!user) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-purple-500 to-pink-500 flex items-center justify-center">
         <HoppingLogo size={64} opacity={0.7} />
@@ -880,10 +967,26 @@ const ProfileCompletionPage = () => {
   // Show terms acceptance after profile completion
   if (showTermsAcceptance) {
     return (
-      <TermsAcceptance
-        user={user}
-        onAccept={handleTermsAccept}
-      />
+      <Suspense
+        fallback={
+          <div className="min-h-screen bg-gradient-to-br from-purple-500 to-pink-500 flex items-center justify-center">
+            <HoppingLogo size={64} opacity={0.8} />
+          </div>
+        }
+      >
+        <TermsAcceptance
+          user={user}
+          onAccept={handleTermsAccept}
+        />
+      </Suspense>
+    );
+  }
+
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-purple-500 to-pink-500 flex items-center justify-center">
+        <HoppingLogo size={64} opacity={0.7} />
+      </div>
     );
   }
 

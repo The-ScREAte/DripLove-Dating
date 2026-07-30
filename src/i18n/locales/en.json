@@ -289,8 +289,8 @@
     "report": "Report",
     "findingMatches": "Finding your matches...",
     "loadingProfiles": "Loading profiles...",
-    "noProfilesDescription": "You've seen all available profiles. Check back later for new matches! or Adjust your preference in settings for more profiles.",
-    "adjustPreferences": "Adjust your preference in settings for more profiles",
+    "noProfilesDescription": "No profiles are available in your area right now. Check back soon for new matches, or adjust your preferences in Settings to see more people.",
+    "adjustPreferences": "Adjust your preferences in Settings to see more profiles",
     "refresh": "Refresh",
     "swipeGuide": {
       "title": "💕 Start Swiping! 💕",

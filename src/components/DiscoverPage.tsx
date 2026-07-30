@@ -4636,7 +4636,7 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, onNavigateToProfile, isPr
                 aria-label="Play games"
               >
                 <Gamepad2 className="w-4 h-4" />
-                  Try a quick love game
+                  Play Love Games
               </Button>
             </div>
           </CardContent>
@@ -4770,41 +4770,43 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, onNavigateToProfile, isPr
             <Heart className="w-16 h-16 mx-auto mb-4 text-gray-300" />
             <h2 className="text-xl font-semibold mb-2">{emptyTitle}</h2>
             <p className="text-gray-600 mb-4">{emptyDescription}</p>
-            <Button
-              onClick={() => {
-                // Clear all caches and force a complete refresh
-                setPotentialMatches([]);
-                setUserImages({});
-                setUserDistances({});
-                setCurrentIndex(0);
-                setNoMoreProfiles(false);
-                setEmptyStateMode('exhausted');
-                setIsLoading(true);
-                setIsLoadingMore(false);
-                setHasCompletedInitialFetch(false);
-                
-                // Clear image cache
-                clearCache();
-                
-                // Fetch fresh profiles
-                setTimeout(() => {
-                  fetchPotentialMatches();
-                }, 100);
-              }}
-              className="w-full"
-            >
-              {t('discover.refresh')}
-            </Button>
+            <div className="grid grid-cols-2 gap-3 mt-4">
+              <Button
+                onClick={() => {
+                  // Clear all caches and force a complete refresh
+                  setPotentialMatches([]);
+                  setUserImages({});
+                  setUserDistances({});
+                  setCurrentIndex(0);
+                  setNoMoreProfiles(false);
+                  setEmptyStateMode('exhausted');
+                  setIsLoading(true);
+                  setIsLoadingMore(false);
+                  setHasCompletedInitialFetch(false);
+                  
+                  // Clear image cache
+                  clearCache();
+                  
+                  // Fetch fresh profiles
+                  setTimeout(() => {
+                    fetchPotentialMatches();
+                  }, 100);
+                }}
+                className="w-full"
+              >
+                {t('discover.refresh')}
+              </Button>
 
-            <Button
-              onClick={() => navigate('/games')}
-              variant="outline"
-              className="w-full mt-3 border-purple-300 text-purple-700 hover:bg-purple-50 bg-white flex items-center justify-center gap-2"
-              aria-label="Play games"
-            >
-              <Gamepad2 className="w-4 h-4" />
-              Try a quick love game
-            </Button>
+              <Button
+                onClick={() => navigate('/games')}
+                variant="outline"
+                className="w-full border-purple-300 text-purple-700 hover:bg-purple-50 bg-white flex items-center justify-center gap-2"
+                aria-label="Play games"
+              >
+                <Gamepad2 className="w-4 h-4" />
+                Play Love Games
+              </Button>
+            </div>
           </CardContent>
         </Card>
       </div>

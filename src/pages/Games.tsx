@@ -2,7 +2,7 @@ import React from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Gamepad2, Target, Flag, Home, ArrowLeft } from 'lucide-react';
+import { Gamepad2, Target, Flag, Home } from 'lucide-react';
 
 const Games = () => {
   const navigate = useNavigate();
@@ -16,6 +16,8 @@ const Games = () => {
       description: 'Practice messaging through real scenarios. Choose your level and improve your conversation skills.',
       icon: Gamepad2,
       gradient: 'from-yellow-400 to-orange-500',
+      image: '/images/games/toast-chat.svg',
+      cta: 'Start Toast',
       path: '/games/test-your-toast'
     },
     {
@@ -26,6 +28,8 @@ const Games = () => {
       description: 'You have one message and limited time. Test your wit under pressure.',
       icon: Target,
       gradient: 'from-blue-400 to-purple-500',
+      image: '/images/games/shot-target.svg',
+      cta: 'Take the Shot',
       path: '/games/shoot-your-shot'
     },
     {
@@ -36,15 +40,17 @@ const Games = () => {
       description: 'Judge dating scenarios and profiles. Sharpen your instincts.',
       icon: Flag,
       gradient: 'from-red-400 to-green-500',
+      image: '/images/games/flags-instinct.svg',
+      cta: 'Read the Signals',
       path: '/games/red-flag-green-flag'
     }
   ];
 
   return (
-    <div className="h-screen bg-gradient-to-br from-gray-50 to-gray-100 flex flex-col">
+    <div className="h-screen bg-gradient-to-br from-slate-50 via-rose-50/50 to-violet-100/60 flex flex-col">
       {/* Header */}
-      <div className="pt-safe pt-10 bg-white border-b shadow-sm sticky top-0 z-10">
-        <div className="max-w-4xl mx-auto px-4 py-4">
+      <div className="pt-safe pt-10 bg-white/90 backdrop-blur-sm border-b border-white/70 shadow-sm sticky top-0 z-10">
+        <div className="max-w-6xl mx-auto px-4 py-4">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-3">
               <Button
@@ -61,49 +67,72 @@ const Games = () => {
                 <p className="text-sm text-gray-600">Games</p>
               </div>
             </div>
+            <div className="hidden sm:flex items-center gap-2 rounded-full border border-pink-100 bg-white px-3 py-1.5 text-xs font-medium text-gray-600">
+              <span className="h-2 w-2 rounded-full bg-emerald-400" />
+              New mini-games weekly
+            </div>
           </div>
         </div>
       </div>
 
       {/* Scrollable body */}
       <div className="flex-1 overflow-y-auto overflow-x-hidden pt-6 pb-8">
-        <div className="max-w-4xl mx-auto px-4 py-6 space-y-4 pb-32 pb-safe-offset-32">
+        <div className="max-w-6xl mx-auto px-4 py-6 pb-32 pb-safe-offset-32">
+          <div className="mb-5">
+            <h2 className="text-lg sm:text-xl font-semibold text-slate-900">Pick Your Vibe</h2>
+            <p className="text-sm text-slate-600">Quick, fun drills to boost your dating game.</p>
+          </div>
+
+          <div className="grid grid-cols-2 xl:grid-cols-3 gap-3 sm:gap-4">
           {games.map((game) => {
             const IconComponent = game.icon;
             return (
               <Card
                 key={game.id}
-                className="overflow-hidden hover:border-gray-300 transition-all duration-200 hover:shadow-md cursor-pointer"
+                className="group overflow-hidden border-white/70 bg-white/95 backdrop-blur-sm hover:border-white hover:shadow-xl hover:-translate-y-0.5 transition-all duration-250 cursor-pointer h-full"
                 onClick={() => navigate(game.path)}
               >
-                <div className={`h-1.5 bg-gradient-to-r ${game.gradient}`} />
+                <div className="relative">
+                  <img
+                    src={game.image}
+                    alt={`${game.title} artwork`}
+                    className="h-24 sm:h-28 w-full object-cover"
+                    loading="lazy"
+                    decoding="async"
+                  />
+                  <div className="absolute inset-0 bg-gradient-to-t from-black/20 via-transparent to-transparent" />
+                  <div className={`absolute right-3 top-3 p-2.5 rounded-xl bg-gradient-to-br ${game.gradient} shadow-lg ring-2 ring-white/70`}>
+                    <IconComponent className="w-4 h-4 text-white" />
+                  </div>
+                </div>
+
                 <CardHeader className="pb-3">
                   <div className="flex items-start gap-3">
-                    <div className={`p-2.5 rounded-lg bg-gradient-to-br ${game.gradient}`}>
-                      <IconComponent className="w-5 h-5 text-white" />
-                    </div>
                     <div className="flex-1">
-                      <CardTitle className="text-lg mb-0.5">{game.title}</CardTitle>
-                      <p className="text-xs text-gray-500">{game.subtitle}</p>
+                      <div className="inline-flex items-center rounded-full bg-slate-100 px-2 py-0.5 text-[11px] font-medium text-slate-600 mb-2">
+                        {game.subtitle}
+                      </div>
+                      <CardTitle className="text-base sm:text-lg mb-0.5 text-slate-900 leading-tight">{game.title}</CardTitle>
+                      <p className="text-xs sm:text-sm font-medium text-slate-700">{game.tagline}</p>
                     </div>
                   </div>
                 </CardHeader>
-                <CardContent className="pt-0 pb-4">
-                  <p className="text-sm font-medium text-gray-700 mb-2">{game.tagline}</p>
-                  <p className="text-sm text-gray-600 mb-4">{game.description}</p>
+                <CardContent className="pt-0 pb-4 flex flex-col h-full">
+                  <p className="text-xs sm:text-sm text-slate-600 mb-4">{game.description}</p>
                   <Button
-                    className={`w-full bg-gradient-to-r ${game.gradient} hover:opacity-90 text-white font-medium`}
+                    className={`mt-auto w-full bg-gradient-to-r ${game.gradient} hover:opacity-90 text-white font-medium`}
                     onClick={(e) => {
                       e.stopPropagation();
                       navigate(game.path);
                     }}
                   >
-                    Play Now
+                    {game.cta}
                   </Button>
                 </CardContent>
               </Card>
             );
           })}
+          </div>
         </div>
       </div>
     </div>

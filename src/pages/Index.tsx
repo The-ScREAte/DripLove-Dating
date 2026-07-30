@@ -10,6 +10,7 @@ import AboutUs from '@/components/AboutUs';
 import TermsOfService from '@/components/TermsOfService';
 import PrivacyPolicy from '@/components/PrivacyPolicy';
 import ErrorBoundary from '@/components/ErrorBoundary';
+import HoppingLogo from '@/components/HoppingLogo';
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
 import { transformFormDataForSubmission } from '@/utils/formValidation';
@@ -274,8 +275,9 @@ const Index = ({
 
   if (loading) {
     return (
-      <div className="w-full h-screen flex items-center justify-center bg-gradient-to-br from-purple-500 to-pink-500">
-        <div className="w-12 h-12 border-4 border-white border-t-transparent rounded-full animate-spin" />
+      <div className="w-full h-screen flex flex-col items-center justify-center gap-4 bg-gradient-to-br from-purple-500 to-pink-500">
+        <HoppingLogo size={68} opacity={0.85} />
+        <p className="text-white text-sm font-medium">Loading DripLove...</p>
       </div>
     );
   }

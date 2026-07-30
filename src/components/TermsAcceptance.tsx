@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, lazy, Suspense } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -8,13 +8,15 @@ import { Heart, Shield, Users, FileText, ExternalLink } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import { ScrollArea } from '@/components/ui/scroll-area';
-import TermsOfService from './TermsOfService';
-import PrivacyPolicy from './PrivacyPolicy';
+import HoppingLogo from '@/components/HoppingLogo';
 import { preloadPricingConfig } from '@/hooks/usePricingConfig';
 import { discoverCache, calculateAge, createDeterministicShuffle } from '@/utils/discoverCache';
 import { normalizeCountryCode } from '@/utils/countryCode';
 import { getStratifiedBatches } from '@/utils/stratifiedSampling';
 import { locationService } from '@/services/locationService';
+
+const TermsOfService = lazy(() => import('./TermsOfService'));
+const PrivacyPolicy = lazy(() => import('./PrivacyPolicy'));
 
 interface TermsAcceptanceProps {
   user: any;
@@ -32,25 +34,50 @@ const TermsAcceptance = ({ user, onAccept }: TermsAcceptanceProps) => {
   // Preload app data AND profiles in background while user views terms
   useEffect(() => {
     if (!user?.id) return;
+    let cancelled = false;
+    let timeoutId: number | null = null;
+    let idleId: number | null = null;
+
+    const preloadInBackground = () => {
+      if (cancelled) return;
     
-    // Mark user as authenticated for instant app load
-    try {
-      sessionStorage.setItem('driplove_user_session', 'authenticated');
-    } catch {}
-    
-    // Preload pricing config in background
-    preloadPricingConfig(user.id);
-    
-    // Preload user profile data
-    supabase
-      .from('profiles')
-      .select('*')
-      .eq('id', user.id)
-      .single()
-      .then(() => {});
-    
-    // CRITICAL: Preload discover profiles in background for instant app load
-    preloadDiscoverProfiles(user.id);
+      // Mark user as authenticated for instant app load
+      try {
+        sessionStorage.setItem('driplove_user_session', 'authenticated');
+      } catch {}
+
+      // Preload app data without blocking first paint
+      preloadPricingConfig(user.id);
+      supabase
+        .from('profiles')
+        .select('*')
+        .eq('id', user.id)
+        .single()
+        .then(() => {});
+
+      // CRITICAL: Preload discover profiles in background for instant app load
+      preloadDiscoverProfiles(user.id);
+    };
+
+    // Defer heavy background preloading to idle time to keep this page snappy.
+    if (typeof window !== 'undefined' && 'requestIdleCallback' in window) {
+      idleId = (window as Window & { requestIdleCallback: (cb: () => void, options?: { timeout: number }) => number }).requestIdleCallback(
+        preloadInBackground,
+        { timeout: 1200 }
+      );
+    } else {
+      timeoutId = window.setTimeout(preloadInBackground, 150);
+    }
+
+    return () => {
+      cancelled = true;
+      if (timeoutId !== null) {
+        window.clearTimeout(timeoutId);
+      }
+      if (idleId !== null && typeof window !== 'undefined' && 'cancelIdleCallback' in window) {
+        (window as Window & { cancelIdleCallback: (id: number) => void }).cancelIdleCallback(idleId);
+      }
+    };
   }, [user?.id]);
 
   // Background profile preloading - runs while user reads terms
@@ -303,9 +330,24 @@ const TermsAcceptance = ({ user, onAccept }: TermsAcceptanceProps) => {
   };
 
   return (
-    <div className="terms-container min-h-screen bg-white p-3 flex items-center justify-center">
-      <Card className="w-full max-w-md mx-auto bg-white shadow-xl border-0 rounded-xl">
-        <CardHeader className="text-center pb-2 pt-4">
+    <div
+      className="terms-container fixed inset-0 z-[10000] bg-gradient-to-br from-rose-50 via-white to-fuchsia-50 overflow-y-auto overscroll-y-contain pointer-events-auto"
+      style={{
+        paddingTop: 'calc(env(safe-area-inset-top, 0px) + 12px)',
+        paddingBottom: 'calc(env(safe-area-inset-bottom, 0px) + 12px)',
+        paddingLeft: 'calc(env(safe-area-inset-left, 0px) + 12px)',
+        paddingRight: 'calc(env(safe-area-inset-right, 0px) + 12px)',
+        WebkitOverflowScrolling: 'touch'
+      }}
+    >
+      <div
+        className="w-full max-w-md mx-auto flex items-center justify-center py-2"
+        style={{
+          minHeight: 'calc(100dvh - env(safe-area-inset-top, 0px) - env(safe-area-inset-bottom, 0px) - 24px)'
+        }}
+      >
+      <Card className="relative w-full bg-white/95 backdrop-blur-sm shadow-2xl border border-rose-100 rounded-2xl pointer-events-auto">
+        <CardHeader className="text-center pb-2 pt-5">
           <div className="mx-auto w-12 h-12 mb-2">
             <img 
               src="/driplove-logo.webp"
@@ -315,18 +357,18 @@ const TermsAcceptance = ({ user, onAccept }: TermsAcceptanceProps) => {
               className="w-full h-full object-contain"
             />
           </div>
-          <CardTitle className="text-base font-bold text-gray-900 mb-0.5">
+          <CardTitle className="text-lg font-bold text-gray-900 mb-0.5">
             Welcome to DripLove! 💕
           </CardTitle>
-          <CardDescription className="text-xs text-gray-700">
+          <CardDescription className="text-sm text-gray-600">
             Let's keep things safe and fun for everyone
           </CardDescription>
         </CardHeader>
 
-        <CardContent className="space-y-2.5 px-4 pb-4">
+        <CardContent className="space-y-3 px-4 pb-4">
           {/* Key Points */}
-          <div className="space-y-1.5">
-            <div className="flex items-center gap-2 p-1.5 bg-pink-50 rounded-lg">
+          <div className="space-y-2">
+            <div className="flex items-center gap-2 p-2 bg-pink-50 rounded-lg border border-pink-100">
               <div className="w-5 h-5 bg-pink-200 rounded-full flex items-center justify-center flex-shrink-0">
                 <Heart className="w-2.5 h-2.5 text-pink-600" />
               </div>
@@ -336,7 +378,7 @@ const TermsAcceptance = ({ user, onAccept }: TermsAcceptanceProps) => {
               </div>
             </div>
 
-            <div className="flex items-center gap-2 p-1.5 bg-purple-50 rounded-lg">
+            <div className="flex items-center gap-2 p-2 bg-purple-50 rounded-lg border border-purple-100">
               <div className="w-5 h-5 bg-purple-200 rounded-full flex items-center justify-center flex-shrink-0">
                 <Shield className="w-2.5 h-2.5 text-purple-600" />
               </div>
@@ -346,7 +388,7 @@ const TermsAcceptance = ({ user, onAccept }: TermsAcceptanceProps) => {
               </div>
             </div>
 
-            <div className="flex items-center gap-2 p-1.5 bg-blue-50 rounded-lg">
+            <div className="flex items-center gap-2 p-2 bg-blue-50 rounded-lg border border-blue-100">
               <div className="w-5 h-5 bg-blue-200 rounded-full flex items-center justify-center flex-shrink-0">
                 <Users className="w-2.5 h-2.5 text-blue-600" />
               </div>
@@ -358,10 +400,10 @@ const TermsAcceptance = ({ user, onAccept }: TermsAcceptanceProps) => {
           </div>
 
           {/* Document Links */}
-          <div className="flex gap-1.5 justify-center flex-wrap">
+          <div className="flex gap-2 justify-center flex-wrap">
             <button
               onClick={() => setShowTerms(true)}
-              className="inline-flex items-center gap-1 px-2 py-1 bg-pink-100 hover:bg-pink-200 text-pink-700 rounded-full text-[10px] font-medium transition-colors border border-pink-200"
+              className="inline-flex items-center gap-1 px-2.5 py-1 bg-pink-100 hover:bg-pink-200 text-pink-700 rounded-full text-[11px] font-medium transition-colors border border-pink-200"
             >
               <FileText className="w-2.5 h-2.5" />
               Terms
@@ -369,7 +411,7 @@ const TermsAcceptance = ({ user, onAccept }: TermsAcceptanceProps) => {
             </button>
             <button
               onClick={() => setShowPrivacy(true)}
-              className="inline-flex items-center gap-1 px-2 py-1 bg-purple-100 hover:bg-purple-200 text-purple-700 rounded-full text-[10px] font-medium transition-colors border border-purple-200"
+              className="inline-flex items-center gap-1 px-2.5 py-1 bg-purple-100 hover:bg-purple-200 text-purple-700 rounded-full text-[11px] font-medium transition-colors border border-purple-200"
             >
               <Shield className="w-2.5 h-2.5" />
               Privacy
@@ -378,42 +420,51 @@ const TermsAcceptance = ({ user, onAccept }: TermsAcceptanceProps) => {
           </div>
 
           {/* Acceptance Checkbox */}
-          <div className="bg-gradient-to-r from-pink-50 to-purple-50 rounded-lg p-2 border border-pink-200">
-            <div className="flex items-start space-x-2">
+          <div className="rounded-lg p-3 border border-pink-200 bg-white/80">
+            <label
+              htmlFor="terms-acceptance"
+              className="mx-auto max-w-sm flex items-center justify-center gap-2 text-center cursor-pointer"
+            >
               <Checkbox
                 id="terms-acceptance"
                 checked={termsAccepted}
                 onCheckedChange={(checked) => setTermsAccepted(checked === true)}
-                className="mt-0.5 rounded-full h-3.5 w-3.5"
+                className="h-3.5 w-3.5 min-h-3.5 min-w-3.5 p-0 shrink-0 rounded-full border-gray-400 data-[state=checked]:bg-pink-500 data-[state=checked]:border-pink-500"
               />
-              <label
-                htmlFor="terms-acceptance"
-                className="text-xs text-gray-900 cursor-pointer leading-tight"
-              >
+              <span className="text-sm text-gray-900 leading-snug">
                 I agree to the Terms & Privacy Policy, and I'm 18+
-              </label>
-            </div>
+              </span>
+            </label>
           </div>
 
           {/* Action Button */}
           <Button
             onClick={handleAccept}
             disabled={loading || !termsAccepted}
-            className="w-full bg-gradient-to-r from-pink-500 to-purple-500 hover:from-pink-600 hover:to-purple-600 text-white font-semibold py-2 text-sm rounded-lg transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed shadow-md"
+            className="w-full h-10 bg-gradient-to-r from-pink-500 to-purple-500 hover:from-pink-600 hover:to-purple-600 text-white font-semibold text-sm rounded-lg transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed shadow-md"
           >
             {loading ? "Processing..." : "Let's Go! 🚀"}
           </Button>
         </CardContent>
       </Card>
+      </div>
 
       {/* Terms of Service Dialog */}
       <Dialog open={showTerms} onOpenChange={setShowTerms}>
         <DialogContent className="max-w-4xl max-h-[90vh]">
           <DialogTitle className="sr-only">Terms of Service</DialogTitle>
           <ScrollArea className="h-[80vh] pr-4">
-            <div className="pb-6">
-              <TermsOfService onBack={() => setShowTerms(false)} />
-            </div>
+            <Suspense
+              fallback={
+                <div className="h-[60vh] flex items-center justify-center">
+                  <HoppingLogo size={56} opacity={0.75} />
+                </div>
+              }
+            >
+              <div className="pb-6">
+                <TermsOfService onBack={() => setShowTerms(false)} />
+              </div>
+            </Suspense>
           </ScrollArea>
         </DialogContent>
       </Dialog>
@@ -423,9 +474,17 @@ const TermsAcceptance = ({ user, onAccept }: TermsAcceptanceProps) => {
         <DialogContent className="max-w-4xl max-h-[90vh]">
           <DialogTitle className="sr-only">Privacy Policy</DialogTitle>
           <ScrollArea className="h-[80vh] pr-4">
-            <div className="pb-6">
-              <PrivacyPolicy onBack={() => setShowPrivacy(false)} />
-            </div>
+            <Suspense
+              fallback={
+                <div className="h-[60vh] flex items-center justify-center">
+                  <HoppingLogo size={56} opacity={0.75} />
+                </div>
+              }
+            >
+              <div className="pb-6">
+                <PrivacyPolicy onBack={() => setShowPrivacy(false)} />
+              </div>
+            </Suspense>
           </ScrollArea>
         </DialogContent>
       </Dialog>
