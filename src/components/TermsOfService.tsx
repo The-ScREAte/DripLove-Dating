@@ -11,7 +11,13 @@ const TermsOfService = ({ onBack }: TermsOfServiceProps) => {
   const { t } = useTranslation();
   
   return (
-  <div className="min-h-fill bg-gradient-to-br from-pink-400 via-purple-500 to-indigo-600 p-4">
+  <div
+    className="min-h-fill bg-gradient-to-br from-pink-400 via-purple-500 to-indigo-600 px-4 pb-4"
+    style={{
+      paddingTop: 'calc(env(safe-area-inset-top, 0px) + 12px)',
+      paddingBottom: 'calc(env(safe-area-inset-bottom, 0px) + 12px)'
+    }}
+  >
       <div className="max-w-4xl mx-auto bg-white rounded-lg shadow-lg overflow-hidden">
         {/* Header */}
         <div className="bg-gradient-to-r from-purple-600 to-pink-600 text-white py-2 px-4 sticky top-0 z-10">
