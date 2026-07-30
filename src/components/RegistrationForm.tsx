@@ -21,7 +21,6 @@ import { compressImage } from '@/utils/imageCompression';
 import { useToast } from '@/hooks/use-toast';
 import { verifyUploadedImage, detectHumanFace } from '@/utils/faceVerificationUtils';
 import { useTranslation } from 'react-i18next';
-import { videoPreloader } from '@/utils/videoPreloader';
 import FaceVerification from '@/components/FaceVerification';
 import { usePromoCodeEnabled } from '@/hooks/usePromoCodeEnabled';
 
@@ -875,40 +874,10 @@ const RegistrationForm = ({ onSubmit, onBackToLogin }: RegistrationFormProps) =>
   };
 
   return (
-    <div className="keyboard-safe-form input-scroll-container relative min-h-screen">
-      {/* Video Background */}
-      <div className="fixed inset-0">
-        <video
-          autoPlay
-          loop
-          muted
-          playsInline
-          webkit-playsinline="true"
-          x5-playsinline="true"
-          preload="auto"
-          src={videoPreloader.getVideoUrl()}
-          className="absolute top-0 left-0 w-full h-full object-cover opacity-30"
-          onLoadedData={(e) => {
-            e.currentTarget.playbackRate = 1.2;
-            e.currentTarget.play().catch(() => {});
-          }}
-          onTimeUpdate={(e) => {
-            const video = e.currentTarget;
-            if (video.duration && video.currentTime >= video.duration - 0.1) {
-              video.currentTime = 0;
-            }
-          }}
-          onEnded={(e) => {
-            e.currentTarget.currentTime = 0;
-            e.currentTarget.play().catch(() => {});
-          }}
-        />
-        <div className="absolute inset-0 bg-gradient-to-br from-purple-500/20 to-pink-500/20"></div>
-      </div>
-
-      <div className="relative z-10 py-8">
-        <Card className="w-full max-w-md mx-auto backdrop-blur-sm bg-white/50 shadow-2xl border-0 animate-fade-in no-bottom-space" style={{ marginBottom: 0, paddingBottom: 0 }}>
-      <CardHeader className="text-center pb-6">
+    <div className="keyboard-safe-form input-scroll-container relative min-h-[100dvh] overflow-x-visible touch-pan-y">
+      <div className="relative z-10 px-2 sm:px-0 py-4 sm:py-8 pb-[calc(env(safe-area-inset-bottom,0px)+28px)]">
+        <Card className="w-full max-w-full sm:max-w-md mx-auto rounded-none backdrop-blur-sm bg-white/40 shadow-none border border-white/40 animate-fade-in">
+      <CardHeader className="text-center px-3 sm:px-6 pb-5 sm:pb-6">
         <div className="flex justify-center mb-4">
           <div className="p-3 bg-gradient-to-r from-pink-500 to-purple-600 rounded-full hover-scale">
             <Heart className="w-8 h-8 text-white" />
@@ -918,8 +887,8 @@ const RegistrationForm = ({ onSubmit, onBackToLogin }: RegistrationFormProps) =>
           {currentStep === 1 ? t('registration.createAccount') : currentStep === 2 ? t('registration.tellUsMore') : t('registration.addPhotos')}
         </CardTitle>
       </CardHeader>
-      <CardContent className="animate-fade-in pb-8">
-        <form onSubmit={handleSubmit} className="space-y-8">
+      <CardContent className="animate-fade-in px-3 sm:px-6 pb-5 sm:pb-8">
+        <form onSubmit={handleSubmit} className="space-y-6 sm:space-y-8">
           {currentStep === 1 && (
             <div className="space-y-6 animate-fade-in">
           <BasicInfoSection
@@ -942,12 +911,12 @@ const RegistrationForm = ({ onSubmit, onBackToLogin }: RegistrationFormProps) =>
           {/* Work & Education */}
           <div className="space-y-4 animate-scale-in">
             <h4 className="text-lg font-semibold text-gray-800">{t('registration.workEducation')}</h4>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 min-[390px]:grid-cols-2 gap-3 sm:gap-4">
               <div className="space-y-2">
                 <Label className="text-sm font-medium">{t('profile.occupation')}</Label>
                 <Select value={formData.occupation} onValueChange={(value) => handleSelectChange('occupation', value)}>
-                  <SelectTrigger className={`border-gray-200 focus:border-pink-400 focus:ring-pink-400 ${errors.occupation ? 'border-red-500' : ''}`}>
-                    <SelectValue placeholder={t('registration.selectOccupation')} />
+                  <SelectTrigger className={`pl-2.5 pr-2.5 border-gray-200 focus:border-pink-400 focus:ring-pink-400 ${errors.occupation ? 'border-red-500' : ''}`}>
+                    <SelectValue placeholder="Select" />
                   </SelectTrigger>
                   <SelectContent>
                     {occupationOptions.map(option => (
@@ -960,8 +929,8 @@ const RegistrationForm = ({ onSubmit, onBackToLogin }: RegistrationFormProps) =>
               <div className="space-y-2">
                 <Label className="text-sm font-medium">{t('profile.industry')}</Label>
                 <Select value={formData.industry} onValueChange={(value) => handleSelectChange('industry', value)}>
-                  <SelectTrigger className={`border-gray-200 focus:border-pink-400 focus:ring-pink-400 ${errors.industry ? 'border-red-500' : ''}`}>
-                    <SelectValue placeholder={t('registration.selectIndustry')} />
+                  <SelectTrigger className={`pl-2.5 pr-2.5 border-gray-200 focus:border-pink-400 focus:ring-pink-400 ${errors.industry ? 'border-red-500' : ''}`}>
+                    <SelectValue placeholder="Select" />
                   </SelectTrigger>
                   <SelectContent>
                     {industryOptions.map(option => (
@@ -975,8 +944,8 @@ const RegistrationForm = ({ onSubmit, onBackToLogin }: RegistrationFormProps) =>
             <div className="space-y-2">
               <Label className="text-sm font-medium">{t('registration.educationLevel')}</Label>
               <Select value={formData.educationLevel} onValueChange={(value) => handleSelectChange('educationLevel', value)}>
-                <SelectTrigger className={`border-gray-200 focus:border-pink-400 focus:ring-pink-400 ${errors.educationLevel ? 'border-red-500' : ''}`}>
-                  <SelectValue placeholder={t('registration.selectEducation')} />
+                <SelectTrigger className={`pl-2.5 pr-2.5 border-gray-200 focus:border-pink-400 focus:ring-pink-400 ${errors.educationLevel ? 'border-red-500' : ''}`}>
+                  <SelectValue placeholder="Select" />
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="High School">{t('registration.highSchool')}</SelectItem>
@@ -1016,11 +985,11 @@ const RegistrationForm = ({ onSubmit, onBackToLogin }: RegistrationFormProps) =>
             <div className="space-y-6 animate-fade-in">
 
           {/* Gender and Preference */}
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 animate-scale-in">
+          <div className="grid grid-cols-1 min-[390px]:grid-cols-2 gap-3 sm:gap-4 animate-scale-in">
             <div className="space-y-2">
               <Label className="text-sm font-medium">{t('registration.iAm')} *</Label>
               <Select value={formData.gender} onValueChange={(value) => handleSelectChange('gender', value)}>
-                <SelectTrigger className={`border-gray-200 focus:border-pink-400 focus:ring-pink-400 ${errors.gender ? 'border-red-500' : ''}`}>
+                <SelectTrigger className={`pl-2.5 pr-2.5 border-gray-200 focus:border-pink-400 focus:ring-pink-400 ${errors.gender ? 'border-red-500' : ''}`}>
                   <SelectValue placeholder={t('registration.selectGender')} />
                 </SelectTrigger>
                 <SelectContent>
@@ -1034,7 +1003,7 @@ const RegistrationForm = ({ onSubmit, onBackToLogin }: RegistrationFormProps) =>
             <div className="space-y-2">
               <Label className="text-sm font-medium">{t('registration.lookingFor')} *</Label>
               <Select value={formData.preference} onValueChange={(value) => handleSelectChange('preference', value)}>
-                <SelectTrigger className={`border-gray-200 focus:border-pink-400 focus:ring-pink-400 ${errors.preference ? 'border-red-500' : ''}`}>
+                <SelectTrigger className={`pl-2.5 pr-2.5 border-gray-200 focus:border-pink-400 focus:ring-pink-400 ${errors.preference ? 'border-red-500' : ''}`}>
                   <SelectValue placeholder={t('registration.selectPreference')} />
                 </SelectTrigger>
                 <SelectContent>
@@ -1051,7 +1020,7 @@ const RegistrationForm = ({ onSubmit, onBackToLogin }: RegistrationFormProps) =>
           <div className="space-y-2 animate-scale-in">
             <Label className="text-sm font-medium">{t('registration.relationshipIntent')}</Label>
             <Select value={formData.relationshipIntent} onValueChange={(value) => handleSelectChange('relationshipIntent', value)}>
-              <SelectTrigger className={`border-gray-200 focus:border-pink-400 focus:ring-pink-400 ${errors.relationshipIntent ? 'border-red-500' : ''}`}>
+              <SelectTrigger className={`pl-2.5 pr-2.5 border-gray-200 focus:border-pink-400 focus:ring-pink-400 ${errors.relationshipIntent ? 'border-red-500' : ''}`}>
                 <SelectValue placeholder={t('registration.whatLookingFor')} />
               </SelectTrigger>
               <SelectContent>
@@ -1155,13 +1124,13 @@ const RegistrationForm = ({ onSubmit, onBackToLogin }: RegistrationFormProps) =>
             </div>
           )}
 
-          <div className="flex flex-col gap-4">
+          <div className="flex flex-col sm:flex-row sm:justify-end gap-3">
             {currentStep > 1 && (
               <Button 
                 type="button" 
                 variant="outline"
                 onClick={() => setCurrentStep(currentStep - 1)}
-                className="w-full border-pink-400 text-pink-600 hover:bg-pink-50 transition-all duration-200 animate-fade-in"
+                className="h-9 px-4 sm:w-auto border-pink-400 text-pink-600 hover:bg-pink-50 transition-all duration-200 animate-fade-in"
               >
                 {t('registration.back')}
               </Button>
@@ -1169,7 +1138,7 @@ const RegistrationForm = ({ onSubmit, onBackToLogin }: RegistrationFormProps) =>
             <Button 
               type="submit" 
               disabled={isSubmitting}
-              className="w-full bg-gradient-to-r from-pink-500 to-purple-600 hover:from-pink-600 hover:to-purple-700 text-white font-semibold py-3 rounded-lg transition-all duration-200 animate-fade-in disabled:opacity-50 disabled:cursor-not-allowed"
+              className="h-9 px-4 sm:w-auto bg-gradient-to-r from-pink-500 to-purple-600 hover:from-pink-600 hover:to-purple-700 text-white font-semibold rounded-lg transition-all duration-200 animate-fade-in disabled:opacity-50 disabled:cursor-not-allowed"
             >
               {isSubmitting 
                 ? t('registration.creatingAccount')

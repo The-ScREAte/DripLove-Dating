@@ -94,6 +94,18 @@ const AccountActions = ({ currentUser, onLogout, onShowTerms, onShowPrivacy, hid
 
   const handleLogout = async () => {
     try {
+      // Clear chat caches before sign-out to prevent cross-account stale render.
+      const { clearChatCache } = await import('@/cache/chatCache');
+      clearChatCache();
+      if (typeof window !== 'undefined') {
+        const w = window as Window & {
+          chatMatchesCache?: Map<string, unknown>;
+          chatMessagesCache?: Map<string, unknown>;
+        };
+        w.chatMatchesCache?.clear();
+        w.chatMessagesCache?.clear();
+      }
+
       // Remove push token before logging out
       if (currentUser?.id) {
         const { removePushToken } = await import('@/services/pushNotifications');

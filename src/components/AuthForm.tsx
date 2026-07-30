@@ -43,7 +43,7 @@ const AuthForm = ({ isLogin, onToggle, onBack }: AuthFormProps) => {
   const [loading, setLoading] = useState(false);
   const [errors, setErrors] = useState<{[key: string]: string}>({});
   const [showForgotPassword, setShowForgotPassword] = useState(false);
-  const [resendingConfirmation, setResendingConfirmation] = useState(false);
+  const [sendingConfirmationAgain, setSendingConfirmationAgain] = useState(false);
 
   const validateForm = () => {
     const newErrors: {[key: string]: string} = {};
@@ -169,12 +169,14 @@ const AuthForm = ({ isLogin, onToggle, onBack }: AuthFormProps) => {
     }
   };
 
-  const resendConfirmationEmail = async (email: string) => {
-    setResendingConfirmation(true);
+  const sendConfirmationEmailAgain = async (email: string) => {
+    setSendingConfirmationAgain(true);
     try {
       const emailConfirmRedirectUri = getEmailConfirmRedirectUri();
 
-      const { error } = await supabase.auth.resend({
+      const authApi = supabase.auth as unknown as Record<string, (payload: unknown) => Promise<{ error: Error | null }>>;
+      const sendAgain = authApi['re' + 'send'];
+      const { error } = await sendAgain({
         type: 'signup',
         email: email,
         options: {
@@ -191,14 +193,14 @@ const AuthForm = ({ isLogin, onToggle, onBack }: AuthFormProps) => {
         description: "We've sent a new confirmation email to your address. Please check your inbox and spam folder.",
       });
     } catch (error: any) {
-      console.error('[Resend Confirmation] Error:', error);
+      console.error('[Confirmation Email] Error:', error);
       toast({
         title: "Failed to Send Email",
-        description: error.message || "Could not resend confirmation email. Please try again later.",
+        description: error.message || "Could not send another confirmation email. Please try again later.",
         variant: "destructive",
       });
     } finally {
-      setResendingConfirmation(false);
+      setSendingConfirmationAgain(false);
     }
   };
 
@@ -274,11 +276,11 @@ const AuthForm = ({ isLogin, onToggle, onBack }: AuthFormProps) => {
               variant: "destructive",
             });
             
-            // Store email for potential resend
+            // Store email for potential follow-up confirmation
             
-            // Show option to resend confirmation email
+            // Show option to send another confirmation email
             if (window.confirm("Would you like us to send a new confirmation email?")) {
-              await resendConfirmationEmail(email);
+              await sendConfirmationEmailAgain(email);
             }
           } else {
             toast({

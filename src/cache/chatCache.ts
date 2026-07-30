@@ -21,6 +21,7 @@ export interface CachedChat {
 }
 
 export const chatCache = {
+  ownerUserId: '' as string,
   timestamp: 0,
   chats: [] as CachedChat[],
   avatars: {} as Record<string, string>, // blob URLs for user avatars
@@ -36,9 +37,27 @@ export const isCacheValid = (): boolean => {
 };
 
 /**
+ * Check if cache is valid for a specific signed-in user
+ */
+export const isCacheValidForUser = (userId?: string): boolean => {
+  if (!userId) return false;
+  if (chatCache.ownerUserId !== userId) return false;
+  return isCacheValid();
+};
+
+/**
  * Update cache with new chat list
  */
 export const updateChatCache = (chats: CachedChat[]): void => {
+  chatCache.chats = chats;
+  chatCache.timestamp = Date.now();
+};
+
+/**
+ * Update cache and bind ownership to current signed-in user
+ */
+export const updateChatCacheForUser = (userId: string, chats: CachedChat[]): void => {
+  chatCache.ownerUserId = userId;
   chatCache.chats = chats;
   chatCache.timestamp = Date.now();
 };
@@ -85,6 +104,7 @@ export const getCachedUserName = (userId: string): string | undefined => {
  * Clear all cache (logout scenario)
  */
 export const clearChatCache = (): void => {
+  chatCache.ownerUserId = '';
   chatCache.chats = [];
   chatCache.avatars = {};
   chatCache.userNames = {};

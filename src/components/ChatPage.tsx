@@ -5,7 +5,7 @@ import { usePushNotifications } from '@/hooks/usePushNotifications';
 // ⭐ ANDROID FIX: Use platform utils instead of synchronous Capacitor import
 import { getPlatformSync } from '@/utils/platformUtils';
 import { useVirtualizer } from '@tanstack/react-virtual';
-import { chatCache, updateChatCache, isCacheValid, cacheUserName, type CachedChat } from '@/cache/chatCache';
+import { chatCache, updateChatCacheForUser, isCacheValidForUser, cacheUserName, type CachedChat } from '@/cache/chatCache';
 // SafeAreaView removed — use plain divs with env(...) padding where necessary
 import UserProfileModal from './UserProfileModal';
 import BlockDialog from './BlockDialog';
@@ -103,7 +103,7 @@ const ChatPage = ({ currentUser, onUnreadChange, onDetailViewChange }: ChatPageP
   const [matches, setMatches] = useState<ChatMatch[]>(() => {
     if (!currentUser?.id) return [];
     // Show cached chats instantly - no loading spinner
-    return isCacheValid() ? (chatCache.chats as ChatMatch[]) : [];
+    return isCacheValidForUser(currentUser.id) ? (chatCache.chats as ChatMatch[]) : [];
   });
    
   const matchesRef = useRef<ChatMatch[]>([]);
@@ -120,6 +120,7 @@ const ChatPage = ({ currentUser, onUnreadChange, onDetailViewChange }: ChatPageP
   const autoDeletingDormantMatchIdsRef = useRef<Set<string>>(new Set());
   const markReadInFlightRef = useRef(false);
   const markReadPendingRef = useRef(false);
+  const markReadDebounceTimerRef = useRef<number | null>(null);
   const { toast } = useToast();
   const { sendMessageNotification, isInitialized, isSupported } = usePushNotifications(currentUser?.id);
   const messagesEndRef = useRef<HTMLDivElement>(null);
@@ -157,6 +158,17 @@ const ChatPage = ({ currentUser, onUnreadChange, onDetailViewChange }: ChatPageP
       void fetchMatches();
     }, 300);
   };
+
+  const scheduleMarkMessagesAsRead = (delayMs = 200) => {
+    if (markReadDebounceTimerRef.current) {
+      window.clearTimeout(markReadDebounceTimerRef.current);
+    }
+    markReadDebounceTimerRef.current = window.setTimeout(() => {
+      markReadDebounceTimerRef.current = null;
+      void markMessagesAsRead();
+    }, delayMs);
+  };
+
   const backgroundFetchingRef = useRef(false);
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [pullDistance, setPullDistance] = useState(0);
@@ -211,6 +223,9 @@ const ChatPage = ({ currentUser, onUnreadChange, onDetailViewChange }: ChatPageP
       if (highlightTimeoutRef.current) {
         window.clearTimeout(highlightTimeoutRef.current);
       }
+      if (markReadDebounceTimerRef.current) {
+        window.clearTimeout(markReadDebounceTimerRef.current);
+      }
     };
   }, []);
 
@@ -233,7 +248,7 @@ const ChatPage = ({ currentUser, onUnreadChange, onDetailViewChange }: ChatPageP
     })();
     
     // ⭐ Check if we have valid cached data first (instant render)
-    if (isCacheValid()) {
+    if (isCacheValidForUser(currentUser.id)) {
       setMatches(chatCache.chats as ChatMatch[]);
       // Still fetch in background to get latest data
       fetchMatchesInBackground();
@@ -303,7 +318,7 @@ const ChatPage = ({ currentUser, onUnreadChange, onDetailViewChange }: ChatPageP
 
             // Update caches for instant render
             chatMatchesCache.set(currentUser.id, { matches: sorted, timestamp: Date.now() });
-            updateChatCache(sorted as unknown as CachedChat[]);
+            updateChatCacheForUser(currentUser.id, sorted as unknown as CachedChat[]);
 
             return sorted;
           });
@@ -393,17 +408,19 @@ const ChatPage = ({ currentUser, onUnreadChange, onDetailViewChange }: ChatPageP
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [currentUser?.id, onUnreadChange]);
 
-  // ⭐ ANDROID OPTIMIZATION: Reduced polling frequency (5s instead of 2s)
+  // Fallback polling if cache is stale and app is visible.
   // Real-time subscription handles instant updates, polling is just a fallback
   useEffect(() => {
     if (!currentUser?.id || selectedMatch) return;
     
     const interval = setInterval(() => {
-      // ⭐ Only refresh if cache is stale (prevents unnecessary updates)
-      if (!isCacheValid()) {
-        fetchMatches();
+      if (document.visibilityState !== 'visible') return;
+      if (backgroundFetchingRef.current) return;
+      // Only refresh if this signed-in user's cache is stale.
+      if (!isCacheValidForUser(currentUser.id)) {
+        fetchMatchesInBackground();
       }
-    }, 5000); // ⭐ ANDROID FIX: Reduced from 2s to 5s - realtime handles instant updates
+    }, 15000);
 
     return () => {
       clearInterval(interval);
@@ -478,7 +495,7 @@ const ChatPage = ({ currentUser, onUnreadChange, onDetailViewChange }: ChatPageP
       // ALWAYS fetch new messages in background (even if cache exists)
       fetchMessagesInBackground(selectedMatch.id);
       // Mark messages as read (fire and forget, but log for debugging)
-      void markMessagesAsRead();
+      scheduleMarkMessagesAsRead(120);
       onDetailViewChange?.(true);
       
       // Scroll to bottom after messages load
@@ -509,13 +526,13 @@ const ChatPage = ({ currentUser, onUnreadChange, onDetailViewChange }: ChatPageP
     const handleVisibilityChange = () => {
       if (document.visibilityState === 'hidden') {
         // Mark as read when user leaves the chat/app
-        markMessagesAsRead();
+        scheduleMarkMessagesAsRead(0);
       }
     };
     
     const handleBeforeUnload = () => {
       // Attempt to mark as read before page unloads
-      markMessagesAsRead();
+      scheduleMarkMessagesAsRead(0);
     };
     
     document.addEventListener('visibilitychange', handleVisibilityChange);
@@ -523,7 +540,7 @@ const ChatPage = ({ currentUser, onUnreadChange, onDetailViewChange }: ChatPageP
     
     return () => {
       // Also mark as read when unmounting the effect (e.g., when chat is closed)
-      markMessagesAsRead();
+      scheduleMarkMessagesAsRead(0);
       document.removeEventListener('visibilitychange', handleVisibilityChange);
       window.removeEventListener('beforeunload', handleBeforeUnload);
     };
@@ -661,7 +678,7 @@ const ChatPage = ({ currentUser, onUnreadChange, onDetailViewChange }: ChatPageP
             updateMatchInBackground(selectedMatch.id, newMsg);
             
             if (newMsg.sender_id !== currentUser.id) {
-              markMessagesAsRead();
+              scheduleMarkMessagesAsRead(100);
             } else {
               // If we sent the message, trigger unread count refresh for other matches
               onUnreadChange?.();
@@ -890,7 +907,7 @@ const ChatPage = ({ currentUser, onUnreadChange, onDetailViewChange }: ChatPageP
         );
       
       if (listChanged) {
-        updateChatCache(visibleMatches as unknown as CachedChat[]);
+        updateChatCacheForUser(currentUser.id, visibleMatches as unknown as CachedChat[]);
         setMatches(visibleMatches);
       }
 
@@ -965,7 +982,7 @@ const ChatPage = ({ currentUser, onUnreadChange, onDetailViewChange }: ChatPageP
       // Unread counts come from match-level counters (user1_unread_count/user2_unread_count).
       
       // ⭐ Update global cache (survives route changes like Instagram)
-      updateChatCache(visibleMatches as unknown as CachedChat[]);
+      updateChatCacheForUser(currentUser.id, visibleMatches as unknown as CachedChat[]);
 
       setMatches(visibleMatches);
       // Clear the refresh flag when we've just fetched
@@ -1279,7 +1296,7 @@ const ChatPage = ({ currentUser, onUnreadChange, onDetailViewChange }: ChatPageP
 
       if (markReadPendingRef.current) {
         markReadPendingRef.current = false;
-        void markMessagesAsRead();
+        scheduleMarkMessagesAsRead(120);
       }
 
       // Always ask the parent to refresh nav unread badge after a short delay
@@ -1508,8 +1525,8 @@ const ChatPage = ({ currentUser, onUnreadChange, onDetailViewChange }: ChatPageP
 
           // IMPORTANT: Refresh matches immediately when first message is sent
           // This moves the match from "New Matches" to "Conversations" instantly
-          chatMatchesCache.delete(currentUser.id);
-          void fetchMatchesInBackground();
+          matchesNeedsRefreshRef.current = true;
+          scheduleFetchMatches();
         } catch {
           // ignore post-send side effects
         }
@@ -1806,7 +1823,7 @@ const ChatPage = ({ currentUser, onUnreadChange, onDetailViewChange }: ChatPageP
     }
   };
 
-  const handleSwipeMove = async (e: React.TouchEvent) => {
+  const handleSwipeMove = (e: React.TouchEvent) => {
     if (!isSwiping) return;
     
     const touch = e.touches[0];
@@ -1817,8 +1834,8 @@ const ChatPage = ({ currentUser, onUnreadChange, onDetailViewChange }: ChatPageP
     if (Math.abs(deltaX) > Math.abs(deltaY) && deltaX > 50) {
       // Trigger back navigation
       setIsSwiping(false);
-      // Mark messages as read before leaving
-      await markMessagesAsRead();
+      // Mark messages as read in background to keep swipe responsive
+      scheduleMarkMessagesAsRead(0);
       setSelectedMatch(null);
     }
   };
@@ -2167,13 +2184,13 @@ const ChatPage = ({ currentUser, onUnreadChange, onDetailViewChange }: ChatPageP
     );
   }
 
-  const handleBackClick = async () => {
-    // Mark messages as read before leaving
-    await markMessagesAsRead();
+  const handleBackClick = () => {
+    // Mark messages as read in background to keep navigation snappy
+    scheduleMarkMessagesAsRead(0);
     // Clear cache to force fresh data
     chatMatchesCache.delete(currentUser.id);
     // Refresh matches immediately
-    fetchMatches();
+    void fetchMatchesInBackground();
     // Close the chat
     setSelectedMatch(null);
   };

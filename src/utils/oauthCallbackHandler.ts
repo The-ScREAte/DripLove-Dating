@@ -1,5 +1,19 @@
 import { supabase } from '@/integrations/supabase/client';
 
+const PROFILE_COMPLETION_REQUIRED_FIELDS = [
+  'first_name',
+  'last_name',
+  'date_of_birth',
+  'country',
+  'city',
+  'gender',
+  'preference',
+  'relationship_intent',
+  'occupation',
+  'industry',
+  'education_level',
+] as const;
+
 /**
  * Shared OAuth callback handler used by the web /auth/callback page and
  * by the in-app Safari View Controller (Apple) deep-link. It attempts to:
@@ -11,11 +25,14 @@ import { supabase } from '@/integrations/supabase/client';
 export async function handleOAuthRedirect(url?: string) {
   try {
     let sessionData: any = null;
+    let callbackCode: string | null = null;
 
     // Step A: If URL has tokens in fragment, set session immediately (fastest path)
     if (url) {
-      const fragment = url.split('#')[1] || '';
+      const parsed = new URL(url);
+      const fragment = parsed.hash?.replace(/^#/, '') || '';
       const params = new URLSearchParams(fragment);
+      callbackCode = parsed.searchParams.get('code') || params.get('code');
       const access_token = params.get('access_token');
       const refresh_token = params.get('refresh_token');
 
@@ -33,7 +50,17 @@ export async function handleOAuthRedirect(url?: string) {
       }
     }
 
-    // Step B: If we don't have session yet, try getSession (no retries needed if tokens were set)
+    // Step B: For PKCE web callbacks, exchange auth code for a session.
+    if (!sessionData?.session && callbackCode) {
+      const { data, error } = await supabase.auth.exchangeCodeForSession(callbackCode);
+      if (error) {
+        console.warn('[OAuthHandler] exchangeCodeForSession error:', error);
+      } else if (data?.session) {
+        sessionData = data;
+      }
+    }
+
+    // Step C: If we don't have session yet, try getSession.
     if (!sessionData?.session) {
       const { data, error } = await supabase.auth.getSession();
       if (error) {
@@ -48,14 +75,14 @@ export async function handleOAuthRedirect(url?: string) {
 
     const user = sessionData.session.user;
 
-    // Step C: Check if profile exists - same pattern as Apple/Android native
+  // Step D: Check if profile exists - same pattern as Apple/Android native
     let profile = null;
     let needsProfileCompletion = true;
     
     try {
       const { data, error: profileError } = await supabase
         .from('profiles')
-        .select('id, is_admin, account_status, first_name, last_name, preferred_language')
+        .select('id, is_admin, account_status, preferred_language, first_name, last_name, date_of_birth, country, city, gender, preference, relationship_intent, occupation, industry, education_level')
         .eq('id', user.id)
         .maybeSingle();
 
@@ -70,8 +97,8 @@ export async function handleOAuthRedirect(url?: string) {
           sessionStorage.setItem('profile_id', profile.id);
         }
         
-        // Check if profile needs completion (same logic as native flows)
-        needsProfileCompletion = !profile.first_name || !profile.last_name;
+        // Check if profile needs completion using the same required fields as Index routing.
+        needsProfileCompletion = PROFILE_COMPLETION_REQUIRED_FIELDS.some((field) => !data[field]);
       } else {
         needsProfileCompletion = true;
       }

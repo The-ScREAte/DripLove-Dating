@@ -3139,53 +3139,25 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, onNavigateToProfile, isPr
         }
       };
 
-      // CRITICAL: Sync DB likes/matches before using cache/fetch exclusions.
-      // Timeout protection keeps startup snappy on slow networks.
+      // Kick off reconciliation in background so startup is never blocked.
       const syncPromise = syncDbLikesToLocalStorage();
-      let syncCompletedInTime = false;
-      await Promise.race([
-        syncPromise.then(() => {
-          syncCompletedInTime = true;
-        }),
-        new Promise<void>((resolve) => {
-          setTimeout(resolve, 1200);
-        }),
-      ]);
-
-      if (!syncCompletedInTime) {
-        // Fail-open on timeout: keep only very recent optimistic local swipes.
-        // This avoids false "no more profiles" caused by stale local cache.
-        const now = Date.now();
-        const LOCAL_OPTIMISTIC_GRACE_MS = 10 * 60 * 1000;
-        const trimmed = new Map<string, { action: 'like' | 'pass'; timestamp: number }>();
-        for (const [id, data] of locallySwipedProfileIds.current.entries()) {
-          if (!Number.isFinite(data.timestamp)) continue;
-          if ((now - data.timestamp) <= LOCAL_OPTIMISTIC_GRACE_MS) {
-            trimmed.set(id, data);
-          }
-        }
-        locallySwipedProfileIds.current = trimmed;
-        persistSwipedIds();
-      }
 
       pruneExpiredPassedSwipes();
       scheduleStorageCleanup();
 
-      // If sync timed out, apply reconciliation when it eventually finishes and refresh in background.
-      if (!syncCompletedInTime) {
-        void syncPromise
-          .then(() => {
-            if (isCancelled) return;
-            if (initializedUserRef.current !== cacheKey) return;
-            if (!hasCompletedInitialFetchRef.current) return;
-            pruneExpiredPassedSwipes();
-            hydrateLocalSwipedIds();
-            void fetchPotentialMatches({ background: true, cacheKey });
-          })
-          .catch(() => {
-            // ignore sync completion failures
-          });
-      }
+      // Apply reconciliation result when it completes and refresh in background.
+      void syncPromise
+        .then(() => {
+          if (isCancelled) return;
+          if (initializedUserRef.current !== cacheKey) return;
+          if (!hasCompletedInitialFetchRef.current) return;
+          pruneExpiredPassedSwipes();
+          hydrateLocalSwipedIds();
+          void fetchPotentialMatches({ background: true, cacheKey });
+        })
+        .catch(() => {
+          // ignore sync completion failures
+        });
 
       // Final safety net: hydrate again right before using cache.
       // (Helps during fast mount/unmount cycles or storage races.)
@@ -3517,7 +3489,7 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, onNavigateToProfile, isPr
       );
 
       const newProfiles = matches.filter((m) => !existingProfileIds.has(m.id));
-      const refillChunkSize = isAndroidPlatform() ? 15 : 25;
+      const refillChunkSize = isAndroidPlatform() ? 20 : 25;
       let refillChunk = newProfiles.slice(0, refillChunkSize);
 
       if (refillChunk.length === 0) {
@@ -3597,7 +3569,7 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, onNavigateToProfile, isPr
       .filter(m => !isAd(m))
       .length;
 
-    const REFILL_THRESHOLD = isAndroidPlatform() ? 10 : 25; // Smaller threshold on Android since initial batch is capped
+    const REFILL_THRESHOLD = isAndroidPlatform() ? 14 : 25; // Refill earlier on Android to avoid swipe starvation
 
     if (!hasCompletedInitialFetch) return;
     if (isLoadingMore) return;

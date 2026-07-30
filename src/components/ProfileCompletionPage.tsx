@@ -877,9 +877,9 @@ const ProfileCompletionPage = () => {
   }
 
   return (
-    <div className="keyboard-safe-form input-scroll-container">
+    <div className="keyboard-safe-form input-scroll-container h-[100dvh] overflow-hidden">
       <div 
-        className="min-h-screen bg-gradient-to-br from-purple-500 to-pink-500 relative"
+        className="h-full bg-gradient-to-br from-purple-500 to-pink-500 relative overflow-hidden"
         style={{
           paddingTop: "calc(env(safe-area-inset-top, 0px) + 8px)",
           paddingBottom: "calc(env(safe-area-inset-bottom, 0px) + 8px)"
@@ -887,16 +887,16 @@ const ProfileCompletionPage = () => {
       >
       {/* Scrollable form container */}
       <div 
-        className="px-4 pb-4 pt-4 overflow-y-auto relative z-10"
+        className="h-full px-2 sm:px-4 pb-[calc(env(safe-area-inset-bottom,0px)+28px)] pt-4 overflow-y-auto overflow-x-hidden overscroll-y-contain touch-pan-y relative z-10"
         style={{
-          maxHeight: "calc(100vh - env(safe-area-inset-top) - env(safe-area-inset-bottom) - 16px)"
+          WebkitOverflowScrolling: 'touch'
         }}
       >
-        <div className="max-w-2xl mx-auto">
-          <Card className="w-full bg-white rounded-2xl shadow-2xl border-0 relative">
-            <CardContent className="p-6 pb-8">
+        <div className="w-full max-w-full sm:max-w-2xl mx-auto">
+          <Card className="w-full bg-white/18 rounded-none shadow-none border border-white/20 relative">
+            <CardContent className="px-4 sm:px-6 py-5 sm:py-6 pb-6 sm:pb-8">
               {/* Title inside white card */}
-              <h1 className="text-3xl font-bold text-gray-900 mb-6 text-center">
+              <h1 className="text-2xl sm:text-3xl font-bold text-gray-900 mb-5 sm:mb-6 text-center">
                 {t('profileCompletion.title')}
               </h1>
               
@@ -917,7 +917,7 @@ const ProfileCompletionPage = () => {
                   <div className="space-y-4">
                     <h3 className="text-lg font-semibold text-gray-800">{t('profileCompletion.basicInformation')}</h3>
                     
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div className="grid grid-cols-1 min-[390px]:grid-cols-2 gap-3 sm:gap-4">
                       <div className="space-y-2">
                         <label className="text-sm font-medium text-gray-700">{t('profileCompletion.firstName')} *</label>
                         <input
@@ -925,7 +925,7 @@ const ProfileCompletionPage = () => {
                           type="text"
                           value={formData.firstName}
                           onChange={handleInputChange}
-                          className="w-full px-3 py-2 border border-gray-200 rounded-md focus:border-pink-400 focus:ring-pink-400"
+                          className="w-full px-2.5 py-2 border border-gray-200 rounded-md focus:border-pink-400 focus:ring-pink-400"
                           placeholder={t('profileCompletion.enterYourFirstName')}
                           required
                         />
@@ -939,7 +939,7 @@ const ProfileCompletionPage = () => {
                           type="text"
                           value={formData.lastName}
                           onChange={handleInputChange}
-                          className="w-full px-3 py-2 border border-gray-200 rounded-md focus:border-pink-400 focus:ring-pink-400"
+                          className="w-full px-2.5 py-2 border border-gray-200 rounded-md focus:border-pink-400 focus:ring-pink-400"
                           placeholder={t('profileCompletion.enterYourLastName')}
                           required
                         />
@@ -966,18 +966,19 @@ const ProfileCompletionPage = () => {
                           </div>
                         </div>
                       ) : (
-                        <div className={`bg-purple-50 border rounded-lg p-3 ${errors.faceVerification ? 'border-red-300' : 'border-purple-200'}`}>
-                          <div className="flex items-center justify-between">
-                            <p className="text-sm text-purple-800">Verify your face to continue</p>
+                        <div className={`bg-purple-50 border rounded-lg px-3 py-2.5 ${errors.faceVerification ? 'border-red-300' : 'border-purple-200'}`}>
+                          <div className="flex items-center justify-between gap-2">
+                            <p className="text-xs sm:text-sm text-purple-800 leading-tight">Verify your face to continue</p>
                             <Button
                               type="button"
                               onClick={() => setShowFaceVerification(true)}
-                              className="bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700 text-white text-xs"
+                              className="h-5 px-1.5 shrink-0 bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700 text-white text-[9px]"
                               size="sm"
                               disabled={isVerifying}
+                              style={{ minHeight: 0 }}
                             >
-                              <Camera className="w-3 h-3 mr-1" />
-                              Verify
+                              <Camera className="w-1.5 h-1.5 mr-1" />
+                              Verify now
                             </Button>
                           </div>
                           {errors.faceVerification && <p className="text-red-500 text-xs mt-2">{errors.faceVerification}</p>}
@@ -992,20 +993,20 @@ const ProfileCompletionPage = () => {
                         type="date"
                         value={formData.dateOfBirth}
                         onChange={handleInputChange}
-                        className="w-full px-3 py-2 border border-gray-200 rounded-md focus:border-pink-400 focus:ring-pink-400"
+                        className="compact-date-input w-full px-2.5 pr-7 py-2 text-sm border border-gray-200 rounded-md focus:border-pink-400 focus:ring-pink-400"
                         required
                       />
                       {errors.dateOfBirth && <p className="text-sm text-red-500">{errors.dateOfBirth}</p>}
                     </div>
 
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div className="grid grid-cols-1 min-[390px]:grid-cols-2 gap-3 sm:gap-4">
                       <div className="space-y-2">
                         <label className="text-sm font-medium text-gray-700">Gender *</label>
                         <Select
                           value={formData.gender}
                           onValueChange={(value) => handleSelectChange('gender', value)}
                         >
-                          <SelectTrigger className="border-gray-200 focus:border-pink-400">
+                          <SelectTrigger className="pl-2.5 pr-2.5 border-gray-200 focus:border-pink-400">
                             <SelectValue placeholder="Select your gender" />
                           </SelectTrigger>
                           <SelectContent>
@@ -1023,7 +1024,7 @@ const ProfileCompletionPage = () => {
                           value={formData.preference}
                           onValueChange={(value) => handleSelectChange('preference', value)}
                         >
-                          <SelectTrigger className="border-gray-200 focus:border-pink-400">
+                          <SelectTrigger className="pl-2.5 pr-2.5 border-gray-200 focus:border-pink-400">
                             <SelectValue placeholder="Select your preference" />
                           </SelectTrigger>
                           <SelectContent>
@@ -1042,7 +1043,7 @@ const ProfileCompletionPage = () => {
                         value={formData.relationshipIntent}
                         onValueChange={(value) => handleSelectChange('relationshipIntent', value)}
                       >
-                        <SelectTrigger className="border-gray-200 focus:border-pink-400">
+                          <SelectTrigger className="pl-2.5 pr-2.5 border-gray-200 focus:border-pink-400">
                           <SelectValue placeholder="What are you looking for?" />
                         </SelectTrigger>
                         <SelectContent>
@@ -1055,15 +1056,15 @@ const ProfileCompletionPage = () => {
                     </div>
                   </div>
 
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div className="grid grid-cols-1 min-[390px]:grid-cols-2 gap-3 sm:gap-4">
                     <div className="space-y-2">
                       <label className="text-sm font-medium text-gray-700">{t('profileCompletion.occupation')} *</label>
                       <Select
                         value={formData.occupation}
                         onValueChange={(value) => handleSelectChange('occupation', value)}
                       >
-                        <SelectTrigger className="border-gray-200 focus:border-pink-400">
-                          <SelectValue placeholder={t('profileCompletion.selectOccupation')} />
+                          <SelectTrigger className="pl-2.5 pr-2.5 border-gray-200 focus:border-pink-400">
+                          <SelectValue placeholder="Select" />
                         </SelectTrigger>
                         <SelectContent>
                           {occupationOptions.map((option) => (
@@ -1082,8 +1083,8 @@ const ProfileCompletionPage = () => {
                         value={formData.industry}
                         onValueChange={(value) => handleSelectChange('industry', value)}
                       >
-                        <SelectTrigger className="border-gray-200 focus:border-pink-400">
-                          <SelectValue placeholder={t('profileCompletion.selectIndustry')} />
+                        <SelectTrigger className="pl-2.5 pr-2.5 border-gray-200 focus:border-pink-400">
+                          <SelectValue placeholder="Select" />
                         </SelectTrigger>
                         <SelectContent>
                           {industryOptions.map((option) => (
@@ -1104,7 +1105,7 @@ const ProfileCompletionPage = () => {
                       onValueChange={(value) => handleSelectChange('educationLevel', value)}
                     >
                       <SelectTrigger className="border-gray-200 focus:border-pink-400">
-                        <SelectValue placeholder={t('profileCompletion.selectEducation')} />
+                        <SelectValue placeholder="Select" />
                       </SelectTrigger>
                       <SelectContent>
                         <SelectItem value="High School">High School</SelectItem>
@@ -1211,7 +1212,7 @@ const ProfileCompletionPage = () => {
                     <Button
                         type="submit"
                         disabled={isSubmitting}
-                        className="w-full bg-gradient-to-r from-pink-500 to-purple-600 hover:from-pink-600 hover:to-purple-700 text-white font-semibold py-3 rounded-lg transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed"
+                        className="w-full h-9 bg-gradient-to-r from-pink-500 to-purple-600 hover:from-pink-600 hover:to-purple-700 text-white font-semibold rounded-lg transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed"
                       >
                         {isSubmitting ? (
                           <div className="flex items-center justify-center gap-2">
@@ -1226,7 +1227,7 @@ const ProfileCompletionPage = () => {
                         variant="outline"
                         onClick={handleCancel}
                         disabled={isSubmitting}
-                        className="w-full border-gray-300 text-gray-700 hover:bg-gray-50 font-medium py-3 rounded-lg transition-all duration-200"
+                        className="w-full h-9 border-gray-300 text-gray-700 hover:bg-gray-50 font-medium rounded-lg transition-all duration-200"
                       >
                         {t('profileCompletion.cancel')}
                       </Button>

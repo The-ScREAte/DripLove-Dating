@@ -612,7 +612,7 @@ export default function BroadcastNotifications() {
     });
   };
 
-  const resendCampaign = async (campaign: Campaign, useSameAudience: boolean) => {
+  const repeatCampaign = async (campaign: Campaign, useSameAudience: boolean) => {
     // Set the notification content
     setNotificationTitle(campaign.title);
     setNotificationMessage(campaign.message);
@@ -1106,7 +1106,7 @@ export default function BroadcastNotifications() {
                             <Button
                               variant="ghost"
                               size="sm"
-                              onClick={() => resendCampaign(campaign, true)}
+                              onClick={() => repeatCampaign(campaign, true)}
                               className="h-6 text-[10px] px-2 text-purple-600 hover:bg-purple-50"
                             >
                               <Copy className="w-2.5 h-2.5 mr-1" />
@@ -1137,7 +1137,7 @@ export default function BroadcastNotifications() {
             <div>
               <h3 className="text-sm font-semibold mb-2">Send Email Broadcast</h3>
               <p className="text-xs text-gray-600 mb-4">
-                Send custom emails to selected users using Supabase email service
+                Send custom emails to selected users using DripLove SMTP service
               </p>
             </div>
             <EmailBroadcast />

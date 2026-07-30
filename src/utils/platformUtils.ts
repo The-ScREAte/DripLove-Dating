@@ -7,6 +7,31 @@
 let cachedPlatform: string | null = null;
 let capacitorModule: any = null;
 
+const detectPlatformFromRuntime = (): string => {
+  try {
+    const globalCapacitor = (globalThis as any)?.Capacitor;
+    if (globalCapacitor && typeof globalCapacitor.getPlatform === 'function') {
+      const p = globalCapacitor.getPlatform();
+      if (typeof p === 'string' && p) return p;
+    }
+  } catch {
+    // ignore
+  }
+
+  try {
+    const protocol = typeof window !== 'undefined' ? window.location.protocol : '';
+    const ua = typeof navigator !== 'undefined' ? navigator.userAgent : '';
+    if (protocol === 'capacitor:' || protocol === 'file:') {
+      if (/Android/i.test(ua)) return 'android';
+      if (/(iPhone|iPad|iPod)/i.test(ua)) return 'ios';
+    }
+  } catch {
+    // ignore
+  }
+
+  return 'web';
+};
+
 export const getPlatformSafe = async (): Promise<string> => {
   if (cachedPlatform) return cachedPlatform;
   try {
@@ -23,7 +48,10 @@ export const getPlatformSafe = async (): Promise<string> => {
 
 // Synchronous version using cached value (safe after first async call)
 export const getPlatformSync = (): string => {
-  return cachedPlatform || 'web';
+  if (!cachedPlatform) {
+    cachedPlatform = detectPlatformFromRuntime();
+  }
+  return cachedPlatform;
 };
 
 // Initialize platform detection early (non-blocking)

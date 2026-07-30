@@ -67,16 +67,22 @@ interface MainAppProps {
 const MainApp = ({ user, onLogout }: MainAppProps) => {
   const { t, i18n } = useTranslation();
   const userId = user?.id;
-  
-  // ⭐ CRITICAL FIX: Move ALL hooks BEFORE any conditional returns
-  // ⭐ STATE PRESERVATION: Restore active tab from sessionStorage when returning from games
-  const [activeTab, setActiveTab] = useState(() => {
+
+  const getInitialTab = (): string => {
     try {
       const saved = sessionStorage.getItem('mainapp_active_tab');
       return saved || 'dripcheck';
     } catch {
       return 'dripcheck';
     }
+  };
+  
+  // ⭐ CRITICAL FIX: Move ALL hooks BEFORE any conditional returns
+  // ⭐ STATE PRESERVATION: Restore active tab from sessionStorage when returning from games
+  const [activeTab, setActiveTab] = useState(getInitialTab);
+  const [visitedTabs, setVisitedTabs] = useState<Set<string>>(() => {
+    const initialTab = getInitialTab();
+    return new Set(['dripcheck', initialTab]);
   });
   const [isChatDetailOpen, setIsChatDetailOpen] = useState(false);
   const [isKeyboardOpen, setIsKeyboardOpen] = useState(false);
@@ -96,6 +102,16 @@ const MainApp = ({ user, onLogout }: MainAppProps) => {
     } catch {
       // Ignore storage errors
     }
+  }, [activeTab]);
+
+  // Keep visited tabs in sync even when activeTab changes outside handleTabChange.
+  useEffect(() => {
+    setVisitedTabs((prev) => {
+      if (prev.has(activeTab)) return prev;
+      const next = new Set(prev);
+      next.add(activeTab);
+      return next;
+    });
   }, [activeTab]);
 
   // Cached set of match IDs for this user (used to cheaply filter realtime chat events)
@@ -754,8 +770,42 @@ const MainApp = ({ user, onLogout }: MainAppProps) => {
   useEffect(() => {
     if (!userId) return;
     void fetchUserProfile();
-    void fetchUnreadCount();
+
+    const unreadDelayMs = isAndroidPlatform() ? 1300 : 700;
+    const unreadTimer = window.setTimeout(() => {
+      void fetchUnreadCount();
+    }, unreadDelayMs);
+
+    return () => {
+      window.clearTimeout(unreadTimer);
+    };
   }, [fetchUnreadCount, fetchUserProfile, userId]);
+
+  // Warm secondary tab bundles after startup so first tab switch feels instant.
+  useEffect(() => {
+    if (!profile) return;
+
+    const warm = () => {
+      void import('@/components/ChatPage');
+      void import('@/components/LikedMePage');
+      void import('@/components/ProfilePage');
+    };
+
+    const warmDelayMs = isAndroidPlatform() ? 2200 : 1500;
+    const timer = window.setTimeout(() => {
+      const w = window as Window & {
+        requestIdleCallback?: (callback: () => void) => number;
+      };
+
+      if (typeof w.requestIdleCallback === 'function') {
+        w.requestIdleCallback(() => warm());
+      } else {
+        warm();
+      }
+    }, warmDelayMs);
+
+    return () => window.clearTimeout(timer);
+  }, [profile]);
 
   // Preload tab-specific data without mutating unread state.
   useEffect(() => {
@@ -867,6 +917,12 @@ const MainApp = ({ user, onLogout }: MainAppProps) => {
 
   // Memoize tab change handler to prevent re-creating function on every render
   const handleTabChange = useCallback((tab: string) => {
+    setVisitedTabs((prev) => {
+      if (prev.has(tab)) return prev;
+      const next = new Set(prev);
+      next.add(tab);
+      return next;
+    });
     setActiveTab(tab);
   }, []);
 
@@ -971,49 +1027,57 @@ const MainApp = ({ user, onLogout }: MainAppProps) => {
         >
           {/* Lazy load tabs on first access, then keep mounted in background */}
           {/* Use visibility instead of conditional rendering to preserve state */}
-          <Suspense fallback={<TabLoader />}>
-            <div 
-              className="w-full h-full" 
-              style={{ display: activeTab === 'dripcheck' ? 'block' : 'none' }}
-            > 
-              <DiscoverPage currentUser={profile} onNavigateToChat={handleNavigateToChat} onNavigateToProfile={() => setActiveTab('profile')} isPremium={isPremium} profileCompletion={profileCompletion} />
-            </div>
-          </Suspense>
+          {visitedTabs.has('dripcheck') && (
+            <Suspense fallback={<TabLoader />}>
+              <div 
+                className="w-full h-full" 
+                style={{ display: activeTab === 'dripcheck' ? 'block' : 'none' }}
+              > 
+                <DiscoverPage currentUser={profile} onNavigateToChat={handleNavigateToChat} onNavigateToProfile={() => handleTabChange('profile')} isPremium={isPremium} profileCompletion={profileCompletion} />
+              </div>
+            </Suspense>
+          )}
 
-          <Suspense fallback={<TabLoader />}>
-            <div 
-              className="w-full h-full" 
-              style={{ display: activeTab === 'chat' ? 'block' : 'none' }}
-            > 
-              <ChatPage currentUser={profile} onUnreadChange={forceRefreshUnreadCount} onDetailViewChange={setIsChatDetailOpen} />
-            </div>
-          </Suspense>
+          {visitedTabs.has('chat') && (
+            <Suspense fallback={<TabLoader />}>
+              <div 
+                className="w-full h-full" 
+                style={{ display: activeTab === 'chat' ? 'block' : 'none' }}
+              > 
+                <ChatPage currentUser={profile} onUnreadChange={forceRefreshUnreadCount} onDetailViewChange={setIsChatDetailOpen} />
+              </div>
+            </Suspense>
+          )}
 
-          <Suspense fallback={<TabLoader />}>
-            <div 
-              className="w-full h-full" 
-              style={{ display: activeTab === 'liked' ? 'block' : 'none' }}
-            > 
-              <LikedMePage currentUser={profile} isPremium={isPremium} />
-            </div>
-          </Suspense>
+          {visitedTabs.has('liked') && (
+            <Suspense fallback={<TabLoader />}>
+              <div 
+                className="w-full h-full" 
+                style={{ display: activeTab === 'liked' ? 'block' : 'none' }}
+              > 
+                <LikedMePage currentUser={profile} isPremium={isPremium} />
+              </div>
+            </Suspense>
+          )}
 
-          <Suspense fallback={<TabLoader />}>
-            <div 
-              className="w-full h-full" 
-              style={{ display: activeTab === 'profile' ? 'block' : 'none' }}
-            > 
-              <ProfilePage 
-                currentUser={profile} 
-                profile={profile} 
-                onProfileUpdate={fetchUserProfile} 
-                onLogout={onLogout}
-                onShowTerms={handleShowTerms}
-                onShowPrivacy={handleShowPrivacy}
-                isPremium={isPremium}
-              />
-            </div>
-          </Suspense>
+          {visitedTabs.has('profile') && (
+            <Suspense fallback={<TabLoader />}>
+              <div 
+                className="w-full h-full" 
+                style={{ display: activeTab === 'profile' ? 'block' : 'none' }}
+              > 
+                <ProfilePage 
+                  currentUser={profile} 
+                  profile={profile} 
+                  onProfileUpdate={fetchUserProfile} 
+                  onLogout={onLogout}
+                  onShowTerms={handleShowTerms}
+                  onShowPrivacy={handleShowPrivacy}
+                  isPremium={isPremium}
+                />
+              </div>
+            </Suspense>
+          )}
         </div>
 
         {/* Fixed Bottom Nav - always visible */}

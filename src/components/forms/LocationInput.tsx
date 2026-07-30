@@ -563,7 +563,7 @@ const LocationInput = ({
               disabled={loadingCountries}
             >
               <SelectTrigger 
-                className={errors.country ? 'border-red-500' : ''}
+                className={`pl-2.5 pr-2.5 ${errors.country ? 'border-red-500' : ''}`}
               >
                 <SelectValue placeholder={loadingCountries ? "Loading countries..." : "Select your country (cannot be changed later)"} />
               </SelectTrigger>
@@ -603,9 +603,11 @@ const LocationInput = ({
         )}
       </div>
 
+      {/* City + ZIP/Postal layout */}
+      <div className={`grid grid-cols-1 ${selectedCountryCode ? 'min-[390px]:grid-cols-2' : ''} gap-3 sm:gap-4`}>
       {/* City Selection */}
       <div className="space-y-2">
-        <Label className="flex items-center gap-2">
+        <Label className="flex h-5 items-center gap-2">
           <Search className="w-4 h-4" />
           City/Town {required && <span className="text-red-500">*</span>}
         </Label>
@@ -618,7 +620,7 @@ const LocationInput = ({
             placeholder={selectedCountryData?.name 
               ? `Select a city in ${selectedCountryData.name} or type to search` 
               : 'Type your city name (at least 2 characters)'}
-            className={errors.city ? 'border-red-500' : ''}
+            className={`px-2.5 ${errors.city ? 'border-red-500' : ''}`}
             disabled={disabled}
           />
 
@@ -687,23 +689,6 @@ const LocationInput = ({
             )}
           </div>
 
-          {/* City Status Indicator */}
-          {cityInput && (
-            <div className="flex items-center gap-2 text-xs">
-              {coordinates.lat && coordinates.lng ? (
-                <span className="text-green-600 flex items-center gap-1">
-                  <Check className="w-3 h-3" />
-                  Exact location found
-                </span>
-              ) : isCustomCity ? (
-                <span className="text-orange-600 flex items-center gap-1">
-                  <MapPin className="w-3 h-3" />
-                  Custom location (may affect matching accuracy)
-                </span>
-              ) : null}
-            </div>
-          )}
-
           {errors.city && (
             <p className="text-sm text-red-500">{errors.city}</p>
           )}
@@ -712,7 +697,7 @@ const LocationInput = ({
       {/* ZIP/Postal Code */}
       {selectedCountryCode && (
         <div className="space-y-2">
-          <Label>
+          <Label className="flex h-5 items-center">
             {selectedCountryData?.code === 'US' ? 'ZIP Code' : 
              selectedCountryData?.code === 'GB' ? 'Postcode' : 
              'Postal Code'}
@@ -735,12 +720,30 @@ const LocationInput = ({
               selectedCountryData?.code === 'NL' ? '1012' :
               'Enter postal code'
             }
-            className={errors.zipCode ? 'border-red-500' : ''}
+            className={`px-2.5 ${errors.zipCode ? 'border-red-500' : ''}`}
             disabled={disabled}
           />
           {errors.zipCode && (
             <p className="text-sm text-red-500">{errors.zipCode}</p>
           )}
+        </div>
+      )}
+      </div>
+
+      {/* City status shown below the row to keep City/ZIP aligned */}
+      {cityInput && (
+        <div className="mt-1 flex items-center gap-2 text-xs">
+          {coordinates.lat && coordinates.lng ? (
+            <span className="text-green-600 flex items-center gap-1">
+              <Check className="w-3 h-3" />
+              Exact location found
+            </span>
+          ) : isCustomCity ? (
+            <span className="text-orange-600 flex items-center gap-1">
+              <MapPin className="w-3 h-3" />
+              Custom location (may affect matching accuracy)
+            </span>
+          ) : null}
         </div>
       )}
     </div>

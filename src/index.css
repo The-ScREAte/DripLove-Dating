@@ -575,6 +575,20 @@ body.keyboard-open .chat-messages-container {
   height: stretch;
 }
 
+.compact-date-input {
+  font-size: 14px !important;
+}
+
+.compact-date-input::-webkit-datetime-edit {
+  font-size: 14px;
+}
+
+.compact-date-input::-webkit-calendar-picker-indicator {
+  margin-left: 2px;
+  transform: scale(0.9);
+  opacity: 0.9;
+}
+
 
 
   /* Toast and notification safe positioning */

@@ -4,17 +4,80 @@
 const express = require('express');
 const fetch = require('node-fetch');
 const admin = require('firebase-admin');
-const serviceAccount = require('./config/serviceAccountKey.json');
+const path = require('path');
+const dotenv = require('dotenv');
+const emailRoutes = require('./routes/emailRoutes');
 
-// Initialize Firebase Admin SDK
-admin.initializeApp({
-  credential: admin.credential.cert(serviceAccount)
-});
+// Load env files for local/server execution (later files can override earlier ones)
+dotenv.config({ path: path.join(__dirname, '..', '.env') });
+dotenv.config({ path: path.join(__dirname, '..', '.env.local') });
+dotenv.config({ path: path.join(__dirname, '.env') });
 
-console.log('✅ Firebase Admin initialized successfully');
+function loadServiceAccount() {
+  const envJson = process.env.FIREBASE_SERVICE_ACCOUNT_JSON;
+  if (envJson) {
+    try {
+      const parsed = JSON.parse(envJson);
+      if (parsed.private_key && parsed.private_key.includes('\\n')) {
+        parsed.private_key = parsed.private_key.replace(/\\n/g, '\n');
+      }
+      return parsed;
+    } catch (error) {
+      console.error('❌ Invalid FIREBASE_SERVICE_ACCOUNT_JSON:', error.message);
+    }
+  }
+
+  // Backward compatibility for existing local setups
+  const fileCandidates = [
+    path.join(__dirname, 'config', 'serviceAccountKey.json'),
+    path.join(__dirname, 'config', 'serviceAccountKey-new.json'),
+  ];
+
+  for (const filePath of fileCandidates) {
+    try {
+      // eslint-disable-next-line import/no-dynamic-require, global-require
+      return require(filePath);
+    } catch {
+      // Try the next candidate
+    }
+  }
+
+  return null;
+}
+
+const serviceAccount = loadServiceAccount();
+let firebaseReady = false;
+
+if (serviceAccount) {
+  // Initialize Firebase Admin SDK
+  admin.initializeApp({
+    credential: admin.credential.cert(serviceAccount)
+  });
+  firebaseReady = true;
+}
+
+if (firebaseReady) {
+  console.log('✅ Firebase Admin initialized successfully');
+} else {
+  console.warn('⚠️ Firebase Admin not initialized (service account missing)');
+}
 
 const app = express();
 app.use(express.json());
+app.use((req, res, next) => {
+  const allowedOrigin = process.env.EMAIL_ALLOWED_ORIGIN || '*';
+  res.setHeader('Access-Control-Allow-Origin', allowedOrigin);
+  res.setHeader('Access-Control-Allow-Methods', 'GET,POST,OPTIONS');
+  res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization, x-email-api-key');
+
+  if (req.method === 'OPTIONS') {
+    return res.status(204).end();
+  }
+
+  next();
+});
+
+app.use('/api/email', emailRoutes);
 
 const APPLE_PRODUCTION_URL = 'https://buy.itunes.apple.com/verifyReceipt';
 const APPLE_SANDBOX_URL = 'https://sandbox.itunes.apple.com/verifyReceipt';
@@ -48,6 +111,13 @@ app.post('/verify-apple-receipt', async (req, res) => {
 
 // GET /firebase-test - Test Firebase connection
 app.get('/firebase-test', async (req, res) => {
+  if (!firebaseReady) {
+    return res.status(503).json({
+      success: false,
+      error: 'Firebase Admin is not initialized',
+    });
+  }
+
   try {
     const db = admin.firestore();
     const docRef = db.collection('test').doc('connection-check');

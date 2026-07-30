@@ -5,6 +5,20 @@ import { supabase } from '@/integrations/supabase/client';
 import { getRedirectUri } from '@/config/oauth';
 import { Capacitor } from '@capacitor/core';
 
+const PROFILE_COMPLETION_REQUIRED_FIELDS = [
+  'first_name',
+  'last_name',
+  'date_of_birth',
+  'country',
+  'city',
+  'gender',
+  'preference',
+  'relationship_intent',
+  'occupation',
+  'industry',
+  'education_level',
+] as const;
+
 /**
  * Centralized OAuth hook - THE SINGLE SOURCE OF TRUTH for OAuth initiation
  * Used by both AuthForm and WelcomeScreen to avoid duplication
@@ -148,22 +162,120 @@ export const useOAuth = () => {
             throw new Error('Popup blocked. Please allow popups for this site.');
           }
 
-          // Set up message listener to clear loading state when OAuth completes
-          const handleMessage = (event: MessageEvent) => {
-            if (event.origin !== window.location.origin) return;
-            if (event.data?.type === 'oauth_complete') {
-              setOauthLoading(null);
-              window.removeEventListener('message', handleMessage);
+          let isHandled = false;
+          let timeoutId: number | null = null;
+          let pollIntervalId: number | null = null;
+
+          const cleanup = () => {
+            window.removeEventListener('message', handleMessage);
+            window.removeEventListener('focus', handleWindowFocus);
+            if (timeoutId) {
+              window.clearTimeout(timeoutId);
+              timeoutId = null;
+            }
+            if (pollIntervalId) {
+              window.clearInterval(pollIntervalId);
+              pollIntervalId = null;
             }
           };
-          window.addEventListener('message', handleMessage);
 
-          // COOP can block checking popup.closed; instead rely on postMessage and a max timeout.
-          // Max timeout (5 minutes) ensures loading doesn't get stuck if user closes popup.
-          setTimeout(() => {
-            window.removeEventListener('message', handleMessage);
-            setOauthLoading(null);
+          const waitForSession = async (maxWaitMs = 8000, intervalMs = 200) => {
+            const startedAt = Date.now();
+            while (Date.now() - startedAt < maxWaitMs) {
+              const { data: { session } } = await supabase.auth.getSession();
+              if (session?.user) return session;
+              await new Promise((resolve) => setTimeout(resolve, intervalMs));
+            }
+            return null;
+          };
+
+          const routeAfterAuth = async (preferredNeedsCompletion?: boolean): Promise<boolean> => {
+            try {
+              const session = await waitForSession();
+              if (!session?.user) return false;
+
+              let needsProfileCompletion = preferredNeedsCompletion;
+
+              // Always verify against profile when not explicitly known to be incomplete.
+              if (needsProfileCompletion !== true) {
+                const { data: profile } = await supabase
+                  .from('profiles')
+                  .select('first_name, last_name, date_of_birth, country, city, gender, preference, relationship_intent, occupation, industry, education_level')
+                  .eq('id', session.user.id)
+                  .maybeSingle();
+
+                needsProfileCompletion = PROFILE_COMPLETION_REQUIRED_FIELDS.some((field) => !profile?.[field]);
+              }
+
+              isHandled = true;
+              cleanup();
+              setOauthLoading(null);
+              navigate(needsProfileCompletion ? '/complete-profile' : '/');
+              return true;
+            } catch {
+              return false;
+            }
+          };
+
+          const recoverAndRouteFromSession = async (): Promise<boolean> => {
+            return routeAfterAuth();
+          };
+
+          // Set up message listener to complete routing when OAuth callback finishes.
+          timeoutId = window.setTimeout(() => {
+            if (!isHandled) {
+              void recoverAndRouteFromSession();
+            }
+            if (!isHandled) {
+              cleanup();
+              setOauthLoading(null);
+            }
           }, 5 * 60 * 1000);
+
+          // Aggressive fallback for browsers/incognito where popup postMessage/focus events are inconsistent.
+          // Poll session state briefly and route as soon as auth lands.
+          pollIntervalId = window.setInterval(() => {
+            if (isHandled) return;
+            void recoverAndRouteFromSession();
+
+            // If popup is closed and we're still not authenticated, stop polling but keep timeout fallback.
+            try {
+              if (popup.closed && !isHandled && pollIntervalId) {
+                window.clearInterval(pollIntervalId);
+                pollIntervalId = null;
+              }
+            } catch {
+              // Ignore cross-window access issues.
+            }
+          }, 500);
+
+          const handleMessage = (event: MessageEvent) => {
+            if (isHandled) return;
+            if (event.origin !== window.location.origin) return;
+            if (event.data?.type === 'oauth_complete') {
+              if (event.data?.success === false) {
+                isHandled = true;
+                cleanup();
+                setOauthLoading(null);
+                toast({
+                  title: 'Authentication Error',
+                  description: event.data?.error || 'Failed to complete sign in. Please try again.',
+                  variant: 'destructive',
+                });
+                return;
+              }
+
+              void routeAfterAuth(event.data?.needsProfileCompletion === true ? true : undefined);
+            }
+          };
+
+          const handleWindowFocus = () => {
+            if (isHandled) return;
+            void recoverAndRouteFromSession();
+          };
+
+          window.addEventListener('message', handleMessage);
+          window.addEventListener('focus', handleWindowFocus);
           
         } catch (err: any) {
           console.error('[useOAuth Web Google] ❌ Error:', err);

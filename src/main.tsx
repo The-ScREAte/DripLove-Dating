@@ -5,6 +5,7 @@ import App from "./App.tsx";
 import "./index.css";
 import "./i18n/config"; // Initialize i18n
 import { supabase } from "./integrations/supabase/client";
+import { clearChatCache } from "./cache/chatCache";
 
 // Suppress non-critical console output in production
 if (import.meta.env.PROD) {
@@ -162,6 +163,15 @@ const AppWrapper = () => {
           const { data: { subscription } } = supabase.auth.onAuthStateChange((event, nextSession) => {
             // ONLY SIGNED_OUT should clear the session
             if (event === 'SIGNED_OUT') {
+              clearChatCache();
+              if (typeof window !== 'undefined') {
+                const w = window as Window & {
+                  chatMatchesCache?: Map<string, unknown>;
+                  chatMessagesCache?: Map<string, unknown>;
+                };
+                w.chatMatchesCache?.clear();
+                w.chatMessagesCache?.clear();
+              }
               setHasSession(false);
               setUser(null);
               return;

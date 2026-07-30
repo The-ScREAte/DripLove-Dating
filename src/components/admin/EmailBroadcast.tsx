@@ -253,73 +253,44 @@ export default function EmailBroadcast() {
         return;
       }
 
-      // Create Primary inbox-friendly HTML content (minimal design, no promotions triggers)
-      const htmlContent = `
-<!DOCTYPE html>
-<html>
-<head>
-  <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-</head>
-<body style="font-family: Arial, Helvetica, sans-serif; font-size: 14px; line-height: 1.6; color: #333333; margin: 0; padding: 0;">
-  <div style="max-width: 580px; margin: 0 auto; padding: 20px;">
-    <!-- Message content -->
-    <div style="color: #333333;">
-      ${emailBody.replace(/\n/g, '<br>')}
-    </div>
-    
-    <!-- Professional sign-off with logo -->
-    <table style="margin-top: 30px; border: none;" cellpadding="0" cellspacing="0">
-      <tr>
-        <td style="vertical-align: top; padding-right: 12px;">
-          <img src="https://driplove.love/driplove-logo.png" alt="DripLove" width="40" height="40" style="display: block; border-radius: 6px;" />
-        </td>
-        <td style="vertical-align: middle;">
-          <span style="font-size: 14px; color: #333333; display: block;">Best regards,</span>
-          <span style="font-size: 14px; font-weight: 600; color: #333333; display: block;">The DripLove Team</span>
-        </td>
-      </tr>
-    </table>
-  </div>
-</body>
-</html>
-      `;
+      const htmlContent = `<p>${emailBody.replace(/\n/g, '<br>')}</p>`;
 
-      // Get current user for logging
-      const { data: { user } } = await supabase.auth.getUser();
+      const configuredEmailServiceUrl = import.meta.env.VITE_EMAIL_SERVICE_URL as string | undefined;
+      const emailServiceApiKey = import.meta.env.VITE_EMAIL_SERVICE_API_KEY as string | undefined;
 
-      // Call edge function to send emails
-      const response = await supabase.functions.invoke('send-broadcast-email', {
-        body: {
+      const hostname = window.location.hostname;
+      const isCurrentHostLocal = hostname === 'localhost' || hostname === '127.0.0.1';
+      const isConfiguredUrlLocal =
+        !!configuredEmailServiceUrl &&
+        /https?:\/\/(localhost|127\.0\.0\.1)(:\d+)?/i.test(configuredEmailServiceUrl);
+
+      const emailServiceBaseUrl = configuredEmailServiceUrl
+        ? (isConfiguredUrlLocal && !isCurrentHostLocal ? window.location.origin : configuredEmailServiceUrl)
+        : (isCurrentHostLocal ? 'http://localhost:3001' : window.location.origin);
+
+      const endpoint = `${emailServiceBaseUrl.replace(/\/$/, '')}/api/email/send-broadcast-email-smtp`;
+      const smtpResponse = await fetch(endpoint, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          ...(emailServiceApiKey ? { 'x-email-api-key': emailServiceApiKey } : {}),
+        },
+        body: JSON.stringify({
           recipients: selectedUserEmails,
           subject: emailSubject,
-          htmlContent: htmlContent,
+          htmlContent,
           textContent: emailBody,
           targetCountries: Array.from(selectedCountries),
-          recipientFilter: recipientFilter,
-          adminId: user?.id,
-        },
+          recipientFilter,
+        }),
       });
 
-      if (response.error) {
-        console.error('Edge function error:', response.error);
-        // Show more specific error from the response
-        const errorData = response.error;
-        let errorMessage = 'Failed to send emails';
-        if (typeof errorData === 'object' && errorData.message) {
-          errorMessage = errorData.message;
-        } else if (typeof errorData === 'string') {
-          errorMessage = errorData;
-        }
-        throw new Error(errorMessage);
-      }
-      
-      // Check for error in response data (edge function returned error)
-      if (response.data?.error) {
-        throw new Error(response.data.error);
+      const smtpData = await smtpResponse.json().catch(() => ({}));
+      if (!smtpResponse.ok) {
+        throw new Error(smtpData?.error || 'SMTP email request failed');
       }
 
-      const results = response.data?.results;
+      const results: { sent?: number; failed?: number; details?: { failed?: Array<{ email: string; error: string }> } } | undefined = smtpData?.results;
       
       if (results?.failed > 0) {
         toast({
@@ -369,7 +340,7 @@ export default function EmailBroadcast() {
       <Alert>
         <Mail className="h-4 w-4" />
         <AlertDescription>
-          Send custom emails to selected users. Emails are sent using Supabase's email service.
+          Send custom emails to selected users. All messages now use the DripLove SMTP integration.
         </AlertDescription>
       </Alert>
 

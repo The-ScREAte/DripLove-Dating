@@ -1,7 +1,7 @@
 #!/bin/bash
 
-# Setup script for email broadcasting with Resend
-# This will guide you through setting up real email sending
+# Setup script for SMTP + Supabase email broadcasting
+# This configures the Supabase Edge Function to forward to the Node SMTP service
 
 # Colors
 GREEN='\033[0;32m'
@@ -13,7 +13,7 @@ NC='\033[0m' # No Color
 echo ""
 echo -e "${BLUE}╔════════════════════════════════════════════════╗${NC}"
 echo -e "${BLUE}║   DripLove Email Broadcasting Setup           ║${NC}"
-echo -e "${BLUE}╔════════════════════════════════════════════════╗${NC}"
+echo -e "${BLUE}╚════════════════════════════════════════════════╝${NC}"
 echo ""
 
 # Check if supabase CLI is installed
@@ -26,56 +26,60 @@ fi
 echo -e "${GREEN}✓ Supabase CLI found${NC}"
 echo ""
 
-# Step 1: Get Resend API Key
-echo -e "${BLUE}Step 1: Get Your Resend API Key${NC}"
+# Step 1: Configure Node SMTP API URL
+echo -e "${BLUE}Step 1: Set SMTP Service URL${NC}"
 echo "--------------------------------------"
-echo "1. Go to: https://resend.com/signup"
-echo "2. Create a free account (3,000 emails/month)"
-echo "3. Get your API key from the dashboard"
+echo "Use the URL where your Node SMTP service is running."
+echo "Examples:"
+echo "  - Local: http://localhost:3001"
+echo "  - Production: https://api.driplove.love"
 echo ""
-read -p "Paste your Resend API key (starts with re_): " RESEND_KEY
+read -p "Enter SMTP service URL [http://localhost:3001]: " EMAIL_SERVICE_URL
+EMAIL_SERVICE_URL=${EMAIL_SERVICE_URL:-http://localhost:3001}
 
-if [[ ! $RESEND_KEY == re_* ]]; then
-    echo -e "${RED}❌ Invalid API key format. It should start with 're_'${NC}"
+if [[ ! $EMAIL_SERVICE_URL == http*://* ]]; then
+    echo -e "${RED}❌ Invalid URL. Must start with http:// or https://${NC}"
     exit 1
 fi
 
-echo -e "${GREEN}✓ Valid API key format${NC}"
+echo -e "${GREEN}✓ Using SMTP service URL: ${EMAIL_SERVICE_URL}${NC}"
 echo ""
 
-# Step 2: Set from email
-echo -e "${BLUE}Step 2: Set From Email${NC}"
+# Step 2: Set API key used by SMTP service
+echo -e "${BLUE}Step 2: Set SMTP Service API Key${NC}"
 echo "--------------------------------------"
-echo "For testing, use: onboarding@resend.dev (Resend's default)"
-echo "For production, use your own domain: noreply@driplove.com"
 echo ""
-read -p "Enter from email [onboarding@resend.dev]: " FROM_EMAIL
-FROM_EMAIL=${FROM_EMAIL:-onboarding@resend.dev}
+read -p "Enter SMTP service API key: " EMAIL_SERVICE_API_KEY
 
-echo -e "${GREEN}✓ Using: ${FROM_EMAIL}${NC}"
+if [[ -z $EMAIL_SERVICE_API_KEY ]]; then
+    echo -e "${RED}❌ API key cannot be empty${NC}"
+    exit 1
+fi
+
+echo -e "${GREEN}✓ API key captured${NC}"
 echo ""
 
 # Step 3: Set secrets
 echo -e "${BLUE}Step 3: Configuring Supabase Secrets${NC}"
 echo "--------------------------------------"
 
-echo "Setting RESEND_API_KEY..."
-supabase secrets set RESEND_API_KEY="$RESEND_KEY"
+echo "Setting EMAIL_SERVICE_URL..."
+supabase secrets set EMAIL_SERVICE_URL="$EMAIL_SERVICE_URL"
 
 if [ $? -eq 0 ]; then
-    echo -e "${GREEN}✓ RESEND_API_KEY configured${NC}"
+    echo -e "${GREEN}✓ EMAIL_SERVICE_URL configured${NC}"
 else
-    echo -e "${RED}❌ Failed to set RESEND_API_KEY${NC}"
+    echo -e "${RED}❌ Failed to set EMAIL_SERVICE_URL${NC}"
     exit 1
 fi
 
-echo "Setting FROM_EMAIL..."
-supabase secrets set FROM_EMAIL="$FROM_EMAIL"
+echo "Setting EMAIL_SERVICE_API_KEY..."
+supabase secrets set EMAIL_SERVICE_API_KEY="$EMAIL_SERVICE_API_KEY"
 
 if [ $? -eq 0 ]; then
-    echo -e "${GREEN}✓ FROM_EMAIL configured${NC}"
+    echo -e "${GREEN}✓ EMAIL_SERVICE_API_KEY configured${NC}"
 else
-    echo -e "${RED}❌ Failed to set FROM_EMAIL${NC}"
+    echo -e "${RED}❌ Failed to set EMAIL_SERVICE_API_KEY${NC}"
     exit 1
 fi
 
@@ -111,6 +115,14 @@ echo ""
 echo -e "${YELLOW}To view logs in real-time:${NC}"
 echo "  supabase functions logs send-broadcast-email --follow"
 echo ""
-echo -e "${YELLOW}For production (custom domain):${NC}"
-echo "  See SETUP_EMAIL_SERVICE.md for instructions"
+echo -e "${YELLOW}Important:${NC}"
+echo "  Ensure your Node SMTP service is running and reachable from Supabase."
+echo "  The send-broadcast-email function now uses SMTP integration only."
+echo ""
+echo -e "${YELLOW}Required for full visual consistency (Auth emails):${NC}"
+echo "  1. Open Supabase Dashboard -> Authentication -> Emails"
+echo "  2. Configure Custom SMTP to use the same sender domain"
+echo "  3. Paste matching templates from: supabase/AUTH_EMAIL_TEMPLATES.md"
+echo "  4. Save templates for: Confirm signup, Magic Link, Change Email, Reset Password"
+echo "  5. Test sign-up and forgot-password emails to confirm the same DripLove look"
 echo ""

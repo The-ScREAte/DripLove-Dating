@@ -1,26 +1,27 @@
 #!/bin/bash
 
-# Test email sending to bondahdean@gmail.com
+# Test email sending via new SMTP-first Node endpoint
 
-echo "📧 Sending test email to bondahdean@gmail.com..."
+echo "📧 Sending test email via SMTP endpoint..."
 echo ""
 
-# Get the Supabase project URL and anon key
-SUPABASE_URL=$(grep VITE_SUPABASE_URL .env.local 2>/dev/null | cut -d '=' -f2 | tr -d '"' | tr -d "'")
-SUPABASE_ANON_KEY=$(grep VITE_SUPABASE_ANON_KEY .env.local 2>/dev/null | cut -d '=' -f2 | tr -d '"' | tr -d "'")
+EMAIL_SERVICE_URL=$(grep VITE_EMAIL_SERVICE_URL .env.local 2>/dev/null | cut -d '=' -f2 | tr -d '"' | tr -d "'")
+EMAIL_SERVICE_API_KEY=$(grep VITE_EMAIL_SERVICE_API_KEY .env.local 2>/dev/null | cut -d '=' -f2 | tr -d '"' | tr -d "'")
 
-# If not in .env.local, try .env
-if [ -z "$SUPABASE_URL" ]; then
-  SUPABASE_URL=$(grep VITE_SUPABASE_URL .env 2>/dev/null | cut -d '=' -f2 | tr -d '"' | tr -d "'")
-  SUPABASE_ANON_KEY=$(grep VITE_SUPABASE_ANON_KEY .env 2>/dev/null | cut -d '=' -f2 | tr -d '"' | tr -d "'")
+if [ -z "$EMAIL_SERVICE_URL" ]; then
+  EMAIL_SERVICE_URL=$(grep VITE_EMAIL_SERVICE_URL .env 2>/dev/null | cut -d '=' -f2 | tr -d '"' | tr -d "'")
+  EMAIL_SERVICE_API_KEY=$(grep VITE_EMAIL_SERVICE_API_KEY .env 2>/dev/null | cut -d '=' -f2 | tr -d '"' | tr -d "'")
 fi
 
-# Fallback to hardcoded if still empty
-if [ -z "$SUPABASE_URL" ]; then
-  SUPABASE_URL="https://tgjsyyihabsovironesw.supabase.co"
+if [ -z "$EMAIL_SERVICE_URL" ]; then
+  EMAIL_SERVICE_URL="http://localhost:3001"
 fi
 
-echo "Using Supabase URL: $SUPABASE_URL"
+if [ -z "$EMAIL_SERVICE_API_KEY" ]; then
+  EMAIL_SERVICE_API_KEY="YourSuperSecretKey"
+fi
+
+echo "Using SMTP service URL: $EMAIL_SERVICE_URL"
 echo ""
 
 # Create test email HTML
@@ -47,11 +48,11 @@ HTML_CONTENT='<!DOCTYPE html>
         <p>This is a test email from your DripLove email broadcasting system.</p>
         <p>If you are seeing this, it means:</p>
         <ul>
-          <li>✅ Your Brevo integration is working correctly</li>
+          <li>✅ Your SMTP integration is working correctly</li>
           <li>✅ Emails are being delivered to real inboxes</li>
           <li>✅ You can now send broadcasts to your users</li>
         </ul>
-        <p>You have <strong>600 free emails per day</strong> (2 accounts × 300 emails each) with automatic fallback!</p>
+        <p>You can now send broadcasts through the new DripLove SMTP pathway.</p>
         <p style="margin-top: 30px;">
           <strong>Ready to send your first real broadcast?</strong><br>
           Go to Admin Panel → Broadcast Notifications → Emailing
@@ -69,8 +70,8 @@ HTML_CONTENT='<!DOCTYPE html>
 </html>'
 
 # Send the test email
-curl -i --location --request POST "${SUPABASE_URL}/functions/v1/send-broadcast-email" \
-  --header "Authorization: Bearer ${SUPABASE_ANON_KEY}" \
+curl -i --location --request POST "${EMAIL_SERVICE_URL}/api/email/send-broadcast-email-smtp" \
+  --header "x-email-api-key: ${EMAIL_SERVICE_API_KEY}" \
   --header 'Content-Type: application/json' \
   --data "{
     \"recipients\": [\"bondahdean@gmail.com\"],
