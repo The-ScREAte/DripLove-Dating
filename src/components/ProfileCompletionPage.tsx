@@ -4,7 +4,7 @@ import { useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
-import { Heart, ArrowLeft, Upload, Shield, CheckCircle, AlertTriangle, Camera } from 'lucide-react';
+import { Heart, Upload, Shield, CheckCircle, AlertTriangle, Camera } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
@@ -160,7 +160,18 @@ const ProfileCompletionPage = () => {
   useEffect(() => {
     const getUser = async () => {
       try {
-        const { data: { session }, error } = await supabase.auth.getSession();
+        const waitForSession = async (maxWaitMs = 8000, intervalMs = 200) => {
+          const startedAt = Date.now();
+          while (Date.now() - startedAt < maxWaitMs) {
+            const { data: { session }, error } = await supabase.auth.getSession();
+            if (error) return { session: null, error };
+            if (session?.user) return { session, error: null };
+            await new Promise((resolve) => setTimeout(resolve, intervalMs));
+          }
+          return { session: null, error: null };
+        };
+
+        const { session, error } = await waitForSession();
         
         if (error) {
           console.error('Error getting session:', error);
@@ -893,26 +904,13 @@ const ProfileCompletionPage = () => {
         }}
       >
         <div className="w-full max-w-full sm:max-w-2xl mx-auto">
-          <Card className="w-full bg-white/18 rounded-none shadow-none border border-white/20 relative">
+          <Card className="w-full backdrop-blur-sm bg-white/40 rounded-none shadow-none border border-white/40 relative animate-fade-in">
             <CardContent className="px-4 sm:px-6 py-5 sm:py-6 pb-6 sm:pb-8">
               {/* Title inside white card */}
               <h1 className="text-2xl sm:text-3xl font-bold text-gray-900 mb-5 sm:mb-6 text-center">
                 {t('profileCompletion.title')}
               </h1>
               
-              <div className="flex items-center justify-between mb-6">
-                <Button
-                  type="button"
-                  variant="ghost"
-                  size="sm"
-                  onClick={handleCancel}
-                  className="flex items-center text-gray-600 hover:text-gray-800"
-                >
-                  <ArrowLeft className="w-4 h-4 mr-1" />
-                  {t('profileCompletion.back')}
-                </Button>
-                <div className="w-16"></div> {/* Spacer for alignment */}
-              </div>
                 <form onSubmit={handleSubmit} className="space-y-4">
                   <div className="space-y-4">
                     <h3 className="text-lg font-semibold text-gray-800">{t('profileCompletion.basicInformation')}</h3>
@@ -951,7 +949,7 @@ const ProfileCompletionPage = () => {
                     <div className="space-y-3">
                       <div className="flex items-center gap-2">
                         <Shield className="w-5 h-5 text-purple-600" />
-                        <label className="text-sm font-medium text-gray-700">{t('profileCompletion.faceVerification')} *</label>
+                        <label className="text-sm font-medium text-gray-700">Face Verification *</label>
                       </div>
 
                       {showFaceVerification ? (
@@ -966,18 +964,17 @@ const ProfileCompletionPage = () => {
                           </div>
                         </div>
                       ) : (
-                        <div className={`bg-purple-50 border rounded-lg px-3 py-2.5 ${errors.faceVerification ? 'border-red-300' : 'border-purple-200'}`}>
-                          <div className="flex items-center justify-between gap-2">
-                            <p className="text-xs sm:text-sm text-purple-800 leading-tight">Verify your face to continue</p>
+                        <div className={`bg-purple-50 border rounded-lg p-3 ${errors.faceVerification ? 'border-red-300' : 'border-purple-200'}`}>
+                          <div className="flex flex-col min-[390px]:flex-row min-[390px]:items-center min-[390px]:justify-between gap-2">
+                            <p className="text-sm text-purple-800 leading-tight">Verify your face to continue</p>
                             <Button
                               type="button"
                               onClick={() => setShowFaceVerification(true)}
-                              className="h-5 px-1.5 shrink-0 bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700 text-white text-[9px]"
+                              className="h-6 px-2 self-start min-[390px]:self-auto shrink-0 bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700 text-white text-[10px]"
                               size="sm"
                               disabled={isVerifying}
-                              style={{ minHeight: 0 }}
                             >
-                              <Camera className="w-1.5 h-1.5 mr-1" />
+                              <Camera className="w-2.5 h-2.5 mr-1" />
                               Verify now
                             </Button>
                           </div>
@@ -1122,7 +1119,6 @@ const ProfileCompletionPage = () => {
 
                   <div className="space-y-4">
                     <h3 className="text-lg font-semibold text-gray-800">Location</h3>
-                    <p className="text-sm text-gray-600">City is required. Country is optional but helps improve matches.</p>
                     <LocationInput
                       country={formData.country}
                       city={formData.city}
@@ -1165,7 +1161,7 @@ const ProfileCompletionPage = () => {
                     </div>
                     <p className="text-xs text-gray-500 text-center flex items-center justify-center gap-1">
                       <Shield className="w-3 h-3" />
-                      Pending images will be reviewed and approved within 24 hours or less for security.
+                      Pending images are reviewed within 24 hours.
                     </p>
 
                     {images.length > 0 && (
@@ -1208,11 +1204,11 @@ const ProfileCompletionPage = () => {
                     />
                   )}
 
-                  <div className="flex flex-col gap-3">
+                  <div className="grid grid-cols-2 gap-2">
                     <Button
                         type="submit"
                         disabled={isSubmitting}
-                        className="w-full h-9 bg-gradient-to-r from-pink-500 to-purple-600 hover:from-pink-600 hover:to-purple-700 text-white font-semibold rounded-lg transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed"
+                        className="w-full h-8 text-xs px-2 bg-gradient-to-r from-pink-500 to-purple-600 hover:from-pink-600 hover:to-purple-700 text-white font-semibold rounded-lg transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed"
                       >
                         {isSubmitting ? (
                           <div className="flex items-center justify-center gap-2">
@@ -1227,7 +1223,7 @@ const ProfileCompletionPage = () => {
                         variant="outline"
                         onClick={handleCancel}
                         disabled={isSubmitting}
-                        className="w-full h-9 border-gray-300 text-gray-700 hover:bg-gray-50 font-medium rounded-lg transition-all duration-200"
+                        className="w-full h-8 text-xs px-2 border-gray-300 text-gray-700 hover:bg-gray-50 font-medium rounded-lg transition-all duration-200"
                       >
                         {t('profileCompletion.cancel')}
                       </Button>

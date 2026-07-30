@@ -99,43 +99,44 @@ const AdinkraSymbolSelector: React.FC<AdinkraSymbolSelectorProps> = ({ selectedS
   return (
     <div className="space-y-4">
       <div>
-        <div className="flex items-center gap-2 mb-1">
-          <Label className="text-base font-medium">Cultural Signs *</Label>
-          <div className="relative info-tooltip-container">
-            <button
-              type="button"
-              className="w-4 h-4 min-w-4 min-h-4 p-0 rounded-full bg-pink-100 hover:bg-pink-200 flex items-center justify-center transition-colors shadow-md flex-shrink-0 border border-pink-200"
-              onClick={() => setShowInfoTooltip(!showInfoTooltip)}
-            >
-              <span className="text-pink-700 text-sm font-bold leading-none">!</span>
-            </button>
-            {showInfoTooltip && (
-              <div className="absolute top-full left-1/2 transform -translate-x-1/2 mt-2 z-30 w-64">
-                <div className="bg-popover text-popover-foreground p-2.5 rounded-lg shadow-lg border">
-                  <p className="text-xs">
-                    <span className="font-semibold text-purple-700"> Cultural Signs</span>
-                    <br />
-                    <span className="text-muted-foreground">
-                      Select symbols that resonate with you and reflect your personality and values.
-                    </span>
-                  </p>
-                  <div className="absolute bottom-full left-1/2 transform -translate-x-1/2 -mb-1">
-                    <div className="border-6 border-transparent border-b-popover"></div>
+        <div className="flex items-center justify-between gap-3 mb-1">
+          <div className="flex items-center gap-2">
+            <Label className="text-base font-medium">Cultural Signs *</Label>
+            <div className="relative info-tooltip-container">
+              <button
+                type="button"
+                className="w-4 h-4 min-w-4 min-h-4 p-0 rounded-full bg-pink-100 hover:bg-pink-200 flex items-center justify-center transition-colors shadow-md flex-shrink-0 border border-pink-200"
+                onClick={() => setShowInfoTooltip(!showInfoTooltip)}
+              >
+                <span className="text-pink-700 text-sm font-bold leading-none">!</span>
+              </button>
+              {showInfoTooltip && (
+                <div className="absolute top-full left-1/2 transform -translate-x-1/2 mt-2 z-30 w-64">
+                  <div className="bg-popover text-popover-foreground p-2.5 rounded-lg shadow-lg border">
+                    <p className="text-xs">
+                      <span className="font-semibold text-purple-700"> Cultural Signs</span>
+                      <br />
+                      <span className="text-muted-foreground">
+                        Select symbols that resonate with you and reflect your personality and values.
+                      </span>
+                    </p>
+                    <div className="absolute bottom-full left-1/2 transform -translate-x-1/2 -mb-1">
+                      <div className="border-6 border-transparent border-b-popover"></div>
+                    </div>
                   </div>
                 </div>
-              </div>
-            )}
+              )}
+            </div>
           </div>
-        </div>
-        
-        {/* Selection Counter */}
-        <div className="flex items-center gap-3 text-sm">
-          {selectedSymbols.length === 0 && (
-            <span className="text-red-600 font-medium">Select at least 1</span>
-          )}
-          <div className="flex items-center gap-1.5">
-            <div className={`w-2 h-2 rounded-full ${selectedSymbols.length > 0 ? 'bg-green-500' : 'bg-red-500'}`} />
-            <span className="font-medium text-gray-700">{selectedSymbols.length} / 10</span>
+
+          <div className="flex items-center gap-3 text-sm shrink-0">
+            {selectedSymbols.length === 0 && (
+              <span className="text-red-600 font-medium">Select at least 1</span>
+            )}
+            <div className="flex items-center gap-1.5">
+              <div className={`w-2 h-2 rounded-full ${selectedSymbols.length > 0 ? 'bg-green-500' : 'bg-red-500'}`} />
+              <span className="font-medium text-gray-700">{selectedSymbols.length} / 10</span>
+            </div>
           </div>
         </div>
       </div>

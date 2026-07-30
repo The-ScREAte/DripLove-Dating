@@ -95,21 +95,11 @@ const Index = ({
           .maybeSingle();
         profile = result.data;
         
-        // If no profile found, check if OAuth user needs profile completion
+        // If no profile found, send authenticated user to profile completion.
+        // This avoids race/provider edge-cases where OAuth metadata is delayed.
         if (!profile) {
-          const provider = user?.app_metadata?.provider;
-          const isOAuthUser = provider === 'google' || provider === 'apple';
-          
-          if (isOAuthUser) {
-            setLoading(false);
-            setViewIfChanged('profile-completion');
-            return;
-          }
-          
-          // Non-OAuth users need to register
-          await supabase.auth.signOut();
           setLoading(false);
-          setViewIfChanged('register');
+          setViewIfChanged('profile-completion');
           return;
         }
       }
