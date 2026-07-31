@@ -78,6 +78,16 @@ const AuthForm = ({ isLogin, onToggle, onBack }: AuthFormProps) => {
     }
   };
 
+  const hasNetworkConnectivity = async () => {
+    // navigator.onLine can be unreliable in iOS simulator/webview.
+    // If it reports offline, verify with a quick real network probe.
+    if (navigator.onLine) {
+      return true;
+    }
+
+    return await preflightAuthEndpoint();
+  };
+
   const validateForm = () => {
     const newErrors: {[key: string]: string} = {};
     
@@ -265,7 +275,8 @@ const AuthForm = ({ isLogin, onToggle, onBack }: AuthFormProps) => {
 
     try {
       // Check for network connectivity first
-      if (!navigator.onLine) {
+      const isReachable = await hasNetworkConnectivity();
+      if (!isReachable) {
         toast({
           title: t('auth.noConnection'),
           description: t('auth.checkConnection'),
@@ -516,7 +527,8 @@ const AuthForm = ({ isLogin, onToggle, onBack }: AuthFormProps) => {
       
       // Check for network errors in catch block
       const errorMessage = error?.message?.toLowerCase() || '';
-      if (!navigator.onLine || 
+      const appearsOffline = !navigator.onLine && !(await preflightAuthEndpoint());
+      if (appearsOffline || 
           errorMessage.includes('fetch') || 
           errorMessage.includes('network') ||
           errorMessage.includes('timeout') ||

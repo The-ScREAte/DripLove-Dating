@@ -287,6 +287,33 @@ const MatchCard: React.FC<MatchCardProps> = ({
     t('reportModal.reasons.other')
   ];
 
+  const reasonStyles = [
+    {
+      selected: 'border-rose-500 bg-rose-50 text-rose-700 ring-1 ring-rose-100',
+      badge: 'bg-rose-100 text-rose-700'
+    },
+    {
+      selected: 'border-orange-500 bg-orange-50 text-orange-700 ring-1 ring-orange-100',
+      badge: 'bg-orange-100 text-orange-700'
+    },
+    {
+      selected: 'border-amber-500 bg-amber-50 text-amber-700 ring-1 ring-amber-100',
+      badge: 'bg-amber-100 text-amber-700'
+    },
+    {
+      selected: 'border-fuchsia-500 bg-fuchsia-50 text-fuchsia-700 ring-1 ring-fuchsia-100',
+      badge: 'bg-fuchsia-100 text-fuchsia-700'
+    },
+    {
+      selected: 'border-red-500 bg-red-50 text-red-700 ring-1 ring-red-100',
+      badge: 'bg-red-100 text-red-700'
+    },
+    {
+      selected: 'border-slate-500 bg-slate-50 text-slate-700 ring-1 ring-slate-100',
+      badge: 'bg-slate-100 text-slate-700'
+    }
+  ];
+
   // Prevent body scrolling when modal is open
   useEffect(() => {
     const originalCssText = document.body.style.cssText;
@@ -512,7 +539,7 @@ const MatchCard: React.FC<MatchCardProps> = ({
                 }}
               >
                 <div 
-                  className="bg-white rounded-2xl shadow-2xl w-full max-w-sm mx-auto" 
+                  className="bg-white rounded-2xl shadow-2xl border border-rose-100/70 w-full max-w-sm mx-auto" 
                   onClick={e => e.stopPropagation()}
                   style={{
                     minHeight: '350px',
@@ -525,22 +552,26 @@ const MatchCard: React.FC<MatchCardProps> = ({
                   }}
                 >
                   {/* Modal header with close button */}
-                  <div className="relative p-6 pb-2">
+                  <div className="relative px-4 pt-4 pb-3 border-b border-rose-100 bg-gradient-to-r from-rose-50 via-orange-50 to-white">
                     <button
                       onClick={closeReportModal}
-                      className="absolute top-4 right-4 w-6 h-6 flex items-center justify-center text-gray-400 hover:text-gray-600 transition-colors rounded-full hover:bg-gray-100"
+                      className="absolute top-3 right-3 w-7 h-7 flex items-center justify-center text-slate-400 hover:text-slate-700 transition-colors rounded-full bg-white/90 border border-slate-200 hover:bg-white"
                       disabled={reporting}
                     >
                       <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
                       </svg>
                     </button>
-                    
-                    <h3 className="text-xl font-bold text-red-600 pr-8">{t('reportModal.title')}</h3>
+
+                    <div className="pr-10">
+                      <p className="text-[11px] uppercase tracking-[0.14em] text-rose-500 font-semibold">Safety Center</p>
+                      <h3 className="text-lg font-bold text-slate-900 mt-1">{t('reportModal.title')}</h3>
+                      <p className="text-xs text-slate-600 mt-1">{t('reportModal.instruction')}</p>
+                    </div>
                   </div>
 
                   {/* Modal content */}
-                  <div className="px-6 pb-6 max-h-96 overflow-y-auto">
+                  <div className="px-4 pb-4 pt-3 max-h-96 overflow-y-auto">
                     {isBlockSuccess ? (
                       <div className="text-green-600 font-semibold text-center py-8">
                         <div className="mb-2 text-3xl">🚫</div>
@@ -554,44 +585,45 @@ const MatchCard: React.FC<MatchCardProps> = ({
                       </div>
                     ) : (
                       <>
-                        <p className="text-gray-700 mb-4 text-sm font-semibold">{t('reportModal.instruction')}</p>
-                        
                         {/* Reason selection with stable layout */}
-                        <div className="space-y-3 mb-6">
-                          {reportReasons.map((reason) => (
+                        <div className="grid grid-cols-2 gap-2 mb-4">
+                          {reportReasons.map((reason, index) => {
+                            const tone = reasonStyles[index % reasonStyles.length];
+                            return (
                             <button
                               key={reason}
                               onClick={() => setSelectedReason(reason)}
                               disabled={reporting || isBlocking}
-                              className={`w-full h-12 px-4 text-left rounded-lg border-2 transition-all duration-200 flex items-center justify-between ${
+                              className={`w-full min-h-11 px-3 py-2 text-left rounded-xl border-2 transition-all duration-200 flex items-center justify-between ${
                                 selectedReason === reason
-                                  ? 'border-red-500 bg-red-50 text-red-700'
-                                  : 'border-gray-200 bg-gray-50 text-gray-700 hover:border-gray-300 hover:bg-gray-100'
+                                  ? tone.selected
+                                  : 'border-slate-200 bg-slate-50/80 text-slate-700 hover:border-slate-300 hover:bg-white'
                               } ${(reporting || isBlocking) ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer'}`}
                             >
-                              <span className="text-sm font-medium flex-1 pr-2">{reason}</span>
+                              <span className="text-xs sm:text-sm font-semibold leading-tight flex-1 pr-1">{reason}</span>
                               {selectedReason === reason && (
-                                <svg className="w-5 h-5 text-red-500 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
+                                <svg className="w-4 h-4 text-current flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
                                   <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
                                 </svg>
                               )}
                             </button>
-                          ))}
+                            );
+                          })}
                         </div>
 
                         {/* Block section */}
-                        <div className="mb-6 p-4 bg-gray-50 rounded-lg border border-gray-200">
-                          <p className="text-gray-700 mb-3 text-sm font-semibold">{t('reportModal.blockSection.title')}</p>
+                        <div className="mb-4 p-3 bg-gradient-to-r from-slate-50 to-white rounded-xl border border-slate-200">
+                          <p className="text-slate-700 mb-2 text-xs font-semibold uppercase tracking-wide">{t('reportModal.blockSection.title')}</p>
                           <textarea
                             placeholder={t('reportModal.blockSection.placeholder')}
                             value={blockReason}
                             onChange={(e) => setBlockReason(e.target.value)}
                             disabled={reporting || isBlocking}
-                            className="w-full p-3 border border-gray-300 rounded-lg text-sm resize-none focus:ring-2 focus:ring-red-500 focus:border-red-500 disabled:opacity-50 disabled:cursor-not-allowed"
-                            rows={3}
+                            className="w-full p-2.5 border border-slate-300 rounded-lg text-xs resize-none focus:ring-2 focus:ring-slate-400 focus:border-slate-500 disabled:opacity-50 disabled:cursor-not-allowed"
+                            rows={2}
                           />
                           <button
-                            className="w-full mt-3 h-10 bg-gray-800 hover:bg-gray-900 text-white font-semibold rounded-lg disabled:opacity-50 disabled:cursor-not-allowed transition-colors duration-200 text-sm"
+                            className="w-full mt-2 h-9 bg-slate-800 hover:bg-slate-900 text-white font-semibold rounded-lg disabled:opacity-50 disabled:cursor-not-allowed transition-colors duration-200 text-xs"
                             onClick={handleBlockUser}
                             disabled={isBlocking || reporting}
                           >
@@ -600,9 +632,9 @@ const MatchCard: React.FC<MatchCardProps> = ({
                         </div>
 
                         {/* Action buttons with stable height */}
-                        <div className="space-y-3">
+                        <div className="grid grid-cols-2 gap-2">
                           <button
-                            className="w-full h-12 bg-red-500 hover:bg-red-600 text-white font-semibold rounded-lg disabled:opacity-50 disabled:cursor-not-allowed transition-colors duration-200"
+                            className="w-full h-10 bg-gradient-to-r from-rose-500 to-red-500 hover:from-rose-600 hover:to-red-600 text-white font-semibold text-sm rounded-lg shadow-sm disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-200"
                             onClick={handleReportImage}
                             disabled={reporting || !selectedReason || isBlocking}
                           >
@@ -610,7 +642,7 @@ const MatchCard: React.FC<MatchCardProps> = ({
                           </button>
                           
                           <button
-                            className="w-full h-12 bg-gray-200 hover:bg-gray-300 text-gray-800 font-semibold rounded-lg disabled:opacity-50 disabled:cursor-not-allowed transition-colors duration-200"
+                            className="w-full h-10 bg-white hover:bg-slate-50 text-slate-700 font-semibold text-sm rounded-lg border border-slate-300 disabled:opacity-50 disabled:cursor-not-allowed transition-colors duration-200"
                             onClick={closeReportModal}
                             disabled={reporting || isBlocking}
                           >
@@ -619,7 +651,7 @@ const MatchCard: React.FC<MatchCardProps> = ({
                         </div>
                         
                         {reportError && (
-                          <div className="text-red-500 text-sm mt-4 text-center bg-red-50 p-3 rounded-lg border border-red-200">
+                          <div className="text-red-600 text-xs mt-3 text-center bg-red-50 p-2.5 rounded-lg border border-red-200">
                             {reportError}
                           </div>
                         )}

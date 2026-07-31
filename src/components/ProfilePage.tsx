@@ -485,14 +485,13 @@ const ProfilePage = ({ currentUser, profile, onProfileUpdate, onLogout, onShowTe
       if (error) {
         console.error('Error saving language:', error);
         toast({
-          title: "Error",
-          description: "Failed to save language preference",
+          title: "Couldn't update language",
+          description: "Please try again.",
           variant: "destructive",
         });
       } else {
         toast({
-          title: "Language Updated! 🌍",
-          description: "Your language preference has been saved.",
+          title: "Language updated",
           duration: 2000,
         });
       }
@@ -612,8 +611,7 @@ const ProfilePage = ({ currentUser, profile, onProfileUpdate, onLogout, onShowTe
         win.discoverForceRefresh();
       }
       toast({
-        title: "Preferences Updated! 🎉",
-        description: "Your discovery feed will refresh with matches based on your new preferences!",
+        title: "Preferences updated",
         duration: 5000,
       });
     } else {
@@ -622,8 +620,7 @@ const ProfilePage = ({ currentUser, profile, onProfileUpdate, onLogout, onShowTe
         win.discoverCache.delete(currentUser.id);
       }
       toast({
-        title: "Profile Updated! 🎉",
-        description: "Your changes have been saved.",
+        title: "Profile updated",
         duration: 3000,
       });
     }
@@ -632,6 +629,11 @@ const ProfilePage = ({ currentUser, profile, onProfileUpdate, onLogout, onShowTe
   onProfileUpdate();
     } catch (error: unknown) {
       console.error('🚨 Save failed:', error);
+      toast({
+        title: "Couldn't save changes",
+        description: "Please check your connection and try again.",
+        variant: 'destructive',
+      });
     } finally {
       setIsSaving(false);
     }
@@ -762,23 +764,23 @@ const ProfilePage = ({ currentUser, profile, onProfileUpdate, onLogout, onShowTe
          }}> 
       {/* Fixed Header with Progress Bar - completely fixed below main header */}
       <div
-        className="fixed left-0 right-0 z-40 bg-pink-50 border-b border-gray-200 shadow-sm"
+        className="fixed left-0 right-0 z-40 bg-pink-50/95 border-b border-gray-200 shadow-sm backdrop-blur-sm"
         style={{
-          // Start from where main header ends - pushed up higher
+          // Start from where main header ends; slightly lowered for cleaner breathing room
           top: platform === 'android' 
-            ? 'clamp(90px, calc(env(safe-area-inset-top, 10px) + 70px), 120px)'
-            : 'clamp(56px, calc(env(safe-area-inset-top, 10px) + 36px), 86px)',
-          paddingTop: '4px',
+            ? 'clamp(96px, calc(env(safe-area-inset-top, 10px) + 76px), 126px)'
+            : 'clamp(62px, calc(env(safe-area-inset-top, 10px) + 42px), 92px)',
+          paddingTop: '2px',
           width: '100%',
         }}
       >
-  <div className="p-2">
-          <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
-            <div className="flex flex-row gap-3 w-full">
+  <div className="px-3 py-1.5">
+          <div className="flex justify-center">
+            <div className="flex flex-wrap items-center justify-center gap-2.5 w-full">
               {!isPremium && (
                 <Button
                   onClick={() => setShowPremiumUpgrade(true)}
-                  className="bg-gradient-to-r from-yellow-400 to-yellow-500 hover:from-yellow-500 hover:to-yellow-600 text-white font-semibold w-full sm:w-auto shadow-md hover:shadow-lg transition-all duration-200"
+                  className="h-9 px-4 bg-gradient-to-r from-yellow-400 to-yellow-500 hover:from-yellow-500 hover:to-yellow-600 text-white font-semibold shadow-md hover:shadow-lg transition-all duration-200"
                 >
                   {t('Upgrade')}
                 </Button>
@@ -788,7 +790,7 @@ const ProfilePage = ({ currentUser, profile, onProfileUpdate, onLogout, onShowTe
                 <div className="relative">
                   <Button
                     onClick={openProfileMessages}
-                    className="w-full sm:w-auto border-gray-300 text-gray-700 hover:bg-pink-100 disabled:opacity-50 bg-pink-50 border"
+                    className="h-9 px-3.5 border-gray-300 text-gray-700 hover:bg-pink-100 disabled:opacity-50 bg-pink-50 border"
                     variant="outline"
                     aria-label="Open profile messages"
                   >
@@ -806,7 +808,7 @@ const ProfilePage = ({ currentUser, profile, onProfileUpdate, onLogout, onShowTe
               {isOwnProfile && (
                 <Button
                   onClick={() => navigate('/games')}
-                  className="w-full sm:w-auto border-purple-300 text-purple-700 hover:bg-purple-50 bg-pink-50 border"
+                  className="h-9 px-3.5 border-purple-300 text-purple-700 hover:bg-purple-50 bg-pink-50 border"
                   variant="outline"
                   size="sm"
                   aria-label="Play games"
@@ -820,7 +822,7 @@ const ProfilePage = ({ currentUser, profile, onProfileUpdate, onLogout, onShowTe
                 onClick={isEditing ? handleCancel : () => setIsEditing(true)}
                 disabled={isSaving}
                 size="sm"
-                className={`w-full sm:w-auto font-medium transition-all duration-200 ${
+                className={`h-9 px-3.5 font-medium transition-all duration-200 ${
                   isEditing 
                     ? 'border-red-300 text-red-700 hover:bg-red-50 disabled:opacity-50 bg-pink-50 border' 
                     : 'bg-gray-900 hover:bg-gray-800 text-white'
@@ -841,7 +843,7 @@ const ProfilePage = ({ currentUser, profile, onProfileUpdate, onLogout, onShowTe
                 <Button 
                   onClick={handleSave} 
                   disabled={isSaving} 
-                  className="w-full sm:w-auto bg-emerald-600 hover:bg-emerald-700 text-white font-medium disabled:opacity-50"
+                  className="h-9 px-4 bg-emerald-600 hover:bg-emerald-700 text-white font-medium disabled:opacity-50"
                 >
                   <Save className="w-4 h-4 mr-2" /> 
                   {isSaving ? t('common.saving') : t('common.save')}
@@ -938,7 +940,7 @@ const ProfilePage = ({ currentUser, profile, onProfileUpdate, onLogout, onShowTe
                 <DialogHeader className="px-6 py-4 border-b bg-gradient-to-r from-pink-50 to-purple-50">
                   <DialogTitle className="text-xl font-semibold text-gray-900 flex items-center gap-2">
                     <MessageCircle className="w-5 h-5 text-pink-600" />
-                    Drip Info
+                    {t('profile.updatesTitle', 'Profile Updates')}
                   </DialogTitle>
                 </DialogHeader>
 
@@ -947,7 +949,7 @@ const ProfilePage = ({ currentUser, profile, onProfileUpdate, onLogout, onShowTe
                     <div className="flex items-center justify-center py-12">
                       <div className="text-center">
                         <div className="animate-spin rounded-full h-10 w-10 border-b-2 border-pink-600 mx-auto mb-3"></div>
-                        <p className="text-sm text-gray-500">Loading Info...</p>
+                        <p className="text-sm text-gray-500">{t('profile.loadingUpdates', 'Loading updates...')}</p>
                       </div>
                     </div>
                   ) : broadcastMessages.length === 0 ? (
@@ -955,8 +957,8 @@ const ProfilePage = ({ currentUser, profile, onProfileUpdate, onLogout, onShowTe
                       <div className="w-20 h-20 bg-gradient-to-br from-green-100 to-emerald-100 rounded-full flex items-center justify-center mb-4">
                         <span className="text-4xl">😊</span>
                       </div>
-                      <p className="text-xl font-semibold text-gray-800 mb-2">All caught up!</p>
-                      <p className="text-sm text-gray-500">You have no new messages right now</p>
+                      <p className="text-xl font-semibold text-gray-800 mb-2">{t('profile.allCaughtUp', 'All caught up')}</p>
+                      <p className="text-sm text-gray-500">{t('profile.noNewUpdates', 'No new updates right now.')}</p>
                     </div>
                   ) : (
                     <div className="space-y-3">

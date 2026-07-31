@@ -61,7 +61,7 @@ const BasicInfoSection = ({ editedProfile, isEditing, onInputChange }: BasicInfo
       </CardHeader>
       <CardContent>
         <div className="space-y-4">
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div className="grid grid-cols-2 gap-3">
             <div>
               <Label htmlFor="first_name">{t('profile.firstName')}</Label>
               <Input
@@ -123,7 +123,7 @@ const BasicInfoSection = ({ editedProfile, isEditing, onInputChange }: BasicInfo
           </div>
           
           {/* Date of Birth and Age Display */}
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div className="grid grid-cols-2 gap-3">
             <div>
               <Label htmlFor="date_of_birth">{t('profile.dateOfBirth', 'Date of Birth')}</Label>
               <Input

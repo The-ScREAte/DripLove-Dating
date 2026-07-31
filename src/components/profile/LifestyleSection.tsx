@@ -21,7 +21,7 @@ const LifestyleSection = ({ editedProfile, isEditing, onSelectChange }: Lifestyl
       </CardHeader>
       <CardContent>
         <div className="space-y-4">
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div className="grid grid-cols-2 gap-3">
             <div>
               <Label htmlFor="relationship_intent">{t('profile.relationshipIntent')}</Label>
               <Select disabled={!isEditing} onValueChange={(value) => onSelectChange('relationship_intent', value)} value={editedProfile.relationship_intent}>
@@ -49,7 +49,7 @@ const LifestyleSection = ({ editedProfile, isEditing, onSelectChange }: Lifestyl
               </Select>
             </div>
           </div>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div className="grid grid-cols-2 gap-3">
             <div>
               <Label htmlFor="drinking">{t('profile.drinking')}</Label>
               <Select disabled={!isEditing} onValueChange={(value) => onSelectChange('drinking', value)} value={editedProfile.drinking}>
