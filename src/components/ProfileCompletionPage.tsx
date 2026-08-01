@@ -23,6 +23,7 @@ import { videoPreloader } from '@/utils/videoPreloader';
 import FaceVerification from '@/components/FaceVerification';
 import HoppingLogo from '@/components/HoppingLogo';
 import { usePromoCodeEnabled } from '@/hooks/usePromoCodeEnabled';
+import { getFaceReferenceCode } from '@/utils/faceReference';
 
 const TermsAcceptance = lazy(() => import('./TermsAcceptance'));
 
@@ -41,6 +42,32 @@ type StoredImageUpload = {
   hash?: string
 }
 
+type DuplicateFaceDetails = {
+  similarity?: number | null
+  faceId?: string | null
+  imageId?: string | null
+  externalImageId?: string | null
+  associatedUserId?: string | null
+  associatedEmail?: string | null
+  associatedName?: string | null
+}
+
+function extractDuplicateFaceDetails(data: any): DuplicateFaceDetails {
+  if (data?.duplicateFace && typeof data.duplicateFace === 'object') {
+    return data.duplicateFace
+  }
+
+  return {
+    similarity: data?.similarity ?? null,
+    faceId: data?.faceId ?? null,
+    imageId: data?.imageId ?? null,
+    externalImageId: data?.externalImageId ?? null,
+    associatedUserId: data?.associatedUserId ?? null,
+    associatedEmail: data?.associatedEmail ?? null,
+    associatedName: data?.associatedName ?? null,
+  }
+}
+
 function isStoredImageUpload(value: unknown): value is StoredImageUpload {
   if (typeof value !== 'object' || !value) return false
   const v = value as Record<string, unknown>
@@ -53,6 +80,12 @@ function getErrorMessage(err: unknown): string | undefined {
   if (!('message' in err)) return undefined
   const msg = (err as { message?: unknown }).message
   return typeof msg === 'string' ? msg : undefined
+}
+
+function formatDuplicateFaceMessage(details?: DuplicateFaceDetails | null): string {
+  const code = getFaceReferenceCode(details)
+
+  return `User already exists. Reference code: ${code}.`
 }
 
 const ProfileCompletionPage = () => {
@@ -126,9 +159,12 @@ const ProfileCompletionPage = () => {
 
       if (!data?.success) {
         // Face already exists in system
+        const isDuplicateFace = data?.code === 'DUPLICATE_FACE';
         toast({
-          title: data?.code === 'DUPLICATE_FACE' ? "Face Already Registered" : "Verification Failed",
-          description: data?.error || "Could not verify your face. Please try again.",
+          title: isDuplicateFace ? "Face Already Registered" : "Verification Failed",
+          description: isDuplicateFace
+            ? formatDuplicateFaceMessage(extractDuplicateFaceDetails(data))
+            : (data?.error || "Could not verify your face. Please try again."),
           variant: "destructive",
         });
         return;
@@ -1243,11 +1279,13 @@ const ProfileCompletionPage = () => {
                     {errors.adinkraSymbols && <p className="text-sm text-red-500">{errors.adinkraSymbols}</p>}
                   </div>
 
-                  <div className="space-y-4">
-                    <h3 className="text-lg font-semibold text-gray-800">{t('profileCompletion.profilePhotos')} *</h3>
-                    <p className="text-sm text-gray-600">{t('profileCompletion.uploadAtLeastTwoPhotos')}</p>
+                  <div className="space-y-2.5">
+                    <div className="flex items-center justify-between gap-3">
+                      <h3 className="text-sm font-semibold text-gray-800">{t('profileCompletion.profilePhotos')} *</h3>
+                      <p className="text-[11px] text-gray-600 whitespace-nowrap">2+ photos required</p>
+                    </div>
                     
-                    <div className="border-2 border-dashed border-gray-300 rounded-lg p-6 text-center hover:border-pink-400 transition-colors">
+                    <div className="border-2 border-dashed border-gray-300 rounded-lg p-3 text-center hover:border-pink-400 transition-colors">
                       <Input
                         type="file"
                         accept="image/*"
@@ -1256,25 +1294,25 @@ const ProfileCompletionPage = () => {
                         className="hidden"
                         id="image-upload"
                       />
-                      <Label htmlFor="image-upload" className="cursor-pointer">
-                        <Upload className="mx-auto h-8 w-8 text-gray-400 mb-2" />
-                        <p className="text-sm text-gray-600">{t('profileCompletion.clickToUploadImages')}</p>
-                        <p className="text-xs text-gray-500">{t('profileCompletion.jpgPngUpTo10MB')}</p>
+                      <Label htmlFor="image-upload" className="cursor-pointer block">
+                        <Upload className="mx-auto h-5 w-5 text-gray-400 mb-1" />
+                        <p className="text-xs text-gray-600">Upload photos</p>
+                        <p className="text-[11px] text-gray-500">JPG/PNG up to 10MB</p>
                       </Label>
                     </div>
-                    <p className="text-xs text-gray-500 text-center flex items-center justify-center gap-1">
+                    <p className="text-[11px] text-gray-500 text-center flex items-center justify-center gap-1">
                       <Shield className="w-3 h-3" />
-                      Pending images are reviewed within 24 hours.
+                      Reviewed within 24h.
                     </p>
 
                     {images.length > 0 && (
-                      <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
+                      <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
                         {images.map((image, index) => (
                           <div key={index} className="relative">
                             <img
                               src={image.preview}
                               alt={`Upload ${index + 1}`}
-                              className="w-full h-32 object-cover rounded-lg"
+                              className="w-full h-28 object-cover rounded-lg"
                             />
                             <Button
                               type="button"

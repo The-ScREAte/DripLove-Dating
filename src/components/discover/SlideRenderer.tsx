@@ -15,6 +15,22 @@ interface SlideRendererProps {
   getOptimizedUrl: (url: string) => string;
 }
 
+const areBlobMapsEqual = (
+  a?: { [url: string]: string },
+  b?: { [url: string]: string }
+) => {
+  if (a === b) return true;
+  if (!a || !b) return !a && !b;
+  const aKeys = Object.keys(a);
+  const bKeys = Object.keys(b);
+  if (aKeys.length !== bKeys.length) return false;
+  for (let i = 0; i < aKeys.length; i++) {
+    const key = aKeys[i];
+    if (a[key] !== b[key]) return false;
+  }
+  return true;
+};
+
 // Image Slide Component
 // ⭐ FIX: Show image immediately (opacity 1) - no more blank flash on swipe
 // Only use opacity transition for blob URLs where we know loading is instant
@@ -236,7 +252,7 @@ export const SlideRenderer = React.memo<SlideRendererProps>(({
     prev.userBackgroundColor === next.userBackgroundColor &&
     prev.matchFirstName === next.matchFirstName &&
     prev.matchLastName === next.matchLastName &&
-    JSON.stringify(prev.preloadedBlobImages) === JSON.stringify(next.preloadedBlobImages)
+    areBlobMapsEqual(prev.preloadedBlobImages, next.preloadedBlobImages)
   );
 });
 

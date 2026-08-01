@@ -145,9 +145,9 @@ const AdinkraSymbolSelector: React.FC<AdinkraSymbolSelectorProps> = ({ selectedS
       <div className="space-y-3">
         {/* Default Groups (Western/Chinese Zodiac) - Show when user's country is not in our list */}
         {!userCountryGroup && defaultGroups.length > 0 && defaultGroups.map((group) => (
-          <div key={group.id} className="space-y-2">
+          <div key={group.id} className="space-y-1.5">
             <Card className="overflow-visible border-2 border-primary/30 bg-gradient-to-br from-primary/5 to-purple-500/5">
-              <div className="p-2 bg-gradient-to-r from-primary/10 to-purple-500/10 border-b border-primary/20">
+              <div className="p-1.5 bg-gradient-to-r from-primary/10 to-purple-500/10 border-b border-primary/20">
                 <div className="flex items-center gap-2">
                   <span className="text-xl">{group.flag}</span>
                   <div className="flex-1">
@@ -179,7 +179,7 @@ const AdinkraSymbolSelector: React.FC<AdinkraSymbolSelectorProps> = ({ selectedS
                   </div>
                 </div>
               </div>
-              <div className="px-2 pb-2 pt-2">
+              <div className="px-1.5 pb-1.5 pt-1.5">
                 <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-6 lg:grid-cols-8 gap-2">
                   {group.symbols.map((symbol, index) => {
                     const isSelected = selectedSymbols.includes(symbol.name);
@@ -195,7 +195,7 @@ const AdinkraSymbolSelector: React.FC<AdinkraSymbolSelectorProps> = ({ selectedS
                     return (
                       <div key={symbol.name} className="relative info-tooltip-container">
                         <Card
-                          className={`cursor-pointer transition-all p-1.5 flex flex-col items-center justify-center gap-1 relative h-20 ${
+                          className={`cursor-pointer transition-all p-1 flex flex-col items-center justify-center gap-0.5 relative h-16 ${
                             isSelected ? 'border-primary border-2 bg-primary/10 shadow-md' : canSelect ? 'border-border hover:border-primary/50 hover:shadow-sm hover:scale-105' : 'border-border opacity-50 cursor-not-allowed'
                           }`}
                           onClick={() => canSelect && toggleSymbol(symbol.name)}
@@ -204,8 +204,8 @@ const AdinkraSymbolSelector: React.FC<AdinkraSymbolSelectorProps> = ({ selectedS
                             onClick={(e) => { e.stopPropagation(); setTooltipSymbol(showTooltip ? null : symbol.name); }}>
                             <span className="text-pink-700 text-[8px] font-bold leading-none">!</span>
                           </button>
-                          <div className="w-10 h-10 flex-shrink-0 flex items-center justify-center" dangerouslySetInnerHTML={{ __html: symbol.svg }} />
-                          <p className="text-[10px] font-medium leading-tight text-center px-1">{symbol.name}</p>
+                          <div className="w-8 h-8 flex-shrink-0 flex items-center justify-center [&_svg]:w-8 [&_svg]:h-8" dangerouslySetInnerHTML={{ __html: symbol.svg }} />
+                          <p className="text-[9px] font-medium leading-tight text-center px-1">{symbol.name}</p>
                           {isSelected && <div className="absolute bottom-0 left-0 right-0 h-1 bg-primary" />}
                         </Card>
                         {showTooltip && (
@@ -231,10 +231,10 @@ const AdinkraSymbolSelector: React.FC<AdinkraSymbolSelectorProps> = ({ selectedS
         {/* User's Country Group - Always Visible if exists */}
         {userCountryGroup && (
                           
-          <div className="space-y-2">
+          <div className="space-y-1.5">
             <Card className="overflow-visible border-2 border-primary/30 bg-gradient-to-br from-primary/5 to-purple-500/5">
               {/* User's Country Header - Always Expanded */}
-              <div className="p-2 bg-gradient-to-r from-primary/10 to-purple-500/10 border-b border-primary/20">
+              <div className="p-1.5 bg-gradient-to-r from-primary/10 to-purple-500/10 border-b border-primary/20">
                 <div className="flex items-center gap-2">
                   <span className="text-xl">{userCountryGroup.flag}</span>
                   <div className="flex-1">
@@ -268,7 +268,7 @@ const AdinkraSymbolSelector: React.FC<AdinkraSymbolSelectorProps> = ({ selectedS
               </div>
 
               {/* User's Country Symbols - Always Visible */}
-              <div className="px-2 pb-2 pt-2">
+              <div className="px-1.5 pb-1.5 pt-1.5">
                 <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-6 lg:grid-cols-8 gap-2">
                   {userCountryGroup.symbols.map((symbol, index) => {
                     const isSelected = selectedSymbols.includes(symbol.name);
@@ -291,7 +291,7 @@ const AdinkraSymbolSelector: React.FC<AdinkraSymbolSelectorProps> = ({ selectedS
                       <div key={symbol.name} className="relative info-tooltip-container">
                         <Card
                           className={`
-                            cursor-pointer transition-all p-1.5 flex flex-col items-center justify-center gap-1 relative h-20
+                            cursor-pointer transition-all p-1 flex flex-col items-center justify-center gap-0.5 relative h-16
                             ${isSelected 
                               ? 'border-primary border-2 bg-primary/10 shadow-md' 
                               : canSelect 
@@ -313,10 +313,10 @@ const AdinkraSymbolSelector: React.FC<AdinkraSymbolSelectorProps> = ({ selectedS
                           </button>
 
                           <div 
-                            className="w-10 h-10 flex-shrink-0 flex items-center justify-center"
+                            className="w-8 h-8 flex-shrink-0 flex items-center justify-center [&_svg]:w-8 [&_svg]:h-8"
                             dangerouslySetInnerHTML={{ __html: symbol.svg }}
                           />
-                          <p className="text-[10px] font-medium leading-tight text-center px-1">{symbol.name}</p>
+                          <p className="text-[9px] font-medium leading-tight text-center px-1">{symbol.name}</p>
                           {isSelected && (
                             <div className="absolute bottom-0 left-0 right-0 h-1 bg-primary" />
                           )}
@@ -414,7 +414,7 @@ const AdinkraSymbolSelector: React.FC<AdinkraSymbolSelectorProps> = ({ selectedS
                     </button>
 
                     {isExpanded && (
-                      <div className="px-2 pb-2 pt-1 border-t bg-muted/20">
+                      <div className="px-1.5 pb-1.5 pt-1 border-t bg-muted/20">
                         <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-6 lg:grid-cols-8 gap-2">
                           {group.symbols.map((symbol, index) => {
                             const isSelected = selectedSymbols.includes(symbol.name);
@@ -437,7 +437,7 @@ const AdinkraSymbolSelector: React.FC<AdinkraSymbolSelectorProps> = ({ selectedS
                               <div key={symbol.name} className="relative info-tooltip-container">
                                 <Card
                                   className={`
-                                    cursor-pointer transition-all p-1.5 flex flex-col items-center justify-center gap-1 relative h-20
+                                    cursor-pointer transition-all p-1 flex flex-col items-center justify-center gap-0.5 relative h-16
                                     ${isSelected 
                                       ? 'border-primary border-2 bg-primary/10 shadow-md' 
                                       : canSelect 
@@ -460,10 +460,10 @@ const AdinkraSymbolSelector: React.FC<AdinkraSymbolSelectorProps> = ({ selectedS
                                   </button>
 
                                   <div 
-                                    className="w-10 h-10 flex-shrink-0 flex items-center justify-center"
+                                    className="w-8 h-8 flex-shrink-0 flex items-center justify-center [&_svg]:w-8 [&_svg]:h-8"
                                     dangerouslySetInnerHTML={{ __html: symbol.svg }}
                                   />
-                                  <p className="text-[10px] font-medium leading-tight text-center px-1">{symbol.name}</p>
+                                  <p className="text-[9px] font-medium leading-tight text-center px-1">{symbol.name}</p>
                                   {isSelected && (
                                     <div className="absolute bottom-0 left-0 right-0 h-1 bg-primary" />
                                   )}

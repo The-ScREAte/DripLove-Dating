@@ -3,12 +3,7 @@ import WelcomeScreen from '@/components/WelcomeScreen';
 import AuthDialog from '@/components/AuthDialog';
 import AuthForm from '@/components/AuthForm';
 import RegistrationForm from '@/components/RegistrationForm';
-import ProfileCompletionPage from '@/components/ProfileCompletionPage';
-import TermsAcceptance from '@/components/TermsAcceptance';
-import MainApp from '@/components/MainApp';
 import AboutUs from '@/components/AboutUs';
-import TermsOfService from '@/components/TermsOfService';
-import PrivacyPolicy from '@/components/PrivacyPolicy';
 import ErrorBoundary from '@/components/ErrorBoundary';
 import HoppingLogo from '@/components/HoppingLogo';
 import { useToast } from '@/hooks/use-toast';
@@ -20,6 +15,11 @@ import { preloadExchangeRates } from '@/services/exchangeRateService';
 
 // Lazy load AdminPage (54KB) - only loads when admin features are accessed
 const LazyAdminPage = lazy(() => import('@/components/AdminPage'));
+const ProfileCompletionPage = lazy(() => import('@/components/ProfileCompletionPage'));
+const TermsAcceptance = lazy(() => import('@/components/TermsAcceptance'));
+const MainApp = lazy(() => import('@/components/MainApp'));
+const TermsOfService = lazy(() => import('@/components/TermsOfService'));
+const PrivacyPolicy = lazy(() => import('@/components/PrivacyPolicy'));
 
 // Loading component for lazy-loaded pages - minimal spinner
 const PageLoader = () => null;
@@ -45,30 +45,11 @@ const Index = ({
   const { toast } = useToast();
   const didRouteRef = React.useRef(false);
 
-  const setViewIfChanged = (nextView: typeof currentView) => {
+  const setViewIfChanged = React.useCallback((nextView: typeof currentView) => {
     setCurrentView((prev) => (prev === nextView ? prev : nextView));
-  };
+  }, []);
 
-  // React to global auth state (single source of truth lives in AppWrapper)
-  useEffect(() => {
-    if (!isAuthenticated || !user) {
-      setLoading(false);
-      setViewIfChanged('welcome');
-      didRouteRef.current = false;
-      return;
-    }
-
-    if (didRouteRef.current) return;
-    didRouteRef.current = true;
-
-    // If user is authenticated, run app-specific profile routing
-    setLoading(true);
-    preloadPricingConfig(user.id);
-    preloadExchangeRates(); // Preload exchange rates for currency conversion
-    checkUserTypeAndRedirect(user.id);
-  }, [isAuthenticated, user?.id]);
-
-  const checkUserTypeAndRedirect = async (userId: string) => {
+  const checkUserTypeAndRedirect = React.useCallback(async (userId: string) => {
     try {
       // Fast-path: check sessionStorage for OAuth profile first
       let profile: (Record<string, unknown> & {
@@ -82,10 +63,12 @@ const Index = ({
           const raw = sessionStorage.getItem('oauth_profile');
           if (raw) {
             profile = JSON.parse(raw);
-            try { sessionStorage.removeItem('oauth_profile'); } catch {}
+            try { sessionStorage.removeItem('oauth_profile'); } catch { /* ignore storage cleanup errors */ }
           }
         }
-      } catch {}
+      } catch {
+        // ignore profile cache parsing/storage errors and continue with DB fetch
+      }
 
       if (!profile) {
         // Single fast query with retry logic built-in
@@ -173,7 +156,26 @@ const Index = ({
     } finally {
       setLoading(false);
     }
-  };
+  }, [isAuthenticated, setViewIfChanged, toast, user?.app_metadata?.provider]);
+
+  // React to global auth state (single source of truth lives in AppWrapper)
+  useEffect(() => {
+    if (!isAuthenticated || !user) {
+      setLoading(false);
+      setViewIfChanged('welcome');
+      didRouteRef.current = false;
+      return;
+    }
+
+    if (didRouteRef.current) return;
+    didRouteRef.current = true;
+
+    // If user is authenticated, run app-specific profile routing
+    setLoading(true);
+    preloadPricingConfig(user.id);
+    preloadExchangeRates(); // Preload exchange rates for currency conversion
+    checkUserTypeAndRedirect(user.id);
+  }, [checkUserTypeAndRedirect, isAuthenticated, setViewIfChanged, user]);
 
   const handleGetStarted = () => {
     setCurrentView('login');
@@ -309,11 +311,15 @@ const Index = ({
         )}
 
         {currentView === 'terms' && (
-          <TermsOfService onBack={handleBackToWelcome} />
+          <Suspense fallback={<PageLoader />}>
+            <TermsOfService onBack={handleBackToWelcome} />
+          </Suspense>
         )}
 
         {currentView === 'privacy' && (
-          <PrivacyPolicy onBack={handleBackToWelcome} />
+          <Suspense fallback={<PageLoader />}>
+            <PrivacyPolicy onBack={handleBackToWelcome} />
+          </Suspense>
         )}
 
         {currentView === 'login' && (
@@ -342,20 +348,26 @@ const Index = ({
         {currentView === 'profile-completion' && user && (
           <div className="h-fill bg-gradient-to-br from-purple-500 to-pink-500 flex items-start justify-center px-4 pt-8 overflow-y-auto relative" style={{ minHeight: '100vh' }}>
             <VideoBackground />
-            <ProfileCompletionPage />
+            <Suspense fallback={<PageLoader />}>
+              <ProfileCompletionPage />
+            </Suspense>
           </div>
         )}
 
         {currentView === 'terms-acceptance' && user && (
-          <TermsAcceptance
-            user={user}
-            onAccept={handleTermsAccept}
-          />
+          <Suspense fallback={<PageLoader />}>
+            <TermsAcceptance
+              user={user}
+              onAccept={handleTermsAccept}
+            />
+          </Suspense>
         )}
 
         {currentView === 'app' && user && (
           <ErrorBoundary>
-            <MainApp user={user} onLogout={handleLogout} />
+            <Suspense fallback={<PageLoader />}>
+              <MainApp user={user} onLogout={handleLogout} />
+            </Suspense>
           </ErrorBoundary>
         )}
 

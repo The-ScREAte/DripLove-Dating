@@ -17,6 +17,10 @@ export interface SymbolGroup {
   symbols: AfricanSymbol[];
 }
 
+function westernZodiacGlyphSvg(glyph: string, fill: string, stroke: string, glyphColor: string): string {
+  return `<svg width="48" height="48" viewBox="0 0 48 48"><circle cx="24" cy="24" r="21" fill="${fill}" stroke="${stroke}" stroke-width="2"/><text x="24" y="31" text-anchor="middle" font-size="22" font-family="'Noto Sans Symbols 2','Segoe UI Symbol','Apple Symbols',sans-serif" fill="${glyphColor}">${glyph}</text></svg>`;
+}
+
 export const AFRICAN_SYMBOL_GROUPS: SymbolGroup[] = [
   {
     id: 'ghana-adinkra',
@@ -410,62 +414,62 @@ export const AFRICAN_SYMBOL_GROUPS: SymbolGroup[] = [
       {
         name: 'Aries',
         meaning: 'The Ram (Mar 21-Apr 19). Courage, energy, leadership.',
-        svg: `<svg width="48" height="48" viewBox="0 0 48 48"><circle cx="24" cy="24" r="22" fill="#FFEBEE" stroke="#D32F2F" stroke-width="2"/><path d="M16 20c-3-6 0-10 4-10s4 4 4 10M28 20c3-6 0-10-4-10s-4 4-4 10" stroke="#F44336" stroke-width="3" fill="none"/><circle cx="16" cy="12" r="3" fill="#D32F2F"/><circle cx="32" cy="12" r="3" fill="#D32F2F"/></svg>`
+        svg: westernZodiacGlyphSvg('♈', '#FFEBEE', '#D32F2F', '#B71C1C')
       },
       {
         name: 'Taurus',
         meaning: 'The Bull (Apr 20-May 20). Stability, determination, sensuality.',
-        svg: `<svg width="48" height="48" viewBox="0 0 48 48"><circle cx="24" cy="24" r="22" fill="#E8F5E9" stroke="#388E3C" stroke-width="2"/><circle cx="24" cy="28" r="12" fill="none" stroke="#4CAF50" stroke-width="3"/><path d="M12 20c0-8 6-12 12-12s12 4 12 12" stroke="#2E7D32" stroke-width="3" fill="none"/><circle cx="14" cy="16" r="3" fill="#1B5E20"/><circle cx="34" cy="16" r="3" fill="#1B5E20"/></svg>`
+        svg: westernZodiacGlyphSvg('♉', '#E8F5E9', '#388E3C', '#1B5E20')
       },
       {
         name: 'Gemini',
         meaning: 'The Twins (May 21-Jun 20). Communication, adaptability, duality.',
-        svg: `<svg width="48" height="48" viewBox="0 0 48 48"><rect x="4" y="4" width="40" height="40" rx="6" fill="#FFF9C4" stroke="#F9A825" stroke-width="2"/><rect x="14" y="12" width="6" height="24" rx="2" fill="#FFB300"/><rect x="28" y="12" width="6" height="24" rx="2" fill="#FFB300"/><path d="M14 16h20M14 32h20" stroke="#F57F17" stroke-width="2"/></svg>`
+        svg: westernZodiacGlyphSvg('♊', '#FFF9C4', '#F9A825', '#F57F17')
       },
       {
         name: 'Cancer',
         meaning: 'The Crab (Jun 21-Jul 22). Emotion, intuition, protection.',
-        svg: `<svg width="48" height="48" viewBox="0 0 48 48"><circle cx="24" cy="24" r="22" fill="#E3F2FD" stroke="#1976D2" stroke-width="2"/><circle cx="18" cy="20" r="6" fill="none" stroke="#2196F3" stroke-width="2"/><circle cx="30" cy="20" r="6" fill="none" stroke="#2196F3" stroke-width="2"/><path d="M12 20c-4 0-6 2-6 6M36 20c4 0 6 2 6 6" stroke="#0D47A1" stroke-width="2" fill="none"/><circle cx="18" cy="20" r="2" fill="#1565C0"/><circle cx="30" cy="20" r="2" fill="#1565C0"/></svg>`
+        svg: westernZodiacGlyphSvg('♋', '#E3F2FD', '#1976D2', '#0D47A1')
       },
       {
         name: 'Leo',
         meaning: 'The Lion (Jul 23-Aug 22). Confidence, creativity, passion.',
-        svg: `<svg width="48" height="48" viewBox="0 0 48 48"><circle cx="24" cy="24" r="22" fill="#FFF3E0" stroke="#E65100" stroke-width="2"/><circle cx="24" cy="24" r="14" fill="#FF9800" stroke="#E65100" stroke-width="2"/><circle cx="16" cy="16" r="4" fill="#FFB300"/><circle cx="32" cy="16" r="4" fill="#FFB300"/><circle cx="12" cy="24" r="4" fill="#FFB300"/><circle cx="36" cy="24" r="4" fill="#FFB300"/></svg>`
+        svg: westernZodiacGlyphSvg('♌', '#FFF3E0', '#E65100', '#BF360C')
       },
       {
         name: 'Virgo',
         meaning: 'The Maiden (Aug 23-Sep 22). Analysis, service, perfection.',
-        svg: `<svg width="48" height="48" viewBox="0 0 48 48"><rect x="6" y="6" width="36" height="36" rx="4" fill="#F3E5F5" stroke="#6A1B9A" stroke-width="2"/><path d="M12 12v24M20 12v20c0 4 2 6 6 6M28 12v24M36 30c-2 4-6 6-8 2" stroke="#8E24AA" stroke-width="2" fill="none"/></svg>`
+        svg: westernZodiacGlyphSvg('♍', '#F3E5F5', '#6A1B9A', '#4A148C')
       },
       {
         name: 'Libra',
         meaning: 'The Scales (Sep 23-Oct 22). Balance, harmony, justice.',
-        svg: `<svg width="48" height="48" viewBox="0 0 48 48"><circle cx="24" cy="24" r="22" fill="#FCE4EC" stroke="#C2185B" stroke-width="2"/><path d="M10 28h28M24 18v10" stroke="#E91E63" stroke-width="3"/><circle cx="14" cy="28" r="4" fill="none" stroke="#AD1457" stroke-width="2"/><circle cx="34" cy="28" r="4" fill="none" stroke="#AD1457" stroke-width="2"/></svg>`
+        svg: westernZodiacGlyphSvg('♎', '#FCE4EC', '#C2185B', '#880E4F')
       },
       {
         name: 'Scorpio',
         meaning: 'The Scorpion (Oct 23-Nov 21). Intensity, transformation, mystery.',
-        svg: `<svg width="48" height="48" viewBox="0 0 48 48"><rect x="4" y="4" width="40" height="40" rx="6" fill="#212121" stroke="#000000" stroke-width="2"/><path d="M12 12v16c0 4 2 6 6 6M20 12v16c0 4 2 6 6 6M28 12v20l8 4" stroke="#E91E63" stroke-width="2" fill="none"/><path d="M36 36l4-4-4-4" stroke="#E91E63" stroke-width="2"/></svg>`
+        svg: westernZodiacGlyphSvg('♏', '#212121', '#000000', '#F06292')
       },
       {
         name: 'Sagittarius',
         meaning: 'The Archer (Nov 22-Dec 21). Adventure, optimism, freedom.',
-        svg: `<svg width="48" height="48" viewBox="0 0 48 48"><circle cx="24" cy="24" r="22" fill="#E1F5FE" stroke="#01579B" stroke-width="2"/><path d="M12 36L36 12M28 12h8v8M12 32l6 6" stroke="#0277BD" stroke-width="3"/></svg>`
+        svg: westernZodiacGlyphSvg('♐', '#E1F5FE', '#01579B', '#0D47A1')
       },
       {
         name: 'Capricorn',
         meaning: 'The Goat (Dec 22-Jan 19). Ambition, discipline, responsibility.',
-        svg: `<svg width="48" height="48" viewBox="0 0 48 48"><rect x="6" y="6" width="36" height="36" rx="4" fill="#EFEBE9" stroke="#4E342E" stroke-width="2"/><path d="M12 20c0-6 4-10 8-10v20c0 4 4 6 8 2" stroke="#6D4C41" stroke-width="3" fill="none"/><circle cx="32" cy="28" r="6" fill="none" stroke="#5D4037" stroke-width="2"/></svg>`
+        svg: westernZodiacGlyphSvg('♑', '#EFEBE9', '#4E342E', '#3E2723')
       },
       {
         name: 'Aquarius',
         meaning: 'The Water Bearer (Jan 20-Feb 18). Innovation, humanitarianism, independence.',
-        svg: `<svg width="48" height="48" viewBox="0 0 48 48"><circle cx="24" cy="24" r="22" fill="#E0F2F1" stroke="#00695C" stroke-width="2"/><path d="M8 18c4 0 4 4 8 4s4-4 8-4 4 4 8 4 4-4 8-4M8 28c4 0 4 4 8 4s4-4 8-4 4 4 8 4 4-4 8-4" stroke="#00897B" stroke-width="2" fill="none"/></svg>`
+        svg: westernZodiacGlyphSvg('♒', '#E0F2F1', '#00695C', '#004D40')
       },
       {
         name: 'Pisces',
         meaning: 'The Fish (Feb 19-Mar 20). Compassion, imagination, spirituality.',
-        svg: `<svg width="48" height="48" viewBox="0 0 48 48"><rect x="4" y="4" width="40" height="40" rx="6" fill="#F3E5F5" stroke="#4A148C" stroke-width="2"/><path d="M16 12c-4 6-4 18 0 24M32 12c4 6 4 18 0 24M12 24h24" stroke="#7B1FA2" stroke-width="2" fill="none"/><circle cx="16" cy="18" r="2" fill="#6A1B9A"/><circle cx="32" cy="18" r="2" fill="#6A1B9A"/></svg>`
+        svg: westernZodiacGlyphSvg('♓', '#F3E5F5', '#4A148C', '#6A1B9A')
       }
     ]
   },

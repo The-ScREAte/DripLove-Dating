@@ -112,17 +112,14 @@ const MatchCard: React.FC<MatchCardProps> = ({
   const containerRef = useRef<HTMLDivElement>(null);
 
   // ⭐ PHASE 1.1: Memoize all expensive inputs (prevents Android re-render storm)
-  const memoUserImages = useMemo(() => userImages.slice(), [userImages.join(',')]); // ⭐ FIX: Detect actual URL changes
-  const memoPreloadedBlobs = useMemo(
-    () => preloadedBlobImages,
-    [preloadedBlobImages ? Object.keys(preloadedBlobImages).length : 0]
-  );
+  const memoUserImages = useMemo(() => userImages.slice(), [userImages]);
+  const memoPreloadedBlobs = useMemo(() => preloadedBlobImages, [preloadedBlobImages]);
 
   // ⭐ PHASE 1.2: Freeze match fields (prevents 3-5x re-computation on Android)
   const stableMatch = useMemo(() => ({
     ...match,
     adinkra_symbols: match.adinkra_symbols || []
-  }), [match.id]);
+  }), [match]);
 
   // ⭐ PHASE 1.3: Move heavy logic OUTSIDE + use memoized buildSlides
   const slides = useMemo(() => buildSlides(stableMatch, memoUserImages), [stableMatch, memoUserImages]);
@@ -160,7 +157,7 @@ const MatchCard: React.FC<MatchCardProps> = ({
     if (currentSlide >= slides.length) {
       setCurrentSlide(0); // Reset to first slide to prevent out-of-bounds
     }
-  }, [slides.length]);
+  }, [currentSlide, slides.length]);
 
   // ⭐ PHASE 2.7: Pre-calc card width AND left position once (eliminate ALL DOM reads on Android)
   // ⭐ FIX #3: Add resize listener for orientation changes
@@ -931,16 +928,57 @@ const MatchCard: React.FC<MatchCardProps> = ({
   );
 };
 
+const areStringArraysEqual = (a: string[], b: string[]) => {
+  if (a === b) return true;
+  if (a.length !== b.length) return false;
+  for (let i = 0; i < a.length; i++) {
+    if (a[i] !== b[i]) return false;
+  }
+  return true;
+};
+
+const areStringMapsEqual = (
+  a?: Record<string, string>,
+  b?: Record<string, string>
+) => {
+  if (a === b) return true;
+  if (!a || !b) return !a && !b;
+  const aKeys = Object.keys(a);
+  const bKeys = Object.keys(b);
+  if (aKeys.length !== bKeys.length) return false;
+  for (let i = 0; i < aKeys.length; i++) {
+    const key = aKeys[i];
+    if (a[key] !== b[key]) return false;
+  }
+  return true;
+};
+
+const areImageStatusMapsEqual = (
+  a?: Record<string, 'idle'|'loading'|'loaded'|'error'>,
+  b?: Record<string, 'idle'|'loading'|'loaded'|'error'>
+) => {
+  if (a === b) return true;
+  if (!a || !b) return !a && !b;
+  const aKeys = Object.keys(a);
+  const bKeys = Object.keys(b);
+  if (aKeys.length !== bKeys.length) return false;
+  for (let i = 0; i < aKeys.length; i++) {
+    const key = aKeys[i];
+    if (a[key] !== b[key]) return false;
+  }
+  return true;
+};
+
 // ⭐ PHASE 2.9: PureComponent to freeze layout (prevents unnecessary re-renders on Android)
 export default React.memo(MatchCard, (prev, next) => {
   return (
     prev.match.id === next.match.id &&
-    prev.userImages.join(',') === next.userImages.join(',') && // ⭐ FIX #1: Detect URL changes, not just length
-    Object.keys(prev.preloadedBlobImages || {}).length === Object.keys(next.preloadedBlobImages || {}).length &&
+    areStringArraysEqual(prev.userImages, next.userImages) &&
+    areStringMapsEqual(prev.preloadedBlobImages, next.preloadedBlobImages) &&
     prev.showMoreInfo === next.showMoreInfo &&
     prev.swipeDirection === next.swipeDirection &&
     prev.imageIndex === next.imageIndex &&
     prev.preferredLanguageName === next.preferredLanguageName && // ⭐ FIX #2: Detect language changes
-    JSON.stringify(prev.imageStatus) === JSON.stringify(next.imageStatus) // ⭐ FIX #3: Detect loading state changes
+    areImageStatusMapsEqual(prev.imageStatus, next.imageStatus) // ⭐ FIX #3: Detect loading state changes
   );
 });

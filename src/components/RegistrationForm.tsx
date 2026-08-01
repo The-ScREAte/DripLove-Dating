@@ -23,6 +23,7 @@ import { verifyUploadedImage, detectHumanFace } from '@/utils/faceVerificationUt
 import { useTranslation } from 'react-i18next';
 import FaceVerification from '@/components/FaceVerification';
 import { usePromoCodeEnabled } from '@/hooks/usePromoCodeEnabled';
+import { getFaceReferenceCode } from '@/utils/faceReference';
 
 interface RegistrationFormProps {
   onSubmit: (data: any) => void;
@@ -36,6 +37,32 @@ interface ImageUpload {
   status: 'uploading' | 'moderating' | 'approved' | 'pending' | 'rejected';
   hash?: string; // Store hash for duplicate detection
 }
+
+interface DuplicateFaceDetails {
+  similarity?: number | null;
+  faceId?: string | null;
+  imageId?: string | null;
+  externalImageId?: string | null;
+  associatedUserId?: string | null;
+  associatedEmail?: string | null;
+  associatedName?: string | null;
+}
+
+const extractDuplicateFaceDetails = (data: any): DuplicateFaceDetails => {
+  if (data?.duplicateFace && typeof data.duplicateFace === 'object') {
+    return data.duplicateFace;
+  }
+
+  return {
+    similarity: data?.similarity ?? null,
+    faceId: data?.faceId ?? null,
+    imageId: data?.imageId ?? null,
+    externalImageId: data?.externalImageId ?? null,
+    associatedUserId: data?.associatedUserId ?? null,
+    associatedEmail: data?.associatedEmail ?? null,
+    associatedName: data?.associatedName ?? null,
+  };
+};
 
 const RegistrationForm = ({ onSubmit, onBackToLogin }: RegistrationFormProps) => {
   const [formData, setFormData] = useState(initialFormData);
@@ -52,6 +79,11 @@ const RegistrationForm = ({ onSubmit, onBackToLogin }: RegistrationFormProps) =>
   const { toast } = useToast();
   const { t } = useTranslation();
   const { isEnabled: promoCodeEnabled } = usePromoCodeEnabled();
+
+  const formatDuplicateFaceMessage = (details?: DuplicateFaceDetails | null) => {
+    const code = getFaceReferenceCode(details);
+    return `User already exists. Reference code: ${code}.`;
+  };
 
   // Restore face verification from localStorage on mount
   React.useEffect(() => {
@@ -86,9 +118,12 @@ const RegistrationForm = ({ onSubmit, onBackToLogin }: RegistrationFormProps) =>
 
       if (!data?.success) {
         // Face already exists in system
+        const isDuplicateFace = data?.code === 'DUPLICATE_FACE';
         toast({
-          title: data?.code === 'DUPLICATE_FACE' ? "Face Already Registered" : "Verification Failed",
-          description: data?.error || "Could not verify your face. Please try again.",
+          title: isDuplicateFace ? "Face Already Registered" : "Verification Failed",
+          description: isDuplicateFace
+            ? formatDuplicateFaceMessage(extractDuplicateFaceDetails(data))
+            : (data?.error || "Could not verify your face. Please try again."),
           variant: "destructive",
         });
         return;
@@ -1045,38 +1080,41 @@ const RegistrationForm = ({ onSubmit, onBackToLogin }: RegistrationFormProps) =>
           )}
 
           {currentStep === 3 && (
-            <div className="space-y-6 animate-fade-in">
-              <div className="text-center">
-                <div className="flex items-center justify-center mb-4">
-                  <Shield className="w-5 h-5 text-purple-600 mr-2" />
-                  <span className="text-sm text-purple-600 font-medium">AI Content Moderation Active</span>
-                </div>
-                <p className="text-sm text-gray-600">{t('registration.photosChecked')}</p>
-              </div>
+            <div className="space-y-4 animate-fade-in">
 
-              <div className="space-y-4">
-                <Label htmlFor="photos" className="text-lg font-medium">{t('registration.uploadPhotosLabel')}</Label>
-                <Input
-                  id="photos"
-                  type="file"
-                  accept="image/*"
-                  multiple
-                  onChange={handleImageUpload}
-                  className="cursor-pointer"
-                />
-                <p className="text-xs text-gray-500 flex items-center gap-1">
+              <div className="space-y-2.5">
+                <div className="flex items-center justify-between gap-3">
+                  <Label htmlFor="photos" className="text-sm font-semibold text-gray-800">Profile Photos *</Label>
+                  <p className="text-[11px] text-gray-600 whitespace-nowrap">2+ photos required</p>
+                </div>
+                <div className="border-2 border-dashed border-gray-300 rounded-lg p-3 text-center hover:border-pink-400 transition-colors">
+                  <Input
+                    id="photos"
+                    type="file"
+                    accept="image/*"
+                    multiple
+                    onChange={handleImageUpload}
+                    className="hidden"
+                  />
+                  <Label htmlFor="photos" className="cursor-pointer block">
+                    <Upload className="mx-auto h-5 w-5 text-gray-400 mb-1" />
+                    <p className="text-xs text-gray-600">Upload photos</p>
+                    <p className="text-[11px] text-gray-500">JPG/PNG up to 10MB</p>
+                  </Label>
+                </div>
+                <p className="text-[11px] text-gray-500 flex items-center justify-center gap-1">
                   <Shield className="w-3 h-3" />
-                  Pending images will be reviewed and approved within 24 hours or less for security.
+                  Reviewed within 24h.
                 </p>
                 
                 {images.length > 0 && (
-                  <div className="grid grid-cols-2 sm:grid-cols-3 gap-4">
+                  <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
                     {images.map((image, index) => (
                       <div key={image.preview} className="relative group">
                         <img 
                           src={image.preview} 
                           alt={`Upload ${index + 1}`}
-                          className="w-full h-32 object-cover rounded-lg shadow-sm"
+                          className="w-full h-28 object-cover rounded-lg shadow-sm"
                         />
                         {renderImageStatus(image)}
                         
@@ -1108,16 +1146,6 @@ const RegistrationForm = ({ onSubmit, onBackToLogin }: RegistrationFormProps) =>
                     />
                   </div>
                 )}
-
-                <div className="bg-blue-50 p-4 rounded-lg">
-                  <h4 className="font-medium text-blue-900 mb-2">{t('registration.photoGuidelines')}</h4>
-                  <ul className="text-sm text-blue-800 space-y-1">
-                    <li>• {t('registration.clearPhotoFace')}</li>
-                    <li>• {t('registration.appropriateClothing')}</li>
-                    <li>• {t('registration.noExplicit')}</li>
-                    <li>• {t('registration.borderlineMayReview')}</li>
-                  </ul>
-                </div>
 
                 {/* Note: Face verification is now shown in step 1 under name fields */}
               </div>

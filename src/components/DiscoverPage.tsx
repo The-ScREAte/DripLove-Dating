@@ -19,12 +19,33 @@ import React, { useState, useEffect, useCallback, useMemo, useRef, lazy, Suspens
 import { useNavigate } from 'react-router-dom';
 import { isAndroidPlatform, isIOSPlatform } from '@/utils/platformUtils';
 import { preloadImageToBlob } from '@/utils/imageCache';
-import { calculateAge, createDeterministicShuffle } from '@/utils/discoverCache';
+import { calculateAge } from '@/utils/discoverCache';
 import { normalizeCountryCode } from '@/utils/countryCode';
 import { getStratifiedBatches } from '@/utils/stratifiedSampling';
 import { applyActivityWeighting, getSwipeFatigueRescueCandidates, injectRescueProfiles } from '@/utils/activityWeighting';
-import { useLikeBackInjection } from '@/hooks/useLikeBackInjection';
 import DominantColorImageBg from './discover/DominantColorImageBg';
+import { useDiscoverAds } from './discover/useDiscoverAds';
+import { AdData, MatchOrAd } from './discover/discoverTypes';
+import { useDiscoverLikeBack } from './discover/useDiscoverLikeBack';
+import {
+  isUuid,
+  uniqUuids,
+  todayStr,
+  applyLightActivityWeighting,
+  getUserFeedSeed,
+  readCachedSwipeCount,
+  writeCachedSwipeCount,
+  formatUuidInFilter,
+  hashStringToInt,
+  getTrustedBaseCountryCode,
+  isLocalCountryForFreeUser,
+  mixByCountryRoundRobin,
+  buildFeedSignature,
+  buildSavedOrderKey,
+  readPersistentItem,
+  writePersistentItem,
+  normalizeCountryCodeList,
+} from './discover/discoverFeedUtils';
 
 const AdinkraBar = lazy(() => import('./discover/AdinkraBar'));
 
@@ -62,53 +83,6 @@ import RatingDialog from './RatingDialog';
 import { handleMatchForRating, preloadNativeRating } from '@/services/appRatingService';
 import { CurrentUser, PotentialMatch } from '@/types';
 
-const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
-const isUuid = (value: unknown): value is string => typeof value === 'string' && UUID_RE.test(value);
-const uniqUuids = (values: unknown[]): string[] => Array.from(new Set(values.filter(isUuid)));
-
-const todayStr = () => new Date().toISOString().split('T')[0];
-
-// ⭐ LIGHT ACTIVITY WEIGHTING: Only reorder a small head slice to cap CPU
-const applyLightActivityWeighting = (profiles: PotentialMatch[] | ProfileRow[], seed: string, headSize = 32) => {
-  if (!profiles || profiles.length === 0) return profiles;
-  const head = profiles.slice(0, headSize);
-  const tail = profiles.slice(headSize);
-  const weightedHead = applyActivityWeighting(head as PotentialMatch[], seed);
-  return [...weightedHead, ...tail] as typeof profiles;
-};
-
-// ⭐ PER-USER SEED: Generate a unique seed that varies by user AND date
-// This ensures different users see different profile orders (fair visibility for all)
-// Stays consistent for the entire day to provide stable experience
-const getUserFeedSeed = (userId: string): string => {
-  const dateStr = todayStr();
-  // Put userId FIRST so different users get completely different shuffles
-  return `${userId}_${dateStr}`;
-};
-
-const swipeCountCacheKey = (userId: string) => `driplove_swipe_count_${userId}_${todayStr()}`;
-
-const readCachedSwipeCount = (userId: string): number | null => {
-  try {
-    const raw = localStorage.getItem(swipeCountCacheKey(userId));
-    if (!raw) return null;
-    const parsed = Number(JSON.parse(raw));
-    if (!Number.isFinite(parsed) || parsed < 0) return null;
-    return Math.floor(parsed);
-  } catch {
-    return null;
-  }
-};
-
-const writeCachedSwipeCount = (userId: string, count: number) => {
-  try {
-    if (!Number.isFinite(count) || count < 0) return;
-    localStorage.setItem(swipeCountCacheKey(userId), JSON.stringify(Math.floor(count)));
-  } catch {
-    // ignore
-  }
-};
-
 // Paginated fetch for tables that can exceed Supabase's 1000-row default limit.
 // Returns all matching rows by fetching in pages of `pageSize`.
 const fetchAllRows = async <T,>(
@@ -117,7 +91,6 @@ const fetchAllRows = async <T,>(
 ): Promise<T[]> => {
   const allRows: T[] = [];
   let offset = 0;
-  // eslint-disable-next-line no-constant-condition
   while (true) {
     const { data, error } = await queryBuilder().range(offset, offset + pageSize - 1);
     if (error) throw error;
@@ -128,220 +101,6 @@ const fetchAllRows = async <T,>(
   }
   return allRows;
 };
-
-// PostgREST `in.(...)` / `not.in.(...)` expects a comma-separated list inside parentheses.
-// Since we validate UUID format, we can safely emit raw UUIDs (no extra quoting), which
-// avoids 400 "Bad Request" errors caused by invalid quoting.
-const formatUuidInFilter = (ids: string[], maxLen = 3500) => {
-  const unique = Array.from(new Set(ids.filter(Boolean)));
-  if (unique.length === 0) return '()';
-
-  const build = (count: number) => `(${unique.slice(0, count).join(',')})`;
-  if (build(unique.length).length <= maxLen) return build(unique.length);
-
-  // Binary search the largest prefix that fits within maxLen.
-  let low = 0;
-  let high = unique.length;
-  while (low < high) {
-    const mid = Math.ceil((low + high) / 2);
-    if (build(mid).length <= maxLen) {
-      low = mid;
-    } else {
-      high = mid - 1;
-    }
-  }
-  return low > 0 ? build(low) : '()';
-};
-
-const hashStringToInt = (str: string): number => {
-  let hash = 0;
-  for (let i = 0; i < str.length; i++) {
-    hash = ((hash << 5) - hash) + str.charCodeAt(i);
-    hash |= 0;
-  }
-  return Math.abs(hash);
-};
-
-const seededRandomFromString = (seedStr: string) => {
-  let seed = hashStringToInt(seedStr);
-  return () => {
-    seed = (seed * 9301 + 49297) % 233280;
-    return seed / 233280;
-  };
-};
-
-// When country_code and country disagree, trust the country name (what the user sees/sets)
-// to avoid leaking international profiles to free users due to stale/incorrect country_code.
-const getTrustedBaseCountryCode = (countryCode: unknown, country: unknown): string => {
-  const cc = normalizeCountryCode(String(countryCode || ''));
-  const cn = normalizeCountryCode(String(country || ''));
-  if (cc && cn && cc !== cn) return cn;
-  return cc || cn;
-};
-
-const isLocalCountryForFreeUser = (
-  p: { country_code?: unknown; country?: unknown },
-  baseCountryCode: string
-): boolean => {
-  if (!baseCountryCode) return false;
-  const cc = normalizeCountryCode(String(p?.country_code || ''));
-  const cn = normalizeCountryCode(String(p?.country || ''));
-  // If both exist, require they agree (prevents “country_code=GH, country=Kenya” leakage).
-  if (cc && cn) return cc === baseCountryCode && cn === baseCountryCode;
-  return (cc || cn) === baseCountryCode;
-};
-
-// Round-robin across selected countries, skipping empty buckets.
-const mixByCountryRoundRobin = <T extends { country_code?: string | null; id: string }>(
-  profiles: T[], 
-  countryCodes: string[],
-  seed: string
-): T[] => {
-  const orderedCountries = countryCodes.map(normalizeCountryCode).filter(Boolean);
-  if (orderedCountries.length <= 1) return profiles;
-
-  const buckets = new Map<string, T[]>();
-  for (const c of orderedCountries) buckets.set(c, []);
-  for (const p of profiles) {
-    const cc = normalizeCountryCode(p.country_code || '');
-    if (!cc) continue;
-    if (!buckets.has(cc)) continue;
-    buckets.get(cc)!.push(p);
-  }
-
-  // Deterministically shuffle within each country for variety.
-  for (const c of orderedCountries) {
-    const list = buckets.get(c)!;
-    buckets.set(c, createDeterministicShuffle(list, `${seed}_${c}`));
-  }
-
-  const rand = seededRandomFromString(seed);
-  const result: T[] = [];
-  let countryIndex = 0;
-
-  while (true) {
-    let hasAny = false;
-    for (const c of orderedCountries) {
-      if (buckets.get(c)!.length > 0) {
-        hasAny = true;
-        break;
-      }
-    }
-    if (!hasAny) break;
-
-    const currentCountry = orderedCountries[countryIndex % orderedCountries.length];
-    const list = buckets.get(currentCountry);
-
-    if (list && list.length > 0) {
-      const r = rand();
-      let chunkSize = 1;
-      if (r > 0.7 && list.length >= 2) chunkSize = 2;
-      if (r > 0.85 && list.length >= 3) chunkSize = 3;
-
-      for (let i = 0; i < chunkSize && list.length > 0; i++) {
-        result.push(list.shift()!);
-      }
-    }
-
-    countryIndex++;
-  }
-
-  return result;
-};
-
-const buildFeedSignature = (baseCountryCode: string, unlockedCountries: string[], isPremium: boolean, maxDistance: number) => {
-  const base = normalizeCountryCode(baseCountryCode);
-  const unlockedSignature = isPremium
-    ? unlockedCountries.map(normalizeCountryCode).filter(Boolean).sort().join(',')
-    : '';
-  // v10 feed signature - daily rotation per-user randomization (no hour blocks)
-  return `v10_${hashStringToInt(`${base}|${unlockedSignature}|${maxDistance}|${isPremium ? 'premium' : 'free'}`).toString(36)}`;
-};
-
-// ⭐ PER-USER RANDOMIZATION: Saved order persists for entire day per user
-// This ensures stable experience throughout the day with fair per-user distribution
-const buildSavedOrderKey = (userId: string, feedSignature: string) =>
-  `driplove_profile_order_${userId}_${todayStr()}_${feedSignature}`;
-
-// Persist helpers with fallbacks for Android WebView storage quirks
-const readPersistentItem = (key: string): string | null => {
-  try {
-    const v = localStorage.getItem(key);
-    if (v !== null) return v;
-  } catch {
-    // ignore
-  }
-  try {
-    const v = sessionStorage.getItem(key);
-    if (v !== null) return v;
-  } catch {
-    // ignore
-  }
-  return null;
-};
-
-const writePersistentItem = (key: string, value: string) => {
-  try {
-    localStorage.setItem(key, value);
-  } catch {
-    // ignore
-  }
-  try {
-    sessionStorage.setItem(key, value);
-  } catch {
-    // ignore
-  }
-};
-
-const normalizeCountryCodeList = (value: unknown, baseCountryCode?: string): string[] => {
-  const normalize = (items: unknown[]): string[] => {
-    const baseNorm = typeof baseCountryCode === 'string' ? normalizeCountryCode(baseCountryCode) : undefined;
-    const result = items
-      .filter((c): c is string => typeof c === 'string')
-      .map((c) => normalizeCountryCode(c))
-      .filter((c) => c.length > 0);
-    return baseNorm ? result.filter((c) => c !== baseNorm) : result;
-  };
-
-  if (Array.isArray(value)) {
-    return normalize(value);
-  }
-
-  if (typeof value === 'string') {
-    const trimmed = value.trim();
-    if (trimmed.length === 0) return [];
-
-    try {
-      const parsed = JSON.parse(trimmed);
-      if (Array.isArray(parsed)) return normalize(parsed);
-    } catch {
-      // ignore
-    }
-
-    // Note: `[` does not need escaping inside a character class; `]` does.
-    const cleaned = trimmed.replace(/[{}[\]"]+/g, '');
-    const parts = cleaned.split(',').map((s) => normalizeCountryCode(s)).filter(Boolean);
-    return normalize(parts);
-  }
-
-  return [];
-};
-
-interface AdData {
-  id: string;
-  image_url: string;
-  video_url?: string | null;
-  media_type?: string | null;
-  name: string;
-  about: string;
-  link: string | null;
-  link_as: string | null;
-  target_countries?: string[];
-  isAd: true; // Mark this as an ad
-}
-
-// Union type for matches and ads
-type MatchOrAd = PotentialMatch | AdData;
 
 interface DiscoverPageProps {
   currentUser: CurrentUser;
@@ -371,18 +130,6 @@ interface UserImageRow {
   image_url: string;
   is_approved: boolean | null;
   moderation_status: string | null;
-}
-
-interface AdsRow {
-  id: string;
-  name: string;
-  about: string;
-  image_url: string;
-  video_url: string | null;
-  link: string | null;
-  link_as: string | null;
-  media_type: string | null;
-  target_countries: unknown;
 }
 
 type ProfileRow = Pick<
@@ -577,7 +324,6 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, onNavigateToProfile, isPr
   const [showMatchAnimation, setShowMatchAnimation] = useState(false);
   const [matchedUser, setMatchedUser] = useState<PotentialMatch | null>(null);
   const [showRatingDialog, setShowRatingDialog] = useState(false);
-  const [ads, setAds] = useState<AdData[]>([]);
   const [realSwipeCount, setRealSwipeCount] = useState(0); // Track actual user swipes (excluding ads)
   // Store users who liked the current user (for "they liked you" notification)
   const [usersWhoLikedMeIds, setUsersWhoLikedMeIds] = useState<string[]>([]);
@@ -808,125 +554,30 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, onNavigateToProfile, isPr
   const requestedImageProfileIds = useRef<Set<string>>(new Set());
 
   // ⭐ LIKE-BACK INJECTION: 25% injection of users who liked the current user
-  // Build filter sets for the injection hook
   // ⭐ FIX: Store blocked IDs in state (populated from fetchPotentialMatchesData)
   const [blockedUserIds, setBlockedUserIds] = useState<string[]>([]);
-  const blockedIdsSet = useMemo(() => new Set(blockedUserIds), [blockedUserIds]);
-  
-  // ⭐ FIX: Memoize passedTodayIdsSet to prevent infinite loop in useLikeBackInjection
-  // Only recreate when locallySwipedProfileIds actually changes content
-  const passedTodayIdsSet = useMemo(() => {
-    const now = Date.now();
-    const oneDayMs = 24 * 60 * 60 * 1000;
-    const passedToday = new Set<string>();
-    for (const [id, data] of locallySwipedProfileIds.current.entries()) {
-      if (data.action === 'pass' && (now - data.timestamp) < oneDayMs) {
-        passedToday.add(id);
-      }
-    }
-    return passedToday;
-  }, [locallySwipedProfileIds.current.size]); // Re-compute only when Map size changes
-  
-  const inQueueIdsSet = useMemo(() => {
-    const inQueue = new Set<string>();
-    potentialMatches.forEach(m => {
-      if (!isAd(m)) inQueue.add(m.id);
-    });
-    return inQueue;
-  }, [potentialMatches]);
-
-  // Calculate max distance for like-back injection with 500km cap for free users
-  const likeBackMaxDistance = (() => {
-    const userMax = currentUser?.max_distance || currentUser?.distance_preference || 500;
-    const FREE_USER_MAX = 500;
-    // Free users are capped at 500km
-    return premiumActive ? userMax : Math.min(userMax, FREE_USER_MAX);
-  })();
-
   const {
-    onSwipe: onLikeBackSwipe,
+    onLikeBackSwipe,
     isLikedMeProfile,
-    candidateCount: likeBackCandidateCount,
-    refreshCandidates: refreshLikeBackCandidates,
-  } = useLikeBackInjection({
-    userId: currentUser?.id,
-    blockedIds: blockedIdsSet,
-    passedTodayIds: passedTodayIdsSet,
-    inQueueIds: inQueueIdsSet,
-    locallySwipedIds: locallySwipedProfileIds.current,
-    // Location-based filtering for free users - only inject from same country/within distance
-    isPremium: premiumActive,
-    userCountryCode: currentUser?.country_code || currentUser?.country,
-    userLatitude: currentUser?.latitude,
-    userLongitude: currentUser?.longitude,
-    maxDistance: likeBackMaxDistance, // Free users capped at 500km
+    likeBackCandidateCount,
+    refreshLikeBackCandidates,
+  } = useDiscoverLikeBack({
+    currentUser,
+    premiumActive,
+    potentialMatches,
+    blockedUserIds,
+    locallySwipedProfileIds,
+    isAd,
   });
 
-  // Fetch ads from database - load them BEFORE fetching profiles
-  const [adsLoaded, setAdsLoaded] = useState(false);
-  
-  // Get user's country code for filtering ads
-  const userCountryCode = useMemo(() => {
-    // IMPORTANT: Ads are targeted by COUNTRY only.
-    // Do not depend on city/lat/lng geocoding, because those can be wrong/missing.
-    // We normalize either the saved ISO2 `country_code` or the human-readable `country`.
-    return normalizeCountryCode(currentUser?.country_code || currentUser?.country || '');
-  }, [currentUser?.country_code, currentUser?.country]);
-  
-  useEffect(() => {
-    // ⭐ ANDROID OPTIMIZATION: Longer defer for Android to prioritize profile loading
-    const delay = isAndroidPlatform() ? 800 : 300;
-    const timer = setTimeout(async () => {
-      const fetchAds = async () => {
-        try {
-          // Build query with server-side filtering when possible
-          const query = supabase
-            .from('ads')
-            .select('id, name, about, image_url, video_url, link, link_as, media_type, target_countries')
-            .order('created_at', { ascending: false });
-
-          const { data, error } = await query;
-
-          if (error) throw error;
-
-        // Filter ads by COUNTRY only - still needed for target_countries array filtering
-        // Server-side contains filter for arrays isn't reliable with empty arrays
-        const rows: AdsRow[] = Array.isArray(data) ? (data as unknown as AdsRow[]) : [];
-
-        const filteredAds = rows.filter((ad) => {
-          const targetCountries = normalizeCountryCodeList(ad.target_countries);
-          // If no target countries specified, show to everyone
-          if (targetCountries.length === 0) return true;
-          // Otherwise, only show if user's country is in the list
-          return Boolean(userCountryCode) && targetCountries.includes(userCountryCode);
-        });
-
-        // Mark ads with isAd property
-        const adsWithMarker: AdData[] = filteredAds.map((ad) => ({
-          id: ad.id,
-          name: ad.name,
-          about: ad.about,
-          image_url: ad.image_url,
-          video_url: ad.video_url,
-          media_type: ad.media_type,
-          link: ad.link,
-          link_as: ad.link_as,
-          isAd: true as const
-        }));
-
-        setAds(adsWithMarker);
-        setAdsLoaded(true);
-      } catch (error) {
-        // Silently handle ad fetch errors
-        setAdsLoaded(true); // Still allow profiles to load
-      }
-    };
-
-      await fetchAds();
-    }, delay);
-
-    return () => clearTimeout(timer);
-  }, [userCountryCode]);
+  const { adsLoaded, injectAds } = useDiscoverAds({
+    currentUser,
+    premiumActive,
+    potentialMatches,
+    currentIndex,
+    setPotentialMatches,
+    setCurrentIndex,
+  });
 
   // Ensure currentIndex stays valid when potentialMatches array changes
   useEffect(() => {
@@ -934,92 +585,6 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, onNavigateToProfile, isPr
       setCurrentIndex(Math.max(0, potentialMatches.length - 1));
     }
   }, [potentialMatches.length, currentIndex]);
-
-  // Stable ad shuffle - deterministic based on user ID and date
-  const stableShuffledAds = useMemo(() => {
-    if (ads.length === 0) return [];
-    
-    // Use deterministic shuffle for ads as well to maintain consistency
-    const today = new Date().toISOString().split('T')[0]; // Use same stable date format
-    const adSeed = `${currentUser?.id}_ads_${today}`;
-    return createDeterministicShuffle(ads, adSeed);
-  }, [ads, currentUser?.id]);
-
-  // Helper function to inject ads into matches array
-  const injectAds = useCallback((matches: PotentialMatch[]): (PotentialMatch | AdData)[] => {
-    if (stableShuffledAds.length === 0) {
-      return matches;
-    }
-    
-    const result: (PotentialMatch | AdData)[] = [];
-    let adIndex = 0;
-    
-    // Premium users see ads every 15 swipes, free users every 7 swipes
-    const adFrequency = premiumActive ? 15 : 7;
-    
-    for (let i = 0; i < matches.length; i++) {
-      result.push(matches[i]);
-      
-      // Insert ad at the specified frequency, ensuring we cycle through ALL ads
-      if ((i + 1) % adFrequency === 0) {
-        let selectedAd = stableShuffledAds[adIndex % stableShuffledAds.length];
-        // Avoid back-to-back identical ads (can happen if merge boundaries align)
-        const last = result[result.length - 1];
-        if (last && isAd(last) && selectedAd?.id && last.id === selectedAd.id) {
-          adIndex++;
-          selectedAd = stableShuffledAds[adIndex % stableShuffledAds.length];
-        }
-        result.push(selectedAd);
-        adIndex++;
-      }
-    }
-    
-    return result;
-  }, [stableShuffledAds, premiumActive]);
-
-  // If ads arrive after the initial profile fetch, inject them without changing the current card.
-  useEffect(() => {
-    if (!adsLoaded) return;
-    if (stableShuffledAds.length === 0) return;
-    if (potentialMatches.length === 0) return;
-    if (potentialMatches.some((m) => isAd(m))) return;
-
-    const current = potentialMatches[currentIndex];
-    if (!current || isAd(current)) return;
-
-    const profilesOnly = potentialMatches.filter((m): m is PotentialMatch => !isAd(m));
-    const withAds = injectAds(profilesOnly);
-
-    // If the injection didn't actually add any ads (e.g., deck shorter than ad frequency),
-    // do not set state with an equivalent array — that can cause a render loop.
-    if (withAds.length === profilesOnly.length) return;
-
-    const nextIndex = withAds.findIndex((m) => !isAd(m) && m.id === current.id);
-
-    if (nextIndex < 0) return;
-
-    // Keep the current card at index 0 by trimming the deck.
-    const trimmed = withAds.slice(nextIndex);
-
-    // Avoid setting state if the resulting deck is identical by id order.
-    if (trimmed.length === potentialMatches.length) {
-      let same = true;
-      for (let i = 0; i < trimmed.length; i++) {
-        const a = trimmed[i];
-        const b = potentialMatches[i];
-        const aKey = isAd(a) ? `ad:${a.id}` : a.id;
-        const bKey = isAd(b) ? `ad:${b.id}` : b.id;
-        if (aKey !== bKey) {
-          same = false;
-          break;
-        }
-      }
-      if (same) return;
-    }
-
-    setPotentialMatches(trimmed);
-    setCurrentIndex(0);
-  }, [adsLoaded, stableShuffledAds.length, potentialMatches.length, currentIndex, injectAds]);
 
   // --- BEGIN: Swipe Guide Popup State ---
   const [showSwipeGuide, setShowSwipeGuide] = useState(false);
@@ -3242,13 +2807,25 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, onNavigateToProfile, isPr
     };
   }, [
     currentUser?.id,
+    currentUser?.country,
+    currentUser?.country_code,
+    currentUser?.distance_preference,
+    currentUser?.gender,
+    currentUser?.latitude,
+    currentUser?.longitude,
+    currentUser?.max_age,
+    currentUser?.max_distance,
+    currentUser?.min_age,
+    currentUser?.preference,
+    currentUser?.unlocked_countries,
     premiumActive,
+    buildDeckCacheKey,
     fetchPotentialMatches,
     fetchReverseUsage,
     persistSwipedIds,
     getStoredSwipedIds,
     readDeckCache,
-  ]); // Removed preference dependencies - refresh only happens on explicit save
+  ]);
 
 
   // Cleanup on unmount (minimal now that continuous loader is removed)

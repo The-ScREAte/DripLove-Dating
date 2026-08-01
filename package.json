@@ -11,7 +11,7 @@
     "build:android": "npm run build:capacitor",
     "postinstall": "patch-package || ( [ \"$RENDER\" = \"true\" ] && echo 'patch-package failed on Render; continuing web deploy' || exit 1 )",
     "start": "serve -s dist -l 10000",
-    "test": "echo \"(tests removed)\"",
+    "test": "vitest run",
     "test:google:iap": "node scripts/test-google-iap-validator.mjs",
     "get:user:id": "node scripts/get-user-id.mjs",
     "lint": "eslint .",

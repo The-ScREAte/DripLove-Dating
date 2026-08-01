@@ -4,8 +4,6 @@ import { Button } from '@/components/ui/button';
 import { MessageCircle, Users, User } from 'lucide-react';
 // ⭐ ANDROID FIX: Use platform utils instead of synchronous Capacitor import
 import { isAndroidPlatform, isIOSPlatform, getPlatformSync, getPlatformSafe } from '@/utils/platformUtils';
-import TermsOfService from '@/components/TermsOfService';
-import PrivacyPolicy from '@/components/PrivacyPolicy';
 import DripCoupleIcon from '@/components/DripCoupleIcon';
 import RatingDialog from '@/components/RatingDialog';
 import AppUpdatePopup from '@/components/AppUpdatePopup';
@@ -20,12 +18,15 @@ import ProfilePage from '@/components/ProfilePage';
 import { calculateProfileCompletion } from '@/utils/profileCompletion';
 
 type ProfileRow = Database['public']['Tables']['profiles']['Row'];
+type UserImageRow = Database['public']['Tables']['user_images']['Row'];
 
 // Lazy load tab components - reduces initial bundle by ~700KB
 // Each component only loads when user navigates to that tab
 const DiscoverPage = lazy(() => import('@/components/DiscoverPage'));
 const ChatPage = lazy(() => import('@/components/ChatPage'));
 const LikedMePage = lazy(() => import('@/components/LikedMePage'));
+const TermsOfService = lazy(() => import('@/components/TermsOfService'));
+const PrivacyPolicy = lazy(() => import('@/components/PrivacyPolicy'));
 
 // Tab loading fallback
 const TabLoader = () => (
@@ -92,7 +93,7 @@ const MainApp = ({ user, onLogout }: MainAppProps) => {
   const [isPremium, setIsPremium] = useState(false);
   const [unreadCount, setUnreadCount] = useState(0);
   const [profileCompletion, setProfileCompletion] = useState(0);
-  const [userImages, setUserImages] = useState<any[]>([]);
+  const [userImages, setUserImages] = useState<UserImageRow[]>([]);
   const { toast } = useToast();
 
   // ⭐ STATE PRESERVATION: Save active tab to sessionStorage whenever it changes
@@ -199,8 +200,11 @@ const MainApp = ({ user, onLogout }: MainAppProps) => {
               setIsPremium(!!fallback && fallback.plan_name === 'premium' && entitledByStatus && notExpired);
             }
           } else {
-            const status = Array.isArray(subData) ? subData[0] : (subData as any);
-            setIsPremium(!!status && status.plan_name === 'premium' && status.is_active === true);
+            const statusRaw = Array.isArray(subData) ? subData[0] : subData;
+            const status = (statusRaw && typeof statusRaw === 'object')
+              ? (statusRaw as { plan_name?: unknown; is_active?: unknown })
+              : null;
+            setIsPremium(Boolean(status && status.plan_name === 'premium' && status.is_active === true));
           }
         } catch (subErr) {
           console.error('[MainApp] Subscription check failed:', subErr);
@@ -963,11 +967,19 @@ const MainApp = ({ user, onLogout }: MainAppProps) => {
 
   const renderContent = () => {
     if (showTerms) {
-      return <TermsOfService onBack={handleBackFromTerms} />;
+        return (
+          <Suspense fallback={<TabLoader />}>
+            <TermsOfService onBack={handleBackFromTerms} />
+          </Suspense>
+        );
     }
     
     if (showPrivacy) {
-      return <PrivacyPolicy onBack={handleBackFromPrivacy} />;
+        return (
+          <Suspense fallback={<TabLoader />}>
+            <PrivacyPolicy onBack={handleBackFromPrivacy} />
+          </Suspense>
+        );
     }
 
     return currentPageComponent;

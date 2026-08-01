@@ -5,12 +5,16 @@ import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Trash2, CheckCircle2, AlertTriangle, Scan, RefreshCw, User, Search } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
+import { getFaceReferenceCode } from "@/utils/faceReference";
 
 interface Face {
   faceId: string;
   externalImageId: string;
   imageId: string;
   confidence: number;
+  associatedUserId?: string | null;
+  associatedEmail?: string | null;
+  associatedName?: string | null;
 }
 
 export default function FaceManagement() {
@@ -202,10 +206,18 @@ export default function FaceManagement() {
     
     const query = searchQuery.toLowerCase();
     const { name, userId } = parseUserInfo(face.externalImageId);
+    const associatedName = (face.associatedName || '').toLowerCase();
+    const associatedEmail = (face.associatedEmail || '').toLowerCase();
+    const associatedUserId = (face.associatedUserId || '').toLowerCase();
+    const referenceCode = getFaceReferenceCode(face).toLowerCase();
     
     return (
       name.toLowerCase().includes(query) ||
       userId.toLowerCase().includes(query) ||
+      associatedName.includes(query) ||
+      associatedEmail.includes(query) ||
+      associatedUserId.includes(query) ||
+      referenceCode.includes(query) ||
       face.externalImageId.toLowerCase().includes(query) ||
       face.faceId.toLowerCase().includes(query)
     );
@@ -239,7 +251,7 @@ export default function FaceManagement() {
         <div className="relative">
           <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-gray-400" />
           <Input
-            placeholder="Search by name or ID..."
+            placeholder="Search by reference code, name, email, or ID..."
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
             className="pl-10"
@@ -259,6 +271,11 @@ export default function FaceManagement() {
           <div className="space-y-2 max-h-80 overflow-y-auto">
             {filteredFaces.map((face) => {
               const { name, userId } = parseUserInfo(face.externalImageId);
+              const displayName = face.associatedName || name;
+              const displayId = face.associatedUserId
+                ? `${face.associatedUserId.substring(0, 8)}...`
+                : userId;
+              const referenceCode = getFaceReferenceCode(face);
               return (
                 <div
                   key={face.faceId}
@@ -270,15 +287,21 @@ export default function FaceManagement() {
                     </div>
                     <div>
                       <p className="text-sm font-semibold text-gray-800">
-                        {name}
+                        {displayName}
                       </p>
-                      {userId && (
+                      {displayId && (
                         <p className="text-xs text-gray-500">
-                          ID: {userId}
+                          ID: {displayId}
                         </p>
+                      )}
+                      {face.associatedEmail && (
+                        <p className="text-xs text-gray-500">{face.associatedEmail}</p>
                       )}
                       <p className="text-xs text-gray-400">
                         Confidence: {face.confidence?.toFixed(1)}%
+                      </p>
+                      <p className="text-xs text-gray-400">
+                        Reference code: {referenceCode}
                       </p>
                     </div>
                   </div>

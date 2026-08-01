@@ -10,6 +10,88 @@ const AWS_ACCESS_KEY_ID = Deno.env.get("AWS_ACCESS_KEY_ID") || "";
 const AWS_SECRET_ACCESS_KEY = Deno.env.get("AWS_SECRET_ACCESS_KEY") || "";
 const AWS_REGION = "us-east-1";
 const COLLECTION_ID = "driplove_faces";
+const SUPABASE_URL = Deno.env.get("SUPABASE_URL") || "";
+const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") || "";
+
+const adminClient = SUPABASE_URL && SUPABASE_SERVICE_ROLE_KEY
+  ? createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY, {
+      auth: { persistSession: false }
+    })
+  : null;
+
+type ProfileLookup = {
+  id: string;
+  email: string | null;
+  fullName: string | null;
+};
+
+function parseUserIdFromExternalImageId(externalImageId?: string): string | null {
+  if (!externalImageId) return null;
+
+  const uuidMatch = externalImageId.match(
+    /[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}/i
+  );
+  if (uuidMatch?.[0]) return uuidMatch[0];
+
+  if (externalImageId.startsWith("temp_")) {
+    const tempId = externalImageId.slice(5).trim();
+    return tempId || null;
+  }
+
+  return null;
+}
+
+async function fetchProfilesByIds(userIds: string[]): Promise<Map<string, ProfileLookup>> {
+  const profileMap = new Map<string, ProfileLookup>();
+  if (!adminClient || userIds.length === 0) return profileMap;
+
+  const { data, error } = await adminClient
+    .from("profiles")
+    .select("id,email,first_name,last_name")
+    .in("id", userIds);
+
+  if (error) {
+    console.warn("Could not load profile associations for faces:", error.message);
+    return profileMap;
+  }
+
+  for (const row of data || []) {
+    const first = typeof row.first_name === "string" ? row.first_name.trim() : "";
+    const last = typeof row.last_name === "string" ? row.last_name.trim() : "";
+    const fullName = `${first} ${last}`.trim() || null;
+    profileMap.set(row.id, {
+      id: row.id,
+      email: row.email ?? null,
+      fullName,
+    });
+  }
+
+  return profileMap;
+}
+
+async function getFaceAssociation(face: any, similarity?: number) {
+  const externalImageId = face?.ExternalImageId || null;
+  const associatedUserId = parseUserIdFromExternalImageId(externalImageId || undefined);
+  let associatedEmail: string | null = null;
+  let associatedName: string | null = null;
+
+  if (associatedUserId) {
+    const profileMap = await fetchProfilesByIds([associatedUserId]);
+    const profile = profileMap.get(associatedUserId);
+    associatedEmail = profile?.email ?? null;
+    associatedName = profile?.fullName ?? null;
+  }
+
+  return {
+    similarity: typeof similarity === "number" ? similarity : null,
+    faceId: face?.FaceId || null,
+    imageId: face?.ImageId || null,
+    externalImageId,
+    associatedUserId,
+    associatedEmail,
+    associatedName,
+  };
+}
 
 // AWS Signature V4 helper
 async function sha256(message: string | Uint8Array): Promise<ArrayBuffer> {
@@ -183,12 +265,30 @@ serve(async (req: Request) => {
           });
         }
         
-        const faces = (listResult.Faces || []).map((face: any) => ({
-          faceId: face.FaceId,
-          externalImageId: face.ExternalImageId || 'Unknown',
-          imageId: face.ImageId,
-          confidence: face.Confidence
-        }));
+        const facesRaw = listResult.Faces || [];
+        const associatedIds = Array.from(
+          new Set(
+            facesRaw
+              .map((face: any) => parseUserIdFromExternalImageId(face.ExternalImageId))
+              .filter((id: string | null): id is string => Boolean(id))
+          )
+        );
+        const profileMap = await fetchProfilesByIds(associatedIds);
+
+        const faces = facesRaw.map((face: any) => {
+          const associatedUserId = parseUserIdFromExternalImageId(face.ExternalImageId);
+          const associatedProfile = associatedUserId ? profileMap.get(associatedUserId) : undefined;
+
+          return {
+            faceId: face.FaceId,
+            externalImageId: face.ExternalImageId || 'Unknown',
+            imageId: face.ImageId,
+            confidence: face.Confidence,
+            associatedUserId: associatedProfile?.id || associatedUserId || null,
+            associatedEmail: associatedProfile?.email || null,
+            associatedName: associatedProfile?.fullName || null,
+          };
+        });
         
         return new Response(JSON.stringify({ 
           success: true, 
@@ -400,11 +500,13 @@ serve(async (req: Request) => {
 
         if (searchResult.FaceMatches && searchResult.FaceMatches.length > 0) {
           const matchConfidence = searchResult.FaceMatches[0].Similarity || 0;
+          const duplicateFace = await getFaceAssociation(searchResult.FaceMatches[0].Face, matchConfidence);
           console.log('⚠️ Duplicate face found with similarity:', matchConfidence);
           return new Response(JSON.stringify({
             success: false,
             error: 'This face already exists in our system. Each person can only have one account.',
-            code: 'DUPLICATE_FACE'
+            code: 'DUPLICATE_FACE',
+            duplicateFace,
           }), {
             status: 409,
             headers: { ...corsHeaders, 'Content-Type': 'application/json' }
@@ -665,11 +767,13 @@ serve(async (req: Request) => {
 
       if (searchResult.FaceMatches && searchResult.FaceMatches.length > 0) {
         const matchConfidence = searchResult.FaceMatches[0].Similarity || 0;
+        const duplicateFace = await getFaceAssociation(searchResult.FaceMatches[0].Face, matchConfidence);
         console.log('⚠️ Duplicate face found with similarity:', matchConfidence);
         return new Response(JSON.stringify({
           success: false,
           error: 'This face already exists in our system. Each person can only have one account.',
-          code: 'DUPLICATE_FACE'
+          code: 'DUPLICATE_FACE',
+          duplicateFace,
         }), {
           status: 409,
           headers: { ...corsHeaders, 'Content-Type': 'application/json' }

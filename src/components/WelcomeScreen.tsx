@@ -160,6 +160,37 @@ const WelcomeScreen: React.FC<WelcomeScreenProps> = ({ onLogin, onAbout, onTerms
   
   return (
   <div className="min-h-fill bg-gradient-to-br from-purple-500 to-pink-500 flex flex-col items-center justify-start text-center relative overflow-hidden">
+      <style>{`
+        @keyframes bubbleFloatSlow {
+          0% { transform: translate3d(0, 0, 0) scale(1); }
+          50% { transform: translate3d(0, -12px, 0) scale(1.03); }
+          100% { transform: translate3d(0, 0, 0) scale(1); }
+        }
+
+        @keyframes bubbleDriftSlow {
+          0% { transform: translate3d(0, 0, 0); }
+          50% { transform: translate3d(10px, -6px, 0); }
+          100% { transform: translate3d(0, 0, 0); }
+        }
+
+        .welcome-bubble {
+          will-change: transform;
+          transform: translate3d(0, 0, 0);
+          backface-visibility: hidden;
+        }
+
+        .welcome-bubble-a { animation: bubbleFloatSlow 18s ease-in-out infinite; }
+        .welcome-bubble-b { animation: bubbleDriftSlow 22s ease-in-out infinite; }
+        .welcome-bubble-c { animation: bubbleFloatSlow 20s ease-in-out infinite; }
+        .welcome-bubble-d { animation: bubbleDriftSlow 24s ease-in-out infinite; }
+        .welcome-bubble-e { animation: bubbleFloatSlow 26s ease-in-out infinite; }
+
+        @media (prefers-reduced-motion: reduce) {
+          .welcome-bubble {
+            animation: none !important;
+          }
+        }
+      `}</style>
       {/* Video Background - always rendered, loads async */}
       <div className="absolute inset-0">
         <video
@@ -179,11 +210,11 @@ const WelcomeScreen: React.FC<WelcomeScreenProps> = ({ onLogin, onAbout, onTerms
 
       {/* Background Bubbles */}
       <div className="absolute inset-0">
-        <div className="bg-purple-400 opacity-30 rounded-full w-20 h-20 absolute top-10 left-20"></div>
-        <div className="bg-pink-400 opacity-30 rounded-full w-48 h-48 absolute bottom-32 right-20"></div>
-        <div className="bg-purple-300 opacity-20 rounded-full w-12 h-12 absolute top-32 right-32"></div>
-        <div className="bg-pink-300 opacity-20 rounded-full w-32 h-32 absolute bottom-40 left-10"></div>
-        <div className="bg-purple-200 opacity-25 rounded-full w-24 h-24 absolute top-5 right-5"></div>
+        <div className="welcome-bubble welcome-bubble-a bg-purple-400 opacity-30 rounded-full w-20 h-20 absolute top-10 left-20"></div>
+        <div className="welcome-bubble welcome-bubble-b bg-pink-400 opacity-30 rounded-full w-48 h-48 absolute bottom-32 right-20"></div>
+        <div className="welcome-bubble welcome-bubble-c bg-purple-300 opacity-20 rounded-full w-12 h-12 absolute top-32 right-32"></div>
+        <div className="welcome-bubble welcome-bubble-d bg-pink-300 opacity-20 rounded-full w-32 h-32 absolute bottom-40 left-10"></div>
+        <div className="welcome-bubble welcome-bubble-e bg-purple-200 opacity-25 rounded-full w-24 h-24 absolute top-5 right-5"></div>
       </div>
 
       {/* Logo and Tagline */}

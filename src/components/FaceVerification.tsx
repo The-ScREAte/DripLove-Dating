@@ -6,12 +6,39 @@ import { Camera as CapacitorCamera } from '@capacitor/camera';
 import { supabase } from "@/integrations/supabase/client";
 import { FunctionsHttpError } from "@supabase/supabase-js";
 import { Button } from "@/components/ui/button";
+import { getFaceReferenceCode } from "@/utils/faceReference";
 import { Camera as CameraIcon, CheckCircle2, RefreshCw } from "lucide-react";
 
 type FaceVerificationProps = {
   onVerified?: (faceImageBase64: string) => void;
   disabled?: boolean;
 };
+
+type DuplicateFaceDetails = {
+  similarity?: number | null;
+  faceId?: string | null;
+  imageId?: string | null;
+  externalImageId?: string | null;
+  associatedUserId?: string | null;
+  associatedEmail?: string | null;
+  associatedName?: string | null;
+};
+
+function extractDuplicateFaceDetails(responseData: any): DuplicateFaceDetails {
+  if (responseData?.duplicateFace && typeof responseData.duplicateFace === 'object') {
+    return responseData.duplicateFace;
+  }
+
+  return {
+    similarity: responseData?.similarity ?? null,
+    faceId: responseData?.faceId ?? null,
+    imageId: responseData?.imageId ?? null,
+    externalImageId: responseData?.externalImageId ?? null,
+    associatedUserId: responseData?.associatedUserId ?? null,
+    associatedEmail: responseData?.associatedEmail ?? null,
+    associatedName: responseData?.associatedName ?? null,
+  };
+}
 
 const CAMERA_SIZE = 280;
 
@@ -34,6 +61,11 @@ export default function FaceVerification({ onVerified, disabled }: FaceVerificat
   // Native live preview
   const [nativeLiveFrame, setNativeLiveFrame] = useState<string | null>(null);
   const nativeFrameIntervalRef = useRef<number | null>(null);
+
+  function formatDuplicateFaceMessage(details?: DuplicateFaceDetails | null): string {
+    const code = getFaceReferenceCode(details);
+    return `User already exists. Reference code: ${code}.`;
+  }
 
   // Cleanup on unmount
   useEffect(() => {
@@ -290,7 +322,7 @@ export default function FaceVerification({ onVerified, disabled }: FaceVerificat
 
     if (code === 'DUPLICATE_FACE') {
       setVerificationResult('duplicate');
-      setErrorMessage("This face is already registered. Each person can only create one account.");
+      setErrorMessage(formatDuplicateFaceMessage(extractDuplicateFaceDetails(responseData)));
       setStep(3);
       return;
     }
