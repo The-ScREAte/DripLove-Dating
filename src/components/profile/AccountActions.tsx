@@ -124,26 +124,37 @@ const AccountActions = ({ currentUser, onLogout, onShowTerms, onShowPrivacy, hid
         // Non-fatal: continue with deletion even if this fails
       }
 
-      // Delete face from AWS Rekognition
+      // Delete every Rekognition face tied to this user. Looked up server-side by
+      // user ID rather than trusting a single locally-known faceId, so it still
+      // works even if profiles.face_descriptor is stale/missing, and cleans up
+      // every face if the user ever re-verified more than once.
       try {
-        const { data: profile } = await supabase
-          .from('profiles')
-          .select('face_descriptor')
-          .eq('id', currentUser.id)
-          .single();
-
-        if (profile?.face_descriptor) {
-          await supabase.functions.invoke('face-verify', {
-            body: {
-              action: 'delete_face',
-              userId: currentUser.id,
-              faceId: profile.face_descriptor
-            }
-          });
-        }
+        await supabase.functions.invoke('face-verify', {
+          body: {
+            action: 'delete_user_faces',
+            userId: currentUser.id,
+          }
+        });
       } catch (faceError) {
         console.error('Error deleting face from Rekognition:', faceError);
         // Continue with account deletion even if face deletion fails
+      }
+
+      // Delete the user's photo files from Storage. delete_user_and_data only
+      // removes the user_images rows (metadata) - the actual files are never
+      // freed unless we remove them here first.
+      try {
+        const { data: files, error: listError } = await supabase.storage
+          .from('user-photos')
+          .list(currentUser.id);
+
+        if (!listError && files && files.length > 0) {
+          const filePaths = files.map((file) => `${currentUser.id}/${file.name}`);
+          await supabase.storage.from('user-photos').remove(filePaths);
+        }
+      } catch (storageError) {
+        console.error('Error deleting photos from storage:', storageError);
+        // Continue with account deletion even if storage cleanup fails
       }
 
       // Proceed with account deletion

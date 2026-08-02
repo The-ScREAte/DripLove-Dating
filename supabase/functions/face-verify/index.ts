@@ -342,16 +342,165 @@ serve(async (req: Request) => {
         });
       } catch (deleteError: any) {
         console.error('Delete face error:', deleteError);
-        return new Response(JSON.stringify({ 
-          success: false, 
-          error: 'Failed to delete face' 
+        return new Response(JSON.stringify({
+          success: false,
+          error: 'Failed to delete face'
         }), {
           status: 500,
           headers: { ...corsHeaders, 'Content-Type': 'application/json' }
         });
       }
     }
-    
+
+    // Delete every Rekognition face tied to a user (used by account deletion).
+    // More robust than delete_face: doesn't depend on the client having a
+    // correct/current faceId on hand, and cleans up all faces if a user ever
+    // re-verified more than once (delete_face only ever removes one).
+    if (body.action === 'delete_user_faces' && body.userId) {
+      console.log('🗑️ Deleting all Rekognition faces for user:', body.userId);
+      try {
+        const allFaces = await listAllFaces();
+        const matchingFaceIds = allFaces
+          .filter((f) => parseUserIdFromExternalImageId(f.ExternalImageId) === body.userId)
+          .map((f) => f.FaceId);
+
+        if (matchingFaceIds.length === 0) {
+          return new Response(JSON.stringify({
+            success: true,
+            message: 'No faces found for user',
+            deletedCount: 0
+          }), {
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+          });
+        }
+
+        await rekognitionRequest('RekognitionService.DeleteFaces', {
+          CollectionId: COLLECTION_ID,
+          FaceIds: matchingFaceIds,
+        });
+
+        console.log(`✅ Deleted ${matchingFaceIds.length} face(s) for user:`, body.userId);
+        return new Response(JSON.stringify({
+          success: true,
+          deletedCount: matchingFaceIds.length
+        }), {
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+        });
+      } catch (deleteError: any) {
+        console.error('Delete user faces error:', deleteError);
+        return new Response(JSON.stringify({
+          success: false,
+          error: 'Failed to delete user faces'
+        }), {
+          status: 500,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+        });
+      }
+    }
+
+    // Sweep the whole collection for faces that aren't tied to any existing
+    // account (e.g. left behind by account deletions from before delete_user_faces
+    // existed, or a malformed/unparseable ExternalImageId) and delete them.
+    if (body.action === 'delete_orphaned_faces') {
+      console.log('🧹 Scanning for orphaned faces...');
+      try {
+        const allFaces = await listAllFaces();
+
+        const candidateIds = Array.from(
+          new Set(
+            allFaces
+              .map((f) => parseUserIdFromExternalImageId(f.ExternalImageId))
+              .filter((id): id is string => Boolean(id))
+          )
+        );
+
+        // Look up existence directly (not via fetchProfilesByIds, which
+        // swallows query errors and returns an empty map on failure - here
+        // that would make every face look orphaned and wipe the collection).
+        // Fail the whole sweep instead of guessing if this can't be verified.
+        if (!adminClient) {
+          return new Response(JSON.stringify({
+            success: false,
+            error: 'Admin database client not configured - refusing to sweep'
+          }), {
+            status: 500,
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+          });
+        }
+
+        const existingIds = new Set<string>();
+        // Kept small: .in() filters are sent as URL query params by
+        // PostgREST, and a few hundred UUIDs can exceed a URL length limit
+        // (this is what failed at 500 - the request never even reached Postgres).
+        const ID_CHUNK_SIZE = 100;
+        for (let i = 0; i < candidateIds.length; i += ID_CHUNK_SIZE) {
+          const chunk = candidateIds.slice(i, i + ID_CHUNK_SIZE);
+          const { data, error } = await adminClient
+            .from('profiles')
+            .select('id')
+            .in('id', chunk);
+
+          if (error) {
+            console.error('Profile existence check failed, aborting sweep:', error.message);
+            return new Response(JSON.stringify({
+              success: false,
+              error: 'Could not verify account existence - aborted without deleting anything'
+            }), {
+              status: 500,
+              headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+            });
+          }
+
+          for (const row of data || []) existingIds.add(row.id);
+        }
+        const existingProfiles = existingIds;
+
+        const orphanedFaces = allFaces.filter((f) => {
+          const userId = parseUserIdFromExternalImageId(f.ExternalImageId);
+          return !userId || !existingProfiles.has(userId);
+        });
+
+        if (orphanedFaces.length === 0) {
+          return new Response(JSON.stringify({
+            success: true,
+            message: 'No orphaned faces found',
+            totalFaces: allFaces.length,
+            deletedCount: 0
+          }), {
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+          });
+        }
+
+        const orphanedFaceIds = orphanedFaces.map((f) => f.FaceId);
+        const CHUNK_SIZE = 1000;
+        for (let i = 0; i < orphanedFaceIds.length; i += CHUNK_SIZE) {
+          await rekognitionRequest('RekognitionService.DeleteFaces', {
+            CollectionId: COLLECTION_ID,
+            FaceIds: orphanedFaceIds.slice(i, i + CHUNK_SIZE),
+          });
+        }
+
+        console.log(`✅ Deleted ${orphanedFaceIds.length} orphaned face(s) out of ${allFaces.length} total`);
+        return new Response(JSON.stringify({
+          success: true,
+          totalFaces: allFaces.length,
+          deletedCount: orphanedFaceIds.length,
+          remainingFaces: allFaces.length - orphanedFaceIds.length
+        }), {
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+        });
+      } catch (sweepError: any) {
+        console.error('Delete orphaned faces error:', sweepError);
+        return new Response(JSON.stringify({
+          success: false,
+          error: 'Failed to delete orphaned faces'
+        }), {
+          status: 500,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+        });
+      }
+    }
+
     // Handle delete/clear collection request
     if (body.action === 'clear_collection') {
       console.log('🗑️ Clearing face collection...');
