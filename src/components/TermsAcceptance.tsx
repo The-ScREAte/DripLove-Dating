@@ -457,7 +457,7 @@ const TermsAcceptance = ({ user, onAccept }: TermsAcceptanceProps) => {
             <Suspense
               fallback={
                 <div className="h-[60vh] flex items-center justify-center">
-                  <HoppingLogo size={56} opacity={0.75} />
+                  <HoppingLogo size={56} />
                 </div>
               }
             >
@@ -477,7 +477,7 @@ const TermsAcceptance = ({ user, onAccept }: TermsAcceptanceProps) => {
             <Suspense
               fallback={
                 <div className="h-[60vh] flex items-center justify-center">
-                  <HoppingLogo size={56} opacity={0.75} />
+                  <HoppingLogo size={56} />
                 </div>
               }
             >

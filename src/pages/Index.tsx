@@ -278,7 +278,7 @@ const Index = ({
   if (loading) {
     return (
       <div className="w-full h-screen flex flex-col items-center justify-center gap-4 bg-gradient-to-br from-purple-500 to-pink-500">
-        <HoppingLogo size={68} opacity={0.85} />
+        <HoppingLogo size={68} />
         <p className="text-white text-sm font-medium">Loading DripLove...</p>
       </div>
     );

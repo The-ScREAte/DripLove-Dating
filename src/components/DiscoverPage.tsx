@@ -80,6 +80,7 @@ import MatchCard from './discover/MatchCard';
 import SwipeButtons from './discover/SwipeButtons';
 import AdCard from './discover/AdCard';
 import RatingDialog from './RatingDialog';
+import HoppingLogo from '@/components/HoppingLogo';
 import { handleMatchForRating, preloadNativeRating } from '@/services/appRatingService';
 import { CurrentUser, PotentialMatch } from '@/types';
 
@@ -2388,11 +2389,27 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, onNavigateToProfile, isPr
               .lte('longitude', currentUserData.longitude + radiusInDegrees);
           }
 
+          // Swipes are optimistic: the deck removes a card immediately and persists
+          // the like/pass to the DB in the background afterward. This query only
+          // knows about DB-persisted swipes, so without also checking this local,
+          // in-memory record, a profile swiped moments ago (whose write hasn't
+          // landed yet) would get pulled right back into the deck it was just
+          // removed from - showing up as if the swipe never happened.
+          const now = Date.now();
+          const thirtyDaysMs = 30 * 24 * 60 * 60 * 1000;
+          const locallyExcluded = new Set<string>();
+          for (const [id, data] of locallySwipedProfileIds.current.entries()) {
+            if (data.action === 'like' || (now - data.timestamp) < thirtyDaysMs) {
+              locallyExcluded.add(id);
+            }
+          }
+
           const { data: rows } = await query;
           const recoveredProfiles = (Array.isArray(rows) ? (rows as ProfileRow[]) : [])
             .filter((p) => {
               // Final guard for large exclusion lists (liked/matched/passed/blocked).
               if (excluded.has(p.id)) return false;
+              if (locallyExcluded.has(p.id)) return false;
               if (!baseCountryCode) return false;
               if (!isLocalCountryForFreeUser(p, baseCountryCode)) return false;
               if (!p.date_of_birth) return false;
@@ -4293,37 +4310,32 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, onNavigateToProfile, isPr
   // Show loading state ONLY while initial fetch is in progress AND we have no profiles
   if (!hasCompletedInitialFetch && potentialMatches.length === 0 && isLoading) {
     return (
-      <>
-        <style>
-          {`
-            @keyframes float {
-              0%, 100% {
-                transform: translateY(0px);
-              }
-              50% {
-                transform: translateY(-12px);
-              }
-            }
-            .float-animation {
-              animation: float 1.8s ease-in-out infinite;
-            }
-          `}
-        </style>
-        <div className="min-h-screen w-full flex items-center justify-center" style={{ minHeight: 'calc(100vh - 152px)' }}>
-          <div className="flex flex-col items-center">
-            <div className="mb-4 float-animation">
-              <img
-                src="/driplove-logo.webp"
-                loading="lazy"
-                decoding="async" 
-                alt="DripLove" 
-                className="w-20 h-20"
-              />
-            </div>
-            <p className="text-gray-600">{t('discover.findingMatches')}</p>
+      <div className="min-h-screen w-full flex items-center justify-center" style={{ minHeight: 'calc(100vh - 152px)' }}>
+        <div className="flex flex-col items-center">
+          <div className="mb-4">
+            <HoppingLogo size={80} />
           </div>
+          <p className="text-gray-600">{t('discover.findingMatches')}</p>
         </div>
-      </>
+      </div>
+    );
+  }
+
+  // Deck hit zero exactly while a background refill is already in flight (e.g. fast
+  // swiping outran the fetch). Show the same lightweight loading state instead of the
+  // "no more profiles" dead end - loadMoreMatches always resolves (its finally block
+  // clears isLoadingMore), so this can't get stuck, and it closes the visible gap
+  // where the empty screen would flash before the refill silently lands a moment later.
+  if (potentialMatches.length === 0 && hasCompletedInitialFetch && isLoadingMore) {
+    return (
+      <div className="min-h-screen w-full flex items-center justify-center" style={{ minHeight: 'calc(100vh - 152px)' }}>
+        <div className="flex flex-col items-center">
+          <div className="mb-4">
+            <HoppingLogo size={80} />
+          </div>
+          <p className="text-gray-600">{t('discover.findingMatches')}</p>
+        </div>
+      </div>
     );
   }
 

@@ -39,7 +39,7 @@ if (import.meta.env.PROD) {
 // Minimal branded loading screen used during bootstrap/session hydration.
 const LoadingScreen = () => (
   <div className="w-full h-screen flex flex-col items-center justify-center gap-3 bg-gradient-to-br from-purple-500 to-pink-500">
-    <HoppingLogo size={64} opacity={0.82} />
+    <HoppingLogo size={64} />
     <p className="text-white text-sm font-medium">Loading DripLove...</p>
   </div>
 );

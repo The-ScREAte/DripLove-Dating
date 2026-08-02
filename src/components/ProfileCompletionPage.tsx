@@ -656,7 +656,7 @@ const ProfileCompletionPage = () => {
   if (isFinalizingTerms) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-purple-500 to-pink-500 flex flex-col items-center justify-center gap-4">
-        <HoppingLogo size={72} opacity={0.85} />
+        <HoppingLogo size={72} />
         <p className="text-white text-sm font-medium tracking-wide">Loading your DripLove experience...</p>
       </div>
     );
@@ -995,7 +995,7 @@ const ProfileCompletionPage = () => {
   if (!user) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-purple-500 to-pink-500 flex items-center justify-center">
-        <HoppingLogo size={64} opacity={0.7} />
+        <HoppingLogo size={64} />
       </div>
     );
   }
@@ -1006,7 +1006,7 @@ const ProfileCompletionPage = () => {
       <Suspense
         fallback={
           <div className="min-h-screen bg-gradient-to-br from-purple-500 to-pink-500 flex items-center justify-center">
-            <HoppingLogo size={64} opacity={0.8} />
+            <HoppingLogo size={64} />
           </div>
         }
       >
@@ -1021,7 +1021,7 @@ const ProfileCompletionPage = () => {
   if (loading) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-purple-500 to-pink-500 flex items-center justify-center">
-        <HoppingLogo size={64} opacity={0.7} />
+        <HoppingLogo size={64} />
       </div>
     );
   }

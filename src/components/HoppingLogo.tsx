@@ -5,7 +5,7 @@ interface HoppingLogoProps {
   opacity?: number;
 }
 
-const HoppingLogo: React.FC<HoppingLogoProps> = ({ size = 48, opacity = 0.6 }) => {
+const HoppingLogo: React.FC<HoppingLogoProps> = ({ size = 48, opacity = 1 }) => {
   return (
     <div className="flex items-center justify-center">
       <style>{`
