@@ -1758,8 +1758,12 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, onNavigateToProfile, isPr
 
     const imageMap: { [key: string]: string[] } = {};
     if (shuffled.length > 0) {
-      // Take first 8 profiles (or fewer if less exist)
-      const firstEight = shuffled.slice(0, 8);
+      // Take first 4 profiles for the instant-paint batch (or fewer if less exist).
+      // Only the top 1-2 cards are ever visible in the stack at once, and the
+      // per-swipe preloader (preloadProfileImages, triggered on currentIndex change)
+      // keeps loading further ahead as the user actually swipes - so this initial
+      // batch only needs to cover first paint, not the whole session.
+      const firstEight = shuffled.slice(0, 4);
       const firstEightIds = firstEight.map(p => p.id);
 
       // Get ALL approved images for the first 8 profiles

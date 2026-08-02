@@ -8,8 +8,12 @@ const config: CapacitorConfig = {
   // (otherwise the WKWebView paints an opaque layer and the camera appears "blank").
   backgroundColor: '#00000000',
   server: {
+    // Matches the real production domain so iOS Associated Domains
+    // (Password AutoFill, Universal Links) can recognize the WKWebView's
+    // origin as www.driplove.love instead of the synthetic capacitor://localhost.
+    hostname: 'www.driplove.love',
     androidScheme: 'https',
-    iosScheme: 'capacitor',
+    iosScheme: 'https',
     cleartext: true,
     // Performance optimizations
     allowNavigation: [

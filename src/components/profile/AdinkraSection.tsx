@@ -78,20 +78,20 @@ const AdinkraSection = ({ editedProfile, profile, isEditing, onAdinkraChange }: 
           {selectedSymbols.length > 0 && (
             <div className="space-y-2">
               <p className="text-sm text-muted-foreground">{t('profile.selected')} ({selectedSymbols.length}/10)</p>
-              <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-6 lg:grid-cols-8 gap-2">
+              <div className="grid grid-cols-4 sm:grid-cols-5 md:grid-cols-7 lg:grid-cols-9 gap-1.5">
                 {selectedSymbols.map((symbolName: string, index: number) => {
                   const symbol = ALL_SYMBOLS.find(s => s.name === symbolName);
                   if (!symbol) return null;
-                  
+
                   const totalCols = 8;
                   const colIndex = index % totalCols;
                   const isLeftEdge = colIndex === 0;
                   const isRightEdge = colIndex === totalCols - 1;
-                  
+
                   return (
                     <div key={symbolName} className="relative">
                       <Card
-                        className={`relative border-primary border-2 bg-primary/5 p-2 flex flex-col items-center gap-1 transition-all aspect-square ${
+                        className={`relative border-primary border-2 bg-primary/5 p-1 flex flex-col items-center gap-0.5 transition-all aspect-square ${
                           isEditing ? 'cursor-pointer hover:scale-105' : ''
                         }`}
                         onClick={() => isEditing && handleRemoveSymbol(symbolName)}
@@ -99,16 +99,16 @@ const AdinkraSection = ({ editedProfile, profile, isEditing, onAdinkraChange }: 
                         {isEditing && (
                           <button
                             type="button"
-                            className="absolute top-0.5 left-0.5 bg-destructive text-destructive-foreground rounded-full p-0.5 hover:bg-destructive/90 z-10"
+                            className="absolute top-0.5 left-0.5 bg-destructive text-destructive-foreground rounded-full aspect-square p-0 m-0 min-w-3.5 min-h-3.5 w-3.5 h-3.5 flex items-center justify-center hover:bg-destructive/90 transition-colors z-10"
                             onClick={(e) => {
                               e.stopPropagation();
                               handleRemoveSymbol(symbolName);
                             }}
                           >
-                            <X className="w-2.5 h-2.5" />
+                            <X className="w-2 h-2" />
                           </button>
                         )}
-                        
+
                         {/* Info button - always visible */}
                         <button
                           type="button"
@@ -116,16 +116,16 @@ const AdinkraSection = ({ editedProfile, profile, isEditing, onAdinkraChange }: 
                             e.stopPropagation();
                             setTooltipSymbol(tooltipSymbol === symbolName ? null : symbolName);
                           }}
-                          className="absolute top-0.5 right-0.5 bg-pink-500 text-white rounded-full aspect-square p-0 m-0 min-w-4 min-h-4 w-4 h-4 flex items-center justify-center hover:bg-pink-600 transition-colors z-10"
+                          className="absolute top-0.5 right-0.5 bg-pink-500 text-white rounded-full aspect-square p-0 m-0 min-w-3.5 min-h-3.5 w-3.5 h-3.5 flex items-center justify-center hover:bg-pink-600 transition-colors z-10"
                         >
-                          <Info className="w-2.5 h-2.5" />
+                          <Info className="w-2 h-2" />
                         </button>
-                        
-                        <div 
-                          className="w-8 h-8 flex items-center justify-center"
+
+                        <div
+                          className="w-6 h-6 flex items-center justify-center [&_svg]:w-6 [&_svg]:h-6"
                           dangerouslySetInnerHTML={{ __html: symbol.svg }}
                         />
-                        <p className="text-[10px] font-medium text-center line-clamp-1">{symbol.name}</p>
+                        <p className="text-[9px] font-medium text-center line-clamp-1 leading-tight">{symbol.name}</p>
                         <div className="w-full h-0.5 bg-primary rounded-full" />
                       </Card>
 
@@ -200,17 +200,17 @@ const AdinkraSection = ({ editedProfile, profile, isEditing, onAdinkraChange }: 
                         </div>
 
                         {expandedGroup === group.id && (
-                          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-3 p-2">
+                          <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-5 lg:grid-cols-6 gap-2 p-2">
                             {group.symbols.filter(symbol => !selectedSymbols.includes(symbol.name)).map((symbol, index) => {
                               const totalCols = 5;
                               const colIndex = index % totalCols;
                               const isLeftEdge = colIndex === 0;
                               const isRightEdge = colIndex === totalCols - 1;
-                              
+
                               return (
                                 <div key={symbol.name} className="relative">
                                   <Card
-                                    className="cursor-pointer border-border hover:border-primary/50 p-3 flex flex-col items-center gap-2 hover:scale-105 transition-all relative aspect-square"
+                                    className="cursor-pointer border-border hover:border-primary/50 p-2 flex flex-col items-center gap-1 hover:scale-105 transition-all relative aspect-square"
                                     onClick={() => handleToggleSymbol(symbol.name)}
                                   >
                                     <button
@@ -219,15 +219,15 @@ const AdinkraSection = ({ editedProfile, profile, isEditing, onAdinkraChange }: 
                                         e.stopPropagation();
                                         setTooltipSymbol(tooltipSymbol === symbol.name ? null : symbol.name);
                                       }}
-                                      className="absolute top-1 right-1 bg-pink-500 text-white rounded-full aspect-square p-0 m-0 min-w-5 min-h-5 w-5 h-5 flex items-center justify-center hover:bg-pink-600 transition-colors z-10"
+                                      className="absolute top-1 right-1 bg-pink-500 text-white rounded-full aspect-square p-0 m-0 min-w-4 min-h-4 w-4 h-4 flex items-center justify-center hover:bg-pink-600 transition-colors z-10"
                                     >
-                                      <Info className="w-3 h-3" />
+                                      <Info className="w-2.5 h-2.5" />
                                     </button>
-                                    <div 
-                                      className="w-12 h-12 flex items-center justify-center"
+                                    <div
+                                      className="w-9 h-9 flex items-center justify-center [&_svg]:w-9 [&_svg]:h-9"
                                       dangerouslySetInnerHTML={{ __html: symbol.svg }}
                                     />
-                                    <p className="text-xs font-medium text-center line-clamp-2">{symbol.name}</p>
+                                    <p className="text-[11px] font-medium text-center line-clamp-2 leading-tight">{symbol.name}</p>
                                   </Card>
 
                                   {/* Symbol Tooltip */}

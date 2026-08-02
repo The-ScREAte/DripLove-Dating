@@ -197,6 +197,34 @@ async function rekognitionRequest(target: string, payload: object, allowedErrors
   return JSON.parse(responseText);
 }
 
+// List every face in the collection, following Rekognition's NextToken pagination.
+// ListFaces caps each page at MaxResults, so a collection bigger than one page
+// was previously silently truncated (admin panel + clear-all only ever saw page 1).
+interface RekognitionFace {
+  FaceId: string;
+  ImageId: string;
+  ExternalImageId?: string;
+  Confidence: number;
+}
+
+async function listAllFaces(): Promise<RekognitionFace[]> {
+  const allFaces: RekognitionFace[] = [];
+  let nextToken: string | undefined;
+
+  do {
+    const payload: Record<string, unknown> = { CollectionId: COLLECTION_ID, MaxResults: 1000 };
+    if (nextToken) payload.NextToken = nextToken;
+
+    const result = await rekognitionRequest('RekognitionService.ListFaces', payload, ['ResourceNotFoundException']);
+    if (result.__allowedError) break;
+
+    allFaces.push(...(result.Faces || []));
+    nextToken = result.NextToken;
+  } while (nextToken);
+
+  return allFaces;
+}
+
 // Ensure collection exists
 async function ensureCollection(): Promise<void> {
   const result = await rekognitionRequest(
@@ -250,22 +278,10 @@ serve(async (req: Request) => {
       console.log('📋 Listing all faces...');
       try {
         await ensureCollection();
-        
-        const listResult = await rekognitionRequest('RekognitionService.ListFaces', {
-          CollectionId: COLLECTION_ID,
-          MaxResults: 100,
-        }, ['ResourceNotFoundException']);
-        
-        if (listResult.__allowedError) {
-          return new Response(JSON.stringify({ 
-            success: true, 
-            faces: [] 
-          }), {
-            headers: { ...corsHeaders, 'Content-Type': 'application/json' }
-          });
-        }
-        
-        const facesRaw = listResult.Faces || [];
+
+        const facesRaw = await listAllFaces();
+        console.log(`Found ${facesRaw.length} faces across all pages`);
+
         const associatedIds = Array.from(
           new Set(
             facesRaw
@@ -340,34 +356,26 @@ serve(async (req: Request) => {
     if (body.action === 'clear_collection') {
       console.log('🗑️ Clearing face collection...');
       try {
-        // List all faces in collection
-        const listResult = await rekognitionRequest('RekognitionService.ListFaces', {
-          CollectionId: COLLECTION_ID,
-          MaxResults: 100,
-        }, ['ResourceNotFoundException']);
-        
-        if (listResult.__allowedError) {
-          return new Response(JSON.stringify({ 
-            success: true, 
-            message: 'Collection does not exist - nothing to clear' 
-          }), {
-            headers: { ...corsHeaders, 'Content-Type': 'application/json' }
-          });
-        }
-        
-        if (listResult.Faces && listResult.Faces.length > 0) {
-          const faceIds = listResult.Faces.map((f: any) => f.FaceId);
+        // List every face in the collection (paginated - a collection can hold more than one page)
+        const facesRaw = await listAllFaces();
+
+        if (facesRaw.length > 0) {
+          const faceIds = facesRaw.map((f: any) => f.FaceId);
           console.log(`Found ${faceIds.length} faces to delete`);
-          
-          await rekognitionRequest('RekognitionService.DeleteFaces', {
-            CollectionId: COLLECTION_ID,
-            FaceIds: faceIds,
-          });
-          
+
+          // DeleteFaces accepts at most 4096 IDs per call - chunk defensively
+          const CHUNK_SIZE = 1000;
+          for (let i = 0; i < faceIds.length; i += CHUNK_SIZE) {
+            await rekognitionRequest('RekognitionService.DeleteFaces', {
+              CollectionId: COLLECTION_ID,
+              FaceIds: faceIds.slice(i, i + CHUNK_SIZE),
+            });
+          }
+
           console.log('✅ Deleted all faces');
-          return new Response(JSON.stringify({ 
-            success: true, 
-            message: `Deleted ${faceIds.length} faces from collection` 
+          return new Response(JSON.stringify({
+            success: true,
+            message: `Deleted ${faceIds.length} faces from collection`
           }), {
             headers: { ...corsHeaders, 'Content-Type': 'application/json' }
           });

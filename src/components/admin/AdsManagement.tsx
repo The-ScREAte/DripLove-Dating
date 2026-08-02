@@ -11,7 +11,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 import { ChevronDown, ChevronUp } from 'lucide-react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
-import { optimizeImageUrl } from '@/utils/imageOptimizer';
+import { optimizeImageUrl, getRawStorageUrl } from '@/utils/imageOptimizer';
 
 interface Ad {
   id: string;
@@ -370,7 +370,7 @@ const AdsManagement = () => {
                     <img
                       loading="lazy"
                       decoding="async"
-                      src={optimizeImageUrl(formData.image_url, { width: 200, quality: 60 })}
+                      src={getRawStorageUrl(formData.image_url)}
                       alt="Preview" 
                       className="w-20 h-20 object-cover rounded"
                     />
@@ -491,7 +491,7 @@ const AdsManagement = () => {
                       <img
                         loading="lazy"
                         decoding="async"
-                        src={optimizeImageUrl(ad.image_url, { width: 200, quality: 60 })}
+                        src={getRawStorageUrl(ad.image_url)}
                         alt={ad.name}
                         className="w-24 h-24 object-cover rounded"
                       />

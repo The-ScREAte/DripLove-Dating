@@ -3,7 +3,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Trash2, CheckCircle2, AlertTriangle, Scan, RefreshCw, User, Search } from "lucide-react";
+import { Trash2, CheckCircle2, Scan, RefreshCw, User, Search } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { getFaceReferenceCode } from "@/utils/faceReference";
 
@@ -17,12 +17,15 @@ interface Face {
   associatedName?: string | null;
 }
 
+const PAGE_SIZE = 30;
+
 export default function FaceManagement() {
   const [isClearing, setIsClearing] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [deletingFaceId, setDeletingFaceId] = useState<string | null>(null);
   const [faces, setFaces] = useState<Face[]>([]);
   const [searchQuery, setSearchQuery] = useState("");
+  const [visibleCount, setVisibleCount] = useState(PAGE_SIZE);
   const [result, setResult] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const { toast } = useToast();
@@ -223,6 +226,24 @@ export default function FaceManagement() {
     );
   });
 
+  // Search always runs against the full loaded set above; only the rendered
+  // list is paginated, for DOM performance with large collections.
+  const visibleFaces = filteredFaces.slice(0, visibleCount);
+  const hasMore = visibleCount < filteredFaces.length;
+
+  function handleSearchChange(value: string) {
+    setSearchQuery(value);
+    setVisibleCount(PAGE_SIZE);
+  }
+
+  function handleFacesListScroll(e: React.UIEvent<HTMLDivElement>) {
+    if (!hasMore) return;
+    const el = e.currentTarget;
+    if (el.scrollTop + el.clientHeight >= el.scrollHeight - 80) {
+      setVisibleCount(count => Math.min(count + PAGE_SIZE, filteredFaces.length));
+    }
+  }
+
   return (
     <Card>
       <CardHeader className="pb-3">
@@ -253,7 +274,7 @@ export default function FaceManagement() {
           <Input
             placeholder="Search by reference code, name, email, or ID..."
             value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
+            onChange={(e) => handleSearchChange(e.target.value)}
             className="pl-10"
           />
         </div>
@@ -261,15 +282,20 @@ export default function FaceManagement() {
         {/* Info about image storage */}
         <div className="bg-blue-50 border border-blue-200 rounded-lg p-3">
           <p className="text-xs text-blue-800">
-            <strong>Note:</strong> AWS Rekognition stores face vectors, not actual images. 
+            <strong>Note:</strong> AWS Rekognition stores face vectors, not actual images.
             Names are saved with face data for identification.
           </p>
         </div>
 
         {/* Face List */}
         {filteredFaces.length > 0 && (
-          <div className="space-y-2 max-h-80 overflow-y-auto">
-            {filteredFaces.map((face) => {
+          <>
+            <p className="text-xs text-gray-500">
+              Showing {visibleFaces.length} of {filteredFaces.length}
+              {searchQuery.trim() ? ` matching "${searchQuery}"` : ''}
+            </p>
+            <div className="space-y-2 max-h-80 overflow-y-auto" onScroll={handleFacesListScroll}>
+            {visibleFaces.map((face) => {
               const { name, userId } = parseUserInfo(face.externalImageId);
               const displayName = face.associatedName || name;
               const displayId = face.associatedUserId
@@ -321,7 +347,18 @@ export default function FaceManagement() {
                 </div>
               );
             })}
-          </div>
+            </div>
+            {hasMore && (
+              <Button
+                variant="outline"
+                size="sm"
+                className="w-full"
+                onClick={() => setVisibleCount(count => Math.min(count + PAGE_SIZE, filteredFaces.length))}
+              >
+                Load {Math.min(PAGE_SIZE, filteredFaces.length - visibleCount)} more
+              </Button>
+            )}
+          </>
         )}
 
         {filteredFaces.length === 0 && faces.length > 0 && (
@@ -342,16 +379,6 @@ export default function FaceManagement() {
             Loading faces...
           </div>
         )}
-
-        <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-3">
-          <div className="flex items-start gap-2">
-            <AlertTriangle className="w-4 h-4 text-yellow-600 mt-0.5 flex-shrink-0" />
-            <div className="text-xs text-yellow-800">
-              <p className="font-medium">Warning</p>
-              <p>Deleting a face will allow that user to register again with face verification.</p>
-            </div>
-          </div>
-        </div>
 
         {result && (
           <div className="bg-green-50 border border-green-200 rounded-lg p-3 flex items-center gap-2">

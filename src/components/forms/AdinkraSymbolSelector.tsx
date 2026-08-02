@@ -180,7 +180,7 @@ const AdinkraSymbolSelector: React.FC<AdinkraSymbolSelectorProps> = ({ selectedS
                 </div>
               </div>
               <div className="px-1.5 pb-1.5 pt-1.5">
-                <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-6 lg:grid-cols-8 gap-2">
+                <div className="grid grid-cols-4 sm:grid-cols-5 md:grid-cols-7 lg:grid-cols-9 gap-1.5">
                   {group.symbols.map((symbol, index) => {
                     const isSelected = selectedSymbols.includes(symbol.name);
                     const canSelect = selectedSymbols.length < 10 || isSelected;
@@ -195,17 +195,17 @@ const AdinkraSymbolSelector: React.FC<AdinkraSymbolSelectorProps> = ({ selectedS
                     return (
                       <div key={symbol.name} className="relative info-tooltip-container">
                         <Card
-                          className={`cursor-pointer transition-all p-1 flex flex-col items-center justify-center gap-0.5 relative h-16 ${
+                          className={`cursor-pointer transition-all p-1 flex flex-col items-center justify-center gap-0.5 relative h-14 ${
                             isSelected ? 'border-primary border-2 bg-primary/10 shadow-md' : canSelect ? 'border-border hover:border-primary/50 hover:shadow-sm hover:scale-105' : 'border-border opacity-50 cursor-not-allowed'
                           }`}
                           onClick={() => canSelect && toggleSymbol(symbol.name)}
                         >
-                          <button type="button" className="absolute top-0.5 right-0.5 w-4 h-4 min-w-4 min-h-4 p-0 rounded-full bg-pink-100 hover:bg-pink-200 flex items-center justify-center z-10 transition-colors shadow-sm flex-shrink-0 border border-pink-200"
+                          <button type="button" className="absolute top-0.5 right-0.5 w-3.5 h-3.5 min-w-3.5 min-h-3.5 p-0 rounded-full bg-pink-100 hover:bg-pink-200 flex items-center justify-center z-10 transition-colors shadow-sm flex-shrink-0 border border-pink-200"
                             onClick={(e) => { e.stopPropagation(); setTooltipSymbol(showTooltip ? null : symbol.name); }}>
-                            <span className="text-pink-700 text-[8px] font-bold leading-none">!</span>
+                            <span className="text-pink-700 text-[7px] font-bold leading-none">!</span>
                           </button>
-                          <div className="w-8 h-8 flex-shrink-0 flex items-center justify-center [&_svg]:w-8 [&_svg]:h-8" dangerouslySetInnerHTML={{ __html: symbol.svg }} />
-                          <p className="text-[9px] font-medium leading-tight text-center px-1">{symbol.name}</p>
+                          <div className="w-6 h-6 flex-shrink-0 flex items-center justify-center [&_svg]:w-6 [&_svg]:h-6" dangerouslySetInnerHTML={{ __html: symbol.svg }} />
+                          <p className="text-[8px] font-medium leading-tight text-center px-1 line-clamp-1">{symbol.name}</p>
                           {isSelected && <div className="absolute bottom-0 left-0 right-0 h-1 bg-primary" />}
                         </Card>
                         {showTooltip && (
@@ -269,33 +269,33 @@ const AdinkraSymbolSelector: React.FC<AdinkraSymbolSelectorProps> = ({ selectedS
 
               {/* User's Country Symbols - Always Visible */}
               <div className="px-1.5 pb-1.5 pt-1.5">
-                <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-6 lg:grid-cols-8 gap-2">
+                <div className="grid grid-cols-4 sm:grid-cols-5 md:grid-cols-7 lg:grid-cols-9 gap-1.5">
                   {userCountryGroup.symbols.map((symbol, index) => {
                     const isSelected = selectedSymbols.includes(symbol.name);
                     const canSelect = selectedSymbols.length < 10 || isSelected;
                     const showTooltip = tooltipSymbol === symbol.name;
-                    
+
                     const totalCols = 8;
                     const colIndex = index % totalCols;
                     const isLeftEdge = colIndex === 0;
                     const isRightEdge = colIndex === totalCols - 1;
-                    
+
                     let tooltipPositionClass = 'left-1/2 transform -translate-x-1/2';
                     if (isLeftEdge) {
                       tooltipPositionClass = 'left-0';
                     } else if (isRightEdge) {
                       tooltipPositionClass = 'right-0';
                     }
-                    
+
                     return (
                       <div key={symbol.name} className="relative info-tooltip-container">
                         <Card
                           className={`
-                            cursor-pointer transition-all p-1 flex flex-col items-center justify-center gap-0.5 relative h-16
-                            ${isSelected 
-                              ? 'border-primary border-2 bg-primary/10 shadow-md' 
-                              : canSelect 
-                                ? 'border-border hover:border-primary/50 hover:shadow-sm hover:scale-105' 
+                            cursor-pointer transition-all p-1 flex flex-col items-center justify-center gap-0.5 relative h-14
+                            ${isSelected
+                              ? 'border-primary border-2 bg-primary/10 shadow-md'
+                              : canSelect
+                                ? 'border-border hover:border-primary/50 hover:shadow-sm hover:scale-105'
                                 : 'border-border opacity-50 cursor-not-allowed'
                             }
                           `}
@@ -303,20 +303,20 @@ const AdinkraSymbolSelector: React.FC<AdinkraSymbolSelectorProps> = ({ selectedS
                         >
                           <button
                             type="button"
-                            className="absolute top-0.5 right-0.5 w-4 h-4 min-w-4 min-h-4 p-0 rounded-full bg-pink-100 hover:bg-pink-200 flex items-center justify-center z-10 transition-colors shadow-sm flex-shrink-0 border border-pink-200"
+                            className="absolute top-0.5 right-0.5 w-3.5 h-3.5 min-w-3.5 min-h-3.5 p-0 rounded-full bg-pink-100 hover:bg-pink-200 flex items-center justify-center z-10 transition-colors shadow-sm flex-shrink-0 border border-pink-200"
                             onClick={(e) => {
                               e.stopPropagation();
                               setTooltipSymbol(showTooltip ? null : symbol.name);
                             }}
                           >
-                            <span className="text-pink-700 text-[8px] font-bold leading-none">!</span>
+                            <span className="text-pink-700 text-[7px] font-bold leading-none">!</span>
                           </button>
 
-                          <div 
-                            className="w-8 h-8 flex-shrink-0 flex items-center justify-center [&_svg]:w-8 [&_svg]:h-8"
+                          <div
+                            className="w-6 h-6 flex-shrink-0 flex items-center justify-center [&_svg]:w-6 [&_svg]:h-6"
                             dangerouslySetInnerHTML={{ __html: symbol.svg }}
                           />
-                          <p className="text-[9px] font-medium leading-tight text-center px-1">{symbol.name}</p>
+                          <p className="text-[8px] font-medium leading-tight text-center px-1 line-clamp-1">{symbol.name}</p>
                           {isSelected && (
                             <div className="absolute bottom-0 left-0 right-0 h-1 bg-primary" />
                           )}
@@ -415,55 +415,55 @@ const AdinkraSymbolSelector: React.FC<AdinkraSymbolSelectorProps> = ({ selectedS
 
                     {isExpanded && (
                       <div className="px-1.5 pb-1.5 pt-1 border-t bg-muted/20">
-                        <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-6 lg:grid-cols-8 gap-2">
+                        <div className="grid grid-cols-4 sm:grid-cols-5 md:grid-cols-7 lg:grid-cols-9 gap-1.5">
                           {group.symbols.map((symbol, index) => {
                             const isSelected = selectedSymbols.includes(symbol.name);
                             const canSelect = selectedSymbols.length < 10 || isSelected;
                             const showTooltip = tooltipSymbol === symbol.name;
-                            
+
                             const totalCols = 8;
                             const colIndex = index % totalCols;
                             const isLeftEdge = colIndex === 0;
                             const isRightEdge = colIndex === totalCols - 1;
-                            
+
                             let tooltipPositionClass = 'left-1/2 transform -translate-x-1/2';
                             if (isLeftEdge) {
                               tooltipPositionClass = 'left-0';
                             } else if (isRightEdge) {
                               tooltipPositionClass = 'right-0';
                             }
-                            
+
                             return (
                               <div key={symbol.name} className="relative info-tooltip-container">
                                 <Card
                                   className={`
-                                    cursor-pointer transition-all p-1 flex flex-col items-center justify-center gap-0.5 relative h-16
-                                    ${isSelected 
-                                      ? 'border-primary border-2 bg-primary/10 shadow-md' 
-                                      : canSelect 
-                                        ? 'border-border hover:border-primary/50 hover:shadow-sm hover:scale-105' 
+                                    cursor-pointer transition-all p-1 flex flex-col items-center justify-center gap-0.5 relative h-14
+                                    ${isSelected
+                                      ? 'border-primary border-2 bg-primary/10 shadow-md'
+                                      : canSelect
+                                        ? 'border-border hover:border-primary/50 hover:shadow-sm hover:scale-105'
                                         : 'border-border opacity-50 cursor-not-allowed'
                                     }
                                   `}
                                   onClick={() => canSelect && toggleSymbol(symbol.name)}
                                 >
-                                  
+
                                   <button
                                     type="button"
-                                    className="absolute top-0.5 right-0.5 w-4 h-4 min-w-4 min-h-4 p-0 rounded-full bg-pink-100 hover:bg-pink-200 flex items-center justify-center z-10 transition-colors shadow-sm flex-shrink-0 border border-pink-200"
+                                    className="absolute top-0.5 right-0.5 w-3.5 h-3.5 min-w-3.5 min-h-3.5 p-0 rounded-full bg-pink-100 hover:bg-pink-200 flex items-center justify-center z-10 transition-colors shadow-sm flex-shrink-0 border border-pink-200"
                                     onClick={(e) => {
                                       e.stopPropagation();
                                       setTooltipSymbol(showTooltip ? null : symbol.name);
                                     }}
                                   >
-                                    <span className="text-pink-700 text-[8px] font-bold leading-none">!</span>
+                                    <span className="text-pink-700 text-[7px] font-bold leading-none">!</span>
                                   </button>
 
-                                  <div 
-                                    className="w-8 h-8 flex-shrink-0 flex items-center justify-center [&_svg]:w-8 [&_svg]:h-8"
+                                  <div
+                                    className="w-6 h-6 flex-shrink-0 flex items-center justify-center [&_svg]:w-6 [&_svg]:h-6"
                                     dangerouslySetInnerHTML={{ __html: symbol.svg }}
                                   />
-                                  <p className="text-[9px] font-medium leading-tight text-center px-1">{symbol.name}</p>
+                                  <p className="text-[8px] font-medium leading-tight text-center px-1 line-clamp-1">{symbol.name}</p>
                                   {isSelected && (
                                     <div className="absolute bottom-0 left-0 right-0 h-1 bg-primary" />
                                   )}
