@@ -295,8 +295,8 @@
       "loadFailed": "فشل تحميل التطابقات المحتملة. يرجى المحاولة مرة أخرى.",
       "reverseFailed": "تعذر التراجع عن عدم الإعجاب. يرجى المحاولة مرة أخرى.",
       "likeFailed": "فشل تسجيل الإعجاب.",
-      "profileCompletionRequired": "أكمل ملفك الشخصي",
-      "profileCompletionMessage": "تحتاج إلى {{percentage}}٪ أخرى للمتابعة في التمرير. أكمل ملفك الشخصي لفتح المزيد من التمريرات!",
+      "profileCompletionRequired": "أنت قريب جدًا 💫",
+      "profileCompletionMessage": "أضف 30٪ من المعلومات إلى ملفك الشخصي لمواصلة التمرير — من أجل العدالة.",
       "dailyLimitReached": "تم الوصول إلى الحد اليومي",
       "dailyLimitMessage": "لقد وصلت إلى حد التمرير الخاص بك."
     },

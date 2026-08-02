@@ -3353,7 +3353,7 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, onNavigateToProfile, isPr
         description: (
           <div className="flex items-center justify-between gap-3">
             <span className="flex-1">
-              {t('discover.errors.profileCompletionMessage', { percentage: 70 - effectiveProfileCompletion })}
+              {t('discover.errors.profileCompletionMessage')}
             </span>
             {onNavigateToProfile && (
               <button
@@ -3654,7 +3654,7 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, onNavigateToProfile, isPr
         description: (
           <div className="flex items-center justify-between gap-3">
             <span className="flex-1">
-              {t('discover.errors.profileCompletionMessage', { percentage: 70 - effectiveProfileCompletion })}
+              {t('discover.errors.profileCompletionMessage')}
             </span>
             {onNavigateToProfile && (
               <button

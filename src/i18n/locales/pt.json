@@ -295,8 +295,8 @@
       "loadFailed": "Falha ao carregar correspondências potenciais. Tente novamente.",
       "reverseFailed": "Não foi possível reverter a rejeição. Tente novamente.",
       "likeFailed": "Falha ao registrar curtida.",
-      "profileCompletionRequired": "Complete Seu Perfil",
-      "profileCompletionMessage": "Você precisa de mais {{percentage}}% para continuar deslizando. Complete seu perfil para desbloquear mais deslizes!",
+      "profileCompletionRequired": "Quase lá 💫",
+      "profileCompletionMessage": "Adicione mais 30% de informações ao seu perfil para continuar deslizando — por uma questão de justiça.",
       "dailyLimitReached": "Limite Diário Atingido",
       "dailyLimitMessage": "Você atingiu seu limite de deslizes."
     },

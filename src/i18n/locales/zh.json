@@ -295,8 +295,8 @@
       "loadFailed": "无法加载潜在匹配。请重试。",
       "reverseFailed": "无法撤销不喜欢。请重试。",
       "likeFailed": "无法记录喜欢。",
-      "profileCompletionRequired": "完善您的个人资料",
-      "profileCompletionMessage": "您需要再完成{{percentage}}%才能继续滑动。完善您的个人资料以解锁更多滑动！",
+      "profileCompletionRequired": "就快好了 💫",
+      "profileCompletionMessage": "请再完善30%的资料信息才能继续滑动 — 这是为了公平起见。",
       "dailyLimitReached": "已达到每日限制",
       "dailyLimitMessage": "您已达到滑动限制。"
     },

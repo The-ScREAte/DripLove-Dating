@@ -299,8 +299,8 @@
       "loadFailed": "Impossible de charger les correspondances potentielles. Veuillez réessayer.",
       "reverseFailed": "Impossible d'annuler le refus. Veuillez réessayer.",
       "likeFailed": "Impossible d'enregistrer le j'aime.",
-      "profileCompletionRequired": "Complétez votre profil",
-      "profileCompletionMessage": "Vous avez besoin de {{percentage}}% de plus pour continuer à swiper. Complétez votre profil pour débloquer plus de swipes !",
+      "profileCompletionRequired": "Vous y êtes presque 💫",
+      "profileCompletionMessage": "Ajoutez 30% d'informations supplémentaires à votre profil pour continuer à swiper — par souci d'équité.",
       "dailyLimitReached": "Limite quotidienne atteinte",
       "dailyLimitMessage": "Vous avez atteint votre limite de swipes."
     },
