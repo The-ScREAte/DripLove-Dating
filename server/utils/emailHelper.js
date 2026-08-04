@@ -137,7 +137,7 @@ function buildDripLoveHtml({ subject, htmlContent }) {
               <div>
                 <a href="https://www.instagram.com/driplove_official?utm_source=qr" style="color:#0b5cff;text-decoration:none;">Instagram</a>
                 <span style="color:#9ca3af;"> | </span>
-                <a href="https://www.tiktok.com/@silencewin3?_r=1&_t=ZN-988z4wA6UnG" style="color:#0b5cff;text-decoration:none;">TikTok</a>
+                <a href="https://www.tiktok.com/@driplovedating?_r=1&_t=ZN-98auX3Ma9qc" style="color:#0b5cff;text-decoration:none;">TikTok</a>
                 <span style="color:#9ca3af;"> | </span>
                 <a href="https://www.facebook.com/share/1Cp18uWDZP/?mibextid=wwXIfr" style="color:#0b5cff;text-decoration:none;">Facebook</a>
               </div>
